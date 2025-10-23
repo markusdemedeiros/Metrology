@@ -1,0 +1,78 @@
+import Metrology
+import Mathlib.Data.Real.Basic
+
+@[projections]
+inductive Expr' (B Z R : Type _) where
+-- Literals
+| elit (l : Lit B Z R)
+-- Functions
+| evar (s : Ident)
+| erec (f x : Ident) (e : Expr' B Z R)
+| eapp (e1 e2 : Expr' B Z R)
+-- -- Operations
+| ebinop (op : BinOp) (e1 e2 : Expr' B Z R)
+| econd (e et ef : Expr' B Z R)
+-- -- Products
+| epair (e1 e2 : Expr' B Z R)
+| efst (e : Expr' B Z R)
+| esnd (e : Expr' B Z R)
+-- -- Sums
+| eleft (e : Expr' B Z R)
+| eright (e : Expr' B Z R)
+| ecase (e el er : Expr' B Z R)
+
+/-- info: Expr'.epair.π.{u, u_1, u_2, u_3} {B : Type u_1} {Z : Type u_2} {R : Type u_3} :
+  Expr' B Z R → Option (Expr' B Z R × Expr' B Z R) -/
+#guard_msgs in #check Expr'.epair.π
+
+def test1 : Expr' Bool ℤ ℝ := .elit <| .real (5 : ℝ)
+def test2 : Expr' Bool ℤ ℝ := .eleft <| .evar "x"
+example : Expr'.epair.π (.epair test1 test2) = some (test1, test2) := rfl
+example : Expr'.esnd.π (.epair test1 test2) = none := rfl
+
+@[projections]
+inductive MyDepC' (n : Nat)
+| DepC' (depV : Fin n)
+
+/-- info: MyDepC'.DepC'.π.{u} {n : ℕ} : MyDepC' n → Option (Fin n) -/
+#guard_msgs in #check MyDepC'.DepC'.π
+
+@[projections]
+inductive MyTree where
+| nil
+| leaf (x : Nat)
+| branch (tl tr : MyTree) (v : Nat)
+
+example : (3, 4, 5) = (3, (4, 5)) := rfl
+
+example : MyTree.nil.π .nil = some () := rfl
+example : MyTree.nil.π (.leaf 5) = none := rfl
+example : MyTree.branch.π (.leaf 5) = none := rfl
+example : MyTree.branch.π (.branch (.leaf 1) (.leaf 2) 5) = some (MyTree.leaf 1, MyTree.leaf 2, 5) := rfl
+
+@[projections]
+inductive MyEmpty
+
+@[projections]
+inductive MyType (x y : Nat)
+| MyV (n : Unit)
+
+@[projections]
+inductive MyThing (x : Nat) (y : Fin x)
+| MyNothing
+| MyV (blah : String) (bleh : Bool)
+
+example : (@MyThing.MyV.π 5 2 <| .MyV "hi" false) = some ("hi", false) := rfl
+example : (@MyThing.MyV.π 5 2 <| MyThing.MyNothing) = none := rfl
+
+@[projections]
+inductive MyParamT (n : Sort 0) (α β : Type)
+| Val1 (x : α)
+| Val2 (y : β)
+| Rec (x1 : MyParamT n α β) (v2 : α)
+
+/-- info: MyParamT.Val2.π.{u} {n : Prop} {α β : Type} : MyParamT n α β → Option β -/
+#guard_msgs in #check MyParamT.Val2.π
+
+def main : IO Unit := return
+

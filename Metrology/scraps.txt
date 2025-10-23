@@ -1,0 +1,664 @@
+-- Testing: Return a function that quantifies over all implicit paramaters,
+-- takes the inductive
+-- and returns Unit
+def ProjectionUnitType (c : ConstructorVal) : MetaM Expr := do
+  forallBoundedTelescope c.type (some c.numParams) fun univs e' => do
+    forallTelescope e' (fun args core => do
+      let _  ← args.toList.mapM (inferType)
+      let unitType ← mkAppM ``Nat #[]
+      let funType := mkForall .anonymous .default core unitType
+      mkForallFVars univs funType)
+
+
+def displayFVars (pref : String) (A : Array Expr) : MetaM Unit := do
+  for a in A do logInfo s!"{pref} {a}: {← inferType a}"
+
+-- NB: TODO: I just need CasesOn, not the recursor.
+
+-- A function that returns the constant Unit expression
+def ProjectionUnitImpl (c : ConstructorVal) (r : RecursorVal) : MetaM Expr := do
+  logInfo s!">>>>>>>> impl for {c.name}"
+  logInfo s!"{c.type}"
+  forallBoundedTelescope r.type (some r.numParams) fun recr_univs _ => do
+  forallBoundedTelescope c.type (some c.numParams) fun ctor_univs ctor_fun => do
+  forallTelescope ctor_fun fun ctor_args ctor_exprT => do
+  displayFVars  "| recr univ | " recr_univs
+  displayFVars  "| ctor univ | " ctor_univs
+  displayFVars  "| ctor args | " ctor_args
+  logInfo     s!"| ctor core | {ctor_exprT} "
+  let ctor_f := mkLambda .anonymous .default ctor_exprT (Lean.mkConst ``Nat.zero)
+  logInfo     s!"| ctor fun  | {ctor_f} "
+  let ctor_c ←  mkLambdaFVars ctor_univs ctor_f
+  logInfo     s!"| ctor clos | {ctor_c} "
+  return ctor_c
+
+/-
+
+def expect {α : Type _} : α ⊕ String → AttrM α
+| .inl a => return a
+| .inr e => throwError e
+
+
+def mkOption (ty : Expr) : MetaM Expr := do mkAppM ``Option #[ty]
+
+def wrapBVarApp (e : Expr) (total : Nat) : Nat → MetaM Expr
+| .zero => return e
+| .succ n => do return .app (← wrapBVarApp e total n) (.bvar (total - n - 1))
+
+/-- Textual (non capture-avoiding) replacement of a bvar. -/
+def replaceBvar (n : Nat) (sub : Expr) : Expr → Expr
+| .bvar i => if i == n then sub else .bvar i
+| .fvar i => .fvar i
+| .mvar i => .mvar i
+| .sort i => .sort i
+| .const n us => .const n us
+| .app fn arg => .app (replaceBvar n sub fn) (replaceBvar n sub arg)
+| .lam x ty b info => .lam x (replaceBvar n sub ty) (replaceBvar (n + 1) sub b) info
+| .forallE x ty b info => .forallE x (replaceBvar n sub ty) (replaceBvar (n + 1) sub b) info
+| .letE x ty v b dep => .letE x (replaceBvar n sub ty) (replaceBvar n sub v) (replaceBvar (n + 1) sub b) dep
+| .lit v => .lit v
+| .mdata d e => .mdata d (replaceBvar n sub e)
+| .proj tn ix e => .proj tn ix (replaceBvar n sub e)
+
+def modifyBvar (f : Nat → Nat) : Expr → Expr
+| .bvar i => .bvar (f i)
+| .fvar i => .fvar i
+| .mvar i => .mvar i
+| .sort i => .sort i
+| .const n us => .const n us
+| .app fn arg => .app (modifyBvar f fn) (modifyBvar f arg)
+| .lam x ty b info => .lam x (modifyBvar f ty) (modifyBvar f b) info
+| .forallE x ty b info => .forallE x (modifyBvar f ty) (modifyBvar f b) info
+| .letE x ty v b dep => .letE x (modifyBvar f ty) (modifyBvar f v) (modifyBvar f b) dep
+| .lit v => .lit v
+| .mdata d e => .mdata d (modifyBvar f e)
+| .proj tn ix e => .proj tn ix (modifyBvar f e)
+
+/-- Convert a list of arguments to a product. -/
+def argListCurry : List Expr → MetaM Expr
+| [] => return .const ``Unit []
+| [e] => return e
+| e :: es => do mkAppM ``Prod #[e, ← argListCurry es]
+
+structure ArgumentInfo where
+  params    : List Expr
+  args      : List Expr
+  constName : Name
+  constUniv : List Level
+
+def ArgumentInfo.parse (typ : Expr) (numParams : Nat) : MetaM ArgumentInfo := do
+  let rec parseArgs : Expr → MetaM (List Expr × Expr)
+  | .forallE _ τ body _ => do
+    let ⟨L, k⟩ ← parseArgs body
+    return ⟨τ :: L, k⟩
+  | e => return ([], e)
+
+  let rec parseParams : Nat → Expr → MetaM (List Expr × Expr)
+  | .succ n', .forallE _ τ body _ => do
+    let ⟨L, rest⟩ ← parseParams n' body
+    return (τ :: L, rest)
+  | 0, e => return ([], e)
+  | n, e => throwError "(internal) parseParams unhandled case {n}, {e}"
+
+  -- Check that an expression is of the form (.const τ u) applied to numParams bvars.
+  let rec validateConst : Nat → Expr → MetaM (Name × List Level)
+  | .zero, .const τ u => return ⟨τ, u⟩
+  | .succ n, .app body (.bvar _) => validateConst n body
+  | _, _ => throwError "(internal) unexpected type former"
+
+  let ⟨params, rest⟩ ← parseParams numParams typ
+  let ⟨args, const⟩ ← parseArgs rest
+  let ⟨name, univ⟩ ← validateConst numParams const
+  return ⟨params, args, name, univ⟩
+
+def ArgumentInfo.numParams (i : ArgumentInfo) : Nat :=
+  i.params.length
+
+def ArgumentInfo.typeFormer (i : ArgumentInfo) (offset : Nat := 0) : MetaM Expr :=
+  let rec go : Nat → MetaM Expr
+  | .zero => return .const i.constName i.constUniv
+  | .succ n => do return .app (← go n) (.bvar <| offset + i.numParams - n - 1)
+  go i.numParams
+
+nonrec def ArgumentInfo.argListCurry (i : ArgumentInfo) := argListCurry i.args
+
+/-- The expression for the result type -/
+def ArgumentInfo.projResultType (i : ArgumentInfo) : MetaM Expr := do mkOption (← i.argListCurry)
+
+/-- Construct the type (forall ... e) which for the paramaters -/
+def ArgumentInfo.wrapParamType (i : ArgumentInfo) (e : Expr) : MetaM Expr :=
+  let rec go : List Expr → MetaM Expr
+  | [] => return e
+  | (t :: ts) => do return mkForall .anonymous .implicit t (← go ts)
+  go i.params
+
+def ArgumentInfo.wrapParamValue (i : ArgumentInfo) (e : Expr) : MetaM Expr :=
+  let rec go : List Expr → MetaM Expr
+  | [] => return e
+  | (t :: ts) => do return mkLambda .anonymous .implicit t (← go ts)
+  go i.params
+
+def ArgumentInfo.projType (i : ArgumentInfo) : MetaM Expr := do
+  let rt ← i.projResultType
+  let tf ← i.typeFormer
+  let coreType := mkForall .anonymous .default tf rt -- (modifyBvar .succ rt)
+  let r ← i.wrapParamType coreType
+  return r
+
+/-- Same thing as the return type but a function instead of type forall. -/
+def ArgumentInfo.projMotive (i : ArgumentInfo) : MetaM Expr := do
+  let rt ← i.projResultType
+  let tf ← i.typeFormer
+  let coreType := mkLambda .anonymous .default tf rt -- (modifyBvar .succ rt)
+  i.wrapParamValue coreType
+
+/-- Remove all of the parameters to the motive -/
+def ArgumentInfo.stripMotive (i : ArgumentInfo) (motive : Expr) : MetaM Expr := do
+  let rec go : Nat → Expr → MetaM Expr
+  | 0, .forallE `motive _ body .implicit => return body
+  | .succ n, .forallE _ _ body .implicit => go n body
+  | _, _ => throwError "(internal) unhandled motive form"
+  go i.params.length motive
+
+def getFieldType : Nat → Expr → MetaM Expr
+| .zero, .forallE _ ty _ _ => return ty
+| .succ n, .forallE _ _ body _ => getFieldType n body
+| n, e => throwError "getFieldType error on num {n} expr {inspectFormat e}"
+
+def inhabWithNone : Expr → MetaM Expr
+| .app _ _ => return (.const ``Option.none [])
+| .forallE _ ty body _ => return mkLambda .anonymous .default ty (← inhabWithNone body)
+| x => throwError "malformed inhab {x}"
+
+def stripRecrType : Expr → MetaM Expr
+| .forallE `motive _ body .implicit => return body
+| _ => throwError "could not strip recursor motive"
+
+def minorRecrType : Expr → Nat → MetaM Expr
+| .forallE _ ty _ _, .zero => return ty
+| .forallE _ _ body _, .succ n' => minorRecrType body n'
+| e, _ => throwError "could not extract the recursor minor: {inspectFormat e}"
+
+def mkStubRec (stubE' : Expr) : Expr → MetaM Expr
+| .forallE _ ty body _ => do return mkLambda .anonymous .default ty (← mkStubRec stubE' body)
+| .app _ _ => return stubE'
+| e => throwError "could not generate stub function\n{inspectFormat e}"
+
+def parseRecTypes : Expr → MetaM (List Expr)
+| .forallE _ ty body _ => return ty :: (← parseRecTypes body)
+| .app _ _ => return []
+| e => throwError "could not generate stub function\n{inspectFormat e}"
+
+partial def mkTarget (offset : Nat) (L : List Expr) : MetaM Expr :=
+  match L with
+  | [] => return .const ``Unit.unit []
+  | [_] => return .bvar offset
+  | (leftType :: rightTypeList) => do
+    let rightType ← argListCurry rightTypeList
+    let leftValue : Expr := .bvar offset
+    let rightValue : Expr ← mkTarget (offset - 1) rightTypeList
+    return (Expr.const ``Prod.mk [0, 0]) |>.app
+              leftType |>.app
+              rightType |>.app
+              leftValue |>.app
+              rightValue
+
+def ProjectionImpl (info : ArgumentInfo) (recr : RecursorVal) (cinfo : ConstructorVal) (iinfo : InductiveVal) (env : Environment): MetaM Expr := do
+  -- let returnRawProd ← info.projResultType
+  -- let returnType ← info.projType
+  let motiveE : Expr ← info.projMotive
+  let recrStripped ← info.stripMotive recr.type
+  let minorRecrMod (n : Nat) : MetaM Expr := do
+    let minor ← minorRecrType recrStripped n
+    return replaceBvar n motiveE minor
+
+  -- let stubE : Expr := .app (.const ``Option.none [0]) returnRawProd
+  let stubE : Expr ← Meta.mkNone (← info.argListCurry)
+  let mkStub (n : Nat) : MetaM Expr := do
+    let typ ← minorRecrMod n
+    mkStubRec stubE typ
+
+  let tmp_rename ← info.argListCurry
+  let tgtE (v : Expr) : MetaM Expr := Meta.mkSome tmp_rename v
+
+  let getCtorNumArgs (n : Nat) : MetaM Nat := do
+    let ctorName : Name := iinfo.ctors[n]!
+    let some (.ctorInfo ctorInfo) := env.constants.find? ctorName | throwError "bad constructor"
+    return ctorInfo.numFields
+
+  -- BUG: bvars in the types of target arguments are one too big, I think?
+  let mkTgt (n : Nat) : MetaM Expr := do
+    let typ ← minorRecrMod n
+    let args ← getCtorNumArgs n
+    let types' ← parseRecTypes typ
+    let types := List.take args types'
+    let tgt ← mkTarget (types'.length - 1) types
+    let tgtEv ← tgtE tgt
+    let r ← mkStubRec tgtEv typ
+    return r
+
+  let mut implE : Expr := .const recr.name [1]
+  implE ← wrapBVarApp implE info.params.length info.params.length
+  implE := .app implE (← wrapBVarApp motiveE info.params.length info.params.length)
+  for j in [0:iinfo.ctors.length] do
+    let target? : Bool := j == cinfo.cidx
+    implE := implE.app (← if target? then mkTgt j else mkStub j)
+  implE ← info.wrapParamValue implE
+  return implE
+
+syntax (name := projections) "projections" : attr
+
+-- TODO: Add projection type itself to the context
+def projectionsImpl : AttributeImpl := {
+    name  := `projections
+    descr := "Automatically construct projection functions for a inductive datatype"
+    add   := fun decl _stx _kind => do
+      let env ← getEnv
+      let some (.inductInfo info) := env.constants.find? decl
+        | throwError "(internal) bad constant"
+      expectE (info.numNested == 0) "expected inductive with no nesting"
+      expectE (info.numIndices == 0) "expected inductive with no indexing"
+
+      let some (.recInfo recr) := env.constants.find? (decl.str "rec")
+        | throwError "(internal) could not find recursor"
+      expectE (recr.numMotives == 1) "expected only 1 recursor motive"
+      expectE (recr.getMajorInduct == info.name) "recursor major induct mismatch"
+
+      for ctor in info.ctors do
+        let some (.ctorInfo cinfo) := env.constants.find? ctor
+          | throwError "(internal) bad constructor"
+
+        let projectionName := ProjectionName cinfo
+        let projectionArgInfo ← ArgumentInfo.parse cinfo.type info.numParams |>.run'
+        let projectionType   ← MetaM.run' <| projectionArgInfo.projType
+        let projectionImpl   ← MetaM.run' <| ProjectionImpl projectionArgInfo recr cinfo info env
+        let πDecl : DefinitionVal := {
+          name := projectionName
+          levelParams := []
+          type := projectionType
+          -- value := ← MetaM.run' <| mkSorry projectionType false -- projectionImpl
+          value := projectionImpl
+          hints := .regular 5 -- TODO: How to pick a good value for this number?
+          safety := .safe
+        }
+        addDecl (.defnDecl πDecl)
+  }
+
+initialize registerBuiltinAttribute projectionsImpl
+
+
+-- Lots of stuff in here: #check mkAppN
+-- #check Compiler.LCNF.InferType.inferLambdaType
+
+/-- Given the type of a recursor, list all the types of the parameters -/
+def Lean.InductiveVal.getParams (r : InductiveVal) : MetaM (List Expr) :=
+  let rec go : Expr → MetaM (List Expr)
+  | .forallE _ ty body _ => do return (ty :: (← go body))
+  | _ => return []
+  go r.type
+
+-- These levels are off by one
+def Lean.InductiveVal.getLevels (r : InductiveVal) : MetaM (List Level) := do
+  let params ← r.getParams
+  let levels ← List.mapM' getLevel params
+  return levels
+
+/-- Top-level function which closes over all parameters using a lambda expression. -/
+def wrapParamsFun (e : Expr) : List Expr → MetaM Expr
+| [] => return e
+| (ty :: tys) => do return mkLambda .anonymous .implicit ty (← wrapParamsFun e tys)
+
+/-- Specialize the recursor constant value with a list of parameters -/
+def Lean.RecursorVal.applyToParams (r : RecursorVal) (params : List Expr) : MetaM Expr := do
+  -- let args : List Expr := (.bvar <| params.length - · - 1) <$> (.range params.length)
+  -- mkAppOptM r.name (Array.mk  <| .some <$> args)
+  let rec go (base : Expr) : List Expr → MetaM Expr
+  | [] => return base
+  | (_ :: tys) =>
+    return .app (← go base tys) (.bvar (params.length - tys.length - 1))
+  -- FIXME: This will only work for inductives with no level variables, and a return
+  -- value of Type.
+  let levels : List Level := [1]
+  go (.const r.name levels) (List.reverse params)
+
+
+
+def projectionInspectImpl: AttributeImpl := {
+    name  := `projectionInspect
+    descr := "Testing code"
+    add   := fun decl _stx _kind => do
+      let env ← getEnv
+      let some (.inductInfo info) := env.constants.find? decl
+        | throwError "(internal) bad constant"
+      expectE (info.numNested == 0) "expected inductive with no nesting"
+      expectE (info.numIndices == 0) "expected inductive with no indexing"
+
+      let some (.recInfo recr) := env.constants.find? (decl.str "rec")
+        | throwError "(internal) could not find recursor"
+      expectE (recr.numMotives == 1) "expected only 1 recursor motive"
+      expectE (recr.getMajorInduct == info.name) "recursor major induct mismatch"
+
+      let params ← MetaM.run' <| info.getParams
+      let paramsLevels ← MetaM.run' <| List.mapM' getLevel params
+      let testWrapParams ← MetaM.run' <| wrapParamsFun (.const ``Unit.unit []) params
+      let recrApp ← MetaM.run' <| recr.applyToParams params
+
+      let mut branchLog := ""
+      for ctor in info.ctors do
+        let some (.ctorInfo cinfo) := env.constants.find? ctor
+          | throwError "(internal) bad constructor"
+
+        let projectionArgInfo ← ArgumentInfo.parse cinfo.type info.numParams |>.run'
+        -- let projectionType   ← MetaM.run' <| projectionArgInfo.projType
+
+        branchLog := s!"{branchLog}..... ctor {ctor}
+........... params           {projectionArgInfo.params}
+........... args             {projectionArgInfo.args}
+........... curry            {← MetaM.run' <| projectionArgInfo.argListCurry}
+"
+
+      logInfo s!"Info for {info.name}:
+..... num params:            {info.numParams}
+..... type:                  {info.type}
+..... recursor type:         {recr.type}
+..... params:                {params}
+..... param levels:          {paramsLevels}
+..... (test) wrap unit:      {testWrapParams}
+..... (test) recrursor app:  {recrApp}
+{branchLog}
+"
+
+
+
+
+
+
+
+
+      -- for ctor in info.ctors do
+      --   -- let some (.ctorInfo cinfo) := env.constants.find? ctor
+      --   --   | throwError "(internal) bad constructor"
+
+      --   -- let projectionName := ProjectionName cinfo
+      --   -- let projectionArgInfo ← ArgumentInfo.parse cinfo.type info.numParams |>.run'
+      --   -- let projectionType   ← MetaM.run' <| projectionArgInfo.projType
+      --   -- let projectionImpl   ← MetaM.run' <| ProjectionImpl projectionArgInfo recr cinfo info env
+      --   logInfo s!"ctor: {ctor}"
+  }
+
+initialize registerBuiltinAttribute projectionInspectImpl
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/- ---------------------------------------------------------------------------------------
+Scrap bin
+
+
+liftMetaM
+
+elab "#cyl" t:ident : command => do
+  let env ← getEnv
+  let x := env.constants.find?
+  logInfo s!"Hello World {t}"
+
+
+registerSimplePersistentEnvExtension
+
+https://github.com/leanprover/SampCert/blob/main/SampCert/Extractor/Export.lean
+
+
+let info ← MetaM.run' do
+
+If an argument is in the decl syntax category, it is TSyntax `Ident, and can be used as an Ident.
+ident.getId : Name
+
+mkDefinitionValEx: Make definition but externed
+
+How to assign reducibility hint height?
+
+addAndCompile
+
+-- def MyDefinition : DefinitionVal :=
+--   mkDefinitionValEx `myDef []
+--     (.const `Nat [])
+--     (.app (.app (.app (.const `OfNat.ofNat [0]) (.const `Nat [])) (.lit <| .natVal 5)) (.app (.const `instOfNatNat []) (.lit <| .natVal 5)))
+--     (.regular 5)
+--     .safe
+--     [`myDef]
+
+
+-- def MyDefinition : DefinitionVal :=
+--   mkDefinitionValEx `myDef []
+--     (.const `Nat [])
+--     (.app (.app (.app (.const `OfNat.ofNat [0]) (.const `Nat [])) (.lit <| .natVal 5)) (.app (.const `instOfNatNat []) (.lit <| .natVal 5)))
+--     (.regular 5)
+--     .safe
+--     [`myDef]
+--
+-- #eval addAndCompile (.defnDecl MyDefinition)
+-- #check myDef -- myDef : Nat
+-- #reduce myDef -- 5
+-- #eval myDef
+
+
+-- addDecl (.defnDecl MyDefinition)
+-- Add new definitions to the enviornment
+--
+--   logInfo s!"constructor {ctor} has {cinfo.numFields} fields, {cinfo.numParams} params"
+
+#reduce (.const ``sorryAx [0] : Expr)
+
+mkArrow
+
+
+    -- (← mkSorry (← minorRecrMod 0) false) |>.app
+    -- (← mkSorry (← minorRecrMod 1) false) |>.app
+    -- (← mkSorry (← minorRecrMod 2) false)
+
+
+
+-------------------------------------------------------------------------------------- -/
+
+/-
+/-- Get the list of arguments in a function type, and its return type
+
+Expects: An expression of the form
+(.forallE _ (.const typ []) · .default) ... (.const iname [])
+
+Returns: Either an error, or a pair:
+- The return type expression, for now is (.const iname [])
+- A list of the expressions for the parameters
+
+-- FIXME: Assumes all constants with zero universe variables.
+-- FIXME: Assumes all binder infos are regular. -/
+def toArgList (iname : Name) : Expr → (Expr × List Expr) ⊕ String
+| .const cv [] =>
+    if cv == iname
+      then .inl (.const cv [], [])
+      else .inr s!"toArgList: Return type is {cv} but is expected to be {iname}"
+| .forallE _ (.const typ []) body _ =>
+    match toArgList iname body with
+    | .inr e => .inr e
+    | .inl (ret, args) => .inl (ret, (.const typ []) :: args)
+| e => .inr s!"Unhandled toArgList case: {inspectFormat e}"
+-/
+
+  /-
+  let projectionResultTypeBare ← argListCurry info.args
+  -- let retNoneE : Expr := .app (.const ``Option.none [0]) projectionResultTypeBare
+  -- let indE : Expr := .const iinfo.name []
+  -- let projectionType ← ProjectionType args
+  let motiveE : Expr ← info.projMotive
+  let recE : Expr := .const recr.name [1]
+
+  let stubE : Expr := .app (.const ``Option.none [0]) projectionResultTypeBare
+  let tgtE (v : Expr) : Expr := Expr.const ``Option.some [0] |>.app projectionResultTypeBare |>.app v
+
+  let recrStripped ← stripRecrType recr.type
+  let minorRecrMod (n : Nat) : MetaM Expr := do
+    let minor ← minorRecrType recrStripped n
+    return replaceBvar n motiveE minor
+
+  let mkStub (n : Nat) : MetaM Expr := do
+    let typ ← minorRecrMod n
+    mkStubRec stubE typ
+
+
+
+  let mut implE : Expr := recE.app motiveE
+  for j in [0:iinfo.ctors.length] do
+    let target? : Bool := j == cinfo.cidx
+    implE := implE.app (← if target? then mkTgt j else mkStub j)
+
+  -- let stubE : Expr := .lam .anonymous indE retNoneE .default
+  -- let sorryE : Expr ← mkSorry projectionType false
+  return implE
+  -/
+-/
+
+-- A function that applies the recursor to the constant Unit expression in each case
+-- A function that applies the recursor to the constant None expression of the right type in each case
+-- A function that returns the correct projection in the right case
+def ProjectionImpl (c : ConstructorVal) (_ : RecursorVal) : MetaM Expr := do
+  logInfo s!">>>>>>>> impl for {c.name}"
+  return .const ``Unit []
+  -- let returnT : Expr ← argTyps.foldlM' (Expr.const ``Unit []) (fun x p => do mkAppM ``Prod #[x,p])
+  -- let motive : Expr := mkLambda .anonymous .default core_c (← mkAppM ``Option #[returnT])
+  -- forallBoundedTelescope c.type (some c.numParams) fun univs_c ec_c => do
+  -- forallTelescope ec_r <| fun args_r core_r => do
+  -- forallTelescope ec_c <| fun args_c core_c => do
+  -- let motiveT ← inferType args_r[0]!
+  -- let casesT ← (args_r.toList.dropLast.tail).mapM inferType
+  -- logInfo s!"********** Motive: {motiveT}"
+  -- for c in casesT do
+  --   logInfo s!"********** Case:   {c}"
+  -- let argTyps ← args_c.toList.mapM (inferType)
+  -- let returnT : Expr ← argTyps.foldlM' (Expr.const ``Unit []) (fun x p => do mkAppM ``Prod #[x,p])
+  -- let motive : Expr := mkLambda .anonymous .default core_c (← mkAppM ``Option #[returnT])
+  -- let args_impl : List Expr ← args_r.toList.dropLast.tail.mapM (fun ecase => do
+  --   let ect ← inferType ecase
+  --   logInfo s!">>>>>>>> {ect}"
+  --   forallTelescope ect <| fun args_case core_case => (do
+  --     let n ← mkNone returnT
+  --     let lam ← mkLambdaFVars args_case n
+  --     return (Expr.replaceFVars lam univs_r univs_c)))
+  -- logInfo s!">>>>>>>> done!"
+  -- -- for ar in args_impl do
+  -- --   logInfo s!">>>>>>>> {ar}"
+  -- let mut recr_spec : Expr ← mkAppOptM r.name
+  --   (Array.append (Array.append (Array.replicate r.numParams none) #[some motive])
+  --     (Array.mk <| args_impl.map some ))
+  -- for ecase in args_r.toList.tail do
+  --   let ect ← inferType ecase
+  --   let fn ← lambdaTelescope ect <| fun args_case core_case => (do
+  --     return ← mkLambdaFVars args_case (← mkNone returnT))
+  --   recr_spec := mkAppN recr_spec #[fn]
+  --   logInfo s!"{recr_spec}"
+  -- Construct: A Lambda that goes from the expression core to the
+  -- mkForallFVars univs_r (Expr.replaceFVars recr_spec univs_c univs_r)
+  -- forallTelescope ec_r fun args_r core_r => do
+  --   for a in args_r do
+  --     logInfo s!"{a}"
+  --   return c.type
+    -- let motiveReturnT ← forallTelescope e' (fun args _ => do
+    --   let argTyps ← args.toList.mapM (inferType)
+    --   let returnT : Expr ← argTyps.foldlM' (Expr.const ``Unit []) (fun x p => do mkAppM ``Prod.mk #[x,p])
+    --   return returnT)
+
+    -- mkForallFVars univs sorry -- motiveReturnT
+
+-- #check instantiateForall
+
+/-
+def mkTerm (decl : Name) (t_ctor : Nat) (t_ctor_info : ConstructorVal): MetaM Unit := do
+  let ConstantInfo.inductInfo info ← getConstInfo decl | unreachable!
+  expectE (info.numNested == 0) "expected inductive with no nesting"
+  expectE (info.numIndices == 0) "expected inductive with no indexing"
+  let casesOnName := mkCasesOnName decl
+  let casesOnInfo ← getConstVal casesOnName
+  let _::us := casesOnInfo.levelParams.map mkLevelParam | panic! "unexpected universe levels on `casesOn`"
+  -- logInfo     s!"| cases  | {casesOnInfo.type}"
+  let (e, τ) ← forallTelescope casesOnInfo.type fun xs _ => do
+    let params : Array Expr := xs[:info.numParams]
+
+    -- TODO: DO I need to replace motive with MyMotive?
+    -- let motive := xs[info.numParams]!
+    let indices : Array Expr := xs[info.numParams + 1:info.numParams + 1 + info.numIndices]
+    let majorArg := xs[info.numParams + 1 + info.numIndices]!
+    -- displayFVars  "| params |" params
+    -- logInfo     s!"| motive | {motive} : {← inferType motive}"
+    -- displayFVars  "| idxs   |" indices
+    -- logInfo     s!"| maj ar | {majorArg} : {← inferType majorArg}"
+    let ism := indices.push majorArg
+    -- displayFVars  "| idxs   |" ism
+    -- -- The motive for the recursor.
+    let myMotive := mkLambda .anonymous .default (← inferType majorArg) (mkConst ``Nat [])
+    -- logInfo     s!"| motive | {myMotive} : {← inferType myMotive}" -- Motive applied to the major argument
+    let e := Lean.mkConst casesOnInfo.name (Level.succ Level.zero:: us)
+    let e := mkAppN e params
+    -- logInfo     s!"| e      | {e}" -- The recursor
+    -- logInfo     s!"| eT     | {← inferType e}" -- The recursor
+    -- logInfo     s!"| motive | {myMotive}"
+    -- logInfo     s!"| mot ty | {← inferType myMotive}"
+    let e := mkApp e myMotive
+    -- logInfo     s!"| e mot  | {e}" -- ... applied to the motive
+    let e := mkAppN e ism
+    -- logInfo     s!"| e ism  | {e}" -- ... applied to the major argument
+    -- let et ← inferType e
+    -- logInfo     s!"| e typ  | {et}" -- The type of e
+    let alts : Array Expr ← info.ctors.toArray.mapIdxM fun i ctorName => do
+      -- logInfo     s!"| ------ | alt {ctorName} "
+      let ctor := mkAppN (mkConst ctorName us) params
+      let ctorType ← inferType ctor
+      -- logInfo     s!"| ctor   | {ctor} : {ctorType}" -- The constructor for this alternative
+      forallTelescope ctorType fun ctorargs _ => do
+        -- displayFVars  "| ct arg |" ctorargs
+        let nexp := mkRawNatLit i
+        -- logInfo s!"| nexp   | {nexp} : {← inferType nexp}"
+        mkLambdaFVars ctorargs nexp
+        -- logInfo s!"| nexp c | {nexp} : {← inferType nexp}"
+        -- return nexp
+    -- for a in alts do logInfo s!" | alt    | {a}"
+    -- for a in alts do logInfo s!" | altT   | {← inferType a}"
+    let e := mkAppN e alts
+    -- logInfo     s!"| e alt  | {e}" -- ... applied to the cases
+    -- logInfo     s!"| e altT | {← inferType e}"
+    let e ← mkLambdaFVars (params ++ ism) e
+
+    let projectionType := Lean.mkConst ``Nat []
+    -- logInfo s!"| p typ  | {projectionType} : {← inferType projectionType }"
+    let projectionType ← mkArrow (← inferType majorArg) projectionType
+    -- logInfo s!"| p typ  | {projectionType} : {← inferType projectionType }"
+    let projectionType ← mkForallFVars params projectionType
+    -- logInfo s!"| p typ  | {projectionType} : {← inferType projectionType }"
+    return (e, projectionType)
+  -- logInfo     s!"| e clos | {e}" -- ... Closed over fvars
+  -- logInfo     s!"| e cloT | {← inferType e}"
+  -- logInfo     s!"| pt     | {projectionType}"
+  -- logInfo     s!"| e      | {e}"
+  -- logInfo     s!"| lp     | {e}"
+  let πDecl : DefinitionVal := {
+    name := ProjectionName t_ctor_info
+    levelParams := casesOnInfo.levelParams
+    type := τ
+    value := e
+    hints := ReducibilityHints.abbrev
+    safety := .safe
+  }
+  addAndCompile (.defnDecl πDecl)
+-/
