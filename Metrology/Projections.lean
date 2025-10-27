@@ -83,7 +83,7 @@ def mkProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Un
 
   addAndCompile <| .defnDecl {
     name := ProjectionName cinfo
-    levelParams := casesOnInfo.levelParams
+    levelParams := casesOnInfo.levelParams.drop 1
     type := τ
     value := e
     hints := ReducibilityHints.abbrev

@@ -21,7 +21,7 @@ inductive Expr' (B Z R : Type _) where
 | eright (e : Expr' B Z R)
 | ecase (e el er : Expr' B Z R)
 
-/-- info: Expr'.epair.π.{u, u_1, u_2, u_3} {B : Type u_1} {Z : Type u_2} {R : Type u_3} :
+/-- info: Expr'.epair.π.{u_1, u_2, u_3} {B : Type u_1} {Z : Type u_2} {R : Type u_3} :
   Expr' B Z R → Option (Expr' B Z R × Expr' B Z R) -/
 #guard_msgs in #check Expr'.epair.π
 
@@ -34,7 +34,7 @@ example : Expr'.esnd.π (.epair test1 test2) = none := rfl
 inductive MyDepC' (n : Nat)
 | DepC' (depV : Fin n)
 
-/-- info: MyDepC'.DepC'.π.{u} {n : ℕ} : MyDepC' n → Option (Fin n) -/
+/-- info: MyDepC'.DepC'.π {n : ℕ} : MyDepC' n → Option (Fin n) -/
 #guard_msgs in #check MyDepC'.DepC'.π
 
 @[projections]
@@ -55,7 +55,7 @@ inductive MyEmpty
 
 @[projections]
 inductive MyType (x y : Nat)
-| MyV (n : Unit)
+| MyV (n : Unit) (w : Fin x)
 
 @[projections]
 inductive MyThing (x : Nat) (y : Fin x)
@@ -71,8 +71,24 @@ inductive MyParamT (n : Sort 0) (α β : Type)
 | Val2 (y : β)
 | Rec (x1 : MyParamT n α β) (v2 : α)
 
-/-- info: MyParamT.Val2.π.{u} {n : Prop} {α β : Type} : MyParamT n α β → Option β -/
+/-- info: MyParamT.Val2.π {n : Prop} {α β : Type} : MyParamT n α β → Option β -/
 #guard_msgs in #check MyParamT.Val2.π
 
 def main : IO Unit := return
 
+@[projections]
+inductive MyTree' (L1 L2 : Type _) where
+| nil
+| leaf1 (x : L1)
+| leaf2 (x : L1) (y : L2)
+| branch (tl tr : MyTree' L1 L2) (v : Nat)
+
+
+def MyTree'.flatten {L1 L2} : MyTree' (Set L1) (Set L2) → Set (MyTree' L1 L2) :=
+  fun go =>
+    let s1 := MyTree'.nil.π go
+    sorry
+    -- Set.union { nil } <|
+    -- Set.union { leaf1 l | l ∈ Set.univ } <|
+    -- Set.union { leaf1 l | l ∈ Set.univ } <|
+    --           { leaf1 l | l ∈ Set.univ }
