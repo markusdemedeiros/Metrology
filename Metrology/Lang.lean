@@ -12,6 +12,7 @@ inductive LitSyntax (R Z B : Type _) where
 | real (r : R)
 | int (z : Z)
 | bool (b : B)
+deriving Repr
 
 @[projections, constructors]
 inductive ExprSyntax R Z B where
@@ -20,12 +21,11 @@ inductive ExprSyntax R Z B where
 | var (x : Ident)
 | app (rator rand : ExprSyntax R Z B)
 | lam (x : Ident) (body : ExprSyntax R Z B)
+deriving Repr
 
 open ExprSyntax
 example (ident_body : Ident × ExprSyntax R Z B) : lam.π (lam.ctor ident_body) = some ident_body := rfl
 example (ident_body : Ident × ExprSyntax R Z B) : app.π (lam.ctor ident_body) = none := rfl
-
-
 
 
 

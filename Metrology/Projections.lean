@@ -12,9 +12,7 @@ def mkNestedProdType (types : List Expr) : MetaM Expr :=
   match types with
   | [] => pure (Expr.const ``Unit [])
   | _ =>
-    let init := types.getLast!
-    let rest := types.dropLast
-    rest.foldrM (init := init) (fun ty acc => mkAppM ``Prod #[ty, acc])
+    types.dropLast.foldrM (fun ty acc => mkAppM ``Prod #[ty, acc]) types.getLast!
 
 -- Helper to construct nested Prod values: (a, (b, c)) (right-associative)
 -- For empty list: ()
@@ -23,9 +21,7 @@ def mkNestedProdValue (exprs : List Expr) : MetaM Expr :=
   match exprs with
   | [] => pure (Lean.mkConst `Unit.unit)
   | _ =>
-    let init := exprs.getLast!
-    let rest := exprs.dropLast
-    rest.foldrM (init := init) (fun e acc => mkAppM ``Prod.mk #[e, acc])
+    exprs.dropLast.foldrM  (fun e acc => mkAppM ``Prod.mk #[e, acc]) exprs.getLast!
 
 
 def ProjectionName (cinfo : ConstructorVal) : Name := cinfo.name.str "π"
@@ -41,7 +37,6 @@ def ProjectionType (c : ConstructorVal) : MetaM Expr := do
 
 def displayFVars (pref : String) (A : Array Expr) : MetaM Unit := do
   for a in A do logInfo s!"{pref} {a}: {← inferType a}"
-
 
 def mkProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
   -- Collect the casesOn information
