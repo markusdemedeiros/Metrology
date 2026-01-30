@@ -108,7 +108,7 @@ def projectionsImpl : AttributeImpl := {
 
 initialize registerBuiltinAttribute projectionsImpl
 
-def ConstructorName (cinfo : ConstructorVal) : Name := cinfo.name.str "ctor"
+def ConstructorName (cinfo : ConstructorVal) : Name := cinfo.name.str "ι"
 
 def mkConstructor (decl : Name) (_ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
   let info ← getConstInfoInduct decl
