@@ -39,16 +39,6 @@ inductive Expr (B Z R : Type _) where
 | erand (et en : Expr B Z R)
 
 
-
-
-
-
-
-
-
-
-
-
 /-
 Inductive expr :=
   (* Values *)

@@ -83,10 +83,42 @@ inductive MyTree' (L1 L2 : Type _) where
 | leaf2 (x : L1) (y : L2)
 | branch (tl tr : MyTree' L1 L2) (v : Nat)
 
+-- Automatically define these uncurried constructors (should be easy)
+-- If we want to use Function.uncurry, we should reassociate the product back to the foldl direction.
+def MyTree'.nil.ctor : Unit → MyTree' L1 L2 := Function.const _ .nil
+def MyTree'.leaf1.ctor  : L1 → MyTree' L1 L2 := .leaf1
+def MyTree'.leaf2.ctor  : L1 × L2 → MyTree' L1 L2 := Function.uncurry .leaf2
+def MyTree'.branch.ctor  : MyTree' L1 L2 × MyTree' L1 L2 × Nat  → MyTree' L1 L2 :=
+  -- This is why we need to reassociate
+  -- Function.uncurry (Function.uncurry MyTree'.branch)
+  fun (x, y, z) => .branch x y z
 
-def MyTree'.flatten {L1 L2} : MyTree' (Set L1) (Set L2) → Set (MyTree' L1 L2) :=
-  fun go =>
-    let s1 := MyTree'.nil.π go
+-- The ctor and π functions should be inverses
+-- #check fun {L1 L2 }(x : MyTree' L1 L2) => (MyTree'.branch.π x) |>.map MyTree'.branch.ctor
+
+-- #check MyTree'.leaf1
+-- #check Function.uncurry (Function.uncurry MyTree'.branch)
+
+def MyTree'.flatten {L1 L2} (ts : MyTree' (Set L1) (Set L2)) : Set (MyTree' L1 L2) :=
+    let π_nil : Set (MyTree' L1 L2) :=
+      MyTree'.nil.π ts |>.map (fun _ => {nil}) |>.getD ∅
+    let π_leaf1 : Set (MyTree' L1 L2):=
+      MyTree'.leaf1.π ts |>.map (fun f1 => sorry) |>.getD ∅
+
+
+    -- let π_leaf1 := MyTree'.leaf1.π go
+    -- let π_leaf2 := MyTree'.leaf2.π go
+    -- let π_branch := MyTree'.branch.π go
+
+    -- If it's none, then return Set.empty
+    -- If it's some, then
+    --     - Apply flatten to all recursive cases
+    --     - Take the singleton set for all non-recursive, non-parameter cases
+    --     - Take the set itself for all parameter cases
+    --     - Define the preimage of (Some (prod. of sets.)) under the projection function
+    -- The preimage is the union of these sets
+    -- Could also do a dummy match on the go arguent
+
     sorry
     -- Set.union { nil } <|
     -- Set.union { leaf1 l | l ∈ Set.univ } <|
