@@ -5,24 +5,27 @@ import Lean.AuxRecursor
 
 open Lean Elab Command Term Meta
 
-def List.foldlM' {m : Type _ → Type _} [Monad m] {α : Type _} :
-    (d : α) → (f : α → α → m α) → List α → m α :=
-  fun d f l =>
-    match l with
-    | [] => return d
-    | l0::ls => ls.foldlM f l0
+-- Helper to construct nested Prod types: A × B × C (right-associative)
+-- For empty list: Unit
+-- For non-empty list: uses last element as base, folds rest to build nested Prod
+def mkNestedProdType (types : List Expr) : MetaM Expr :=
+  match types with
+  | [] => pure (Expr.const ``Unit [])
+  | _ =>
+    let init := types.getLast!
+    let rest := types.dropLast
+    rest.foldrM (init := init) (fun ty acc => mkAppM ``Prod #[ty, acc])
 
--- FIXME:
-def List.foldrM' {m : Type _ → Type _} [Monad m] {α : Type _} :
-    (d : α) → (f : α → α → m α) → List α → m α :=
-  fun d f l =>
-    match l with
-    | [] => return d
-    | _::_ =>
-      let _ : Inhabited α := ⟨d⟩ -- Nonsense
-      let l_last := l[l.length - 1]!
-      let l_exceptlast := l.take (l.length - 1)
-      List.foldrM f l_last l_exceptlast
+-- Helper to construct nested Prod values: (a, (b, c)) (right-associative)
+-- For empty list: ()
+-- For non-empty list: uses last element as base, folds rest to build nested Prod
+def mkNestedProdValue (exprs : List Expr) : MetaM Expr :=
+  match exprs with
+  | [] => pure (Lean.mkConst `Unit.unit)
+  | _ =>
+    let init := exprs.getLast!
+    let rest := exprs.dropLast
+    rest.foldrM (init := init) (fun e acc => mkAppM ``Prod.mk #[e, acc])
 
 
 def ProjectionName (cinfo : ConstructorVal) : Name := cinfo.name.str "π"
@@ -31,7 +34,7 @@ def ProjectionType (c : ConstructorVal) : MetaM Expr := do
   forallBoundedTelescope c.type (some c.numParams) fun univs e' => do
     forallTelescope e' (fun args core => do
       let argTyps ← args.toList.mapM (inferType)
-      let projs ← argTyps.foldlM' (Expr.const ``Unit []) (fun x p => do mkAppM ``Prod #[x,p])
+      let projs ← mkNestedProdType argTyps
       let optionType ← mkAppM ``Option #[projs]
       let funType := mkForall .anonymous .default core optionType
       mkForallFVars univs funType)
@@ -55,7 +58,7 @@ def mkProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Un
 
     -- Construct the return type (optPair)
     let argtypes ← forallTelescope (← inferType target_arg) (fun args _ => args.mapM inferType)
-    let projs ← argtypes.toList.foldrM' (Expr.const ``Unit []) (fun x p => do mkAppM ``Prod #[x,p])
+    let projs ← mkNestedProdType argtypes.toList
     let retNone ← mkNone projs
     let returnType : Expr ← mkAppM ``Option #[projs]
 
@@ -69,7 +72,7 @@ def mkProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Un
       forallTelescope ctorType fun ctorargs _ =>
         if (i = ictor)
           then do
-            let ret_tup ← ctorargs.toList.foldrM' (Lean.mkConst `Unit.unit) (fun x p => do mkAppM ``Prod.mk #[x,p])
+            let ret_tup ← mkNestedProdValue ctorargs.toList
             mkLambdaFVars ctorargs (← mkSome projs ret_tup)
           else mkLambdaFVars ctorargs retNone
 
@@ -120,7 +123,7 @@ def mkConstructor (decl : Name) (_ictor : Nat) (cinfo : ConstructorVal) : MetaM 
 
     -- Construct the uncurried constructor type
     let argtypes ← args.mapM inferType
-    let projargtyp ← argtypes.toList.foldrM' (Expr.const ``Unit []) (fun x p => do mkAppM ``Prod #[x,p])
+    let projargtyp ← mkNestedProdType argtypes.toList
     let typOpen ← mkArrow projargtyp typ
     let typClosed ← mkForallFVars params typOpen
 
@@ -130,20 +133,22 @@ def mkConstructor (decl : Name) (_ictor : Nat) (cinfo : ConstructorVal) : MetaM 
         | 0 => mkLambdaFVars #[x] (← mkAppOptM cinfo.name (params.map some))
         | 1 => mkLambdaFVars #[x] (← mkAppOptM cinfo.name (params.map some ++ [some x]))
         | n => do
-          let rec mkAppProj' : Nat → MetaM Expr
-            | .zero => do return x
-            | .succ n => do
-              let r ← mkAppProj' n
-              mkAppM ``Prod.snd #[r]
-          let mkAppProj (i N : Nat) : MetaM Expr := do
-            if i = N - 1
-              then do
-                let r ← mkAppProj' (i-1)
-                mkAppM ``Prod.snd #[r]
-              else do
-                let r ← mkAppProj' i
-                mkAppM ``Prod.fst #[r]
-          let mkAppArgs ← List.ofFnM (n := n) (fun i : Fin n => mkAppProj i n)
+          -- Extract the i-th component from nested Prod structure
+          -- For structure (a, (b, (c, d))), we need to extract each component
+          let mkAppProj (i : Nat) : MetaM Expr := do
+            if i == n - 1 then
+              -- Last element: apply snd repeatedly (i times)
+              let mut result := x
+              for _ in [:i] do
+                result ← mkAppM ``Prod.snd #[result]
+              return result
+            else
+              -- Other elements: apply snd (i times) then fst
+              let mut result := x
+              for _ in [:i] do
+                result ← mkAppM ``Prod.snd #[result]
+              mkAppM ``Prod.fst #[result]
+          let mkAppArgs ← List.ofFnM (n := n) (fun i : Fin n => mkAppProj i.val)
           mkLambdaFVars #[x] (← mkAppOptM cinfo.name (params.map some ++ mkAppArgs.map some))
     let bodyClosed ← mkLambdaFVars params body
 
