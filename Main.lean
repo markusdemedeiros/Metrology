@@ -1,34 +1,36 @@
 import Metrology
 import Mathlib.Data.Real.Basic
 
-@[projections]
-inductive Expr' (B Z R : Type _) where
--- Literals
-| elit (l : Lit B Z R)
--- Functions
-| evar (s : Ident)
-| erec (f x : Ident) (e : Expr' B Z R)
-| eapp (e1 e2 : Expr' B Z R)
--- -- Operations
-| ebinop (op : BinOp) (e1 e2 : Expr' B Z R)
-| econd (e et ef : Expr' B Z R)
--- -- Products
-| epair (e1 e2 : Expr' B Z R)
-| efst (e : Expr' B Z R)
-| esnd (e : Expr' B Z R)
--- -- Sums
-| eleft (e : Expr' B Z R)
-| eright (e : Expr' B Z R)
-| ecase (e el er : Expr' B Z R)
-
-/-- info: Expr'.epair.π.{u_1, u_2, u_3} {B : Type u_1} {Z : Type u_2} {R : Type u_3} :
-  Expr' B Z R → Option (Expr' B Z R × Expr' B Z R) -/
-#guard_msgs in #check Expr'.epair.π
-
-def test1 : Expr' Bool ℤ ℝ := .elit <| .real (5 : ℝ)
-def test2 : Expr' Bool ℤ ℝ := .eleft <| .evar "x"
-example : Expr'.epair.π (.epair test1 test2) = some (test1, test2) := rfl
-example : Expr'.esnd.π (.epair test1 test2) = none := rfl
+-- inductive Lit (B Z R  : Type _) where
+--
+-- @[projections]
+-- inductive Expr' (B Z R : Type _) where
+-- -- Literals
+-- -- | elit (l : Lit B Z R)
+-- -- Functions
+-- | evar (s : Ident)
+-- | erec (f x : Ident) (e : Expr' B Z R)
+-- | eapp (e1 e2 : Expr' B Z R)
+-- -- -- Operations
+-- | ebinop (op : BinOp) (e1 e2 : Expr' B Z R)
+-- | econd (e et ef : Expr' B Z R)
+-- -- -- Products
+-- | epair (e1 e2 : Expr' B Z R)
+-- | efst (e : Expr' B Z R)
+-- | esnd (e : Expr' B Z R)
+-- -- -- Sums
+-- | eleft (e : Expr' B Z R)
+-- | eright (e : Expr' B Z R)
+-- | ecase (e el er : Expr' B Z R)
+--
+-- /-- info: Expr'.epair.π.{u_1, u_2, u_3} {B : Type u_1} {Z : Type u_2} {R : Type u_3} :
+--   Expr' B Z R → Option (Expr' B Z R × Expr' B Z R) -/
+-- #guard_msgs in #check Expr'.epair.π
+--
+-- def test1 : Expr' Bool ℤ ℝ := .elit <| .real (5 : ℝ)
+-- def test2 : Expr' Bool ℤ ℝ := .eleft <| .evar "x"
+-- example : Expr'.epair.π (.epair test1 test2) = some (test1, test2) := rfl
+-- example : Expr'.esnd.π (.epair test1 test2) = none := rfl
 
 @[projections]
 inductive MyDepC' (n : Nat)

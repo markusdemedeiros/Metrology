@@ -107,3 +107,67 @@ def projectionsImpl : AttributeImpl := {
     }
 
 initialize registerBuiltinAttribute projectionsImpl
+
+def ConstructorName (cinfo : ConstructorVal) : Name := cinfo.name.str "ctor"
+
+def mkConstructor (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
+  let ConstantInfo.inductInfo info ← getConstInfo decl | unreachable!
+  let _ ← forallTelescope cinfo.type fun xs typ => do
+    let params : Array Expr := xs[:info.numParams]
+    let args : Array Expr := xs[info.numParams:]
+
+    -- Construct the uncurried constructor type
+    let argtypes ← args.mapM inferType
+    let projargtyp ← argtypes.toList.foldrM' (Expr.const ``Unit []) (fun x p => do mkAppM ``Prod #[x,p])
+    let typOpen ← mkArrow projargtyp typ
+    let typClosed ← mkForallFVars params typOpen
+
+    -- Construct the uncurried constructor function
+    let body : Expr ← withLocalDecl `x BinderInfo.default projargtyp λ x => do
+      match args.size with
+        | 0 => mkLambdaFVars #[x] (← mkAppOptM cinfo.name (params.map some))
+        | 1 => mkLambdaFVars #[x] (← mkAppOptM cinfo.name (params.map some ++ [some x]))
+        | n => do
+          let rec mkAppProj' : Nat → MetaM Expr
+            | .zero => do return x
+            | .succ n => do
+              let r ← mkAppProj' n
+              mkAppM ``Prod.snd #[r]
+          let mkAppProj (i N : Nat) : MetaM Expr := do
+            if i = N - 1
+              then do
+                let r ← mkAppProj' (i-1)
+                mkAppM ``Prod.snd #[r]
+              else do
+                let r ← mkAppProj' i
+                mkAppM ``Prod.fst #[r]
+          let mkAppArgs ← List.ofFnM (n := n) (fun i : Fin n => mkAppProj i n)
+          mkLambdaFVars #[x] (← mkAppOptM cinfo.name (params.map some ++ mkAppArgs.map some))
+    let bodyClosed ← mkLambdaFVars params body
+
+    addAndCompile <| .defnDecl {
+      name := ConstructorName cinfo
+      levelParams := cinfo.levelParams
+      type := typClosed
+      value := bodyClosed
+      hints := ReducibilityHints.abbrev
+      safety := .safe
+    }
+
+syntax (name := constructors) "constructors" : attr
+
+-- TODO: Add projection type itself to the context?
+def constructorsImpl : AttributeImpl := {
+    name  := `constructors
+    descr := "Automatically construct constructor functions for a inductive datatype"
+    add   := fun decl _stx _kind => do
+      let env ← getEnv
+      let some (.inductInfo info) := env.constants.find? decl | unreachable!
+      expectE (info.numNested == 0) "expected inductive with no nesting"
+      expectE (info.numIndices == 0) "expected inductive with no indexing"
+      let _ ← info.ctors.toArray.mapIdxM fun x y => do
+        let some (.ctorInfo cinfo) := env.constants.find? y | throwError "(internal) bad constructor"
+        mkConstructor decl x cinfo |>.run'
+    }
+
+initialize registerBuiltinAttribute constructorsImpl
