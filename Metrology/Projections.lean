@@ -5,9 +5,6 @@ import Lean.AuxRecursor
 
 open Lean Elab Command Term Meta
 
-def expectE (b : Bool) (s : String) : AttrM Unit :=
-  if b then return () else throwError s
-
 def List.foldlM' {m : Type _ → Type _} [Monad m] {α : Type _} :
     (d : α) → (f : α → α → m α) → List α → m α :=
   fun d f l =>
@@ -45,12 +42,16 @@ def displayFVars (pref : String) (A : Array Expr) : MetaM Unit := do
 
 def mkProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
   -- Collect the casesOn information
-  let ConstantInfo.inductInfo info ← getConstInfo decl | unreachable!
+  let info ← getConstInfoInduct decl
   let casesOnInfo ← getConstVal <| mkCasesOnName decl
   let (e, τ) ← forallTelescope casesOnInfo.type fun xs _ => do
     let params : Array Expr := xs[:info.numParams]
-    let majorArg := xs[info.numParams + 1 + info.numIndices]!
-    let target_arg := xs[info.numParams + 2 + ictor]!
+    let majorIdx := info.numParams + 1 + info.numIndices
+    let targetIdx := info.numParams + 2 + ictor
+    unless xs.size > majorIdx && xs.size > targetIdx do
+      throwError "unexpected arity in casesOn type"
+    let majorArg := xs[majorIdx]!
+    let target_arg := xs[targetIdx]!
 
     -- Construct the return type (optPair)
     let argtypes ← forallTelescope (← inferType target_arg) (fun args _ => args.mapM inferType)
@@ -97,12 +98,13 @@ def projectionsImpl : AttributeImpl := {
     name  := `projections
     descr := "Automatically construct projection functions for a inductive datatype"
     add   := fun decl _stx _kind => do
-      let env ← getEnv
-      let some (.inductInfo info) := env.constants.find? decl | unreachable!
-      expectE (info.numNested == 0) "expected inductive with no nesting"
-      expectE (info.numIndices == 0) "expected inductive with no indexing"
+      let info ← getConstInfoInduct decl
+      unless info.numNested == 0 do
+        throwError "expected inductive with no nesting"
+      unless info.numIndices == 0 do
+        throwError "expected inductive with no indexing"
       let _ ← info.ctors.toArray.mapIdxM fun x y => do
-        let some (.ctorInfo cinfo) := env.constants.find? y | throwError "(internal) bad constructor"
+        let cinfo ← getConstInfoCtor y
         mkProjection decl x cinfo |>.run'
     }
 
@@ -110,8 +112,8 @@ initialize registerBuiltinAttribute projectionsImpl
 
 def ConstructorName (cinfo : ConstructorVal) : Name := cinfo.name.str "ctor"
 
-def mkConstructor (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
-  let ConstantInfo.inductInfo info ← getConstInfo decl | unreachable!
+def mkConstructor (decl : Name) (_ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
+  let info ← getConstInfoInduct decl
   let _ ← forallTelescope cinfo.type fun xs typ => do
     let params : Array Expr := xs[:info.numParams]
     let args : Array Expr := xs[info.numParams:]
@@ -161,12 +163,13 @@ def constructorsImpl : AttributeImpl := {
     name  := `constructors
     descr := "Automatically construct constructor functions for a inductive datatype"
     add   := fun decl _stx _kind => do
-      let env ← getEnv
-      let some (.inductInfo info) := env.constants.find? decl | unreachable!
-      expectE (info.numNested == 0) "expected inductive with no nesting"
-      expectE (info.numIndices == 0) "expected inductive with no indexing"
+      let info ← getConstInfoInduct decl
+      unless info.numNested == 0 do
+        throwError "expected inductive with no nesting"
+      unless info.numIndices == 0 do
+        throwError "expected inductive with no indexing"
       let _ ← info.ctors.toArray.mapIdxM fun x y => do
-        let some (.ctorInfo cinfo) := env.constants.find? y | throwError "(internal) bad constructor"
+        let cinfo ← getConstInfoCtor y
         mkConstructor decl x cinfo |>.run'
     }
 
