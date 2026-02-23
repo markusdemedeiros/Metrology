@@ -5,6 +5,43 @@ import Metrology.Projections
 
 -- Operational semantics of continuous PPL
 
+open Set
+
+/-- Sigma algebra on `Option` values obtained by lifting the sigma algebra on `some` values,
+    as well as the singleton `none` set. -/
+local instance [MeasurableSpace α] : MeasurableSpace (Option α) :=
+  .generateFrom <| {{ none }} ∪ ((some '' ·) '' MeasurableSet)
+
+section Option
+
+variable [MeasurableSpace α]
+
+open MeasurableSpace
+
+theorem measurableSet_none : MeasurableSet { none (α := α) } :=
+  measurableSet_generateFrom (mem_union_left _ rfl)
+
+theorem measurableSet_some {S : Set α} (HS : MeasurableSet S) : MeasurableSet (some '' S) :=
+  measurableSet_generateFrom <| mem_union_right _ (mem_image_of_mem _ HS)
+
+theorem measurableSet_range_some : MeasurableSet (range (some (α := α))) :=
+  image_univ ▸ measurableSet_some (α := α) .univ
+
+/-- When proving the measurability of a set in Option, it suffices to only prove the
+    measurability of the terms which are `some`. -/
+theorem measurableSet_iff_int_some_measurableSet {S : Set (Option α)} :
+    MeasurableSet S ↔ MeasurableSet (S ∩ range some) := by
+  refine ⟨fun H => ?_, fun H => ?_⟩
+  · exact MeasurableSet.inter H measurableSet_range_some
+  · rw [show S = (S ∩ range some) ∪ (S ∩ { none }) by simp [← inter_union_distrib_left]]
+    refine MeasurableSet.union H ?_
+    have HSdisj' : S ∩ { none } = ∅ ∨ S ∩ { none } = { none } := by simp [em' (none ∈ S)]
+    rcases HSdisj' with (h|h) <;> rw [h]
+    · exact MeasurableSet.empty
+    · exact measurableSet_none
+
+end Option
+
 abbrev Ident : Type _ := String
 
 -- /- Typeclass containing all of the information necessary to perform the cylinder
@@ -17,7 +54,7 @@ def MeasurableSyntax.cylinder [I : MeasurableSyntax Syntax Gen] : Set (Set Synta
   I.flatten '' I.base
 
 instance MeasurableSyntax.instMeasurableSpace [MeasurableSyntax Syntax Gen] : MeasurableSpace Syntax :=
-  MeasurableSpace.generateFrom cylinder
+  .generateFrom cylinder
 
 @[projections, constructors]
 inductive LitSyntax (R Z B : Type _) where
@@ -25,12 +62,14 @@ inductive LitSyntax (R Z B : Type _) where
 | int (z : Z)
 | bool (b : B)
 
--- For any base argument (one of the Sets mentioned as a paramater to the inductive),
--- take the image of the constructor
+-- Derive: A higher-kinded functor
+-- LitSyntax R Z B → LitSyntax R' Z' B'
+
+
 def LitSyntax.flatten : LitSyntax (Set R) (Set Z) (Set B) → Set (LitSyntax R Z B)
-| .real S => LitSyntax.real.ι '' S
-| .int S => LitSyntax.int.ι '' S
-| .bool S => LitSyntax.bool.ι '' S
+| .real S => real.ι '' S
+| .int S => int.ι '' S
+| .bool S => bool.ι '' S
 
 def LitSyntax.base [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B] :
   Set (LitSyntax (Set R) (Set Z) (Set B))
@@ -43,8 +82,11 @@ instance [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B] :
   base := LitSyntax.base
   flatten := LitSyntax.flatten
 
--- abbrev LitSyntax.Shape : Type _ := LitSyntax Unit Unit Unit
--- abbrev LitSyntax.Pre (R Z B : Type _) : Type _ := LitSyntax (Set R) (Set Z) (Set B)
+-- Does the construction work when we take measurable sets of the intermediate stages (ie. LitSyntax)
+-- instead of combining the trees? That would make a lot of the metaprogrammable: we'd require that
+-- every field of every constructor be recursive or measurable.
+-- This way there's only one step to unfold.
+-- Perhaps we can generate the shape inductives then?
 
 @[projections, constructors]
 inductive ExprSyntax R Z B where
@@ -54,19 +96,13 @@ inductive ExprSyntax R Z B where
 | app (rator rand : ExprSyntax R Z B)
 | lam (x : Ident) (body : ExprSyntax R Z B)
 
+
 def ExprSyntax.flatten : ExprSyntax (Set R) (Set Z) (Set B) → Set (ExprSyntax R Z B)
--- Because rand has no arguments, its flattening is the image of the singleton unit set.
-| rand => ExprSyntax.rand.ι '' { () }
--- To flatten lit, whose argument is a LitSyntax, which also has a flattening procedure.
--- So first, we flatten its argument, and then take the preimage under the lit projection.
-| lit l => ExprSyntax.lit.ι '' (LitSyntax.flatten l)
--- Variables do not have flattening. So we take the image of a singleton set.
-| var x => ExprSyntax.var.ι '' { x }
--- Applications have two flattenable arguments. We take their product, before taking their image.
-| app fn arg => ExprSyntax.app.ι '' (Set.prod (ExprSyntax.flatten fn) (ExprSyntax.flatten arg))
--- The first argument is not flattenable, the second argument is. So it's the image of the
--- product of the singleton set and the flattened set.
-| lam x body => Set.image ExprSyntax.lam.ι (Set.prod { x } (ExprSyntax.flatten body))
+| rand => rand.ι '' { () }
+| lit l => lit.ι '' (LitSyntax.flatten l)
+| var x => var.ι '' { x }
+| app fn arg => app.ι '' prod (flatten fn) (flatten arg)
+| lam x body => lam.ι '' prod { x } (flatten body)
 
 def ExprSyntax.base [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B] :
   Set (ExprSyntax (Set R) (Set Z) (Set B))
@@ -84,3 +120,26 @@ instance [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B] :
 open ExprSyntax
 example (ident_body : Ident × ExprSyntax R Z B) : lam.π (lam.ι ident_body) = some ident_body := rfl
 example (ident_body : Ident × ExprSyntax R Z B) : app.π (lam.ι ident_body) = none := rfl
+
+-- variable {R Z B : Type _} [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B]
+-- #synth MeasurableSpace (ExprSyntax R Z B)
+
+section MeasurableProjections
+
+variable {R Z B : Type _} [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B]
+
+-- set_option pp.all true
+theorem LitSyntax.real.π.measurable : Measurable (@LitSyntax.real.π R Z B) := by
+  intros S HS
+  have X := measurableSet_iff_int_some_measurableSet.mp HS
+  refine MeasurableSpace.measurableSet_generateFrom ?_
+  simp only [MeasurableSyntax.cylinder, MeasurableSyntax.base, MeasurableSyntax.flatten, mem_image]
+  -- This is something that should be metaprogrammed
+  sorry
+
+
+end MeasurableProjections
+
+class HasZip (M : Type _ → Type _) (K : Type _) [FiniteMap M K] where
+  zip : M T₁ → M T₂ → M (T₁ × T₂)
+  zip_iff {k v m₁ m₂} : (zip m₁ m₂) k = some v ↔ (FiniteMap.zip m₁ m₂) k = some v

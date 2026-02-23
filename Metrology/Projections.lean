@@ -174,3 +174,42 @@ def constructorsImpl : AttributeImpl := {
     }
 
 initialize registerBuiltinAttribute constructorsImpl
+
+def mkParameterFunctor (decl : Name) (info : InductiveVal) : MetaM Unit := do
+  logInfo s!"{decl} : {info.type}"
+  -- Telescope over all parameters, twice
+  let _ ← forallTelescope info.type fun xs_1 _ => do
+    let params_1 : Array Expr := xs_1[:info.numParams]
+    let _ ← forallTelescope info.type fun xs_2 _ => do
+      let params_2 : Array Expr := xs_2[:info.numParams]
+      for fv in params_1 do
+        logInfo s!"| {fv} : {← inferType fv}"
+      for fv in params_2 do
+        logInfo s!"| {fv} : {← inferType fv}"
+
+      let typ1 ← mkAppM info.name params_1
+      let typ2 ← mkAppM info.name params_2
+      let fargs ← (params_1.toList.zip params_2.toList).mapM (fun ⟨τ1, τ2⟩ => mkArrow τ1 τ2)
+
+      -- Create a new fvar for each item in fargs
+      let typ ← mkArrowN (#[typ1] ++ fargs) typ2
+      let typ_closed ← mkForallFVars (params_1 ++ params_2) typ
+      -- logInfo s!"{typ_closed}"
+
+
+
+
+
+def parameterFunctorImpl : AttributeImpl := {
+    name  := `parameter_functor
+    descr := "Automatically construct a functor for inductive datatype"
+    add   := fun decl _stx _kind => do
+      let info ← getConstInfoInduct decl
+      unless info.numNested == 0 do
+        throwError "expected inductive with no nesting"
+      unless info.numIndices == 0 do
+        throwError "expected inductive with no indexing"
+      mkParameterFunctor decl info |>.run'
+    }
+
+initialize registerBuiltinAttribute parameterFunctorImpl
