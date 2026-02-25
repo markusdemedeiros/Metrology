@@ -327,6 +327,18 @@ def Ectx.fill (K : Ectx) (e : Expr) : Expr := K.foldl (flip EctxItem.FillItem) e
 theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
   List.foldl_append
 
+-- Lemma fill_comp : ∀ (K1 K2 : ectx) e, fill K1 (fill K2 e) = fill (flip app K1 K2) e
+--     - intros K1 K2 e. by rewrite /fill /= foldl_app.
+
+-- Lemma fill_inj : ∀ K : ectx, Inj eq eq (fill K)
+--     - intros K; induction K as [|Ki K IH]; rewrite /Inj; naive_solver.
+
+--     assert (fill_val : ∀ K e, is_Some (to_val (fill K e)) → is_Some (to_val e)).
+--     { intros K. induction K as [|Ki K IH]=> e //=. by intros ?%IH%fill_item_val. }
+
+--   Lemma fill_not_val K e : to_val e = None → to_val (fill K e) = None.
+--   Proof. rewrite !eq_None_not_Some. eauto using fill_val. Qed.
+
 theorem Expr.DecompItem_height {e : Expr} (h : e.DecompItem = some (Ki, e')) :
     e'.height < e.height := by
   simp only [DecompItem, toVal?] at h
@@ -343,3 +355,60 @@ noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
   | none => ([], e)
   termination_by e.height
   decreasing_by exact Expr.DecompItem_height _h
+
+--   Lemma decomp_unfold e :
+--     decomp e =
+--       match decomp_item e with
+--       | Some (Ki, e') => let '(K, e'') := decomp e' in (K ++ [Ki], e'')
+--       | None => ([], e)
+--       end.
+--   Proof.
+--     rewrite /decomp WfExtensionality.fix_sub_eq_ext /= -/decomp.
+--     repeat case_match; try done.
+--   Qed.
+--
+--   Lemma decomp_inv_nil e e' :
+--     decomp e = ([], e') → decomp_item e = None ∧ e = e'.
+--   Proof.
+--     rewrite decomp_unfold.
+--     destruct (decomp_item e) as [[Ki e'']|] eqn:Heq; [|by intros [=]].
+--     destruct (decomp e''). intros [= Hl He].
+--     assert (l = []) as ->.
+--     { destruct l; inversion Hl. }
+--     inversion Hl.
+--   Qed.
+--
+--   Lemma decomp_inv_cons Ki K e e'' :
+--     decomp e = (K ++ [Ki], e'') → ∃ e', decomp_item e = Some (Ki, e') ∧ decomp e' = (K, e'').
+--   Proof.
+--     rewrite decomp_unfold.
+--     destruct (decomp_item e) as [[Ki' e']|] eqn:Heq'.
+--     2 : { intros [=]. by destruct K. }
+--     destruct (decomp e') as [K' e'''] eqn:Heq.
+--     intros [= [<- <-]%list_snoc_singleton_inv ->].
+--     eauto.
+--   Qed.
+
+-- Lemma decomp_fill  : ∀ (K : ectx) e e', decomp e = (K, e') → fill K e' = e
+--     - induction K as [|Ki K] using rev_ind; intros e e'.
+--       { intros [? ->]%decomp_inv_nil=>//. }
+--       intros (e'' & Hrei & Hre)%decomp_inv_cons.
+--       rewrite fill_app /= (IHK e'') //.
+--       by apply decomp_fill_item_2.
+
+-- Lemma decomp_val_empty : ∀ (K : ectx) e e', decomp e = (K, e') → is_Some (to_val e') → K = []
+--     - intros K. induction K as [|Ki K] using rev_ind; [done|].
+--       intros ?? (e'' & Hrei & Hre)%decomp_inv_cons Hv.
+--       specialize (IHK _ _ Hre Hv). simplify_eq.
+--       apply decomp_inv_nil in Hre as [? ?]; simplify_eq.
+--       by apply decomp_fill_item_2 in Hrei as [_ ?%eq_None_not_Some].
+
+-- Lemma decomp_fill_comp  : ∀ e e' (K K' : ectx), to_val e = None → decomp e = (K', e') → decomp (fill K e) = (flip app K K', e')
+--     - intros e e' K K'. revert K' e e'.
+--       induction K as [|Ki K] using rev_ind.
+--       { intros ??? =>/=. rewrite app_nil_r //. }
+--       intros K' e e' Hval Hre. rewrite fill_app /=.
+--       rewrite decomp_unfold.
+--       rewrite decomp_fill_item; [|auto using fill_item_not_val].
+--       rewrite (IHK K' _ e') //=.
+--       rewrite !app_assoc //.
