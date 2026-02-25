@@ -153,3 +153,9 @@
 --
 -- Lemma expr_ord_wf : well_founded expr_ord.
 -- Proof. red; intro; eapply expr_ord_wf'; eauto. Defined.
+
+-- Lemma decomp_expr_ord Ki e e' : decomp_item e = Some (Ki, e') → expr_ord e' e.
+-- Proof.
+--   rewrite /expr_ord /decomp_item.
+--   destruct Ki ; repeat destruct_match ; intros [=] ; subst ; cbn ; lia.
+-- Qed.
