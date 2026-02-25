@@ -140,3 +140,16 @@
 --         eexists (fill K e2'', σ2'').
 --         eapply dmap_pos.
 --         eexists (_, _); eauto.
+
+-- Definition expr_ord (e1 e2 : expr) : Prop := (height e1 < height e2)%nat.
+--
+-- Lemma expr_ord_wf' h e : (height e ≤ h)%nat → Acc expr_ord e.
+-- Proof.
+--   rewrite /expr_ord. revert e; induction h.
+--   { destruct e; simpl; lia. }
+--   intros []; simpl;
+--     constructor; simpl; intros []; eauto with lia.
+-- Defined.
+--
+-- Lemma expr_ord_wf : well_founded expr_ord.
+-- Proof. red; intro; eapply expr_ord_wf'; eauto. Defined.

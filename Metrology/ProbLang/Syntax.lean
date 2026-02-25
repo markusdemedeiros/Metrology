@@ -275,43 +275,26 @@ theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue :
 --   fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
 -- Proof. destruct Ki2, Ki1; naive_solver eauto with f_equal. Qed.
 
--- Fixpoint height (e : expr) : nat :=
---   match e with
---   | Val _ => 1
---   | Var _ => 1
---   | Rec _ _ e => 1 + height e
---   | App e1 e2 => 1 + height e1 + height e2
---   | UnOp _ e => 1 + height e
---   | BinOp _ e1 e2 => 1 + height e1 + height e2
---   | If e0 e1 e2 => 1 + height e0 + height e1 + height e2
---   | Pair e1 e2 => 1 + height e1 + height e2
---   | Fst e => 1 + height e
---   | Snd e => 1 + height e
---   | InjL e => 1 + height e
---   | InjR e => 1 + height e
---   | Case e0 e1 e2 => 1 + height e0 + height e1 + height e2
---   | AllocN e1 e2 => 1 + height e1 + height e2
---   | Load e => 1 + height e
---   | Store e1 e2 => 1 + height e1 + height e2
---   | AllocTape e => 1 + height e
---   | Rand e1 e2 => 1 + height e1 + height e2
---   | Laplace e1 e2 e3 => 1 + height e1 + height e2 + height e3
---   | Tick e => 1 + height e
---   end.
---
--- Definition expr_ord (e1 e2 : expr) : Prop := (height e1 < height e2)%nat.
---
--- Lemma expr_ord_wf' h e : (height e ≤ h)%nat → Acc expr_ord e.
--- Proof.
---   rewrite /expr_ord. revert e; induction h.
---   { destruct e; simpl; lia. }
---   intros []; simpl;
---     constructor; simpl; intros []; eauto with lia.
--- Defined.
---
--- Lemma expr_ord_wf : well_founded expr_ord.
--- Proof. red; intro; eapply expr_ord_wf'; eauto. Defined.
---
+@[simp]
+def Expr.height : Expr → Nat
+  | lit _ | var _ => 1
+  | letrec _ _ e => 1 + e.height
+  | app e1 e2 => 1 + e1.height + e2.height
+  | binop _ e1 e2 => 1 + e1.height + e2.height
+  | pair e1 e2 => 1 + e1.height + e2.height
+  | store e1 e2 => 1 + e1.height + e2.height
+  | rand e1 e2 => 1 + e1.height + e2.height
+  | unop _ e => 1 + e.height
+  | fst e => 1 + e.height
+  | snd e => 1 + e.height
+  | inl e => 1 + e.height
+  | inr e => 1 + e.height
+  | alloc e => 1 + e.height
+  | load e => 1 + e.height
+  | allocTape e => 1 + e.height
+  | .bif e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+  | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+
 -- Lemma decomp_expr_ord Ki e e' : decomp_item e = Some (Ki, e') → expr_ord e' e.
 -- Proof.
 --   rewrite /expr_ord /decomp_item.
@@ -330,7 +313,6 @@ theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue :
 --     destruct Ki ; cbn ; repeat destruct_match ; intros [=] ; subst ; auto.
 -- Qed.
 
-
 -- Lemma fill_item_not_val K e : to_val e = None → to_val (fill_item K e) = None.
 -- Proof. rewrite !eq_None_not_Some. eauto using fill_item_val. Qed.
 
@@ -342,5 +324,22 @@ def Ectx.comp (e1 e2 : Ectx) : Ectx := e2 ++ e1
 
 def Ectx.fill (K : Ectx) (e : Expr) : Expr := K.foldl (flip EctxItem.FillItem) e
 
---   Lemma fill_app (K1 K2 : ectx) e : fill (K1 ++ K2) e = fill K2 (fill K1 e).
---   Proof. apply foldl_app. Qed.
+theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
+  List.foldl_append
+
+theorem Expr.DecompItem_height {e : Expr} (h : e.DecompItem = some (Ki, e')) :
+    e'.height < e.height := by
+  simp only [DecompItem, toVal?] at h
+  split at h
+  all_goals simp_all
+  all_goals (split at h <;> simp_all <;> try omega)
+  all_goals (split at h <;> simp_all <;> omega)
+
+noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
+  match _h : e.DecompItem with
+  | some (Ki, e') =>
+      let (K, e'') := decomp e'
+      (K ++ [Ki], e'')
+  | none => ([], e)
+  termination_by e.height
+  decreasing_by exact Expr.DecompItem_height _h

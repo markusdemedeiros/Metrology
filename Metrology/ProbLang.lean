@@ -1,9 +1,3 @@
---   Program Fixpoint decomp (e : expr Λ) {wf expr_ord e} : ectx * expr Λ :=
---     match decomp_item e with
---     | Some (Ki, e') => let '(K, e'') := decomp e' in (K ++ [Ki], e'')
---     | None => ([], e)
---     end.
---   Solve Obligations with eauto using decomp_ord, expr_ord_wf.
 --
 --   Lemma decomp_unfold e :
 --     decomp e =
