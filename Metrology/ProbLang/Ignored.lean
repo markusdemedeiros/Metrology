@@ -1,3 +1,19 @@
+-- PORTING NOTE: Ignore for now
+-- Lemma state_upd_heap_singleton l v σ :
+--   state_upd_heap_N l 1 v σ = state_upd_heap <[l:= v]> σ.
+-- Proof.
+--   destruct σ as [h p]. rewrite /state_upd_heap_N /=. f_equiv.
+--   rewrite right_id insert_union_singleton_l. done.
+-- Qed.
+
+-- PORTING NOTE: Ignore for now
+-- Lemma state_upd_tapes_heap σ l1 l2 n xs m v :
+--   state_upd_tapes <[l2:=(n; xs)]> (state_upd_heap_N l1 m v σ) =
+--   state_upd_heap_N l1 m v (state_upd_tapes <[l2:=(n; xs)]> σ).
+-- Proof.
+--   by rewrite /state_upd_tapes /state_upd_heap_N /=.
+-- Qed.
+
 -- PORTING NOTE: Ignore state step lemmas for now
 -- Definition state_step (σ1 : state) (α : loc) : distr state :=
 --   if bool_decide (α ∈ dom σ1.(tapes)) then
@@ -104,3 +120,23 @@
 --     + rewrite lookup_insert_ne //.
 --       apply elem_of_dom. eapply elem_of_elements, Hact. by right.
 -- Qed.
+
+-- Lemma state_step_not_stuck :
+--   ∀ e (σ σ' : state Λ) (α : state_idx Λ),
+--     state_step σ α σ' > 0
+--     → (∃ ρ : expr Λ * state Λ, prim_step e σ ρ > 0) ↔ ∃ ρ' : expr Λ * state Λ, prim_step e σ' ρ' > 0
+--     - intros e1 σ1 σ1' α. rewrite /prim_step.
+--       destruct (decomp e1) as [K e1'] eqn:Heq.
+--       intros Hs. split.
+--       + intros [[e2 σ2] [[e2' σ2'] [_ Hh]]%dmap_pos].
+--         assert (∃ ρ, head_step e1' σ1' ρ > 0) as [[e2'' σ2''] Hs'].
+--         { erewrite <-state_step_head_not_stuck; [|done]. eauto. }
+--         eexists (fill K e2'', σ2'').
+--         eapply dmap_pos.
+--         eexists (_, _). eauto.
+--       + intros [[e2 σ2] [[e2' σ2'] [_ Hh]]%dmap_pos].
+--         assert (∃ ρ, head_step e1' σ1 ρ > 0) as [[e2'' σ2''] Hs'].
+--         { erewrite state_step_head_not_stuck; [|done]. eauto. }
+--         eexists (fill K e2'', σ2'').
+--         eapply dmap_pos.
+--         eexists (_, _); eauto.

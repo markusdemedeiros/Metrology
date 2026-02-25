@@ -1,17 +1,3 @@
-
-
--- ------------- EctxiLanguage.v -------------
-
--- Notation ectx := (list (ectx_item Λ)).
-
---   Lemma fill_item_not_val K e : to_val e = None → to_val (fill_item K e) = None.
---   Proof. rewrite !eq_None_not_Some. eauto using fill_item_val. Qed.
-
---   Definition fill (K : ectx) (e : expr Λ) : expr Λ := foldl (flip fill_item) e K.
-
---   Lemma fill_app (K1 K2 : ectx) e : fill (K1 ++ K2) e = fill K2 (fill K1 e).
---   Proof. apply foldl_app. Qed.
---
 --   Program Fixpoint decomp (e : expr Λ) {wf expr_ord e} : ectx * expr Λ :=
 --     match decomp_item e with
 --     | Some (Ki, e') => let '(K, e'') := decomp e' in (K ++ [Ki], e'')
@@ -58,9 +44,6 @@
 --     assert (fill_not_val : ∀ K e, to_val e = None → to_val (fill K e) = None).
 --     { intros K e. rewrite !eq_None_not_Some. eauto. }
 
-
--- empty_ectxt := []
--- comp_ectxt := flip (++)
 
 -- Lemma fill_comp : ∀ (K1 K2 : ectx) e, fill K1 (fill K2 e) = fill (flip app K1 K2) e
 --     - intros K1 K2 e. by rewrite /fill /= foldl_app.
@@ -174,8 +157,6 @@
 --   Proof. rewrite !eq_None_not_Some. eauto using fill_val. Qed.
 
 
-
-
 -- Lemma val_stuck  : ∀ e (σ : state Λ) (ρ : expr Λ * state Λ), prim_step e σ ρ > 0 → to_val e = None
 --     - intros e1 σ1 [e2 σ2] =>/=. rewrite /prim_step.
 --       destruct (decomp e1) as [K e1'] eqn:Heq.
@@ -183,26 +164,6 @@
 --       rewrite -(decomp_fill _ _ _ Heq).
 --       eapply fill_not_val.
 --       by eapply val_head_stuck.
-
--- Lemma state_step_not_stuck :
---   ∀ e (σ σ' : state Λ) (α : state_idx Λ),
---     state_step σ α σ' > 0
---     → (∃ ρ : expr Λ * state Λ, prim_step e σ ρ > 0) ↔ ∃ ρ' : expr Λ * state Λ, prim_step e σ' ρ' > 0
---     - intros e1 σ1 σ1' α. rewrite /prim_step.
---       destruct (decomp e1) as [K e1'] eqn:Heq.
---       intros Hs. split.
---       + intros [[e2 σ2] [[e2' σ2'] [_ Hh]]%dmap_pos].
---         assert (∃ ρ, head_step e1' σ1' ρ > 0) as [[e2'' σ2''] Hs'].
---         { erewrite <-state_step_head_not_stuck; [|done]. eauto. }
---         eexists (fill K e2'', σ2'').
---         eapply dmap_pos.
---         eexists (_, _). eauto.
---       + intros [[e2 σ2] [[e2' σ2'] [_ Hh]]%dmap_pos].
---         assert (∃ ρ, head_step e1' σ1 ρ > 0) as [[e2'' σ2''] Hs'].
---         { erewrite state_step_head_not_stuck; [|done]. eauto. }
---         eexists (fill K e2'', σ2'').
---         eapply dmap_pos.
---         eexists (_, _); eauto.
 
 -- Lemma prim_step_mass : ∀ e (σ : state Λ), (∃ ρ : expr Λ * state Λ, prim_step e σ ρ > 0) → SeriesC (prim_step e σ) = 1
 --     - intros e σ [[e' σ'] Hs]. revert Hs. rewrite /prim_step.

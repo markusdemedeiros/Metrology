@@ -1,19 +1,20 @@
 import Std
-import Std.Data.TreeMap.Lemmas
+import Std.Data.ExtTreeMap.Lemmas
 
 open Std
 
-def Std.TreeMap.fresh [Ord K] [Add K] [One K] (t : TreeMap K V) : K :=
+def Std.ExtTreeMap.fresh (t : ExtTreeMap Int V) : Int :=
   match t.maxKey? with | none => 1 | some v => v + 1
 
-theorem Std.TreeMap.fresh_get? (t : TreeMap Int V) :
+theorem Std.ExtTreeMap.fresh_get? (t : ExtTreeMap Int V) :
     t[t.fresh]? = none := by
-  unfold TreeMap.fresh
+  unfold ExtTreeMap.fresh
   rcases HM : t.maxKey? with _ | v
-  · exact getElem?_of_isEmpty <| maxKey?_eq_none_iff.mp HM
-  · rw [getElem?_eq_none_iff]
+  · have hemp : t = ∅ := maxKey?_eq_none_iff.mp HM
+    simp [hemp]
+  · apply getElem?_eq_none
     intro hmem
-    have hle := TreeMap.le_maxKey?_of_mem hmem (Option.get_of_eq_some (isSome_maxKey?_of_mem hmem) HM)
+    have hle := ExtTreeMap.le_maxKey?_of_mem hmem (Option.get_of_eq_some (isSome_maxKey?_of_mem hmem) HM)
     simp [compare, compareOfLessAndEq] at hle
     split at hle; grind
     split at hle; grind
@@ -82,8 +83,8 @@ structure Tape where
 def Tape.empty (z : Int) : Tape := ⟨z, []⟩
 
 structure State where
-  heap  : TreeMap Loc Val
-  tapes : TreeMap Loc Tape
+  heap  : ExtTreeMap Loc Val
+  tapes : ExtTreeMap Loc Tape
   deriving Inhabited
 
 theorem Expr.toVal?_ofVal (v : Val) : (Expr.ofVal v).toVal? = some v := by
@@ -224,66 +225,40 @@ def BinOp.eval (op : BinOp) (v1 v2 : Expr) : Option Expr :=
   | eq,    .lit l1,         .lit l2         => some <| .lit <| .bool (decide (l1 = l2))
   |_,      _,        _        => none
 
-def State.update_heap (σ : State) (f : TreeMap Loc Val → TreeMap Loc Val) : State :=
+def State.update_heap (σ : State) (f : ExtTreeMap Loc Val → ExtTreeMap Loc Val) : State :=
   ⟨f σ.heap, σ.tapes⟩
 
-def State.update_tapes (σ : State) (f : TreeMap Loc Tape → TreeMap Loc Tape) : State :=
+def State.update_tapes (σ : State) (f : ExtTreeMap Loc Tape → ExtTreeMap Loc Tape) : State :=
   ⟨σ.heap, f σ.tapes⟩
 
--- PORTING NOTE: Ignore for now
--- Lemma state_upd_tapes_twice σ l n xs ys :
---   state_upd_tapes <[l:=(n; ys)]> (state_upd_tapes <[l:=(n; xs)]> σ) = state_upd_tapes <[l:=(n; ys)]> σ.
--- Proof. rewrite /state_upd_tapes /=. f_equal. apply insert_insert. Qed.
+theorem State.update_tapes_twice (σ : State) (l : Loc) (ys xs : Tape) :
+    (σ.update_tapes (·.insert l xs)).update_tapes (·.insert l ys) =
+    σ.update_tapes (·.insert l ys) := by
+  unfold State.update_tapes; congr 1; grind
 
--- PORTING NOTE: Ignore for now
--- Lemma state_upd_tapes_same σ σ' l n xs ys :
---   state_upd_tapes <[l:=(n; ys)]> σ = state_upd_tapes <[l:=(n; xs)]> σ' -> xs = ys.
--- Proof. rewrite /state_upd_tapes /=. intros K. simplify_eq.
---        rewrite map_eq_iff in H.
---        specialize (H l).
---        rewrite !lookup_insert in H.
---        by simplify_eq.
--- Qed.
+theorem State.update_tapes_same {σ σ' : State}
+    (h : σ.update_tapes (·.insert l xs) = σ'.update_tapes (·.insert l ys)) :
+    xs = ys := by
+  have key := congrArg (·.tapes[l]?) h
+  simp [State.update_tapes] at key
+  exact key
 
--- PORTING NOTE: Ignore for now
--- Lemma state_upd_tapes_no_change σ l n ys :
---   tapes σ !! l = Some (n; ys)->
---   state_upd_tapes <[l:=(n; ys)]> σ = σ .
--- Proof.
---   destruct σ as [? t]. simpl.
---   intros Ht.
---   f_equal.
---   apply insert_id. done.
--- Qed.
+theorem State.update_tapes_no_change {σ : State} (h : σ.tapes[l]? = some ys) :
+    σ.update_tapes (·.insert l ys) = σ := by
+  unfold State.update_tapes; congr 1; grind
 
--- PORTING NOTE: Ignore for now
--- Lemma state_upd_tapes_same' σ σ' l n xs (x y : fin (S n)) :
---   state_upd_tapes <[l:=(n; xs++[x])]> σ = state_upd_tapes <[l:=(n; xs++[y])]> σ' -> x = y.
--- Proof. intros H. apply state_upd_tapes_same in H.
---        by simplify_eq.
--- Qed.
+theorem State.update_tapes_same' {σ σ' : State} {xs : List { z : Int // 0 ≤ z ∧ z < n }}
+    {x y : { z : Int // 0 ≤ z ∧ z < n }}
+    (h : σ.update_tapes (·.insert l ⟨n, xs ++ [x]⟩) = σ'.update_tapes (·.insert l ⟨n, xs ++ [y]⟩)) :
+    x = y := by
+  have heq := State.update_tapes_same h
+  simp [Tape.mk.injEq] at heq
+  exact heq
 
--- PORTING NOTE: Ignore for now
--- Lemma state_upd_tapes_neq' σ σ' l n xs (x y : fin (S n)) :
---   x≠y -> state_upd_tapes <[l:=(n; xs++[x])]> σ ≠ state_upd_tapes <[l:=(n; xs++[y])]> σ'.
--- Proof. move => H /state_upd_tapes_same ?. simplify_eq.
--- Qed.
-
--- PORTING NOTE: Ignore for now
--- Lemma state_upd_heap_singleton l v σ :
---   state_upd_heap_N l 1 v σ = state_upd_heap <[l:= v]> σ.
--- Proof.
---   destruct σ as [h p]. rewrite /state_upd_heap_N /=. f_equiv.
---   rewrite right_id insert_union_singleton_l. done.
--- Qed.
-
--- PORTING NOTE: Ignore for now
--- Lemma state_upd_tapes_heap σ l1 l2 n xs m v :
---   state_upd_tapes <[l2:=(n; xs)]> (state_upd_heap_N l1 m v σ) =
---   state_upd_heap_N l1 m v (state_upd_tapes <[l2:=(n; xs)]> σ).
--- Proof.
---   by rewrite /state_upd_tapes /state_upd_heap_N /=.
--- Qed.
+theorem State.update_tapes_neq' {σ σ' : State} {xs : List { z : Int // 0 ≤ z ∧ z < n }}
+    {x y : { z : Int // 0 ≤ z ∧ z < n }} (hne : x ≠ y) :
+    σ.update_tapes (·.insert l ⟨n, xs ++ [x]⟩) ≠ σ'.update_tapes (·.insert l ⟨n, xs ++ [y]⟩) :=
+  (hne <| State.update_tapes_same' ·)
 
 structure Cfg where
   expr : Expr
@@ -354,3 +329,18 @@ theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue :
 --     destruct e ; try done ;
 --     destruct Ki ; cbn ; repeat destruct_match ; intros [=] ; subst ; auto.
 -- Qed.
+
+
+-- Lemma fill_item_not_val K e : to_val e = None → to_val (fill_item K e) = None.
+-- Proof. rewrite !eq_None_not_Some. eauto using fill_item_val. Qed.
+
+abbrev Ectx := List EctxItem
+
+def Ectx.empty : Ectx := []
+
+def Ectx.comp (e1 e2 : Ectx) : Ectx := e2 ++ e1
+
+def Ectx.fill (K : Ectx) (e : Expr) : Expr := K.foldl (flip EctxItem.FillItem) e
+
+--   Lemma fill_app (K1 K2 : ectx) e : fill (K1 ++ K2) e = fill K2 (fill K1 e).
+--   Proof. apply foldl_app. Qed.
