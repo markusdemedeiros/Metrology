@@ -270,6 +270,10 @@ theorem Ectx.FillItem_injective : Function.Injective (EctxItem.FillItem K) := by
 theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue := by
   cases K <;> simp [EctxItem.FillItem] <;> grind
 
+theorem EctxItem.FillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Expr}
+    (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
+    (h : Ki1.FillItem e1 = Ki2.FillItem e2) : Ki1 = Ki2 := by
+  sorry
 -- Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
 --   to_val e1 = None → to_val e2 = None →
 --   fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
@@ -301,10 +305,16 @@ def Expr.height : Expr → Nat
 --   destruct Ki ; repeat destruct_match ; intros [=] ; subst ; cbn ; lia.
 -- Qed.
 --
+theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Expr} (hv : ¬e.isValue) :
+    (Ki.FillItem e).DecompItem = some (Ki, e) := by
+  sorry
 -- Lemma decomp_fill_item Ki e :
 --   to_val e = None → decomp_item (fill_item Ki e) = Some (Ki, e).
 -- Proof. destruct Ki ; simpl ; by repeat destruct_match. Qed.
 
+theorem Expr.DecompItem_fill {e e' : Expr} {Ki : EctxItem}
+    (h : e.DecompItem = some (Ki, e')) : Ki.FillItem e' = e ∧ ¬e'.isValue := by
+  sorry
 -- Lemma decomp_fill_item_2 e e' Ki :
 --   decomp_item e = Some (Ki, e') → fill_item Ki e' = e ∧ to_val e' = None.
 -- Proof.
@@ -313,6 +323,9 @@ def Expr.height : Expr → Nat
 --     destruct Ki ; cbn ; repeat destruct_match ; intros [=] ; subst ; auto.
 -- Qed.
 
+theorem EctxItem.FillItem_noVal {Ki : EctxItem} {e : Expr} (hv : ¬e.isValue) :
+    ¬(Ki.FillItem e).isValue := by
+  sorry
 -- Lemma fill_item_not_val K e : to_val e = None → to_val (fill_item K e) = None.
 -- Proof. rewrite !eq_None_not_Some. eauto using fill_item_val. Qed.
 
@@ -327,15 +340,24 @@ def Ectx.fill (K : Ectx) (e : Expr) : Expr := K.foldl (flip EctxItem.FillItem) e
 theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
   List.foldl_append
 
+theorem Ectx.fill_comp (K1 K2 : Ectx) (e : Expr) :
+    K1.fill (K2.fill e) = (K2.comp K1).fill e := by
+  sorry
 -- Lemma fill_comp : ∀ (K1 K2 : ectx) e, fill K1 (fill K2 e) = fill (flip app K1 K2) e
 --     - intros K1 K2 e. by rewrite /fill /= foldl_app.
 
+theorem Ectx.fill_injective (K : Ectx) : Function.Injective K.fill := by
+  sorry
 -- Lemma fill_inj : ∀ K : ectx, Inj eq eq (fill K)
 --     - intros K; induction K as [|Ki K IH]; rewrite /Inj; naive_solver.
 
+theorem Ectx.fill_isValue {K : Ectx} {e : Expr} (hv : (K.fill e).isValue) : e.isValue := by
+  sorry
 --     assert (fill_val : ∀ K e, is_Some (to_val (fill K e)) → is_Some (to_val e)).
 --     { intros K. induction K as [|Ki K IH]=> e //=. by intros ?%IH%fill_item_val. }
 
+theorem Ectx.fill_noVal {K : Ectx} {e : Expr} (hv : ¬e.isValue) : ¬(K.fill e).isValue := by
+  sorry
 --   Lemma fill_not_val K e : to_val e = None → to_val (fill K e) = None.
 --   Proof. rewrite !eq_None_not_Some. eauto using fill_val. Qed.
 
@@ -356,6 +378,12 @@ noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
   termination_by e.height
   decreasing_by exact Expr.DecompItem_height _h
 
+theorem Expr.decomp_unfold (e : Expr) :
+    e.decomp =
+      match e.DecompItem with
+      | some (Ki, e') => let (K, e'') := e'.decomp; (K ++ [Ki], e'')
+      | none => ([], e) := by
+  sorry
 --   Lemma decomp_unfold e :
 --     decomp e =
 --       match decomp_item e with
@@ -366,7 +394,10 @@ noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
 --     rewrite /decomp WfExtensionality.fix_sub_eq_ext /= -/decomp.
 --     repeat case_match; try done.
 --   Qed.
---
+
+theorem Expr.decomp_inv_nil {e e' : Expr} (h : e.decomp = ([], e')) :
+    e.DecompItem = none ∧ e = e' := by
+  sorry
 --   Lemma decomp_inv_nil e e' :
 --     decomp e = ([], e') → decomp_item e = None ∧ e = e'.
 --   Proof.
@@ -377,7 +408,11 @@ noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
 --     { destruct l; inversion Hl. }
 --     inversion Hl.
 --   Qed.
---
+
+theorem Expr.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Expr}
+    (h : e.decomp = (K ++ [Ki], e'')) :
+    ∃ e', e.DecompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
+  sorry
 --   Lemma decomp_inv_cons Ki K e e'' :
 --     decomp e = (K ++ [Ki], e'') → ∃ e', decomp_item e = Some (Ki, e') ∧ decomp e' = (K, e'').
 --   Proof.
@@ -389,6 +424,9 @@ noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
 --     eauto.
 --   Qed.
 
+theorem Expr.decomp_fill {K : Ectx} {e e' : Expr} (h : e.decomp = (K, e')) :
+    K.fill e' = e := by
+  sorry
 -- Lemma decomp_fill  : ∀ (K : ectx) e e', decomp e = (K, e') → fill K e' = e
 --     - induction K as [|Ki K] using rev_ind; intros e e'.
 --       { intros [? ->]%decomp_inv_nil=>//. }
@@ -396,6 +434,9 @@ noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
 --       rewrite fill_app /= (IHK e'') //.
 --       by apply decomp_fill_item_2.
 
+theorem Expr.decomp_val_empty {K : Ectx} {e e' : Expr}
+    (hd : e.decomp = (K, e')) (hv : e'.isValue) : K = [] := by
+  sorry
 -- Lemma decomp_val_empty : ∀ (K : ectx) e e', decomp e = (K, e') → is_Some (to_val e') → K = []
 --     - intros K. induction K as [|Ki K] using rev_ind; [done|].
 --       intros ?? (e'' & Hrei & Hre)%decomp_inv_cons Hv.
@@ -403,6 +444,10 @@ noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
 --       apply decomp_inv_nil in Hre as [? ?]; simplify_eq.
 --       by apply decomp_fill_item_2 in Hrei as [_ ?%eq_None_not_Some].
 
+theorem Expr.decomp_fill_comp {e e' : Expr} {K K' : Ectx}
+    (hv : ¬e.isValue) (hd : e.decomp = (K', e')) :
+    (K.fill e).decomp = (K' ++ K, e') := by
+  sorry
 -- Lemma decomp_fill_comp  : ∀ e e' (K K' : ectx), to_val e = None → decomp e = (K', e') → decomp (fill K e) = (flip app K K', e')
 --     - intros e e' K K'. revert K' e e'.
 --       induction K as [|Ki K] using rev_ind.
