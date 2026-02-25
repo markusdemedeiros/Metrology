@@ -1,6 +1,23 @@
 import Std
+import Std.Data.TreeMap.Lemmas
 
 open Std
+
+def Std.TreeMap.fresh [Ord K] [Add K] [One K] (t : TreeMap K V) : K :=
+  match t.maxKey? with | none => 1 | some v => v + 1
+
+theorem Std.TreeMap.fresh_get? (t : TreeMap Int V) :
+    t[t.fresh]? = none := by
+  unfold TreeMap.fresh
+  rcases HM : t.maxKey? with _ | v
+  · exact getElem?_of_isEmpty <| maxKey?_eq_none_iff.mp HM
+  · rw [getElem?_eq_none_iff]
+    intro hmem
+    have hle := TreeMap.le_maxKey?_of_mem hmem (Option.get_of_eq_some (isSome_maxKey?_of_mem hmem) HM)
+    simp [compare, compareOfLessAndEq] at hle
+    split at hle; grind
+    split at hle; grind
+    simp at hle
 
 abbrev Loc : Type := Int
 
@@ -51,17 +68,6 @@ def Expr.noValue (e : Expr) : Prop := ¬ e.isValue
 
 def Val := { e : Expr // e.isValue }
 
--- def Expr.toVal? : Expr → Option Val
--- | letrec f x e' => some ⟨letrec f x e', trivial⟩
--- | lit l => some ⟨lit l, trivial⟩
--- | inl e' => e'.toVal?.bind fun ⟨v, Hv⟩ => some ⟨inl v, Hv⟩
--- | inr e' => e'.toVal?.bind fun ⟨v, Hv⟩ => some ⟨inr v, Hv⟩
--- | pair e1 e2 =>
---   e1.toVal?.bind fun ⟨v1, H1⟩ =>
---   e2.toVal?.bind fun ⟨v2, H2⟩ =>
---   some ⟨pair v1 v2, ⟨H1, H2⟩⟩
--- | _ => none
-
 open Classical in
 noncomputable def Expr.toVal? (e : Expr) : Option Val :=
   if H : e.isValue then some ⟨e, H⟩ else none
@@ -69,9 +75,11 @@ noncomputable def Expr.toVal? (e : Expr) : Option Val :=
 def Expr.ofVal (v : Val) : Expr := v.1
 
 structure Tape where
-  bound : Nat
-  presamples : List (Fin bound.succ)
+  bound : Int
+  presamples : List { z : Int // 0 ≤ z ∧ z < bound}
   deriving Inhabited
+
+def Tape.empty (z : Int) : Tape := ⟨z, []⟩
 
 structure State where
   heap  : TreeMap Loc Val
@@ -205,15 +213,15 @@ def UnOp.eval (op : UnOp) (v : Expr) : Option Expr :=
   | minus, .lit (.int z) => some <| .lit <| .int <| z.neg
   | _, _ => none
 
-def BinOp.eval (op : BinOp) (v1 v2 : BaseLit) : Option Expr :=
+def BinOp.eval (op : BinOp) (v1 v2 : Expr) : Option Expr :=
   match op, v1, v2 with
-  | plus,  .int z1,  .int z2  => some <| .lit <| .int (z1 + z2)
-  | minus, .int z1,  .int z2  => some <| .lit <| .int (z1 - z2)
-  | mult,  .int z1,  .int z2  => some <| .lit <| .int (z1 * z2)
-  | and,   .bool b1, .bool b2 => some <| .lit <| .bool (b1 && b2)
-  | or,    .bool b1, .bool b2 => some <| .lit <| .bool (b1 || b2)
-  | xor,   .bool b1, .bool b2 => some <| .lit <| .bool (b1 ^^ b2)
-  | eq,    l1,       l2       => some <| .lit <| .bool (decide (l1 = l2))
+  | plus,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 + z2)
+  | minus, .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 - z2)
+  | mult,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 * z2)
+  | and,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 && b2)
+  | or,    .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 || b2)
+  | xor,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 ^^ b2)
+  | eq,    .lit l1,         .lit l2         => some <| .lit <| .bool (decide (l1 = l2))
   |_,      _,        _        => none
 
 def State.update_heap (σ : State) (f : TreeMap Loc Val → TreeMap Loc Val) : State :=
@@ -275,4 +283,74 @@ def State.update_tapes (σ : State) (f : TreeMap Loc Tape → TreeMap Loc Tape) 
 --   state_upd_heap_N l1 m v (state_upd_tapes <[l2:=(n; xs)]> σ).
 -- Proof.
 --   by rewrite /state_upd_tapes /state_upd_heap_N /=.
+-- Qed.
+
+structure Cfg where
+  expr : Expr
+  state : State
+
+theorem Ectx.FillItem_injective : Function.Injective (EctxItem.FillItem K) := by
+  cases K <;> simp [Function.Injective, EctxItem.FillItem]
+
+theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue := by
+  cases K <;> simp [EctxItem.FillItem] <;> grind
+
+-- Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
+--   to_val e1 = None → to_val e2 = None →
+--   fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
+-- Proof. destruct Ki2, Ki1; naive_solver eauto with f_equal. Qed.
+
+-- Fixpoint height (e : expr) : nat :=
+--   match e with
+--   | Val _ => 1
+--   | Var _ => 1
+--   | Rec _ _ e => 1 + height e
+--   | App e1 e2 => 1 + height e1 + height e2
+--   | UnOp _ e => 1 + height e
+--   | BinOp _ e1 e2 => 1 + height e1 + height e2
+--   | If e0 e1 e2 => 1 + height e0 + height e1 + height e2
+--   | Pair e1 e2 => 1 + height e1 + height e2
+--   | Fst e => 1 + height e
+--   | Snd e => 1 + height e
+--   | InjL e => 1 + height e
+--   | InjR e => 1 + height e
+--   | Case e0 e1 e2 => 1 + height e0 + height e1 + height e2
+--   | AllocN e1 e2 => 1 + height e1 + height e2
+--   | Load e => 1 + height e
+--   | Store e1 e2 => 1 + height e1 + height e2
+--   | AllocTape e => 1 + height e
+--   | Rand e1 e2 => 1 + height e1 + height e2
+--   | Laplace e1 e2 e3 => 1 + height e1 + height e2 + height e3
+--   | Tick e => 1 + height e
+--   end.
+--
+-- Definition expr_ord (e1 e2 : expr) : Prop := (height e1 < height e2)%nat.
+--
+-- Lemma expr_ord_wf' h e : (height e ≤ h)%nat → Acc expr_ord e.
+-- Proof.
+--   rewrite /expr_ord. revert e; induction h.
+--   { destruct e; simpl; lia. }
+--   intros []; simpl;
+--     constructor; simpl; intros []; eauto with lia.
+-- Defined.
+--
+-- Lemma expr_ord_wf : well_founded expr_ord.
+-- Proof. red; intro; eapply expr_ord_wf'; eauto. Defined.
+--
+-- Lemma decomp_expr_ord Ki e e' : decomp_item e = Some (Ki, e') → expr_ord e' e.
+-- Proof.
+--   rewrite /expr_ord /decomp_item.
+--   destruct Ki ; repeat destruct_match ; intros [=] ; subst ; cbn ; lia.
+-- Qed.
+--
+-- Lemma decomp_fill_item Ki e :
+--   to_val e = None → decomp_item (fill_item Ki e) = Some (Ki, e).
+-- Proof. destruct Ki ; simpl ; by repeat destruct_match. Qed.
+
+-- Lemma decomp_fill_item_2 e e' Ki :
+--   decomp_item e = Some (Ki, e') → fill_item Ki e' = e ∧ to_val e' = None.
+-- Proof.
+--   rewrite /decomp_item ;
+--     destruct e ; try done ;
+--     destruct Ki ; cbn ; repeat destruct_match ; intros [=] ; subst ; auto.
 -- Qed.

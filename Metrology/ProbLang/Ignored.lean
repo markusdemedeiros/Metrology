@@ -1,0 +1,106 @@
+-- PORTING NOTE: Ignore state step lemmas for now
+-- Definition state_step (σ1 : state) (α : loc) : distr state :=
+--   if bool_decide (α ∈ dom σ1.(tapes)) then
+--     let: (N; ns) := (σ1.(tapes) !!! α) in
+--     dmap (λ n, state_upd_tapes (<[α := (N; ns ++ [n])]>) σ1) (dunifP N)
+--   else dzero.
+
+-- PORTING NOTE: Ignore state step lemmas for now
+-- Lemma state_step_unfold σ α N ns:
+--   tapes σ !! α = Some (N; ns) ->
+--   state_step σ α = dmap (λ n, state_upd_tapes (<[α := (N; ns ++ [n])]>) σ) (dunifP N).
+-- Proof.
+--   intros H.
+--   rewrite /state_step.
+--   rewrite bool_decide_eq_true_2; last first.
+--   { by apply elem_of_dom. }
+--   by rewrite (lookup_total_correct (tapes σ) α (N; ns)); last done.
+-- Qed.
+
+-- PORTING NOTE: Ignore state step lemmas for now
+-- Inductive state_step_rel : state → loc → state → Prop :=
+-- | AddTapeS α N (n : fin (S N)) ns σ :
+--   α ∈ dom σ.(tapes) →
+--   σ.(tapes) !!! α = ((N; ns) : tape) →
+--   state_step_rel σ α (state_upd_tapes <[α := (N; ns ++ [n]) : tape]> σ).
+
+
+-- PORTING NOTE: Ignore state step lemmas for now
+-- Lemma state_step_support_equiv_rel σ1 α σ2 :
+--   state_step σ1 α σ2 > 0 ↔ state_step_rel σ1 α σ2.
+-- Proof.
+--   rewrite /state_step. split.
+--   - case_bool_decide; [|intros; inv_distr].
+--     case_match. intros ?. inv_distr.
+--     econstructor; eauto with lia.
+--   - inversion_clear 1.
+--     rewrite bool_decide_eq_true_2 // H1. solve_distr.
+-- Qed.
+
+-- PORTING NOTE: Ignore state step lemmas for now
+-- Lemma state_step_head_step_not_stuck e σ σ' α :
+--   state_step σ α σ' > 0 → (∃ ρ, head_step e σ ρ > 0) ↔ (∃ ρ', head_step e σ' ρ' > 0).
+-- Proof.
+--   rewrite state_step_support_equiv_rel.
+--   inversion_clear 1.
+--   split; intros [[e2 σ2] Hs].
+--   (* TODO: the sub goals used to be solved by [simplify_map_eq]  *)
+--   - destruct e; inv_head_step; try by (unshelve (eexists; solve_distr)).
+--     + destruct (decide (α = l1)); simplify_eq.
+--       * rewrite lookup_insert in H11. done.
+--       * rewrite lookup_insert_ne // in H11. rewrite H11 in H7. done.
+--     + destruct (decide (α = l1)); simplify_eq.
+--       * rewrite lookup_insert in H11. done.
+--       * rewrite lookup_insert_ne // in H11. rewrite H11 in H7. done.
+--     + destruct (decide (α = l1)); simplify_eq.
+--       * rewrite lookup_insert in H10. done.
+--       * rewrite lookup_insert_ne // in H10. rewrite H10 in H7. done.
+--   - destruct e; inv_head_step; try by (unshelve (eexists; solve_distr)).
+--     + destruct (decide (α = l1)); simplify_eq.
+--       * apply not_elem_of_dom_2 in H11. done.
+--       * rewrite lookup_insert_ne // in H7. rewrite H11 in H7.  done.
+--     + destruct (decide (α = l1)); simplify_eq.
+--       * rewrite lookup_insert // in H7.
+--         apply not_elem_of_dom_2 in H11. done.
+--       * rewrite lookup_insert_ne // in H7. rewrite H11 in H7. done.
+--     + destruct (decide (α = l1)); simplify_eq.
+--       * rewrite lookup_insert // in H7.
+--         apply not_elem_of_dom_2 in H10. done.
+--       * rewrite lookup_insert_ne // in H7. rewrite H10 in H7. done.
+-- Qed.
+
+-- PORTING NOTE: Ignore state step lemmas for now
+-- Lemma state_step_mass σ α :
+--   α ∈ dom σ.(tapes) → SeriesC (state_step σ α) = 1.
+-- Proof.
+--   intros Hdom.
+--   rewrite /state_step bool_decide_eq_true_2 //=.
+--   case_match.
+--   rewrite dmap_mass dunif_mass //.
+-- Qed.
+
+-- Definition get_active (σ : state) : list loc := elements (dom σ.(tapes)).
+
+-- Lemma state_step_get_active_mass σ α :
+--   α ∈ get_active σ → SeriesC (state_step σ α) = 1.
+-- Proof. rewrite elem_of_elements. apply state_step_mass. Qed.
+
+-- Lemma state_steps_mass σ αs :
+--   αs ⊆ get_active σ →
+--   SeriesC (foldlM state_step σ αs) = 1.
+-- Proof.
+--   induction αs as [|α αs IH] in σ |-* ; intros Hact.
+--   { rewrite /= dret_mass //. }
+--   rewrite foldlM_cons.
+--   rewrite dbind_det //.
+--   - apply state_step_get_active_mass. set_solver.
+--   - intros σ' Hσ'. apply IH.
+--     apply state_step_support_equiv_rel in Hσ'.
+--     inversion Hσ'; simplify_eq.
+--     intros α' ?. rewrite /get_active /=.
+--     apply elem_of_elements, elem_of_dom.
+--     destruct (decide (α = α')); subst.
+--     + eexists. rewrite lookup_insert //.
+--     + rewrite lookup_insert_ne //.
+--       apply elem_of_dom. eapply elem_of_elements, Hact. by right.
+-- Qed.

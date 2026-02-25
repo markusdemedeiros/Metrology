@@ -139,7 +139,3 @@ theorem LitSyntax.real.π.measurable : Measurable (@LitSyntax.real.π R Z B) := 
 
 
 end MeasurableProjections
-
-class HasZip (M : Type _ → Type _) (K : Type _) [FiniteMap M K] where
-  zip : M T₁ → M T₂ → M (T₁ × T₂)
-  zip_iff {k v m₁ m₂} : (zip m₁ m₂) k = some v ↔ (FiniteMap.zip m₁ m₂) k = some v
