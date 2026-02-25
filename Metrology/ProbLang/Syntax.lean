@@ -149,7 +149,7 @@ noncomputable def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
     e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
     e1.toVal?.casesOn (some (.appL v2, e1)) fun _ => none
   | unop op e1 =>
-    e.toVal?.casesOn (some (.unop op, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.unop op, e1)) fun _ => none
   | binop op e1 e2 =>
     e2.toVal?.casesOn (some (.binopR op e1, e2)) fun v2 =>
     e1.toVal?.casesOn (some (.binopL op v2, e1)) fun _ => none
@@ -316,14 +316,11 @@ theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Expr} (hv : ¬e.isValu
 
 theorem Expr.DecompItem_fill {e e' : Expr} {Ki : EctxItem}
     (h : e.DecompItem = some (Ki, e')) : Ki.FillItem e' = e ∧ ¬e'.isValue := by
-  sorry
--- Lemma decomp_fill_item_2 e e' Ki :
---   decomp_item e = Some (Ki, e') → fill_item Ki e' = e ∧ to_val e' = None.
--- Proof.
---   rewrite /decomp_item ;
---     destruct e ; try done ;
---     destruct Ki ; cbn ; repeat destruct_match ; intros [=] ; subst ; auto.
--- Qed.
+  simp only [DecompItem, toVal?] at h
+  cases e <;> simp_all [EctxItem.FillItem, ofVal] <;>
+    (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq]) <;>
+    (try (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq])) <;>
+    (try (obtain ⟨rfl, rfl⟩ := h; simp_all))
 
 theorem EctxItem.FillItem_noVal {Ki : EctxItem} {e : Expr} (hv : ¬e.isValue) :
     ¬(Ki.FillItem e).isValue :=
@@ -394,48 +391,88 @@ theorem Expr.decomp_inv_nil {e e' : Expr} (h : e.decomp = ([], e')) :
 theorem Expr.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Expr}
     (h : e.decomp = (K ++ [Ki], e'')) :
     ∃ e', e.DecompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
-  sorry
---   Lemma decomp_inv_cons Ki K e e'' :
---     decomp e = (K ++ [Ki], e'') → ∃ e', decomp_item e = Some (Ki, e') ∧ decomp e' = (K, e'').
---   Proof.
---     rewrite decomp_unfold.
---     destruct (decomp_item e) as [[Ki' e']|] eqn:Heq'.
---     2 : { intros [=]. by destruct K. }
---     destruct (decomp e') as [K' e'''] eqn:Heq.
---     intros [= [<- <-]%list_snoc_singleton_inv ->].
---     eauto.
---   Qed.
+  rw [decomp_unfold] at h
+  split at h
+  · rename_i Ki' e' hd
+    simp only at h
+    obtain ⟨hK, he⟩ := Prod.mk.inj h
+    have hlen : (e'.decomp.1).length = K.length := by
+      have := congrArg List.length hK; simp at this; omega
+    obtain ⟨hK', hKi⟩ := List.append_inj hK hlen
+    have hKi' : Ki' = Ki := List.singleton_inj.mp hKi
+    exact ⟨e', hd.symm ▸ hKi' ▸ rfl,
+           Prod.ext hK' (by simp [he])⟩
+  · simp_all [List.append_eq_nil_iff]
 
 theorem Expr.decomp_fill {K : Ectx} {e e' : Expr} (h : e.decomp = (K, e')) :
     K.fill e' = e := by
-  sorry
--- Lemma decomp_fill  : ∀ (K : ectx) e e', decomp e = (K, e') → fill K e' = e
---     - induction K as [|Ki K] using rev_ind; intros e e'.
---       { intros [? ->]%decomp_inv_nil=>//. }
---       intros (e'' & Hrei & Hre)%decomp_inv_cons.
---       rewrite fill_app /= (IHK e'') //.
---       by apply decomp_fill_item_2.
+  suffices ∀ n K (e e' : Expr), K.length = n → e.decomp = (K, e') → K.fill e' = e by
+    exact this K.length K e e' rfl h
+  intro n
+  induction n with
+  | zero =>
+    intro K e e' hlen hd
+    have : K = [] := List.eq_nil_of_length_eq_zero hlen
+    subst this; exact (decomp_inv_nil hd).2.symm
+  | succ n ih =>
+    intro K e e' hlen hd
+    have hne : K ≠ [] := by intro hK; simp [hK] at hlen
+    obtain ⟨K'', Ki, rfl⟩ : ∃ K'' Ki, K = K'' ++ [Ki] :=
+      ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
+    obtain ⟨e'', hKi, hK''⟩ := decomp_inv_cons hd
+    have hlen'' : K''.length = n := by simp at hlen; omega
+    -- (K'' ++ [Ki]).fill e' = Ki.FillItem (K''.fill e') = Ki.FillItem e'' = e
+    have hfill := ih K'' e'' e' hlen'' hK''
+    have hitem := (DecompItem_fill hKi).1
+    simp only [Ectx.fill, List.foldl_append, List.foldl_cons, List.foldl_nil] at *
+    show Ki.FillItem (List.foldl (flip EctxItem.FillItem) e' K'') = e
+    rw [hfill]
+    exact hitem
 
 theorem Expr.decomp_val_empty {K : Ectx} {e e' : Expr}
     (hd : e.decomp = (K, e')) (hv : e'.isValue) : K = [] := by
-  sorry
--- Lemma decomp_val_empty : ∀ (K : ectx) e e', decomp e = (K, e') → is_Some (to_val e') → K = []
---     - intros K. induction K as [|Ki K] using rev_ind; [done|].
---       intros ?? (e'' & Hrei & Hre)%decomp_inv_cons Hv.
---       specialize (IHK _ _ Hre Hv). simplify_eq.
---       apply decomp_inv_nil in Hre as [? ?]; simplify_eq.
---       by apply decomp_fill_item_2 in Hrei as [_ ?%eq_None_not_Some].
+  suffices ∀ n K (e e' : Expr), K.length = n → e.decomp = (K, e') → e'.isValue → K = [] by
+    exact this K.length K e e' rfl hd hv
+  intro n
+  induction n with
+  | zero => intros; exact List.eq_nil_of_length_eq_zero ‹_›
+  | succ n ih =>
+    intro K e e' hlen hd hv
+    have hne : K ≠ [] := by intro hK; simp [hK] at hlen
+    obtain ⟨K'', Ki, rfl⟩ : ∃ K'' Ki, K = K'' ++ [Ki] :=
+      ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
+    obtain ⟨e'', hKi, hK''⟩ := decomp_inv_cons hd
+    have hlen'' : K''.length = n := by simp at hlen; omega
+    have hK''nil : K'' = [] := ih K'' e'' e' hlen'' hK'' hv
+    subst hK''nil
+    obtain ⟨_, he''⟩ := decomp_inv_nil hK''
+    subst he''
+    exact absurd hv (DecompItem_fill hKi).2
 
 theorem Expr.decomp_fill_comp {e e' : Expr} {K K' : Ectx}
     (hv : ¬e.isValue) (hd : e.decomp = (K', e')) :
     (K.fill e).decomp = (K' ++ K, e') := by
-  sorry
--- Lemma decomp_fill_comp  : ∀ e e' (K K' : ectx), to_val e = None → decomp e = (K', e') → decomp (fill K e) = (flip app K K', e')
---     - intros e e' K K'. revert K' e e'.
---       induction K as [|Ki K] using rev_ind.
---       { intros ??? =>/=. rewrite app_nil_r //. }
---       intros K' e e' Hval Hre. rewrite fill_app /=.
---       rewrite decomp_unfold.
---       rewrite decomp_fill_item; [|auto using fill_item_not_val].
---       rewrite (IHK K' _ e') //=.
---       rewrite !app_assoc //.
+  -- Reverse induction on K
+  suffices ∀ n K, K.length = n →
+      (K.fill e).decomp = (K' ++ K, e') by
+    exact this K.length K rfl
+  intro n
+  induction n with
+  | zero =>
+    intro K hlen
+    have : K = [] := List.eq_nil_of_length_eq_zero hlen
+    subst this; simpa
+  | succ n ih =>
+    intro K hlen
+    have hne : K ≠ [] := by intro hK; simp [hK] at hlen
+    obtain ⟨K'', Ki, rfl⟩ : ∃ K'' Ki, K = K'' ++ [Ki] :=
+      ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
+    have hlen'' : K''.length = n := by simp at hlen; omega
+    have hfill_eq : Ectx.fill (K'' ++ [Ki]) e =
+        Ki.FillItem (Ectx.fill K'' e) := by
+      simp only [Ectx.fill, List.foldl_append, List.foldl_cons, List.foldl_nil]; rfl
+    rw [hfill_eq]
+    have hfill_noVal : ¬(Ectx.fill K'' e).isValue := Ectx.fill_noVal hv
+    rw [decomp_unfold, EctxItem.DecompItem_FillItem Ki hfill_noVal]
+    have ih_applied : (Ectx.fill K'' e).decomp = (K' ++ K'', e') := ih K'' hlen''
+    simp only [ih_applied, List.append_assoc]
