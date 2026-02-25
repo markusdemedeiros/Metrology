@@ -2,15 +2,15 @@ import Std
 
 open Std
 
-abbrev Loc : Type _ := Int
+abbrev Loc : Type := Int
 
-abbrev Lbl : Type _ := Int
+abbrev Lbl : Type := Int
 
 inductive Binder | anon | named (s : String)
-  deriving Inhabited
+  deriving Inhabited, DecidableEq
 
-inductive BaseLit | int (z : ℤ) | bool (b : Bool) | unit | loc (loc : Loc) | lbl (lbl : Lbl)
-  deriving Inhabited
+inductive BaseLit | int (z : Int) | bool (b : Bool) | unit | loc (loc : Loc) | lbl (lbl : Lbl)
+  deriving Inhabited, DecidableEq
 
 inductive UnOp | neg | minus
   deriving Inhabited
@@ -20,11 +20,12 @@ inductive BinOp | plus | minus | mult | and | or | xor | eq
 
 inductive Expr
 | lit (b : BaseLit)
+| var (x : String)
 | letrec (f x : Binder) (e : Expr)
 | app (e1 e2 : Expr)
 | unop (u : UnOp) (e : Expr)
 | binop (b : BinOp) (e1 e2 : Expr)
-| bif (ec et tf : BiNOp)
+| bif (ec et tf : Expr)
 | pair (e1 e2 : Expr)
 | fst (e : Expr)
 | snd (e : Expr)
@@ -34,7 +35,7 @@ inductive Expr
 | alloc (e : Expr) -- Initial value
 | load (e : Expr)
 | store (el ev : Expr)
-| alloctape (e : Expr)
+| allocTape (e : Expr)
 | rand (en et : Expr)
   deriving Inhabited
 
@@ -45,259 +46,188 @@ def Expr.isValue : Expr → Prop
 | pair e1 e2 => e1.isValue ∧ e2.isValue
 | _ => False
 
+@[simp]
+def Expr.noValue (e : Expr) : Prop := ¬ e.isValue
+
 def Val := { e : Expr // e.isValue }
 
-def Expr.toVal? : Expr → Option Val 
-| letrec f x e' => some ⟨letrec f x e', trivial⟩
-| lit l => some ⟨lit l, trivial⟩
-| inl e' => e'.toVal?.bind fun ⟨v, Hv⟩ => some ⟨inl v, Hv⟩
-| inr e' => e'.toVal?.bind fun ⟨v, Hv⟩ => some ⟨inr v, Hv⟩
-| pair e1 e2 =>
-  e1.toVal?.bind fun ⟨v1, H1⟩ =>
-  e2.toVal?.bind fun ⟨v2, H2⟩ =>
-  some ⟨pair v1 v2, ⟨H1, H2⟩⟩
-| _ => none
+-- def Expr.toVal? : Expr → Option Val
+-- | letrec f x e' => some ⟨letrec f x e', trivial⟩
+-- | lit l => some ⟨lit l, trivial⟩
+-- | inl e' => e'.toVal?.bind fun ⟨v, Hv⟩ => some ⟨inl v, Hv⟩
+-- | inr e' => e'.toVal?.bind fun ⟨v, Hv⟩ => some ⟨inr v, Hv⟩
+-- | pair e1 e2 =>
+--   e1.toVal?.bind fun ⟨v1, H1⟩ =>
+--   e2.toVal?.bind fun ⟨v2, H2⟩ =>
+--   some ⟨pair v1 v2, ⟨H1, H2⟩⟩
+-- | _ => none
+
+open Classical in
+noncomputable def Expr.toVal? (e : Expr) : Option Val :=
+  if H : e.isValue then some ⟨e, H⟩ else none
 
 def Expr.ofVal (v : Val) : Expr := v.1
 
 structure Tape where
   bound : Nat
   presamples : List (Fin bound.succ)
+  deriving Inhabited
 
 structure State where
   heap  : TreeMap Loc Val
   tapes : TreeMap Loc Tape
+  deriving Inhabited
 
+theorem Expr.toVal?_ofVal (v : Val) : (Expr.ofVal v).toVal? = some v := by
+  obtain ⟨e, He⟩ := v
+  revert He
+  induction e <;> simp_all [isValue, Expr.ofVal, Expr.toVal?]
 
+theorem Expr.ofVal_of_toVal_some {e : Expr} : ∀ {v}, e.toVal? = some v → Expr.ofVal v = e := by
+  induction e <;> simp [toVal?, ofVal]
 
+theorem ofVal_injective : Function.Injective Expr.ofVal :=
+  fun ⟨_, _⟩ _ _ => by congr
 
--- Lemma to_of_val v : to_val (of_val v) = Some v.
--- Proof. by destruct v. Qed.
+inductive EctxItem
+| appL (v2 : Val)
+| appR (e1 : Expr)
+| unop (op : UnOp)
+| binopL (op : BinOp) (v2 : Val)
+| binopR (op : BinOp) (e1 : Expr)
+| bifC (e1 e2 : Expr)
+| pairL (v2 : Val)
+| pairR (e1 : Expr)
+| fst
+| snd
+| inl
+| inr
+| case (e1 e2 : Expr)
+| alloc
+| load
+| storeL (v2 : Val)
+| storeR (e1 : Expr)
+| allocTape
+| randL (v2 : Val)
+| randR (e1 : Expr)
 
--- Lemma of_to_val e v : to_val e = Some v → of_val v = e.
--- Proof. destruct e=>//=. by intros [= <-]. Qed.
+def EctxItem.FillItem (Ki : EctxItem) (e : Expr) : Expr :=
+  match Ki with
+  | appL v2 => .app e (.ofVal v2)
+  | appR e1 => .app e1 e
+  | unop op => .unop op e
+  | binopL op v2 => .binop op e (.ofVal v2)
+  | binopR op e1 => .binop op e1 e
+  | bifC e1 e2 => .bif e e1 e2
+  | .pairL v2 => .pair e (.ofVal v2)
+  | .pairR e1 => .pair e1 e
+  | .fst => .fst e
+  | .snd => .snd e
+  | .inl => .inl e
+  | .inr => .inr e
+  | .case e1 e2 => .case e e1 e2
+  | .alloc => .alloc e
+  | .load => .load e
+  | .storeL v2 => .store e (.ofVal v2)
+  | .storeR e1 => .store e1 e
+  | .allocTape => .allocTape e
+  | .randL v2 => .rand e (.ofVal v2)
+  | .randR e1 => .rand e1 e
 
--- Global Instance of_val_inj : Inj (=) (=) of_val.
--- Proof. intros ??. congruence. Qed.
+noncomputable def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
+  match e with
+  | app e1 e2 =>
+    e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.appL v2, e1)) fun _ => none
+  | unop op e1 =>
+    e.toVal?.casesOn (some (.unop op, e1)) fun _ => none
+  | binop op e1 e2 =>
+    e2.toVal?.casesOn (some (.binopR op e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.binopL op v2, e1)) fun _ => none
+  | .bif ec et ef =>
+    ec.toVal?.casesOn (some (.bifC et ef, ec)) fun _ => none
+  | pair e1 e2 =>
+    e2.toVal?.casesOn (some (.pairR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.pairL v2, e1)) fun _ => none
+  | fst e1 =>
+    e1.toVal?.casesOn (some (.fst, e1)) fun _ => none
+  | snd e1 =>
+    e1.toVal?.casesOn (some (.snd, e1)) fun _ => none
+  | inl e1 =>
+    e1.toVal?.casesOn (some (.inl, e1)) fun _ => none
+  | inr e1 =>
+    e1.toVal?.casesOn (some (.inr, e1)) fun _ => none
+  | alloc e1 =>
+    e1.toVal?.casesOn (some (.alloc, e1)) fun _ => none
+  | load e1 =>
+    e1.toVal?.casesOn (some (.load, e1)) fun _ => none
+  | store e1 e2 =>
+    e2.toVal?.casesOn (some (.storeR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.storeL v2, e1)) fun _ => none
+  | rand e1 e2 =>
+    e2.toVal?.casesOn (some (.randR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.randL v2, e1)) fun _ => none
+  | _ => none
 
--- Global Instance state_inhabited : Inhabited state :=
---   populate {| heap := inhabitant; tapes := inhabitant |}.
--- Global Instance val_inhabited : Inhabited val := populate (LitV LitUnit).
--- Global Instance expr_inhabited : Inhabited expr := populate (Val inhabitant).
+def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
+  match e with
+  | lit l => lit l
+  | var y =>
+    if x = y
+    then v
+    else var y
+  | letrec f y e =>
+    if .named x ≠ f ∧ .named x ≠ y
+    then letrec f y (e.subst x v)
+    else letrec f y e
+  | app e1 e2 => app (e1.subst x v) (e2.subst x v)
+  | unop op e => unop op (e.subst x v)
+  | binop op e1 e2 => binop op (e1.subst x v) (e2.subst x v)
+  | .bif ec et ef => .bif (ec.subst x v) (et.subst x v) (ef.subst x v)
+  | pair e1 e2 => pair (e1.subst x v) (e2.subst x v)
+  | fst e => fst (e.subst x v)
+  | snd e => snd (e.subst x v)
+  | inl e => inl (e.subst x v)
+  | inr e => inr (e.subst x v)
+  | case ec el er => case (ec.subst x v) (el.subst x v) (er.subst x v)
+  | alloc e => alloc (e.subst x v)
+  | load e => load (e.subst x v)
+  | store e1 e2 => store (e1.subst x v) (e2.subst x v)
+  | rand e1 e2 => rand (e1.subst x v) (e2.subst x v)
+  | allocTape e => allocTape (e.subst x v)
 
--- Inductive ectx_item :=
---   | AppLCtx (v2 : val)
---   | AppRCtx (e1 : expr)
---   | UnOpCtx (op : un_op)
---   | BinOpLCtx (op : bin_op) (v2 : val)
---   | BinOpRCtx (op : bin_op) (e1 : expr)
---   | IfCtx (e1 e2 : expr)
---   | PairLCtx (v2 : val)
---   | PairRCtx (e1 : expr)
---   | FstCtx
---   | SndCtx
---   | InjLCtx
---   | InjRCtx
---   | CaseCtx (e1 : expr) (e2 : expr)
---   | AllocNLCtx (v2 : val)
---   | AllocNRCtx (e1 : expr)
---   | LoadCtx
---   | StoreLCtx (v2 : val)
---   | StoreRCtx (e1 : expr)
---   | AllocTapeCtx
---   | RandLCtx (v2 : val)
---   | RandRCtx (e1 : expr)
---   | LaplaceNumCtx (v2 : val) (v3 : val)
---   | LaplaceDenCtx (e1 : expr) (v3 : val)
---   | LaplaceLocCtx (e1 : expr) (e2 : expr)
---   | TickCtx.
+def Expr.subst' (mx : Binder) (v e : Expr) : Expr :=
+  match mx with | .named x => e.subst x v | .anon => e
 
--- Definition fill_item (Ki : ectx_item) (e : expr) : expr :=
---   match Ki with
---   | AppLCtx v2 => App e (of_val v2)
---   | AppRCtx e1 => App e1 e
---   | UnOpCtx op => UnOp op e
---   | BinOpLCtx op v2 => BinOp op e (Val v2)
---   | BinOpRCtx op e1 => BinOp op e1 e
---   | IfCtx e1 e2 => If e e1 e2
---   | PairLCtx v2 => Pair e (Val v2)
---   | PairRCtx e1 => Pair e1 e
---   | FstCtx => Fst e
---   | SndCtx => Snd e
---   | InjLCtx => InjL e
---   | InjRCtx => InjR e
---   | CaseCtx e1 e2 => Case e e1 e2
---   | AllocNLCtx v2 => AllocN e (Val v2)
---   | AllocNRCtx e1 => AllocN e1 e
---   | LoadCtx => Load e
---   | StoreLCtx v2 => Store e (Val v2)
---   | StoreRCtx e1 => Store e1 e
---   | AllocTapeCtx => AllocTape e
---   | RandLCtx v2 => Rand e (Val v2)
---   | RandRCtx e1 => Rand e1 e
---   | LaplaceNumCtx v2 v3 => Laplace e (Val v2) (Val v3)
---   | LaplaceDenCtx e1 v3 => Laplace e1 e (Val v3)
---   | LaplaceLocCtx e1 e2 => Laplace e1 e2 e
---   | TickCtx => Tick e
---   end.
+def UnOp.eval (op : UnOp) (v : Expr) : Option Expr :=
+  match op, v with
+  | neg, .lit (.bool b) => some <| .lit <| .bool <| ¬ b
+  | minus, .lit (.int z) => some <| .lit <| .int <| z.neg
+  | _, _ => none
 
--- Definition decomp_item (e : expr) : option (ectx_item * expr) :=
---   let noval (e : expr) (ei : ectx_item) :=
---     match e with Val _ => None | _ => Some (ei, e) end in
---   match e with
---   | App e1 e2      =>
---       match e2 with
---       | (Val v)    => noval e1 (AppLCtx v)
---       | _          => Some (AppRCtx e1, e2)
---       end
---   | UnOp op e      => noval e (UnOpCtx op)
---   | BinOp op e1 e2 =>
---       match e2 with
---       | Val v      => noval e1 (BinOpLCtx op v)
---       | _          => Some (BinOpRCtx op e1, e2)
---       end
---   | If e0 e1 e2    => noval e0 (IfCtx e1 e2)
---   | Pair e1 e2     =>
---       match e2 with
---       | Val v      => noval e1 (PairLCtx v)
---       | _          => Some (PairRCtx e1, e2)
---       end
---   | Fst e          => noval e FstCtx
---   | Snd e          => noval e SndCtx
---   | InjL e         => noval e InjLCtx
---   | InjR e         => noval e InjRCtx
---   | Case e0 e1 e2  => noval e0 (CaseCtx e1 e2)
---   | AllocN e1 e2        =>
---       match e2 with
---       | Val v      => noval e1 (AllocNLCtx v)
---       | _          => Some (AllocNRCtx e1, e2)
---       end
---
---   | Load e         => noval e LoadCtx
---   | Store e1 e2    =>
---       match e2 with
---       | Val v      => noval e1 (StoreLCtx v)
---       | _          => Some (StoreRCtx e1, e2)
---       end
---   | AllocTape e    => noval e AllocTapeCtx
---   | Rand e1 e2     =>
---       match e2 with
---       | Val v      => noval e1 (RandLCtx v)
---       | _          => Some (RandRCtx e1, e2)
---       end
---   | Laplace e1 e2 e3 =>
---       match e3 with
---       | Val v3 =>
---           match e2 with
---           | Val v2 => noval e1 (LaplaceNumCtx v2 v3)
---           | _ => Some (LaplaceDenCtx e1 v3, e2)
---           end
---       | _ => Some (LaplaceLocCtx e1 e2, e3)
---       end
---   | Tick e         => noval e TickCtx
---   | _              => None
---   end.
+def BinOp.eval (op : BinOp) (v1 v2 : BaseLit) : Option Expr :=
+  match op, v1, v2 with
+  | plus,  .int z1,  .int z2  => some <| .lit <| .int (z1 + z2)
+  | minus, .int z1,  .int z2  => some <| .lit <| .int (z1 - z2)
+  | mult,  .int z1,  .int z2  => some <| .lit <| .int (z1 * z2)
+  | and,   .bool b1, .bool b2 => some <| .lit <| .bool (b1 && b2)
+  | or,    .bool b1, .bool b2 => some <| .lit <| .bool (b1 || b2)
+  | xor,   .bool b1, .bool b2 => some <| .lit <| .bool (b1 ^^ b2)
+  | eq,    l1,       l2       => some <| .lit <| .bool (decide (l1 = l2))
+  |_,      _,        _        => none
 
--- Fixpoint subst (x : string) (v : val) (e : expr)  : expr :=
---   match e with
---   | Val _ => e
---   | Var y => if decide (x = y) then Val v else Var y
---   | Rec f y e =>
---      Rec f y $ if decide (BNamed x ≠ f ∧ BNamed x ≠ y) then subst x v e else e
---   | App e1 e2 => App (subst x v e1) (subst x v e2)
---   | UnOp op e => UnOp op (subst x v e)
---   | BinOp op e1 e2 => BinOp op (subst x v e1) (subst x v e2)
---   | If e0 e1 e2 => If (subst x v e0) (subst x v e1) (subst x v e2)
---   | Pair e1 e2 => Pair (subst x v e1) (subst x v e2)
---   | Fst e => Fst (subst x v e)
---   | Snd e => Snd (subst x v e)
---   | InjL e => InjL (subst x v e)
---   | InjR e => InjR (subst x v e)
---   | Case e0 e1 e2 => Case (subst x v e0) (subst x v e1) (subst x v e2)
---   | AllocN e1 e2 => AllocN (subst x v e1) (subst x v e2)
---   | Load e => Load (subst x v e)
---   | Store e1 e2 => Store (subst x v e1) (subst x v e2)
---   | AllocTape e => AllocTape (subst x v e)
---   | Rand e1 e2 => Rand (subst x v e1) (subst x v e2)
---   | Laplace e1 e2 e3 => Laplace (subst x v e1) (subst x v e2) (subst x v e3)
---   | Tick e => Tick (subst x v e)
---   end.
+def State.update_heap (σ : State) (f : TreeMap Loc Val → TreeMap Loc Val) : State :=
+  ⟨f σ.heap, σ.tapes⟩
 
--- Definition subst' (mx : binder) (v : val) : expr → expr :=
---   match mx with BNamed x => subst x v | BAnon => λ x, x end.
+def State.update_tapes (σ : State) (f : TreeMap Loc Tape → TreeMap Loc Tape) : State :=
+  ⟨σ.heap, f σ.tapes⟩
 
--- Definition un_op_eval (op : un_op) (v : val) : option val :=
---   match op, v with
---   | NegOp, LitV (LitBool b) => Some $ LitV $ LitBool (negb b)
---   | NegOp, LitV (LitInt z) => Some $ LitV $ LitInt (Z.lnot z)
---   | MinusUnOp, LitV (LitInt z) => Some $ LitV $ LitInt (- z)
---   | _, _ => None
---   end.
-
--- Definition bin_op_eval_int (op : bin_op) (n1 n2 : Z) : base_lit :=
---   match op with
---   | PlusOp => LitInt (n1 + n2)
---   | MinusOp => LitInt (n1 - n2)
---   | MultOp => LitInt (n1 * n2)
---   | QuotOp => LitInt (n1 `quot` n2)
---   | RemOp => LitInt (n1 `rem` n2)
---   | AndOp => LitInt (Z.land n1 n2)
---   | OrOp => LitInt (Z.lor n1 n2)
---   | XorOp => LitInt (Z.lxor n1 n2)
---   | ShiftLOp => LitInt (n1 ≪ n2)
---   | ShiftROp => LitInt (n1 ≫ n2)
---   | LeOp => LitBool (bool_decide (n1 ≤ n2))
---   | LtOp => LitBool (bool_decide (n1 < n2))
---   | EqOp => LitBool (bool_decide (n1 = n2))
---   | OffsetOp => LitInt (n1 + n2) (* Treat offsets as ints *)
---   end%Z.
-
--- Definition bin_op_eval_bool (op : bin_op) (b1 b2 : bool) : option base_lit :=
---   match op with
---   | PlusOp | MinusOp | MultOp | QuotOp | RemOp => None (* Arithmetic *)
---   | AndOp => Some (LitBool (b1 && b2))
---   | OrOp => Some (LitBool (b1 || b2))
---   | XorOp => Some (LitBool (xorb b1 b2))
---   | ShiftLOp | ShiftROp => None (* Shifts *)
---   | LeOp | LtOp => None (* InEquality *)
---   | EqOp => Some (LitBool (bool_decide (b1 = b2)))
---   | OffsetOp => None
---   end.
-
--- Definition bin_op_eval_loc (op : bin_op) (l1 : loc) (v2 : base_lit) : option base_lit :=
---   match op, v2 with
---   | OffsetOp, LitInt off => Some $ LitLoc (l1 +ₗ off)
---   | LeOp, LitLoc l2 => Some $ LitBool (bool_decide (l1 ≤ₗ l2))
---   | LtOp, LitLoc l2 => Some $ LitBool (bool_decide (l1 <ₗ l2))
---   | _, _ => None
---   end.
-
--- Definition bin_op_eval (op : bin_op) (v1 v2 : val) : option val :=
---   if decide (op = EqOp) then
---     if decide (vals_compare_safe v1 v2) then
---       Some $ LitV $ LitBool $ bool_decide (v1 = v2)
---     else
---       None
---   else
---     match v1, v2 with
---     | LitV (LitInt n1), LitV (LitInt n2) => Some $ LitV $ bin_op_eval_int op n1 n2
---     | LitV (LitBool b1), LitV (LitBool b2) => LitV <$> bin_op_eval_bool op b1 b2
---     | LitV (LitLoc l1), LitV v2 => LitV <$> bin_op_eval_loc op l1 v2
---     | _, _ => None
---     end.
-
--- Definition state_upd_heap (f : gmap loc val → gmap loc val) (σ : state) : state :=
---   {| heap := f σ.(heap); tapes := σ.(tapes) |}.
--- Global Arguments state_upd_heap _ !_ /.
-
--- Definition state_upd_tapes (f : gmap loc tape → gmap loc tape) (σ : state) : state :=
---   {| heap := σ.(heap); tapes := f σ.(tapes) |}.
--- Global Arguments state_upd_tapes _ !_ /.
-
+-- PORTING NOTE: Ignore for now
 -- Lemma state_upd_tapes_twice σ l n xs ys :
 --   state_upd_tapes <[l:=(n; ys)]> (state_upd_tapes <[l:=(n; xs)]> σ) = state_upd_tapes <[l:=(n; ys)]> σ.
 -- Proof. rewrite /state_upd_tapes /=. f_equal. apply insert_insert. Qed.
---
+
+-- PORTING NOTE: Ignore for now
 -- Lemma state_upd_tapes_same σ σ' l n xs ys :
 --   state_upd_tapes <[l:=(n; ys)]> σ = state_upd_tapes <[l:=(n; xs)]> σ' -> xs = ys.
 -- Proof. rewrite /state_upd_tapes /=. intros K. simplify_eq.
@@ -307,6 +237,7 @@ structure State where
 --        by simplify_eq.
 -- Qed.
 
+-- PORTING NOTE: Ignore for now
 -- Lemma state_upd_tapes_no_change σ l n ys :
 --   tapes σ !! l = Some (n; ys)->
 --   state_upd_tapes <[l:=(n; ys)]> σ = σ .
@@ -317,17 +248,20 @@ structure State where
 --   apply insert_id. done.
 -- Qed.
 
+-- PORTING NOTE: Ignore for now
 -- Lemma state_upd_tapes_same' σ σ' l n xs (x y : fin (S n)) :
 --   state_upd_tapes <[l:=(n; xs++[x])]> σ = state_upd_tapes <[l:=(n; xs++[y])]> σ' -> x = y.
 -- Proof. intros H. apply state_upd_tapes_same in H.
 --        by simplify_eq.
 -- Qed.
 
+-- PORTING NOTE: Ignore for now
 -- Lemma state_upd_tapes_neq' σ σ' l n xs (x y : fin (S n)) :
 --   x≠y -> state_upd_tapes <[l:=(n; xs++[x])]> σ ≠ state_upd_tapes <[l:=(n; xs++[y])]> σ'.
 -- Proof. move => H /state_upd_tapes_same ?. simplify_eq.
 -- Qed.
 
+-- PORTING NOTE: Ignore for now
 -- Lemma state_upd_heap_singleton l v σ :
 --   state_upd_heap_N l 1 v σ = state_upd_heap <[l:= v]> σ.
 -- Proof.
@@ -335,23 +269,10 @@ structure State where
 --   rewrite right_id insert_union_singleton_l. done.
 -- Qed.
 
+-- PORTING NOTE: Ignore for now
 -- Lemma state_upd_tapes_heap σ l1 l2 n xs m v :
 --   state_upd_tapes <[l2:=(n; xs)]> (state_upd_heap_N l1 m v σ) =
 --   state_upd_heap_N l1 m v (state_upd_tapes <[l2:=(n; xs)]> σ).
 -- Proof.
 --   by rewrite /state_upd_tapes /state_upd_heap_N /=.
--- Qed.
---
--- Lemma heap_array_replicate_S_end l v n :
---   heap_array l (replicate (S n) v) = heap_array l (replicate n v) ∪ {[l +ₗ n:= v]}.
--- Proof.
---   induction n.
---   - simpl.
---     rewrite map_union_empty.
---     rewrite map_empty_union.
---     by rewrite loc_add_0.
---   - rewrite replicate_S_end
---      heap_array_app
---      IHn /=.
---     rewrite map_union_empty length_replicate //.
 -- Qed.
