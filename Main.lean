@@ -1,6 +1,8 @@
 import Metrology
 import Mathlib.Data.Real.Basic
 
+/-! # Some tests -/
+
 -- inductive Lit (B Z R  : Type _) where
 --
 -- @[projections]
@@ -32,14 +34,14 @@ import Mathlib.Data.Real.Basic
 -- example : Expr'.epair.π (.epair test1 test2) = some (test1, test2) := rfl
 -- example : Expr'.esnd.π (.epair test1 test2) = none := rfl
 
-@[projections]
+@[projections, constructors]
 inductive MyDepC' (n : Nat)
 | DepC' (depV : Fin n)
 
 /-- info: MyDepC'.DepC'.π {n : ℕ} : MyDepC' n → Option (Fin n) -/
 #guard_msgs in #check MyDepC'.DepC'.π
 
-@[projections]
+@[projections, constructors]
 inductive MyTree where
 | nil
 | leaf (x : Nat)
@@ -52,14 +54,14 @@ example : MyTree.nil.π (.leaf 5) = none := rfl
 example : MyTree.branch.π (.leaf 5) = none := rfl
 example : MyTree.branch.π (.branch (.leaf 1) (.leaf 2) 5) = some (MyTree.leaf 1, MyTree.leaf 2, 5) := rfl
 
-@[projections]
+@[projections, constructors]
 inductive MyEmpty
 
-@[projections]
+@[projections, constructors]
 inductive MyType (x y : Nat)
 | MyV (n : Unit) (w : Fin x)
 
-@[projections]
+@[projections, constructors]
 inductive MyThing (x : Nat) (y : Fin x)
 | MyNothing
 | MyV (blah : String) (bleh : Bool)
@@ -67,7 +69,7 @@ inductive MyThing (x : Nat) (y : Fin x)
 example : (@MyThing.MyV.π 5 2 <| .MyV "hi" false) = some ("hi", false) := rfl
 example : (@MyThing.MyV.π 5 2 <| MyThing.MyNothing) = none := rfl
 
-@[projections]
+@[projections, constructors]
 inductive MyParamT (n : Sort 0) (α β : Type)
 | Val1 (x : α)
 | Val2 (y : β)
@@ -76,9 +78,7 @@ inductive MyParamT (n : Sort 0) (α β : Type)
 /-- info: MyParamT.Val2.π {n : Prop} {α β : Type} : MyParamT n α β → Option β -/
 #guard_msgs in #check MyParamT.Val2.π
 
-def main : IO Unit := return
-
-@[projections]
+@[projections, constructors]
 inductive MyTree' (L1 L2 : Type _) where
 | nil
 | leaf1 (x : L1)
@@ -101,28 +101,30 @@ def MyTree'.branch.ctor  : MyTree' L1 L2 × MyTree' L1 L2 × Nat  → MyTree' L1
 -- #check MyTree'.leaf1
 -- #check Function.uncurry (Function.uncurry MyTree'.branch)
 
-def MyTree'.flatten {L1 L2} (ts : MyTree' (Set L1) (Set L2)) : Set (MyTree' L1 L2) :=
-    let π_nil : Set (MyTree' L1 L2) :=
-      MyTree'.nil.π ts |>.map (fun _ => {nil}) |>.getD ∅
-    let π_leaf1 : Set (MyTree' L1 L2):=
-      MyTree'.leaf1.π ts |>.map (fun f1 => sorry) |>.getD ∅
+-- def MyTree'.flatten {L1 L2} (ts : MyTree' (Set L1) (Set L2)) : Set (MyTree' L1 L2) :=
+--     let π_nil : Set (MyTree' L1 L2) :=
+--       MyTree'.nil.π ts |>.map (fun _ => {nil}) |>.getD ∅
+--     let π_leaf1 : Set (MyTree' L1 L2):=
+--       MyTree'.leaf1.π ts |>.map (fun f1 => sorry) |>.getD ∅
+--
+--
+--     -- let π_leaf1 := MyTree'.leaf1.π go
+--     -- let π_leaf2 := MyTree'.leaf2.π go
+--     -- let π_branch := MyTree'.branch.π go
+--
+--     -- If it's none, then return Set.empty
+--     -- If it's some, then
+--     --     - Apply flatten to all recursive cases
+--     --     - Take the singleton set for all non-recursive, non-parameter cases
+--     --     - Take the set itself for all parameter cases
+--     --     - Define the preimage of (Some (prod. of sets.)) under the projection function
+--     -- The preimage is the union of these sets
+--     -- Could also do a dummy match on the go arguent
+--
+--     sorry
+--     -- Set.union { nil } <|
+--     -- Set.union { leaf1 l | l ∈ Set.univ } <|
+--     -- Set.union { leaf1 l | l ∈ Set.univ } <|
+--     --           { leaf1 l | l ∈ Set.univ }
 
-
-    -- let π_leaf1 := MyTree'.leaf1.π go
-    -- let π_leaf2 := MyTree'.leaf2.π go
-    -- let π_branch := MyTree'.branch.π go
-
-    -- If it's none, then return Set.empty
-    -- If it's some, then
-    --     - Apply flatten to all recursive cases
-    --     - Take the singleton set for all non-recursive, non-parameter cases
-    --     - Take the set itself for all parameter cases
-    --     - Define the preimage of (Some (prod. of sets.)) under the projection function
-    -- The preimage is the union of these sets
-    -- Could also do a dummy match on the go arguent
-
-    sorry
-    -- Set.union { nil } <|
-    -- Set.union { leaf1 l | l ∈ Set.univ } <|
-    -- Set.union { leaf1 l | l ∈ Set.univ } <|
-    --           { leaf1 l | l ∈ Set.univ }
+def main : IO Unit := return
