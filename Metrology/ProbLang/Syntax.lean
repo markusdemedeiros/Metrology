@@ -281,10 +281,6 @@ theorem EctxItem.FillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Expr}
     simp_all [EctxItem.FillItem, Expr.ofVal] <;>
     (try (obtain ⟨_, hval⟩ := ‹Val›; simp_all [Expr.isValue])) <;>
     grind [ofVal_injective, Subtype.ext_iff]
--- Lemma fill_item_no_val_inj Ki1 Ki2 e1 e2 :
---   to_val e1 = None → to_val e2 = None →
---   fill_item Ki1 e1 = fill_item Ki2 e2 → Ki1 = Ki2.
--- Proof. destruct Ki2, Ki1; naive_solver eauto with f_equal. Qed.
 
 @[simp]
 def Expr.height : Expr → Nat

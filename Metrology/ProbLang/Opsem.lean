@@ -39,6 +39,8 @@ def Cfg.Uniform (z : Int) (σ : State) : Measure Cfg :=
 -- TODO: What if we change Cfg to Option (Expr × State)?
 -- NB. Rand is currently off-by-one from Eris. I'm going to see if sticking `by grind`
 -- as a default term everywhere will solve all the positvity side conditions.
+-- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
+-- order, should be governed by the reduction context.
 def HeadStep : Cfg → Measure Cfg
 | ⟨.app (.letrec f x e1) e2, σ⟩ =>
   e2.isValM <|
@@ -178,7 +180,6 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   0 ≤ v →
   v < z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
-
 
 -- Lemma head_step_support_equiv_rel e1 e2 σ1 σ2 :
 --   head_step e1 σ1 (e2, σ2) > 0 ↔ head_step_rel e1 σ1 e2 σ2.
