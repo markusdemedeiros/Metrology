@@ -1,5 +1,5 @@
 import Lean
-import Metrology.Inspect
+import Metrology.Meta.Inspect
 import Lean.Meta.Constructions.CtorElim
 import Lean.AuxRecursor
 
@@ -175,6 +175,7 @@ def constructorsImpl : AttributeImpl := {
 
 initialize registerBuiltinAttribute constructorsImpl
 
+/-
 def mkParameterFunctor (decl : Name) (info : InductiveVal) : MetaM Unit := do
   logInfo s!"{decl} : {info.type}"
   -- Telescope over all parameters, twice
@@ -196,10 +197,6 @@ def mkParameterFunctor (decl : Name) (info : InductiveVal) : MetaM Unit := do
       let typ_closed ← mkForallFVars (params_1 ++ params_2) typ
       -- logInfo s!"{typ_closed}"
 
-
-
-
-
 def parameterFunctorImpl : AttributeImpl := {
     name  := `parameter_functor
     descr := "Automatically construct a functor for inductive datatype"
@@ -213,3 +210,4 @@ def parameterFunctorImpl : AttributeImpl := {
     }
 
 initialize registerBuiltinAttribute parameterFunctorImpl
+-/

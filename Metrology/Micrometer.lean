@@ -1,7 +1,7 @@
 import Mathlib.MeasureTheory.Constructions.Cylinders
 import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
 import Mathlib.Data.Real.Basic
-import Metrology.Projections
+import Metrology.Meta.Projections
 
 -- Operational semantics of continuous PPL
 
@@ -128,7 +128,6 @@ section MeasurableProjections
 
 variable {R Z B : Type _} [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B]
 
--- set_option pp.all true
 theorem LitSyntax.real.π.measurable : Measurable (@LitSyntax.real.π R Z B) := by
   intros S HS
   have X := measurableSet_iff_int_some_measurableSet.mp HS
