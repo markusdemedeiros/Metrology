@@ -37,32 +37,47 @@ inductive BinOp | plus | minus | mult | and | or | xor | eq
   deriving Inhabited
 
 inductive Expr
-| lit (b : BaseLit)
+-- Values: Marker for terms that are finished reducing.
+-- These are here so that we can pattern match on whether or not something is a value,
+-- instead of requiring nested branching.
+-- The property that these expressions actually contain no redexes is not internalized
+-- by this type.
+| val (e : Expr)
+-- Base lambda calculus
 | var (x : String)
 | letrec (f x : Binder) (e : Expr)
 | app (e1 e2 : Expr)
+-- Literals
+| lit (b : BaseLit)
 | unop (u : UnOp) (e : Expr)
 | binop (b : BinOp) (e1 e2 : Expr)
-| bif (ec et tf : Expr)
+| cond (ec et tf : Expr)
+-- Products
 | pair (e1 e2 : Expr)
 | fst (e : Expr)
 | snd (e : Expr)
+-- Sums
 | inl (e : Expr)
 | inr (e : Expr)
 | case (ec el er : Expr)
-| alloc (e : Expr) -- Initial value
+-- State
+| alloc (e : Expr)
 | load (e : Expr)
 | store (el ev : Expr)
-| allocTape (e : Expr)
+-- Randomness
+| tape (e : Expr)
 | rand (en et : Expr)
   deriving Inhabited
 
-@[simp]
-def Expr.isValue : Expr → Prop
-| lit _ | letrec _ _ _ => True
-| inl e | inr e => e.isValue
-| pair e1 e2 => e1.isValue ∧ e2.isValue
+/-- An expression is a value if it is compsed exclusively of value terms -/
+@[simp] def Expr.isValue : Expr → Prop
+| .val _ => True
 | _ => False
+
+-- | .val (.lit _) | .val (.letrec _ _ _) => True
+-- | .val (.inl e) | .val (.inr e) => e.isValue
+-- | .val (.pair e1 e2) => e1.isValue ∧ e2.isValue
+-- | _ => False
 
 @[simp]
 def Expr.noValue (e : Expr) : Prop := ¬ e.isValue
@@ -83,7 +98,7 @@ structure Tape where
 def Tape.empty (z : Int) : Tape := ⟨z, []⟩
 
 structure State where
-  heap  : ExtTreeMap Loc Val
+  heap  : ExtTreeMap Loc Expr
   tapes : ExtTreeMap Loc Tape
   deriving Inhabited
 
@@ -99,13 +114,13 @@ theorem ofVal_injective : Function.Injective Expr.ofVal :=
   fun ⟨_, _⟩ _ _ => by congr
 
 inductive EctxItem
-| appL (v2 : Val)
+| appL (v2 : Expr)
 | appR (e1 : Expr)
 | unop (op : UnOp)
-| binopL (op : BinOp) (v2 : Val)
+| binopL (op : BinOp) (v2 : Expr)
 | binopR (op : BinOp) (e1 : Expr)
-| bifC (e1 e2 : Expr)
-| pairL (v2 : Val)
+| condC (e1 e2 : Expr)
+| pairL (v2 : Expr)
 | pairR (e1 : Expr)
 | fst
 | snd
@@ -114,76 +129,107 @@ inductive EctxItem
 | case (e1 e2 : Expr)
 | alloc
 | load
-| storeL (v2 : Val)
+| storeL (v2 : Expr)
 | storeR (e1 : Expr)
-| allocTape
-| randL (v2 : Val)
+| tape
+| randL (v2 : Expr)
 | randR (e1 : Expr)
 
 def EctxItem.FillItem (Ki : EctxItem) (e : Expr) : Expr :=
   match Ki with
-  | appL v2 => .app e (.ofVal v2)
+  | appL v2 => .app e (.val v2)
   | appR e1 => .app e1 e
   | unop op => .unop op e
-  | binopL op v2 => .binop op e (.ofVal v2)
+  | binopL op v2 => .binop op e (.val v2)
   | binopR op e1 => .binop op e1 e
-  | bifC e1 e2 => .bif e e1 e2
-  | .pairL v2 => .pair e (.ofVal v2)
-  | .pairR e1 => .pair e1 e
-  | .fst => .fst e
-  | .snd => .snd e
-  | .inl => .inl e
-  | .inr => .inr e
-  | .case e1 e2 => .case e e1 e2
-  | .alloc => .alloc e
-  | .load => .load e
-  | .storeL v2 => .store e (.ofVal v2)
-  | .storeR e1 => .store e1 e
-  | .allocTape => .allocTape e
-  | .randL v2 => .rand e (.ofVal v2)
-  | .randR e1 => .rand e1 e
+  | condC e1 e2 => .cond e e1 e2
+  | pairL v2 => .pair e (.val v2)
+  | pairR e1 => .pair e1 e
+  | fst => .fst e
+  | snd => .snd e
+  | inl => .inl e
+  | inr => .inr e
+  | case e1 e2 => .case e e1 e2
+  | alloc => .alloc e
+  | load => .load e
+  | storeL v2 => .store e (.val v2)
+  | storeR e1 => .store e1 e
+  | tape => .tape e
+  | randL v2 => .rand e (.val v2)
+  | randR e1 => .rand e1 e
 
-noncomputable def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
+def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
   match e with
-  | app e1 e2 =>
-    e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.appL v2, e1)) fun _ => none
-  | unop op e1 =>
-    e1.toVal?.casesOn (some (.unop op, e1)) fun _ => none
-  | binop op e1 e2 =>
-    e2.toVal?.casesOn (some (.binopR op e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.binopL op v2, e1)) fun _ => none
-  | .bif ec et ef =>
-    ec.toVal?.casesOn (some (.bifC et ef, ec)) fun _ => none
-  | pair e1 e2 =>
-    e2.toVal?.casesOn (some (.pairR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.pairL v2, e1)) fun _ => none
-  | fst e1 =>
-    e1.toVal?.casesOn (some (.fst, e1)) fun _ => none
-  | snd e1 =>
-    e1.toVal?.casesOn (some (.snd, e1)) fun _ => none
-  | inl e1 =>
-    e1.toVal?.casesOn (some (.inl, e1)) fun _ => none
-  | inr e1 =>
-    e1.toVal?.casesOn (some (.inr, e1)) fun _ => none
-  | alloc e1 =>
-    e1.toVal?.casesOn (some (.alloc, e1)) fun _ => none
-  | load e1 =>
-    e1.toVal?.casesOn (some (.load, e1)) fun _ => none
-  | store e1 e2 =>
-    e2.toVal?.casesOn (some (.storeR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.storeL v2, e1)) fun _ => none
-  | rand e1 e2 =>
-    e2.toVal?.casesOn (some (.randR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.randL v2, e1)) fun _ => none
-  | .case ec el er =>
-    ec.toVal?.casesOn (some (.case el er, ec)) fun _ => none
-  | allocTape e1 =>
-    e1.toVal?.casesOn (some (.allocTape, e1)) fun _ => none
+  | .app e1 e2 =>
+    match e1, e2 with
+    | .val _, .val _ => none
+    | _, .val v2     => some (.appL v2, e1)
+    | _, _           => some (.appR e1, e2)
+  | .unop op e =>
+    match e with
+    | .val _ => none
+    | _      => some (.unop op, e)
+  | .binop op e1 e2 =>
+    match e1, e2 with
+    | .val _, .val _ => none
+    | _, .val v2     => some (.binopL op v2, e1)
+    | _, _           => some (.binopR op e1, e2)
+  | .cond ec et ef =>
+    match ec with
+    | .val _ => none
+    | _      => some (.condC et ef, ec)
+  | .pair e1 e2 =>
+    match e1, e2 with
+    | .val _, .val _ => none
+    | _, .val v2     => some (.pairL v2, e1)
+    | _, _           => some (.pairR e1, e2)
+  | .fst e =>
+    match e with
+    | .val _ => none
+    | _      => some (.fst, e)
+  | .snd e =>
+    match e with
+    | .val _ => none
+    | _      => some (.snd, e)
+  | .inl e =>
+    match e with
+    | .val _ => none
+    | _      => some (.inl, e)
+  | .inr e =>
+    match e with
+    | .val _ => none
+    | _      => some (.inr, e)
+  | .case ec et ef =>
+    match ec with
+    | .val _ => none
+    | _ => some (.case et ef, ec)
+  | .alloc e =>
+    match e with
+    | .val _ => none
+    | _      => some (.alloc, e)
+  | .load e =>
+    match e with
+    | .val _ => none
+    | _      => some (.load, e)
+  | .store e1 e2 =>
+    match e1, e2 with
+    | .val _, .val _ => none
+    | _, .val v2     => some (.storeL v2, e1)
+    | _, _           => some (.storeR e1, e2)
+  | .rand e1 e2 =>
+    match e1, e2 with
+    | .val _, .val _ => none
+    | _, .val v2     => some (.randL v2, e1)
+    | _, _           => some (.randR e1, e2)
+  | .tape e =>
+    match e with
+    | .val _ => none
+    | _      => some (.tape, e)
   | _ => none
 
 def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
   match e with
+  | val v => val v
   | lit l => lit l
   | var y =>
     if x = y
@@ -196,7 +242,7 @@ def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
   | app e1 e2 => app (e1.subst x v) (e2.subst x v)
   | unop op e => unop op (e.subst x v)
   | binop op e1 e2 => binop op (e1.subst x v) (e2.subst x v)
-  | .bif ec et ef => .bif (ec.subst x v) (et.subst x v) (ef.subst x v)
+  | .cond ec et ef => .cond (ec.subst x v) (et.subst x v) (ef.subst x v)
   | pair e1 e2 => pair (e1.subst x v) (e2.subst x v)
   | fst e => fst (e.subst x v)
   | snd e => snd (e.subst x v)
@@ -207,7 +253,7 @@ def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
   | load e => load (e.subst x v)
   | store e1 e2 => store (e1.subst x v) (e2.subst x v)
   | rand e1 e2 => rand (e1.subst x v) (e2.subst x v)
-  | allocTape e => allocTape (e.subst x v)
+  | tape e => tape (e.subst x v)
 
 def Expr.subst' (mx : Binder) (v e : Expr) : Expr :=
   match mx with | .named x => e.subst x v | .anon => e
@@ -229,7 +275,7 @@ def BinOp.eval (op : BinOp) (v1 v2 : Expr) : Option Expr :=
   | eq,    .lit l1,         .lit l2         => some <| .lit <| .bool (decide (l1 = l2))
   |_,      _,        _        => none
 
-def State.update_heap (σ : State) (f : ExtTreeMap Loc Val → ExtTreeMap Loc Val) : State :=
+def State.update_heap (σ : State) (f : ExtTreeMap Loc Expr → ExtTreeMap Loc Expr) : State :=
   ⟨f σ.heap, σ.tapes⟩
 
 def State.update_tapes (σ : State) (f : ExtTreeMap Loc Tape → ExtTreeMap Loc Tape) : State :=
@@ -277,13 +323,15 @@ theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue :
 theorem EctxItem.FillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Expr}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
     (h : Ki1.FillItem e1 = Ki2.FillItem e2) : Ki1 = Ki2 := by
-  cases Ki1 <;> cases Ki2 <;>
-    simp_all [EctxItem.FillItem, Expr.ofVal] <;>
-    (try (obtain ⟨_, hval⟩ := ‹Val›; simp_all [Expr.isValue])) <;>
-    grind [ofVal_injective, Subtype.ext_iff]
+  cases Ki1 <;> cases Ki2
+  all_goals simp only [EctxItem.FillItem] at h
+  all_goals try (obtain ⟨rfl, rfl⟩ := h)
+  all_goals try (obtain ⟨rfl, rfl, rfl⟩ := h)
+  all_goals simp_all
 
 @[simp]
 def Expr.height : Expr → Nat
+  | val e => 1 + e.height
   | lit _ | var _ => 1
   | letrec _ _ e => 1 + e.height
   | app e1 e2 => 1 + e1.height + e2.height
@@ -298,25 +346,25 @@ def Expr.height : Expr → Nat
   | inr e => 1 + e.height
   | alloc e => 1 + e.height
   | load e => 1 + e.height
-  | allocTape e => 1 + e.height
-  | .bif e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+  | tape e => 1 + e.height
+  | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
 
 theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Expr} (hv : ¬e.isValue) :
     (Ki.FillItem e).DecompItem = some (Ki, e) := by
-  cases Ki with
-  | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
-    obtain ⟨val, hval⟩ := v2
-    simp [EctxItem.FillItem, Expr.DecompItem, Expr.toVal?, hv, hval, Expr.ofVal]
-  | _ => simp [EctxItem.FillItem, Expr.DecompItem, Expr.toVal?, hv]
+  cases Ki
+  all_goals (simp only [EctxItem.FillItem, Expr.DecompItem])
+  all_goals (split <;> simp_all)
 
 theorem Expr.DecompItem_fill {e e' : Expr} {Ki : EctxItem}
     (h : e.DecompItem = some (Ki, e')) : Ki.FillItem e' = e ∧ ¬e'.isValue := by
-  simp only [DecompItem, toVal?] at h
-  cases e <;> simp_all [EctxItem.FillItem, ofVal] <;>
-    (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq]) <;>
-    (try (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq])) <;>
-    (try (obtain ⟨rfl, rfl⟩ := h; simp_all))
+  simp only [DecompItem] at h
+  cases e
+  all_goals simp_all [EctxItem.FillItem]
+  all_goals split at h
+  all_goals simp at h
+  all_goals try (obtain ⟨rfl, rfl⟩ := h)
+  all_goals simp
 
 theorem EctxItem.FillItem_noVal {Ki : EctxItem} {e : Expr} (hv : ¬e.isValue) :
     ¬(Ki.FillItem e).isValue :=
@@ -354,7 +402,7 @@ theorem Ectx.fill_isValue {K : Ectx} {e : Expr} (hv : (K.fill e).isValue) : e.is
 
 theorem Expr.DecompItem_height {e : Expr} (h : e.DecompItem = some (Ki, e')) :
     e'.height < e.height := by
-  simp only [DecompItem, toVal?] at h
+  simp only [DecompItem] at h
   split at h
   all_goals simp_all
   all_goals (split at h <;> simp_all <;> try omega)
