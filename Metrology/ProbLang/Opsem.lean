@@ -64,37 +64,236 @@ def HeadStep : Cfg → Measure Cfg
   ed.asValM fun vd =>
   let ℓ := σ.heap.fresh
   dirac ⟨.lit <| .loc ℓ, σ.update_heap fun t => t.insert ℓ vd⟩
-| ⟨.load (.lit (.loc ℓ)), σ⟩ => σ.heap[ℓ]?.casesOn 0 (dirac ⟨.ofVal ·, σ⟩)
+| ⟨.load (.lit (.loc ℓ)), σ⟩ =>
+  match σ.heap[ℓ]? with | none => 0 | some v => (dirac ⟨.ofVal v, σ⟩)
 | ⟨.store (.lit (.loc ℓ)) e, σ⟩ =>
   e.asValM fun v =>
-  σ.heap[ℓ]?.casesOn 0 fun _ => dirac ⟨.lit .unit, σ.update_heap fun t => t.insert ℓ v⟩
+  match σ.heap[ℓ]? with | none => 0 | some _ => dirac ⟨.lit .unit, σ.update_heap fun t => t.insert ℓ v⟩
 | ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ => Cfg.Uniform z σ
-| ⟨.allocTape (.lit (.int z)), σ⟩ =>
+| ⟨.tape (.lit (.int z)), σ⟩ =>
   let α := σ.tapes.fresh
   dirac ⟨.lit <| .lbl α, σ.update_tapes fun t => t.insert α (.empty z)⟩
 | ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ =>
-  σ.tapes[α]?.unwrapM fun ⟨M, ns⟩ =>
-  if M = z
-    then
-      match ns with
-      | [] => Cfg.Uniform z σ
-      | n :: ns => dirac ⟨.lit <| .int n, σ.update_tapes fun t => t.insert α ⟨M, ns⟩⟩
-    else Cfg.Uniform z σ
+  match σ.tapes[α]? with
+  | none => 0
+  | some ⟨M, ns⟩ =>
+    if M = z
+      then
+        match ns with
+        | [] => Cfg.Uniform z σ
+        | n :: ns => dirac ⟨.lit <| .int n, σ.update_tapes fun t => t.insert α ⟨M, ns⟩⟩
+      else Cfg.Uniform z σ
 | _ => 0
+
+elab "rename_goal" name:ident : tactic => do
+  let goal ← Lean.Elab.Tactic.getMainGoal
+  goal.setUserName name.getId
+
+/-- Split the HeadStep cases, but with informative goal names -/
+macro "head_case_names" : tactic =>
+  `(tactic| (
+    unfold HeadStep
+    split
+    on_goal 1  => rename_goal beta
+    on_goal 2  => rename_goal unop
+    on_goal 3  => rename_goal binop
+    on_goal 4  => rename_goal cond.true
+    on_goal 5  => rename_goal cond.false
+    on_goal 6  => rename_goal fst
+    on_goal 7  => rename_goal snd
+    on_goal 8  => rename_goal case.left
+    on_goal 9  => rename_goal case.right
+    on_goal 10 => rename_goal alloc
+    on_goal 11 => rename_goal load
+    on_goal 12 => rename_goal store
+    on_goal 13 => rename_goal rand.plain
+    on_goal 14 => rename_goal tape
+    on_goal 15 => rename_goal rand.tape
+    on_goal 16 => rename_goal default
+  ))
+
+macro "head_case" : tactic =>
+  `(tactic| (
+    head_case_names
+    case' rand.tape =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      split
+      on_goal 1 => rename_goal rand.tape.unalloc
+      on_goal 2 =>
+        split
+        on_goal 2 =>
+          rename_goal rand.tape.mismatch
+        on_goal 1 =>
+          subst_eqs
+          split
+          on_goal 1 => rename_goal rand.tape.empty
+          on_goal 2 => rename_goal rand.tape.deterministic
+    case' tape =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+    case' rand.plain =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+    case' store =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.asValM
+      split
+      on_goal 1 => rename_goal store.no_redex
+      on_goal 2 =>
+        split
+        on_goal 1 => rename_goal store.segfault
+        on_goal 2 => rename_goal store.redex
+    case' load =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      split
+      on_goal 1 => rename_goal load.segfault
+      on_goal 2 => rename_goal load.redex
+    case' alloc =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.asValM
+      split
+      on_goal 1 => rename_goal alloc.no_redex
+      on_goal 2 => rename_goal alloc.redex
+    case' case.right =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.isValM
+      split
+      on_goal 1 => rename_goal case.right.no_redex
+      on_goal 2 => rename_goal case.right.redex
+    case' case.left =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.isValM
+      split
+      on_goal 1 => rename_goal case.left.no_redex
+      on_goal 2 => rename_goal case.left.redex
+    case' snd =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.isValM
+      split
+      on_goal 1 => rename_goal snd.no_redex_1
+      on_goal 2 =>
+        split
+        on_goal 1 => rename_goal snd.no_redex_2
+        on_goal 2 => rename_goal snd.redex
+    case' fst =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.isValM
+      split
+      on_goal 1 => rename_goal fst.no_redex_1
+      on_goal 2 =>
+        split
+        on_goal 1 => rename_goal fst.no_redex_2
+        on_goal 2 => rename_goal fst.redex
+    case' cond.false =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+    case' cond.true =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+    case' binop =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.isValM
+      split
+      on_goal 1 => rename_goal binop.no_redex_1
+      on_goal 2 =>
+        split
+        on_goal 1 => rename_goal binop.no_redex_2
+        on_goal 2 => rename_goal binop.redex
+    case' unop =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.isValM
+      split
+      on_goal 1 => rename_goal unop.no_redex
+      on_goal 2 => rename_goal unop.redex
+    case' beta =>
+      rename_i h_eq
+      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+      subst_eqs
+      unfold Expr.isValM
+      split
+      on_goal 1 => rename_goal beta.no_redex
+      on_goal 2 => rename_goal beta.redex
+  ))
+
+
 
 def HeadStepKernel : Kernel Cfg Cfg where
   measurable' := .of_discrete
   toFun := HeadStep
 
 theorem val_head_stuck : HeadStep ⟨e, σ⟩ {ρ} > 0 → e.toVal? = none := by
-  sorry
--- Lemma val_head_stuck e σ ρ :
---   head_step e σ ρ > 0 → to_val e = None.
--- Proof. destruct ρ, e; [|done..]. rewrite /pmf /=. lra. Qed.
+  head_case
+  case beta.redex => sorry
+  case beta.no_redex => sorry
+  case unop.redex => sorry
+  case unop.no_redex => sorry
+  case binop.no_redex_1 => sorry
+  case binop.no_redex_2 => sorry
+  case binop.redex => sorry
+  case cond.true => sorry
+  case cond.false => sorry
+  case fst.no_redex_1 => sorry
+  case fst.no_redex_2 => sorry
+  case fst.redex => sorry
+  case snd.no_redex_1 => sorry
+  case snd.no_redex_2 => sorry
+  case snd.redex => sorry
+  case case.left.no_redex => sorry
+  case case.left.redex => sorry
+  case case.right.no_redex => sorry
+  case case.right.redex => sorry
+  case alloc.no_redex => sorry
+  case alloc.redex => sorry
+  case load.segfault => sorry
+  case load.redex => sorry
+  case store.no_redex => sorry
+  case store.segfault => sorry
+  case store.redex => sorry
+  case rand.plain => sorry
+  case tape => sorry
+  case rand.tape.unalloc => sorry
+  case rand.tape.mismatch => sorry
+  case rand.tape.empty => sorry
+  case rand.tape.deterministic => sorry
+  case default => sorry
+
 
 theorem haed_ctx_step_val {Ki : EctxItem} :
     HeadStep ⟨Ki.FillItem e, σ⟩ {ρ} > 0 → e.isValue := by
+  -- head_step_cases
   sorry
+  -- <;> try simp_all only [Cfg.mk.injEq]
+  -- all_goals simp_all [Pi.single, Function.update]
+  -- all_goals subst_eqs
+  -- all_goals rename_i H
+  -- all_goals obtain ⟨H1, H2⟩ := H
+  -- all_goals subst_eqs
+  -- · sorry
+
 -- Lemma head_ctx_step_val Ki e σ ρ :
 --   head_step (fill_item Ki e) σ ρ > 0 → is_Some (to_val e).
 -- Proof.
@@ -155,10 +354,10 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   0 ≤ v →
   v < z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ ⟨.lit (.int v), σ⟩
-| AllocTapeS :
+| TapeS :
   ℓ = σ.tapes.fresh →
   σ' = σ.update_tapes (·.insert ℓ (.empty z)) →
-  HeadStepSupport ⟨.allocTape (.lit (.int z)), σ⟩ ⟨.lit (.lbl ℓ), σ'⟩
+  HeadStepSupport ⟨.tape (.lit (.int z)), σ⟩ ⟨.lit (.lbl ℓ), σ'⟩
 | RandTapeS :
   0 < z →
   σ.tapes[α]? = some ⟨N, nn :: ns⟩ →

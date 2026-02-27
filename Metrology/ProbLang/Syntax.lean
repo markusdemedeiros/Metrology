@@ -53,7 +53,7 @@ inductive Expr
 | alloc (e : Expr) -- Initial value
 | load (e : Expr)
 | store (el ev : Expr)
-| allocTape (e : Expr)
+| tape (e : Expr)
 | rand (en et : Expr)
   deriving Inhabited
 
@@ -116,7 +116,7 @@ inductive EctxItem
 | load
 | storeL (v2 : Val)
 | storeR (e1 : Expr)
-| allocTape
+| tape
 | randL (v2 : Val)
 | randR (e1 : Expr)
 
@@ -139,7 +139,7 @@ def EctxItem.FillItem (Ki : EctxItem) (e : Expr) : Expr :=
   | .load => .load e
   | .storeL v2 => .store e (.ofVal v2)
   | .storeR e1 => .store e1 e
-  | .allocTape => .allocTape e
+  | .tape => .tape e
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
 
@@ -178,8 +178,8 @@ noncomputable def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
     e1.toVal?.casesOn (some (.randL v2, e1)) fun _ => none
   | .case ec el er =>
     ec.toVal?.casesOn (some (.case el er, ec)) fun _ => none
-  | allocTape e1 =>
-    e1.toVal?.casesOn (some (.allocTape, e1)) fun _ => none
+  | tape e1 =>
+    e1.toVal?.casesOn (some (.tape, e1)) fun _ => none
   | _ => none
 
 def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
@@ -207,7 +207,7 @@ def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
   | load e => load (e.subst x v)
   | store e1 e2 => store (e1.subst x v) (e2.subst x v)
   | rand e1 e2 => rand (e1.subst x v) (e2.subst x v)
-  | allocTape e => allocTape (e.subst x v)
+  | tape e => tape (e.subst x v)
 
 def Expr.subst' (mx : Binder) (v e : Expr) : Expr :=
   match mx with | .named x => e.subst x v | .anon => e
@@ -298,7 +298,7 @@ def Expr.height : Expr → Nat
   | inr e => 1 + e.height
   | alloc e => 1 + e.height
   | load e => 1 + e.height
-  | allocTape e => 1 + e.height
+  | tape e => 1 + e.height
   | .bif e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
 
