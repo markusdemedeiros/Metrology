@@ -85,11 +85,47 @@ def HeadStep : Cfg → Measure Cfg
       else Cfg.Uniform z σ
 | _ => 0
 
+
+-- head_case
+-- case beta.redex => sorry
+-- case beta.no_redex => sorry
+-- case unop.redex => sorry
+-- case unop.no_redex => sorry
+-- case binop.no_redex_1 => sorry
+-- case binop.no_redex_2 => sorry
+-- case binop.redex => sorry
+-- case cond.true => sorry
+-- case cond.false => sorry
+-- case fst.no_redex_1 => sorry
+-- case fst.no_redex_2 => sorry
+-- case fst.redex => sorry
+-- case snd.no_redex_1 => sorry
+-- case snd.no_redex_2 => sorry
+-- case snd.redex => sorry
+-- case case.left.no_redex => sorry
+-- case case.left.redex => sorry
+-- case case.right.no_redex => sorry
+-- case case.right.redex => sorry
+-- case alloc.no_redex => sorry
+-- case alloc.redex => sorry
+-- case load.segfault => sorry
+-- case load.redex => sorry
+-- case store.no_redex => sorry
+-- case store.segfault => sorry
+-- case store.redex => sorry
+-- case rand.plain => sorry
+-- case tape => sorry
+-- case rand.tape.unalloc => sorry
+-- case rand.tape.mismatch => sorry
+-- case rand.tape.empty => sorry
+-- case rand.tape.deterministic => sorry
+-- case default => sorry
+
 elab "rename_goal" name:ident : tactic => do
   let goal ← Lean.Elab.Tactic.getMainGoal
   goal.setUserName name.getId
 
-/-- Split the HeadStep cases, but with informative goal names -/
+/-- Split the HeadStep cases, but with informative goal names. -/
 macro "head_case_names" : tactic =>
   `(tactic| (
     unfold HeadStep
@@ -112,6 +148,14 @@ macro "head_case_names" : tactic =>
     on_goal 16 => rename_goal default
   ))
 
+macro "head_case_intro" : tactic =>
+  `(tactic| (
+    rename_i h_eq
+    have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+    subst_eqs
+  ))
+
+-- TODO: Refactor
 macro "head_case" : tactic =>
   `(tactic| (
     head_case_names
@@ -239,69 +283,36 @@ macro "head_case" : tactic =>
       on_goal 2 => rename_goal beta.redex
   ))
 
-
-
 def HeadStepKernel : Kernel Cfg Cfg where
   measurable' := .of_discrete
   toFun := HeadStep
 
 theorem val_head_stuck : HeadStep ⟨e, σ⟩ {ρ} > 0 → e.toVal? = none := by
-  head_case
-  case beta.redex => sorry
-  case beta.no_redex => sorry
-  case unop.redex => sorry
-  case unop.no_redex => sorry
-  case binop.no_redex_1 => sorry
-  case binop.no_redex_2 => sorry
-  case binop.redex => sorry
-  case cond.true => sorry
-  case cond.false => sorry
-  case fst.no_redex_1 => sorry
-  case fst.no_redex_2 => sorry
-  case fst.redex => sorry
-  case snd.no_redex_1 => sorry
-  case snd.no_redex_2 => sorry
-  case snd.redex => sorry
-  case case.left.no_redex => sorry
-  case case.left.redex => sorry
-  case case.right.no_redex => sorry
-  case case.right.redex => sorry
-  case alloc.no_redex => sorry
-  case alloc.redex => sorry
-  case load.segfault => sorry
-  case load.redex => sorry
-  case store.no_redex => sorry
-  case store.segfault => sorry
-  case store.redex => sorry
-  case rand.plain => sorry
-  case tape => sorry
-  case rand.tape.unalloc => sorry
-  case rand.tape.mismatch => sorry
-  case rand.tape.empty => sorry
-  case rand.tape.deterministic => sorry
-  case default => sorry
+  head_case <;> simp [Expr.toVal?]
 
+theorem Expr.toVal?_isValue {e : Expr} : e.toVal? = some v → e.isValue := by
+  simp [Expr.toVal?]; grind
 
+-- FIXME: Long proof, needs some automation
 theorem haed_ctx_step_val {Ki : EctxItem} :
     HeadStep ⟨Ki.FillItem e, σ⟩ {ρ} > 0 → e.isValue := by
-  -- head_step_cases
-  sorry
-  -- <;> try simp_all only [Cfg.mk.injEq]
-  -- all_goals simp_all [Pi.single, Function.update]
-  -- all_goals subst_eqs
-  -- all_goals rename_i H
-  -- all_goals obtain ⟨H1, H2⟩ := H
-  -- all_goals subst_eqs
-  -- · sorry
-
--- Lemma head_ctx_step_val Ki e σ ρ :
---   head_step (fill_item Ki e) σ ρ > 0 → is_Some (to_val e).
--- Proof.
---   destruct ρ, Ki ;
---     rewrite /pmf/= ;
---     repeat case_match; clear -H ; inversion H; intros ; (lra || done).
--- Qed.
-
+  have Hzero : (0 : Measure Cfg) {ρ} > 0 → False := by simp
+  have Hdirac : ∀ {ρ' : Cfg}, dirac ρ' {ρ} > 0 → ρ = ρ' := by
+    simp [dirac, Pi.single, Function.update]; grind
+  head_case
+  all_goals try (exact fun H => (Hzero H).elim) -- Deal with all stuck cases
+  -- Now: the redexes remain
+  all_goals cases Ki
+  all_goals (rename_i Hk _; simp [EctxItem.FillItem] at Hk)
+  all_goals try (obtain ⟨rfl, rfl⟩ := Hk)
+  all_goals try (obtain ⟨rfl, rfl, rfl⟩ := Hk)
+  all_goals try (· simp [Expr.isValue])
+  all_goals try (rename_i Hk _; intro _; exact Expr.toVal?_isValue Hk)
+  all_goals simp [Expr.isValue]
+  all_goals intro _
+  all_goals try (· apply Expr.toVal?_isValue; trivial)
+  all_goals try (· apply And.intro <;> apply Expr.toVal?_isValue <;> trivial)
+  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp [Expr.isValue])
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
 | BetaS :
