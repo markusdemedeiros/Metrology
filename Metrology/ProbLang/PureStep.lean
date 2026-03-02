@@ -134,7 +134,17 @@ theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Expr}
 theorem rtc_pure_step_val {n : ℕ} {v : Val} {e : Expr}
     (h : nsteps PureStep n v.1 e) :
     e.toVal? = some v := by
-  sorry
+  induction n generalizing e with
+  | zero =>
+    simp [nsteps] at h
+    subst h
+    exact Expr.toVal?_ofVal v
+  | succ n ih =>
+    obtain ⟨c, hstep, hrest⟩ := h
+    -- v.1 is a value, so val_stuck gives v.1.toVal? = none, contradiction
+    obtain ⟨ρ, hρ⟩ := hstep.safe default
+    have : v.1.toVal? = none := val_stuck hρ
+    simp [Expr.toVal?, v.2] at this
 
 --   (* This is a family of frequent assumptions for PureExec *)
 --   Class IntoVal (e : expr Λ) (v : val Λ) :=

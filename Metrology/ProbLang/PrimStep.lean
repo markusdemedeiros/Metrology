@@ -80,18 +80,6 @@ theorem val_stuck {cfg : Cfg} {ρ : Cfg} (h : PrimStep cfg {ρ} > 0) :
   -- rw [← Expr.decomp_fill rfl]; exact Ectx.fill_noVal' (val_head_stuck hρ')
   sorry
 
--- Lemma prim_step_mass : ∀ e (σ : state Λ), (∃ ρ : expr Λ * state Λ, prim_step e σ ρ > 0) → SeriesC (prim_step e σ) = 1
---     - intros e σ [[e' σ'] Hs]. revert Hs. rewrite /prim_step.
---       destruct (decomp e) as [K e1'] eqn:Heq.
---       intros [[e2' σ2'] [? Hs]]%dmap_pos.
---       assert (SeriesC (head_step e1' σ) = 1) as Hsum; [eauto using head_step_mass|].
---       rewrite dmap_mass //.
---   Qed.
-theorem prim_step_mass (cfg : Cfg) :
-    (∃ ρ : Cfg, PrimStep cfg {ρ} > 0) → IsProbabilityMeasure (PrimStep cfg) := by
-  sorry
-
-
 --   Lemma head_prim_step_eq e1 σ1 :
 --     head_reducible e1 σ1 →
 --     prim_step e1 σ1 = head_step e1 σ1.
@@ -173,20 +161,6 @@ theorem fill_prim_step {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State} (hv : e1.toVa
   ext ⟨e', σ'⟩
   simp only [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq,
              (Ectx.fill_injective K).eq_iff]
-
---   Lemma head_reducible_prim_step e1 σ1 ρ :
---     head_reducible e1 σ1 →
---     prim_step e1 σ1 ρ > 0 → head_step e1 σ1 ρ > 0.
---   Proof.
---     intros. destruct ρ.
---     edestruct (head_reducible_prim_step_ctx empty_ectx) as (?&?&?);
---       rewrite ?fill_empty; eauto.
---     by simplify_eq; rewrite fill_empty.
---   Qed.
-theorem head_reducible_prim_step {e : Expr} {σ : State} {ρ : Cfg}
-    (hred : ∃ ρ' : Cfg, HeadStep ⟨e, σ⟩ {ρ'} > 0)
-    (hstep : PrimStep ⟨e, σ⟩ {ρ} > 0) : HeadStep ⟨e, σ⟩ {ρ} > 0 := by
-  sorry
 
 --   Lemma fill_step e1 σ1 e2 σ2 `{!LanguageCtx K} :
 --     prim_step e1 σ1 (e2, σ2) > 0 →
@@ -348,7 +322,13 @@ theorem prim_step_iff {e1 e2 : Expr} {σ1 σ2 : State} :
       K.fill e1' = e1 ∧
       K.fill e2' = e2 ∧
       HeadStep ⟨e1', σ1⟩ {⟨e2', σ2⟩} > 0 := by
-  sorry
+  constructor
+  · -- (→) needs "map positive → preimage nonempty" — same Mathlib gap as val_stuck/fill_step_inv
+    intro h
+    sorry
+  · rintro ⟨K, e1', e2', rfl, rfl, hhs⟩
+    rw [← fill_prim_step (val_head_stuck hhs)]
+    exact head_prim_step hhs
 
 -- Lemma prim_step_iff' e1 σ1:
 --   (∃ x, prim_step e1 σ1 x > 0) ->
@@ -373,7 +353,27 @@ theorem prim_step_iff' {e : Expr} {σ : State}
     ∃ (K : Ectx) (e' : Expr), K.fill e' = e ∧
       (∃ ρ : Cfg, HeadStep ⟨e', σ⟩ {ρ} > 0) ∧
       PrimStep ⟨e, σ⟩ = (HeadStep ⟨e', σ⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩) := by
-  sorry
+  obtain ⟨⟨e2, σ2⟩, h⟩ := hstep
+  rw [prim_step_iff] at h
+  obtain ⟨K, e1', e2', hfill1, hfill2, hhs⟩ := h
+  refine ⟨K, e1', hfill1, ⟨⟨e2', σ2⟩, hhs⟩, ?_⟩
+  rw [← hfill1, fill_prim_step_map K e1' σ (val_head_stuck hhs),
+      head_prim_step_eq ⟨⟨e2', σ2⟩, hhs⟩]
+
+--  --- Lemma prim_step_mass : ∀ e (σ : state Λ), (∃ ρ : expr Λ * state Λ, prim_step e σ ρ > 0) → SeriesC (prim_step e σ) = 1
+--  ---     - intros e σ [[e' σ'] Hs]. revert Hs. rewrite /prim_step.
+--  ---       destruct (decomp e) as [K e1'] eqn:Heq.
+--  ---       intros [[e2' σ2'] [? Hs]]%dmap_pos.
+--  ---       assert (SeriesC (head_step e1' σ) = 1) as Hsum; [eauto using head_step_mass|].
+--  ---       rewrite dmap_mass //.
+--  ---   Qed.
+theorem prim_step_mass (cfg : Cfg) :
+    (∃ ρ : Cfg, PrimStep cfg {ρ} > 0) → IsProbabilityMeasure (PrimStep cfg) := by
+  intro hred
+  obtain ⟨K', e'', hfill, hhead_red, hps_eq⟩ := prim_step_iff' hred
+  rw [hps_eq]
+  haveI := head_step_mass e'' cfg.state hhead_red
+  exact Measure.isProbabilityMeasure_map (.of_discrete)
 
 -- Lemma head_reducible_prim_step_ctx K e1 σ1 e2 σ2:
 --   head_reducible e1 σ1 →
@@ -393,7 +393,46 @@ theorem head_reducible_prim_step_ctx (K : Ectx) {e1 : Expr} {σ1 : State} {e2 : 
     (hred : ∃ ρ : Cfg, HeadStep ⟨e1, σ1⟩ {ρ} > 0)
     (hstep : PrimStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩} > 0) :
     ∃ e2', e2 = K.fill e2' ∧ HeadStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} > 0 := by
-  sorry
+  rw [prim_step_iff] at hstep
+  obtain ⟨K', e1', e2', hfill1, hfill2, hhs⟩ := hstep
+  -- hfill1 : K'.fill e1' = K.fill e1
+  -- By step_by_val (with K' playing role of K' and K playing role of K_redex):
+  -- ∃ K'', K = K'.comp K''
+  obtain ⟨ρ_red, hρ_red⟩ := hred
+  obtain ⟨K'', hK''⟩ := step_by_val K' K e1' e1 σ1 ρ_red hfill1 (val_head_stuck hhs) hρ_red
+  -- hK'' : K = K'.comp K'' = K'' ++ K'
+  subst hK''
+  -- hfill1 now: K'.fill e1' = (K'' ++ K').fill e1
+  -- i.e. K'.fill e1' = K'.fill (K''.fill e1)
+  -- so e1' = K''.fill e1 by fill_injective
+  simp only [Ectx.comp, fill_app] at hfill1
+  have he1' : e1' = Ectx.fill K'' e1 := Ectx.fill_injective K' hfill1
+  -- K'' must be [] by head_ctx_step_val on hhs (since hhs has head step from e1' = K''.fill e1)
+  have hK''nil : K'' = [] := by
+    rcases head_ctx_step_val K'' e1 σ1 ⟨e2', σ2⟩ (he1' ▸ hhs) with hval | hnil
+    · have hne : e1.toVal? = none := val_head_stuck hρ_red
+      simp [Expr.toVal?, hval] at hne
+    · exact hnil
+  subst hK''nil
+  simp only [Ectx.fill, List.foldl_nil] at he1' hfill2
+  exact ⟨e2', hfill2.symm, he1' ▸ hhs⟩
+
+--   Lemma head_reducible_prim_step e1 σ1 ρ :
+--     head_reducible e1 σ1 →
+--     prim_step e1 σ1 ρ > 0 → head_step e1 σ1 ρ > 0.
+--   Proof.
+--     intros. destruct ρ.
+--     edestruct (head_reducible_prim_step_ctx empty_ectx) as (?&?&?);
+--       rewrite ?fill_empty; eauto.
+--     by simplify_eq; rewrite fill_empty.
+--   Qed.
+theorem head_reducible_prim_step {e : Expr} {σ : State} {ρ : Cfg}
+    (hred : ∃ ρ' : Cfg, HeadStep ⟨e, σ⟩ {ρ'} > 0)
+    (hstep : PrimStep ⟨e, σ⟩ {ρ} > 0) : HeadStep ⟨e, σ⟩ {ρ} > 0 := by
+  obtain ⟨e2, σ2⟩ := ρ
+  obtain ⟨e2', hfill, hhs⟩ := head_reducible_prim_step_ctx [] hred hstep
+  simp [Ectx.fill] at hfill
+  exact hfill ▸ hhs
 
 -- Lemma not_head_reducible_dzero e σ :
 --   head_irreducible e σ → head_step e σ = dzero.
@@ -431,8 +470,8 @@ theorem head_step_not_stuck {e : Expr} {σ : State} {ρ : Cfg}
 -- Qed.
 theorem fill_reducible (K : Ectx) {e : Expr} {σ : State}
     (hred : ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0) :
-    ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0 := by
-  sorry
+    ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0 :=
+  reducible_fill K hred
 
 -- Lemma head_prim_reducible e σ : head_reducible e σ → reducible (e, σ).
 -- Proof. intros [ρ Hstep]. exists ρ. by apply head_prim_step. Qed.
