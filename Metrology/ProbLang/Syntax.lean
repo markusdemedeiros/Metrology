@@ -336,8 +336,6 @@ theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
 theorem Ectx.fill_comp (K1 K2 : Ectx) (e : Expr) :
     K1.fill (K2.fill e) = (K1.comp K2).fill e := by
   simp [Ectx.comp, fill_app]
--- Lemma fill_comp : ∀ (K1 K2 : ectx) e, fill K1 (fill K2 e) = fill (flip app K1 K2) e
---     - intros K1 K2 e. by rewrite /fill /= foldl_app.
 
 theorem Ectx.fill_injective (K : Ectx) : Function.Injective K.fill := by
   induction K with
@@ -425,6 +423,7 @@ theorem Expr.decomp_fill {K : Ectx} {e e' : Expr} (h : e.decomp = (K, e')) :
     rw [hfill]
     exact hitem
 
+-- TODO: Cleanup
 theorem Expr.decomp_val_empty {K : Ectx} {e e' : Expr}
     (hd : e.decomp = (K, e')) (hv : e'.isValue) : K = [] := by
   suffices ∀ n K (e e' : Expr), K.length = n → e.decomp = (K, e') → e'.isValue → K = [] by
@@ -445,10 +444,10 @@ theorem Expr.decomp_val_empty {K : Ectx} {e e' : Expr}
     subst he''
     exact absurd hv (DecompItem_fill hKi).2
 
+-- TODO: Cleanup
 theorem Expr.decomp_fill_comp {e e' : Expr} {K K' : Ectx}
     (hv : ¬e.isValue) (hd : e.decomp = (K', e')) :
     (K.fill e).decomp = (K' ++ K, e') := by
-  -- Reverse induction on K
   suffices ∀ n K, K.length = n →
       (K.fill e).decomp = (K' ++ K, e') by
     exact this K.length K rfl
