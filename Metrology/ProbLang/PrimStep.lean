@@ -8,6 +8,34 @@ local instance : MeasurableSpace State := ⊤
 local instance : MeasurableSpace Val := ⊤
 local instance : MeasurableSpace Cfg := ⊤
 
+--   Definition fill_lift (K : ectx Λ) : (expr Λ * state Λ) → (expr Λ * state Λ) :=
+--     λ '(e, σ), (fill K e, σ).
+def fillLift (K : Ectx) (ρ : Cfg) : Cfg := ⟨K.fill ρ.expr, ρ.state⟩
+
+--   Lemma fill_lift_comp (K1 K2 : ectx Λ) :
+--     fill_lift (comp_ectx K1 K2) = fill_lift K1 ∘ fill_lift K2.
+--   Proof.
+--     extensionality ρ. destruct ρ.
+--     rewrite /fill_lift -fill_comp //=.
+--   Qed.
+theorem fillLift_comp (K1 K2 : Ectx) :
+    fillLift (K1.comp K2) = fillLift K1 ∘ fillLift K2 := by
+  sorry
+
+--   Lemma fill_lift_empty :
+--     fill_lift empty_ectx = (λ ρ, ρ).
+--   Proof.
+--     extensionality ρ. destruct ρ.
+--     rewrite /fill_lift fill_empty //.
+--   Qed.
+theorem fillLift_empty : fillLift [] = id := by
+  sorry
+
+--   Instance inj_fill (K : ectx Λ) : Inj eq eq (fill_lift K).
+--   Proof. intros [] [] [=<-%(inj _) ->]=>//. Qed.
+theorem fillLift_injective (K : Ectx) : Function.Injective (fillLift K) := by
+  sorry
+
 -- Definition prim_step (e1 : expr Λ) (σ1 : state Λ) : distr (expr Λ * state Λ) :=
 --   let '(K, e1') := decomp e1 in
 --   dmap (fill_lift K) (head_step e1' σ1).
@@ -118,6 +146,56 @@ theorem head_reducible_prim_step {e : Expr} {σ : State} {ρ : Cfg}
     (hstep : PrimStep ⟨e, σ⟩ {ρ} > 0) : HeadStep ⟨e, σ⟩ {ρ} > 0 := by
   sorry
 
+--   Lemma fill_step e1 σ1 e2 σ2 `{!LanguageCtx K} :
+--     prim_step e1 σ1 (e2, σ2) > 0 →
+--     prim_step (K e1) σ1 (K e2, σ2) > 0.
+--   Proof.
+--     intros Hs.
+--     rewrite fill_dmap; [|by eapply val_stuck].
+--     apply dbind_pos. eexists (_,_). split; [|done].
+--     rewrite dret_1_1 //. lra.
+--   Qed.
+theorem fill_step {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
+    (h : PrimStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} > 0) :
+    PrimStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} > 0 := by
+  sorry
+
+--   Lemma fill_step_inv e1' σ1 e2 σ2 `{!LanguageCtx K} :
+--     to_val e1' = None → prim_step (K e1') σ1 (e2, σ2) > 0 →
+--     ∃ e2', e2 = K e2' ∧ prim_step e1' σ1 (e2', σ2) > 0.
+--   Proof.
+--     intros Hv. rewrite fill_dmap //.
+--     intros ([e1 σ1'] & [=]%dret_pos & Hstep)%dbind_pos.
+--     subst. eauto.
+--   Qed.
+theorem fill_step_inv {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
+    (hv : e1.toVal? = none)
+    (h : PrimStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩} > 0) :
+    ∃ e2', e2 = K.fill e2' ∧ PrimStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} > 0 := by
+  sorry
+
+--   Lemma fill_step_prob e1 σ1 e2 σ2 `{!LanguageCtx K} :
+--     to_val e1 = None →
+--     prim_step e1 σ1 (e2, σ2) = prim_step (K e1) σ1 (K e2, σ2).
+--   Proof.
+--     intros Hv. rewrite fill_dmap //.
+--     by erewrite (dmap_elem_eq _ (e2, σ2) _ (λ '(e0, σ0), (K e0, σ0))).
+--   Qed.
+theorem fill_step_prob {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
+    (hv : e1.toVal? = none) :
+    PrimStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = PrimStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
+  sorry
+
+--   Lemma reducible_fill `{!@LanguageCtx Λ K} e σ :
+--     reducible (e, σ) → reducible (K e, σ).
+--   Proof.
+--     unfold reducible in *. intros [[] ?]. eexists; by apply fill_step.
+--   Qed.
+theorem reducible_fill (K : Ectx) {e : Expr} {σ : State}
+    (hred : ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0) :
+    ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0 := by
+  sorry
+
 -- Lemma step_by_val :
 --   ∀ (K' K_redex : ectx) (e1' e1_redex : expr Λ) (σ1 : state Λ) (ρ : expr Λ * state Λ),
 --     fill K' e1' = fill K_redex e1_redex
@@ -149,6 +227,39 @@ theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Expr) (σ : State) (ρ :
 theorem head_ctx_step_val (K : Ectx) (e : Expr) (σ : State) (ρ : Cfg)
     (hstep : HeadStep ⟨K.fill e, σ⟩ {ρ} > 0) :
     e.isValue ∨ K = [] := by
+  sorry
+
+-- Lemma not_head_reducible e σ : ¬head_reducible e σ ↔ head_irreducible e σ.
+-- Proof.
+--   unfold head_reducible, head_irreducible. split.
+--   - intros Hnot ρ.
+--     assert (¬ head_step e σ ρ > 0) as H%Rnot_gt_ge; eauto.
+--     pose proof (pmf_pos (head_step e σ) ρ). lra.
+--   - intros Hall [ρ ?]. specialize (Hall ρ). lra.
+-- Qed.
+theorem not_head_reducible {e : Expr} {σ : State} :
+    (¬ ∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) ↔ (∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0) := by
+  sorry
+
+-- Lemma head_redex_unique K K' e e' σ :
+--   fill K e = fill K' e' →
+--   head_reducible e σ →
+--   head_reducible e' σ →
+--   K = comp_ectx K' empty_ectx ∧ e = e'.
+-- Proof.
+--   intros Heq [[e2 σ2] Hred] [[e2' σ2'] Hred'].
+--   edestruct (step_by_val K' K e' e) as [K'' HK];
+--     [by eauto using val_head_stuck..|].
+--   subst K. move: Heq. rewrite -fill_comp. intros <-%(inj (fill _)).
+--   destruct (head_ctx_step_val _ _ _ _ Hred') as [[]%not_eq_None_Some|HK''].
+--   { by eapply val_head_stuck. }
+--   subst K''. rewrite fill_empty. done.
+-- Qed.
+theorem head_redex_unique (K K' : Ectx) (e e' : Expr) (σ : State)
+    (hfill : K.fill e = K'.fill e')
+    (hred  : ∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0)
+    (hred' : ∃ ρ : Cfg, HeadStep ⟨e', σ⟩ {ρ} > 0) :
+    K = K'.comp [] ∧ e = e' := by
   sorry
 
 -- Lemma prim_step_iff e1 e2 σ1 σ2 :
@@ -296,6 +407,18 @@ theorem head_prim_irreducible {e : Expr} {σ : State}
 def SubRedexesAreValues (e : Expr) : Prop :=
   ∀ (K : Ectx) (e' : Expr), e = K.fill e' → e'.toVal? = none → K = []
 
+--   Lemma ectxi_language_sub_redexes_are_values e :
+--     (∀ Ki e', e = fill_item Ki e' → is_Some (to_val e')) →
+--     sub_redexes_are_values e.
+--   Proof.
+--     intros Hsub K e' ->. destruct K as [|Ki K _] using @rev_ind=> //=.
+--     intros []%eq_None_not_Some. eapply fill_val, Hsub. by rewrite /= fill_app.
+--   Qed.
+theorem ectxi_language_sub_redexes_are_values {e : Expr}
+    (h : ∀ (Ki : EctxItem) (e' : Expr), e = Ki.FillItem e' → e'.isValue) :
+    SubRedexesAreValues e := by
+  sorry
+
 theorem prim_head_reducible {e : Expr} {σ : State}
     (hred : ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0)
     (hsub : SubRedexesAreValues e) :
@@ -338,6 +461,50 @@ theorem reducible_fill_inv (K : Ectx) {e : Expr} {σ : State}
     (hv : e.toVal? = none)
     (hred : ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0) :
     ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0 := by
+  sorry
+
+-- Lemma irreducible_fill `{!@LanguageCtx Λ K} e σ :
+--   to_val e = None → irreducible (e, σ) → irreducible (K e, σ).
+-- Proof. rewrite -!not_reducible. naive_solver eauto using reducible_fill_inv. Qed.
+theorem irreducible_fill (K : Ectx) {e : Expr} {σ : State}
+    (hv   : e.toVal? = none)
+    (hirr : ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0) :
+    ¬ ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0 := by
+  sorry
+
+-- Lemma irreducible_fill_inv `{!@LanguageCtx Λ K} e σ :
+--   irreducible (K e, σ) → irreducible (e, σ).
+-- Proof. rewrite -!not_reducible. naive_solver eauto using reducible_fill. Qed.
+theorem irreducible_fill_inv (K : Ectx) {e : Expr} {σ : State}
+    (hirr : ¬ ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0) :
+    ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0 := by
+  sorry
+
+-- Lemma not_stuck_fill_inv K `{!@LanguageCtx Λ K} e σ :
+--   not_stuck (K e, σ) → not_stuck (e, σ).
+-- Proof.
+--   rewrite /not_stuck /is_final /to_final /= -!not_eq_None_Some.
+--   intros [?|?].
+--   - auto using fill_not_val.
+--   - destruct (decide (to_val e = None)); eauto using reducible_fill_inv.
+-- Qed.
+/-- not_stuck: expression is a value or has a prim step -/
+def NotStuck (e : Expr) (σ : State) : Prop :=
+  e.isValue ∨ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0
+
+theorem not_stuck_fill_inv (K : Ectx) {e : Expr} {σ : State}
+    (h : NotStuck (K.fill e) σ) : NotStuck e σ := by
+  sorry
+
+-- Lemma stuck_fill `{!@LanguageCtx Λ K} e σ :
+--   stuck (e, σ) → stuck (K e, σ).
+-- Proof. rewrite -!not_not_stuck. eauto using not_stuck_fill_inv. Qed.
+/-- stuck: expression is not a value and has no prim step -/
+def Stuck (e : Expr) (σ : State) : Prop :=
+  ¬ e.isValue ∧ ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0
+
+theorem stuck_fill (K : Ectx) {e : Expr} {σ : State}
+    (h : Stuck e σ) : Stuck (K.fill e) σ := by
   sorry
 
 end PrimStep
