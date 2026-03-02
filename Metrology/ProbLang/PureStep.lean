@@ -1,6 +1,10 @@
 import Metrology.ProbLang.PrimStep
 import Mathlib.Order.Defs.PartialOrder
 
+def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
+  | 0,   a, b => a = b
+  | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
+
 noncomputable section PureStep
 open Classical MeasureTheory ProbabilityTheory Measure
 
@@ -20,7 +24,7 @@ structure PureStep (e1 e2 : Expr) : Prop where
 -- Class PureExec (φ : Prop) (n : nat) (e1 e2 : expr Λ) :=
 --   pure_exec : φ → relations.nsteps pure_step n e1 e2.
 class PureExec (φ : Prop) (n : ℕ) (e1 e2 : Expr) : Prop where
-  pure_exec : φ → Relation.ReflTransGen PureStep e1 e2
+  pure_exec : φ → nsteps PureStep n e1 e2
 
 -- Record pure_head_step (e1 e2 : expr Λ) := {
 --   pure_head_step_safe σ1 : head_reducible e1 σ1;
@@ -60,11 +64,19 @@ theorem PureStep.fill (K : Ectx) {e1 e2 : Expr} (h : PureStep e1 e2) :
 --   relations.nsteps pure_step n e1 e2 →
 --   relations.nsteps pure_step n (K e1) (K e2).
 -- Proof. eauto using nsteps_congruence, pure_step_ctx. Qed.
-theorem PureStep.fill_nsteps (K : Ectx) {e1 e2 : Expr}
-    (h : Relation.ReflTransGen PureStep e1 e2) :
-    Relation.ReflTransGen PureStep (K.fill e1) (K.fill e2) := by
-  sorry
+theorem PureStep.fill_nsteps (K : Ectx) {n : ℕ} {e1 e2 : Expr}
+    (h : nsteps PureStep n e1 e2) :
+    nsteps PureStep n (K.fill e1) (K.fill e2) := by
+  induction n generalizing e1 e2 with
+  | zero => simp [nsteps] at h; subst h; simp [nsteps]
+  | succ n ih =>
+    obtain ⟨c, hstep, hrest⟩ := h
+    exact ⟨K.fill c, hstep.fill K, ih hrest⟩
 
+-- Lemma pure_exec_fill K φ n e1 e2 :
+--   PureExec φ n e1 e2 →
+--   PureExec φ n (fill K e1) (fill K e2).
+-- Proof. apply: pure_exec_ctx. Qed.
 -- Lemma pure_exec_fill K φ n e1 e2 :
 --   PureExec φ n e1 e2 →
 --   PureExec φ n (fill K e1) (fill K e2).
@@ -79,7 +91,8 @@ theorem PureExec.fill (K : Ectx) {φ : Prop} {n : ℕ} {e1 e2 : Expr}
 theorem PureExec.reducible {σ : State} {φ : Prop} {n : ℕ} {e1 e2 : Expr}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     ∃ ρ : Cfg, PrimStep ⟨e1, σ⟩ {ρ} > 0 := by
-  sorry
+  obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
+  exact hstep.safe σ
 
 -- Lemma PureExec_not_val `{Inhabited (language.state Λ)} φ n e1 e2 :
 --   φ → PureExec φ (S n) e1 e2 → to_val e1 = None.
@@ -92,7 +105,9 @@ theorem PureExec.reducible {σ : State} {φ : Prop} {n : ℕ} {e1 e2 : Expr}
 theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Expr}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     e1.toVal? = none := by
-  sorry
+  obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
+  obtain ⟨ρ, hρ⟩ := hstep.safe default
+  exact val_stuck hρ
 
 -- Lemma rtc_pure_step_val `{!Inhabited (state Λ)} v e :
 --   rtc pure_step (of_val v) e → to_val e = Some v.
@@ -103,8 +118,8 @@ theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Expr}
 --   specialize (Hstep inhabitant) as [? Hval%val_stuck].
 --   by rewrite to_of_val in Hval.
 -- Qed.
-theorem rtc_pure_step_val {v : Val} {e : Expr}
-    (h : Relation.ReflTransGen PureStep v.1 e) :
+theorem rtc_pure_step_val {n : ℕ} {v : Val} {e : Expr}
+    (h : nsteps PureStep n v.1 e) :
     e.toVal? = some v := by
   sorry
 
@@ -122,7 +137,8 @@ class AsVal (e : Expr) : Prop where
 --     (∃ v, of_val v = e) → is_Some (to_val e).
 --   Proof. intros [v <-]. rewrite to_of_val. eauto. Qed.
 theorem as_val_is_Some {e : Expr} (h : ∃ v : Val, v.1 = e) : e.isValue := by
-  sorry
+  obtain ⟨⟨_, hv⟩, rfl⟩ := h
+  exact hv
 
 --   Lemma fill_is_val e K `{@LanguageCtx Λ K} :
 --     is_Some (to_val (K e)) → is_Some (to_val e).
