@@ -159,3 +159,46 @@
 --   rewrite /expr_ord /decomp_item.
 --   destruct Ki ; repeat destruct_match ; intros [=] ; subst ; cbn ; lia.
 -- Qed.
+
+--   Definition head_atomic (a : atomicity) (e : expr Λ) : Prop :=
+--     ∀ σ e' σ',
+--       head_step e σ (e', σ') > 0 →
+--       if a is WeaklyAtomic then irreducible (e', σ') else is_Some (to_val e').
+
+-- Inductive atomicity := StronglyAtomic | WeaklyAtomic.
+--
+--   Lemma strongly_atomic_atomic e a :
+--     Atomic StronglyAtomic e → Atomic a e.
+--   Proof.
+--     unfold Atomic. destruct a; eauto.
+--     intros ?????. eapply is_final_irreducible.
+--     rewrite /is_final /to_final /=. eauto.
+--   Qed.
+
+--   Lemma ectx_language_atomic a e :
+--     head_atomic a e → sub_redexes_are_values e → Atomic a e.
+--   Proof.
+--     intros Hatomic Hsub σ e' σ' (K & e1' & e2' & <- & <- & Hs)%prim_step_iff.
+--     assert (K = empty_ectx) as -> by eauto 10 using val_head_stuck.
+--     rewrite fill_empty in Hatomic.
+--     eapply Hatomic. rewrite fill_empty. eauto.
+--   Qed.
+
+
+--   Lemma state_step_head_reducible e σ σ' α :
+--     state_step σ α σ' > 0 → head_reducible e σ ↔ head_reducible e σ'.
+--   Proof. eapply state_step_head_not_stuck. Qed.
+
+
+--   Lemma state_step_reducible e σ σ' α :
+--     state_step σ α σ' > 0 → reducible (e, σ) ↔ reducible (e, σ').
+--   Proof. apply state_step_not_stuck. Qed.
+--   Lemma state_step_iterM_reducible e σ σ' α n:
+--     iterM n (λ σ, state_step σ α) σ σ'> 0 → reducible (e, σ) ↔ reducible (e, σ').
+--   Proof.
+--     revert σ σ'.
+--     induction n.
+--     - intros σ σ'. rewrite iterM_O. by intros ->%dret_pos.
+--     - intros σ σ'. rewrite iterM_Sn. rewrite dbind_pos. elim.
+--       intros x [??]. pose proof state_step_reducible. naive_solver.
+--   Qed.
