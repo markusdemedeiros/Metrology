@@ -42,7 +42,13 @@ structure PureHeadStep (e1 e2 : Expr) : Prop where
 --   - intros σ1. rewrite /= head_prim_step_eq //.
 -- Qed.
 theorem PureHeadStep.toPureStep {e1 e2 : Expr} (h : PureHeadStep e1 e2) : PureStep e1 e2 := by
-  sorry
+  constructor
+  · intro σ
+    obtain ⟨ρ, hρ⟩ := h.safe σ
+    exact ⟨ρ, head_prim_step hρ⟩
+  · intro σ
+    rw [head_prim_step_eq (h.safe σ)]
+    exact h.det σ
 
 -- Lemma pure_step_ctx K `{!@LanguageCtx Λ K} e1 e2 :
 --   pure_step e1 e2 → pure_step (K e1) (K e2).
@@ -58,7 +64,14 @@ theorem PureHeadStep.toPureStep {e1 e2 : Expr} (h : PureHeadStep e1 e2) : PureSt
 -- Qed.
 theorem PureStep.fill (K : Ectx) {e1 e2 : Expr} (h : PureStep e1 e2) :
     PureStep (K.fill e1) (K.fill e2) := by
-  sorry
+  constructor
+  · intro σ
+    obtain ⟨⟨e2', σ2⟩, hρ⟩ := h.safe σ
+    exact ⟨⟨K.fill e2', σ2⟩, fill_step hρ⟩
+  · intro σ
+    have hv : e1.toVal? = none := val_stuck (h.safe σ).choose_spec
+    rw [← fill_step_prob hv]
+    exact h.det σ
 
 -- Lemma pure_step_nsteps_ctx K `{!@LanguageCtx Λ K} n e1 e2 :
 --   relations.nsteps pure_step n e1 e2 →

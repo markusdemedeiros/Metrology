@@ -261,13 +261,6 @@ theorem reducible_fill (K : Ectx) {e : Expr} {σ : State}
 --         apply fill_not_val. revert Hstep. apply ectxi_language_mixin. }
 --       simplify_eq. destruct (IH K') as [K'' ->]; auto.
 --       exists K''. by rewrite assoc.
-theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Expr) (σ : State) (ρ : Cfg)
-    (hfill : K'.fill e1' = K_redex.fill e1_redex)
-    (hv : e1'.toVal? = none)
-    (hstep : HeadStep ⟨e1_redex, σ⟩ {ρ} > 0) :
-    ∃ K'' : Ectx, K_redex = K'.comp K'' := by
-  sorry
-
 -- Lemma head_ctx_step_val : ∀ (K : ectx) e (σ1 : state Λ) (ρ : expr Λ * state Λ),
 --   head_step (fill K e) σ1 ρ > 0 → is_Some (to_val e) ∨ K = []
 --     - intros K e1 σ1 [e2 σ2].
@@ -277,6 +270,21 @@ theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Expr) (σ : State) (ρ :
 theorem head_ctx_step_val (K : Ectx) (e : Expr) (σ : State) (ρ : Cfg)
     (hstep : HeadStep ⟨K.fill e, σ⟩ {ρ} > 0) :
     e.isValue ∨ K = [] := by
+  rcases List.eq_nil_or_concat K with rfl | ⟨K'', Ki, rfl⟩
+  · exact Or.inr rfl
+  · rw [List.concat_eq_append, fill_app] at hstep
+    simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip] at hstep
+    exact Or.inl (Ectx.fill_isValue (haed_ctx_step_val hstep))
+
+theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Expr) (σ : State) (ρ : Cfg)
+    (hfill : K'.fill e1' = K_redex.fill e1_redex)
+    (hv : e1'.toVal? = none)
+    (hstep : HeadStep ⟨e1_redex, σ⟩ {ρ} > 0) :
+    ∃ K'' : Ectx, K_redex = K'.comp K'' := by
+  -- Blocked: `suffices ∀ n ...` approach fails because the outer `hstep` (referring to
+  -- the outer e1_redex) becomes inaccessible inside the suffices (where e1_redex is
+  -- rebound). Need a different induction scheme (e.g. List.reverseRecOn, which doesn't
+  -- exist in this Mathlib) or a helper lemma that takes hstep as an explicit argument.
   sorry
 
 -- Lemma not_head_reducible e σ : ¬head_reducible e σ ↔ head_irreducible e σ.
@@ -473,13 +481,31 @@ def SubRedexesAreValues (e : Expr) : Prop :=
 theorem ectxi_language_sub_redexes_are_values {e : Expr}
     (h : ∀ (Ki : EctxItem) (e' : Expr), e = Ki.FillItem e' → e'.isValue) :
     SubRedexesAreValues e := by
-  sorry
+  intro K e' hfill hv
+  -- Reverse induction: if K = K'' ++ [Ki] then e = Ki.FillItem (K''.fill e'),
+  -- so by h, K''.fill e' is a value; but fill_isValue gives e'.isValue, contradicting hv.
+  rcases List.eq_nil_or_concat K with rfl | ⟨K'', Ki, rfl⟩
+  · rfl
+  · exfalso
+    rw [List.concat_eq_append, fill_app] at hfill
+    simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip] at hfill
+    have hval : (Ectx.fill K'' e').isValue := h Ki (Ectx.fill K'' e') hfill
+    have hval' : e'.isValue := Ectx.fill_isValue hval
+    simp [Expr.toVal?, hval'] at hv
 
 theorem prim_head_reducible {e : Expr} {σ : State}
     (hred : ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0)
     (hsub : SubRedexesAreValues e) :
     ∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0 := by
-  sorry
+  obtain ⟨⟨e2, σ2⟩, hstep⟩ := hred
+  rw [prim_step_iff] at hstep
+  obtain ⟨K, e1', e2', hfill1, hfill2, hhs⟩ := hstep
+  -- K = [] by SubRedexesAreValues
+  have hK : K = [] := hsub K e1' hfill1.symm (val_head_stuck hhs)
+  subst hK
+  simp [Ectx.fill] at hfill1 hfill2
+  subst hfill1
+  exact ⟨⟨e2', σ2⟩, hhs⟩
 
 -- Lemma prim_head_irreducible e σ :
 --   head_irreducible e σ → sub_redexes_are_values e → irreducible (e, σ).
@@ -489,8 +515,8 @@ theorem prim_head_reducible {e : Expr} {σ : State}
 theorem prim_head_irreducible {e : Expr} {σ : State}
     (hirr : ∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0)
     (hsub : SubRedexesAreValues e) :
-    ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0 := by
-  sorry
+    ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0 :=
+  fun hred => not_head_reducible.mpr hirr (prim_head_reducible hred hsub)
 
 -- Lemma head_stuck_stuck e σ :
 --   head_stuck e σ → sub_redexes_are_values e → stuck (e, σ).
