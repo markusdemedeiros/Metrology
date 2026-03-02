@@ -68,6 +68,16 @@ theorem Ectx.fill_noVal' {K : Ectx} {e : Expr} (hv : e.toVal? = none) :
 --       by eapply val_head_stuck.
 theorem val_stuck {cfg : Cfg} {ρ : Cfg} (h : PrimStep cfg {ρ} > 0) :
     cfg.expr.toVal? = none := by
+  -- Approach: unfold PrimStep, get (K, e') from decomp, show HeadStep ⟨e', σ⟩ is reducible,
+  -- then use val_head_stuck + fill_noVal'.
+  -- Blocked: need "map positive → source positive on preimage → nonempty preimage → witness",
+  -- i.e. the same Mathlib gap as head_irreducible_zero.
+  -- obtain ⟨e, σ⟩ := cfg
+  -- simp only [PrimStep] at h
+  -- obtain ⟨K, e'⟩ := e.decomp
+  -- rw [Measure.map_apply (by measurability) (by measurability)] at h
+  -- have ⟨ρ', hρ'⟩ : ∃ ρ', HeadStep ⟨e', σ⟩ {ρ'} > 0 := ...
+  -- rw [← Expr.decomp_fill rfl]; exact Ectx.fill_noVal' (val_head_stuck hρ')
   sorry
 
 -- Lemma prim_step_mass : ∀ e (σ : state Λ), (∃ ρ : expr Λ * state Λ, prim_step e σ ρ > 0) → SeriesC (prim_step e σ) = 1
@@ -82,12 +92,32 @@ theorem prim_step_mass (cfg : Cfg) :
   sorry
 
 
+--   Lemma head_prim_step_eq e1 σ1 :
+--     head_reducible e1 σ1 →
+--     prim_step e1 σ1 = head_step e1 σ1.
+--   Proof. intros ?. apply distr_ext=>?. by eapply head_prim_step_pmf_eq. Qed.
+/-- If `e` has a head step, then `prim_step` equals `head_step`. -/
+theorem head_prim_step_eq {e : Expr} {σ : State}
+    (hred : ∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) :
+    PrimStep ⟨e, σ⟩ = HeadStep ⟨e, σ⟩ := by
+  simp only [PrimStep]
+  have hd : e.decomp = ([], e) := by
+    rw [e.decomp_unfold]
+    rcases hm : e.DecompItem with _ | ⟨Ki, e'⟩
+    · simp [hm]
+    · exfalso
+      obtain ⟨hfill, hne⟩ := Expr.DecompItem_fill hm
+      obtain ⟨ρ, hρ⟩ := hred
+      rw [← hfill] at hρ
+      exact hne (haed_ctx_step_val hρ)
+  simp [hd, Ectx.fill]
+
 --   Lemma head_prim_step e1 σ1 ρ :
 --     head_step e1 σ1 ρ > 0 → prim_step e1 σ1 ρ > 0.
 --   Proof. intros ?. erewrite head_prim_step_eq; [done|]. eexists; eauto. Qed.
 theorem head_prim_step {e : Expr} {σ : State} {ρ : Cfg}
     (h : HeadStep ⟨e, σ⟩ {ρ} > 0) : PrimStep ⟨e, σ⟩ {ρ} > 0 := by
-  sorry
+  rw [head_prim_step_eq ⟨ρ, h⟩]; exact h
 
 
 --   Lemma fill_prim_step_dbind K e1 σ1 :
@@ -106,7 +136,20 @@ theorem head_prim_step {e : Expr} {σ : State} {ρ : Cfg}
 --   Qed.
 theorem fill_prim_step_map (K : Ectx) (e : Expr) (σ : State) (hv : e.toVal? = none) :
     PrimStep ⟨K.fill e, σ⟩ = (PrimStep ⟨e, σ⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩) := by
-  sorry
+  simp only [PrimStep]
+  -- decomp (K.fill e) = (K' ++ K, e'') where e.decomp = (K', e'')
+  have hne : ¬e.isValue := by simp [Expr.toVal?] at hv; exact hv
+  set d := e.decomp with hd
+  obtain ⟨K', e''⟩ := d
+  have hd' : (K.fill e).decomp = (K' ++ K, e'') :=
+    Expr.decomp_fill_comp hne hd.symm
+  simp only [← hd, hd']
+  have hm1 : Measurable (fun ρ : Cfg => (⟨K'.fill ρ.expr, ρ.state⟩ : Cfg)) := .of_discrete
+  have hm2 : Measurable (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg)) := .of_discrete
+  rw [Measure.map_map hm2 hm1]
+  congr 1
+  funext ⟨e', σ'⟩
+  simp [Function.comp, fill_app]
 
 --   Lemma fill_prim_step K e1 σ1 e2 σ2 :
 --     to_val e1 = None →
@@ -124,17 +167,12 @@ theorem fill_prim_step_map (K : Ectx) (e : Expr) (σ : State) (hv : e.toVal? = n
 --   Qed.
 theorem fill_prim_step {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State} (hv : e1.toVal? = none) :
     PrimStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = PrimStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
-  sorry
-
---   Lemma head_prim_step_eq e1 σ1 :
---     head_reducible e1 σ1 →
---     prim_step e1 σ1 = head_step e1 σ1.
---   Proof. intros ?. apply distr_ext=>?. by eapply head_prim_step_pmf_eq. Qed.
-/-- If `e` has a head step, then `prim_step` equals `head_step`. -/
-theorem head_prim_step_eq {e : Expr} {σ : State}
-    (hred : ∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) :
-    PrimStep ⟨e, σ⟩ = HeadStep ⟨e, σ⟩ := by
-  sorry
+  rw [fill_prim_step_map K e1 σ1 hv,
+      Measure.map_apply (.of_discrete) (.of_discrete)]
+  congr 1
+  ext ⟨e', σ'⟩
+  simp only [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq,
+             (Ectx.fill_injective K).eq_iff]
 
 --   Lemma head_reducible_prim_step e1 σ1 ρ :
 --     head_reducible e1 σ1 →
@@ -162,7 +200,7 @@ theorem head_reducible_prim_step {e : Expr} {σ : State} {ρ : Cfg}
 theorem fill_step {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
     (h : PrimStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} > 0) :
     PrimStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} > 0 := by
-  sorry
+  rwa [← fill_prim_step (val_stuck h)]
 
 --   Lemma fill_step_inv e1' σ1 e2 σ2 `{!LanguageCtx K} :
 --     to_val e1' = None → prim_step (K e1') σ1 (e2, σ2) > 0 →
@@ -176,6 +214,13 @@ theorem fill_step_inv {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
     (hv : e1.toVal? = none)
     (h : PrimStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩} > 0) :
     ∃ e2', e2 = K.fill e2' ∧ PrimStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} > 0 := by
+  rw [fill_prim_step_map K e1 σ1 hv,
+      Measure.map_apply (.of_discrete) (.of_discrete)] at h
+  simp [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq] at h
+  -- h : HeadStep ... (preimage set) > 0, preimage is {ρ | K.fill ρ.expr = e2 ∧ ρ.state = σ2}
+  -- We need a witness e2' with K.fill e2' = e2
+  -- Use that the preimage set is non-empty since PrimStep is positive there
+  -- This again needs the "positive measure → nonempty" gap. Use sorry for now.
   sorry
 
 --   Lemma fill_step_prob e1 σ1 e2 σ2 `{!LanguageCtx K} :
@@ -187,8 +232,8 @@ theorem fill_step_inv {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
 --   Qed.
 theorem fill_step_prob {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
     (hv : e1.toVal? = none) :
-    PrimStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = PrimStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
-  sorry
+    PrimStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = PrimStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} :=
+  fill_prim_step hv
 
 --   Lemma reducible_fill `{!@LanguageCtx Λ K} e σ :
 --     reducible (e, σ) → reducible (K e, σ).
@@ -198,7 +243,8 @@ theorem fill_step_prob {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
 theorem reducible_fill (K : Ectx) {e : Expr} {σ : State}
     (hred : ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0) :
     ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0 := by
-  sorry
+  obtain ⟨⟨e2, σ2⟩, hρ⟩ := hred
+  exact ⟨⟨K.fill e2, σ2⟩, fill_step hρ⟩
 
 -- Lemma step_by_val :
 --   ∀ (K' K_redex : ectx) (e1' e1_redex : expr Λ) (σ1 : state Λ) (ρ : expr Λ * state Λ),
@@ -471,7 +517,9 @@ theorem reducible_fill_inv (K : Ectx) {e : Expr} {σ : State}
     (hv : e.toVal? = none)
     (hred : ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0) :
     ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0 := by
-  sorry
+  obtain ⟨⟨e2, σ2⟩, hρ⟩ := hred
+  obtain ⟨e2', _, hρ'⟩ := fill_step_inv hv hρ
+  exact ⟨⟨e2', σ2⟩, hρ'⟩
 
 -- Lemma irreducible_fill `{!@LanguageCtx Λ K} e σ :
 --   to_val e = None → irreducible (e, σ) → irreducible (K e, σ).
@@ -479,16 +527,16 @@ theorem reducible_fill_inv (K : Ectx) {e : Expr} {σ : State}
 theorem irreducible_fill (K : Ectx) {e : Expr} {σ : State}
     (hv   : e.toVal? = none)
     (hirr : ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0) :
-    ¬ ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0 := by
-  sorry
+    ¬ ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0 :=
+  fun hred => hirr (reducible_fill_inv K hv hred)
 
 -- Lemma irreducible_fill_inv `{!@LanguageCtx Λ K} e σ :
 --   irreducible (K e, σ) → irreducible (e, σ).
 -- Proof. rewrite -!not_reducible. naive_solver eauto using reducible_fill. Qed.
 theorem irreducible_fill_inv (K : Ectx) {e : Expr} {σ : State}
     (hirr : ¬ ∃ ρ : Cfg, PrimStep ⟨K.fill e, σ⟩ {ρ} > 0) :
-    ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0 := by
-  sorry
+    ¬ ∃ ρ : Cfg, PrimStep ⟨e, σ⟩ {ρ} > 0 :=
+  fun hred => hirr (reducible_fill K hred)
 
 -- Lemma not_stuck_fill_inv K `{!@LanguageCtx Λ K} e σ :
 --   not_stuck (K e, σ) → not_stuck (e, σ).
