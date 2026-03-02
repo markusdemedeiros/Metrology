@@ -391,6 +391,9 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   v < z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 
+theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
+    HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} > 0 ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
+  sorry
 -- Lemma head_step_support_equiv_rel e1 e2 σ1 σ2 :
 --   head_step e1 σ1 (e2, σ2) > 0 ↔ head_step_rel e1 σ1 e2 σ2.
 -- Proof.
@@ -399,6 +402,9 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
 --   - inversion 1; simplify_map_eq/= ; try case_bool_decide ; try case_decide ; simplify_eq; solve_distr; try done.
 -- Qed.
 
+theorem head_step_mass (e : Expr) (σ : State) :
+    (∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) → IsProbabilityMeasure (HeadStep ⟨e, σ⟩) := by
+  sorry
 -- Lemma head_step_mass e σ :
 --   (∃ ρ, head_step e σ ρ > 0) → SeriesC (head_step e σ) = 1.
 -- Proof.
