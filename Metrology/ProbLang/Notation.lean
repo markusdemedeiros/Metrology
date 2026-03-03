@@ -37,7 +37,7 @@ syntax:75 "-" pl_exp:75 : pl_exp
 
 /-- Functions -/
 syntax:100 pl_exp:100 ppSpace pl_exp:101 : pl_exp
-syntax:10 "let " binderIdent " := " pl_exp "; " pl_exp:1 : pl_exp
+syntax:10 "let " binderIdent " := " pl_exp:10 "; " pl_exp:1 : pl_exp
 syntax:5 pl_exp:6 "; " pl_exp:5 : pl_exp
 syntax:10 "fun" binderIdent+ ", " pl_exp:10 : pl_exp
 syntax:10 "rec " binderIdent ppSpace binderIdent+ " := " pl_exp:10 : pl_exp
@@ -59,10 +59,6 @@ syntax:80 pl_exp:80 " ← " pl_exp:80 : pl_exp
 /-- Random -/
 syntax:100 "tape(" pl_exp ")" : pl_exp
 syntax:100 "rand(" pl_exp ", " pl_exp ")" : pl_exp
-
--- let and sequencing: use `macro` (not `macro_rules`) so that the `;` token
--- in the pattern is parsed as part of the pl_exp syntax, not as a Lean
--- term-level statement separator.
 
 /-- elaborating binders -/
 macro_rules
@@ -119,14 +115,13 @@ macro_rules
   | `(pl(alloc($e)))             => `(Exp.alloc pl($e))
   | `(pl(! $e))                  => `(Exp.load pl($e))
   | `(pl($e1 ← $e2))            => `(Exp.store pl($e1) pl($e2))
+  -- Let and sequencing
+  | `(pl(let $i := $e1; $e2))   => `(Exp.app (Exp.letrec .anon pl_binder($i) pl($e2)) pl($e1))
+  | `(pl($e1; $e2))              => `(Exp.app (Exp.letrec .anon .anon pl($e2)) pl($e1))
   -- Probabilistic
   | `(pl(tape($e)))              => `(Exp.tape pl($e))
   | `(pl(rand($e1, $e2)))        => `(Exp.rand pl($e1) pl($e2))
 
-macro "pl(" "let " i:binderIdent " := " e1:pl_exp "; " e2:pl_exp ")" : term =>
-  `(Exp.app pl(rec _ $i := $e2) pl($e1))
-macro "pl(" e1:pl_exp "; " e2:pl_exp ")" : term =>
-  `(Exp.app (Exp.letrec Binder.anon Binder.anon pl($e2)) pl($e1))
 
 /-- Strip the `pl(...)` wrapper to get a raw `pl_exp`, or fall back to `{t}` escape. -/
 partial def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
@@ -314,6 +309,96 @@ example :
     (Exp.letrec .anon (.named "r") (Exp.var "r")) := rfl
 
 
+
+-- Operator associativity and precedence
+-- + is right-associative (RHS has same precedence 65, so right wins)
+example : pl(#(.int 1) + #(.int 2) + #(.int 3)) =
+    Exp.binop .plus (Exp.lit (.int 1)) (Exp.binop .plus (Exp.lit (.int 2)) (Exp.lit (.int 3))) := rfl
+-- - is right-associative likewise
+example : pl(#(.int 1) - #(.int 2) - #(.int 3)) =
+    Exp.binop .minus (Exp.lit (.int 1)) (Exp.binop .minus (Exp.lit (.int 2)) (Exp.lit (.int 3))) := rfl
+-- * binds tighter than -
+example : pl(#(.int 1) - #(.int 2) * #(.int 3)) =
+    Exp.binop .minus (Exp.lit (.int 1)) (Exp.binop .mult (Exp.lit (.int 2)) (Exp.lit (.int 3))) := rfl
+-- parentheses override precedence
+example : pl((#(.int 1) + #(.int 2)) * #(.int 3)) =
+    Exp.binop .mult (Exp.binop .plus (Exp.lit (.int 1)) (Exp.lit (.int 2))) (Exp.lit (.int 3)) := rfl
+-- unary minus binds tighter than binary +
+example : pl(-x + y) =
+    Exp.binop .plus (Exp.unop .minus (Exp.var "x")) (Exp.var "y") := rfl
+-- ~ binds tighter than &&
+example : pl(~x && y) =
+    Exp.binop .and (Exp.unop .neg (Exp.var "x")) (Exp.var "y") := rfl
+-- && binds tighter than ||
+example : pl(x && y || z) =
+    Exp.binop .or (Exp.binop .and (Exp.var "x") (Exp.var "y")) (Exp.var "z") := rfl
+-- = has lower precedence than +
+example : pl(x + y = z) =
+    Exp.binop .eq (Exp.binop .plus (Exp.var "x") (Exp.var "y")) (Exp.var "z") := rfl
+
+-- Escape hatch {}: splice a Lean term directly
+example (e : Exp) : pl({e}) = e := rfl
+example (e1 e2 : Exp) : pl({e1} + {e2}) = Exp.binop .plus e1 e2 := rfl
+
+-- Literals
+example : pl(#(.bool true)) = Exp.lit (.bool true) := rfl
+example : pl(#.unit) = Exp.lit .unit := rfl
+
+-- Unary operators
+example : pl(~x) = Exp.unop .neg (Exp.var "x") := rfl
+example : pl(-x) = Exp.unop .minus (Exp.var "x") := rfl
+
+-- Conditional
+example : pl(if x then y else z) = Exp.cond (Exp.var "x") (Exp.var "y") (Exp.var "z") := rfl
+-- if-then-else is low precedence: body can contain operators
+example : pl(if x then y + z else w) =
+    Exp.cond (Exp.var "x") (Exp.binop .plus (Exp.var "y") (Exp.var "z")) (Exp.var "w") := rfl
+
+-- Sequencing
+example : pl(e1; e2) = Exp.app (Exp.letrec .anon .anon (Exp.var "e2")) (Exp.var "e1") := rfl
+-- Let binding (tested via #check since `:=` inside pl(let ...) confuses example/def parsers)
+/-- info: pl(fun x, x e) : Exp -/
+#guard_msgs in #check (pl(let x := e; x) : Exp)
+/-- info: pl(fun x, (x + x) #(BaseLit.int 1)) : Exp -/
+#guard_msgs in #check (pl(let x := #(.int 1); x + x) : Exp)
+
+-- Application is left-associative
+example : pl(f x y) = Exp.app (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.var "y") := rfl
+-- Application binds tighter than +
+example : pl(f x + g y) =
+    Exp.binop .plus (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.app (Exp.var "g") (Exp.var "y")) := rfl
+
+-- Sequencing
+example : pl(e1; e2) = Exp.app (Exp.letrec .anon .anon (Exp.var "e2")) (Exp.var "e1") := rfl
+
+-- rec with named self-reference
+example : pl(rec f x := f x) =
+    Exp.letrec (.named "f") (.named "x") (Exp.app (Exp.var "f") (Exp.var "x")) := rfl
+-- fun with anonymous self-reference
+example : pl(fun x, x) = Exp.letrec .anon (.named "x") (Exp.var "x") := rfl
+-- multi-arg fun desugars to nested letrec
+example : pl(fun x y z, x) =
+    Exp.letrec .anon (.named "x")
+      (Exp.letrec .anon (.named "y")
+        (Exp.letrec .anon (.named "z") (Exp.var "x"))) := rfl
+
+-- Pairs: snd and nested triples
+example : pl(snd((x, y))) = Exp.snd (Exp.pair (Exp.var "x") (Exp.var "y")) := rfl
+example : pl((x, y, z)) =
+    Exp.pair (Exp.var "x") (Exp.pair (Exp.var "y") (Exp.var "z")) := rfl
+
+-- Sums
+example : pl(inr(x)) = Exp.inr (Exp.var "x") := rfl
+-- case with non-trivial branch bodies
+example : pl(case inl(x) | l => l + #(.int 1) | r => r) =
+    Exp.case (Exp.inl (Exp.var "x"))
+      (Exp.letrec .anon (.named "l") (Exp.binop .plus (Exp.var "l") (Exp.lit (.int 1))))
+      (Exp.letrec .anon (.named "r") (Exp.var "r")) := rfl
+
+-- Store binds tighter than sequencing
+example : pl(x ← #(.int 1); e2) =
+    Exp.app (Exp.letrec .anon .anon (Exp.var "e2"))
+            (Exp.store (Exp.var "x") (Exp.lit (.int 1))) := rfl
 
 -- Delaboration (unexpander) tests: check that Exp constructors print back as pl(...) syntax
 /-- info: pl(#(BaseLit.int 1)) : Exp -/
