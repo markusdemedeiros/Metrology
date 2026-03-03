@@ -74,6 +74,7 @@ inductive Exp
 | store (el ev : Exp)
 | tape (e : Exp)
 | rand (en et : Exp)
+| fail
   deriving Inhabited, Countable
 
 @[simp]
@@ -254,6 +255,7 @@ def Exp.subst (e : Exp) (x : String) (v : Exp) : Exp :=
   | store e1 e2 => store (e1.subst x v) (e2.subst x v)
   | rand e1 e2 => rand (e1.subst x v) (e2.subst x v)
   | tape e => tape (e.subst x v)
+  | fail => fail
 
 def Exp.subst' (mx : Binder) (v e : Exp) : Exp :=
   match mx with | .named x => e.subst x v | .anon => e
@@ -348,6 +350,7 @@ def Exp.height : Exp → Nat
   | tape e => 1 + e.height
   | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+  | fail => 1
 
 theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
     (Ki.FillItem e).DecompItem = some (Ki, e) := by

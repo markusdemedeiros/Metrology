@@ -60,10 +60,38 @@ syntax:80 pl_exp:80 " ← " pl_exp:80 : pl_exp
 syntax:100 "tape(" pl_exp ")" : pl_exp
 syntax:100 "rand(" pl_exp ", " pl_exp ")" : pl_exp
 
+/-- Failure -/
+syntax:max "fail" : pl_exp
+
+/-- Destructuring let for pairs -/
+syntax:10 "let" "(" binderIdent ", " binderIdent ")" ":=" pl_exp:10 "; " pl_exp:1 : pl_exp
+
+/-- Single-arm case for sums -/
+syntax:10 "case " pl_exp " | " "inl(" binderIdent ")" " => " pl_exp : pl_exp
+syntax:10 "case " pl_exp " | " "inr(" binderIdent ")" " => " pl_exp : pl_exp
+
+/-- Assertion -/
+syntax:100 "assert(" pl_exp ")" : pl_exp
+
+-- Keywords that may not be used as variable or binder names in ProbLang.
+-- The Lean-level keywords (if, then, else, let, fun, rec, case) are already
+-- rejected by the Lean lexer before our rules fire, but are listed here for
+-- completeness.
+private def reservedKeywords : List String :=
+  ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail",
+   "if", "then", "else", "let", "fun", "rec", "case"]
+
+private def checkNotReserved (i : Lean.Ident) : Lean.MacroM Unit := do
+  let s := i.getId.toString
+  if reservedKeywords.contains s then
+    Macro.throwError s!"'{s}' is a reserved keyword in ProbLang and cannot be used as an identifier"
+
 /-- elaborating binders -/
 macro_rules
   | `(pl_binder(_))        => `(Binder.anon)
-  | `(pl_binder($i:ident)) => `(Binder.named $(Syntax.mkStrLit i.getId.toString))
+  | `(pl_binder($i:ident)) => do
+    checkNotReserved i
+    `(Binder.named $(Syntax.mkStrLit i.getId.toString))
 
 /-- elaborating expressions -/
 macro_rules
@@ -71,10 +99,16 @@ macro_rules
   | `(pl(($e)))             => `(pl($e))
   -- Escape hatch
   | `(pl({$t}))             => pure t
+  -- Literal shorthands (must precede the general `# $e` rule)
+  | `(pl(# $n:num))         => `(Exp.lit (.int (Int.ofNat $n)))
+  | `(pl(#true))            => `(Exp.lit (.bool true))
+  | `(pl(#false))           => `(Exp.lit (.bool false))
   -- Literals
   | `(pl(# $e))             => `(Exp.lit $e)
   -- Variables
-  | `(pl($i:ident))         => `(Exp.var $(Syntax.mkStrLit i.getId.toString))
+  | `(pl($i:ident))         => do
+    checkNotReserved i
+    `(Exp.var $(Syntax.mkStrLit i.getId.toString))
   -- Binary operators
   | `(pl($e1 + $e2))        => `(Exp.binop .plus  pl($e1) pl($e2))
   | `(pl($e1 - $e2))        => `(Exp.binop .minus pl($e1) pl($e2))
@@ -116,11 +150,34 @@ macro_rules
   | `(pl(! $e))                  => `(Exp.load pl($e))
   | `(pl($e1 ← $e2))            => `(Exp.store pl($e1) pl($e2))
   -- Let and sequencing
-  | `(pl(let $i := $e1; $e2))   => `(Exp.app (Exp.letrec .anon pl_binder($i) pl($e2)) pl($e1))
+  | `(pl(let $i := $e1; $e2))    => `(Exp.app (Exp.letrec .anon pl_binder($i) pl($e2)) pl($e1))
   | `(pl($e1; $e2))              => `(Exp.app (Exp.letrec .anon .anon pl($e2)) pl($e1))
   -- Probabilistic
   | `(pl(tape($e)))              => `(Exp.tape pl($e))
   | `(pl(rand($e1, $e2)))        => `(Exp.rand pl($e1) pl($e2))
+  -- Failure
+  | `(pl(fail))                  => `(Exp.fail)
+  -- Destructuring let for pairs: let (x, y) := e; body
+  --   ↦  let p✝ := e; let x := fst(p✝); let y := snd(p✝); body
+  -- Uses addMacroScope to generate a fresh hygienic name for the pair binding.
+  | `(pl(let ( $x , $y ) := $e ; $body)) => do
+      let pName := (← Lean.MonadQuotation.addMacroScope `p).toString
+      `(Exp.app
+          (Exp.letrec .anon (Binder.named $(quote pName))
+            (Exp.app
+              (Exp.letrec .anon pl_binder($x)
+                (Exp.app
+                  (Exp.letrec .anon pl_binder($y) pl($body))
+                  (Exp.snd (Exp.var $(quote pName)))))
+              (Exp.fst (Exp.var $(quote pName)))))
+          pl($e))
+  -- Single-arm case: silently fails on the other branch
+  | `(pl(case $ec | inl($x) => $el)) =>
+      `(pl(case $ec | $x => $el | _ => fail))
+  | `(pl(case $ec | inr($y) => $er)) =>
+      `(pl(case $ec | _ => fail | $y => $er))
+  -- Assert: assert(e) = if e then #.unit else fail
+  | `(pl(assert($e))) => `(pl(if $e then #.unit else fail))
 
 
 /-- Strip the `pl(...)` wrapper to get a raw `pl_exp`, or fall back to `{t}` escape. -/
@@ -133,14 +190,20 @@ partial def unpackPLBinder [Monad m] [MonadRef m] [MonadQuotation m] : Term → 
   | `(pl_binder($e)) => `(binderIdent|$e)
   | `($_)            => panic! "unknown binder"
 
-/-- Flatten nested anonymous letrec into multi-arg `pl(fun ...)`. -/
+/-- Flatten multi-arg `fun`/`rec` into a single binder list.
+    For anonymous recs, folds into `pl(fun xs*, body)`.
+    For named recs, folds inner `fun` binders into `pl(rec f xs*, body)`. -/
 partial def unexpFun : Term → UnexpandM Term
   | `(pl(rec _ $x := $e)) => do unexpFun (← `(pl(fun $x, $e)))
   | `(pl(fun $xs*, $e)) => do
-    -- If body is also a fun, flatten by appending its binders
     match e with
     | `(pl(fun $ys*, $body)) => unexpFun (← `(pl(fun $xs* $ys*, $body)))
     | _ => return (← `(pl(fun $xs*, $e)))
+  -- Named rec: if body is a fun, absorb its binders into the rec argument list
+  | `(pl(rec $f $xs* := $e)) => do
+    match (e : TSyntax `pl_exp) with
+    | `(pl_exp| fun $ys*, $body) => unexpFun (← `(pl(rec $f $xs* $ys* := $body)))
+    | _ => return (← `(pl(rec $f $xs* := $e)))
   | x => return x
 
 @[app_unexpander Binder.anon]
@@ -194,7 +257,22 @@ def unexpLetrec : Unexpander
 @[app_unexpander Exp.app]
 def unexpApp : Unexpander
   | `($_ $e1 $e2) => do
-    `(pl($(← unpackPLExp e1) $(← unpackPLExp e2)))
+    -- Recognize `let x := val; body` and `val; body` before falling through
+    -- to raw application.  Both are encoded as (letrec .anon binder body) val,
+    -- which `unexpLetrec` has already turned into pl(fun xs*, body).
+    match e1 with
+    | `(pl(fun $xs*, $body)) =>
+        if xs.size == 1 then
+          let bi := xs[0]!
+          if bi.raw[0]!.isIdent then
+            -- Named binder → let x := val; body
+            return (← `(pl(let $bi := $(← unpackPLExp e2); $body)))
+          else
+            -- Anonymous binder (_) → val; body
+            return (← `(pl($(← unpackPLExp e2); $body)))
+        `(pl($(← unpackPLExp e1) $(← unpackPLExp e2)))
+    | _ =>
+        `(pl($(← unpackPLExp e1) $(← unpackPLExp e2)))
   | _ => throw ()
 
 partial def unexpPair' : Term → UnexpandM Term
@@ -258,9 +336,34 @@ def unexpRand : Unexpander
   | `($_ $e1 $e2) => do `(pl(rand($(← unpackPLExp e1), $(← unpackPLExp e2))))
   | _ => throw ()
 
-
+@[app_unexpander ProbLang.Exp.fail]
+def unexpFail : Unexpander
+  | `($_) => do `(pl(fail))
 
 section Tests
+
+-- Reserved keywords are rejected in expression position
+/-- error: 'fst' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(fst) : Exp)
+/-- error: 'snd' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(snd) : Exp)
+/-- error: 'inl' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(inl) : Exp)
+/-- error: 'inr' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(inr) : Exp)
+/-- error: 'alloc' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(alloc) : Exp)
+/-- error: 'tape' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(tape) : Exp)
+/-- error: 'rand' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(rand) : Exp)
+-- Reserved keywords are rejected in binder position
+/-- error: 'fst' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(fun fst, x) : Exp)
+/-- error: 'inl' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(fun inl, x) : Exp)
+/-- error: 'rand' is a reserved keyword in ProbLang and cannot be used as an identifier -/
+#guard_msgs (error) in #check (pl(rec f rand := x) : Exp)
 
 -- Literals and variables
 example : pl(#(.int 1)) = Exp.lit (.int 1) := rfl
@@ -344,6 +447,16 @@ example (e1 e2 : Exp) : pl({e1} + {e2}) = Exp.binop .plus e1 e2 := rfl
 example : pl(#(.bool true)) = Exp.lit (.bool true) := rfl
 example : pl(#.unit) = Exp.lit .unit := rfl
 
+-- Literal shorthands
+example : pl(#1) = Exp.lit (.int 1) := rfl
+example : pl(#0) = Exp.lit (.int 0) := rfl
+example : pl(#42) = Exp.lit (.int 42) := rfl
+example : pl(#true) = Exp.lit (.bool true) := rfl
+example : pl(#false) = Exp.lit (.bool false) := rfl
+-- Shorthands compose with operators
+example : pl(#1 + #2) = Exp.binop .plus (Exp.lit (.int 1)) (Exp.lit (.int 2)) := rfl
+example : pl(#true && #false) = Exp.binop .and (Exp.lit (.bool true)) (Exp.lit (.bool false)) := rfl
+
 -- Unary operators
 example : pl(~x) = Exp.unop .neg (Exp.var "x") := rfl
 example : pl(-x) = Exp.unop .minus (Exp.var "x") := rfl
@@ -357,9 +470,9 @@ example : pl(if x then y + z else w) =
 -- Sequencing
 example : pl(e1; e2) = Exp.app (Exp.letrec .anon .anon (Exp.var "e2")) (Exp.var "e1") := rfl
 -- Let binding (tested via #check since `:=` inside pl(let ...) confuses example/def parsers)
-/-- info: pl(fun x, x e) : Exp -/
+/-- info: pl(let x := e; x) : Exp -/
 #guard_msgs in #check (pl(let x := e; x) : Exp)
-/-- info: pl(fun x, (x + x) #(BaseLit.int 1)) : Exp -/
+/-- info: pl(let x := #(BaseLit.int 1); (x + x)) : Exp -/
 #guard_msgs in #check (pl(let x := #(.int 1); x + x) : Exp)
 
 -- Application is left-associative
@@ -400,6 +513,326 @@ example : pl(x ← #(.int 1); e2) =
     Exp.app (Exp.letrec .anon .anon (Exp.var "e2"))
             (Exp.store (Exp.var "x") (Exp.lit (.int 1))) := rfl
 
+-- rec with multiple args desugars to rec with single arg and inner fun
+example : pl(rec f x y := f x y) =
+    Exp.letrec (.named "f") (.named "x")
+      (Exp.letrec .anon (.named "y")
+        (Exp.app (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.var "y"))) := rfl
+-- three-arg rec
+example : pl(rec f x y z := f x y z) =
+    Exp.letrec (.named "f") (.named "x")
+      (Exp.letrec .anon (.named "y")
+        (Exp.letrec .anon (.named "z")
+          (Exp.app (Exp.app (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.var "y")) (Exp.var "z")))) := rfl
+
+-- fun uses .anon self-binder; rec uses .named
+example : pl(fun x, x) = Exp.letrec .anon (.named "x") (Exp.var "x") := rfl
+example : pl(rec f x := x) = Exp.letrec (.named "f") (.named "x") (Exp.var "x") := rfl
+
+-- anonymous argument binder _
+example : pl(fun _, x) = Exp.letrec .anon .anon (Exp.var "x") := rfl
+example : pl(rec f _ := f) = Exp.letrec (.named "f") .anon (Exp.var "f") := rfl
+
+-- snd with nested triple
+example : pl(snd((x, y, z))) =
+    Exp.snd (Exp.pair (Exp.var "x") (Exp.pair (Exp.var "y") (Exp.var "z"))) := rfl
+
+-- Sequencing with let: `let x := e1; e2; e3` parses as `let x := e1; (e2; e3)`
+-- because let (prec 10) has higher precedence than ; (prec 5).
+-- So it elaborates to ((fun x, ((fun _, e3) e2)) e1).
+example : pl(let x := e1; e2; e3) =
+    Exp.app (Exp.letrec .anon (.named "x")
+              (Exp.app (Exp.letrec .anon .anon (Exp.var "e3")) (Exp.var "e2")))
+            (Exp.var "e1") := rfl
+
+-- xor precedence: ^^ binds tighter than ||, looser than &&
+example : pl(x && y ^^ z) =
+    Exp.binop .xor (Exp.binop .and (Exp.var "x") (Exp.var "y")) (Exp.var "z") := rfl
+example : pl(x ^^ y || z) =
+    Exp.binop .or (Exp.binop .xor (Exp.var "x") (Exp.var "y")) (Exp.var "z") := rfl
+
+-- ! (load) binds tighter than *
+example : pl(!x * y) =
+    Exp.binop .mult (Exp.load (Exp.var "x")) (Exp.var "y") := rfl
+
+-- application binds tighter than *
+example : pl(f x * g y) =
+    Exp.binop .mult (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.app (Exp.var "g") (Exp.var "y")) := rfl
+
+-- ← (store) binds tighter than ;;
+example : pl(x ← y; z) =
+    Exp.app (Exp.letrec .anon .anon (Exp.var "z"))
+            (Exp.store (Exp.var "x") (Exp.var "y")) := rfl
+
+-- nested let scoping: x is in scope in the body of the second let
+example : pl(let x := e1; let y := e2; x + y) =
+    Exp.app
+      (Exp.letrec .anon (.named "x")
+        (Exp.app
+          (Exp.letrec .anon (.named "y")
+            (Exp.binop .plus (Exp.var "x") (Exp.var "y")))
+          (Exp.var "e2")))
+      (Exp.var "e1") := rfl
+
+-- case with inr scrutinee
+example : pl(case inr(x) | l => l | r => r) =
+    Exp.case (Exp.inr (Exp.var "x"))
+      (Exp.letrec .anon (.named "l") (Exp.var "l"))
+      (Exp.letrec .anon (.named "r") (Exp.var "r")) := rfl
+
+-- escape hatch inside compound expressions
+example (e : Exp) : pl(let x := {e}; x) =
+    Exp.app (Exp.letrec .anon (.named "x") (Exp.var "x")) e := rfl
+example (e : Exp) : pl(if {e} then x else y) =
+    Exp.cond e (Exp.var "x") (Exp.var "y") := rfl
+example (e : Exp) : pl(fun x, {e}) =
+    Exp.letrec .anon (.named "x") e := rfl
+example (e1 e2 : Exp) : pl(case {e1} | l => {e2} | r => r) =
+    Exp.case e1
+      (Exp.letrec .anon (.named "l") e2)
+      (Exp.letrec .anon (.named "r") (Exp.var "r")) := rfl
+
+-- Variable shadowing: let x rebinds x; inner x refers to new binding
+example : pl(let x := e; let x := x; x) =
+    Exp.app
+      (Exp.letrec .anon (.named "x")
+        (Exp.app
+          (Exp.letrec .anon (.named "x") (Exp.var "x"))
+          (Exp.var "x")))
+      (Exp.var "e") := rfl
+
+-- fun shadows outer variable of same name
+example : pl(fun x, fun x, x) =
+    Exp.letrec .anon (.named "x")
+      (Exp.letrec .anon (.named "x") (Exp.var "x")) := rfl
+
+-- rec self-name shadows outer variable of same name
+example : pl(rec f x := rec f x := f x) =
+    Exp.letrec (.named "f") (.named "x")
+      (Exp.letrec (.named "f") (.named "x")
+        (Exp.app (Exp.var "f") (Exp.var "x"))) := rfl
+
+-- rec self-name and arg name are the same identifier
+example : pl(rec x x := x x) =
+    Exp.letrec (.named "x") (.named "x")
+      (Exp.app (Exp.var "x") (Exp.var "x")) := rfl
+
+-- if branches contain let/fun (low-prec forms inside low-prec if)
+example : pl(if x then let y := e; y else z) =
+    Exp.cond (Exp.var "x")
+      (Exp.app (Exp.letrec .anon (.named "y") (Exp.var "y")) (Exp.var "e"))
+      (Exp.var "z") := rfl
+
+-- case branch body contains sequencing
+example : pl(case inl(x) | l => e1; l | r => r) =
+    Exp.case (Exp.inl (Exp.var "x"))
+      (Exp.letrec .anon (.named "l")
+        (Exp.app (Exp.letrec .anon .anon (Exp.var "l")) (Exp.var "e1")))
+      (Exp.letrec .anon (.named "r") (Exp.var "r")) := rfl
+
+-- application of a literal (function position need not be a variable)
+example : pl(#(.int 0) x) = Exp.app (Exp.lit (.int 0)) (Exp.var "x") := rfl
+
+-- applying a pair projection
+example : pl(fst(p) x) = Exp.app (Exp.fst (Exp.var "p")) (Exp.var "x") := rfl
+
+-- unary minus on a compound expression
+example : pl(-(x + y)) =
+    Exp.unop .minus (Exp.binop .plus (Exp.var "x") (Exp.var "y")) := rfl
+
+-- double negation
+example : pl(~~x) = Exp.unop .neg (Exp.unop .neg (Exp.var "x")) := rfl
+
+-- store into a computed address (address expression is non-trivial)
+example : pl(fst(p) ← x) =
+    Exp.store (Exp.fst (Exp.var "p")) (Exp.var "x") := rfl
+
+-- load a loaded address (!(!x))
+example : pl(!(!x)) = Exp.load (Exp.load (Exp.var "x")) := rfl
+
+-- alloc of an allocated value
+example : pl(alloc(alloc(x))) = Exp.alloc (Exp.alloc (Exp.var "x")) := rfl
+
+-- pair of sums
+example : pl((inl(x), inr(y))) =
+    Exp.pair (Exp.inl (Exp.var "x")) (Exp.inr (Exp.var "y")) := rfl
+
+-- fst/snd of a pair of pairs (projection from nested structure)
+example : pl(fst(snd((x, (y, z))))) =
+    Exp.fst (Exp.snd (Exp.pair (Exp.var "x") (Exp.pair (Exp.var "y") (Exp.var "z")))) := rfl
+
+-- = is non-associative: x = y = z should parse as x = (y = z)
+-- (right-associative at same precedence 50)
+example : pl(x = y = z) =
+    Exp.binop .eq (Exp.var "x") (Exp.binop .eq (Exp.var "y") (Exp.var "z")) := rfl
+
+-- if condition contains a boolean operator
+example : pl(if x && y then z else w) =
+    Exp.cond (Exp.binop .and (Exp.var "x") (Exp.var "y")) (Exp.var "z") (Exp.var "w") := rfl
+
+-- sequencing three expressions: e1; e2; e3 is right-associative
+example : pl(e1; e2; e3) =
+    Exp.app (Exp.letrec .anon .anon
+              (Exp.app (Exp.letrec .anon .anon (Exp.var "e3")) (Exp.var "e2")))
+            (Exp.var "e1") := rfl
+
+-- Unary minus vs binary minus: -x - y is ((-x) - y), not -(x - y)
+example : pl(-x - y) =
+    Exp.binop .minus (Exp.unop .minus (Exp.var "x")) (Exp.var "y") := rfl
+
+-- Unary minus vs binary minus: x - -y
+example : pl(x - -y) =
+    Exp.binop .minus (Exp.var "x") (Exp.unop .minus (Exp.var "y")) := rfl
+
+-- ~ applied to an equality
+example : pl(~(x = y)) =
+    Exp.unop .neg (Exp.binop .eq (Exp.var "x") (Exp.var "y")) := rfl
+
+-- = lower precedence than &&: x && y = z is (x && y) = z
+example : pl(x && y = z) =
+    Exp.binop .eq (Exp.binop .and (Exp.var "x") (Exp.var "y")) (Exp.var "z") := rfl
+
+-- = lower precedence than ||
+example : pl(x || y = z) =
+    Exp.binop .eq (Exp.binop .or (Exp.var "x") (Exp.var "y")) (Exp.var "z") := rfl
+
+-- application of a fun expression (immediately invoked lambda)
+example : pl((fun x, x) y) =
+    Exp.app (Exp.letrec .anon (.named "x") (Exp.var "x")) (Exp.var "y") := rfl
+
+-- application of a rec expression
+example : pl((rec f x := f x) y) =
+    Exp.app (Exp.letrec (.named "f") (.named "x") (Exp.app (Exp.var "f") (Exp.var "x"))) (Exp.var "y") := rfl
+
+-- fun body is itself a fun (currying spelled out)
+example : pl(fun x, fun y, x) =
+    Exp.letrec .anon (.named "x") (Exp.letrec .anon (.named "y") (Exp.var "x")) := rfl
+
+-- let binding of a fun
+example : pl(let f := fun x, x; f) =
+    Exp.app (Exp.letrec .anon (.named "f") (Exp.var "f"))
+            (Exp.letrec .anon (.named "x") (Exp.var "x")) := rfl
+
+-- let binding of a pair
+example : pl(let p := (x, y); fst(p)) =
+    Exp.app (Exp.letrec .anon (.named "p") (Exp.fst (Exp.var "p")))
+            (Exp.pair (Exp.var "x") (Exp.var "y")) := rfl
+
+-- case scrutinee is itself a case
+example : pl(case (case inl(x) | l => inl(l) | r => inr(r)) | l => l | r => r) =
+    Exp.case
+      (Exp.case (Exp.inl (Exp.var "x"))
+        (Exp.letrec .anon (.named "l") (Exp.inl (Exp.var "l")))
+        (Exp.letrec .anon (.named "r") (Exp.inr (Exp.var "r"))))
+      (Exp.letrec .anon (.named "l") (Exp.var "l"))
+      (Exp.letrec .anon (.named "r") (Exp.var "r")) := rfl
+
+-- case scrutinee is an if
+example : pl(case (if b then inl(x) else inr(y)) | l => l | r => r) =
+    Exp.case
+      (Exp.cond (Exp.var "b") (Exp.inl (Exp.var "x")) (Exp.inr (Exp.var "y")))
+      (Exp.letrec .anon (.named "l") (Exp.var "l"))
+      (Exp.letrec .anon (.named "r") (Exp.var "r")) := rfl
+
+-- if condition is itself an if
+example : pl(if (if b then x else y) then z else w) =
+    Exp.cond
+      (Exp.cond (Exp.var "b") (Exp.var "x") (Exp.var "y"))
+      (Exp.var "z") (Exp.var "w") := rfl
+
+-- if branches are themselves ifs (dangling else resolved by grammar)
+example : pl(if x then (if y then a else b) else c) =
+    Exp.cond (Exp.var "x")
+      (Exp.cond (Exp.var "y") (Exp.var "a") (Exp.var "b"))
+      (Exp.var "c") := rfl
+
+-- store value is a freshly allocated reference
+example : pl(x ← alloc(y)) =
+    Exp.store (Exp.var "x") (Exp.alloc (Exp.var "y")) := rfl
+
+-- alloc of a fun value
+example : pl(alloc(fun x, x)) =
+    Exp.alloc (Exp.letrec .anon (.named "x") (Exp.var "x")) := rfl
+
+-- rand applied to tape result
+example : pl(rand(tape(n), #.unit)) =
+    Exp.rand (Exp.tape (Exp.var "n")) (Exp.lit .unit) := rfl
+
+-- Failure
+example : pl(fail) = Exp.fail := rfl
+
+-- Destructuring let for pairs.
+-- The intermediate pair binding uses a hygienic name (addMacroScope), so we
+-- can't predict the exact string.  We verify structure by checking that:
+--  (a) the body expression reaches the right leaves, and
+--  (b) a user variable "p" in the body is NOT captured by the pair binding.
+-- The delab shows the hygienic name with _hyg suffix.
+example : ∃ n,
+    pl(let (x, y) := e; x + y) =
+      Exp.app
+        (Exp.letrec .anon (.named n)
+          (Exp.app
+            (Exp.letrec .anon (.named "x")
+              (Exp.app
+                (Exp.letrec .anon (.named "y")
+                  (Exp.binop .plus (Exp.var "x") (Exp.var "y")))
+                (Exp.snd (Exp.var n))))
+            (Exp.fst (Exp.var n))))
+        (Exp.var "e") := ⟨_, rfl⟩
+-- Hygiene: "p" in the body refers to the outer variable, not the pair binding
+example : ∃ n, n ≠ "p" ∧
+    pl(let (x, y) := e; p) =
+      Exp.app
+        (Exp.letrec .anon (.named n)
+          (Exp.app
+            (Exp.letrec .anon (.named "x")
+              (Exp.app
+                (Exp.letrec .anon (.named "y") (Exp.var "p"))
+                (Exp.snd (Exp.var n))))
+            (Exp.fst (Exp.var n))))
+        (Exp.var "e") := ⟨_, by decide, rfl⟩
+
+-- Single-arm case for sums (inl and inr)
+example : pl(case inl(x) | inl(v) => v) =
+    Exp.case (Exp.inl (Exp.var "x"))
+      (Exp.letrec .anon (.named "v") (Exp.var "v"))
+      (Exp.letrec .anon .anon Exp.fail) := rfl
+example : pl(case inr(x) | inr(v) => v) =
+    Exp.case (Exp.inr (Exp.var "x"))
+      (Exp.letrec .anon .anon Exp.fail)
+      (Exp.letrec .anon (.named "v") (Exp.var "v")) := rfl
+
+-- Assert
+example : pl(assert(b)) =
+    Exp.cond (Exp.var "b") (Exp.lit .unit) Exp.fail := rfl
+
+-- tape and rand in a let
+example : pl(let t := tape(n); rand(t, #.unit)) =
+    Exp.app
+      (Exp.letrec .anon (.named "t")
+        (Exp.rand (Exp.var "t") (Exp.lit .unit)))
+      (Exp.tape (Exp.var "n")) := rfl
+
+-- applying the result of a load
+example : pl((!f) x) = Exp.app (Exp.load (Exp.var "f")) (Exp.var "x") := rfl
+
+-- storing the result of an application
+example : pl(p ← f x) =
+    Exp.store (Exp.var "p") (Exp.app (Exp.var "f") (Exp.var "x")) := rfl
+
+-- fst of an application
+example : pl(fst(f x)) = Exp.fst (Exp.app (Exp.var "f") (Exp.var "x")) := rfl
+
+-- inl of an if
+example : pl(inl(if b then x else y)) =
+    Exp.inl (Exp.cond (Exp.var "b") (Exp.var "x") (Exp.var "y")) := rfl
+
+-- deeply nested pairs (4-tuple)
+example : pl((a, b, c, d)) =
+    Exp.pair (Exp.var "a")
+      (Exp.pair (Exp.var "b")
+        (Exp.pair (Exp.var "c") (Exp.var "d"))) := rfl
+
 -- Delaboration (unexpander) tests: check that Exp constructors print back as pl(...) syntax
 /-- info: pl(#(BaseLit.int 1)) : Exp -/
 #guard_msgs in #check (Exp.lit (.int 1) : Exp)
@@ -424,6 +857,94 @@ example : pl(x ← #(.int 1); e2) =
 
 /-- info: pl(inl(x)) : Exp -/
 #guard_msgs in #check (Exp.inl (Exp.var "x") : Exp)
+
+/-- info: pl(inr(x)) : Exp -/
+#guard_msgs in #check (Exp.inr (Exp.var "x") : Exp)
+
+/-- info: pl(~x) : Exp -/
+#guard_msgs in #check (Exp.unop .neg (Exp.var "x") : Exp)
+
+/-- info: pl(-x) : Exp -/
+#guard_msgs in #check (Exp.unop .minus (Exp.var "x") : Exp)
+
+/-- info: pl(if x then y else z) : Exp -/
+#guard_msgs in #check (Exp.cond (Exp.var "x") (Exp.var "y") (Exp.var "z") : Exp)
+
+/-- info: pl((x, y)) : Exp -/
+#guard_msgs in #check (Exp.pair (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl((x, y, z)) : Exp -/
+#guard_msgs in #check (Exp.pair (Exp.var "x") (Exp.pair (Exp.var "y") (Exp.var "z")) : Exp)
+
+/-- info: pl(fst(x)) : Exp -/
+#guard_msgs in #check (Exp.fst (Exp.var "x") : Exp)
+
+/-- info: pl(snd(x)) : Exp -/
+#guard_msgs in #check (Exp.snd (Exp.var "x") : Exp)
+
+/-- info: pl(case inl(x) | l => l | r => r) : Exp -/
+#guard_msgs in #check (Exp.case (Exp.inl (Exp.var "x"))
+    (Exp.letrec .anon (.named "l") (Exp.var "l"))
+    (Exp.letrec .anon (.named "r") (Exp.var "r")) : Exp)
+
+/-- info: pl(x ← y) : Exp -/
+#guard_msgs in #check (Exp.store (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl(tape(#(BaseLit.int 10))) : Exp -/
+#guard_msgs in #check (Exp.tape (Exp.lit (.int 10)) : Exp)
+
+/-- info: pl(rand(#(BaseLit.int 10), #BaseLit.unit)) : Exp -/
+#guard_msgs in #check (Exp.rand (Exp.lit (.int 10)) (Exp.lit .unit) : Exp)
+
+/-- info: pl(fail) : Exp -/
+#guard_msgs in #check (Exp.fail : Exp)
+
+/-- info: pl(rec f x := f x) : Exp -/
+#guard_msgs in #check (Exp.letrec (.named "f") (.named "x") (Exp.app (Exp.var "f") (Exp.var "x")) : Exp)
+
+/-- info: pl(fun _, x) : Exp -/
+#guard_msgs in #check (Exp.letrec .anon .anon (Exp.var "x") : Exp)
+
+/-- info: pl(rec f _ := f) : Exp -/
+#guard_msgs in #check (Exp.letrec (.named "f") .anon (Exp.var "f") : Exp)
+
+/-- info: pl((x - y)) : Exp -/
+#guard_msgs in #check (Exp.binop .minus (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl((x * y)) : Exp -/
+#guard_msgs in #check (Exp.binop .mult (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl((x && y)) : Exp -/
+#guard_msgs in #check (Exp.binop .and (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl((x || y)) : Exp -/
+#guard_msgs in #check (Exp.binop .or (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl((x ^^ y)) : Exp -/
+#guard_msgs in #check (Exp.binop .xor (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl((x = y)) : Exp -/
+#guard_msgs in #check (Exp.binop .eq (Exp.var "x") (Exp.var "y") : Exp)
+
+/-- info: pl(fun f, f x y) : Exp -/
+#guard_msgs in #check (Exp.letrec .anon (.named "f")
+    (Exp.app (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.var "y")) : Exp)
+
+/-- info: pl(e1; e2) : Exp -/
+#guard_msgs in #check (Exp.app (Exp.letrec .anon .anon (Exp.var "e2")) (Exp.var "e1") : Exp)
+
+-- Delaboration: let and sequencing
+/-- info: pl(let x := e1; e2) : Exp -/
+#guard_msgs in #check (Exp.app (Exp.letrec .anon (.named "x") (Exp.var "e2")) (Exp.var "e1") : Exp)
+
+/-- info: pl(e1; e2) : Exp -/
+#guard_msgs in #check (Exp.app (Exp.letrec .anon .anon (Exp.var "e2")) (Exp.var "e1") : Exp)
+
+-- Delaboration: multi-arg rec
+/-- info: pl(rec f x y := f x y) : Exp -/
+#guard_msgs in #check (Exp.letrec (.named "f") (.named "x")
+    (Exp.letrec .anon (.named "y")
+      (Exp.app (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.var "y"))) : Exp)
 
 end Tests
 
