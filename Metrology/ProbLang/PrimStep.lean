@@ -1,6 +1,6 @@
 import Metrology.ProbLang.Opsem
 
-noncomputable section PrimStep
+noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 
 namespace ProbLang
@@ -510,4 +510,4 @@ theorem stuck_fill (K : Ectx) {e : Exp} {σ : State}
   exact reducible_fill_inv K hv hred
 
 end ProbLang
-end PrimStep
+end

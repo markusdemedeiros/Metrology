@@ -4,7 +4,7 @@ import Mathlib.Probability.ProbabilityMassFunction.Basic
 import Mathlib.Probability.Kernel.Defs
 import Mathlib.Probability.Distributions.Uniform
 
-noncomputable section HeadStep
+noncomputable section
 
 open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 

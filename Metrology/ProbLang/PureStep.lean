@@ -2,14 +2,14 @@ import Metrology.ProbLang.PrimStep
 import Mathlib.Order.Defs.PartialOrder
 
 
-def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
-  | 0,   a, b => a = b
-  | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
-
-noncomputable section PureStep
+noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure
 
 namespace ProbLang
+
+def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
+  | 0,   a, b => a = b
+  | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
 
 local instance : MeasurableSpace Exp := ⊤
 local instance : MeasurableSpace State := ⊤
@@ -101,4 +101,4 @@ theorem fill_is_val {K : Ectx} {e : Exp} (h : (K.fill e).isValue) : e.isValue :=
   Ectx.fill_isValue h
 
 end ProbLang
-end PureStep
+end
