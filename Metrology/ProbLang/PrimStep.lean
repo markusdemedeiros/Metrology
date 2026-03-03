@@ -8,6 +8,16 @@ local instance : MeasurableSpace State := ⊤
 local instance : MeasurableSpace Val := ⊤
 local instance : MeasurableSpace Cfg := ⊤
 
+-- Mathlib gap: for the discrete σ-algebra (⊤), positive measure on a set
+-- implies a singleton witness. This should follow from the fact that in a
+-- discrete space every measure is a sum of Dirac masses, but we haven't
+-- found the right Mathlib lemma yet.
+theorem measure_pos_of_singleton_pos {α : Type*} [MeasurableSpace α]
+    (htop : ‹MeasurableSpace α› = ⊤)
+    (μ : Measure α) (S : Set α) (hS : μ S > 0) :
+    ∃ x ∈ S, μ {x} > 0 := by
+  sorry
+
 def fillLift (K : Ectx) (ρ : Cfg) : Cfg := ⟨K.fill ρ.expr, ρ.state⟩
 
 theorem fillLift_comp (K1 K2 : Ectx) :
@@ -46,17 +56,18 @@ theorem Ectx.fill_noVal' {K : Ectx} {e : Expr} (hv : e.toVal? = none) :
 --       by eapply val_head_stuck.
 theorem val_stuck {cfg : Cfg} {ρ : Cfg} (h : PrimStep cfg {ρ} > 0) :
     cfg.expr.toVal? = none := by
-  -- Approach: unfold PrimStep, get (K, e') from decomp, show HeadStep ⟨e', σ⟩ is reducible,
-  -- then use val_head_stuck + fill_noVal'.
-  -- Blocked: need "map positive → source positive on preimage → nonempty preimage → witness",
-  -- i.e. the same Mathlib gap as head_irreducible_zero.
-  -- obtain ⟨e, σ⟩ := cfg
-  -- simp only [PrimStep] at h
-  -- obtain ⟨K, e'⟩ := e.decomp
-  -- rw [Measure.map_apply (by measurability) (by measurability)] at h
-  -- have ⟨ρ', hρ'⟩ : ∃ ρ', HeadStep ⟨e', σ⟩ {ρ'} > 0 := ...
-  -- rw [← Expr.decomp_fill rfl]; exact Ectx.fill_noVal' (val_head_stuck hρ')
-  sorry
+  obtain ⟨e, σ⟩ := cfg
+  simp only [PrimStep] at h
+  set d := e.decomp with hd
+  obtain ⟨K, e'⟩ := d
+  -- h : (HeadStep ⟨e', σ⟩).map f {ρ} > 0
+  rw [Measure.map_apply (.of_discrete) (.of_discrete)] at h
+  obtain ⟨ρ', _, hρ'⟩ := measure_pos_of_singleton_pos rfl _ _ h
+  -- ρ' has a positive head step from e', so e' is not a value
+  have hv : e'.toVal? = none := val_head_stuck hρ'
+  -- e = K.fill e' by decomp
+  rw [← Expr.decomp_fill hd.symm]
+  exact Ectx.fill_noVal' hv
 
 -- TODO: Cleanup
 theorem head_prim_step_eq {e : Expr} {σ : State}
@@ -124,11 +135,11 @@ theorem fill_step_inv {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
     ∃ e2', e2 = K.fill e2' ∧ PrimStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} > 0 := by
   rw [fill_prim_step_map K e1 σ1 hv,
       Measure.map_apply (.of_discrete) (.of_discrete)] at h
-  -- h : HeadStep ... (preimage set) > 0, preimage is {ρ | K.fill ρ.expr = e2 ∧ ρ.state = σ2}
-  -- We need a witness e2' with K.fill e2' = e2
-  -- Use that the preimage set is non-empty since PrimStep is positive there
-  -- This again needs the "positive measure → nonempty" gap. Use sorry for now.
-  sorry
+  obtain ⟨⟨e2', σ2'⟩, hmem, hpos⟩ := measure_pos_of_singleton_pos rfl _ _ h
+  simp only [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq] at hmem
+  obtain ⟨hfill, hσ⟩ := hmem
+  subst hσ
+  exact ⟨e2', hfill.symm, hpos⟩
 
 theorem fill_step_prob {K : Ectx} {e1 e2 : Expr} {σ1 σ2 : State}
     (hv : e1.toVal? = none) :
@@ -170,11 +181,48 @@ theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Expr) (σ : State) (ρ :
     (hv : e1'.toVal? = none)
     (hstep : HeadStep ⟨e1_redex, σ⟩ {ρ} > 0) :
     ∃ K'' : Ectx, K_redex = K'.comp K'' := by
-  -- Blocked: `suffices ∀ n ...` approach fails because the outer `hstep` (referring to
-  -- the outer e1_redex) becomes inaccessible inside the suffices (where e1_redex is
-  -- rebound). Need a different induction scheme (e.g. List.reverseRecOn, which doesn't
-  -- exist in this Mathlib) or a helper lemma that takes hstep as an explicit argument.
-  sorry
+  -- Induction on K' from the right
+  induction K' using List.reverseRecOn generalizing K_redex e1_redex with
+  | nil =>
+    -- K' = [], so K_redex = [].comp K_redex = K_redex ++ [] = K_redex
+    exact ⟨K_redex, (List.append_nil K_redex).symm⟩
+  | append_singleton K'_rest Ki' ih =>
+    -- K' = K'_rest ++ [Ki']
+    -- Case split K_redex from the right
+    sorry
+    -- rcases List.eq_nil_or_concat K_redex with rfl | ⟨K_redex_rest, Ki_redex, rfl⟩
+    -- · -- K_redex = []: hfill says (K'_rest ++ [Ki']).fill e1' = e1_redex
+    --   exfalso
+    --   -- hfill : (K'_rest ++ [Ki']).fill e1' = [].fill e1_redex = e1_redex
+    --   change Ectx.fill (K'_rest ++ [Ki']) e1' = e1_redex at hfill
+    --   rw [← hfill, fill_app] at hstep
+    --   simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip] at hstep
+    --   have hval := Ectx.fill_isValue (haed_ctx_step_val hstep)
+    --   simp [Expr.toVal?, hval] at hv
+    -- · -- K_redex = K_redex_rest.concat Ki_redex
+    --   simp only [List.concat_eq_append] at hfill ⊢
+    --   -- hfill : (K'_rest ++ [Ki']).fill e1' = (K_redex_rest ++ [Ki_redex]).fill e1_redex
+    --   rw [fill_app, fill_app] at hfill
+    --   simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip] at hfill
+    --   -- hfill : Ki'.FillItem (K'_rest.fill e1') = Ki_redex.FillItem (K_redex_rest.fill e1_redex)
+    --   have hv_inner : ¬(Ectx.fill K'_rest e1').isValue := by
+    --     simp [Expr.toVal?] at hv; exact Ectx.fill_noVal hv
+    --   have hv_redex : ¬(Ectx.fill K_redex_rest e1_redex).isValue := by
+    --     have := val_head_stuck hstep
+    --     simp [Expr.toVal?] at this; exact Ectx.fill_noVal this
+    --   have hKi := EctxItem.FillItem_noVal_inj hv_inner hv_redex hfill
+    --   subst hKi
+    --   have he : Ectx.fill K'_rest e1' = Ectx.fill K_redex_rest e1_redex :=
+    --     Ectx.FillItem_injective hfill
+    --   obtain ⟨K'', hK''⟩ := ih he hstep
+    --   exact ⟨K'', by rw [hK'']; simp [Ectx.comp, List.append_assoc]⟩
+    -- WIP: List.reverseRecOn induction on K' works structurally.
+    -- Base (K'=[]): trivial. Step (K'=K'_rest++[Ki']): case split K_redex via
+    -- eq_nil_or_concat; empty case contradicts hv via head_ctx_step_val+fill_isValue;
+    -- nonempty case uses FillItem_noVal_inj + FillItem_injective + IH.
+    -- Stuck: after fill_app + simp unfolds Ectx.fill to List.foldl, the IH expects
+    -- Ectx.fill but gets raw foldl. Need to keep Ectx.fill folded or use a
+    -- separate helper that avoids the unfolding.
 
 theorem not_head_reducible {e : Expr} {σ : State} :
     (¬ ∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) ↔ (∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0) := by
@@ -204,7 +252,23 @@ theorem head_redex_unique (K K' : Ectx) (e e' : Expr) (σ : State)
     (hred  : ∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0)
     (hred' : ∃ ρ : Cfg, HeadStep ⟨e', σ⟩ {ρ} > 0) :
     K = K'.comp [] ∧ e = e' := by
-  sorry
+  obtain ⟨⟨e2, σ2⟩, hρ⟩ := hred
+  obtain ⟨⟨e2', σ2'⟩, hρ'⟩ := hred'
+  -- step_by_val gives K = K'.comp K'' for some K''
+  obtain ⟨K'', hK⟩ := step_by_val K' K e' e σ ⟨e2, σ2⟩ hfill.symm (val_head_stuck hρ') hρ
+  subst hK
+  -- hfill : (K'.comp K'').fill e = K'.fill e'
+  -- i.e. K'.fill (K''.fill e) = K'.fill e', so K''.fill e = e' by injectivity
+  rw [← Ectx.fill_comp] at hfill
+  have he : K''.fill e = e' := Ectx.fill_injective K' hfill
+  -- head_ctx_step_val on hρ' (after rewriting e' = K''.fill e) gives K'' = []
+  rcases head_ctx_step_val K'' e σ ⟨e2', σ2'⟩ (he ▸ hρ') with hval | hnil
+  · -- e is a value, contradicts head step
+    have := val_head_stuck hρ
+    simp [Expr.toVal?, hval] at this
+  · subst hnil
+    simp [Ectx.fill] at he
+    exact ⟨rfl, he⟩
 
 -- Lemma prim_step_iff e1 e2 σ1 σ2 :
 --   prim_step e1 σ1 (e2, σ2) > 0 ↔
@@ -230,9 +294,16 @@ theorem prim_step_iff {e1 e2 : Expr} {σ1 σ2 : State} :
       K.fill e2' = e2 ∧
       HeadStep ⟨e1', σ1⟩ {⟨e2', σ2⟩} > 0 := by
   constructor
-  · -- (→) needs "map positive → preimage nonempty" — same Mathlib gap as val_stuck/fill_step_inv
-    intro h
-    sorry
+  · intro h
+    simp only [PrimStep] at h
+    set d := e1.decomp with hd
+    obtain ⟨K, e1'⟩ := d
+    rw [Measure.map_apply (.of_discrete) (.of_discrete)] at h
+    obtain ⟨⟨e2', σ2'⟩, hmem, hpos⟩ := measure_pos_of_singleton_pos rfl _ _ h
+    simp only [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq] at hmem
+    obtain ⟨hfill2, hσ⟩ := hmem
+    subst hσ
+    exact ⟨K, e1', e2', Expr.decomp_fill hd.symm, hfill2, hpos⟩
   · rintro ⟨K, e1', e2', rfl, rfl, hhs⟩
     rw [← fill_prim_step (val_head_stuck hhs)]
     exact head_prim_step hhs
@@ -298,11 +369,14 @@ theorem head_reducible_prim_step {e : Expr} {σ : State} {ρ : Cfg}
 --   pose proof (pmf_pos (head_step e σ) ρ).
 --   lra.
 -- Qed.
--- theorem head_irreducible_zero {e : Expr} {σ : State}
---     (hirr : ∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0) :
---     HeadStep ⟨e, σ⟩ = 0 := by
--- Need: measure zero on all singletons → measure is zero (discrete σ-algebra).
--- Blocked on finding the right Mathlib lemma. See Tier 7.
+theorem head_irreducible_zero {e : Expr} {σ : State}
+    (hirr : ∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0) :
+    HeadStep ⟨e, σ⟩ = 0 := by
+  ext S _
+  by_contra hne
+  have hpos : HeadStep ⟨e, σ⟩ S > 0 := bot_lt_iff_ne_bot.mpr hne
+  obtain ⟨x, _, hx⟩ := measure_pos_of_singleton_pos rfl _ S hpos
+  simp [hirr x] at hx
 
 theorem head_step_not_stuck {e : Expr} {σ : State} {ρ : Cfg}
     (h : HeadStep ⟨e, σ⟩ {ρ} > 0) :

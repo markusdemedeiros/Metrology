@@ -391,9 +391,101 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   v < z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 
+-- Helper: dirac positivity on singletons
+private theorem dirac_singleton_pos {a b : Cfg} :
+    (dirac a) {b} > 0 ↔ b = a := by
+  constructor
+  · intro h
+    by_contra hne
+    have : (dirac a) {b} = 0 := by
+      rw [dirac_apply' a (MeasurableSet.of_discrete)]
+      exact Set.indicator_of_notMem (show a ∉ ({b} : Set Cfg) from fun h => hne h.symm) (1 : Cfg → ENNReal)
+    simp [this] at h
+  · intro h
+    subst h
+    rw [dirac_apply_of_mem (Set.mem_singleton _)]
+    exact one_pos
+
+-- Helper: isValM positivity
+private theorem isValM_singleton_pos [MeasurableSpace T] {e : Expr} {m : Measure T} {s : Set T} :
+    (e.isValM m) s > 0 ↔ e.isValue ∧ m s > 0 := by
+  unfold Expr.isValM Expr.toVal?
+  by_cases He : e.isValue
+  · simp [He]
+  · simp [He]
+
+-- Helper: 0 measure has no positive singletons
+private theorem zero_singleton_not_pos {α : Type*} [MeasurableSpace α] {s : Set α} :
+    ¬ ((0 : Measure α) s > 0) := by simp
+
+-- Helper: unwrapM positivity
+private theorem unwrapM_singleton_pos {α β : Type*} [MeasurableSpace β]
+    {f : α → Measure β} {opt : Option α} {s : Set β} :
+    (opt.unwrapM f) s > 0 ↔ ∃ a, opt = some a ∧ (f a) s > 0 := by
+  cases opt with
+  | none => simp [Option.unwrapM]
+  | some a => simp [Option.unwrapM]
+
+-- Helper: asValM positivity
+private theorem asValM_singleton_pos [MeasurableSpace T] {e : Expr} {f : Val → Measure T}
+    {s : Set T} :
+    (e.asValM f) s > 0 ↔ ∃ v, e.toVal? = some v ∧ (f v) s > 0 := by
+  unfold Expr.asValM
+  cases h : e.toVal? with
+  | none => simp
+  | some v => simp
+
+-- Helper: Cfg.Uniform positivity for the → direction (converse)
+-- If Cfg.Uniform z σ {⟨e2, σ2⟩} > 0 then 0 < z, σ2 = σ, e2 = .lit (.int v) with bounds
+private theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
+    (h : Cfg.Uniform z σ {ρ} > 0) :
+    0 < z ∧ ρ.state = σ ∧
+    ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v ≤ z := by
+  unfold Cfg.Uniform Int.isPos Option.unwrapM at h
+  by_cases Hz : 0 < z
+  · simp only [Hz, dite_true] at h
+    rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg)) Measurable.of_discrete MeasurableSet.of_discrete] at h
+    rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete] at h
+    simp only [gt_iff_lt] at h
+    rw [ENNReal.div_pos_iff] at h
+    obtain ⟨hcard, _⟩ := h
+    have hne : ({x ∈ Finset.Icc 0 z | x ∈ (fun x => (⟨.lit (.int x), σ⟩ : Cfg)) ⁻¹' {ρ}}).Nonempty := by
+      rwa [Finset.nonempty_iff_ne_empty, ne_eq, ← Finset.card_eq_zero, ← Nat.cast_eq_zero (R := ENNReal)]
+    obtain ⟨v, hmem⟩ := hne
+    simp only [Finset.mem_filter, Finset.mem_Icc, Set.mem_preimage, Set.mem_singleton_iff] at hmem
+    obtain ⟨⟨hv0, hvz⟩, hmem'⟩ := hmem
+    obtain ⟨e, s⟩ := ρ
+    simp only [Cfg.mk.injEq] at hmem'
+    obtain ⟨he, hs⟩ := hmem'
+    exact ⟨Hz, hs.symm, v, he.symm, hv0, hvz⟩
+  · simp only [Hz, dite_false] at h
+    simp at h
+
+-- Helper: Cfg.Uniform positivity for the ← direction
+-- 0 < z → 0 ≤ v → v ≤ z → Cfg.Uniform z σ {⟨.lit (.int v), σ⟩} > 0
+private theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
+    (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v ≤ z) :
+    Cfg.Uniform z σ {⟨.lit (.int v), σ⟩} > 0 := by
+  unfold Cfg.Uniform Int.isPos Option.unwrapM
+  simp only [Hz, dite_true]
+  -- Now goal: (PMF.uniformOfFinset (Icc 0 z) _).toMeasure.map (fun x => ⟨.lit (.int x), σ⟩)
+  --           {⟨.lit (.int v), σ⟩} > 0
+  rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg)) Measurable.of_discrete MeasurableSet.of_discrete]
+  rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete]
+  simp only [gt_iff_lt]
+  rw [ENNReal.div_pos_iff]
+  refine ⟨?_, ?_⟩
+  · rw [ne_eq, Nat.cast_eq_zero]
+    exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Icc, Hv0, Hvz, Set.mem_preimage]⟩
+  · exact ENNReal.natCast_ne_top _
+
 theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
     HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} > 0 ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
-  sorry
+  constructor
+  · -- (→): HeadStep gives positive measure → construct HeadStepSupport
+    sorry
+  · -- (←): HeadStepSupport → HeadStep gives positive measure
+    sorry
 -- Lemma head_step_support_equiv_rel e1 e2 σ1 σ2 :
 --   head_step e1 σ1 (e2, σ2) > 0 ↔ head_step_rel e1 σ1 e2 σ2.
 -- Proof.
