@@ -1,5 +1,8 @@
 import Std
 import Std.Data.ExtTreeMap.Lemmas
+import Mathlib.Data.Countable.Basic
+import Mathlib.Tactic.DeriveCountable
+import Mathlib.Logic.Equiv.List
 
 open Std
 
@@ -20,21 +23,37 @@ theorem Std.ExtTreeMap.fresh_get? (t : ExtTreeMap Int V) :
     split at hle; grind
     simp at hle
 
+-- TODO: PR back to mathlib
+instance instCountableChar : Countable Char where
+  exists_injective_nat' := by
+    exists (·.1.toNat)
+    rintro ⟨v1, _⟩ ⟨v2, _⟩
+    simp only [Char.mk.injEq]
+    exact UInt32.toNat_inj.mp
+
+-- TODO: PR back to mathlib
+instance instCountableString : Countable String where
+  exists_injective_nat' := by
+    have ⟨f, Hf⟩ : Countable (List Char) := by infer_instance
+    exists (fun s => f s.toList)
+    exact fun _ _ H => String.toList_inj.mp (Hf H)
+
 abbrev Loc : Type := Int
 
 abbrev Lbl : Type := Int
 
+
 inductive Binder | anon | named (s : String)
-  deriving Inhabited, DecidableEq
+  deriving Inhabited, DecidableEq, Countable
 
 inductive BaseLit | int (z : Int) | bool (b : Bool) | unit | loc (loc : Loc) | lbl (lbl : Lbl)
-  deriving Inhabited, DecidableEq
+  deriving Inhabited, DecidableEq, Countable
 
 inductive UnOp | neg | minus
-  deriving Inhabited
+  deriving Inhabited, Countable
 
 inductive BinOp | plus | minus | mult | and | or | xor | eq
-  deriving Inhabited
+  deriving Inhabited, Countable
 
 inductive Expr
 | lit (b : BaseLit)
@@ -55,7 +74,7 @@ inductive Expr
 | store (el ev : Expr)
 | tape (e : Expr)
 | rand (en et : Expr)
-  deriving Inhabited
+  deriving Inhabited, Countable
 
 @[simp]
 def Expr.isValue : Expr → Prop
@@ -69,6 +88,20 @@ def Expr.noValue (e : Expr) : Prop := ¬ e.isValue
 
 def Val := { e : Expr // e.isValue }
 
+instance : Countable Val := Subtype.countable
+
+instance instCountableTreeMapLocVal : Countable (ExtTreeMap Loc Val compare) := by
+  obtain ⟨f_v, Hf_v⟩ : Countable (List (Loc × Val)) := by infer_instance
+  let f_items : ExtTreeMap Loc Val compare → List (Loc × Val) := ExtTreeMap.toList
+  have Hf_items : Function.Injective f_items := by
+    simp [f_items]
+    intro H1 H2 He
+    exact ExtTreeMap.toList_inj.mp (Hf_v (congrArg f_v (Hf_v (congrArg f_v He))))
+  exists (fun t => f_v <| f_items t)
+  intro H1 H2 He
+  exact ExtTreeMap.ext_getElem? (congrFun (congrArg getElem? (Hf_items (Hf_v He))))
+
+
 open Classical in
 noncomputable def Expr.toVal? (e : Expr) : Option Val :=
   if H : e.isValue then some ⟨e, H⟩ else none
@@ -78,14 +111,25 @@ def Expr.ofVal (v : Val) : Expr := v.1
 structure Tape where
   bound : Int
   presamples : List { z : Int // 0 ≤ z ∧ z < bound}
-  deriving Inhabited
+  deriving Inhabited, Countable
+
+instance instCountableTreeMapLocTape : Countable (ExtTreeMap Loc Tape compare) := by
+  obtain ⟨f_v, Hf_v⟩ : Countable (List (Loc × Tape)) := by infer_instance
+  let f_items : ExtTreeMap Loc Tape compare → List (Loc × Tape) := ExtTreeMap.toList
+  have Hf_items : Function.Injective f_items := by
+    simp [f_items]
+    intro H1 H2 He
+    exact ExtTreeMap.toList_inj.mp (Hf_v (congrArg f_v (Hf_v (congrArg f_v He))))
+  exists (fun t => f_v <| f_items t)
+  intro H1 H2 He
+  exact ExtTreeMap.ext_getElem? (congrFun (congrArg getElem? (Hf_items (Hf_v He))))
 
 def Tape.empty (z : Int) : Tape := ⟨z, []⟩
 
 structure State where
   heap  : ExtTreeMap Loc Val
   tapes : ExtTreeMap Loc Tape
-  deriving Inhabited
+  deriving Inhabited, Countable
 
 theorem Expr.toVal?_ofVal (v : Val) : (Expr.ofVal v).toVal? = some v := by
   obtain ⟨e, He⟩ := v
@@ -94,6 +138,8 @@ theorem Expr.toVal?_ofVal (v : Val) : (Expr.ofVal v).toVal? = some v := by
 
 theorem Expr.ofVal_of_toVal_some {e : Expr} : ∀ {v}, e.toVal? = some v → Expr.ofVal v = e := by
   induction e <;> simp [toVal?, ofVal]
+  intros _ _ _ h
+  rw [← h]
 
 theorem ofVal_injective : Function.Injective Expr.ofVal :=
   fun ⟨_, _⟩ _ _ => by congr
@@ -267,19 +313,20 @@ theorem State.update_tapes_neq' {σ σ' : State} {xs : List { z : Int // 0 ≤ z
 structure Cfg where
   expr : Expr
   state : State
+  deriving Countable
 
 theorem Ectx.FillItem_injective : Function.Injective (EctxItem.FillItem K) := by
   cases K <;> simp [Function.Injective, EctxItem.FillItem]
 
 theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue := by
-  cases K <;> simp [EctxItem.FillItem] <;> grind
+  cases K <;> simp [EctxItem.FillItem]; grind
 
 theorem EctxItem.FillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Expr}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
     (h : Ki1.FillItem e1 = Ki2.FillItem e2) : Ki1 = Ki2 := by
   cases Ki1 <;> cases Ki2 <;>
     simp_all [EctxItem.FillItem, Expr.ofVal] <;>
-    (try (obtain ⟨_, hval⟩ := ‹Val›; simp_all [Expr.isValue])) <;>
+    -- (try (obtain ⟨_, hval⟩ := ‹Val›; simp_all [Expr.isValue])) <;>
     grind [ofVal_injective, Subtype.ext_iff]
 
 @[simp]

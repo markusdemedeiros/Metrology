@@ -85,42 +85,6 @@ def HeadStep : Cfg → Measure Cfg
       else Cfg.Uniform z σ
 | _ => 0
 
-
--- head_case
--- case beta.redex => sorry
--- case beta.no_redex => sorry
--- case unop.redex => sorry
--- case unop.no_redex => sorry
--- case binop.no_redex_1 => sorry
--- case binop.no_redex_2 => sorry
--- case binop.redex => sorry
--- case cond.true => sorry
--- case cond.false => sorry
--- case fst.no_redex_1 => sorry
--- case fst.no_redex_2 => sorry
--- case fst.redex => sorry
--- case snd.no_redex_1 => sorry
--- case snd.no_redex_2 => sorry
--- case snd.redex => sorry
--- case case.left.no_redex => sorry
--- case case.left.redex => sorry
--- case case.right.no_redex => sorry
--- case case.right.redex => sorry
--- case alloc.no_redex => sorry
--- case alloc.redex => sorry
--- case load.segfault => sorry
--- case load.redex => sorry
--- case store.no_redex => sorry
--- case store.segfault => sorry
--- case store.redex => sorry
--- case rand.plain => sorry
--- case tape => sorry
--- case rand.tape.unalloc => sorry
--- case rand.tape.mismatch => sorry
--- case rand.tape.empty => sorry
--- case rand.tape.deterministic => sorry
--- case default => sorry
-
 elab "rename_goal" name:ident : tactic => do
   let goal ← Lean.Elab.Tactic.getMainGoal
   goal.setUserName name.getId
@@ -363,7 +327,7 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
 | RandNoTapeS :
   0 < z →
   0 ≤ v →
-  v < z →
+  v ≤ z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ ⟨.lit (.int v), σ⟩
 | TapeS :
   ℓ = σ.tapes.fresh →
@@ -381,18 +345,19 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   σ.tapes[α]? = some ⟨N, []⟩ →
   z = N →
   0 ≤ v →
-  v < z →
+  v ≤ z →
+  σ' = σ →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 | RandTapeOtherS :
   0 < z →
   σ.tapes[α]? = some ⟨N, L⟩ →
   z ≠ N →
   0 ≤ v →
-  v < z →
+  v ≤ z →
+  σ' = σ →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 
--- Helper: dirac positivity on singletons
-private theorem dirac_singleton_pos {a b : Cfg} :
+theorem dirac_singleton_pos {a b : Cfg} :
     (dirac a) {b} > 0 ↔ b = a := by
   constructor
   · intro h
@@ -406,38 +371,27 @@ private theorem dirac_singleton_pos {a b : Cfg} :
     rw [dirac_apply_of_mem (Set.mem_singleton _)]
     exact one_pos
 
--- Helper: isValM positivity
-private theorem isValM_singleton_pos [MeasurableSpace T] {e : Expr} {m : Measure T} {s : Set T} :
+theorem isValM_singleton_pos [MeasurableSpace T] {e : Expr} {m : Measure T} {s : Set T} :
     (e.isValM m) s > 0 ↔ e.isValue ∧ m s > 0 := by
   unfold Expr.isValM Expr.toVal?
   by_cases He : e.isValue
   · simp [He]
   · simp [He]
 
--- Helper: 0 measure has no positive singletons
-private theorem zero_singleton_not_pos {α : Type*} [MeasurableSpace α] {s : Set α} :
+theorem zero_singleton_not_pos {α : Type _} [MeasurableSpace α] {s : Set α} :
     ¬ ((0 : Measure α) s > 0) := by simp
 
--- Helper: unwrapM positivity
-private theorem unwrapM_singleton_pos {α β : Type*} [MeasurableSpace β]
+theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     {f : α → Measure β} {opt : Option α} {s : Set β} :
     (opt.unwrapM f) s > 0 ↔ ∃ a, opt = some a ∧ (f a) s > 0 := by
-  cases opt with
-  | none => simp [Option.unwrapM]
-  | some a => simp [Option.unwrapM]
+  cases opt <;> simp [Option.unwrapM]
 
--- Helper: asValM positivity
-private theorem asValM_singleton_pos [MeasurableSpace T] {e : Expr} {f : Val → Measure T}
+theorem asValM_singleton_pos [MeasurableSpace T] {e : Expr} {f : Val → Measure T}
     {s : Set T} :
     (e.asValM f) s > 0 ↔ ∃ v, e.toVal? = some v ∧ (f v) s > 0 := by
-  unfold Expr.asValM
-  cases h : e.toVal? with
-  | none => simp
-  | some v => simp
+  unfold Expr.asValM; cases e.toVal? <;> simp []
 
--- Helper: Cfg.Uniform positivity for the → direction (converse)
--- If Cfg.Uniform z σ {⟨e2, σ2⟩} > 0 then 0 < z, σ2 = σ, e2 = .lit (.int v) with bounds
-private theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
+theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
     (h : Cfg.Uniform z σ {ρ} > 0) :
     0 < z ∧ ρ.state = σ ∧
     ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v ≤ z := by
@@ -461,15 +415,11 @@ private theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
   · simp only [Hz, dite_false] at h
     simp at h
 
--- Helper: Cfg.Uniform positivity for the ← direction
--- 0 < z → 0 ≤ v → v ≤ z → Cfg.Uniform z σ {⟨.lit (.int v), σ⟩} > 0
-private theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
+theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v ≤ z) :
     Cfg.Uniform z σ {⟨.lit (.int v), σ⟩} > 0 := by
   unfold Cfg.Uniform Int.isPos Option.unwrapM
   simp only [Hz, dite_true]
-  -- Now goal: (PMF.uniformOfFinset (Icc 0 z) _).toMeasure.map (fun x => ⟨.lit (.int x), σ⟩)
-  --           {⟨.lit (.int v), σ⟩} > 0
   rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg)) Measurable.of_discrete MeasurableSet.of_discrete]
   rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete]
   simp only [gt_iff_lt]
@@ -482,27 +432,206 @@ private theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
 theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
     HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} > 0 ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
-  · -- (→): HeadStep gives positive measure → construct HeadStepSupport
-    sorry
-  · -- (←): HeadStepSupport → HeadStep gives positive measure
-    sorry
--- Lemma head_step_support_equiv_rel e1 e2 σ1 σ2 :
---   head_step e1 σ1 (e2, σ2) > 0 ↔ head_step_rel e1 σ1 e2 σ2.
--- Proof.
---   split.
---   - intros ?. destruct e1; inv_head_step ; eauto with head_step.
---   - inversion 1; simplify_map_eq/= ; try case_bool_decide ; try case_decide ; simplify_eq; solve_distr; try done.
--- Qed.
+  · head_case
+    all_goals try (· simp) -- Handle all stuck cases
+    case beta.redex =>
+      rename_i heq
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .BetaS (Expr.toVal?_isValue heq) rfl
+    case unop.redex =>
+      rename_i heq
+      intro h
+      rw [unwrapM_singleton_pos] at h
+      obtain ⟨e', he', h'⟩ := h
+      rw [dirac_singleton_pos] at h'
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
+      exact .UnOpS (Expr.toVal?_isValue heq) he'.symm
+    case binop.redex heq0 _ heq1 heq2 =>
+      intro h
+      rw [unwrapM_singleton_pos] at h
+      obtain ⟨e', he', h'⟩ := h
+      rw [dirac_singleton_pos] at h'
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
+      exact .BinOpS (Expr.toVal?_isValue heq0) (Expr.toVal?_isValue heq2) he'.symm
+    case cond.true =>
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .IfTrueS
+    case cond.false =>
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .IfFalseS
+    case fst.redex heq0 heq1 _ heq2 =>
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      refine .FstS (Expr.toVal?_isValue heq0) (Expr.toVal?_isValue heq2)
+    case snd.redex =>
+      rename_i heq0 heq1 _ heq2
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .SndS (Expr.toVal?_isValue heq0) (Expr.toVal?_isValue heq2)
+    case case.left.redex =>
+      rename_i heq
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .CaseLS (Expr.toVal?_isValue heq)
+    case case.right.redex =>
+      rename_i heq
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .CaseRS (Expr.toVal?_isValue heq)
+    case alloc.redex =>
+      rename_i heq
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .AllocS heq rfl rfl
+    case load.redex =>
+      rename_i heq
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .LoadS heq rfl
+    case store.redex =>
+      rename_i heq heq_val _ heq_heap
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .StoreS heq (by rw [Option.isSome_iff_exists]; exact ⟨_, heq_heap⟩) rfl
+    case rand.plain =>
+      -- Cfg.Uniform z σ
+      intro h
+      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.Uniform_singleton_pos_inv h
+      simp at hv hσ; subst hv; subst hσ
+      exact .RandNoTapeS Hz Hv0 Hvz
+    case tape =>
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      exact .TapeS rfl rfl
+    case rand.tape =>
+      -- rand.tape.empty: tapes[α]? = some ⟨z, []⟩ (M=z already subst'd) → Cfg.Uniform
+      -- After head_case: subst_eqs for M=z, then split on ns=[]
+      -- Context should have the tape lookup hypothesis
+      intro h
+      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.Uniform_singleton_pos_inv h
+      simp at hv hσ; subst hv; subst hσ
+      exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
+    case rand.tape.deterministic =>
+      intro h
+      rw [dirac_singleton_pos] at h
+      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
+      refine .RandTapeS (by omega) ‹_› rfl rfl rfl
+    case rand.tape.mismatch =>
+      intro h
+      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.Uniform_singleton_pos_inv h
+      simp at hv hσ; subst hv; subst hσ
+      exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
+  · intro hsupp
+    cases hsupp with
+    | BetaS hval hrfl =>
+      subst hrfl
+      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+    | UnOpS hval heval =>
+      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+      show _ > 0
+      rw [unwrapM_singleton_pos]
+      exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
+    | BinOpS hval1 hval2 heval =>
+      simp [HeadStep, Expr.isValM, Expr.toVal?, hval1, hval2]
+      show _ > 0
+      rw [unwrapM_singleton_pos]
+      exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
+    | IfTrueS => simp [HeadStep]
+    | IfFalseS => simp [HeadStep]
+    | FstS hval1 hval2 =>
+      simp [HeadStep, Expr.isValM, Expr.toVal?, hval1, hval2]
+    | SndS hval1 hval2 =>
+      simp [HeadStep, Expr.isValM, Expr.toVal?, hval1, hval2]
+    | CaseLS hval =>
+      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+    | CaseRS hval =>
+      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+    | AllocS hval hrfl hrfl2 =>
+      subst hrfl; subst hrfl2
+      simp [HeadStep, Expr.asValM, hval]
+    | LoadS hsome hrfl =>
+      subst hrfl
+      simp [HeadStep, hsome]
+    | StoreS hval hsome hrfl =>
+      subst hrfl
+      simp [HeadStep, Expr.asValM, hval]
+      obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp hsome
+      simp [hw]
+    | RandNoTapeS Hz Hv0 Hvz =>
+      simp only [gt_iff_lt, HeadStep]
+      exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
+    | TapeS hrfl hrfl2 =>
+      subst hrfl; subst hrfl2
+      simp [HeadStep]
+    | RandTapeS Hz htape hzN hv hrfl =>
+      subst hv; subst hrfl; subst hzN
+      simp [HeadStep, htape]
+    | RandTapeEmptyS Hz htape hzN Hv0 Hvz hσ =>
+      subst hzN; subst hσ
+      simp only [gt_iff_lt, HeadStep, htape]
+      exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
+    | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
+      subst hσ
+      simp only [gt_iff_lt, HeadStep, htape]
+      split
+      · rename_i hM; rw [hM] at hzN; exact absurd rfl hzN
+      · exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
+
+theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Expr} {m : Measure T}
+    (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
+  simp [Expr.isValM, Expr.toVal?, he]; infer_instance
+
+theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Expr} {f : Val → Measure T}
+    {v : Val} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
+    IsProbabilityMeasure (e.asValM f) := by
+  simp [Expr.asValM, hv]; infer_instance
+
+theorem Cfg.Uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
+    IsProbabilityMeasure (Cfg.Uniform z σ) := by
+  unfold Cfg.Uniform Int.isPos Option.unwrapM
+  simp only [Hz, dite_true]
+  exact Measure.isProbabilityMeasure_map (μ := (PMF.uniformOfFinset _ _).toMeasure)
+    AEMeasurable.of_discrete
 
 theorem head_step_mass (e : Expr) (σ : State) :
     (∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) → IsProbabilityMeasure (HeadStep ⟨e, σ⟩) := by
-  sorry
--- Lemma head_step_mass e σ :
---   (∃ ρ, head_step e σ ρ > 0) → SeriesC (head_step e σ) = 1.
--- Proof.
---   intros [[] Hs%head_step_support_equiv_rel].
---   inversion Hs;
---     repeat (simplify_map_eq/=; solve_distr_mass || (case_match ; try done) ;
---             try (case_bool_decide; done)).
--- Qed.
-
+  head_case
+  all_goals try (· simp) -- Handle all stuck cases
+  all_goals try (· infer_instance) -- Handle all immediate cases
+  case unop.redex heq =>
+    intro ⟨ρ, hρ⟩
+    rw [unwrapM_singleton_pos] at hρ
+    obtain ⟨e', he', _⟩ := hρ
+    simp [Option.unwrapM, he']; infer_instance
+  case binop.redex =>
+    rename_i heq1 heq2
+    intro ⟨ρ, hρ⟩
+    rw [unwrapM_singleton_pos] at hρ
+    obtain ⟨e', he', _⟩ := hρ
+    simp [Option.unwrapM, he']; infer_instance
+  case rand.plain =>
+    intro ⟨ρ, hρ⟩
+    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.Uniform_singleton_pos_inv hρ
+    exact Cfg.Uniform_isProbabilityMeasure Hz
+  case rand.tape =>
+    intro ⟨ρ, hρ⟩
+    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.Uniform_singleton_pos_inv hρ
+    exact Cfg.Uniform_isProbabilityMeasure Hz
+  case rand.tape.mismatch =>
+    intro ⟨ρ, hρ⟩
+    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.Uniform_singleton_pos_inv hρ
+    exact Cfg.Uniform_isProbabilityMeasure Hz
