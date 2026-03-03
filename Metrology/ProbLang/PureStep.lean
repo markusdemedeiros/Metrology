@@ -1,6 +1,7 @@
 import Metrology.ProbLang.PrimStep
 import Mathlib.Order.Defs.PartialOrder
 
+
 def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
   | 0,   a, b => a = b
   | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
@@ -8,23 +9,25 @@ def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
 noncomputable section PureStep
 open Classical MeasureTheory ProbabilityTheory Measure
 
-local instance : MeasurableSpace Expr := ⊤
+namespace ProbLang
+
+local instance : MeasurableSpace Exp := ⊤
 local instance : MeasurableSpace State := ⊤
 local instance : MeasurableSpace Val := ⊤
 local instance : MeasurableSpace Cfg := ⊤
 
-structure PureStep (e1 e2 : Expr) : Prop where
+structure PureStep (e1 e2 : Exp) : Prop where
   safe : ∀ σ, ∃ ρ : Cfg, PrimStep ⟨e1, σ⟩ {ρ} > 0
   det  : ∀ σ, PrimStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
-class PureExec (φ : Prop) (n : ℕ) (e1 e2 : Expr) : Prop where
+class PureExec (φ : Prop) (n : ℕ) (e1 e2 : Exp) : Prop where
   pure_exec : φ → nsteps PureStep n e1 e2
 
-structure PureHeadStep (e1 e2 : Expr) : Prop where
+structure PureHeadStep (e1 e2 : Exp) : Prop where
   safe : ∀ σ, ∃ ρ : Cfg, HeadStep ⟨e1, σ⟩ {ρ} > 0
   det  : ∀ σ, HeadStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
-theorem PureHeadStep.toPureStep {e1 e2 : Expr} (h : PureHeadStep e1 e2) : PureStep e1 e2 := by
+theorem PureHeadStep.toPureStep {e1 e2 : Exp} (h : PureHeadStep e1 e2) : PureStep e1 e2 := by
   constructor
   · intro σ
     obtain ⟨ρ, hρ⟩ := h.safe σ
@@ -33,7 +36,7 @@ theorem PureHeadStep.toPureStep {e1 e2 : Expr} (h : PureHeadStep e1 e2) : PureSt
     rw [head_prim_step_eq (h.safe σ)]
     exact h.det σ
 
-theorem PureStep.fill (K : Ectx) {e1 e2 : Expr} (h : PureStep e1 e2) :
+theorem PureStep.fill (K : Ectx) {e1 e2 : Exp} (h : PureStep e1 e2) :
     PureStep (K.fill e1) (K.fill e2) := by
   constructor
   · intro σ
@@ -44,7 +47,7 @@ theorem PureStep.fill (K : Ectx) {e1 e2 : Expr} (h : PureStep e1 e2) :
     rw [← fill_step_prob hv]
     exact h.det σ
 
-theorem PureStep.fill_nsteps (K : Ectx) {n : ℕ} {e1 e2 : Expr}
+theorem PureStep.fill_nsteps (K : Ectx) {n : ℕ} {e1 e2 : Exp}
     (h : nsteps PureStep n e1 e2) :
     nsteps PureStep n (K.fill e1) (K.fill e2) := by
   induction n generalizing e1 e2 with
@@ -53,48 +56,49 @@ theorem PureStep.fill_nsteps (K : Ectx) {n : ℕ} {e1 e2 : Expr}
     obtain ⟨c, hstep, hrest⟩ := h
     exact ⟨K.fill c, hstep.fill K, ih hrest⟩
 
-theorem PureExec.fill (K : Ectx) {φ : Prop} {n : ℕ} {e1 e2 : Expr}
+theorem PureExec.fill (K : Ectx) {φ : Prop} {n : ℕ} {e1 e2 : Exp}
     [h : PureExec φ n e1 e2] : PureExec φ n (K.fill e1) (K.fill e2) where
   pure_exec hφ := PureStep.fill_nsteps K (h.pure_exec hφ)
 
-theorem PureExec.reducible {σ : State} {φ : Prop} {n : ℕ} {e1 e2 : Expr}
+theorem PureExec.reducible {σ : State} {φ : Prop} {n : ℕ} {e1 e2 : Exp}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     ∃ ρ : Cfg, PrimStep ⟨e1, σ⟩ {ρ} > 0 := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   exact hstep.safe σ
 
-theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Expr}
+theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Exp}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     e1.toVal? = none := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   obtain ⟨ρ, hρ⟩ := hstep.safe default
   exact val_stuck hρ
 
-theorem rtc_pure_step_val {n : ℕ} {v : Val} {e : Expr}
+theorem rtc_pure_step_val {n : ℕ} {v : Val} {e : Exp}
     (h : nsteps PureStep n v.1 e) :
     e.toVal? = some v := by
   induction n generalizing e with
   | zero =>
     simp [nsteps] at h
     subst h
-    exact Expr.toVal?_ofVal v
+    exact Exp.toVal?_ofVal v
   | succ n ih =>
     obtain ⟨c, hstep, hrest⟩ := h
     obtain ⟨ρ, hρ⟩ := hstep.safe default
     have : v.1.toVal? = none := val_stuck hρ
-    simp [Expr.toVal?, v.2] at this
+    simp [Exp.toVal?, v.2] at this
 
-class IntoVal (e : Expr) (v : Val) : Prop where
+class IntoVal (e : Exp) (v : Val) : Prop where
   into_val : v.1 = e
 
-class AsVal (e : Expr) : Prop where
+class AsVal (e : Exp) : Prop where
   as_val : ∃ v : Val, v.1 = e
 
-theorem as_val_is_Some {e : Expr} (h : ∃ v : Val, v.1 = e) : e.isValue := by
+theorem as_val_is_Some {e : Exp} (h : ∃ v : Val, v.1 = e) : e.isValue := by
   obtain ⟨⟨_, hv⟩, rfl⟩ := h
   exact hv
 
-theorem fill_is_val {K : Ectx} {e : Expr} (h : (K.fill e).isValue) : e.isValue :=
+theorem fill_is_val {K : Ectx} {e : Exp} (h : (K.fill e).isValue) : e.isValue :=
   Ectx.fill_isValue h
 
+end ProbLang
 end PureStep

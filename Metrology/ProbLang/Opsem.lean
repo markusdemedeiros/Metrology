@@ -5,28 +5,31 @@ import Mathlib.Probability.Kernel.Defs
 import Mathlib.Probability.Distributions.Uniform
 
 noncomputable section HeadStep
-open Classical MeasureTheory ProbabilityTheory Measure
+
+open Classical MeasureTheory ProbabilityTheory Measure ProbLang
+
+namespace ProbLang
 
 def Option.unwrapM {α : Type _} [MeasurableSpace β] (f : α → Measure β) : Option α → Measure β
 | some v => f v
 | none => 0
 
-def Expr.asValM [MeasurableSpace T] (e : Expr) (f : Val → Measure T) : Measure T :=
+def Exp.asValM [MeasurableSpace T] (e : Exp) (f : Val → Measure T) : Measure T :=
   match e.toVal? with | none => 0 | some v => f v
 
-def Expr.isValM [MeasurableSpace T] (e : Expr) (m : Measure T) : Measure T :=
+def Exp.isValM [MeasurableSpace T] (e : Exp) (m : Measure T) : Measure T :=
   match e.toVal? with | none => 0 | some _ => m
 
-@[simp] theorem Expr.isValM_some [MeasurableSpace T] {e : Expr} {m : Measure T} (He : e.isValue) :
-    e.isValM m = m := by simp [Expr.isValM, Expr.toVal?, He]
+@[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp} {m : Measure T} (He : e.isValue) :
+    e.isValM m = m := by simp [Exp.isValM, Exp.toVal?, He]
 
-@[simp] theorem Expr.isValM_none [MeasurableSpace T] {e : Expr} {m : Measure T} (He : ¬ e.isValue) :
-    e.isValM m = 0 := by simp [Expr.isValM, Expr.toVal?, He]
+@[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp} {m : Measure T} (He : ¬ e.isValue) :
+    e.isValM m = 0 := by simp [Exp.isValM, Exp.toVal?, He]
 
 def Int.isPos (z : Int) : Option { z : Int // 0 < z } :=
   if H : 0 < z then some ⟨z, H⟩ else none
 
-local instance : MeasurableSpace Expr := ⊤
+local instance : MeasurableSpace Exp := ⊤
 local instance : MeasurableSpace State := ⊤
 local instance : MeasurableSpace Val := ⊤
 local instance : MeasurableSpace Cfg := ⊤
@@ -36,7 +39,7 @@ def Cfg.Uniform (z : Int) (σ : State) : Measure Cfg :=
   PMF.uniformOfFinset (.Icc 0 z) (Finset.nonempty_Icc.mpr <| Int.le_of_lt Hz)
     |>.toMeasure.map (⟨.lit <| .int ·, σ⟩)
 
--- TODO: What if we change Cfg to Option (Expr × State)?
+-- TODO: What if we change Cfg to Option (Exp × State)?
 -- NB. Rand is currently off-by-one from Eris. I'm going to see if sticking `by grind`
 -- as a default term everywhere will solve all the positvity side conditions.
 -- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
@@ -54,8 +57,8 @@ def HeadStep : Cfg → Measure Cfg
   e2.isValM <|
   (op.eval e1 e2).unwrapM <|
   (dirac ⟨·, σ⟩)
-| ⟨.bif (.lit (.bool true)) et _, σ⟩ => dirac ⟨et, σ⟩
-| ⟨.bif (.lit (.bool false)) _ ef, σ⟩ => dirac ⟨ef, σ⟩
+| ⟨.cond (.lit (.bool true)) et _, σ⟩ => dirac ⟨et, σ⟩
+| ⟨.cond (.lit (.bool false)) _ ef, σ⟩ => dirac ⟨ef, σ⟩
 | ⟨.fst (.pair e1 e2), σ⟩ => e1.isValM <| e2.isValM <| (dirac ⟨e1, σ⟩)
 | ⟨.snd (.pair e1 e2), σ⟩ => e1.isValM <| e2.isValM <| (dirac ⟨e2, σ⟩)
 | ⟨.case (.inl e) el _, σ⟩ => e.isValM <| (dirac ⟨el.app e, σ⟩)
@@ -150,7 +153,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.asValM
+      unfold Exp.asValM
       split
       on_goal 1 => rename_goal store.no_redex
       on_goal 2 =>
@@ -168,7 +171,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.asValM
+      unfold Exp.asValM
       split
       on_goal 1 => rename_goal alloc.no_redex
       on_goal 2 => rename_goal alloc.redex
@@ -176,7 +179,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.isValM
+      unfold Exp.isValM
       split
       on_goal 1 => rename_goal case.right.no_redex
       on_goal 2 => rename_goal case.right.redex
@@ -184,7 +187,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.isValM
+      unfold Exp.isValM
       split
       on_goal 1 => rename_goal case.left.no_redex
       on_goal 2 => rename_goal case.left.redex
@@ -192,7 +195,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.isValM
+      unfold Exp.isValM
       split
       on_goal 1 => rename_goal snd.no_redex_1
       on_goal 2 =>
@@ -203,7 +206,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.isValM
+      unfold Exp.isValM
       split
       on_goal 1 => rename_goal fst.no_redex_1
       on_goal 2 =>
@@ -222,7 +225,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.isValM
+      unfold Exp.isValM
       split
       on_goal 1 => rename_goal binop.no_redex_1
       on_goal 2 =>
@@ -233,7 +236,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.isValM
+      unfold Exp.isValM
       split
       on_goal 1 => rename_goal unop.no_redex
       on_goal 2 => rename_goal unop.redex
@@ -241,7 +244,7 @@ macro "head_case" : tactic =>
       rename_i h_eq
       have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
       subst_eqs
-      unfold Expr.isValM
+      unfold Exp.isValM
       split
       on_goal 1 => rename_goal beta.no_redex
       on_goal 2 => rename_goal beta.redex
@@ -252,10 +255,10 @@ def HeadStepKernel : Kernel Cfg Cfg where
   toFun := HeadStep
 
 theorem val_head_stuck : HeadStep ⟨e, σ⟩ {ρ} > 0 → e.toVal? = none := by
-  head_case <;> simp [Expr.toVal?]
+  head_case <;> simp [Exp.toVal?]
 
-theorem Expr.toVal?_isValue {e : Expr} : e.toVal? = some v → e.isValue := by
-  simp [Expr.toVal?]; grind
+theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
+  simp [Exp.toVal?]; grind
 
 -- FIXME: Long proof, needs some automation
 theorem haed_ctx_step_val {Ki : EctxItem} :
@@ -270,13 +273,13 @@ theorem haed_ctx_step_val {Ki : EctxItem} :
   all_goals (rename_i Hk _; simp [EctxItem.FillItem] at Hk)
   all_goals try (obtain ⟨rfl, rfl⟩ := Hk)
   all_goals try (obtain ⟨rfl, rfl, rfl⟩ := Hk)
-  all_goals try (· simp [Expr.isValue])
-  all_goals try (rename_i Hk _; intro _; exact Expr.toVal?_isValue Hk)
-  all_goals simp [Expr.isValue]
+  all_goals try (· simp [Exp.isValue])
+  all_goals try (rename_i Hk _; intro _; exact Exp.toVal?_isValue Hk)
+  all_goals simp [Exp.isValue]
   all_goals intro _
-  all_goals try (· apply Expr.toVal?_isValue; trivial)
-  all_goals try (· apply And.intro <;> apply Expr.toVal?_isValue <;> trivial)
-  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp [Expr.isValue])
+  all_goals try (· apply Exp.toVal?_isValue; trivial)
+  all_goals try (· apply And.intro <;> apply Exp.toVal?_isValue <;> trivial)
+  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp [Exp.isValue])
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
 | BetaS :
@@ -293,9 +296,9 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   some e' = op.eval e1 e2 →
   HeadStepSupport ⟨.binop op e1 e2, σ⟩ ⟨e', σ⟩
 | IfTrueS :
-  HeadStepSupport ⟨.bif (.lit (.bool true)) et _, σ⟩ ⟨et, σ⟩
+  HeadStepSupport ⟨.cond (.lit (.bool true)) et _, σ⟩ ⟨et, σ⟩
 | IfFalseS :
-  HeadStepSupport ⟨.bif (.lit (.bool false)) _ ef, σ⟩ ⟨ef, σ⟩
+  HeadStepSupport ⟨.cond (.lit (.bool false)) _ ef, σ⟩ ⟨ef, σ⟩
 | FstS :
   e1.isValue →
   e2.isValue →
@@ -317,7 +320,7 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   HeadStepSupport ⟨.alloc ed, σ⟩ ⟨.lit (.loc ℓ), σ'⟩
 | LoadS :
   σ.heap[ℓ]? = some v →
-  e' = Expr.ofVal v →
+  e' = Exp.ofVal v →
   HeadStepSupport ⟨.load (.lit (.loc ℓ)), σ⟩ ⟨e', σ⟩
 | StoreS :
   e.toVal? = some v →
@@ -371,9 +374,9 @@ theorem dirac_singleton_pos {a b : Cfg} :
     rw [dirac_apply_of_mem (Set.mem_singleton _)]
     exact one_pos
 
-theorem isValM_singleton_pos [MeasurableSpace T] {e : Expr} {m : Measure T} {s : Set T} :
+theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp} {m : Measure T} {s : Set T} :
     (e.isValM m) s > 0 ↔ e.isValue ∧ m s > 0 := by
-  unfold Expr.isValM Expr.toVal?
+  unfold Exp.isValM Exp.toVal?
   by_cases He : e.isValue
   · simp [He]
   · simp [He]
@@ -386,10 +389,10 @@ theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     (opt.unwrapM f) s > 0 ↔ ∃ a, opt = some a ∧ (f a) s > 0 := by
   cases opt <;> simp [Option.unwrapM]
 
-theorem asValM_singleton_pos [MeasurableSpace T] {e : Expr} {f : Val → Measure T}
+theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp} {f : Val → Measure T}
     {s : Set T} :
     (e.asValM f) s > 0 ↔ ∃ v, e.toVal? = some v ∧ (f v) s > 0 := by
-  unfold Expr.asValM; cases e.toVal? <;> simp []
+  unfold Exp.asValM; cases e.toVal? <;> simp []
 
 theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
     (h : Cfg.Uniform z σ {ρ} > 0) :
@@ -429,7 +432,7 @@ theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Icc, Hv0, Hvz, Set.mem_preimage]⟩
   · exact ENNReal.natCast_ne_top _
 
-theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
+theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
     HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} > 0 ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
   · head_case
@@ -439,7 +442,7 @@ theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .BetaS (Expr.toVal?_isValue heq) rfl
+      exact .BetaS (Exp.toVal?_isValue heq) rfl
     case unop.redex =>
       rename_i heq
       intro h
@@ -447,14 +450,14 @@ theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
       obtain ⟨e', he', h'⟩ := h
       rw [dirac_singleton_pos] at h'
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
-      exact .UnOpS (Expr.toVal?_isValue heq) he'.symm
+      exact .UnOpS (Exp.toVal?_isValue heq) he'.symm
     case binop.redex heq0 _ heq1 heq2 =>
       intro h
       rw [unwrapM_singleton_pos] at h
       obtain ⟨e', he', h'⟩ := h
       rw [dirac_singleton_pos] at h'
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
-      exact .BinOpS (Expr.toVal?_isValue heq0) (Expr.toVal?_isValue heq2) he'.symm
+      exact .BinOpS (Exp.toVal?_isValue heq0) (Exp.toVal?_isValue heq2) he'.symm
     case cond.true =>
       intro h
       rw [dirac_singleton_pos] at h
@@ -469,25 +472,25 @@ theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      refine .FstS (Expr.toVal?_isValue heq0) (Expr.toVal?_isValue heq2)
+      refine .FstS (Exp.toVal?_isValue heq0) (Exp.toVal?_isValue heq2)
     case snd.redex =>
       rename_i heq0 heq1 _ heq2
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .SndS (Expr.toVal?_isValue heq0) (Expr.toVal?_isValue heq2)
+      exact .SndS (Exp.toVal?_isValue heq0) (Exp.toVal?_isValue heq2)
     case case.left.redex =>
       rename_i heq
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .CaseLS (Expr.toVal?_isValue heq)
+      exact .CaseLS (Exp.toVal?_isValue heq)
     case case.right.redex =>
       rename_i heq
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .CaseRS (Expr.toVal?_isValue heq)
+      exact .CaseRS (Exp.toVal?_isValue heq)
     case alloc.redex =>
       rename_i heq
       intro h
@@ -539,36 +542,36 @@ theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
     cases hsupp with
     | BetaS hval hrfl =>
       subst hrfl
-      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
     | UnOpS hval heval =>
-      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
       show _ > 0
       rw [unwrapM_singleton_pos]
       exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
     | BinOpS hval1 hval2 heval =>
-      simp [HeadStep, Expr.isValM, Expr.toVal?, hval1, hval2]
+      simp [HeadStep, Exp.isValM, Exp.toVal?, hval1, hval2]
       show _ > 0
       rw [unwrapM_singleton_pos]
       exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
     | IfTrueS => simp [HeadStep]
     | IfFalseS => simp [HeadStep]
     | FstS hval1 hval2 =>
-      simp [HeadStep, Expr.isValM, Expr.toVal?, hval1, hval2]
+      simp [HeadStep, Exp.isValM, Exp.toVal?, hval1, hval2]
     | SndS hval1 hval2 =>
-      simp [HeadStep, Expr.isValM, Expr.toVal?, hval1, hval2]
+      simp [HeadStep, Exp.isValM, Exp.toVal?, hval1, hval2]
     | CaseLS hval =>
-      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
     | CaseRS hval =>
-      simp [HeadStep, Expr.isValM, Expr.toVal?, hval]
+      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
     | AllocS hval hrfl hrfl2 =>
       subst hrfl; subst hrfl2
-      simp [HeadStep, Expr.asValM, hval]
+      simp [HeadStep, Exp.asValM, hval]
     | LoadS hsome hrfl =>
       subst hrfl
       simp [HeadStep, hsome]
     | StoreS hval hsome hrfl =>
       subst hrfl
-      simp [HeadStep, Expr.asValM, hval]
+      simp [HeadStep, Exp.asValM, hval]
       obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp hsome
       simp [hw]
     | RandNoTapeS Hz Hv0 Hvz =>
@@ -591,14 +594,14 @@ theorem head_step_support_equiv_rel (e1 e2 : Expr) (σ1 σ2 : State) :
       · rename_i hM; rw [hM] at hzN; exact absurd rfl hzN
       · exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
 
-theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Expr} {m : Measure T}
+theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
-  simp [Expr.isValM, Expr.toVal?, he]; infer_instance
+  simp [Exp.isValM, Exp.toVal?, he]; infer_instance
 
-theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Expr} {f : Val → Measure T}
+theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {f : Val → Measure T}
     {v : Val} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
     IsProbabilityMeasure (e.asValM f) := by
-  simp [Expr.asValM, hv]; infer_instance
+  simp [Exp.asValM, hv]; infer_instance
 
 theorem Cfg.Uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
     IsProbabilityMeasure (Cfg.Uniform z σ) := by
@@ -607,7 +610,7 @@ theorem Cfg.Uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
   exact Measure.isProbabilityMeasure_map (μ := (PMF.uniformOfFinset _ _).toMeasure)
     AEMeasurable.of_discrete
 
-theorem head_step_mass (e : Expr) (σ : State) :
+theorem head_step_mass (e : Exp) (σ : State) :
     (∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) → IsProbabilityMeasure (HeadStep ⟨e, σ⟩) := by
   head_case
   all_goals try (· simp) -- Handle all stuck cases
@@ -635,3 +638,5 @@ theorem head_step_mass (e : Expr) (σ : State) :
     intro ⟨ρ, hρ⟩
     obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.Uniform_singleton_pos_inv hρ
     exact Cfg.Uniform_isProbabilityMeasure Hz
+
+end ProbLang

@@ -38,11 +38,11 @@ instance instCountableString : Countable String where
     exists (fun s => f s.toList)
     exact fun _ _ H => String.toList_inj.mp (Hf H)
 
+namespace ProbLang
+
 abbrev Loc : Type := Int
 
 abbrev Lbl : Type := Int
-
-
 inductive Binder | anon | named (s : String)
   deriving Inhabited, DecidableEq, Countable
 
@@ -55,38 +55,38 @@ inductive UnOp | neg | minus
 inductive BinOp | plus | minus | mult | and | or | xor | eq
   deriving Inhabited, Countable
 
-inductive Expr
+inductive Exp
 | lit (b : BaseLit)
 | var (x : String)
-| letrec (f x : Binder) (e : Expr)
-| app (e1 e2 : Expr)
-| unop (u : UnOp) (e : Expr)
-| binop (b : BinOp) (e1 e2 : Expr)
-| bif (ec et tf : Expr)
-| pair (e1 e2 : Expr)
-| fst (e : Expr)
-| snd (e : Expr)
-| inl (e : Expr)
-| inr (e : Expr)
-| case (ec el er : Expr)
-| alloc (e : Expr) -- Initial value
-| load (e : Expr)
-| store (el ev : Expr)
-| tape (e : Expr)
-| rand (en et : Expr)
+| letrec (f x : Binder) (e : Exp)
+| app (e1 e2 : Exp)
+| unop (u : UnOp) (e : Exp)
+| binop (b : BinOp) (e1 e2 : Exp)
+| cond (ec et tf : Exp)
+| pair (e1 e2 : Exp)
+| fst (e : Exp)
+| snd (e : Exp)
+| inl (e : Exp)
+| inr (e : Exp)
+| case (ec el er : Exp)
+| alloc (e : Exp) -- Initial value
+| load (e : Exp)
+| store (el ev : Exp)
+| tape (e : Exp)
+| rand (en et : Exp)
   deriving Inhabited, Countable
 
 @[simp]
-def Expr.isValue : Expr → Prop
+def Exp.isValue : Exp → Prop
 | lit _ | letrec _ _ _ => True
 | inl e | inr e => e.isValue
 | pair e1 e2 => e1.isValue ∧ e2.isValue
 | _ => False
 
 @[simp]
-def Expr.noValue (e : Expr) : Prop := ¬ e.isValue
+def Exp.noValue (e : Exp) : Prop := ¬ e.isValue
 
-def Val := { e : Expr // e.isValue }
+def Val := { e : Exp // e.isValue }
 
 instance : Countable Val := Subtype.countable
 
@@ -103,10 +103,10 @@ instance instCountableTreeMapLocVal : Countable (ExtTreeMap Loc Val compare) := 
 
 
 open Classical in
-noncomputable def Expr.toVal? (e : Expr) : Option Val :=
+noncomputable def Exp.toVal? (e : Exp) : Option Val :=
   if H : e.isValue then some ⟨e, H⟩ else none
 
-def Expr.ofVal (v : Val) : Expr := v.1
+def Exp.ofVal (v : Val) : Exp := v.1
 
 structure Tape where
   bound : Int
@@ -131,49 +131,49 @@ structure State where
   tapes : ExtTreeMap Loc Tape
   deriving Inhabited, Countable
 
-theorem Expr.toVal?_ofVal (v : Val) : (Expr.ofVal v).toVal? = some v := by
+theorem Exp.toVal?_ofVal (v : Val) : (Exp.ofVal v).toVal? = some v := by
   obtain ⟨e, He⟩ := v
   revert He
-  induction e <;> simp_all [isValue, Expr.ofVal, Expr.toVal?]
+  induction e <;> simp_all [isValue, Exp.ofVal, Exp.toVal?]
 
-theorem Expr.ofVal_of_toVal_some {e : Expr} : ∀ {v}, e.toVal? = some v → Expr.ofVal v = e := by
+theorem Exp.ofVal_of_toVal_some {e : Exp} : ∀ {v}, e.toVal? = some v → Exp.ofVal v = e := by
   induction e <;> simp [toVal?, ofVal]
   intros _ _ _ h
   rw [← h]
 
-theorem ofVal_injective : Function.Injective Expr.ofVal :=
+theorem ofVal_injective : Function.Injective Exp.ofVal :=
   fun ⟨_, _⟩ _ _ => by congr
 
 inductive EctxItem
 | appL (v2 : Val)
-| appR (e1 : Expr)
+| appR (e1 : Exp)
 | unop (op : UnOp)
 | binopL (op : BinOp) (v2 : Val)
-| binopR (op : BinOp) (e1 : Expr)
-| bifC (e1 e2 : Expr)
+| binopR (op : BinOp) (e1 : Exp)
+| condC (e1 e2 : Exp)
 | pairL (v2 : Val)
-| pairR (e1 : Expr)
+| pairR (e1 : Exp)
 | fst
 | snd
 | inl
 | inr
-| case (e1 e2 : Expr)
+| case (e1 e2 : Exp)
 | alloc
 | load
 | storeL (v2 : Val)
-| storeR (e1 : Expr)
+| storeR (e1 : Exp)
 | tape
 | randL (v2 : Val)
-| randR (e1 : Expr)
+| randR (e1 : Exp)
 
-def EctxItem.FillItem (Ki : EctxItem) (e : Expr) : Expr :=
+def EctxItem.FillItem (Ki : EctxItem) (e : Exp) : Exp :=
   match Ki with
   | appL v2 => .app e (.ofVal v2)
   | appR e1 => .app e1 e
   | unop op => .unop op e
   | binopL op v2 => .binop op e (.ofVal v2)
   | binopR op e1 => .binop op e1 e
-  | bifC e1 e2 => .bif e e1 e2
+  | condC e1 e2 => .cond e e1 e2
   | .pairL v2 => .pair e (.ofVal v2)
   | .pairR e1 => .pair e1 e
   | .fst => .fst e
@@ -189,7 +189,7 @@ def EctxItem.FillItem (Ki : EctxItem) (e : Expr) : Expr :=
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
 
-noncomputable def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
+noncomputable def Exp.DecompItem (e : Exp) : Option (EctxItem × Exp) :=
   match e with
   | app e1 e2 =>
     e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
@@ -199,8 +199,8 @@ noncomputable def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
   | binop op e1 e2 =>
     e2.toVal?.casesOn (some (.binopR op e1, e2)) fun v2 =>
     e1.toVal?.casesOn (some (.binopL op v2, e1)) fun _ => none
-  | .bif ec et ef =>
-    ec.toVal?.casesOn (some (.bifC et ef, ec)) fun _ => none
+  | .cond ec et ef =>
+    ec.toVal?.casesOn (some (.condC et ef, ec)) fun _ => none
   | pair e1 e2 =>
     e2.toVal?.casesOn (some (.pairR e1, e2)) fun v2 =>
     e1.toVal?.casesOn (some (.pairL v2, e1)) fun _ => none
@@ -228,7 +228,7 @@ noncomputable def Expr.DecompItem (e : Expr) : Option (EctxItem × Expr) :=
     e1.toVal?.casesOn (some (.tape, e1)) fun _ => none
   | _ => none
 
-def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
+def Exp.subst (e : Exp) (x : String) (v : Exp) : Exp :=
   match e with
   | lit l => lit l
   | var y =>
@@ -242,7 +242,7 @@ def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
   | app e1 e2 => app (e1.subst x v) (e2.subst x v)
   | unop op e => unop op (e.subst x v)
   | binop op e1 e2 => binop op (e1.subst x v) (e2.subst x v)
-  | .bif ec et ef => .bif (ec.subst x v) (et.subst x v) (ef.subst x v)
+  | .cond ec et ef => .cond (ec.subst x v) (et.subst x v) (ef.subst x v)
   | pair e1 e2 => pair (e1.subst x v) (e2.subst x v)
   | fst e => fst (e.subst x v)
   | snd e => snd (e.subst x v)
@@ -255,16 +255,16 @@ def Expr.subst (e : Expr) (x : String) (v : Expr) : Expr :=
   | rand e1 e2 => rand (e1.subst x v) (e2.subst x v)
   | tape e => tape (e.subst x v)
 
-def Expr.subst' (mx : Binder) (v e : Expr) : Expr :=
+def Exp.subst' (mx : Binder) (v e : Exp) : Exp :=
   match mx with | .named x => e.subst x v | .anon => e
 
-def UnOp.eval (op : UnOp) (v : Expr) : Option Expr :=
+def UnOp.eval (op : UnOp) (v : Exp) : Option Exp :=
   match op, v with
   | neg, .lit (.bool b) => some <| .lit <| .bool <| ¬ b
   | minus, .lit (.int z) => some <| .lit <| .int <| z.neg
   | _, _ => none
 
-def BinOp.eval (op : BinOp) (v1 v2 : Expr) : Option Expr :=
+def BinOp.eval (op : BinOp) (v1 v2 : Exp) : Option Exp :=
   match op, v1, v2 with
   | plus,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 + z2)
   | minus, .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 - z2)
@@ -311,7 +311,7 @@ theorem State.update_tapes_neq' {σ σ' : State} {xs : List { z : Int // 0 ≤ z
   (hne <| State.update_tapes_same' ·)
 
 structure Cfg where
-  expr : Expr
+  expr : Exp
   state : State
   deriving Countable
 
@@ -321,16 +321,16 @@ theorem Ectx.FillItem_injective : Function.Injective (EctxItem.FillItem K) := by
 theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue := by
   cases K <;> simp [EctxItem.FillItem]; grind
 
-theorem EctxItem.FillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Expr}
+theorem EctxItem.FillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Exp}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
     (h : Ki1.FillItem e1 = Ki2.FillItem e2) : Ki1 = Ki2 := by
   cases Ki1 <;> cases Ki2 <;>
-    simp_all [EctxItem.FillItem, Expr.ofVal] <;>
-    -- (try (obtain ⟨_, hval⟩ := ‹Val›; simp_all [Expr.isValue])) <;>
+    simp_all [EctxItem.FillItem, Exp.ofVal] <;>
+    -- (try (obtain ⟨_, hval⟩ := ‹Val›; simp_all [Exp.isValue])) <;>
     grind [ofVal_injective, Subtype.ext_iff]
 
 @[simp]
-def Expr.height : Expr → Nat
+def Exp.height : Exp → Nat
   | lit _ | var _ => 1
   | letrec _ _ e => 1 + e.height
   | app e1 e2 => 1 + e1.height + e2.height
@@ -346,18 +346,18 @@ def Expr.height : Expr → Nat
   | alloc e => 1 + e.height
   | load e => 1 + e.height
   | tape e => 1 + e.height
-  | .bif e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+  | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
 
-theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Expr} (hv : ¬e.isValue) :
+theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
     (Ki.FillItem e).DecompItem = some (Ki, e) := by
   cases Ki with
   | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
     obtain ⟨val, hval⟩ := v2
-    simp [EctxItem.FillItem, Expr.DecompItem, Expr.toVal?, hv, hval, Expr.ofVal]
-  | _ => simp [EctxItem.FillItem, Expr.DecompItem, Expr.toVal?, hv]
+    simp [EctxItem.FillItem, Exp.DecompItem, Exp.toVal?, hv, hval, Exp.ofVal]
+  | _ => simp [EctxItem.FillItem, Exp.DecompItem, Exp.toVal?, hv]
 
-theorem Expr.DecompItem_fill {e e' : Expr} {Ki : EctxItem}
+theorem Exp.DecompItem_fill {e e' : Exp} {Ki : EctxItem}
     (h : e.DecompItem = some (Ki, e')) : Ki.FillItem e' = e ∧ ¬e'.isValue := by
   simp only [DecompItem, toVal?] at h
   cases e <;> simp_all [EctxItem.FillItem, ofVal] <;>
@@ -365,7 +365,7 @@ theorem Expr.DecompItem_fill {e e' : Expr} {Ki : EctxItem}
     (try (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq])) <;>
     (try (obtain ⟨rfl, rfl⟩ := h; simp_all))
 
-theorem EctxItem.FillItem_noVal {Ki : EctxItem} {e : Expr} (hv : ¬e.isValue) :
+theorem EctxItem.FillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
     ¬(Ki.FillItem e).isValue :=
   fun h => hv (FillItem_isValue h)
 
@@ -375,12 +375,12 @@ def Ectx.empty : Ectx := []
 
 def Ectx.comp (e1 e2 : Ectx) : Ectx := e2 ++ e1
 
-def Ectx.fill (K : Ectx) (e : Expr) : Expr := K.foldl (flip EctxItem.FillItem) e
+def Ectx.fill (K : Ectx) (e : Exp) : Exp := K.foldl (flip EctxItem.FillItem) e
 
 theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
   List.foldl_append
 
-theorem Ectx.fill_comp (K1 K2 : Ectx) (e : Expr) :
+theorem Ectx.fill_comp (K1 K2 : Ectx) (e : Exp) :
     K1.fill (K2.fill e) = (K1.comp K2).fill e := by
   simp [Ectx.comp, fill_app]
 
@@ -389,15 +389,15 @@ theorem Ectx.fill_injective (K : Ectx) : Function.Injective K.fill := by
   | nil => intro _ _ h; exact h
   | cons Ki K ih => exact fun _ _ h => Ectx.FillItem_injective (ih h)
 
-theorem Ectx.fill_noVal {K : Ectx} {e : Expr} (hv : ¬e.isValue) : ¬(K.fill e).isValue := by
+theorem Ectx.fill_noVal {K : Ectx} {e : Exp} (hv : ¬e.isValue) : ¬(K.fill e).isValue := by
   induction K generalizing e with
   | nil => exact hv
   | cons Ki K ih => exact ih (EctxItem.FillItem_noVal hv)
 
-theorem Ectx.fill_isValue {K : Ectx} {e : Expr} (hv : (K.fill e).isValue) : e.isValue :=
+theorem Ectx.fill_isValue {K : Ectx} {e : Exp} (hv : (K.fill e).isValue) : e.isValue :=
   Classical.byContradiction fun h => absurd hv (Ectx.fill_noVal h)
 
-theorem Expr.DecompItem_height {e : Expr} (h : e.DecompItem = some (Ki, e')) :
+theorem Exp.DecompItem_height {e : Exp} (h : e.DecompItem = some (Ki, e')) :
     e'.height < e.height := by
   simp only [DecompItem, toVal?] at h
   split at h
@@ -405,31 +405,31 @@ theorem Expr.DecompItem_height {e : Expr} (h : e.DecompItem = some (Ki, e')) :
   all_goals (split at h <;> simp_all <;> try omega)
   all_goals (split at h <;> simp_all <;> omega)
 
-noncomputable def Expr.decomp (e : Expr) : Ectx × Expr :=
+noncomputable def Exp.decomp (e : Exp) : Ectx × Exp :=
   match _h : e.DecompItem with
   | some (Ki, e') =>
       let (K, e'') := decomp e'
       (K ++ [Ki], e'')
   | none => ([], e)
   termination_by e.height
-  decreasing_by exact Expr.DecompItem_height _h
+  decreasing_by exact Exp.DecompItem_height _h
 
-theorem Expr.decomp_unfold (e : Expr) :
+theorem Exp.decomp_unfold (e : Exp) :
     e.decomp =
       match _h : e.DecompItem with
       | some (Ki, e') => let (K, e'') := e'.decomp; (K ++ [Ki], e'')
       | none => ([], e) :=
-  Expr.decomp.eq_1 e
+  Exp.decomp.eq_1 e
 
-theorem Expr.decomp_inv_nil {e e' : Expr} (h : e.decomp = ([], e')) :
+theorem Exp.decomp_inv_nil {e e' : Exp} (h : e.decomp = ([], e')) :
     e.DecompItem = none ∧ e = e' := by
-  rw [Expr.decomp] at h
+  rw [Exp.decomp] at h
   split at h
   · obtain ⟨K, e''⟩ := e.decomp
     simp_all [List.append_eq_nil_iff]
   · exact ⟨by assumption, by simp_all⟩
 
-theorem Expr.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Expr}
+theorem Exp.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Exp}
     (h : e.decomp = (K ++ [Ki], e'')) :
     ∃ e', e.DecompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
   rw [decomp_unfold] at h
@@ -445,9 +445,9 @@ theorem Expr.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Expr}
            Prod.ext hK' (by simp [he])⟩
   · simp_all [List.append_eq_nil_iff]
 
-theorem Expr.decomp_fill {K : Ectx} {e e' : Expr} (h : e.decomp = (K, e')) :
+theorem Exp.decomp_fill {K : Ectx} {e e' : Exp} (h : e.decomp = (K, e')) :
     K.fill e' = e := by
-  suffices ∀ n K (e e' : Expr), K.length = n → e.decomp = (K, e') → K.fill e' = e by
+  suffices ∀ n K (e e' : Exp), K.length = n → e.decomp = (K, e') → K.fill e' = e by
     exact this K.length K e e' rfl h
   intro n
   induction n with
@@ -471,9 +471,9 @@ theorem Expr.decomp_fill {K : Ectx} {e e' : Expr} (h : e.decomp = (K, e')) :
     exact hitem
 
 -- TODO: Cleanup
-theorem Expr.decomp_val_empty {K : Ectx} {e e' : Expr}
+theorem Exp.decomp_val_empty {K : Ectx} {e e' : Exp}
     (hd : e.decomp = (K, e')) (hv : e'.isValue) : K = [] := by
-  suffices ∀ n K (e e' : Expr), K.length = n → e.decomp = (K, e') → e'.isValue → K = [] by
+  suffices ∀ n K (e e' : Exp), K.length = n → e.decomp = (K, e') → e'.isValue → K = [] by
     exact this K.length K e e' rfl hd hv
   intro n
   induction n with
@@ -492,7 +492,7 @@ theorem Expr.decomp_val_empty {K : Ectx} {e e' : Expr}
     exact absurd hv (DecompItem_fill hKi).2
 
 -- TODO: Cleanup
-theorem Expr.decomp_fill_comp {e e' : Expr} {K K' : Ectx}
+theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
     (hv : ¬e.isValue) (hd : e.decomp = (K', e')) :
     (K.fill e).decomp = (K' ++ K, e') := by
   suffices ∀ n K, K.length = n →
@@ -518,3 +518,5 @@ theorem Expr.decomp_fill_comp {e e' : Expr} {K K' : Ectx}
     rw [decomp_unfold, EctxItem.DecompItem_FillItem Ki hfill_noVal]
     have ih_applied : (Ectx.fill K'' e).decomp = (K' ++ K'', e') := ih K'' hlen''
     simp only [ih_applied, List.append_assoc]
+
+end ProbLang
