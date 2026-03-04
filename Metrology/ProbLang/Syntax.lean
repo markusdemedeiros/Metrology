@@ -84,6 +84,18 @@ def Exp.isValue : Exp → Prop
 | pair e1 e2 => e1.isValue ∧ e2.isValue
 | _ => False
 
+def Exp.isValueB : Exp → Bool
+  | .lit _ | .letrec _ _ _ => true
+  | .inl e | .inr e => e.isValueB
+  | .pair e1 e2 => e1.isValueB && e2.isValueB
+  | _ => false
+
+theorem Exp.isValueB_iff (e : Exp) : e.isValueB = true ↔ e.isValue := by
+  induction e <;> simp_all [isValueB, isValue, Bool.and_eq_true]
+
+theorem Exp.isValueB_false_iff (e : Exp) : e.isValueB = false ↔ ¬e.isValue := by
+  simp [← isValueB_iff, Bool.not_eq_true]
+
 @[simp]
 def Exp.noValue (e : Exp) : Prop := ¬ e.isValue
 
@@ -106,6 +118,17 @@ instance instCountableTreeMapLocVal : Countable (ExtTreeMap Loc Val compare) := 
 open Classical in
 noncomputable def Exp.toVal? (e : Exp) : Option Val :=
   if H : e.isValue then some ⟨e, H⟩ else none
+
+def Exp.toValB? (e : Exp) : Option Val :=
+  if H : e.isValueB = true then some ⟨e, e.isValueB_iff.mp H⟩ else none
+
+theorem Exp.toValB?_eq_toVal? (e : Exp) : e.toValB? = e.toVal? := by
+  simp only [toValB?, toVal?]
+  by_cases H : e.isValue
+  · have hB : e.isValueB = true := (isValueB_iff e).mpr H
+    simp [hB, H]
+  · have hB : e.isValueB = false := by simp [(isValueB_iff e).not.mpr H]
+    simp [hB, H]
 
 def Exp.ofVal (v : Val) : Exp := v.1
 
@@ -190,43 +213,43 @@ def EctxItem.FillItem (Ki : EctxItem) (e : Exp) : Exp :=
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
 
-noncomputable def Exp.DecompItem (e : Exp) : Option (EctxItem × Exp) :=
+def Exp.DecompItem (e : Exp) : Option (EctxItem × Exp) :=
   match e with
   | app e1 e2 =>
-    e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.appL v2, e1)) fun _ => none
+    e2.toValB?.casesOn (some (.appR e1, e2)) fun v2 =>
+    e1.toValB?.casesOn (some (.appL v2, e1)) fun _ => none
   | unop op e1 =>
-    e1.toVal?.casesOn (some (.unop op, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.unop op, e1)) fun _ => none
   | binop op e1 e2 =>
-    e2.toVal?.casesOn (some (.binopR op e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.binopL op v2, e1)) fun _ => none
+    e2.toValB?.casesOn (some (.binopR op e1, e2)) fun v2 =>
+    e1.toValB?.casesOn (some (.binopL op v2, e1)) fun _ => none
   | .cond ec et ef =>
-    ec.toVal?.casesOn (some (.condC et ef, ec)) fun _ => none
+    ec.toValB?.casesOn (some (.condC et ef, ec)) fun _ => none
   | pair e1 e2 =>
-    e2.toVal?.casesOn (some (.pairR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.pairL v2, e1)) fun _ => none
+    e2.toValB?.casesOn (some (.pairR e1, e2)) fun v2 =>
+    e1.toValB?.casesOn (some (.pairL v2, e1)) fun _ => none
   | fst e1 =>
-    e1.toVal?.casesOn (some (.fst, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.fst, e1)) fun _ => none
   | snd e1 =>
-    e1.toVal?.casesOn (some (.snd, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.snd, e1)) fun _ => none
   | inl e1 =>
-    e1.toVal?.casesOn (some (.inl, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.inl, e1)) fun _ => none
   | inr e1 =>
-    e1.toVal?.casesOn (some (.inr, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.inr, e1)) fun _ => none
   | alloc e1 =>
-    e1.toVal?.casesOn (some (.alloc, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.alloc, e1)) fun _ => none
   | load e1 =>
-    e1.toVal?.casesOn (some (.load, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.load, e1)) fun _ => none
   | store e1 e2 =>
-    e2.toVal?.casesOn (some (.storeR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.storeL v2, e1)) fun _ => none
+    e2.toValB?.casesOn (some (.storeR e1, e2)) fun v2 =>
+    e1.toValB?.casesOn (some (.storeL v2, e1)) fun _ => none
   | rand e1 e2 =>
-    e2.toVal?.casesOn (some (.randR e1, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.randL v2, e1)) fun _ => none
+    e2.toValB?.casesOn (some (.randR e1, e2)) fun v2 =>
+    e1.toValB?.casesOn (some (.randL v2, e1)) fun _ => none
   | .case ec el er =>
-    ec.toVal?.casesOn (some (.case el er, ec)) fun _ => none
+    ec.toValB?.casesOn (some (.case el er, ec)) fun _ => none
   | tape e1 =>
-    e1.toVal?.casesOn (some (.tape, e1)) fun _ => none
+    e1.toValB?.casesOn (some (.tape, e1)) fun _ => none
   | _ => none
 
 def Exp.subst (e : Exp) (x : String) (v : Exp) : Exp :=
@@ -354,18 +377,20 @@ def Exp.height : Exp → Nat
 
 theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
     (Ki.FillItem e).DecompItem = some (Ki, e) := by
+  have hvB : e.isValueB = false := by simp [(Exp.isValueB_iff e).not.mpr hv]
   cases Ki with
   | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
     obtain ⟨val, hval⟩ := v2
-    simp [EctxItem.FillItem, Exp.DecompItem, Exp.toVal?, hv, hval, Exp.ofVal]
-  | _ => simp [EctxItem.FillItem, Exp.DecompItem, Exp.toVal?, hv]
+    have hvalB : val.isValueB = true := (Exp.isValueB_iff val).mpr hval
+    simp [EctxItem.FillItem, Exp.DecompItem, Exp.toValB?, hvB, hvalB, Exp.ofVal]
+  | _ => simp [EctxItem.FillItem, Exp.DecompItem, Exp.toValB?, hvB]
 
 theorem Exp.DecompItem_fill {e e' : Exp} {Ki : EctxItem}
     (h : e.DecompItem = some (Ki, e')) : Ki.FillItem e' = e ∧ ¬e'.isValue := by
-  simp only [DecompItem, toVal?] at h
+  simp only [DecompItem, toValB?, isValueB_iff] at h
   cases e <;> simp_all [EctxItem.FillItem, ofVal] <;>
-    (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq]) <;>
-    (try (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq])) <;>
+    (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq, isValueB_false_iff]) <;>
+    (try (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq, isValueB_false_iff])) <;>
     (try (obtain ⟨rfl, rfl⟩ := h; simp_all))
 
 theorem EctxItem.FillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
@@ -402,13 +427,13 @@ theorem Ectx.fill_isValue {K : Ectx} {e : Exp} (hv : (K.fill e).isValue) : e.isV
 
 theorem Exp.DecompItem_height {e : Exp} (h : e.DecompItem = some (Ki, e')) :
     e'.height < e.height := by
-  simp only [DecompItem, toVal?] at h
+  simp only [DecompItem, toValB?, isValueB_iff] at h
   split at h
   all_goals simp_all
   all_goals (split at h <;> simp_all <;> try omega)
   all_goals (split at h <;> simp_all <;> omega)
 
-noncomputable def Exp.decomp (e : Exp) : Ectx × Exp :=
+def Exp.decomp (e : Exp) : Ectx × Exp :=
   match _h : e.DecompItem with
   | some (Ki, e') =>
       let (K, e'') := decomp e'

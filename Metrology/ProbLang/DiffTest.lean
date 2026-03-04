@@ -54,17 +54,6 @@ theorem DetExec.succ {cfg1 cfg2 cfg3 : Cfg} {n : ℕ}
     DetExec (n + 1) cfg1 cfg3 where
   det_exec := ⟨cfg2, hstep, hrest.det_exec⟩
 
-/-! ## Computable value check -/
-
-def Exp.isValueB : Exp → Bool
-  | .lit _ | .letrec _ _ _ => true
-  | .inl e | .inr e => e.isValueB
-  | .pair e1 e2 => e1.isValueB && e2.isValueB
-  | _ => false
-
-theorem Exp.isValueB_iff (e : Exp) : e.isValueB = true ↔ e.isValue := by
-  induction e <;> simp_all [isValueB, isValue, Bool.and_eq_true]
-
 /-! ## Symbolic execution tactic -/
 
 theorem DetHeadStep.fst_pair {e1 e2 : Exp} (h1 : e1.isValueB = true) (h2 : e2.isValueB = true) (σ : State) :
