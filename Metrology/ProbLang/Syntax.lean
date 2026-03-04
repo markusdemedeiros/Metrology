@@ -101,6 +101,9 @@ def Exp.noValue (e : Exp) : Prop := ¬ e.isValue
 
 def Val := { e : Exp // e.isValue }
 
+-- Smart constructor for reflection: takes computable `isValueB` proof.
+def Val.ofValueB (e : Exp) (h : e.isValueB = true) : Val := ⟨e, e.isValueB_iff.mp h⟩
+
 instance : Countable Val := Subtype.countable
 
 instance instCountableTreeMapLocVal : Countable (ExtTreeMap Loc Val compare) := by

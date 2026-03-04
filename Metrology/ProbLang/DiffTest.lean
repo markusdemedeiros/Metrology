@@ -64,8 +64,14 @@ open Lean in deriving instance ToExpr for Exp
 
 open Lean in
 instance : ToExpr Val where
-  toExpr v := toExpr v.1
   toTypeExpr := mkConst ``Val
+  toExpr v :=
+    let e := toExpr v.1
+    -- Val.ofValueB e rfl : Val, where rfl : e.isValueB = true
+    -- (kernel reduces isValueB on concrete e to Bool.true)
+    let rfl_ := mkApp2 (mkConst ``Eq.refl [.succ .zero]) (mkConst ``Bool)
+                        (mkApp (mkConst ``Exp.isValueB) e)
+    mkApp2 (mkConst ``Val.ofValueB) e rfl_
 
 open Lean in deriving instance ToExpr for EctxItem
 
@@ -171,6 +177,50 @@ elab "det_step_of" t:term : term => do
   let cfg1 ← elabTerm t (some (mkConst ``Cfg))
   unsafe elabDetStep (← whnf cfg1)
 
+-- `DetExec 0 cfg cfg` by reflexivity.
+theorem DetExec.refl (cfg : Cfg) : DetExec 0 cfg cfg where
+  det_exec := rfl
+
+-- Non-instance version of DetExec.succ for use in meta-code.
+theorem DetExec.cons {cfg1 cfg2 cfg3 : Cfg} {n : ℕ}
+    (hstep : DetStep cfg1 cfg2) (hrest : DetExec n cfg2 cfg3) :
+    DetExec (n + 1) cfg1 cfg3 where
+  det_exec := ⟨cfg2, hstep, hrest.det_exec⟩
+
+open Lean Lean.Elab Term Meta in
+-- Given a concrete cfg1 and fuel, build a term of type `DetExec n cfg1 cfg2`
+-- where n and cfg2 are synthesized. Tries up to `fuel` DetSteps; stops early
+-- if elabDetStep fails (expression is stuck / a value).
+unsafe def elabDetExec (fuel : ℕ) (cfg1 : Expr) : TermElabM Expr := do
+  if fuel == 0 then
+    return mkApp (mkConst ``DetExec.refl) cfg1
+  -- Try one step; stop if cfg1 is stuck.
+  let stepOpt ← observing? (elabDetStep cfg1)
+  match stepOpt with
+  | none => return mkApp (mkConst ``DetExec.refl) cfg1
+  | some step =>
+    -- step : DetStep cfg1 cfg2; extract cfg2 from its type.
+    let stepType ← inferType step
+    let .app (.app _ _) cfg2 := stepType
+      | throwError "elabDetExec: unexpected DetStep type"
+    -- Recurse for the remaining steps.
+    let rest ← elabDetExec (fuel - 1) cfg2
+    -- rest : DetExec n cfg2 cfg3; extract n and cfg3.
+    let restType ← inferType rest
+    -- restType = DetExec n cfg2 cfg3, laid out as
+    --   @DetExec n cfg2 cfg3
+    let args := restType.getAppArgs
+    -- args[0] = n, args[1] = cfg2, args[2] = cfg3
+    let n    := args[0]!
+    let cfg3 := args[2]!
+    -- Build DetExec.cons hstep rest : DetExec (n+1) cfg1 cfg3
+    return mkApp6 (mkConst ``DetExec.cons) cfg1 cfg2 cfg3 n step rest
+
+open Lean Lean.Elab Term Meta in
+elab "det_exec_of" fuel:num t:term : term => do
+  let cfg1 ← elabTerm t (some (mkConst ``Cfg))
+  unsafe elabDetExec fuel.getNat (← whnf cfg1)
+
 /-! ## Smoke tests -/
 
 section Tests
@@ -194,6 +244,16 @@ example : ∃ cfg2, DetStep ⟨pl(#1 + fst((#2, #3))), default⟩ cfg2 :=
   ⟨_, det_step_of ⟨pl(#1 + fst((#2, #3))), default⟩⟩
 
 end Synthesis
+
+section DetExecTests
+
+-- fst((#1, #2)) + fst((#3, #4)) takes two steps (one for each fst).
+-- After step 1: #1 + fst((#3, #4)); after step 2: #1 + #3; then stuck (no binop rule yet).
+-- With fuel=2 the elab fires exactly twice before getting stuck.
+example : ∃ n cfg2, DetExec n ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩ cfg2 :=
+  ⟨_, _, det_exec_of 2 ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩⟩
+
+end DetExecTests
 
 
 end Tests
