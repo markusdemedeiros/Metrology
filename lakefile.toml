@@ -24,3 +24,7 @@ name = "Metrology"
 [[lean_exe]]
 name = "metrology"
 root = "Main"
+
+[[lean_lib]]
+name = "ProbLangTest"
+roots = ["Metrology.ProbLang.Test"]

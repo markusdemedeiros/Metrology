@@ -44,16 +44,16 @@ abbrev Loc : Type := Int
 
 abbrev Lbl : Type := Int
 inductive Binder | anon | named (s : String)
-  deriving Inhabited, DecidableEq, Countable, Repr
+  deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
 inductive BaseLit | int (z : Int) | bool (b : Bool) | unit | loc (loc : Loc) | lbl (lbl : Lbl)
-  deriving Inhabited, DecidableEq, Countable, Repr
+  deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
 inductive UnOp | neg | minus
-  deriving Inhabited, Countable, Repr
+  deriving Inhabited, Countable, Repr, BEq
 
 inductive BinOp | plus | minus | mult | and | or | xor | eq
-  deriving Inhabited, Countable, Repr
+  deriving Inhabited, Countable, Repr, BEq
 
 inductive Exp
 | lit (b : BaseLit)
@@ -75,7 +75,7 @@ inductive Exp
 | tape (e : Exp)
 | rand (en et : Exp)
 | fail
-  deriving Inhabited, Countable, Repr
+  deriving Inhabited, Countable, Repr, BEq
 
 @[simp]
 def Exp.isValue : Exp → Prop
