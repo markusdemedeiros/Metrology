@@ -54,6 +54,21 @@ theorem DetExec.succ {cfg1 cfg2 cfg3 : Cfg} {n : ℕ}
     DetExec (n + 1) cfg1 cfg3 where
   det_exec := ⟨cfg2, hstep, hrest.det_exec⟩
 
+/-! ## ToExpr instances for reflection -/
+
+open Lean in deriving instance ToExpr for Binder
+open Lean in deriving instance ToExpr for BaseLit
+open Lean in deriving instance ToExpr for UnOp
+open Lean in deriving instance ToExpr for BinOp
+open Lean in deriving instance ToExpr for Exp
+
+open Lean in
+instance : ToExpr Val where
+  toExpr v := toExpr v.1
+  toTypeExpr := mkConst ``Val
+
+open Lean in deriving instance ToExpr for EctxItem
+
 /-! ## Symbolic execution tactic -/
 
 theorem DetHeadStep.fst_pair {e1 e2 : Exp} (h1 : e1.isValueB = true) (h2 : e2.isValueB = true) (σ : State) :
@@ -73,21 +88,48 @@ private def isValueBPf (e : Expr) : MetaM (Option Expr) := do
     return none
 
 open Lean Lean.Elab Term Meta in
--- Given a concrete cfg1, produce a proof of `DetStep cfg1 ?cfg2`,
--- unifying ?cfg2 with the successor configuration.
-def elabDetStep (cfg1 : Expr) : TermElabM Expr := do
-  let .app (.app _ expr) state ← whnf cfg1 | throwError "elabDetStep: cfg1 is not a Cfg"
+-- Given a concrete head-reducible cfg1, produce a proof of `DetHeadStep cfg1 ?cfg2`.
+def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
+  let .app (.app _ expr) state ← whnf cfg1 | throwError "elabDetHeadStep: cfg1 is not a Cfg"
   match ← whnf expr with
   | .app (.const ``Exp.fst _) arg =>
     match ← whnf arg with
     | .app (.app (.const ``Exp.pair _) e1) e2 =>
-      let some h1 ← isValueBPf e1 | throwError "elabDetStep: fst: e1 is not a value"
-      let some h2 ← isValueBPf e2 | throwError "elabDetStep: fst: e2 is not a value"
-      let headStep := mkApp5 (mkConst ``DetHeadStep.fst_pair) e1 e2 h1 h2 state
-      let cfg2 := mkApp2 (mkConst ``Cfg.mk) e1 state
-      return mkApp3 (mkConst ``DetHeadStep.toDetStep) cfg1 cfg2 headStep
-    | _ => throwError "elabDetStep: fst argument is not a pair"
-  | e => throwError "elabDetStep: no matching case for {e}"
+      let some h1 ← isValueBPf e1 | throwError "elabDetHeadStep: fst: e1 is not a value"
+      let some h2 ← isValueBPf e2 | throwError "elabDetHeadStep: fst: e2 is not a value"
+      return mkApp5 (mkConst ``DetHeadStep.fst_pair) e1 e2 h1 h2 state
+    | _ => throwError "elabDetHeadStep: fst argument is not a pair"
+  | e => throwError "elabDetHeadStep: no matching case for {e}"
+
+/-- Lift a `DetHeadStep` through an evaluation context to a `DetStep`. -/
+theorem DetHeadStep.toDetStep_fill (K : Ectx) {cfg1 cfg2 : Cfg}
+    (h : DetHeadStep cfg1 cfg2) :
+    DetStep ⟨K.fill cfg1.expr, cfg1.state⟩ ⟨K.fill cfg2.expr, cfg2.state⟩ where
+  safe := ⟨⟨K.fill cfg2.expr, cfg2.state⟩,
+    fill_step (head_prim_step (by have := h.det; positivity))⟩
+  det := by
+    have hv := val_head_stuck (by have := h.det; positivity)
+    rw [← fill_prim_step hv, head_prim_step_eq h.safe]
+    exact h.det
+
+open Lean Lean.Elab Term Meta in
+-- Given a concrete cfg1, decompose it, find a DetHeadStep for the redex,
+-- and lift to a DetStep via the evaluation context.
+unsafe def elabDetStep (cfg1 : Expr) : TermElabM Expr := do
+  let .app (.app _ expr) state ← whnf cfg1 | throwError "elabDetStep: cfg1 is not a Cfg"
+  -- Step 1: evaluate Exp.decomp to get (K, redex)
+  let expVal ← evalExpr Exp (mkConst ``Exp) expr
+  let (kVal, redexVal) := expVal.decomp
+  let K := toExpr kVal
+  let redex := toExpr redexVal
+  -- Step 2: find a DetHeadStep for the redex
+  let headCfg := mkApp2 (mkConst ``Cfg.mk) redex state
+  let headStep ← elabDetHeadStep headCfg
+  -- Step 3: lift through K via toDetStep_fill
+  let headStepType ← inferType headStep
+  let .app (.app _ _) cfg2 := headStepType
+    | throwError "elabDetStep: unexpected DetHeadStep type"
+  return mkApp3 (mkConst ``DetHeadStep.toDetStep_fill) K headCfg cfg2 |>.app headStep
 
 /-! ## Pure-step tactic (TODO: under construction) -/
 
@@ -127,36 +169,33 @@ def elabDetStep (cfg1 : Expr) : TermElabM Expr := do
 open Lean Lean.Elab Term Meta in
 elab "det_step_of" t:term : term => do
   let cfg1 ← elabTerm t (some (mkConst ``Cfg))
-  elabDetStep cfg1
+  unsafe elabDetStep (← whnf cfg1)
 
 /-! ## Smoke tests -/
 
 section Tests
 
--- fst (pair #1 #2): should hit "fst case not yet implemented"
-#check (det_step_of ⟨.fst (.pair (.lit (.int 1)) (.lit (.int 2))), default⟩)
+section Correctness
+
+-- fst (pair #1 #2) steps to #1
+example : DetStep ⟨pl(fst((#1, #2))), default⟩ ⟨pl(#1), default⟩ :=
+  det_step_of ⟨pl(fst((#1, #2))), default⟩
+
+-- #1 + fst(#2, #3) steps to #1 + #2
+example : DetStep ⟨pl(#1 + fst((#2, #3))), default⟩ ⟨pl(#1 + #2), default⟩ :=
+  det_step_of ⟨pl(#1 + fst((#2, #3))), default⟩
+
+end Correctness
+
+section Synthesis
+
+-- The elab synthesizes the successor cfg without it being stated a priori
+example : ∃ cfg2, DetStep ⟨pl(#1 + fst((#2, #3))), default⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl(#1 + fst((#2, #3))), default⟩⟩
+
+end Synthesis
+
 
 end Tests
-
-/-! ## Smoke tests (TODO: restore once tactic works) -/
-
--- section Tests
---
--- -- 0 steps: value already
--- example : nsteps PureStep 0 (pl(#1)) (pl(#1)) := by pure_steps
---
--- -- 1 step: beta reduction  (fun x, x) #1 → #1
--- example : nsteps PureStep 1 (pl((fun x, x) #1)) (pl(#1)) := by pure_steps
---
--- -- 2 steps: (fun x, x + x) #1 → #1 + #1 → #2
--- example : nsteps PureStep 2 (pl((fun x, x + x) #1)) (pl(#2)) := by pure_steps
---
--- -- 3 steps: let x := #1; if (x = #1) then #42 else #0
--- example : nsteps PureStep 3
---     (pl(let x := #1; if (x = #1) then #42 else #0))
---     (pl(#42)) := by pure_steps
---
--- end Tests
-
 end ProbLang
 end
