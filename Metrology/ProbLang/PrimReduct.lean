@@ -1,3 +1,4 @@
+import Metrology.ProbLang.Measure
 import Metrology.ProbLang.Opsem
 
 noncomputable section
@@ -5,70 +6,26 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 
 namespace ProbLang
 
--- FIXME: Is this really necessary? This has got to be proven somewhere...
-theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
-    [Countable α] (μ : Measure α) (S : Set α) (hS : 0 < μ S) :
-    ∃ x ∈ S, 0 < μ {x} := by
-  by_contra!
-  have HSingle : S = ⋃₀ { {x} | x ∈ S } := by
-    refine Set.ext_iff.mpr (fun x => ⟨?_, ?_⟩)
-    · intro _
-      refine Set.mem_sUnion.mpr ?_
-      exists {x}
-      exact ⟨by simpa, Set.mem_singleton x⟩
-    · intro H
-      have ⟨t, Ht1, Ht2⟩ := Set.mem_sUnion.mp H
-      obtain ⟨x', Hx'1, Hx'2⟩ := Ht1
-      simp only [← Hx'2, Set.mem_singleton_iff] at Ht2
-      exact Ht2 ▸ Hx'1
-  suffices Hμ : μ S = 0 by simp [Hμ] at hS
-  rw [HSingle]
-  rw [MeasureTheory.measure_sUnion ?GCount ?GDisj ?GMeas]
-  case GCount =>
-    let f_forget : {(x : Set α) | ∃ x_1 ∈ S, {x_1} = x} → {(x : Set α) | ∃ x_1, {x_1} = x} :=
-      fun ⟨e, He⟩ => ⟨e, by simp at He ⊢; obtain ⟨x, _, Hx⟩ := He; exists x⟩
-    have Hf_forget : Function.Injective f_forget := by
-      intro _ _
-      simp [f_forget]
-      exact Subtype.ext
-    let f_ofSingle : {(x : Set α) | ∃ x_1, {x_1} = x} → α :=
-      fun ⟨_, He⟩ => (Set.mem_setOf_eq ▸ He).choose
-    have Hf_ofSingle : Function.Injective f_ofSingle := by rintro ⟨S1, H1⟩ ⟨S2, H2⟩; grind
-    let f_count : α → Nat := Countable.exists_injective_nat'.choose
-    have Hf_count : Function.Injective f_count := choose_spec _
-    exists (fun S => f_count <| f_ofSingle <| f_forget S)
-    intros S1 S2 Heq
-    simp at Heq
-    exact SetCoe.ext (congrArg Subtype.val (Hf_forget (Hf_ofSingle (Hf_count Heq))))
-  case GDisj =>
-    intro S1 HS1 S2 HS2 Hne
-    simp only [Set.mem_setOf_eq] at HS1 HS2
-    obtain ⟨_, _, rfl⟩ := HS1
-    obtain ⟨_, _, rfl⟩ := HS2
-    exact Set.disjoint_singleton.mpr fun a ↦ Hne (congrArg singleton a)
-  case GMeas => exact fun s a ↦ DiscreteMeasurableSpace.forall_measurableSet s
-  simp
-  exact fun a Ha => nonpos_iff_eq_zero.mp (this a Ha)
-
+@[simp]
 def fillLift (K : Ectx) (ρ : Cfg) : Cfg := ⟨K.fill ρ.expr, ρ.state⟩
 
 theorem fillLift_comp (K1 K2 : Ectx) :
     fillLift (K1.comp K2) = fillLift K1 ∘ fillLift K2 := by
   funext ⟨e, σ⟩
-  simp [fillLift, Function.comp, Ectx.fill_comp]
+  simp [Ectx.fill_comp]
 
 theorem fillLift_empty : fillLift [] = id := by
   funext ⟨e, σ⟩
   simp [fillLift, Ectx.fill]
 
 theorem fillLift_injective (K : Ectx) : Function.Injective (fillLift K) := by
-  intro ⟨e1, σ1⟩ ⟨e2, σ2⟩ h
-  simp [fillLift] at h
+  rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ h
+  simp only [fillLift, Cfg.mk.injEq] at h
   exact Cfg.mk.injEq .. ▸ ⟨Ectx.fill_injective K h.1, h.2⟩
 
 def primStep (cfg : Cfg) : Measure Cfg :=
   let (K, e') := cfg.expr.decomp
-  (headStep ⟨e', cfg.state⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩)
+  (headStep ⟨e', cfg.state⟩).map (fillLift K)
 
 def primStepKernel : Kernel Cfg Cfg where
   measurable' := .of_discrete
@@ -79,7 +36,7 @@ theorem Ectx.fill_noVal' {K : Ectx} {e : Exp} (hv : e.toVal? = none) :
   simp [Exp.toVal?] at *
   exact Ectx.fill_noVal (by grind)
 
-theorem val_stuck {cfg : Cfg} {ρ : Cfg} (h : primStep cfg {ρ} > 0) :
+theorem val_stuck {cfg : Cfg} {ρ : Cfg} (h : 0 < primStep cfg {ρ}) :
     cfg.expr.toVal? = none := by
   obtain ⟨e, σ⟩ := cfg
   simp only [primStep] at h
@@ -108,10 +65,11 @@ theorem head_prim_step_eq {e : Exp} {σ : State}
       obtain ⟨ρ, hρ⟩ := hred
       rw [← hfill] at hρ
       exact hne (head_ctx_step_val hρ)
+  unfold fillLift
   simp [hd, Ectx.fill]
 
 theorem head_prim_step {e : Exp} {σ : State} {ρ : Cfg}
-    (h : headStep ⟨e, σ⟩ {ρ} > 0) : 0 < primStep ⟨e, σ⟩ {ρ} := by
+    (h : 0 < headStep ⟨e, σ⟩ {ρ}) : 0 < primStep ⟨e, σ⟩ {ρ} := by
   rw [head_prim_step_eq ⟨ρ, h⟩]; exact h
 
 -- TODO: Cleanup
@@ -127,6 +85,7 @@ theorem fill_prim_step_map (K : Ectx) (e : Exp) (σ : State) (hv : e.toVal? = no
   simp only [hd']
   have hm1 : Measurable (fun ρ : Cfg => (⟨K'.fill ρ.expr, ρ.state⟩ : Cfg)) := .of_discrete
   have hm2 : Measurable (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg)) := .of_discrete
+  unfold fillLift
   rw [Measure.map_map hm2 hm1]
   congr 1
   funext ⟨e', σ'⟩
@@ -273,6 +232,7 @@ theorem prim_step_iff {e1 e2 : Exp} {σ1 σ2 : State} :
     obtain ⟨K, e1'⟩ := d
     rw [Measure.map_apply (.of_discrete) (.of_discrete)] at h
     obtain ⟨⟨e2', σ2'⟩, hmem, hpos⟩ := measure_pos_of_singleton_pos _ _ h
+    unfold fillLift at hmem
     simp only [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq] at hmem
     obtain ⟨hfill2, hσ⟩ := hmem
     subst hσ
@@ -436,14 +396,14 @@ theorem notStuck_fill_inv (K : Ectx) {e : Exp} {σ : State}
     · have hv' : e.toVal? = none := by simp [Exp.toVal?, hv]
       exact Or.inr (reducible_fill_inv K hv' hred)
 
--- def stuck (e : Exp) (σ : State) : Prop :=
---   ¬ e.isValue ∧ ¬ ∃ ρ : Cfg, 0 < primStep ⟨e, σ⟩ {ρ}
---
--- theorem stuck_fill (K : Ectx) {e : Exp} {σ : State}
---     (h : stuck e σ) : stuck (K.fill e) σ := by
---   refine ⟨fun hv => h.1 (Ectx.fill_isValue hv), fun hred => h.2 ?_⟩
---   have hv : e.toVal? = none := by simp [Exp.toVal?, h.1]
---   exact reducible_fill_inv K hv hred
+def stuck (e : Exp) (σ : State) : Prop :=
+  ¬ e.isValue ∧ ¬ ∃ ρ : Cfg, 0 < primStep ⟨e, σ⟩ {ρ}
+
+theorem stuck_fill (K : Ectx) {e : Exp} {σ : State}
+    (h : stuck e σ) : stuck (K.fill e) σ := by
+  refine ⟨fun hv => h.1 (Ectx.fill_isValue hv), fun hred => h.2 ?_⟩
+  have hv : e.toVal? = none := by simp [Exp.toVal?, h.1]
+  exact reducible_fill_inv K hv hred
 
 end ProbLang
 end
