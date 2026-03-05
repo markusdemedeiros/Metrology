@@ -1,5 +1,5 @@
 import Metrology.ProbLang.DetStep
-import Metrology.ProbLang.Eval
+import Metrology.ProbLang.EvalPrim
 import Metrology.ProbLang.Notation
 import Metrology.ProbLang.Opsem
 import Metrology.ProbLang.PrimStep
