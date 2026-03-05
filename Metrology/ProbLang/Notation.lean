@@ -3,6 +3,10 @@ import Metrology.ProbLang.Syntax
 
 namespace ProbLang
 
+-- TODO: Change single-arm case syntax to be a let
+-- TODO: Add constructors to case arms, to allow re-ordering
+-- TODO: Add a syntax for match expressions to unify `if let` and enable generic nested pattern matches
+
 open Lean Lean.PrettyPrinter Elab Parser
 
 declare_syntax_cat pl_exp

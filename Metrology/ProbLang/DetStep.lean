@@ -69,9 +69,9 @@ theorem DetHeadStep.cond_false (et ef : Exp) (σ : State) :
 
 theorem DetHeadStep.app_letrec {f x : Binder} {body v : Exp}
     (hv : v.isValueB = true) (σ : State) :
-    DetHeadStep ⟨.app (.letrec f x body) v, σ⟩ ⟨body.subst f (.letrec f x body) |>.subst x v, σ⟩ := by
+    DetHeadStep ⟨.app (.letrec f x body) v, σ⟩ ⟨Exp.subst x v (Exp.subst f (.letrec f x body) body), σ⟩ := by
   have hv' := v.isValueB_iff.mp hv
-  exact ⟨⟨⟨body.subst f (.letrec f x body) |>.subst x v, σ⟩,
+  exact ⟨⟨⟨Exp.subst x v (Exp.subst f (.letrec f x body) body), σ⟩,
           by simp [HeadStep, Exp.isValM_some hv']⟩,
          by simp [HeadStep, Exp.isValM_some hv']⟩
 
