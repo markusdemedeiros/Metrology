@@ -1,4 +1,4 @@
-import Metrology.ProbLang.PrimStep
+import Metrology.ProbLang.PrimReduct
 import Mathlib.Order.Defs.PartialOrder
 
 
@@ -12,15 +12,15 @@ def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
   | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
 
 structure PureStep (e1 e2 : Exp) : Prop where
-  safe : ∀ σ, ∃ ρ : Cfg, PrimStep ⟨e1, σ⟩ {ρ} > 0
-  det  : ∀ σ, PrimStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
+  safe : ∀ σ, ∃ ρ : Cfg, primStep ⟨e1, σ⟩ {ρ} > 0
+  det  : ∀ σ, primStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
 class PureExec (φ : Prop) (n : ℕ) (e1 e2 : Exp) : Prop where
   pure_exec : φ → nsteps PureStep n e1 e2
 
 structure PureHeadStep (e1 e2 : Exp) : Prop where
-  safe : ∀ σ, ∃ ρ : Cfg, HeadStep ⟨e1, σ⟩ {ρ} > 0
-  det  : ∀ σ, HeadStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
+  safe : ∀ σ, ∃ ρ : Cfg, headStep ⟨e1, σ⟩ {ρ} > 0
+  det  : ∀ σ, headStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
 theorem PureHeadStep.toPureStep {e1 e2 : Exp} (h : PureHeadStep e1 e2) : PureStep e1 e2 := by
   constructor
@@ -57,7 +57,7 @@ theorem PureExec.fill (K : Ectx) {φ : Prop} {n : ℕ} {e1 e2 : Exp}
 
 theorem PureExec.reducible {σ : State} {φ : Prop} {n : ℕ} {e1 e2 : Exp}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
-    ∃ ρ : Cfg, PrimStep ⟨e1, σ⟩ {ρ} > 0 := by
+    ∃ ρ : Cfg, primStep ⟨e1, σ⟩ {ρ} > 0 := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   exact hstep.safe σ
 

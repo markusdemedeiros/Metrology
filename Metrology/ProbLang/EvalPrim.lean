@@ -8,11 +8,11 @@ open Std
 This interpreter is structured to mirror the operational semantics as closely
 as possible:
 
-* `headStep` corresponds to `HeadStep : Cfg → Measure Cfg` — it handles
+* `headStep` corresponds to `headStep : Cfg → Measure Cfg` — it handles
   exactly the head-reduction cases, operating on a redex expression together
   with a mutable heap.  Tape operations are unsupported and raise an error.
 
-* `primStep` corresponds to `PrimStep` — it calls `Exp.decomp` to find the
+* `primStep` corresponds to `primStep` — it calls `Exp.decomp` to find the
   unique evaluation context `K` and redex `e'`, runs `headStep` on the redex
   to get a new expression `e_new`, then reassembles via `K.fill e_new`.
 
@@ -52,7 +52,7 @@ private def sampleUniform (z : Int) : IO Int := do
 `headStep` takes a head-redex expression `e` (guaranteed by the caller to be
 the innermost non-value sub-expression identified by `Exp.decomp`) together
 with the current mutable heap `σ`, and returns the reduct expression.
-It corresponds 1-to-1 with the cases of `HeadStep`.
+It corresponds 1-to-1 with the cases of `headStep`.
 -/
 
 /-- The result of a single head-reduction step: a new expression and (possibly
@@ -61,36 +61,36 @@ It corresponds 1-to-1 with the cases of `HeadStep`.
     `primStep`. -/
 def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
   match e with
-  -- Beta reduction: HeadStep (app (letrec f x e1) e2) = subst …
+  -- Beta reduction: headStep (app (letrec f x e1) e2) = subst …
   -- Precondition: e2 is a value (enforced by the evaluation context).
   | .app (.letrec f x body) e2 =>
     return Exp.subst x e2 (Exp.subst f (.letrec f x body) body)
 
-  -- Unary operator: HeadStep (unop op e) = op.eval e
+  -- Unary operator: headStep (unop op e) = op.eval e
   | .unop op v =>
     match op.eval v with
     | some r => return r
     | none   => throw' (.stuck s!"unop: type error on {repr v}" e)
 
-  -- Binary operator: HeadStep (binop op e1 e2) = op.eval e1 e2
+  -- Binary operator: headStep (binop op e1 e2) = op.eval e1 e2
   | .binop op v1 v2 =>
     match op.eval v1 v2 with
     | some r => return r
     | none   => throw' (.stuck s!"binop: type error" e)
 
-  -- Conditional: HeadStep (cond true  et _) = et
-  --              HeadStep (cond false _  ef) = ef
+  -- Conditional: headStep (cond true  et _) = et
+  --              headStep (cond false _  ef) = ef
   | .cond (.lit (.bool true))  et _  => return et
   | .cond (.lit (.bool false)) _  ef => return ef
 
-  -- Pair projections: HeadStep (fst (pair e1 e2)) = e1
-  --                   HeadStep (snd (pair e1 e2)) = e2
+  -- Pair projections: headStep (fst (pair e1 e2)) = e1
+  --                   headStep (snd (pair e1 e2)) = e2
   | .fst (.pair e1 _)  => return e1
   | .snd (.pair _ e2)  => return e2
 
   -- Sum elimination:
-  --   HeadStep (case (inl e) el _)  = el.app e
-  --   HeadStep (case (inr e) _  er) = er.app e
+  --   headStep (case (inl e) el _)  = el.app e
+  --   headStep (case (inr e) _  er) = er.app e
   | .case (.inl v) el _  => return .app el v
   | .case (.inr v) _  er => return .app er v
 
@@ -125,7 +125,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
   | .tape _   => throw' (.unsupported "tape allocation")
   | .rand _ (.lit (.lbl _)) => throw' (.unsupported "rand with tape")
 
-  -- Probabilistic sampling (no tape): HeadStep (rand z unit) = Uniform [0,z)
+  -- Probabilistic sampling (no tape): headStep (rand z unit) = Uniform [0,z)
   | .rand (.lit (.int z)) (.lit .unit) =>
     let n ← sampleUniform z
     return .lit (.int n)
@@ -138,9 +138,9 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
 /-!
 ### Primitive step
 
-`primStep` corresponds to `PrimStep`:
+`primStep` corresponds to `primStep`:
 
-  PrimStep cfg = (HeadStep ⟨e', cfg.state⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩)
+  primStep cfg = (headStep ⟨e', cfg.state⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩)
 
 where `(K, e') = cfg.expr.decomp`.
 

@@ -45,7 +45,7 @@ def Cfg.uniform (z : Int) (σ : State) : Measure Cfg :=
 -- as a default term everywhere will solve all the positvity side conditions.
 -- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
 -- order, should be governed by the reduction context.
-def HeadStep : Cfg → Measure Cfg
+def headStep : Cfg → Measure Cfg
 | ⟨.app (.letrec f x e1) e2, σ⟩ =>
   e2.isValM <|
   dirac ⟨Exp.subst x e2 (Exp.subst f (.letrec f x e1) e1), σ⟩
@@ -93,10 +93,10 @@ elab "rename_goal" name:ident : tactic => do
   let goal ← Lean.Elab.Tactic.getMainGoal
   goal.setUserName name.getId
 
-/-- Split the HeadStep cases, but with informative goal names. -/
+/-- Split the headStep cases, but with informative goal names. -/
 macro "head_case_names" : tactic =>
   `(tactic| (
-    unfold HeadStep
+    unfold headStep
     split
     on_goal 1  => rename_goal beta
     on_goal 2  => rename_goal unop
@@ -244,11 +244,11 @@ macro "head_case" : tactic =>
       on_goal 2 => rename_goal beta.redex
   ))
 
-def HeadStepKernel : Kernel Cfg Cfg where
+def headStepKernel : Kernel Cfg Cfg where
   measurable' := .of_discrete
-  toFun := HeadStep
+  toFun := headStep
 
-theorem val_head_stuck : 0 < HeadStep ⟨e, σ⟩ {ρ} → e.toVal? = none := by
+theorem val_head_stuck : 0 < headStep ⟨e, σ⟩ {ρ} → e.toVal? = none := by
   head_case <;> simp [Exp.toVal?]
 
 theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
@@ -256,7 +256,7 @@ theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
 
 -- FIXME: Long and horrid proof, needs some automation
 theorem head_ctx_step_val {Ki : EctxItem} :
-    0 < HeadStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
+    0 < headStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
   have Hzero : 0 < (0 : Measure Cfg) {ρ} → False := by simp
   have Hdirac : ∀ {ρ' : Cfg}, 0 < dirac ρ' {ρ} → ρ = ρ' := by
     simp [dirac, Pi.single, Function.update]; grind
@@ -405,7 +405,7 @@ theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State}
   · exact ENNReal.natCast_ne_top _
 
 theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
-    0 < HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
+    0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
   · head_case
     all_goals try (· simp) -- Handle all stuck cases
@@ -511,15 +511,15 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
     cases hsupp with
     | BetaS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS
     | TapeS | RandTapeS | AllocS | StoreS =>
-      simp_all [HeadStep]
+      simp_all [headStep]
     | RandNoTapeS | RandTapeEmptyS =>
-      simp_all [HeadStep, Cfg.uniform_singleton_pos_of_mem]
+      simp_all [headStep, Cfg.uniform_singleton_pos_of_mem]
     | UnOpS _ heval | BinOpS _ _ heval =>
-      simp_all [HeadStep]
+      simp_all [headStep]
       exact ⟨_, heval.symm, by simp⟩
     | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
       subst hσ
-      simp only [HeadStep, htape]
+      simp only [headStep, htape]
       split
       · rename_i hM; rw [hM] at hzN; exact absurd rfl hzN
       · exact Cfg.uniform_singleton_pos_of_mem Hz Hv0 Hvz
@@ -541,7 +541,7 @@ theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
     AEMeasurable.of_discrete
 
 theorem head_step_mass (e : Exp) (σ : State) :
-    (∃ ρ : Cfg, 0 < HeadStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (HeadStep ⟨e, σ⟩) := by
+    (∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
   head_case
   all_goals try (· simp) -- Handle all stuck cases
   all_goals try (· infer_instance) -- Handle all immediate cases

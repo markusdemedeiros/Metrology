@@ -2,6 +2,6 @@ import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.EvalPrim
 import Metrology.ProbLang.Notation
 import Metrology.ProbLang.Opsem
-import Metrology.ProbLang.PrimStep
+import Metrology.ProbLang.PrimReduct
 import Metrology.ProbLang.PureStep
 import Metrology.ProbLang.Syntax
