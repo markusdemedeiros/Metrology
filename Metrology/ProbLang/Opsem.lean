@@ -14,6 +14,7 @@ def Option.unwrapM {α : Type _} [MeasurableSpace β] (f : α → Measure β) : 
 | some v => f v
 | none => 0
 
+@[simp]
 def Exp.asValM [MeasurableSpace T] (e : Exp) (f : Val → Measure T) : Measure T :=
   match e.toVal? with | none => 0 | some v => f v
 
@@ -529,25 +530,15 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
   · intro hsupp
     cases hsupp with
-    | BetaS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS | RandNoTapeS
-    | TapeS | RandTapeS | RandTapeEmptyS =>
+    | BetaS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS
+    | TapeS | RandTapeS | AllocS | StoreS =>
+      simp_all [HeadStep]
+    | RandNoTapeS | RandTapeEmptyS =>
       simp_all [HeadStep, Cfg.Uniform_singleton_pos_of_mem]
-    | UnOpS hval heval =>
-      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
+    | UnOpS _ heval | BinOpS _ _ heval =>
+      simp_all [HeadStep]
       rw [unwrapM_singleton_pos]
       exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
-    | BinOpS hval1 hval2 heval =>
-      simp [HeadStep, Exp.isValM, Exp.toVal?, hval1, hval2]
-      rw [unwrapM_singleton_pos]
-      exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
-    | AllocS hval hrfl hrfl2 =>
-      subst hrfl; subst hrfl2
-      simp [HeadStep, Exp.asValM, hval]
-    | StoreS hval hsome hrfl =>
-      subst hrfl
-      simp [HeadStep, Exp.asValM, hval]
-      obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp hsome
-      simp [hw]
     | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
       subst hσ
       simp only [HeadStep, htape]
