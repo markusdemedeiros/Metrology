@@ -88,7 +88,7 @@ class IntoVal (e : Exp) (v : Val) : Prop where
 class AsVal (e : Exp) : Prop where
   as_val : ∃ v : Val, v.1 = e
 
-theorem as_val_is_Some {e : Exp} (h : ∃ v : Val, v.1 = e) : e.isValue := by
+theorem as_val_isSome {e : Exp} (h : ∃ v : Val, v.1 = e) : e.isValue := by
   obtain ⟨⟨_, hv⟩, rfl⟩ := h
   exact hv
 

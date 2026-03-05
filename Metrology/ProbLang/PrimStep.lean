@@ -101,13 +101,13 @@ theorem head_prim_step_eq {e : Exp} {σ : State}
   simp only [PrimStep]
   have hd : e.decomp = ([], e) := by
     rw [e.decomp_unfold]
-    rcases hm : e.DecompItem with _ | ⟨Ki, e'⟩
+    rcases hm : e.decompItem with _ | ⟨Ki, e'⟩
     · simp
     · exfalso
-      obtain ⟨hfill, hne⟩ := Exp.DecompItem_fill hm
+      obtain ⟨hfill, hne⟩ := Exp.decompItem_fill hm
       obtain ⟨ρ, hρ⟩ := hred
       rw [← hfill] at hρ
-      exact hne (haed_ctx_step_val hρ)
+      exact hne (head_ctx_step_val hρ)
   simp [hd, Ectx.fill]
 
 theorem head_prim_step {e : Exp} {σ : State} {ρ : Cfg}
@@ -169,14 +169,14 @@ theorem reducible_fill (K : Ectx) {e : Exp} {σ : State}
   obtain ⟨⟨e2, σ2⟩, hρ⟩ := hred
   exact ⟨⟨K.fill e2, σ2⟩, fill_step hρ⟩
 
-theorem head_ctx_step_val (K : Ectx) (e : Exp) (σ : State) (ρ : Cfg)
+theorem head_ctx_step_val_ectx (K : Ectx) (e : Exp) (σ : State) (ρ : Cfg)
     (hstep : 0 < HeadStep ⟨K.fill e, σ⟩ {ρ}) :
     e.isValue ∨ K = [] := by
   rcases List.eq_nil_or_concat K with rfl | ⟨K'', Ki, rfl⟩
   · exact Or.inr rfl
   · rw [List.concat_eq_append, fill_app] at hstep
     simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip] at hstep
-    exact Or.inl (Ectx.fill_isValue (haed_ctx_step_val hstep))
+    exact Or.inl (Ectx.fill_isValue (head_ctx_step_val hstep))
 
 theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Exp) (σ : State) (ρ : Cfg)
     (hfill : K'.fill e1' = K_redex.fill e1_redex)
@@ -197,22 +197,22 @@ theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Exp) (σ : State) (ρ : 
       simp only [Ectx.fill, List.foldl_nil] at hfill
       subst hfill
       -- hstep : HeadStep on (K'_rest ++ [Ki']).foldl ... e1'
-      -- Rewrite to Ki'.FillItem (K'_rest.foldl ... e1')
-      have hstep' : HeadStep ⟨Ki'.FillItem (Ectx.fill K'_rest e1'), σ⟩ {ρ} > 0 := by
+      -- Rewrite to Ki'.fillItem (K'_rest.foldl ... e1')
+      have hstep' : HeadStep ⟨Ki'.fillItem (Ectx.fill K'_rest e1'), σ⟩ {ρ} > 0 := by
         simp only [List.foldl_append, List.foldl_cons, List.foldl_nil] at hstep; exact hstep
-      have hval := haed_ctx_step_val (Ki := Ki') hstep'
+      have hval := head_ctx_step_val (Ki := Ki') hstep'
       have hv' : ¬e1'.isValue := by simp [Exp.toVal?] at hv; exact hv
       exact absurd (Ectx.fill_isValue hval) hv'
     · -- K_redex = K_redex_rest ++ [Ki_redex]
       simp only [List.concat_eq_append] at hfill ⊢
-      have hfill' : Ki'.FillItem (Ectx.fill K'_rest e1') =
-          Ki_redex.FillItem (Ectx.fill K_redex_rest e1_redex) := by
-        have h1 : (K'_rest ++ [Ki']).foldl (flip EctxItem.FillItem) e1' =
-          Ki'.FillItem (K'_rest.foldl (flip EctxItem.FillItem) e1') := List.foldl_append
-        have h2 : (K_redex_rest ++ [Ki_redex]).foldl (flip EctxItem.FillItem) e1_redex =
-          Ki_redex.FillItem (K_redex_rest.foldl (flip EctxItem.FillItem) e1_redex) := List.foldl_append
-        rw [show (K'_rest ++ [Ki']).foldl (flip EctxItem.FillItem) e1' =
-          (K_redex_rest ++ [Ki_redex]).foldl (flip EctxItem.FillItem) e1_redex from hfill] at h1
+      have hfill' : Ki'.fillItem (Ectx.fill K'_rest e1') =
+          Ki_redex.fillItem (Ectx.fill K_redex_rest e1_redex) := by
+        have h1 : (K'_rest ++ [Ki']).foldl (flip EctxItem.fillItem) e1' =
+          Ki'.fillItem (K'_rest.foldl (flip EctxItem.fillItem) e1') := List.foldl_append
+        have h2 : (K_redex_rest ++ [Ki_redex]).foldl (flip EctxItem.fillItem) e1_redex =
+          Ki_redex.fillItem (K_redex_rest.foldl (flip EctxItem.fillItem) e1_redex) := List.foldl_append
+        rw [show (K'_rest ++ [Ki']).foldl (flip EctxItem.fillItem) e1' =
+          (K_redex_rest ++ [Ki_redex]).foldl (flip EctxItem.fillItem) e1_redex from hfill] at h1
         exact h1.symm.trans h2
       have hv_inner : ¬(Ectx.fill K'_rest e1').isValue := by
         have hv' : ¬e1'.isValue := by simp [Exp.toVal?] at hv; exact hv
@@ -221,10 +221,10 @@ theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Exp) (σ : State) (ρ : 
         have := val_head_stuck hstep
         have hv' : ¬e1_redex.isValue := by simp [Exp.toVal?] at this; exact this
         exact Ectx.fill_noVal hv'
-      have hKi := EctxItem.FillItem_noVal_inj hv_inner hv_redex hfill'
+      have hKi := EctxItem.fillItem_noVal_inj hv_inner hv_redex hfill'
       subst hKi
       have he : Ectx.fill K'_rest e1' = Ectx.fill K_redex_rest e1_redex :=
-        Ectx.FillItem_injective hfill'
+        Ectx.fillItem_injective hfill'
       obtain ⟨K'', hK''⟩ := ih K_redex_rest e1_redex he hstep
       exact ⟨K'', by rw [hK'']; simp [Ectx.comp, List.append_assoc]⟩
 
@@ -252,7 +252,7 @@ theorem head_redex_unique (K K' : Ectx) (e e' : Exp) (σ : State)
   rw [← Ectx.fill_comp] at hfill
   have he : K''.fill e = e' := Ectx.fill_injective K' hfill
   -- head_ctx_step_val on hρ' (after rewriting e' = K''.fill e) gives K'' = []
-  rcases head_ctx_step_val K'' e σ ⟨e2', σ2'⟩ (he ▸ hρ') with hval | hnil
+  rcases head_ctx_step_val_ectx K'' e σ ⟨e2', σ2'⟩ (he ▸ hρ') with hval | hnil
   · -- e is a value, contradicts head step
     have := val_head_stuck hρ
     simp [Exp.toVal?, hval] at this
@@ -314,7 +314,7 @@ theorem head_reducible_prim_step_ctx (K : Ectx) {e1 : Exp} {σ1 : State} {e2 : E
   simp only [Ectx.comp, fill_app] at hfill1
   have he1' : e1' = Ectx.fill K'' e1 := Ectx.fill_injective K' hfill1
   have hK''nil : K'' = [] := by
-    rcases head_ctx_step_val K'' e1 σ1 ⟨e2', σ2⟩ (he1' ▸ hhs) with hval | hnil
+    rcases head_ctx_step_val_ectx K'' e1 σ1 ⟨e2', σ2⟩ (he1' ▸ hhs) with hval | hnil
     · have hne : e1.toVal? = none := val_head_stuck hρ_red
       simp [Exp.toVal?, hval] at hne
     · exact hnil
@@ -364,12 +364,12 @@ theorem head_prim_irreducible {e : Exp} {σ : State}
     ∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0 :=
   not_head_reducible.mp (fun hred => hirr (head_prim_reducible hred))
 
-def SubRedexesAreValues (e : Exp) : Prop :=
+def subRedexesAreValues (e : Exp) : Prop :=
   ∀ (K : Ectx) (e' : Exp), e = K.fill e' → e'.toVal? = none → K = []
 
-theorem ectxi_language_sub_redexes_are_values {e : Exp}
-    (h : ∀ (Ki : EctxItem) (e' : Exp), e = Ki.FillItem e' → e'.isValue) :
-    SubRedexesAreValues e := by
+theorem ectxi_language_subRedexesAreValues {e : Exp}
+    (h : ∀ (Ki : EctxItem) (e' : Exp), e = Ki.fillItem e' → e'.isValue) :
+    subRedexesAreValues e := by
   intro K e' hfill hv
   rcases List.eq_nil_or_concat K with rfl | ⟨K'', Ki, rfl⟩
   · rfl
@@ -382,7 +382,7 @@ theorem ectxi_language_sub_redexes_are_values {e : Exp}
 
 theorem prim_head_reducible {e : Exp} {σ : State}
     (hred : ∃ ρ : Cfg, 0 < PrimStep ⟨e, σ⟩ {ρ})
-    (hsub : SubRedexesAreValues e) :
+    (hsub : subRedexesAreValues e) :
     ∃ ρ : Cfg, 0 < HeadStep ⟨e, σ⟩ {ρ} := by
   obtain ⟨⟨e2, σ2⟩, hstep⟩ := hred
   rw [prim_step_iff] at hstep
@@ -395,13 +395,13 @@ theorem prim_head_reducible {e : Exp} {σ : State}
 
 theorem prim_head_irreducible {e : Exp} {σ : State}
     (hirr : ∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0)
-    (hsub : SubRedexesAreValues e) :
+    (hsub : subRedexesAreValues e) :
     ¬ ∃ ρ : Cfg, 0 < PrimStep ⟨e, σ⟩ {ρ} :=
   fun hred => not_head_reducible.mpr hirr (prim_head_reducible hred hsub)
 
 theorem head_stuck_stuck {e : Exp} {σ : State}
     (hstuck : e.toVal? = none ∧ ∀ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} = 0)
-    (hsub : SubRedexesAreValues e) :
+    (hsub : subRedexesAreValues e) :
     e.toVal? = none ∧ ¬ ∃ ρ : Cfg, 0 < PrimStep ⟨e, σ⟩ {ρ} :=
   ⟨hstuck.1, prim_head_irreducible hstuck.2 hsub⟩
 
@@ -424,11 +424,11 @@ theorem irreducible_fill_inv (K : Ectx) {e : Exp} {σ : State}
     ¬ ∃ ρ : Cfg, 0 < PrimStep ⟨e, σ⟩ {ρ} :=
   fun hred => hirr (reducible_fill K hred)
 
-def NotStuck (e : Exp) (σ : State) : Prop :=
+def notStuck (e : Exp) (σ : State) : Prop :=
   e.isValue ∨ ∃ ρ : Cfg, 0 < PrimStep ⟨e, σ⟩ {ρ}
 
-theorem not_stuck_fill_inv (K : Ectx) {e : Exp} {σ : State}
-    (h : NotStuck (K.fill e) σ) : NotStuck e σ := by
+theorem notStuck_fill_inv (K : Ectx) {e : Exp} {σ : State}
+    (h : notStuck (K.fill e) σ) : notStuck e σ := by
   rcases h with hv | hred
   · exact Or.inl (Ectx.fill_isValue hv)
   · by_cases hv : e.isValue
@@ -436,11 +436,11 @@ theorem not_stuck_fill_inv (K : Ectx) {e : Exp} {σ : State}
     · have hv' : e.toVal? = none := by simp [Exp.toVal?, hv]
       exact Or.inr (reducible_fill_inv K hv' hred)
 
-def Stuck (e : Exp) (σ : State) : Prop :=
+def stuck (e : Exp) (σ : State) : Prop :=
   ¬ e.isValue ∧ ¬ ∃ ρ : Cfg, 0 < PrimStep ⟨e, σ⟩ {ρ}
 
 theorem stuck_fill (K : Ectx) {e : Exp} {σ : State}
-    (h : Stuck e σ) : Stuck (K.fill e) σ := by
+    (h : stuck e σ) : stuck (K.fill e) σ := by
   refine ⟨fun hv => h.1 (Ectx.fill_isValue hv), fun hred => h.2 ?_⟩
   have hv : e.toVal? = none := by simp [Exp.toVal?, h.1]
   exact reducible_fill_inv K hv hred

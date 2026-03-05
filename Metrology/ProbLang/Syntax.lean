@@ -165,7 +165,7 @@ theorem Exp.ofVal_of_toVal_some {e : Exp} : ∀ {v}, e.toVal? = some v → Exp.o
   intros _ _ _ h
   rw [← h]
 
-theorem ofVal_injective : Function.Injective Exp.ofVal :=
+theorem Exp.ofVal_injective : Function.Injective Exp.ofVal :=
   fun ⟨_, _⟩ _ _ => by congr
 
 inductive EctxItem
@@ -190,7 +190,7 @@ inductive EctxItem
   | randL (v2 : Val)
   | randR (e1 : Exp)
 
-def EctxItem.FillItem (Ki : EctxItem) (e : Exp) : Exp :=
+def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
   match Ki with
   | appL v2 => .app e (.ofVal v2)
   | appR e1 => .app e1 e
@@ -213,7 +213,7 @@ def EctxItem.FillItem (Ki : EctxItem) (e : Exp) : Exp :=
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
 
-def Exp.DecompItem (e : Exp) : Option (EctxItem × Exp) :=
+def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
   match e with
   | app e1 e2 =>
     e2.toValB?.casesOn (some (.appR e1, e2)) fun v2 =>
@@ -337,16 +337,16 @@ structure Cfg where
   state : State
   deriving Countable
 
-theorem Ectx.FillItem_injective : Function.Injective (EctxItem.FillItem K) := by
-  cases K <;> simp [Function.Injective, EctxItem.FillItem]
+theorem Ectx.fillItem_injective : Function.Injective (EctxItem.fillItem K) := by
+  cases K <;> simp [Function.Injective, EctxItem.fillItem]
 
-theorem FillItem_isValue {K : EctxItem} : (K.FillItem e).isValue → e.isValue := by
-  cases K <;> simp [EctxItem.FillItem]; grind
+theorem EctxItem.fillItem_isValue {K : EctxItem} : (K.fillItem e).isValue → e.isValue := by
+  cases K <;> simp [EctxItem.fillItem]; grind
 
-theorem EctxItem.FillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Exp}
+theorem EctxItem.fillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Exp}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
-    (h : Ki1.FillItem e1 = Ki2.FillItem e2) : Ki1 = Ki2 := by
-  cases Ki1 <;> cases Ki2 <;> simp_all [EctxItem.FillItem, Exp.ofVal] <;> grind [Subtype.ext_iff]
+    (h : Ki1.fillItem e1 = Ki2.fillItem e2) : Ki1 = Ki2 := by
+  cases Ki1 <;> cases Ki2 <;> simp_all [EctxItem.fillItem, Exp.ofVal] <;> grind [Subtype.ext_iff]
 
 @[simp]
 def Exp.height : Exp → Nat
@@ -369,25 +369,25 @@ def Exp.height : Exp → Nat
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | fail => 1
 
-theorem EctxItem.DecompItem_FillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
-    (Ki.FillItem e).DecompItem = some (Ki, e) := by
+theorem EctxItem.decompItem_fillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
+    (Ki.fillItem e).decompItem = some (Ki, e) := by
   cases Ki with
   | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
     obtain ⟨val, hval⟩ := v2
-    simp [EctxItem.FillItem, Exp.DecompItem, Exp.toValB?,
+    simp [EctxItem.fillItem, Exp.decompItem, Exp.toValB?,
          Exp.isValueB_false_iff.mpr hv, Exp.isValueB_iff.mpr hval, Exp.ofVal]
-  | _ => simp [EctxItem.FillItem, Exp.DecompItem, Exp.toValB?, Exp.isValueB_false_iff.mpr hv]
+  | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toValB?, Exp.isValueB_false_iff.mpr hv]
 
-theorem Exp.DecompItem_fill {e e' : Exp} {Ki : EctxItem}
-    (h : e.DecompItem = some (Ki, e')) : Ki.FillItem e' = e ∧ ¬e'.isValue := by
-  simp only [DecompItem, toValB?, isValueB_iff] at h
-  cases e <;> simp_all [EctxItem.FillItem, ofVal] <;>
+theorem Exp.decompItem_fill {e e' : Exp} {Ki : EctxItem}
+    (h : e.decompItem = some (Ki, e')) : Ki.fillItem e' = e ∧ ¬e'.isValue := by
+  simp only [decompItem, toValB?, isValueB_iff] at h
+  cases e <;> simp_all [EctxItem.fillItem, ofVal] <;>
     (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq, isValueB_false_iff]) <;>
     (try (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq, isValueB_false_iff])) <;>
     (try (obtain ⟨rfl, rfl⟩ := h; simp_all))
 
-theorem EctxItem.FillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
-    ¬(Ki.FillItem e).isValue := (hv <| FillItem_isValue ·)
+theorem EctxItem.fillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
+    ¬(Ki.fillItem e).isValue := (hv <| EctxItem.fillItem_isValue ·)
 
 abbrev Ectx := List EctxItem
 
@@ -395,7 +395,7 @@ def Ectx.empty : Ectx := []
 
 def Ectx.comp (e1 e2 : Ectx) : Ectx := e2 ++ e1
 
-def Ectx.fill (K : Ectx) (e : Exp) : Exp := K.foldl (flip EctxItem.FillItem) e
+def Ectx.fill (K : Ectx) (e : Exp) : Exp := K.foldl (flip EctxItem.fillItem) e
 
 theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
   List.foldl_append
@@ -407,42 +407,42 @@ theorem Ectx.fill_comp (K1 K2 : Ectx) (e : Exp) :
 theorem Ectx.fill_injective (K : Ectx) : Function.Injective K.fill := by
   induction K with
   | nil => intro _ _ h; exact h
-  | cons Ki K ih => exact fun _ _ h => Ectx.FillItem_injective (ih h)
+  | cons Ki K ih => exact fun _ _ h => Ectx.fillItem_injective (ih h)
 
 theorem Ectx.fill_noVal {K : Ectx} {e : Exp} (hv : ¬e.isValue) : ¬(K.fill e).isValue := by
   induction K generalizing e with
   | nil => exact hv
-  | cons Ki K ih => exact ih (EctxItem.FillItem_noVal hv)
+  | cons Ki K ih => exact ih (EctxItem.fillItem_noVal hv)
 
 theorem Ectx.fill_isValue {K : Ectx} {e : Exp} (hv : (K.fill e).isValue) : e.isValue :=
   Classical.byContradiction fun h => absurd hv (Ectx.fill_noVal h)
 
-theorem Exp.DecompItem_height {e : Exp} (h : e.DecompItem = some (Ki, e')) :
+theorem Exp.decompItem_height {e : Exp} (h : e.decompItem = some (Ki, e')) :
     e'.height < e.height := by
-  simp only [DecompItem, toValB?, isValueB_iff] at h
+  simp only [decompItem, toValB?, isValueB_iff] at h
   split at h
   all_goals simp_all
   all_goals (split at h <;> simp_all <;> try omega)
   all_goals (split at h <;> simp_all <;> omega)
 
 def Exp.decomp (e : Exp) : Ectx × Exp :=
-  match _h : e.DecompItem with
+  match _h : e.decompItem with
   | some (Ki, e') =>
       let (K, e'') := decomp e'
       (K ++ [Ki], e'')
   | none => ([], e)
   termination_by e.height
-  decreasing_by exact Exp.DecompItem_height _h
+  decreasing_by exact Exp.decompItem_height _h
 
 theorem Exp.decomp_unfold (e : Exp) :
     e.decomp =
-      match _ : e.DecompItem with
+      match _ : e.decompItem with
       | some (Ki, e') => let (K, e'') := e'.decomp; (K ++ [Ki], e'')
       | none => ([], e) :=
   Exp.decomp.eq_1 e
 
 theorem Exp.decomp_inv_nil {e e' : Exp} (h : e.decomp = ([], e')) :
-    e.DecompItem = none ∧ e = e' := by
+    e.decompItem = none ∧ e = e' := by
   rw [Exp.decomp] at h
   split at h
   · simp_all [List.append_eq_nil_iff]
@@ -451,7 +451,7 @@ theorem Exp.decomp_inv_nil {e e' : Exp} (h : e.decomp = ([], e')) :
 -- TODO: Cleanup
 theorem Exp.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Exp}
     (h : e.decomp = (K ++ [Ki], e'')) :
-    ∃ e', e.DecompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
+    ∃ e', e.decompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
   rw [decomp_unfold] at h
   split at h
   · rename_i Ki' e' hd
@@ -485,7 +485,7 @@ theorem Exp.decomp_fill {K : Ectx} {e e' : Exp} (h : e.decomp = (K, e')) :
     simp at hlen
     have hlen'' : K''.length = n := Nat.add_right_cancel (congrFun (congrArg _ hlen) n)
     rw [ih K'' e'' e' hlen'' hK'']
-    exact (DecompItem_fill hKi).1
+    exact (decompItem_fill hKi).1
 
 -- TODO: Cleanup
 theorem Exp.decomp_val_empty {K : Ectx} {e e' : Exp}
@@ -506,7 +506,7 @@ theorem Exp.decomp_val_empty {K : Ectx} {e e' : Exp}
     subst hK''nil
     obtain ⟨_, he''⟩ := decomp_inv_nil hK''
     subst he''
-    exact absurd hv (DecompItem_fill hKi).2
+    exact absurd hv (decompItem_fill hKi).2
 
 -- TODO: Cleanup
 theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
@@ -528,11 +528,11 @@ theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
       ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
     have hlen'' : K''.length = n := by simp at hlen; omega
     have hfill_eq : Ectx.fill (K'' ++ [Ki]) e =
-        Ki.FillItem (Ectx.fill K'' e) := by
+        Ki.fillItem (Ectx.fill K'' e) := by
       simp only [Ectx.fill, List.foldl_append, List.foldl_cons, List.foldl_nil]; rfl
     rw [hfill_eq]
     have hfill_noVal : ¬(Ectx.fill K'' e).isValue := Ectx.fill_noVal hv
-    rw [decomp_unfold, EctxItem.DecompItem_FillItem Ki hfill_noVal]
+    rw [decomp_unfold, EctxItem.decompItem_fillItem Ki hfill_noVal]
     have ih_applied : (Ectx.fill K'' e).decomp = (K' ++ K'', e') := ih K'' hlen''
     simp only [ih_applied, List.append_assoc]
 

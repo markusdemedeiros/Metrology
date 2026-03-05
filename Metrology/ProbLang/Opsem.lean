@@ -35,7 +35,7 @@ instance : MeasurableSpace State := ⊤
 instance : MeasurableSpace Val := ⊤
 instance : MeasurableSpace Cfg := ⊤
 
-def Cfg.Uniform (z : Int) (σ : State) : Measure Cfg :=
+def Cfg.uniform (z : Int) (σ : State) : Measure Cfg :=
   z.isPos.unwrapM fun ⟨z, Hz⟩ =>
   PMF.uniformOfFinset (.Icc 0 z) (Finset.nonempty_Icc.mpr <| Int.le_of_lt Hz)
     |>.toMeasure.map (⟨.lit <| .int ·, σ⟩)
@@ -73,7 +73,7 @@ def HeadStep : Cfg → Measure Cfg
 | ⟨.store (.lit (.loc ℓ)) e, σ⟩ =>
   e.asValM fun v =>
   match σ.heap[ℓ]? with | none => 0 | some _ => dirac ⟨.lit .unit, σ.update_heap fun t => t.insert ℓ v⟩
-| ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ => Cfg.Uniform z σ
+| ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ => Cfg.uniform z σ
 | ⟨.tape (.lit (.int z)), σ⟩ =>
   let α := σ.tapes.fresh
   dirac ⟨.lit <| .lbl α, σ.update_tapes fun t => t.insert α (.empty z)⟩
@@ -84,9 +84,9 @@ def HeadStep : Cfg → Measure Cfg
     if M = z
       then
         match ns with
-        | [] => Cfg.Uniform z σ
+        | [] => Cfg.uniform z σ
         | n :: ns => dirac ⟨.lit <| .int n, σ.update_tapes fun t => t.insert α ⟨M, ns⟩⟩
-      else Cfg.Uniform z σ
+      else Cfg.uniform z σ
 | _ => 0
 
 elab "rename_goal" name:ident : tactic => do
@@ -255,8 +255,8 @@ theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
   simp [Exp.toVal?]; grind
 
 -- FIXME: Long and horrid proof, needs some automation
-theorem haed_ctx_step_val {Ki : EctxItem} :
-    0 < HeadStep ⟨Ki.FillItem e, σ⟩ {ρ} → e.isValue := by
+theorem head_ctx_step_val {Ki : EctxItem} :
+    0 < HeadStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
   have Hzero : 0 < (0 : Measure Cfg) {ρ} → False := by simp
   have Hdirac : ∀ {ρ' : Cfg}, 0 < dirac ρ' {ρ} → ρ = ρ' := by
     simp [dirac, Pi.single, Function.update]; grind
@@ -264,7 +264,7 @@ theorem haed_ctx_step_val {Ki : EctxItem} :
   all_goals try (exact fun H => (Hzero H).elim) -- Deal with all stuck cases
   -- Now: the redexes remain
   all_goals cases Ki
-  all_goals (rename_i Hk _; simp [EctxItem.FillItem] at Hk)
+  all_goals (rename_i Hk _; simp [EctxItem.fillItem] at Hk)
   all_goals try (obtain ⟨rfl, rfl⟩ := Hk)
   all_goals try (obtain ⟨rfl, rfl, rfl⟩ := Hk)
   all_goals try (· simp [Exp.isValue])
@@ -379,11 +379,11 @@ theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp} {f : Val → Measure 
     0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
   unfold Exp.asValM; cases e.toVal? <;> simp
 
-theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
-    (h : 0 < Cfg.Uniform z σ {ρ}) :
+theorem Cfg.uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
+    (h : 0 < Cfg.uniform z σ {ρ}) :
     0 < z ∧ ρ.state = σ ∧
     ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v ≤ z := by
-  unfold Cfg.Uniform Int.isPos Option.unwrapM at h
+  unfold Cfg.uniform Int.isPos Option.unwrapM at h
   by_cases Hz : 0 < z
   case neg => simp_all
   case pos =>
@@ -391,10 +391,10 @@ theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
     obtain ⟨_, _, _, rfl⟩ := h
     simp_all
 
-theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
+theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v ≤ z) :
-    0 < Cfg.Uniform z σ {⟨.lit (.int v), σ⟩} := by
-  unfold Cfg.Uniform Int.isPos Option.unwrapM
+    0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩} := by
+  unfold Cfg.uniform Int.isPos Option.unwrapM
   simp only [Hz, dite_true]
   rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg)) Measurable.of_discrete MeasurableSet.of_discrete]
   rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete]
@@ -404,7 +404,7 @@ theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Icc, Hv0, Hvz, Set.mem_preimage]⟩
   · exact ENNReal.natCast_ne_top _
 
-theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
+theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
     0 < HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
   · head_case
@@ -482,9 +482,9 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
       exact .StoreS heq (by rw [Option.isSome_iff_exists]; exact ⟨_, heq_heap⟩) rfl
     case rand.plain =>
-      -- Cfg.Uniform z σ
+      -- Cfg.uniform z σ
       intro h
-      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.Uniform_singleton_pos_inv h
+      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
       simp at hv hσ; subst hv; subst hσ
       exact .RandNoTapeS Hz Hv0 Hvz
     case tape =>
@@ -494,7 +494,7 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       exact .TapeS rfl rfl
     case rand.tape =>
       intro h
-      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.Uniform_singleton_pos_inv h
+      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
       simp at hv hσ; subst hv; subst hσ
       exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
     case rand.tape.deterministic =>
@@ -504,7 +504,7 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       refine .RandTapeS (by omega) ‹_› rfl rfl rfl
     case rand.tape.mismatch =>
       intro h
-      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.Uniform_singleton_pos_inv h
+      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
       simp at hv hσ; subst hv; subst hσ
       exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
   · intro hsupp
@@ -513,7 +513,7 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
     | TapeS | RandTapeS | AllocS | StoreS =>
       simp_all [HeadStep]
     | RandNoTapeS | RandTapeEmptyS =>
-      simp_all [HeadStep, Cfg.Uniform_singleton_pos_of_mem]
+      simp_all [HeadStep, Cfg.uniform_singleton_pos_of_mem]
     | UnOpS _ heval | BinOpS _ _ heval =>
       simp_all [HeadStep]
       exact ⟨_, heval.symm, by simp⟩
@@ -522,7 +522,7 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       simp only [HeadStep, htape]
       split
       · rename_i hM; rw [hM] at hzN; exact absurd rfl hzN
-      · exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
+      · exact Cfg.uniform_singleton_pos_of_mem Hz Hv0 Hvz
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
@@ -533,9 +533,9 @@ theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {f : Val → M
     IsProbabilityMeasure (e.asValM f) := by
   simp [Exp.asValM, hv]; infer_instance
 
-theorem Cfg.Uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
-    IsProbabilityMeasure (Cfg.Uniform z σ) := by
-  unfold Cfg.Uniform Int.isPos Option.unwrapM
+theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
+    IsProbabilityMeasure (Cfg.uniform z σ) := by
+  unfold Cfg.uniform Int.isPos Option.unwrapM
   simp only [Hz, dite_true]
   exact Measure.isProbabilityMeasure_map (μ := (PMF.uniformOfFinset _ _).toMeasure)
     AEMeasurable.of_discrete
@@ -558,15 +558,15 @@ theorem head_step_mass (e : Exp) (σ : State) :
     simp [Option.unwrapM, he']; infer_instance
   case rand.plain =>
     intro ⟨ρ, hρ⟩
-    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.Uniform_singleton_pos_inv hρ
-    exact Cfg.Uniform_isProbabilityMeasure Hz
+    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.uniform_singleton_pos_inv hρ
+    exact Cfg.uniform_isProbabilityMeasure Hz
   case rand.tape =>
     intro ⟨ρ, hρ⟩
-    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.Uniform_singleton_pos_inv hρ
-    exact Cfg.Uniform_isProbabilityMeasure Hz
+    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.uniform_singleton_pos_inv hρ
+    exact Cfg.uniform_isProbabilityMeasure Hz
   case rand.tape.mismatch =>
     intro ⟨ρ, hρ⟩
-    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.Uniform_singleton_pos_inv hρ
-    exact Cfg.Uniform_isProbabilityMeasure Hz
+    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.uniform_singleton_pos_inv hρ
+    exact Cfg.uniform_isProbabilityMeasure Hz
 
 end ProbLang
