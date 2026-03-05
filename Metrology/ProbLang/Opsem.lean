@@ -354,63 +354,42 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   σ' = σ →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 
+@[simp]
 theorem dirac_singleton_pos {a b : Cfg} :
-    0 < (dirac a) {b} ↔ b = a := by
+    0 < (dirac a) {b} ↔ a = b := by
   constructor
-  · intro h
-    by_contra hne
-    have : (dirac a) {b} = 0 := by
-      rw [dirac_apply' a (MeasurableSet.of_discrete)]
-      exact Set.indicator_of_notMem (show a ∉ ({b} : Set Cfg) from fun h => hne h.symm) (1 : Cfg → ENNReal)
-    simp [this] at h
-  · intro h
-    subst h
-    rw [dirac_apply_of_mem (Set.mem_singleton _)]
-    exact one_pos
+  · rw [dirac_apply' a .of_discrete, Set.indicator_singleton, Pi.single, Function.update]
+    split <;> simp; trivial
+  · simp_all [dirac_apply_of_mem (Set.mem_singleton _)]
 
+@[simp]
 theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp} {m : Measure T} {s : Set T} :
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
   unfold Exp.isValM Exp.toVal?
-  by_cases He : e.isValue
-  · simp [He]
-  · simp [He]
+  by_cases He : e.isValue <;> simp [He]
 
-theorem zero_singleton_not_pos {α : Type _} [MeasurableSpace α] {s : Set α} :
-    ¬ (0 < (0 : Measure α) s) := by simp
-
+@[simp]
 theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     {f : α → Measure β} {opt : Option α} {s : Set β} :
     0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
   cases opt <;> simp [Option.unwrapM]
 
-theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp} {f : Val → Measure T}
-    {s : Set T} :
+@[simp]
+theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp} {f : Val → Measure T} :
     0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
   unfold Exp.asValM; cases e.toVal? <;> simp
 
 theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
-    (h : Cfg.Uniform z σ {ρ} > 0) :
+    (h : 0 < Cfg.Uniform z σ {ρ}) :
     0 < z ∧ ρ.state = σ ∧
     ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v ≤ z := by
   unfold Cfg.Uniform Int.isPos Option.unwrapM at h
   by_cases Hz : 0 < z
-  · simp only [Hz, dite_true] at h
-    rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg)) Measurable.of_discrete MeasurableSet.of_discrete] at h
-    rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete] at h
-    simp only [gt_iff_lt] at h
-    rw [ENNReal.div_pos_iff] at h
-    obtain ⟨hcard, _⟩ := h
-    have hne : ({x ∈ Finset.Icc 0 z | x ∈ (fun x => (⟨.lit (.int x), σ⟩ : Cfg)) ⁻¹' {ρ}}).Nonempty := by
-      rwa [Finset.nonempty_iff_ne_empty, ne_eq, ← Finset.card_eq_zero, ← Nat.cast_eq_zero (R := ENNReal)]
-    obtain ⟨v, hmem⟩ := hne
-    simp only [Finset.mem_filter, Finset.mem_Icc, Set.mem_preimage, Set.mem_singleton_iff] at hmem
-    obtain ⟨⟨hv0, hvz⟩, hmem'⟩ := hmem
-    obtain ⟨e, s⟩ := ρ
-    simp only [Cfg.mk.injEq] at hmem'
-    obtain ⟨he, hs⟩ := hmem'
-    exact ⟨Hz, hs.symm, v, he.symm, hv0, hvz⟩
-  · simp only [Hz, dite_false] at h
-    simp at h
+  case neg => simp_all
+  case pos =>
+    simp [Hz, Measure.map_apply .of_discrete .of_discrete] at h
+    obtain ⟨_, _, _, rfl⟩ := h
+    simp_all
 
 theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v ≤ z) :
@@ -537,8 +516,7 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       simp_all [HeadStep, Cfg.Uniform_singleton_pos_of_mem]
     | UnOpS _ heval | BinOpS _ _ heval =>
       simp_all [HeadStep]
-      rw [unwrapM_singleton_pos]
-      exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
+      exact ⟨_, heval.symm, by simp⟩
     | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
       subst hσ
       simp only [HeadStep, htape]
