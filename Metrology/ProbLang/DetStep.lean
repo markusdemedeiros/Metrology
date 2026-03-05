@@ -22,11 +22,11 @@ theorem nsteps_succ_intro {r : α → α → Prop} {n : ℕ} {a c b : α}
     Weaker than `PureHeadStep` (which requires all states); useful when
     the next expression may depend on `σ` (e.g. heap operations). -/
 structure DetHeadStep (cfg1 cfg2 : Cfg) : Prop where
-  safe : ∃ ρ : Cfg, HeadStep cfg1 {ρ} > 0
+  safe : ∃ ρ : Cfg, 0 < HeadStep cfg1 {ρ}
   det  : HeadStep cfg1 {cfg2} = 1
 
 structure DetStep (cfg1 cfg2 : Cfg) : Prop where
-  safe : ∃ ρ : Cfg, PrimStep cfg1 {ρ} > 0
+  safe : ∃ ρ : Cfg, 0 < PrimStep cfg1 {ρ}
   det  : PrimStep cfg1 {cfg2} = 1
 
 theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg} (h : DetHeadStep cfg1 cfg2) : DetStep cfg1 cfg2 := by

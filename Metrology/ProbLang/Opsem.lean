@@ -115,13 +115,6 @@ macro "head_case_names" : tactic =>
     on_goal 16 => rename_goal default
   ))
 
-macro "head_case_intro" : tactic =>
-  `(tactic| (
-    rename_i h_eq
-    have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-    subst_eqs
-  ))
-
 -- TODO: Refactor
 macro "head_case" : tactic =>
   `(tactic| (
@@ -254,17 +247,17 @@ def HeadStepKernel : Kernel Cfg Cfg where
   measurable' := .of_discrete
   toFun := HeadStep
 
-theorem val_head_stuck : HeadStep ⟨e, σ⟩ {ρ} > 0 → e.toVal? = none := by
+theorem val_head_stuck : 0 < HeadStep ⟨e, σ⟩ {ρ} → e.toVal? = none := by
   head_case <;> simp [Exp.toVal?]
 
 theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
   simp [Exp.toVal?]; grind
 
--- FIXME: Long proof, needs some automation
+-- FIXME: Long and horrid proof, needs some automation
 theorem haed_ctx_step_val {Ki : EctxItem} :
-    HeadStep ⟨Ki.FillItem e, σ⟩ {ρ} > 0 → e.isValue := by
-  have Hzero : (0 : Measure Cfg) {ρ} > 0 → False := by simp
-  have Hdirac : ∀ {ρ' : Cfg}, dirac ρ' {ρ} > 0 → ρ = ρ' := by
+    0 < HeadStep ⟨Ki.FillItem e, σ⟩ {ρ} → e.isValue := by
+  have Hzero : 0 < (0 : Measure Cfg) {ρ} → False := by simp
+  have Hdirac : ∀ {ρ' : Cfg}, 0 < dirac ρ' {ρ} → ρ = ρ' := by
     simp [dirac, Pi.single, Function.update]; grind
   head_case
   all_goals try (exact fun H => (Hzero H).elim) -- Deal with all stuck cases
@@ -275,7 +268,7 @@ theorem haed_ctx_step_val {Ki : EctxItem} :
   all_goals try (obtain ⟨rfl, rfl, rfl⟩ := Hk)
   all_goals try (· simp [Exp.isValue])
   all_goals try (rename_i Hk _; intro _; exact Exp.toVal?_isValue Hk)
-  all_goals simp [Exp.isValue]
+  all_goals try simp [Exp.isValue]
   all_goals intro _
   all_goals try (· apply Exp.toVal?_isValue; trivial)
   all_goals try (· apply And.intro <;> apply Exp.toVal?_isValue <;> trivial)
@@ -361,7 +354,7 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 
 theorem dirac_singleton_pos {a b : Cfg} :
-    (dirac a) {b} > 0 ↔ b = a := by
+    0 < (dirac a) {b} ↔ b = a := by
   constructor
   · intro h
     by_contra hne
@@ -375,24 +368,24 @@ theorem dirac_singleton_pos {a b : Cfg} :
     exact one_pos
 
 theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp} {m : Measure T} {s : Set T} :
-    (e.isValM m) s > 0 ↔ e.isValue ∧ m s > 0 := by
+    0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
   unfold Exp.isValM Exp.toVal?
   by_cases He : e.isValue
   · simp [He]
   · simp [He]
 
 theorem zero_singleton_not_pos {α : Type _} [MeasurableSpace α] {s : Set α} :
-    ¬ ((0 : Measure α) s > 0) := by simp
+    ¬ (0 < (0 : Measure α) s) := by simp
 
 theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     {f : α → Measure β} {opt : Option α} {s : Set β} :
-    (opt.unwrapM f) s > 0 ↔ ∃ a, opt = some a ∧ (f a) s > 0 := by
+    0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
   cases opt <;> simp [Option.unwrapM]
 
 theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp} {f : Val → Measure T}
     {s : Set T} :
-    (e.asValM f) s > 0 ↔ ∃ v, e.toVal? = some v ∧ (f v) s > 0 := by
-  unfold Exp.asValM; cases e.toVal? <;> simp []
+    0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
+  unfold Exp.asValM; cases e.toVal? <;> simp
 
 theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
     (h : Cfg.Uniform z σ {ρ} > 0) :
@@ -420,12 +413,11 @@ theorem Cfg.Uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
 
 theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v ≤ z) :
-    Cfg.Uniform z σ {⟨.lit (.int v), σ⟩} > 0 := by
+    0 < Cfg.Uniform z σ {⟨.lit (.int v), σ⟩} := by
   unfold Cfg.Uniform Int.isPos Option.unwrapM
   simp only [Hz, dite_true]
   rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg)) Measurable.of_discrete MeasurableSet.of_discrete]
   rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete]
-  simp only [gt_iff_lt]
   rw [ENNReal.div_pos_iff]
   refine ⟨?_, ?_⟩
   · rw [ne_eq, Nat.cast_eq_zero]
@@ -433,7 +425,7 @@ theorem Cfg.Uniform_singleton_pos_of_mem {z v : Int} {σ : State}
   · exact ENNReal.natCast_ne_top _
 
 theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
-    HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} > 0 ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
+    0 < HeadStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
   · head_case
     all_goals try (· simp) -- Handle all stuck cases
@@ -542,12 +534,10 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       simp_all [HeadStep, Cfg.Uniform_singleton_pos_of_mem]
     | UnOpS hval heval =>
       simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
-      show _ > 0
       rw [unwrapM_singleton_pos]
       exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
     | BinOpS hval1 hval2 heval =>
       simp [HeadStep, Exp.isValM, Exp.toVal?, hval1, hval2]
-      show _ > 0
       rw [unwrapM_singleton_pos]
       exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
     | AllocS hval hrfl hrfl2 =>
@@ -560,7 +550,7 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       simp [hw]
     | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
       subst hσ
-      simp only [gt_iff_lt, HeadStep, htape]
+      simp only [HeadStep, htape]
       split
       · rename_i hM; rw [hM] at hzN; exact absurd rfl hzN
       · exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
@@ -582,7 +572,7 @@ theorem Cfg.Uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
     AEMeasurable.of_discrete
 
 theorem head_step_mass (e : Exp) (σ : State) :
-    (∃ ρ : Cfg, HeadStep ⟨e, σ⟩ {ρ} > 0) → IsProbabilityMeasure (HeadStep ⟨e, σ⟩) := by
+    (∃ ρ : Cfg, 0 < HeadStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (HeadStep ⟨e, σ⟩) := by
   head_case
   all_goals try (· simp) -- Handle all stuck cases
   all_goals try (· infer_instance) -- Handle all immediate cases
