@@ -1,3 +1,4 @@
+import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Eval
 import Metrology.ProbLang.Notation
 import Metrology.ProbLang.Opsem

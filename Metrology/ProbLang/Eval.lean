@@ -69,7 +69,7 @@ partial def eval (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Val := do
     | .letrec f x body =>
         -- Match HeadStep: substitute f first (recursive name), then x (argument).
         -- When f = x the order matters: f's substitution shadows x in the letrec value.
-        eval σ (Exp.subst' x v2.1 (Exp.subst' f v1.1 body))
+        eval σ (Exp.subst x v2.1 (Exp.subst f v1.1 body))
     | _ => throw' (.stuck "application of non-function" v1.1)
 
   -- Unary operators

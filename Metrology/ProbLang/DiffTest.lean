@@ -1,91 +1,27 @@
-import Metrology.ProbLang.PureStep
+import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Eval
 import Metrology.ProbLang.Notation
 
-noncomputable section
-open Classical MeasureTheory ProbabilityTheory Measure ProbLang
-
 namespace ProbLang
 
-local instance : MeasurableSpace Exp := ⊤
-local instance : MeasurableSpace State := ⊤
-local instance : MeasurableSpace Val := ⊤
-local instance : MeasurableSpace Cfg := ⊤
-
-/-! ## Infrastructure -/
-
-/-- Build a `PureHeadStep e1 e2` from a proof that `HeadStep` always maps
-    `⟨e1, σ⟩` to `dirac ⟨e2, σ⟩`. The `safe` field is derived automatically. -/
-theorem PureHeadStep.of_det (e1 e2 : Exp)
-    (hdet : ∀ σ, HeadStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1) :
-    PureHeadStep e1 e2 := by
-  refine ⟨fun σ => ⟨⟨e2, σ⟩, ?_⟩, hdet⟩
-  have h1 := hdet σ; positivity
-
-/-- One step followed by n steps gives n+1 steps. -/
-theorem nsteps_succ_intro {r : α → α → Prop} {n : ℕ} {a c b : α}
-    (h1 : r a c) (h2 : nsteps r n c b) : nsteps r (n + 1) a b :=
-  ⟨c, h1, h2⟩
-
-/-- A single deterministic head step at a fixed state `σ`.
-    Weaker than `PureHeadStep` (which requires all states); useful when
-    the next expression may depend on `σ` (e.g. heap operations). -/
-structure DetHeadStep (cfg1 cfg2 : Cfg) : Prop where
-  safe : ∃ ρ : Cfg, HeadStep cfg1 {ρ} > 0
-  det  : HeadStep cfg1 {cfg2} = 1
-
-structure DetStep (cfg1 cfg2 : Cfg) : Prop where
-  safe : ∃ ρ : Cfg, PrimStep cfg1 {ρ} > 0
-  det  : PrimStep cfg1 {cfg2} = 1
-
-theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg} (h : DetHeadStep cfg1 cfg2) : DetStep cfg1 cfg2 := by
-  constructor
-  · obtain ⟨ρ, hρ⟩ := h.safe
-    exact ⟨ρ, head_prim_step hρ⟩
-  · obtain ⟨e1, σ1⟩ := cfg1
-    rw [head_prim_step_eq h.safe]
-    exact h.det
-
-class DetExec (n : ℕ) (cfg1 cfg2 : Cfg) : Prop where
-  det_exec : nsteps DetStep n cfg1 cfg2
-
-theorem DetExec.succ {cfg1 cfg2 cfg3 : Cfg} {n : ℕ}
-    (hstep : DetStep cfg1 cfg2) [hrest : DetExec n cfg2 cfg3] :
-    DetExec (n + 1) cfg1 cfg3 where
-  det_exec := ⟨cfg2, hstep, hrest.det_exec⟩
+open Lean Meta Elab 
 
 /-! ## ToExpr instances for reflection -/
-
-open Lean in deriving instance ToExpr for Binder
-open Lean in deriving instance ToExpr for BaseLit
-open Lean in deriving instance ToExpr for UnOp
-open Lean in deriving instance ToExpr for BinOp
-open Lean in deriving instance ToExpr for Exp
-
-open Lean in
+deriving instance ToExpr for Binder
+deriving instance ToExpr for BaseLit
+deriving instance ToExpr for UnOp
+deriving instance ToExpr for BinOp
+deriving instance ToExpr for Exp
 instance : ToExpr Val where
   toTypeExpr := mkConst ``Val
   toExpr v :=
     let e := toExpr v.1
-    -- Val.ofValueB e rfl : Val, where rfl : e.isValueB = true
-    -- (kernel reduces isValueB on concrete e to Bool.true)
-    let rfl_ := mkApp2 (mkConst ``Eq.refl [.succ .zero]) (mkConst ``Bool)
-                        (mkApp (mkConst ``Exp.isValueB) e)
+    let rfl_ := mkApp2 (mkConst ``Eq.refl [.succ .zero]) (mkConst ``Bool) (mkApp (mkConst ``Exp.isValueB) e)
     mkApp2 (mkConst ``Val.ofValueB) e rfl_
-
-open Lean in deriving instance ToExpr for EctxItem
+deriving instance ToExpr for EctxItem
 
 /-! ## Symbolic execution tactic -/
 
-theorem DetHeadStep.fst_pair {e1 e2 : Exp} (h1 : e1.isValueB = true) (h2 : e2.isValueB = true) (σ : State) :
-    DetHeadStep ⟨.fst (.pair e1 e2), σ⟩ ⟨e1, σ⟩ := by
-  have hv1 := e1.isValueB_iff.mp h1
-  have hv2 := e2.isValueB_iff.mp h2
-  exact ⟨⟨⟨e1, σ⟩, by simp [HeadStep, Exp.isValM_some hv1, Exp.isValM_some hv2]⟩,
-         by simp [HeadStep, Exp.isValM_some hv1, Exp.isValM_some hv2]⟩
-
-open Lean Meta in
--- Returns a proof of `e.isValueB = true`, or none if not a value.
 private def isValueBPf (e : Expr) : MetaM (Option Expr) := do
   let r ← reduce (mkApp (mkConst ``Exp.isValueB) e)
   if r == mkConst ``Bool.true then
@@ -93,9 +29,8 @@ private def isValueBPf (e : Expr) : MetaM (Option Expr) := do
   else
     return none
 
-open Lean Lean.Elab Term Meta in
--- Given a concrete head-reducible cfg1, produce a proof of `DetHeadStep cfg1 ?cfg2`.
-def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
+open Term in
+unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
   let .app (.app _ expr) state ← whnf cfg1 | throwError "elabDetHeadStep: cfg1 is not a Cfg"
   match ← whnf expr with
   | .app (.const ``Exp.fst _) arg =>
@@ -105,6 +40,103 @@ def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
       let some h2 ← isValueBPf e2 | throwError "elabDetHeadStep: fst: e2 is not a value"
       return mkApp5 (mkConst ``DetHeadStep.fst_pair) e1 e2 h1 h2 state
     | _ => throwError "elabDetHeadStep: fst argument is not a pair"
+  | .app (.const ``Exp.snd _) arg =>
+    match ← whnf arg with
+    | .app (.app (.const ``Exp.pair _) e1) e2 =>
+      let some h1 ← isValueBPf e1 | throwError "elabDetHeadStep: snd: e1 is not a value"
+      let some h2 ← isValueBPf e2 | throwError "elabDetHeadStep: snd: e2 is not a value"
+      return mkApp5 (mkConst ``DetHeadStep.snd_pair) e1 e2 h1 h2 state
+    | _ => throwError "elabDetHeadStep: snd argument is not a pair"
+  | .app (.app (.const ``Exp.app _) fn) arg =>
+    match ← whnf fn with
+    | .app (.app (.app (.const ``Exp.letrec _) f) x) body =>
+      let some hv ← isValueBPf arg | throwError "elabDetHeadStep: app: argument is not a value"
+      -- @DetHeadStep.app_letrec f x body arg hv state
+      return mkApp6 (mkConst ``DetHeadStep.app_letrec) f x body arg hv state
+    | _ => throwError "elabDetHeadStep: app: function is not a letrec"
+  | .app (.app (.const ``Exp.unop _) op) e =>
+    let some hv ← isValueBPf e | throwError "elabDetHeadStep: unop: e is not a value"
+    let opVal     ← evalExpr UnOp (mkConst ``UnOp) op
+    let eVal      ← evalExpr Exp  (mkConst ``Exp)  e
+    let some resultVal := UnOp.eval opVal eVal
+      | throwError "elabDetHeadStep: unop: UnOp.eval returned none"
+    let result := toExpr resultVal
+    let optExpType := mkApp (mkConst ``Option [.zero]) (mkConst ``Exp)
+    let heval := mkApp2 (mkConst ``Eq.refl [.succ .zero]) optExpType
+                         (mkApp2 (mkConst ``UnOp.eval) op e)
+    -- @DetHeadStep.unop op e result hv heval state
+    return mkApp6 (mkConst ``DetHeadStep.unop) op e result hv heval state
+  | .app (.app (.app (.const ``Exp.binop _) op) e1) e2 =>
+    let some h1 ← isValueBPf e1 | throwError "elabDetHeadStep: binop: e1 is not a value"
+    let some h2 ← isValueBPf e2 | throwError "elabDetHeadStep: binop: e2 is not a value"
+    -- Evaluate BinOp.eval op e1 e2 at meta-level using evalExpr
+    let opVal  ← evalExpr BinOp (mkConst ``BinOp) op
+    let e1Val  ← evalExpr Exp   (mkConst ``Exp)   e1
+    let e2Val  ← evalExpr Exp   (mkConst ``Exp)   e2
+    let some resultVal := BinOp.eval opVal e1Val e2Val
+      | throwError "elabDetHeadStep: binop: BinOp.eval returned none"
+    let result := toExpr resultVal
+    let optExpType := mkApp (mkConst ``Option [.zero]) (mkConst ``Exp)
+    let heval := mkApp2 (mkConst ``Eq.refl [.succ .zero]) optExpType
+                         (mkApp3 (mkConst ``BinOp.eval) op e1 e2)
+    -- @DetHeadStep.binop op e1 e2 result h1 h2 heval state
+    return mkApp8 (mkConst ``DetHeadStep.binop) op e1 e2 result h1 h2 heval state
+  | .app (.app (.app (.const ``Exp.case _) scrut) el) er =>
+    match ← whnf scrut with
+    | .app (.const ``Exp.inl _) v =>
+      let some hv ← isValueBPf v | throwError "elabDetHeadStep: case_inl: scrutinee is not a value"
+      return mkApp5 (mkConst ``DetHeadStep.case_inl) v el er hv state
+    | .app (.const ``Exp.inr _) v =>
+      let some hv ← isValueBPf v | throwError "elabDetHeadStep: case_inr: scrutinee is not a value"
+      return mkApp5 (mkConst ``DetHeadStep.case_inr) v el er hv state
+    | _ => throwError "elabDetHeadStep: case: scrutinee is not inl/inr"
+  | .app (.app (.app (.const ``Exp.cond _) cond_e) et) ef =>
+    match ← whnf cond_e with
+    | .app (.const ``Exp.lit _) (.app (.const ``BaseLit.bool _) (.const ``Bool.true _)) =>
+      return mkApp3 (mkConst ``DetHeadStep.cond_true) et ef state
+    | .app (.const ``Exp.lit _) (.app (.const ``BaseLit.bool _) (.const ``Bool.false _)) =>
+      return mkApp3 (mkConst ``DetHeadStep.cond_false) et ef state
+    | _ => throwError "elabDetHeadStep: cond: condition is not a boolean literal"
+  | .app (.const ``Exp.alloc _) v =>
+    let some hv ← isValueBPf v | throwError "elabDetHeadStep: alloc: argument is not a value"
+    return mkApp3 (mkConst ``DetHeadStep.alloc) v hv state
+  | .app (.const ``Exp.load _) addr =>
+    match ← whnf addr with
+    | .app (.const ``Exp.lit _) (.app (.const ``BaseLit.loc _) loc) =>
+      let σVal   ← evalExpr State (mkConst ``State) state
+      let locVal ← evalExpr Loc   (mkConst ``Loc)   loc
+      let some vVal := σVal.heap[locVal]?
+        | throwError "elabDetHeadStep: load: location not in heap"
+      let v := toExpr vVal
+            -- TODO: build hlookup : σ.heap[ℓ]? = some v
+      let heapExpr := mkApp (mkConst ``State.heap) state
+      let someV := mkApp2 (mkConst ``Option.some [.zero]) (mkConst ``Val) v
+      let hlookupTy ← mkEq (← mkAppM ``getElem? #[heapExpr, loc]) someV
+      let hlookup := mkApp2 (mkConst ``sorryAx [.zero]) hlookupTy (mkConst ``Bool.false)
+      return mkApp4 (mkConst ``DetHeadStep.load) loc v state hlookup
+    | _ => throwError "elabDetHeadStep: load: argument is not a location literal"
+  | .app (.app (.const ``Exp.store _) addr) e =>
+    match ← whnf addr with
+    | .app (.const ``Exp.lit _) (.app (.const ``BaseLit.loc _) loc) =>
+      let some hv ← isValueBPf e | throwError "elabDetHeadStep: store: value is not a value"
+      let σVal   ← evalExpr State (mkConst ``State) state
+      let locVal ← evalExpr Loc   (mkConst ``Loc)   loc
+      let eVal   ← evalExpr Exp   (mkConst ``Exp)   e
+      let some v_oldVal := σVal.heap[locVal]?
+        | throwError "elabDetHeadStep: store: location not in heap"
+      let some v_newVal := eVal.toValB?
+        | throwError "elabDetHeadStep: store: expression not a value"
+      let v_old := toExpr v_oldVal
+      let v_new := toExpr v_newVal
+      let optValType := mkApp (mkConst ``Option [.zero]) (mkConst ``Val)
+      let hlookupTy ← mkEq (← mkAppM ``getElem? #[mkApp (mkConst ``State.heap) state, loc])
+                            (mkApp2 (mkConst ``Option.some [.zero]) (mkConst ``Val) v_old)
+      let hlookup := mkApp2 (mkConst ``sorryAx [.zero]) hlookupTy (mkConst ``Bool.false)
+      let hnewTy ← mkEq (mkApp (mkConst ``Exp.toValB?) e)
+                         (mkApp2 (mkConst ``Option.some [.zero]) (mkConst ``Val) v_new)
+      let hnew := mkApp2 (mkConst ``sorryAx [.zero]) hnewTy (mkConst ``Bool.false)
+      return mkApp8 (mkConst ``DetHeadStep.store) loc e v_old v_new hv state hlookup hnew
+    | _ => throwError "elabDetHeadStep: store: address is not a location literal"
   | e => throwError "elabDetHeadStep: no matching case for {e}"
 
 /-- Lift a `DetHeadStep` through an evaluation context to a `DetStep`. -/
@@ -118,7 +150,7 @@ theorem DetHeadStep.toDetStep_fill (K : Ectx) {cfg1 cfg2 : Cfg}
     rw [← fill_prim_step hv, head_prim_step_eq h.safe]
     exact h.det
 
-open Lean Lean.Elab Term Meta in
+open Term in
 -- Given a concrete cfg1, decompose it, find a DetHeadStep for the redex,
 -- and lift to a DetStep via the evaluation context.
 unsafe def elabDetStep (cfg1 : Expr) : TermElabM Expr := do
@@ -137,57 +169,12 @@ unsafe def elabDetStep (cfg1 : Expr) : TermElabM Expr := do
     | throwError "elabDetStep: unexpected DetHeadStep type"
   return mkApp3 (mkConst ``DetHeadStep.toDetStep_fill) K headCfg cfg2 |>.app headStep
 
-/-! ## Pure-step tactic (TODO: under construction) -/
-
--- open Lean Lean.Elab Tactic Meta in
--- def dischargeHeadStep : TacticM Unit := do
---   evalTactic (← `(tactic|
---     simp only [HeadStep, Exp.isValM, Exp.toVal?, Exp.isValue,
---                Exp.asValM, Option.unwrapM, BinOp.eval, UnOp.eval,
---                Exp.subst, Exp.subst']))
---   evalTactic (← `(tactic| simp only [Pi.single_apply, ite_eq_left_iff, not_and]))
---   evalTactic (← `(tactic| intro heq; exact absurd rfl heq))
---
--- open Lean Lean.Elab Tactic in
--- partial def pureStepsTac : TacticM Unit := do
---   try evalTactic (← `(tactic| rfl)); return
---   catch _ => pure ()
---   evalTactic (← `(tactic| apply nsteps_succ_intro))
---   let goals ← getGoals
---   if goals.length < 2 then
---     throwError "pure_steps: expected ≥ 2 goals after apply nsteps_succ_intro"
---   let restGoal := goals[1]!
---   setGoals [goals[0]!]
---   evalTactic (← `(tactic| apply PureHeadStep.toPureStep))
---   evalTactic (← `(tactic| apply PureHeadStep.of_det))
---   evalTactic (← `(tactic| intro σ))
---   dischargeHeadStep
---   let leftover ← getGoals
---   if !leftover.isEmpty then do
---     let ty ← leftover[0]!.getType
---     throwError "pure_steps: HeadStep goal not closed; remaining: {ty}"
---   setGoals [restGoal]
---   pureStepsTac
---
--- open Lean Lean.Elab Tactic in
--- elab "pure_steps" : tactic => pureStepsTac
-
-open Lean Lean.Elab Term Meta in
+open Term in
 elab "det_step_of" t:term : term => do
   let cfg1 ← elabTerm t (some (mkConst ``Cfg))
   unsafe elabDetStep (← whnf cfg1)
 
--- `DetExec 0 cfg cfg` by reflexivity.
-theorem DetExec.refl (cfg : Cfg) : DetExec 0 cfg cfg where
-  det_exec := rfl
-
--- Non-instance version of DetExec.succ for use in meta-code.
-theorem DetExec.cons {cfg1 cfg2 cfg3 : Cfg} {n : ℕ}
-    (hstep : DetStep cfg1 cfg2) (hrest : DetExec n cfg2 cfg3) :
-    DetExec (n + 1) cfg1 cfg3 where
-  det_exec := ⟨cfg2, hstep, hrest.det_exec⟩
-
-open Lean Lean.Elab Term Meta in
+open Term in
 -- Given a concrete cfg1 and fuel, build a term of type `DetExec n cfg1 cfg2`
 -- where n and cfg2 are synthesized. Tries up to `fuel` DetSteps; stops early
 -- if elabDetStep fails (expression is stuck / a value).
@@ -216,22 +203,61 @@ unsafe def elabDetExec (fuel : ℕ) (cfg1 : Expr) : TermElabM Expr := do
     -- Build DetExec.cons hstep rest : DetExec (n+1) cfg1 cfg3
     return mkApp6 (mkConst ``DetExec.cons) cfg1 cfg2 cfg3 n step rest
 
-open Lean Lean.Elab Term Meta in
+open Term in
 elab "det_exec_of" fuel:num t:term : term => do
   let cfg1 ← elabTerm t (some (mkConst ``Cfg))
   unsafe elabDetExec fuel.getNat (← whnf cfg1)
-
-/-! ## Smoke tests -/
 
 section Tests
 
 section Correctness
 
--- fst (pair #1 #2) steps to #1
 example : DetStep ⟨pl(fst((#1, #2))), default⟩ ⟨pl(#1), default⟩ :=
   det_step_of ⟨pl(fst((#1, #2))), default⟩
 
--- #1 + fst(#2, #3) steps to #1 + #2
+example : DetStep ⟨pl(snd((#1, #2))), default⟩ ⟨pl(#2), default⟩ :=
+  det_step_of ⟨pl(snd((#1, #2))), default⟩
+
+-- alloc: one step
+example : ∃ cfg2, DetStep ⟨pl(alloc(#42)), default⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl(alloc(#42)), default⟩⟩
+
+-- load directly from a known state
+def stateWith42 : State :=
+  (default : State).update_heap (·.insert 0 (Val.ofValueB pl(#42) rfl))
+
+example : ∃ cfg2, DetStep ⟨pl(!(#(BaseLit.loc (0 : Loc)))), stateWith42⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl(!(#(BaseLit.loc (0 : Loc)))), stateWith42⟩⟩
+
+-- case inl/inr
+example : ∃ cfg2, DetStep ⟨pl(case inl(#1) | x => x + #10 | y => y), default⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl(case inl(#1) | x => x + #10 | y => y), default⟩⟩
+
+example : ∃ cfg2, DetStep ⟨pl(case inr(#2) | x => x | y => y + #10), default⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl(case inr(#2) | x => x | y => y + #10), default⟩⟩
+
+-- (fun x, x + #1) #2  steps by beta reduction
+example : ∃ cfg2, DetStep ⟨pl((fun x, x + #1) #2), default⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl((fun x, x + #1) #2), default⟩⟩
+
+example : DetStep ⟨pl(~#true), default⟩ ⟨pl(#false), default⟩ :=
+  det_step_of ⟨pl(~#true), default⟩
+
+example : ∃ cfg2, DetStep ⟨pl(-#5), default⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl(-#5), default⟩⟩
+
+example : DetStep ⟨pl(#1 + #2), default⟩ ⟨pl(#3), default⟩ :=
+  det_step_of ⟨pl(#1 + #2), default⟩
+
+example : DetStep ⟨pl(#10 - #3), default⟩ ⟨pl(#7), default⟩ :=
+  det_step_of ⟨pl(#10 - #3), default⟩
+
+example : DetStep ⟨pl(if #true then #1 else #2), default⟩ ⟨pl(#1), default⟩ :=
+  det_step_of ⟨pl(if #true then #1 else #2), default⟩
+
+example : DetStep ⟨pl(if #false then #1 else #2), default⟩ ⟨pl(#2), default⟩ :=
+  det_step_of ⟨pl(if #false then #1 else #2), default⟩
+
 example : DetStep ⟨pl(#1 + fst((#2, #3))), default⟩ ⟨pl(#1 + #2), default⟩ :=
   det_step_of ⟨pl(#1 + fst((#2, #3))), default⟩
 
@@ -239,23 +265,37 @@ end Correctness
 
 section Synthesis
 
--- The elab synthesizes the successor cfg without it being stated a priori
 example : ∃ cfg2, DetStep ⟨pl(#1 + fst((#2, #3))), default⟩ cfg2 :=
   ⟨_, det_step_of ⟨pl(#1 + fst((#2, #3))), default⟩⟩
 
-end Synthesis
+example : ∃ cfg2, DetStep ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩ cfg2 :=
+  ⟨_, det_step_of ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩⟩
 
-section DetExecTests
-
--- fst((#1, #2)) + fst((#3, #4)) takes two steps (one for each fst).
--- After step 1: #1 + fst((#3, #4)); after step 2: #1 + #3; then stuck (no binop rule yet).
--- With fuel=2 the elab fires exactly twice before getting stuck.
 example : ∃ n cfg2, DetExec n ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩ cfg2 :=
-  ⟨_, _, det_exec_of 2 ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩⟩
+  ⟨_, _, det_exec_of 2 _⟩
 
-end DetExecTests
+example : ∃ n cfg2, DetExec n ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩ cfg2 :=
+  ⟨_, _, det_exec_of 3 _⟩
 
+-- binop + fst: three steps: fst, fst, then binop evaluation
+example : ∃ n cfg2, DetExec n ⟨pl(fst((#1, #2)) + fst((#3, #4))), default⟩ cfg2 :=
+  ⟨_, _, det_exec_of 5 _⟩
 
+-- function application followed by arithmetic: (fun x, x * #2) #5 →* #10
+example : ∃ n cfg2, DetExec n ⟨pl((fun x, x * #2) #5), default⟩ cfg2 :=
+  ⟨_, _, det_exec_of 5 _⟩
+
+-- conditional branch: if #true then #1 + #2 else #99 →* #3
+example : ∃ n cfg2, DetExec n ⟨pl(if #true then #1 + #2 else #99), default⟩ cfg2 :=
+  ⟨_, _, det_exec_of 5 _⟩
+
+-- sum type dispatch: case inl(#3) | x => x + #1 | y => y →* #4
+example : ∃ n cfg2, DetExec n ⟨pl(case inl(#3) | x => x + #1 | y => y), default⟩ cfg2 :=
+  ⟨_, _, det_exec_of 5 _⟩
+
+-- nested: snd((fst((#1, #2)), #3)) →* #3 (two steps: inner fst, then snd)
+example : ∃ n cfg2, DetExec n ⟨pl(snd((fst((#1, #2)), #3))), default⟩ cfg2 :=
+  ⟨_, _, det_exec_of 5 _⟩
+
+end Synthesis
 end Tests
-end ProbLang
-end

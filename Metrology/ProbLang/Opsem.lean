@@ -47,7 +47,7 @@ def Cfg.Uniform (z : Int) (σ : State) : Measure Cfg :=
 def HeadStep : Cfg → Measure Cfg
 | ⟨.app (.letrec f x e1) e2, σ⟩ =>
   e2.isValM <|
-  dirac ⟨e1.subst' f (.letrec f x e1) |>.subst' x e2, σ⟩
+  dirac ⟨e1.subst f (.letrec f x e1) |>.subst x e2, σ⟩
 | ⟨.unop op e, σ⟩ =>
   e.isValM <|
   (op.eval e).unwrapM <|
@@ -284,7 +284,7 @@ theorem haed_ctx_step_val {Ki : EctxItem} :
 inductive HeadStepSupport : Cfg → Cfg → Prop
 | BetaS :
   e2.isValue →
-  e' = (e1.subst' f (.letrec f x e1)).subst' x e2 →
+  e' = (e1.subst f (.letrec f x e1)).subst x e2 →
   HeadStepSupport ⟨.app (.letrec f x e1) e2, σ⟩ ⟨e', σ⟩
 | UnOpS :
   e.isValue →
