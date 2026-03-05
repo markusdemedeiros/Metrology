@@ -5,11 +5,6 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 
 namespace ProbLang
 
-local instance : MeasurableSpace Exp := ⊤
-local instance : MeasurableSpace State := ⊤
-local instance : MeasurableSpace Val := ⊤
-local instance : MeasurableSpace Cfg := ⊤
-
 -- FIXME: Is this really necessary? This has got to be proven somewhere...
 theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     [Countable α] (μ : Measure α) (S : Set α) (hS : μ S > 0) :

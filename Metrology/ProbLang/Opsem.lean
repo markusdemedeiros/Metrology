@@ -29,10 +29,10 @@ def Exp.isValM [MeasurableSpace T] (e : Exp) (m : Measure T) : Measure T :=
 def Int.isPos (z : Int) : Option { z : Int // 0 < z } :=
   if H : 0 < z then some ⟨z, H⟩ else none
 
-local instance : MeasurableSpace Exp := ⊤
-local instance : MeasurableSpace State := ⊤
-local instance : MeasurableSpace Val := ⊤
-local instance : MeasurableSpace Cfg := ⊤
+instance : MeasurableSpace Exp := ⊤
+instance : MeasurableSpace State := ⊤
+instance : MeasurableSpace Val := ⊤
+instance : MeasurableSpace Cfg := ⊤
 
 def Cfg.Uniform (z : Int) (σ : State) : Measure Cfg :=
   z.isPos.unwrapM fun ⟨z, Hz⟩ =>
@@ -521,9 +521,6 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
       exact .TapeS rfl rfl
     case rand.tape =>
-      -- rand.tape.empty: tapes[α]? = some ⟨z, []⟩ (M=z already subst'd) → Cfg.Uniform
-      -- After head_case: subst_eqs for M=z, then split on ns=[]
-      -- Context should have the tape lookup hypothesis
       intro h
       obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.Uniform_singleton_pos_inv h
       simp at hv hσ; subst hv; subst hσ
@@ -540,9 +537,9 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
   · intro hsupp
     cases hsupp with
-    | BetaS hval hrfl =>
-      subst hrfl
-      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
+    | BetaS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS | RandNoTapeS
+    | TapeS | RandTapeS | RandTapeEmptyS =>
+      simp_all [HeadStep, Cfg.Uniform_singleton_pos_of_mem]
     | UnOpS hval heval =>
       simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
       show _ > 0
@@ -553,40 +550,14 @@ theorem head_step_support_equiv_rel (e1 e2 : Exp) (σ1 σ2 : State) :
       show _ > 0
       rw [unwrapM_singleton_pos]
       exact ⟨_, heval.symm, by rw [dirac_singleton_pos]⟩
-    | IfTrueS => simp [HeadStep]
-    | IfFalseS => simp [HeadStep]
-    | FstS hval1 hval2 =>
-      simp [HeadStep, Exp.isValM, Exp.toVal?, hval1, hval2]
-    | SndS hval1 hval2 =>
-      simp [HeadStep, Exp.isValM, Exp.toVal?, hval1, hval2]
-    | CaseLS hval =>
-      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
-    | CaseRS hval =>
-      simp [HeadStep, Exp.isValM, Exp.toVal?, hval]
     | AllocS hval hrfl hrfl2 =>
       subst hrfl; subst hrfl2
       simp [HeadStep, Exp.asValM, hval]
-    | LoadS hsome hrfl =>
-      subst hrfl
-      simp [HeadStep, hsome]
     | StoreS hval hsome hrfl =>
       subst hrfl
       simp [HeadStep, Exp.asValM, hval]
       obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp hsome
       simp [hw]
-    | RandNoTapeS Hz Hv0 Hvz =>
-      simp only [gt_iff_lt, HeadStep]
-      exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
-    | TapeS hrfl hrfl2 =>
-      subst hrfl; subst hrfl2
-      simp [HeadStep]
-    | RandTapeS Hz htape hzN hv hrfl =>
-      subst hv; subst hrfl; subst hzN
-      simp [HeadStep, htape]
-    | RandTapeEmptyS Hz htape hzN Hv0 Hvz hσ =>
-      subst hzN; subst hσ
-      simp only [gt_iff_lt, HeadStep, htape]
-      exact Cfg.Uniform_singleton_pos_of_mem Hz Hv0 Hvz
     | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
       subst hσ
       simp only [gt_iff_lt, HeadStep, htape]

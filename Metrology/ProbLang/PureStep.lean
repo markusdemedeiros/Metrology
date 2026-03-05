@@ -11,11 +11,6 @@ def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
   | 0,   a, b => a = b
   | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
 
-local instance : MeasurableSpace Exp := ⊤
-local instance : MeasurableSpace State := ⊤
-local instance : MeasurableSpace Val := ⊤
-local instance : MeasurableSpace Cfg := ⊤
-
 structure PureStep (e1 e2 : Exp) : Prop where
   safe : ∀ σ, ∃ ρ : Cfg, PrimStep ⟨e1, σ⟩ {ρ} > 0
   det  : ∀ σ, PrimStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1

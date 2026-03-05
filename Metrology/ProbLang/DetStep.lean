@@ -5,11 +5,6 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 
 namespace ProbLang
 
-local instance : MeasurableSpace Exp := ⊤
-local instance : MeasurableSpace State := ⊤
-local instance : MeasurableSpace Val := ⊤
-local instance : MeasurableSpace Cfg := ⊤
-
 /-- Build a `PureHeadStep e1 e2` from a proof that `HeadStep` always maps
     `⟨e1, σ⟩` to `dirac ⟨e2, σ⟩`. The `safe` field is derived automatically. -/
 theorem PureHeadStep.of_det (e1 e2 : Exp)
