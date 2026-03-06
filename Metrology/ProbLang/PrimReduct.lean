@@ -239,10 +239,9 @@ theorem headStep_of_primStep_fill (K : Ectx) {e1 : Exp} {σ1 : State} {e2 : Exp}
 theorem headStep_of_primStep {e : Exp} {σ : State} {ρ : Cfg}
     (hred : ∃ ρ' : Cfg, 0 < headStep ⟨e, σ⟩ {ρ'})
     (hstep : 0 < primStep ⟨e, σ⟩ {ρ}) : 0 < headStep ⟨e, σ⟩ {ρ} := by
-  obtain ⟨e2, σ2⟩ := ρ
+  obtain ⟨_, σ₂⟩ := ρ
   obtain ⟨e2', hfill, hhs⟩ := headStep_of_primStep_fill [] hred hstep
-  simp [Ectx.fill] at hfill
-  exact hfill ▸ hhs
+  simp [Ectx.fill] at hfill; exact hfill ▸ hhs
 
 theorem head_irreducible_zero {e : Exp} {σ : State}
     (hirr : ∀ ρ : Cfg, headStep ⟨e, σ⟩ {ρ} = 0) :

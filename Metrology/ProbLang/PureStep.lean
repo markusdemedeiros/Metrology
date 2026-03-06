@@ -22,14 +22,8 @@ structure PureHeadStep (e1 e2 : Exp) : Prop where
   safe : ∀ σ, ∃ ρ : Cfg, headStep ⟨e1, σ⟩ {ρ} > 0
   det  : ∀ σ, headStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
-theorem PureHeadStep.toPureStep {e1 e2 : Exp} (h : PureHeadStep e1 e2) : PureStep e1 e2 := by
-  constructor
-  · intro σ
-    obtain ⟨ρ, hρ⟩ := h.safe σ
-    exact ⟨ρ, primStep_pos_of_headStep hρ⟩
-  · intro σ
-    rw [primStep_eq_headStep (h.safe σ)]
-    exact h.det σ
+theorem PureHeadStep.toPureStep {e1 e2 : Exp} (h : PureHeadStep e1 e2) : PureStep e1 e2 :=
+  ⟨fun σ => Reducible.of_head (h.safe σ), fun σ => primStep_eq_headStep (h.safe σ) ▸ h.det σ⟩
 
 theorem PureStep.fill (K : Ectx) {e1 e2 : Exp} (h : PureStep e1 e2) :
     PureStep (K.fill e1) (K.fill e2) := by
