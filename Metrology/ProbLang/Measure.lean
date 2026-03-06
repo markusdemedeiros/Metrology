@@ -50,3 +50,14 @@ theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [Measura
   case GMeas => exact fun s a ↦ DiscreteMeasurableSpace.forall_measurableSet s
   simp
   exact fun a Ha => nonpos_iff_eq_zero.mp (this a Ha)
+
+theorem map_singleton_pos {α β : Type _}
+    [MeasurableSpace α] [MeasurableSpace β]
+    [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β] [Countable α]
+    {f : α → β} {μ : Measure α} {b : β}
+    (h : 0 < (μ.map f) {b}) :
+    ∃ a, f a = b ∧ 0 < μ {a} := by
+  rw [Measure.map_apply .of_discrete .of_discrete] at h
+  obtain ⟨a, ha, hpos⟩ := measure_pos_of_singleton_pos μ _ h
+  simp [Set.mem_preimage, Set.mem_singleton_iff] at ha
+  exact ⟨a, ha, hpos⟩

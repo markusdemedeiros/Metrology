@@ -26,7 +26,7 @@ structure DetHeadStep (cfg1 cfg2 : Cfg) : Prop where
   det  : headStep cfg1 {cfg2} = 1
 
 structure DetStep (cfg1 cfg2 : Cfg) : Prop where
-  safe : ∃ ρ : Cfg, 0 < primStep cfg1 {ρ}
+  safe : Reducible cfg1.expr cfg1.state
   det  : primStep cfg1 {cfg2} = 1
 
 theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg} (h : DetHeadStep cfg1 cfg2) : DetStep cfg1 cfg2 := by

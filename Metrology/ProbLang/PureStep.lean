@@ -12,7 +12,7 @@ def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
   | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
 
 structure PureStep (e1 e2 : Exp) : Prop where
-  safe : ∀ σ, ∃ ρ : Cfg, primStep ⟨e1, σ⟩ {ρ} > 0
+  safe : ∀ σ, Reducible e1 σ
   det  : ∀ σ, primStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
 class PureExec (φ : Prop) (n : ℕ) (e1 e2 : Exp) : Prop where
@@ -57,7 +57,7 @@ theorem PureExec.fill (K : Ectx) {φ : Prop} {n : ℕ} {e1 e2 : Exp}
 
 theorem PureExec.reducible {σ : State} {φ : Prop} {n : ℕ} {e1 e2 : Exp}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
-    ∃ ρ : Cfg, primStep ⟨e1, σ⟩ {ρ} > 0 := by
+    Reducible e1 σ := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   exact hstep.safe σ
 
