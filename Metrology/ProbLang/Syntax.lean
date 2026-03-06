@@ -130,6 +130,9 @@ theorem Exp.toValB?_eq_toVal? (e : Exp) : e.toValB? = e.toVal? := by
   · simp [isValueB_iff.mpr H, H]
   · simp [isValueB_false_iff.mpr H, H]
 
+@[simp] theorem Exp.toVal?_eq_none {e : Exp} : e.toVal? = none ↔ ¬e.isValue := by
+  simp [Exp.toVal?]
+
 def Exp.ofVal (v : Val) : Exp := v.1
 
 structure Tape where
@@ -391,6 +394,11 @@ theorem EctxItem.fillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
 
 abbrev Ectx := List EctxItem
 
+theorem List.eq_nil_or_snoc (l : List α) : l = [] ∨ ∃ l' x, l = l' ++ [x] := by
+  rcases List.eq_nil_or_concat l with h | ⟨l', x, h⟩
+  · exact .inl h
+  · exact .inr ⟨l', x, List.concat_eq_append .. ▸ h⟩
+
 def Ectx.empty : Ectx := []
 
 def Ectx.comp (e1 e2 : Ectx) : Ectx := e2 ++ e1
@@ -398,6 +406,10 @@ def Ectx.comp (e1 e2 : Ectx) : Ectx := e2 ++ e1
 def Ectx.fill (K : Ectx) (e : Exp) : Exp := K.foldl (flip EctxItem.fillItem) e
 
 theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
+  List.foldl_append
+
+@[simp] theorem Ectx.fill_snoc (K : Ectx) (Ki : EctxItem) (e : Exp) :
+    Ectx.fill (K ++ [Ki]) e = Ki.fillItem (K.fill e) :=
   List.foldl_append
 
 theorem Ectx.fill_comp (K1 K2 : Ectx) (e : Exp) :
