@@ -9,14 +9,11 @@ namespace ProbLang
 @[simp]
 def fillLift (K : Ectx) (ρ : Cfg) : Cfg := ⟨K.fill ρ.expr, ρ.state⟩
 
-theorem fillLift_comp (K1 K2 : Ectx) :
-    fillLift (K1.comp K2) = fillLift K1 ∘ fillLift K2 := by
-  funext ⟨e, σ⟩
-  simp [Ectx.fill_comp]
+theorem fillLift_comp (K1 K2 : Ectx) : fillLift (K1.comp K2) = fillLift K1 ∘ fillLift K2 := by
+  funext ⟨e, σ⟩; simp [Ectx.fill_comp]
 
 theorem fillLift_empty : fillLift [] = id := by
-  funext ⟨e, σ⟩
-  simp [fillLift, Ectx.fill]
+  funext ⟨e, σ⟩; simp [fillLift, Ectx.fill]
 
 theorem fillLift_injective (K : Ectx) : Function.Injective (fillLift K) := by
   rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ h
@@ -36,65 +33,48 @@ theorem Ectx.fill_noVal' {K : Ectx} {e : Exp} (hv : e.toVal? = none) :
   simp [Exp.toVal?] at *
   exact Ectx.fill_noVal (by grind)
 
-theorem val_stuck {cfg : Cfg} {ρ : Cfg} (h : 0 < primStep cfg {ρ}) :
-    cfg.expr.toVal? = none := by
-  obtain ⟨e, σ⟩ := cfg
+theorem val_stuck (h : 0 < primStep ⟨e, σ⟩ {ρ}) : e.toVal? = none := by
   simp only [primStep] at h
   set d := e.decomp with hd
-  obtain ⟨K, e'⟩ := d
-  -- h : (headStep ⟨e', σ⟩).map f {ρ} > 0
-  rw [Measure.map_apply (.of_discrete) (.of_discrete)] at h
-  obtain ⟨ρ', _, hρ'⟩ := measure_pos_of_singleton_pos _ _ h
-  -- ρ' has a positive head step from e', so e' is not a value
-  have hv : e'.toVal? = none := val_head_stuck hρ'
-  -- e = K.fill e' by decomp
   rw [← Exp.decomp_fill hd.symm]
-  exact Ectx.fill_noVal' hv
+  refine Ectx.fill_noVal' ?_
+  rw [Measure.map_apply .of_discrete .of_discrete] at h
+  obtain ⟨_, _, hρ'⟩ := measure_pos_of_singleton_pos _ _ h
+  exact val_head_stuck hρ'
 
--- TODO: Cleanup
-theorem head_prim_step_eq {e : Exp} {σ : State}
-    (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ} ) :
+theorem head_prim_step_eq (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
     primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
-  simp only [primStep]
-  have hd : e.decomp = ([], e) := by
-    rw [e.decomp_unfold]
-    rcases hm : e.decompItem with _ | ⟨Ki, e'⟩
-    · simp
-    · exfalso
-      obtain ⟨hfill, hne⟩ := Exp.decompItem_fill hm
-      obtain ⟨ρ, hρ⟩ := hred
-      rw [← hfill] at hρ
-      exact hne (head_ctx_step_val hρ)
-  unfold fillLift
-  simp [hd, Ectx.fill]
+  suffices hd : e.decomp = ([], e) by rw [primStep]; unfold fillLift; simp [Ectx.fill, hd]
+  rw [e.decomp_unfold]
+  rcases hm : e.decompItem with _ | ⟨Ki, e'⟩
+  · simp
+  · obtain ⟨hfill, hne⟩ := Exp.decompItem_fill hm
+    obtain ⟨ρ, hρ⟩ := hred
+    rw [← hfill] at hρ
+    exact (hne (head_ctx_step_val hρ)).elim
 
 theorem head_prim_step {e : Exp} {σ : State} {ρ : Cfg}
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) : 0 < primStep ⟨e, σ⟩ {ρ} := by
   rw [head_prim_step_eq ⟨ρ, h⟩]; exact h
 
 -- TODO: Cleanup
-theorem fill_prim_step_map (K : Ectx) (e : Exp) (σ : State) (hv : e.toVal? = none) :
+theorem fill_prim_step_map {K : Ectx} (hv : e.toVal? = none) :
     primStep ⟨K.fill e, σ⟩ = (primStep ⟨e, σ⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩) := by
   simp only [primStep]
-  -- decomp (K.fill e) = (K' ++ K, e'') where e.decomp = (K', e'')
-  have hne : ¬e.isValue := by simp [Exp.toVal?] at hv; exact hv
   set d := e.decomp with hd
   obtain ⟨K', e''⟩ := d
-  have hd' : (K.fill e).decomp = (K' ++ K, e'') :=
-    Exp.decomp_fill_comp hne hd.symm
+  have hne : ¬e.isValue := by simp [Exp.toVal?] at hv; exact hv
+  have hd' : (K.fill e).decomp = (K' ++ K, e'') := Exp.decomp_fill_comp hne hd.symm
   simp only [hd']
-  have hm1 : Measurable (fun ρ : Cfg => (⟨K'.fill ρ.expr, ρ.state⟩ : Cfg)) := .of_discrete
-  have hm2 : Measurable (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg)) := .of_discrete
   unfold fillLift
-  rw [Measure.map_map hm2 hm1]
-  congr 1
+  rw [Measure.map_map .of_discrete .of_discrete]
+  congr
   funext ⟨e', σ'⟩
   simp [Function.comp, fill_app]
 
 theorem fill_prim_step {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State} (hv : e1.toVal? = none) :
     primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
-  rw [fill_prim_step_map K e1 σ1 hv,
-      Measure.map_apply (.of_discrete) (.of_discrete)]
+  rw [fill_prim_step_map hv, Measure.map_apply .of_discrete .of_discrete]
   congr 1
   ext ⟨e', σ'⟩
   simp only [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq,
@@ -109,8 +89,7 @@ theorem fill_step_inv {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
     (hv : e1.toVal? = none)
     (h : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
     ∃ e2', e2 = K.fill e2' ∧ 0 < primStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} := by
-  rw [fill_prim_step_map K e1 σ1 hv,
-      Measure.map_apply (.of_discrete) (.of_discrete)] at h
+  rw [fill_prim_step_map hv, Measure.map_apply .of_discrete .of_discrete] at h
   obtain ⟨⟨e2', σ2'⟩, hmem, hpos⟩ := measure_pos_of_singleton_pos _ _ h
   simp only [Set.mem_preimage, Set.mem_singleton_iff, Cfg.mk.injEq] at hmem
   obtain ⟨hfill, hσ⟩ := hmem
@@ -145,25 +124,17 @@ theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Exp) (σ : State) (ρ : 
   -- Induction on K' from the right
   induction K' using List.reverseRecOn generalizing K_redex e1_redex with
   | nil =>
-    -- K' = [], so K_redex = [].comp K_redex = K_redex ++ [] = K_redex
     exact ⟨K_redex, (List.append_nil K_redex).symm⟩
   | append_singleton K'_rest Ki' ih =>
-    -- K' = K'_rest ++ [Ki']
-    -- Case split K_redex from the right
-    -- hfill has List.foldl; work with it directly
     rcases List.eq_nil_or_concat K_redex with rfl | ⟨K_redex_rest, Ki_redex, rfl⟩
-    · -- K_redex = []: contradiction
-      simp only [Ectx.fill, List.foldl_nil] at hfill
+    · simp only [Ectx.fill, List.foldl_nil] at hfill
       subst hfill
-      -- hstep : headStep on (K'_rest ++ [Ki']).foldl ... e1'
-      -- Rewrite to Ki'.fillItem (K'_rest.foldl ... e1')
       have hstep' : headStep ⟨Ki'.fillItem (Ectx.fill K'_rest e1'), σ⟩ {ρ} > 0 := by
         simp only [List.foldl_append, List.foldl_cons, List.foldl_nil] at hstep; exact hstep
       have hval := head_ctx_step_val (Ki := Ki') hstep'
       have hv' : ¬e1'.isValue := by simp [Exp.toVal?] at hv; exact hv
       exact absurd (Ectx.fill_isValue hval) hv'
-    · -- K_redex = K_redex_rest ++ [Ki_redex]
-      simp only [List.concat_eq_append] at hfill ⊢
+    · simp only [List.concat_eq_append] at hfill ⊢
       have hfill' : Ki'.fillItem (Ectx.fill K'_rest e1') =
           Ki_redex.fillItem (Ectx.fill K_redex_rest e1_redex) := by
         have h1 : (K'_rest ++ [Ki']).foldl (flip EctxItem.fillItem) e1' =
@@ -203,17 +174,12 @@ theorem head_redex_unique (K K' : Ectx) (e e' : Exp) (σ : State)
     K = K'.comp [] ∧ e = e' := by
   obtain ⟨⟨e2, σ2⟩, hρ⟩ := hred
   obtain ⟨⟨e2', σ2'⟩, hρ'⟩ := hred'
-  -- step_by_val gives K = K'.comp K'' for some K''
   obtain ⟨K'', hK⟩ := step_by_val K' K e' e σ ⟨e2, σ2⟩ hfill.symm (val_head_stuck hρ') hρ
   subst hK
-  -- hfill : (K'.comp K'').fill e = K'.fill e'
-  -- i.e. K'.fill (K''.fill e) = K'.fill e', so K''.fill e = e' by injectivity
   rw [← Ectx.fill_comp] at hfill
   have he : K''.fill e = e' := Ectx.fill_injective K' hfill
-  -- head_ctx_step_val on hρ' (after rewriting e' = K''.fill e) gives K'' = []
   rcases head_ctx_step_val_ectx K'' e σ ⟨e2', σ2'⟩ (he ▸ hρ') with hval | hnil
-  · -- e is a value, contradicts head step
-    have := val_head_stuck hρ
+  · have := val_head_stuck hρ
     simp [Exp.toVal?, hval] at this
   · subst hnil
     simp [Ectx.fill] at he
@@ -250,8 +216,7 @@ theorem prim_step_iff' {e : Exp} {σ : State}
   rw [prim_step_iff] at h
   obtain ⟨K, e1', e2', hfill1, hfill2, hhs⟩ := h
   refine ⟨K, e1', hfill1, ⟨⟨e2', σ2⟩, hhs⟩, ?_⟩
-  rw [← hfill1, fill_prim_step_map K e1' σ (val_head_stuck hhs),
-      head_prim_step_eq ⟨⟨e2', σ2⟩, hhs⟩]
+  rw [← hfill1, fill_prim_step_map (val_head_stuck hhs), head_prim_step_eq ⟨⟨e2', σ2⟩, hhs⟩]
 
 theorem prim_step_mass (cfg : Cfg) :
     (∃ ρ : Cfg, 0 < primStep cfg {ρ}) → IsProbabilityMeasure (primStep cfg) := by
@@ -261,7 +226,6 @@ theorem prim_step_mass (cfg : Cfg) :
   haveI := head_step_mass e'' cfg.state hhead_red
   exact Measure.isProbabilityMeasure_map (.of_discrete)
 
--- TODO: Cleanup
 theorem head_reducible_prim_step_ctx (K : Ectx) {e1 : Exp} {σ1 : State} {e2 : Exp} {σ2 : State}
     (hred : ∃ ρ : Cfg, 0 < headStep ⟨e1, σ1⟩ {ρ})
     (hstep : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
