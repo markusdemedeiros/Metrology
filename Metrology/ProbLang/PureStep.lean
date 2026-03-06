@@ -32,8 +32,7 @@ theorem PureStep.fill (K : Ectx) {e1 e2 : Exp} (h : PureStep e1 e2) :
     obtain ⟨⟨e2', σ2⟩, hρ⟩ := h.safe σ
     exact ⟨⟨K.fill e2', σ2⟩, primStep_fill_pos hρ⟩
   · intro σ
-    have hv : e1.toVal? = none := val_stuck (h.safe σ).choose_spec
-    rw [← primStep_fill_singleton hv]
+    rw [← primStep_fill_singleton (val_stuck (h.safe σ).choose_spec)]
     exact h.det σ
 
 theorem PureStep.fill_nsteps (K : Ectx) {n : ℕ} {e1 e2 : Exp}
@@ -57,7 +56,7 @@ theorem PureExec.reducible {σ : State} {φ : Prop} {n : ℕ} {e1 e2 : Exp}
 
 theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Exp}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
-    e1.toVal? = none := by
+    ¬e1.isValue := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   obtain ⟨ρ, hρ⟩ := hstep.safe default
   exact val_stuck hρ
@@ -73,8 +72,7 @@ theorem rtc_pure_step_val {n : ℕ} {v : Val} {e : Exp}
   | succ n ih =>
     obtain ⟨c, hstep, hrest⟩ := h
     obtain ⟨ρ, hρ⟩ := hstep.safe default
-    have : v.1.toVal? = none := val_stuck hρ
-    simp [Exp.toVal?, v.2] at this
+    exact absurd v.2 (val_stuck hρ)
 
 class IntoVal (e : Exp) (v : Val) : Prop where
   into_val : v.1 = e
