@@ -29,19 +29,18 @@ def primStepKernel : Kernel Cfg Cfg where
 abbrev Reducible (e : Exp) (σ : State) : Prop :=
   ∃ ρ : Cfg, 0 < primStep ⟨e, σ⟩ {ρ}
 
-theorem Ectx.fill_noVal' {K : Ectx} {e : Exp} (hv : e.toVal? = none) :
-    (K.fill e).toVal? = none :=
-  Exp.toVal?_eq_none.mpr (Ectx.fill_noVal (Exp.toVal?_eq_none.mp hv))
+/-! ## Values can't step -/
 
 theorem val_stuck (h : 0 < primStep ⟨e, σ⟩ {ρ}) : e.toVal? = none := by
   simp only [primStep] at h
   set d := e.decomp with hd
   rw [← Exp.decomp_fill hd.symm]
-  refine Ectx.fill_noVal' ?_
-  obtain ⟨_, _, hρ'⟩ := map_singleton_pos h
-  exact val_head_stuck hρ'
+  exact Exp.toVal?_eq_none.mpr (Ectx.fill_noVal (Exp.toVal?_eq_none.mp
+    (val_head_stuck (map_singleton_pos h).choose_spec.2)))
 
-theorem head_prim_step_eq (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
+/-! ## Bridge: headStep ↔ primStep -/
+
+theorem primStep_eq_headStep (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
     primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
   suffices hd : e.decomp = ([], e) by
     simp only [primStep, hd, Ectx.fillCfg_empty, Measure.map_id]
@@ -53,11 +52,13 @@ theorem head_prim_step_eq (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
     rw [← hfill] at hρ
     exact (hne (head_ctx_step_val hρ)).elim
 
-theorem head_prim_step {e : Exp} {σ : State} {ρ : Cfg}
+theorem primStep_pos_of_headStep {e : Exp} {σ : State} {ρ : Cfg}
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) : 0 < primStep ⟨e, σ⟩ {ρ} :=
-  head_prim_step_eq ⟨ρ, h⟩ ▸ h
+  primStep_eq_headStep ⟨ρ, h⟩ ▸ h
 
-theorem fill_prim_step_map {K : Ectx} (hv : e.toVal? = none) :
+/-! ## Context fill interaction with primStep -/
+
+theorem primStep_fill {K : Ectx} (hv : e.toVal? = none) :
     primStep ⟨K.fill e, σ⟩ = (primStep ⟨e, σ⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩) := by
   simp only [primStep]
   set d := e.decomp with hd
@@ -69,35 +70,66 @@ theorem fill_prim_step_map {K : Ectx} (hv : e.toVal? = none) :
   funext ⟨e', σ'⟩
   simp [Function.comp, fill_app]
 
-theorem fill_prim_step {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State} (hv : e1.toVal? = none) :
+theorem primStep_fill_singleton {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
+    (hv : e1.toVal? = none) :
     primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
-  rw [fill_prim_step_map hv, Measure.map_apply .of_discrete .of_discrete]
+  rw [primStep_fill hv, Measure.map_apply .of_discrete .of_discrete]
   congr 1
   ext ⟨e', σ'⟩
   simp [(Ectx.fill_injective K).eq_iff]
 
-theorem fill_step {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
+theorem primStep_fill_pos {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
     (h : 0 < primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩}) :
     0 < primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
-  rwa [← fill_prim_step (val_stuck h)]
+  rwa [← primStep_fill_singleton (val_stuck h)]
 
-theorem fill_step_inv {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
+theorem primStep_fill_inv {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
     (hv : e1.toVal? = none)
     (h : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
     ∃ e2', e2 = K.fill e2' ∧ 0 < primStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} := by
-  rw [fill_prim_step_map hv] at h
+  rw [primStep_fill hv] at h
   obtain ⟨⟨e2', σ2'⟩, heq, hpos⟩ := map_singleton_pos h
   simp [Cfg.mk.injEq] at heq
   exact ⟨e2', heq.1.symm, heq.2 ▸ hpos⟩
 
-theorem fill_step_prob {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
-    (hv : e1.toVal? = none) :
-    primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} :=
-  fill_prim_step hv
+/-! ## Reducible: fill interaction -/
 
-theorem reducible_fill (K : Ectx) {e : Exp} {σ : State}
+theorem Reducible.fill (K : Ectx) {e : Exp} {σ : State}
     (hred : Reducible e σ) : Reducible (K.fill e) σ :=
-  let ⟨⟨e2, σ2⟩, hρ⟩ := hred; ⟨⟨K.fill e2, σ2⟩, fill_step hρ⟩
+  let ⟨⟨e2, σ2⟩, hρ⟩ := hred; ⟨⟨K.fill e2, σ2⟩, primStep_fill_pos hρ⟩
+
+theorem Reducible.of_fill (K : Ectx) {e : Exp} {σ : State}
+    (hv : e.toVal? = none) (hred : Reducible (K.fill e) σ) : Reducible e σ :=
+  let ⟨⟨_, σ2⟩, hρ⟩ := hred; let ⟨e2', _, hρ'⟩ := primStep_fill_inv hv hρ; ⟨⟨e2', σ2⟩, hρ'⟩
+
+theorem Reducible.of_head {e : Exp} {σ : State}
+    (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
+    Reducible e σ :=
+  let ⟨ρ, hρ⟩ := hred; ⟨ρ, primStep_pos_of_headStep hρ⟩
+
+theorem Reducible.of_head_fill (K : Ectx) {e : Exp} {σ : State}
+    (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
+    Reducible (K.fill e) σ :=
+  (Reducible.of_head hred).fill K
+
+/-! ## Irreducible: contrapositives -/
+
+theorem irreducible_fill (K : Ectx) {e : Exp} {σ : State}
+    (hv : e.toVal? = none) (hirr : ¬ Reducible e σ) : ¬ Reducible (K.fill e) σ :=
+  fun hred => hirr (hred.of_fill K hv)
+
+theorem irreducible_fill_inv (K : Ectx) {e : Exp} {σ : State}
+    (hirr : ¬ Reducible (K.fill e) σ) : ¬ Reducible e σ :=
+  fun hred => hirr (hred.fill K)
+
+theorem Reducible.headStep_zero {e : Exp} {σ : State}
+    (hirr : ¬ Reducible e σ) :
+    ∀ ρ : Cfg, headStep ⟨e, σ⟩ {ρ} = 0 :=
+  fun ρ => by
+    by_contra h
+    exact hirr ⟨ρ, primStep_pos_of_headStep (pos_iff_ne_zero.mpr h)⟩
+
+/-! ## Context decomposition -/
 
 theorem head_ctx_step_val_ectx (K : Ectx) (e : Exp) (σ : State) (ρ : Cfg)
     (hstep : 0 < headStep ⟨K.fill e, σ⟩ {ρ}) :
@@ -148,6 +180,8 @@ theorem head_redex_unique (K K' : Ectx) (e e' : Exp) (σ : State)
   · simp [Ectx.fill] at he
     exact ⟨rfl, he⟩
 
+/-! ## primStep characterization -/
+
 theorem prim_step_iff {e1 e2 : Exp} {σ1 σ2 : State} :
     0 < primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔
     ∃ (K : Ectx) (e1' e2' : Exp),
@@ -162,8 +196,8 @@ theorem prim_step_iff {e1 e2 : Exp} {σ1 σ2 : State} :
     simp [Ectx.fillCfg, Cfg.mk.injEq] at heq
     exact ⟨K, e1', e2', Exp.decomp_fill hd.symm, heq.1, heq.2 ▸ hpos⟩
   · rintro ⟨K, e1', e2', rfl, rfl, hhs⟩
-    rw [← fill_prim_step (val_head_stuck hhs)]
-    exact head_prim_step hhs
+    rw [← primStep_fill_singleton (val_head_stuck hhs)]
+    exact primStep_pos_of_headStep hhs
 
 theorem prim_step_iff' {e : Exp} {σ : State}
     (hstep : Reducible e σ) :
@@ -174,7 +208,7 @@ theorem prim_step_iff' {e : Exp} {σ : State}
   rw [prim_step_iff] at h
   obtain ⟨K, e1', e2', hfill1, _, hhs⟩ := h
   exact ⟨K, e1', hfill1, ⟨_, hhs⟩, by
-    rw [← hfill1, fill_prim_step_map (val_head_stuck hhs), head_prim_step_eq ⟨_, hhs⟩]⟩
+    rw [← hfill1, primStep_fill (val_head_stuck hhs), primStep_eq_headStep ⟨_, hhs⟩]⟩
 
 theorem prim_step_mass (cfg : Cfg) :
     Reducible cfg.expr cfg.state → IsProbabilityMeasure (primStep cfg) := by
@@ -184,7 +218,9 @@ theorem prim_step_mass (cfg : Cfg) :
   haveI := head_step_mass e'' cfg.state hhead_red
   exact Measure.isProbabilityMeasure_map .of_discrete
 
-theorem head_reducible_prim_step_ctx (K : Ectx) {e1 : Exp} {σ1 : State} {e2 : Exp} {σ2 : State}
+/-! ## headStep ↔ primStep in context -/
+
+theorem headStep_of_primStep_fill (K : Ectx) {e1 : Exp} {σ1 : State} {e2 : Exp} {σ2 : State}
     (hred : ∃ ρ : Cfg, 0 < headStep ⟨e1, σ1⟩ {ρ})
     (hstep : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
     ∃ e2', e2 = K.fill e2' ∧ 0 < headStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} := by
@@ -200,11 +236,11 @@ theorem head_reducible_prim_step_ctx (K : Ectx) {e1 : Exp} {σ1 : State} {e2 : E
   · simp only [Ectx.fill, List.foldl_nil] at he1' hfill2
     exact ⟨e2', hfill2.symm, he1' ▸ hhs⟩
 
-theorem head_reducible_prim_step {e : Exp} {σ : State} {ρ : Cfg}
+theorem headStep_of_primStep {e : Exp} {σ : State} {ρ : Cfg}
     (hred : ∃ ρ' : Cfg, 0 < headStep ⟨e, σ⟩ {ρ'})
     (hstep : 0 < primStep ⟨e, σ⟩ {ρ}) : 0 < headStep ⟨e, σ⟩ {ρ} := by
   obtain ⟨e2, σ2⟩ := ρ
-  obtain ⟨e2', hfill, hhs⟩ := head_reducible_prim_step_ctx [] hred hstep
+  obtain ⟨e2', hfill, hhs⟩ := headStep_of_primStep_fill [] hred hstep
   simp [Ectx.fill] at hfill
   exact hfill ▸ hhs
 
@@ -219,26 +255,9 @@ theorem head_irreducible_zero {e : Exp} {σ : State}
 theorem head_step_not_stuck {e : Exp} {σ : State} {ρ : Cfg}
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) :
     e.toVal? = none ∧ Reducible e σ :=
-  ⟨val_head_stuck h, ρ, head_prim_step h⟩
+  ⟨val_head_stuck h, ρ, primStep_pos_of_headStep h⟩
 
-theorem fill_reducible (K : Ectx) {e : Exp} {σ : State}
-    (hred : Reducible e σ) : Reducible (K.fill e) σ :=
-  reducible_fill K hred
-
-theorem head_prim_reducible {e : Exp} {σ : State}
-    (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
-    Reducible e σ :=
-  let ⟨ρ, hρ⟩ := hred; ⟨ρ, head_prim_step hρ⟩
-
-theorem head_prim_fill_reducible (K : Ectx) {e : Exp} {σ : State}
-    (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :
-    Reducible (K.fill e) σ :=
-  fill_reducible K (head_prim_reducible hred)
-
-theorem head_prim_irreducible {e : Exp} {σ : State}
-    (hirr : ¬ Reducible e σ) :
-    ∀ ρ : Cfg, headStep ⟨e, σ⟩ {ρ} = 0 :=
-  not_head_reducible.mp (fun hred => hirr (head_prim_reducible hred))
+/-! ## subRedexesAreValues -/
 
 def subRedexesAreValues (e : Exp) : Prop :=
   ∀ (K : Ectx) (e' : Exp), e = K.fill e' → e'.toVal? = none → K = []
@@ -276,27 +295,17 @@ theorem head_stuck_stuck {e : Exp} {σ : State}
     e.toVal? = none ∧ ¬ Reducible e σ :=
   ⟨hstuck.1, prim_head_irreducible hstuck.2 hsub⟩
 
-theorem reducible_fill_inv (K : Ectx) {e : Exp} {σ : State}
-    (hv : e.toVal? = none) (hred : Reducible (K.fill e) σ) : Reducible e σ :=
-  let ⟨⟨_, σ2⟩, hρ⟩ := hred; let ⟨e2', _, hρ'⟩ := fill_step_inv hv hρ; ⟨⟨e2', σ2⟩, hρ'⟩
-
-theorem irreducible_fill (K : Ectx) {e : Exp} {σ : State}
-    (hv : e.toVal? = none) (hirr : ¬ Reducible e σ) : ¬ Reducible (K.fill e) σ :=
-  fun hred => hirr (reducible_fill_inv K hv hred)
-
-theorem irreducible_fill_inv (K : Ectx) {e : Exp} {σ : State}
-    (hirr : ¬ Reducible (K.fill e) σ) : ¬ Reducible e σ :=
-  fun hred => hirr (reducible_fill K hred)
+/-! ## notStuck / stuck -/
 
 def notStuck (e : Exp) (σ : State) : Prop :=
   e.isValue ∨ Reducible e σ
 
-theorem notStuck_fill_inv (K : Ectx) {e : Exp} {σ : State}
+theorem NotStuck.of_fill (K : Ectx) {e : Exp} {σ : State}
     (h : notStuck (K.fill e) σ) : notStuck e σ := by
   rcases h with hv | hred
   · exact .inl (Ectx.fill_isValue hv)
   · exact if hv : e.isValue then .inl hv
-    else .inr (reducible_fill_inv K (Exp.toVal?_eq_none.mpr hv) hred)
+    else .inr (hred.of_fill K (Exp.toVal?_eq_none.mpr hv))
 
 def stuck (e : Exp) (σ : State) : Prop :=
   ¬ e.isValue ∧ ¬ Reducible e σ
@@ -304,10 +313,10 @@ def stuck (e : Exp) (σ : State) : Prop :=
 theorem stuck_iff_not_notStuck : stuck e σ ↔ ¬ notStuck e σ := by
   simp [stuck, notStuck, not_or]
 
-theorem stuck_fill (K : Ectx) {e : Exp} {σ : State}
+theorem Stuck.fill (K : Ectx) {e : Exp} {σ : State}
     (h : stuck e σ) : stuck (K.fill e) σ :=
   ⟨fun hv => h.1 (Ectx.fill_isValue hv),
-   fun hred => h.2 (reducible_fill_inv K (Exp.toVal?_eq_none.mpr h.1) hred)⟩
+   fun hred => h.2 (hred.of_fill K (Exp.toVal?_eq_none.mpr h.1))⟩
 
 end ProbLang
 end

@@ -26,9 +26,9 @@ theorem PureHeadStep.toPureStep {e1 e2 : Exp} (h : PureHeadStep e1 e2) : PureSte
   constructor
   · intro σ
     obtain ⟨ρ, hρ⟩ := h.safe σ
-    exact ⟨ρ, head_prim_step hρ⟩
+    exact ⟨ρ, primStep_pos_of_headStep hρ⟩
   · intro σ
-    rw [head_prim_step_eq (h.safe σ)]
+    rw [primStep_eq_headStep (h.safe σ)]
     exact h.det σ
 
 theorem PureStep.fill (K : Ectx) {e1 e2 : Exp} (h : PureStep e1 e2) :
@@ -36,10 +36,10 @@ theorem PureStep.fill (K : Ectx) {e1 e2 : Exp} (h : PureStep e1 e2) :
   constructor
   · intro σ
     obtain ⟨⟨e2', σ2⟩, hρ⟩ := h.safe σ
-    exact ⟨⟨K.fill e2', σ2⟩, fill_step hρ⟩
+    exact ⟨⟨K.fill e2', σ2⟩, primStep_fill_pos hρ⟩
   · intro σ
     have hv : e1.toVal? = none := val_stuck (h.safe σ).choose_spec
-    rw [← fill_step_prob hv]
+    rw [← primStep_fill_singleton hv]
     exact h.det σ
 
 theorem PureStep.fill_nsteps (K : Ectx) {n : ℕ} {e1 e2 : Exp}
@@ -91,9 +91,6 @@ class AsVal (e : Exp) : Prop where
 theorem as_val_isSome {e : Exp} (h : ∃ v : Val, v.1 = e) : e.isValue := by
   obtain ⟨⟨_, hv⟩, rfl⟩ := h
   exact hv
-
-theorem fill_is_val {K : Ectx} {e : Exp} (h : (K.fill e).isValue) : e.isValue :=
-  Ectx.fill_isValue h
 
 end ProbLang
 end

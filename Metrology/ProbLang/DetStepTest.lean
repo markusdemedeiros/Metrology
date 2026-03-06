@@ -142,11 +142,9 @@ unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
 theorem DetHeadStep.toDetStep_fill (K : Ectx) {cfg1 cfg2 : Cfg}
     (h : DetHeadStep cfg1 cfg2) :
     DetStep ⟨K.fill cfg1.expr, cfg1.state⟩ ⟨K.fill cfg2.expr, cfg2.state⟩ where
-  safe := ⟨⟨K.fill cfg2.expr, cfg2.state⟩,
-    fill_step (head_prim_step (by have := h.det; positivity))⟩
+  safe := ⟨⟨K.fill cfg2.expr, cfg2.state⟩, primStep_fill_pos (primStep_pos_of_headStep h.pos)⟩
   det := by
-    have hv := val_head_stuck (by have := h.det; positivity)
-    rw [← fill_prim_step hv, head_prim_step_eq h.safe]
+    rw [← primStep_fill_singleton (val_head_stuck h.pos), primStep_eq_headStep h.safe]
     exact h.det
 
 open Term in

@@ -25,17 +25,19 @@ structure DetHeadStep (cfg1 cfg2 : Cfg) : Prop where
   safe : ∃ ρ : Cfg, 0 < headStep cfg1 {ρ}
   det  : headStep cfg1 {cfg2} = 1
 
+theorem DetHeadStep.pos (h : DetHeadStep cfg1 cfg2) : 0 < headStep cfg1 {cfg2} :=
+  h.det ▸ one_pos
+
 structure DetStep (cfg1 cfg2 : Cfg) : Prop where
   safe : Reducible cfg1.expr cfg1.state
   det  : primStep cfg1 {cfg2} = 1
 
-theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg} (h : DetHeadStep cfg1 cfg2) : DetStep cfg1 cfg2 := by
-  constructor
-  · obtain ⟨ρ, hρ⟩ := h.safe
-    exact ⟨ρ, head_prim_step hρ⟩
-  · obtain ⟨e1, σ1⟩ := cfg1
-    rw [head_prim_step_eq h.safe]
-    exact h.det
+theorem DetStep.pos (h : DetStep cfg1 cfg2) : 0 < primStep cfg1 {cfg2} :=
+  h.det ▸ one_pos
+
+theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg} (h : DetHeadStep cfg1 cfg2) : DetStep cfg1 cfg2 where
+  safe := ⟨_, primStep_pos_of_headStep h.pos⟩
+  det := by obtain ⟨e1, σ1⟩ := cfg1; rw [primStep_eq_headStep h.safe]; exact h.det
 
 class DetExec (n : ℕ) (cfg1 cfg2 : Cfg) : Prop where
   det_exec : nsteps DetStep n cfg1 cfg2
