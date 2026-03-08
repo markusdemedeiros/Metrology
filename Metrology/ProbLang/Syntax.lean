@@ -101,7 +101,7 @@ inductive Exp
   | rand (en et : Exp)
   | fail
   | annot (a : Annot) (e : Exp)
-  | «match» (scrut : Exp) (pat : Pat)
+  | scrut (e : Exp) (pat : Pat)
   deriving Inhabited, Countable, Repr, BEq
 
 /-- Try to match an expression against a pattern.
@@ -361,7 +361,7 @@ inductive EctxItem
   | randL (v2 : Val)
   | randR (e1 : Exp)
   | annot (a : Annot)
-  | «match» (p : Pat)
+  | scrut (p : Pat)
 
 @[simp] def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
   match Ki with
@@ -386,7 +386,7 @@ inductive EctxItem
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
   | .annot a => .annot a e
-  | .match p => .match e p
+  | .scrut p => .scrut e p
 
 def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
   match e with
@@ -427,8 +427,8 @@ def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
     e1.toVal?.casesOn (some (.tape, e1)) fun _ => none
   | annot a e1 =>
     e1.toVal?.casesOn (some (.annot a, e1)) fun _ => none
-  | «match» e1 p =>
-    e1.toVal?.casesOn (some (.match p, e1)) fun _ => none
+  | scrut e1 p =>
+    e1.toVal?.casesOn (some (.scrut p, e1)) fun _ => none
   | _ => none
 
 def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
@@ -455,7 +455,7 @@ def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
   | rand e1 e2 => rand (e1.subst' x v) (e2.subst' x v)
   | tape e => tape (e.subst' x v)
   | annot a e => annot a (e.subst' x v)
-  | «match» e p => «match» (e.subst' x v) p
+  | scrut e p => scrut (e.subst' x v) p
   | fail => fail
 
 def Exp.subst (mx : Binder) (v e : Exp) : Exp :=
@@ -551,7 +551,7 @@ def Exp.height : Exp → Nat
   | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | annot _ e => 1 + e.height
-  | «match» e _ => 1 + e.height
+  | scrut e _ => 1 + e.height
   | fail => 1
 
 private theorem Exp.toVal?_of_isVal {e : Exp} (w : IsVal e) : ∃ v : Val, e.toVal? = some v ∧ v.1 = e :=

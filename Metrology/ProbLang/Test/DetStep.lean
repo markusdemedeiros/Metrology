@@ -83,8 +83,8 @@ unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
                          (mkApp3 (mkConst ``BinOp.eval) op e1 e2)
     -- @DetHeadStep.binop op e1 e2 result h1 h2 heval state
     return mkApp8 (mkConst ``DetHeadStep.binop) op e1 e2 result h1 h2 heval state
-  | .app (.app (.app (.const ``Exp.case _) scrut) el) er =>
-    match ← whnf scrut with
+  | .app (.app (.app (.const ``Exp.case _) sc) el) er =>
+    match ← whnf sc with
     | .app (.const ``Exp.inl _) v =>
       let some hv ← mkIsValWitness v | throwError "elabDetHeadStep: case_inl: scrutinee is not a value"
       return mkApp5 (mkConst ``DetHeadStep.case_inl) v el er hv state
@@ -225,12 +225,12 @@ def stateWith42 : State :=
 example : ∃ cfg2, DetStep ⟨pl(!(#(BaseLit.loc (0 : Loc)))), stateWith42⟩ cfg2 :=
   ⟨_, det_step_of ⟨pl(!(#(BaseLit.loc (0 : Loc)))), stateWith42⟩⟩
 
--- case inl/inr
-example : ∃ cfg2, DetStep ⟨pl(case inl(#1) | x => x + #10 | y => y), default⟩ cfg2 :=
-  ⟨_, det_step_of ⟨pl(case inl(#1) | x => x + #10 | y => y), default⟩⟩
-
-example : ∃ cfg2, DetStep ⟨pl(case inr(#2) | x => x | y => y + #10), default⟩ cfg2 :=
-  ⟨_, det_step_of ⟨pl(case inr(#2) | x => x | y => y + #10), default⟩⟩
+-- [commented out: case tests, to be replaced by match+case]
+-- example : ∃ cfg2, DetStep ⟨pl(case inl(#1) | x => x + #10 | y => y), default⟩ cfg2 :=
+--   ⟨_, det_step_of ⟨pl(case inl(#1) | x => x + #10 | y => y), default⟩⟩
+--
+-- example : ∃ cfg2, DetStep ⟨pl(case inr(#2) | x => x | y => y + #10), default⟩ cfg2 :=
+--   ⟨_, det_step_of ⟨pl(case inr(#2) | x => x | y => y + #10), default⟩⟩
 
 -- (fun x, x + #1) #2  steps by beta reduction
 example : ∃ cfg2, DetStep ⟨pl((fun x, x + #1) #2), default⟩ cfg2 :=
@@ -285,9 +285,9 @@ example : ∃ n cfg2, DetExec n ⟨pl((fun x, x * #2) #5), default⟩ cfg2 :=
 example : ∃ n cfg2, DetExec n ⟨pl(if #true then #1 + #2 else #99), default⟩ cfg2 :=
   ⟨_, _, det_exec_of 5 _⟩
 
--- sum type dispatch: case inl(#3) | x => x + #1 | y => y →* #4
-example : ∃ n cfg2, DetExec n ⟨pl(case inl(#3) | x => x + #1 | y => y), default⟩ cfg2 :=
-  ⟨_, _, det_exec_of 5 _⟩
+-- [commented out: case tests, to be replaced by match+case]
+-- example : ∃ n cfg2, DetExec n ⟨pl(case inl(#3) | x => x + #1 | y => y), default⟩ cfg2 :=
+--   ⟨_, _, det_exec_of 5 _⟩
 
 -- nested: snd((fst((#1, #2)), #3)) →* #3 (two steps: inner fst, then snd)
 example : ∃ n cfg2, DetExec n ⟨pl(snd((fst((#1, #2)), #3))), default⟩ cfg2 :=

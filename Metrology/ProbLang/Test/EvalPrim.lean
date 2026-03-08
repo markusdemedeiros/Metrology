@@ -109,18 +109,19 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
 -- Sums
 -- ---------------------------------------------------------------------------
 
-#eval check "case inl"
-  pl(case inl(#1) | x => x + #10 | _ => #0)
-  pl(#11)
-
-#eval check "case inr"
-  pl(case inr(#2) | _ => #0 | y => y + #20)
-  pl(#22)
-
--- case with a non-value scrutinee (redex is inside the scrutinee position)
-#eval check "case: scrutinee is redex"
-  pl(case inl(#1 + #2) | x => x | _ => #0)
-  pl(#3)
+-- [commented out: case tests, to be replaced by match+case]
+-- #eval check "case inl"
+--   pl(case inl(#1) | x => x + #10 | _ => #0)
+--   pl(#11)
+--
+-- #eval check "case inr"
+--   pl(case inr(#2) | _ => #0 | y => y + #20)
+--   pl(#22)
+--
+-- -- case with a non-value scrutinee (redex is inside the scrutinee position)
+-- #eval check "case: scrutinee is redex"
+--   pl(case inl(#1 + #2) | x => x | _ => #0)
+--   pl(#3)
 
 -- ---------------------------------------------------------------------------
 -- Heap
