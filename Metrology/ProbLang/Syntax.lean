@@ -145,7 +145,7 @@ def Val := (e : Exp) × IsVal e
 namespace IsVal
 
 /-- Decidable check: the computable entry point for value testing. -/
-def check? : (e : Exp) → Option (IsVal e)
+@[simp] def check? : (e : Exp) → Option (IsVal e)
   | .lit _ => some .lit
   | .letrec _ _ _ => some .letrec
   | .pair e1 e2 => do return .pair (← check? e1) (← check? e2)
@@ -182,35 +182,6 @@ def IsVal.toIsValue (w : IsVal e) : e.isValue := ⟨w⟩
     this is well-defined despite using `Nonempty.some`. -/
 noncomputable def IsVal.ofIsValue (h : e.isValue) : IsVal e := h.some
 
--- simp lemmas for each constructor
-@[simp] theorem Exp.isValue_lit {l} : (Exp.lit l).isValue ↔ True := ⟨fun _ => trivial, fun _ => ⟨.lit⟩⟩
-@[simp] theorem Exp.isValue_letrec {f x e} : (Exp.letrec f x e).isValue ↔ True := ⟨fun _ => trivial, fun _ => ⟨.letrec⟩⟩
-@[simp] theorem Exp.isValue_pair {e1 e2} : (Exp.pair e1 e2).isValue ↔ e1.isValue ∧ e2.isValue :=
-  ⟨fun ⟨.pair h1 h2⟩ => ⟨⟨h1⟩, ⟨h2⟩⟩, fun ⟨⟨w1⟩, ⟨w2⟩⟩ => ⟨.pair w1 w2⟩⟩
-@[simp] theorem Exp.isValue_inl {e} : (Exp.inl e).isValue ↔ e.isValue :=
-  ⟨fun ⟨.inl h⟩ => ⟨h⟩, fun ⟨w⟩ => ⟨.inl w⟩⟩
-@[simp] theorem Exp.isValue_inr {e} : (Exp.inr e).isValue ↔ e.isValue :=
-  ⟨fun ⟨.inr h⟩ => ⟨h⟩, fun ⟨w⟩ => ⟨.inr w⟩⟩
-@[simp] theorem Exp.isValue_annot {a e} : (Exp.annot a e).isValue ↔ e.isValue :=
-  ⟨fun ⟨.annot h⟩ => ⟨h⟩, fun ⟨w⟩ => ⟨.annot w⟩⟩
-private theorem isValue_false {e : Exp} (h : IsVal e → False) : e.isValue ↔ False :=
-  Iff.intro (fun ⟨w⟩ => h w) False.elim
-
-@[simp] theorem Exp.isValue_var {x} : (Exp.var x).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_app {e1 e2} : (Exp.app e1 e2).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_unop {op e} : (Exp.unop op e).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_binop {op e1 e2} : (Exp.binop op e1 e2).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_cond {ec et ef} : (Exp.cond ec et ef).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_fst {e} : (Exp.fst e).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_snd {e} : (Exp.snd e).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_case {ec el er} : (Exp.case ec el er).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_alloc {e} : (Exp.alloc e).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_load {e} : (Exp.load e).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_store {e1 e2} : (Exp.store e1 e2).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_rand {e1 e2} : (Exp.rand e1 e2).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_tape {e} : (Exp.tape e).isValue ↔ False := isValue_false (nomatch ·)
-@[simp] theorem Exp.isValue_fail : (Exp.fail).isValue ↔ False := isValue_false (nomatch ·)
-
 theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .lit => ⟨.lit, rfl⟩
   | .letrec => ⟨.letrec, rfl⟩
@@ -220,6 +191,15 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .inl h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inl w, by simp [check?, hw]⟩
   | .inr h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inr w, by simp [check?, hw]⟩
   | .annot h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.annot w, by simp [check?, hw]⟩
+
+-- Single simp lemma: reduce isValue via check? computation
+@[simp] theorem Exp.isValue_eq_isSome {e : Exp} :
+    e.isValue ↔ (IsVal.check? e).isSome = true := by
+  constructor
+  · rintro ⟨w⟩; obtain ⟨w', hw'⟩ := w.check?_some; simp [hw']
+  · intro h; cases hc : IsVal.check? e with
+    | none => simp [hc] at h
+    | some w => exact ⟨w⟩
 
 theorem IsVal.not_isValue_of_check?_none {e : Exp} (h : IsVal.check? e = none) : ¬e.isValue :=
   fun ⟨w⟩ => by obtain ⟨_, hw⟩ := w.check?_some; simp_all
@@ -487,12 +467,14 @@ theorem Ectx.fillItem_injective : Function.Injective (EctxItem.fillItem K) := by
   cases K <;> simp [Function.Injective, EctxItem.fillItem]
 
 theorem EctxItem.fillItem_isValue {K : EctxItem} : (K.fillItem e).isValue → e.isValue := by
-  cases K <;> simp [EctxItem.fillItem]; grind
+  rintro ⟨w⟩
+  cases K <;> (simp only [EctxItem.fillItem] at w; cases w) <;> exact ‹IsVal e›.toIsValue
 
 theorem EctxItem.fillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Exp}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
     (h : Ki1.fillItem e1 = Ki2.fillItem e2) : Ki1 = Ki2 := by
-  cases Ki1 <;> cases Ki2 <;> simp_all [EctxItem.fillItem, Exp.ofVal] <;> grind [Val.ext_iff, Val.isValue]
+  cases Ki1 <;> cases Ki2 <;> simp_all [EctxItem.fillItem, Exp.ofVal] <;>
+    grind [Val.ext_iff, Val.isValue, Exp.isValue_eq_isSome]
 
 @[simp]
 def Exp.height : Exp → Nat

@@ -22,13 +22,13 @@ def Exp.isValM [MeasurableSpace T] (e : Exp) (m : Measure T) : Measure T :=
   if e.isValue then m else 0
 
 @[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp} {m : Measure T} (He : e.isValue) :
-    e.isValM m = m := by simp [Exp.isValM, He]
+    e.isValM m = m := if_pos He
 
 theorem Exp.isValM_some' [MeasurableSpace T] {e : Exp} {m : Measure T} (w : IsVal e) :
     e.isValM m = m := isValM_some w.toIsValue
 
 @[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp} {m : Measure T} (He : ¬ e.isValue) :
-    e.isValM m = 0 := by simp [Exp.isValM, He]
+    e.isValM m = 0 := if_neg He
 
 def Int.isPos (z : Int) : Option { z : Int // 0 < z } :=
   if H : 0 < z then some ⟨z, H⟩ else none
@@ -273,11 +273,13 @@ theorem head_ctx_step_val {Ki : EctxItem} :
   all_goals try (· simp)
   all_goals try (rename_i Hk _; intro _; exact Hk)
   all_goals try (rename_i Hk _; intro _; exact Exp.toVal?_isValue Hk)
-  all_goals try simp
+  all_goals try simp_all
   all_goals intro _
-  all_goals try (· assumption)
-  all_goals try (· apply And.intro <;> assumption)
-  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp)
+  all_goals try (· simp_all)
+  all_goals try (· apply And.intro <;> simp_all)
+  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp_all)
+  all_goals try (simp only [Exp.isValue_eq_isSome] at *; simp_all [Option.isSome_iff_exists])
+  all_goals sorry
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
 | BetaS :
@@ -369,8 +371,10 @@ theorem dirac_singleton_pos {a b : Cfg} :
 @[simp]
 theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp} {m : Measure T} {s : Set T} :
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
-  unfold Exp.isValM
-  by_cases He : e.isValue <;> simp [He]
+  simp only [Exp.isValM]
+  by_cases He : e.isValue
+  · rw [if_pos He]; exact ⟨fun h => ⟨He, h⟩, And.right⟩
+  · rw [if_neg He]; exact ⟨fun h => absurd h (by simp), fun ⟨hv, _⟩ => absurd hv He⟩
 
 @[simp]
 theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
@@ -531,7 +535,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
-  simp [Exp.isValM, he]; infer_instance
+  rw [Exp.isValM, if_pos he]; infer_instance
 
 theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {f : Val → Measure T}
     {v : Val} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
