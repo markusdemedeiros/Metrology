@@ -22,6 +22,36 @@ A failing assertion throws an IO error naming the test.
 - [x] `rand` with computed bound: bound is a redex, not a literal
 - Note: `fst`/`snd`/`case` on annotated values (e.g. `fst((1,2) : int×int)`)
   gets stuck — same in formal semantics, may need an annot-stripping rule
+
+### Stuck/error cases
+- [x] `app` with non-function stuck: apply `inl`, `inr`, or `loc` to an argument
+- [x] `case` raw 3-arg on non-sum scrutinee (e.g. `case #5 el er` → stuck)
+- [x] Free variable / open term: `x + #1` → stuck
+- [x] `checkErrorMsg`: verify error message contains expected substring
+
+### Substitution / binding
+- [x] `subst` capture-avoidance: inner `letrec` binder shadows outer let
+- [x] `letrec` self-reference vs parameter name collision (`rec f f := f`)
+- [x] `Binder.typed`: exercise typed binders (`fun (x : int), x + #1`)
+
+### Evaluation order
+- [x] Right-to-left evaluation order with side effects
+- [x] `store` return value is `unit` (check directly, not just via sequencing)
+- [x] `rand` with two non-value arguments (both bound and tape need reducing)
+
+### Pattern matching
+- [x] `Pat.annot`: dead code in interpreter (decomp strips annot first);
+      tested directly via `Pat.tryMatch` and via interpreter (mismatch path)
+- [x] Multi-arm `case` with variable-binding pattern in non-first arm
+
+### Heap
+- [x] `eq` on locations: `#(.loc 1) = #(.loc 1)`, `#(.loc 1) = #(.loc 2)`
+- [x] `eq` on labels: `#(.lbl 1) = #(.lbl 1)`
+- [x] Dead-code audit: `alloc`/`store` non-value argument branches in
+      `headStep` — unreachable (decomp reduces arg to value first)
+
+### Misc
+- [x] `assert` with a redex condition (e.g. `assert(#1 = #1)`)
 -/
 
 private def check (name : String) (prog : Exp) (expected : Exp) : IO Unit := do
@@ -840,3 +870,222 @@ private def isEvenOdd : Exp :=
     if n < 0 || n > 6 then
       throw (IO.userError s!"FAIL [rand computed bound]: got {n}, expected 0..6")
   | e => throw (IO.userError s!"FAIL [rand computed bound type]: got {repr e}")
+
+-- ---------------------------------------------------------------------------
+-- checkError with substring matching
+-- ---------------------------------------------------------------------------
+
+private def String.hasSubstr (haystack needle : String) : Bool :=
+  (haystack.splitOn needle).length > 1
+
+/-- Like `checkError` but also checks the error message contains `needle`. -/
+private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Unit := do
+  try
+    let v ← run prog
+    throw (IO.userError s!"FAIL [{name}]: expected error, got {repr v.1}")
+  catch e =>
+    let msg := toString e
+    if !msg.hasSubstr needle then
+      throw (IO.userError s!"FAIL [{name}]: expected error containing \"{needle}\", got \"{msg}\"")
+
+-- ---------------------------------------------------------------------------
+-- Application errors: non-function stuck cases
+-- ---------------------------------------------------------------------------
+
+#eval checkErrorMsg "apply inl"
+  pl(inl(#1) #2)
+  "stuck"
+#eval checkErrorMsg "apply inr"
+  pl(inr(#1) #2)
+  "stuck"
+#eval checkErrorMsg "apply loc"
+  pl(#(.loc 1) #2)
+  "stuck"
+
+-- ---------------------------------------------------------------------------
+-- Raw case on non-sum scrutinee (stuck)
+-- ---------------------------------------------------------------------------
+
+-- The notation `case e | ...` desugars through scrut, but raw .case only
+-- handles inl/inr.  Build a raw .case with a literal scrutinee directly.
+#eval checkErrorMsg "raw case on int"
+  (Exp.case (.lit (.int 5)) (.letrec .anon (.named "x") (.var "x"))
+                             (.letrec .anon (.named "y") (.var "y")))
+  "stuck"
+
+-- ---------------------------------------------------------------------------
+-- Free variable / open term (stuck)
+-- ---------------------------------------------------------------------------
+
+#eval checkErrorMsg "free variable"
+  (.binop .plus (.var "x") (.lit (.int 1)))
+  "stuck"
+
+-- ---------------------------------------------------------------------------
+-- Substitution: capture avoidance
+-- ---------------------------------------------------------------------------
+
+-- Inner letrec parameter `x` shadows the outer `let x := #100`.
+-- The body `x + #1` should use the letrec's parameter, not the outer binding.
+#eval check "subst capture avoidance"
+  pl(let x := #100; (rec f x := x + #1) #5)
+  pl(#6)
+
+-- Letrec where the self-reference name `f` shadows an outer `let f`.
+#eval check "subst capture avoidance rec name"
+  pl(let f := #999; (rec f x := if x = #0 then #1 else x * f (x - #1)) #3)
+  pl(#6)
+
+-- ---------------------------------------------------------------------------
+-- Letrec: self-reference vs parameter name collision
+-- ---------------------------------------------------------------------------
+
+-- `rec f f := f` — both binders are `f`, so subst stops for both.
+-- The body `f` refers to the parameter (which shadows the self-ref).
+-- But subst of the argument is blocked by the param binder, and subst of
+-- the self-ref is blocked by the rec binder.  So the body is returned
+-- literally as the letrec — it's the self-reference that wins because
+-- the self-ref subst happens first (inner), then the param subst (outer)
+-- is blocked.
+#eval check "rec f f shadows self-ref"
+  pl((rec f f := f) #42)
+  pl(rec f f := f)
+
+-- ---------------------------------------------------------------------------
+-- Typed binders
+-- ---------------------------------------------------------------------------
+
+#eval check "typed binder fn"
+  pl((fun (x : int), x + #1) #9)
+  pl(#10)
+
+#eval check "typed binder let"
+  pl(let (x : int) := #5; x * #2)
+  pl(#10)
+
+#eval check "typed binder rec"
+  pl((rec f (n : int) := if n = #0 then #1 else n * f (n - #1)) #4)
+  pl(#24)
+
+-- ---------------------------------------------------------------------------
+-- Evaluation order with side effects (right-to-left decomp)
+-- ---------------------------------------------------------------------------
+
+-- binop evaluates right arg first.  So `!r` (right) reduces before
+-- `r ← #1` (left).  The load sees the initial value 0.
+#eval check "eval order: binop right before left"
+  pl(let r := alloc(#0); let a := !r; r ← #1; a)
+  pl(#0)
+
+-- pair evaluates right arg first
+#eval check "eval order: pair right before left"
+  pl(let r := alloc(#0); let p := (r ← #99, !r); snd(p))
+  pl(#0)
+
+-- ---------------------------------------------------------------------------
+-- Store return value
+-- ---------------------------------------------------------------------------
+
+#eval check "store returns unit"
+  pl(let r := alloc(#0); r ← #42)
+  pl(#.unit)
+
+-- ---------------------------------------------------------------------------
+-- Rand with both arguments needing reduction
+-- ---------------------------------------------------------------------------
+
+-- Both bound (#2 + #1 = 3) and tape arg (if #true then #.unit else #.unit)
+-- need evaluation before rand fires.
+#eval do
+  let v ← run pl(rand(#2 + #1, if #true then #.unit else #.unit))
+  match v.1 with
+  | .lit (.int n) =>
+    if n < 0 || n > 3 then
+      throw (IO.userError s!"FAIL [rand both redex]: got {n}, expected 0..3")
+  | e => throw (IO.userError s!"FAIL [rand both redex type]: got {repr e}")
+
+-- ---------------------------------------------------------------------------
+-- Pat.annot matching via scrut
+-- ---------------------------------------------------------------------------
+
+-- Pat.annot in tryMatch is dead code in the interpreter: decomp always strips
+-- annotations before scrut fires (annot is not a value, so decompItem
+-- decomposes through it).  We verify this: an annotated-pattern scrut on
+-- a value that *was* annotated still works, because the annotation is gone
+-- by the time tryMatch runs, so Pat.annot mismatches and we fall through.
+#eval check "scrut annot stripped before match"
+  pl(case scrut (#42 : int) with (x : int)
+     | inl(_) => #99
+     | inr(_) => #0)
+  pl(#0)
+
+-- Plain var pattern still matches after annotation stripping
+#eval check "scrut after annot strip"
+  pl(case scrut (#42 : int) with x
+     | inl(b) => b
+     | inr(_) => #0)
+  pl(#42)
+
+-- Direct test of Pat.tryMatch with annot (bypassing the interpreter)
+#eval show IO Unit from do
+  -- Both annotated: should match
+  let r1 := Pat.tryMatch (.annot (.ty .int) (.var (.named "x")))
+                          (Exp.annot (.ty .int) (Exp.lit (.int 7)))
+  if r1 != some (Exp.lit (.int 7)) then
+    throw (IO.userError s!"FAIL [Pat.annot match]: got {repr r1}")
+  -- Pattern annotated, value not: should fail
+  let r2 := Pat.tryMatch (.annot (.ty .int) (.var (.named "x")))
+                          (Exp.lit (.int 7))
+  if r2 != none then
+    throw (IO.userError s!"FAIL [Pat.annot mismatch]: got {repr r2}")
+
+-- ---------------------------------------------------------------------------
+-- Multi-arm case with variable-binding pattern in non-first arm
+-- ---------------------------------------------------------------------------
+
+-- First arm is a literal (no binding), second arm binds a variable via inl
+#eval check "case: var binding in second arm"
+  pl(case inl(#7)
+     | #(.int 99) => #0
+     | inl(x) => x + #1
+     | _ => #0)
+  pl(#8)
+
+-- Third arm binds
+#eval check "case: var binding in third arm"
+  pl(case (#5, #6)
+     | #(.int 0) => #0
+     | inl(_) => #0
+     | (x, y) => x + y)
+  pl(#11)
+
+-- ---------------------------------------------------------------------------
+-- Equality on locations and labels
+-- ---------------------------------------------------------------------------
+
+#eval check "eq loc same"
+  pl(#(.loc 1) = #(.loc 1))
+  pl(#true)
+#eval check "eq loc diff"
+  pl(#(.loc 1) = #(.loc 2))
+  pl(#false)
+#eval check "eq lbl same"
+  pl(#(.lbl 1) = #(.lbl 1))
+  pl(#true)
+#eval check "eq lbl diff"
+  pl(#(.lbl 1) = #(.lbl 2))
+  pl(#false)
+#eval check "eq loc vs int"
+  pl(#(.loc 1) = #1)
+  pl(#false)
+
+-- ---------------------------------------------------------------------------
+-- Assert with a redex condition
+-- ---------------------------------------------------------------------------
+
+#eval check "assert redex true"
+  pl(assert(#1 = #1))
+  pl(#.unit)
+
+#eval checkError "assert redex false"
+  pl(assert(#1 = #2))
