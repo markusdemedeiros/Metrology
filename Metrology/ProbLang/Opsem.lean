@@ -213,11 +213,7 @@ theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
 
 theorem head_ctx_step_val {Ki : EctxItem} :
     0 < headStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
-  -- headStep pattern-matches on the expression. Ki.fillItem e plugs e into a
-  -- context position. For headStep to fire, e must sit in a value slot.
   have Hzero : 0 < (0 : Measure Cfg) {ρ} → False := by simp
-  -- Case-split on headStep rule, kill stuck cases, then case-split on Ki.
-  -- simp_all eliminates impossible Ki cases and closes value goals.
   head_case
   all_goals try (exact fun H => (Hzero H).elim)
   all_goals cases Ki <;> (intro _; simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR])
@@ -363,15 +359,8 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
     0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
   · head_case
-    -- Stuck cases (measure is 0)
-    case default | beta.no_redex | unop.no_redex | binop.no_redex_1 | binop.no_redex_2
-       | fst.no_redex_1 | fst.no_redex_2 | snd.no_redex_1 | snd.no_redex_2
-       | case.left.no_redex | case.right.no_redex
-       | alloc.no_redex | store.no_redex | store.segfault
-       | load.segfault | rand.tape.unalloc => simp
-    -- Pure dirac, constructor suffices
+    all_goals try (· simp)
     case cond.true | cond.false => intro h; cfg_dirac h; constructor
-    -- Dirac with hypotheses from head_case
     case beta.redex => intro h; cfg_dirac h; exact .BetaS ‹_› rfl
     case fst.redex => intro h; cfg_dirac h; exact .FstS ‹_› ‹_›
     case snd.redex => intro h; cfg_dirac h; exact .SndS ‹_› ‹_›
@@ -385,14 +374,12 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       exact .StoreS ‹_› (by rw [Option.isSome_iff_exists]; exact ⟨_, ‹_›⟩) rfl
     case rand.tape.deterministic =>
       intro h; cfg_dirac h; exact .RandTapeS (by omega) ‹_› rfl rfl rfl
-    -- unwrapM + dirac
     case unop.redex =>
       intro h; rw [unwrapM_singleton_pos] at h
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .UnOpS ‹_› hr.symm
     case binop.redex =>
       intro h; rw [unwrapM_singleton_pos] at h
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .BinOpS ‹_› ‹_› hr.symm
-    -- Cfg.uniform cases
     case rand.plain =>
       intro h
       obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
@@ -444,22 +431,14 @@ theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
 theorem head_step_mass (e : Exp) (σ : State) :
     (∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
   head_case
-  -- Stuck cases (measure is 0, hypothesis is vacuously false)
-  case default | beta.no_redex | unop.no_redex | binop.no_redex_1 | binop.no_redex_2
-     | fst.no_redex_1 | fst.no_redex_2 | snd.no_redex_1 | snd.no_redex_2
-     | case.left.no_redex | case.right.no_redex
-     | alloc.no_redex | store.no_redex | store.segfault
-     | load.segfault | rand.tape.unalloc => simp
-  -- Dirac cases (IsProbabilityMeasure (dirac _) is automatic)
+  all_goals try (· simp)
   case beta.redex | cond.true | cond.false
      | fst.redex | snd.redex | case.left.redex | case.right.redex
      | alloc.redex | load.redex | store.redex | tape
      | rand.tape.deterministic => intro _; infer_instance
-  -- unwrapM cases: need to extract the `some` witness
   case unop.redex | binop.redex =>
     intro ⟨_, hρ⟩; rw [unwrapM_singleton_pos] at hρ
     obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
-  -- Cfg.uniform cases
   case rand.plain | rand.tape | rand.tape.mismatch =>
     intro ⟨_, hρ⟩
     exact Cfg.uniform_isProbabilityMeasure (Cfg.uniform_singleton_pos_inv hρ).1

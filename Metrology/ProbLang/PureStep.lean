@@ -74,12 +74,6 @@ theorem rtc_pure_step_val {n : ℕ} {v : Val} {e : Exp}
     obtain ⟨ρ, hρ⟩ := hstep.safe default
     exact absurd v.2.toIsValue (val_stuck hρ)
 
-class IntoVal (e : Exp) (v : Val) : Prop where
-  into_val : v.1 = e
-
-class AsVal (e : Exp) : Prop where
-  as_val : ∃ v : Val, v.1 = e
-
 theorem as_val_isSome {e : Exp} (h : ∃ v : Val, v.1 = e) : e.isValue := by
   obtain ⟨⟨_, hv⟩, rfl⟩ := h
   exact hv.toIsValue

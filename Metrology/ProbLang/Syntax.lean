@@ -677,11 +677,8 @@ theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
     have hne : K ≠ [] := by intro hK; simp [hK] at hlen
     obtain ⟨K'', Ki, rfl⟩ : ∃ K'' Ki, K = K'' ++ [Ki] :=
       ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
-    -- Rewrite fill (K'' ++ [Ki]) e = Ki.fillItem (fill K'' e).
     simp only [Ectx.fill_snoc]
-    -- Unfold decomp one step. decompItem_fillItem peels off Ki (e is not a value, so fill K'' e isn't either).
     rw [decomp_unfold, EctxItem.decompItem_fillItem Ki (Ectx.fill_noVal hv)]
-    -- By IH, (fill K'' e).decomp = (K' ++ K'', e'). Reassociate the append.
     simp only [ih K'' (by simp at hlen; omega), List.append_assoc]
 
 end ProbLang
