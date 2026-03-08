@@ -42,8 +42,6 @@ namespace ProbLang
 abbrev Loc : Type := Int
 
 abbrev Lbl : Type := Int
-inductive Binder | anon | named (s : String)
-  deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
 inductive BaseLit | int (z : Int) | bool (b : Bool) | unit | loc (loc : Loc) | lbl (lbl : Lbl)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
@@ -60,7 +58,14 @@ inductive Ty
   | sum (τ1 τ2 : Ty)
   | arrow (τ1 τ2 : Ty)
   | ref (τ : Ty)
+  | tape (τ : Ty)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
+
+inductive Binder | anon | named (s : String) | typed (s : String) (τ : Ty)
+  deriving Inhabited, DecidableEq, Countable, Repr, BEq
+
+def Binder.binds (b : Binder) (x : String) : Bool :=
+  match b with | .named s | .typed s _ => s == x | .anon => false
 
 inductive Annot
   | ty (τ : Ty)
@@ -397,7 +402,7 @@ def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
   | lit l => lit l
   | var y => if x = y then v else var y
   | letrec f y e =>
-    if .named x ≠ f ∧ .named x ≠ y
+    if !f.binds x ∧ !y.binds x
     then letrec f y (e.subst' x v)
     else letrec f y e
   | app e1 e2 => app (e1.subst' x v) (e2.subst' x v)
@@ -419,7 +424,7 @@ def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
   | fail => fail
 
 def Exp.subst (mx : Binder) (v e : Exp) : Exp :=
-  match mx with | .named x => e.subst' x v | .anon => e
+  match mx with | .named x | .typed x _ => e.subst' x v | .anon => e
 
 def UnOp.eval (op : UnOp) (v : Exp) : Option Exp :=
   match op, v with

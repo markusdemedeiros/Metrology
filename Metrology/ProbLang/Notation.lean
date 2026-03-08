@@ -10,11 +10,35 @@ namespace ProbLang
 open Lean Lean.PrettyPrinter Elab Parser
 
 declare_syntax_cat pl_exp
+declare_syntax_cat pl_ty
+declare_syntax_cat pl_arg
 
 /-- embedding ProbLang expressions into terms -/
 syntax:max "pl(" pl_exp ")" : term
 /-- embedding ProbLang binders into terms -/
 syntax:max "pl_binder(" binderIdent ")" : term
+/-- embedding ProbLang typed binders into terms -/
+syntax:max "pl_binder(" "(" ident " : " pl_ty ")" ")" : term
+/-- embedding ProbLang types into terms -/
+syntax:max "pl_ty(" pl_ty ")" : term
+
+/-- pl_arg: plain binder or typed binder -/
+syntax binderIdent : pl_arg
+syntax "(" ident " : " pl_ty ")" : pl_arg
+
+/-- embedding ProbLang binder arguments into terms -/
+syntax:max "pl_binder_arg(" pl_arg ")" : term
+
+/-- Type syntax -/
+syntax:max "int" : pl_ty
+syntax:max "bool" : pl_ty
+syntax:max "unit" : pl_ty
+syntax:max "(" pl_ty ")" : pl_ty
+syntax:35 pl_ty:36 " × " pl_ty:35 : pl_ty
+syntax:30 pl_ty:31 " + " pl_ty:30 : pl_ty
+syntax:25 pl_ty:26 " → " pl_ty:25 : pl_ty
+syntax:max "ref(" pl_ty ")" : pl_ty
+syntax:max "tape(" pl_ty ")" : pl_ty
 
 /-- escaping back to Lean -/
 syntax:max "{" term "}" : pl_exp
@@ -24,6 +48,8 @@ syntax:max "#" term:max : pl_exp
 syntax:max ident : pl_exp
 /-- parentheses -/
 syntax:max "(" pl_exp ")" : pl_exp
+/-- type annotation -/
+syntax:max "(" pl_exp " : " pl_ty ")" : pl_exp
 
 -- Operator precedences mirror Init.Notation
 syntax:65 pl_exp:66 " + " pl_exp:65 : pl_exp
@@ -41,10 +67,10 @@ syntax:75 "-" pl_exp:75 : pl_exp
 
 /-- Functions -/
 syntax:100 pl_exp:100 ppSpace pl_exp:101 : pl_exp
-syntax:10 "let " binderIdent " := " pl_exp:10 "; " pl_exp:1 : pl_exp
+syntax:10 "let " pl_arg " := " pl_exp:10 "; " pl_exp:1 : pl_exp
 syntax:5 pl_exp:6 "; " pl_exp:5 : pl_exp
-syntax:10 "fun" binderIdent+ ", " pl_exp:10 : pl_exp
-syntax:10 "rec " binderIdent ppSpace binderIdent+ " := " pl_exp:10 : pl_exp
+syntax:10 "fun" pl_arg+ ", " pl_exp:10 : pl_exp
+syntax:10 "rec " pl_arg ppSpace pl_arg+ " := " pl_exp:10 : pl_exp
 
 /-- Cases -/
 syntax:max "(" pl_exp ", " pl_exp,+ ")" : pl_exp
@@ -53,7 +79,7 @@ syntax:100 "snd(" pl_exp ")" : pl_exp
 
 syntax:100 "inl(" pl_exp ")" : pl_exp
 syntax:100 "inr(" pl_exp ")" : pl_exp
-syntax:10 "case " pl_exp " | " binderIdent " => " pl_exp " | " binderIdent " => " pl_exp : pl_exp
+syntax:10 "case " pl_exp " | " pl_arg " => " pl_exp " | " pl_arg " => " pl_exp : pl_exp
 
 /-- State -/
 syntax:100 "alloc(" pl_exp ")" : pl_exp
@@ -68,11 +94,11 @@ syntax:100 "rand(" pl_exp ", " pl_exp ")" : pl_exp
 syntax:max "fail" : pl_exp
 
 /-- Destructuring let for pairs -/
-syntax:10 "let" "(" binderIdent ", " binderIdent ")" ":=" pl_exp:10 "; " pl_exp:1 : pl_exp
+syntax:10 "let" "(" pl_arg ", " pl_arg ")" ":=" pl_exp:10 "; " pl_exp:1 : pl_exp
 
 /-- Single-arm case for sums -/
-syntax:10 "case " pl_exp " | " "inl(" binderIdent ")" " => " pl_exp : pl_exp
-syntax:10 "case " pl_exp " | " "inr(" binderIdent ")" " => " pl_exp : pl_exp
+syntax:10 "case " pl_exp " | " "inl(" pl_arg ")" " => " pl_exp : pl_exp
+syntax:10 "case " pl_exp " | " "inr(" pl_arg ")" " => " pl_exp : pl_exp
 
 /-- Assertion -/
 syntax:100 "assert(" pl_exp ")" : pl_exp
@@ -90,15 +116,37 @@ private def checkNotReserved (i : Lean.Ident) : Lean.MacroM Unit := do
   if reservedKeywords.contains s then
     Macro.throwError s!"'{s}' is a reserved keyword in ProbLang and cannot be used as an identifier"
 
+/-- elaborating types -/
+macro_rules
+  | `(pl_ty(int))          => `(Ty.int)
+  | `(pl_ty(bool))         => `(Ty.bool)
+  | `(pl_ty(unit))         => `(Ty.unit)
+  | `(pl_ty(($τ)))         => `(pl_ty($τ))
+  | `(pl_ty($τ1 × $τ2))   => `(Ty.prod pl_ty($τ1) pl_ty($τ2))
+  | `(pl_ty($τ1 + $τ2))   => `(Ty.sum pl_ty($τ1) pl_ty($τ2))
+  | `(pl_ty($τ1 → $τ2))   => `(Ty.arrow pl_ty($τ1) pl_ty($τ2))
+  | `(pl_ty(ref($τ)))      => `(Ty.ref pl_ty($τ))
+  | `(pl_ty(tape($τ)))     => `(Ty.tape pl_ty($τ))
+
 /-- elaborating binders -/
 macro_rules
   | `(pl_binder(_))        => `(Binder.anon)
   | `(pl_binder($i:ident)) => do
     checkNotReserved i
     `(Binder.named $(Syntax.mkStrLit i.getId.toString))
+  | `(pl_binder(($i:ident : $τ))) => do
+    checkNotReserved i
+    `(Binder.typed $(Syntax.mkStrLit i.getId.toString) pl_ty($τ))
+
+/-- elaborating binder arguments (pl_arg → pl_binder) -/
+macro_rules
+  | `(pl_binder_arg($i:binderIdent)) => `(pl_binder($i))
+  | `(pl_binder_arg(($i:ident : $τ))) => `(pl_binder(($i : $τ)))
 
 /-- elaborating expressions -/
 macro_rules
+  -- Type annotation (must precede parentheses)
+  | `(pl(($e : $τ)))        => `(Exp.annot (.ty pl_ty($τ)) pl($e))
   -- Parentheses (transparent)
   | `(pl(($e)))             => `(pl($e))
   -- Escape hatch
@@ -129,12 +177,12 @@ macro_rules
   -- Application
   | `(pl($e1 $e2))          => `(Exp.app pl($e1) pl($e2))
   -- Desugaring: rec with multiple args, λ
-  | `(pl(rec $f $x $xs* := $e)) => do
+  | `(pl(rec $f:pl_arg $x:pl_arg $xs:pl_arg* := $e)) => do
       if xs.size == 0 then
-        `(Exp.letrec pl_binder($f) pl_binder($x) pl($e))
+        `(Exp.letrec pl_binder_arg($f) pl_binder_arg($x) pl($e))
       else
         `(pl(rec $f $x := fun $xs*, $e))
-  | `(pl(fun $x $xs* , $e)) => do
+  | `(pl(fun $x:pl_arg $xs:pl_arg* , $e)) => do
       if xs.size == 0 then
         `(pl(rec _ $x := $e))
       else
@@ -147,14 +195,14 @@ macro_rules
   -- Sums
   | `(pl(inl($e)))               => `(Exp.inl pl($e))
   | `(pl(inr($e)))               => `(Exp.inr pl($e))
-  | `(pl(case $ec | $il => $el | $ir => $er)) =>
+  | `(pl(case $ec | $il:pl_arg => $el | $ir:pl_arg => $er)) =>
       `(Exp.case pl($ec) pl(rec _ $il := $el) pl(rec _ $ir := $er))
   -- Heap
   | `(pl(alloc($e)))             => `(Exp.alloc pl($e))
   | `(pl(! $e))                  => `(Exp.load pl($e))
   | `(pl($e1 ← $e2))            => `(Exp.store pl($e1) pl($e2))
   -- Let and sequencing
-  | `(pl(let $i := $e1; $e2))    => `(Exp.app (Exp.letrec .anon pl_binder($i) pl($e2)) pl($e1))
+  | `(pl(let $i:pl_arg := $e1; $e2))    => `(Exp.app (Exp.letrec .anon pl_binder_arg($i) pl($e2)) pl($e1))
   | `(pl($e1; $e2))              => `(Exp.app (Exp.letrec .anon .anon pl($e2)) pl($e1))
   -- Probabilistic
   | `(pl(tape($e)))              => `(Exp.tape pl($e))
@@ -164,21 +212,21 @@ macro_rules
   -- Destructuring let for pairs: let (x, y) := e; body
   --   ↦  let p✝ := e; let x := fst(p✝); let y := snd(p✝); body
   -- Uses addMacroScope to generate a fresh hygienic name for the pair binding.
-  | `(pl(let ( $x , $y ) := $e ; $body)) => do
+  | `(pl(let ( $x:pl_arg , $y:pl_arg ) := $e ; $body)) => do
       let pName := (← Lean.MonadQuotation.addMacroScope `p).toString
       `(Exp.app
           (Exp.letrec .anon (Binder.named $(quote pName))
             (Exp.app
-              (Exp.letrec .anon pl_binder($x)
+              (Exp.letrec .anon pl_binder_arg($x)
                 (Exp.app
-                  (Exp.letrec .anon pl_binder($y) pl($body))
+                  (Exp.letrec .anon pl_binder_arg($y) pl($body))
                   (Exp.snd (Exp.var $(quote pName)))))
               (Exp.fst (Exp.var $(quote pName)))))
           pl($e))
   -- Single-arm case: silently fails on the other branch
-  | `(pl(case $ec | inl($x) => $el)) =>
+  | `(pl(case $ec | inl($x:pl_arg) => $el)) =>
       `(pl(case $ec | $x => $el | _ => fail))
-  | `(pl(case $ec | inr($y) => $er)) =>
+  | `(pl(case $ec | inr($y:pl_arg) => $er)) =>
       `(pl(case $ec | _ => fail | $y => $er))
   -- Assert: assert(e) = if e then #.unit else fail
   | `(pl(assert($e))) => `(pl(if $e then #.unit else fail))
@@ -189,9 +237,16 @@ partial def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (
   | `(pl($e)) => `(pl_exp|$e)
   | `($t)     => `(pl_exp|{$t})
 
-/-- Strip the `pl_binder(...)` wrapper to get a raw `binderIdent`. -/
-partial def unpackPLBinder [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `Lean.binderIdent)
-  | `(pl_binder($e)) => `(binderIdent|$e)
+/-- Strip the `pl_ty(...)` wrapper to get a raw `pl_ty`. -/
+partial def unpackPLTy [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
+  | `(pl_ty($τ)) => pure τ
+  | `($_)        => panic! "unknown type"
+
+/-- Strip the `pl_binder(...)` wrapper to get a raw `pl_arg`. -/
+partial def unpackPLBinder [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_arg)
+  | `(pl_binder($i:ident)) => `(pl_arg|$i:ident)
+  | `(pl_binder(_)) => `(pl_arg|_)
+  | `(pl_binder(($i:ident : $τ))) => `(pl_arg|($i : $τ))
   | `($_)            => panic! "unknown binder"
 
 /-- Flatten multi-arg `fun`/`rec` into a single binder list.
@@ -217,6 +272,52 @@ def unexpAnon : Unexpander
 @[app_unexpander Binder.named]
 def unexpNamed : Unexpander
   | `($_ $s:str) => `(pl_binder($(Lean.mkIdent $ Name.mkSimple s.getString):ident))
+  | _ => throw ()
+
+@[app_unexpander Binder.typed]
+def unexpTyped : Unexpander
+  | `($_ $s:str $τ) => do
+    `(pl_binder(($(Lean.mkIdent $ Name.mkSimple s.getString):ident : $(← unpackPLTy τ))))
+  | _ => throw ()
+
+@[app_unexpander Ty.int]
+def unexpTyInt : Unexpander | `($_) => `(pl_ty(int))
+@[app_unexpander Ty.bool]
+def unexpTyBool : Unexpander | `($_) => `(pl_ty(bool))
+@[app_unexpander Ty.unit]
+def unexpTyUnit : Unexpander | `($_) => `(pl_ty(unit))
+@[app_unexpander Ty.prod]
+def unexpTyProd : Unexpander
+  | `($_ $τ1 $τ2) => do `(pl_ty($(← unpackPLTy τ1) × $(← unpackPLTy τ2)))
+  | _ => throw ()
+@[app_unexpander Ty.sum]
+def unexpTySum : Unexpander
+  | `($_ $τ1 $τ2) => do `(pl_ty($(← unpackPLTy τ1) + $(← unpackPLTy τ2)))
+  | _ => throw ()
+@[app_unexpander Ty.arrow]
+def unexpTyArrow : Unexpander
+  | `($_ $τ1 $τ2) => do `(pl_ty($(← unpackPLTy τ1) → $(← unpackPLTy τ2)))
+  | _ => throw ()
+@[app_unexpander Ty.ref]
+def unexpTyRef : Unexpander
+  | `($_ $τ) => do `(pl_ty(ref($(← unpackPLTy τ))))
+  | _ => throw ()
+@[app_unexpander Ty.tape]
+def unexpTyTape : Unexpander
+  | `($_ $τ) => do `(pl_ty(tape($(← unpackPLTy τ))))
+  | _ => throw ()
+
+@[app_unexpander Annot.ty]
+def unexpAnnotTy : Unexpander
+  | `($_ $τ) => pure τ  -- pass through the pl_ty(...) wrapper
+  | _ => throw ()
+
+@[app_unexpander Exp.annot]
+def unexpAnnot : Unexpander
+  | `($_ $a $e) => do
+    match a with
+    | `(pl_ty($τ)) => `(pl(($(← unpackPLExp e) : $τ)))
+    | _ => throw ()
   | _ => throw ()
 
 @[app_unexpander Exp.var]
@@ -258,6 +359,13 @@ def unexpLetrec : Unexpander
     unexpFun (← `(pl(rec $(← unpackPLBinder f) $(← unpackPLBinder x) := $(← unpackPLExp e))))
   | _ => throw ()
 
+/-- Check if a `pl_arg` represents a named (non-anonymous) binder. -/
+private def isNamedArg (bi : TSyntax `pl_arg) : Bool :=
+  -- A typed binder `(x : τ)` always has multiple args (parens, ident, colon, ty).
+  -- A plain binderIdent wraps ident or hole; check first child's first child.
+  if bi.raw.getNumArgs > 1 then true        -- typed binder
+  else bi.raw[0]![0]!.isIdent               -- plain binderIdent: ident vs _
+
 @[app_unexpander Exp.app]
 def unexpApp : Unexpander
   | `($_ $e1 $e2) => do
@@ -268,7 +376,7 @@ def unexpApp : Unexpander
     | `(pl(fun $xs*, $body)) =>
         if xs.size == 1 then
           let bi := xs[0]!
-          if bi.raw[0]!.isIdent then
+          if isNamedArg bi then
             -- Named binder → let x := val; body
             return (← `(pl(let $bi := $(← unpackPLExp e2); $body)))
           else
@@ -949,6 +1057,228 @@ example : pl((a, b, c, d)) =
 #guard_msgs in #check (Exp.letrec (.named "f") (.named "x")
     (Exp.letrec .anon (.named "y")
       (Exp.app (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.var "y"))) : Exp)
+
+-- Type syntax
+example : pl_ty(int) = Ty.int := rfl
+example : pl_ty(bool) = Ty.bool := rfl
+example : pl_ty(unit) = Ty.unit := rfl
+example : pl_ty(int × bool) = Ty.prod .int .bool := rfl
+example : pl_ty(int + bool) = Ty.sum .int .bool := rfl
+example : pl_ty(int → bool) = Ty.arrow .int .bool := rfl
+example : pl_ty(ref(int)) = Ty.ref .int := rfl
+-- × is right-associative
+example : pl_ty(int × bool × unit) = Ty.prod .int (.prod .bool .unit) := rfl
+-- → is right-associative
+example : pl_ty(int → bool → unit) = Ty.arrow .int (.arrow .bool .unit) := rfl
+-- + is right-associative
+example : pl_ty(int + bool + unit) = Ty.sum .int (.sum .bool .unit) := rfl
+-- × binds tighter than +
+example : pl_ty(int × bool + unit) = Ty.sum (.prod .int .bool) .unit := rfl
+-- × binds tighter than →
+example : pl_ty(int × bool → unit) = Ty.arrow (.prod .int .bool) .unit := rfl
+-- parentheses override precedence
+example : pl_ty(int × (bool + unit)) = Ty.prod .int (.sum .bool .unit) := rfl
+-- ref and tape
+example : pl_ty(ref(int × bool)) = Ty.ref (.prod .int .bool) := rfl
+example : pl_ty(tape(int)) = Ty.tape .int := rfl
+
+-- Expression type annotations
+example : pl((x : int)) = Exp.annot (.ty .int) (Exp.var "x") := rfl
+example : pl((#1 : int)) = Exp.annot (.ty .int) (Exp.lit (.int 1)) := rfl
+example : pl((x + y : int)) = Exp.annot (.ty .int) (Exp.binop .plus (Exp.var "x") (Exp.var "y")) := rfl
+
+-- Typed binders in fun
+example : pl(fun (x : int), x) = Exp.letrec .anon (.typed "x" .int) (Exp.var "x") := rfl
+-- Typed binders in rec
+example : pl(rec f (x : int) := f x) =
+    Exp.letrec (.named "f") (.typed "x" .int) (Exp.app (Exp.var "f") (Exp.var "x")) := rfl
+-- Typed binders in let
+example : pl(let (x : int) := #1; x) =
+    Exp.app (Exp.letrec .anon (.typed "x" .int) (Exp.var "x")) (Exp.lit (.int 1)) := rfl
+-- Mixed typed and untyped binders
+example : pl(fun (x : int) y, x + y) =
+    Exp.letrec .anon (.typed "x" .int)
+      (Exp.letrec .anon (.named "y")
+        (Exp.binop .plus (Exp.var "x") (Exp.var "y"))) := rfl
+
+-- Delaboration: type annotations
+/-- info: pl((x : int)) : Exp -/
+#guard_msgs in #check (Exp.annot (.ty .int) (Exp.var "x") : Exp)
+
+-- Delaboration: typed binders
+/-- info: pl(fun(x : int), x) : Exp -/
+#guard_msgs in #check (Exp.letrec .anon (.typed "x" .int) (Exp.var "x") : Exp)
+
+/-- info: pl(rec f (x : int) := f x) : Exp -/
+#guard_msgs in #check (Exp.letrec (.named "f") (.typed "x" .int) (Exp.app (Exp.var "f") (Exp.var "x")) : Exp)
+
+-- Delaboration: types
+/-- info: pl_ty(int × bool → unit) : Ty -/
+#guard_msgs in #check (Ty.arrow (.prod .int .bool) .unit : Ty)
+
+/-- info: pl_ty(ref(int)) : Ty -/
+#guard_msgs in #check (Ty.ref .int : Ty)
+
+-- + binds tighter than →
+example : pl_ty(int + bool → unit) = Ty.arrow (.sum .int .bool) .unit := rfl
+-- ref inside compound types
+example : pl_ty(ref(int) × ref(bool)) = Ty.prod (.ref .int) (.ref .bool) := rfl
+-- nested ref
+example : pl_ty(ref(ref(int))) = Ty.ref (.ref .int) := rfl
+
+-- Annotation with compound type
+example : pl((x : int → bool)) = Exp.annot (.ty (.arrow .int .bool)) (Exp.var "x") := rfl
+-- Annotation with product type
+example : pl((x : int × bool)) = Exp.annot (.ty (.prod .int .bool)) (Exp.var "x") := rfl
+-- Nested annotation
+example : pl(((x : int) : int)) =
+    Exp.annot (.ty .int) (Exp.annot (.ty .int) (Exp.var "x")) := rfl
+
+-- Typed binder in case arms
+example : pl(case inl(#1) | (x : int) => x | (y : bool) => y) =
+    Exp.case (Exp.inl (Exp.lit (.int 1)))
+      (Exp.letrec .anon (.typed "x" .int) (Exp.var "x"))
+      (Exp.letrec .anon (.typed "y" .bool) (Exp.var "y")) := rfl
+
+-- Multi-arg rec with all typed binders
+example : pl(rec f (x : int) (y : bool) := f x y) =
+    Exp.letrec (.named "f") (.typed "x" .int)
+      (Exp.letrec .anon (.typed "y" .bool)
+        (Exp.app (Exp.app (Exp.var "f") (Exp.var "x")) (Exp.var "y"))) := rfl
+
+-- Typed binder in single-arm case
+example : pl(case inl(#1) | inl((v : int)) => v) =
+    Exp.case (Exp.inl (Exp.lit (.int 1)))
+      (Exp.letrec .anon (.typed "v" .int) (Exp.var "v"))
+      (Exp.letrec .anon .anon Exp.fail) := rfl
+
+-- Annotation inside a let body
+example : pl(let (x : int) := #1; (x : int)) =
+    Exp.app (Exp.letrec .anon (.typed "x" .int)
+              (Exp.annot (.ty .int) (Exp.var "x")))
+            (Exp.lit (.int 1)) := rfl
+
+-- Delaboration: compound type annotation
+/-- info: pl((x : int → bool)) : Exp -/
+#guard_msgs in #check (Exp.annot (.ty (.arrow .int .bool)) (Exp.var "x") : Exp)
+
+-- Delaboration: product type
+/-- info: pl_ty(int × bool) : Ty -/
+#guard_msgs in #check (Ty.prod .int .bool : Ty)
+
+-- Delaboration: sum type
+/-- info: pl_ty(int + bool) : Ty -/
+#guard_msgs in #check (Ty.sum .int .bool : Ty)
+
+-- ---------------------------------------------------------------------------
+-- Annotation interactions with IsVal
+-- ---------------------------------------------------------------------------
+
+-- Annotated literal is a value
+example : (pl((#1 : int))).isValue := ⟨.annot .lit⟩
+-- Annotated pair is a value
+example : (pl(((#1, #2) : int × int))).isValue := ⟨.annot (.pair .lit .lit)⟩
+-- Annotated non-value is not a value
+example : ¬(pl((x + y : int))).isValue := by simp [Exp.isValue_iff_isValueR]
+
+-- Annotated value in operational positions
+example : pl(fst(((#1, #2) : int × int))) =
+    Exp.fst (Exp.annot (.ty (.prod .int .int)) (Exp.pair (Exp.lit (.int 1)) (Exp.lit (.int 2)))) := rfl
+example : pl((fun x, x : int → int) #1) =
+    Exp.app (Exp.annot (.ty (.arrow .int .int)) (Exp.letrec .anon (.named "x") (Exp.var "x")))
+            (Exp.lit (.int 1)) := rfl
+
+-- ---------------------------------------------------------------------------
+-- Typed binders in destructuring let
+-- ---------------------------------------------------------------------------
+
+example : ∃ n,
+    pl(let ((x : int), (y : bool)) := e; x + y) =
+      Exp.app
+        (Exp.letrec .anon (.named n)
+          (Exp.app
+            (Exp.letrec .anon (.typed "x" .int)
+              (Exp.app
+                (Exp.letrec .anon (.typed "y" .bool)
+                  (Exp.binop .plus (Exp.var "x") (Exp.var "y")))
+                (Exp.snd (Exp.var n))))
+            (Exp.fst (Exp.var n))))
+        (Exp.var "e") := ⟨_, rfl⟩
+
+-- ---------------------------------------------------------------------------
+-- Substitution with typed binders
+-- ---------------------------------------------------------------------------
+
+-- typed binder substitutes like named
+example : Exp.subst (.typed "x" .int) (Exp.lit (.int 42)) (Exp.var "x") = Exp.lit (.int 42) := rfl
+-- typed binder doesn't substitute other variables
+example : Exp.subst (.typed "x" .int) (Exp.lit (.int 42)) (Exp.var "y") = Exp.var "y" := rfl
+-- typed binder in letrec shadows correctly
+example : (Exp.letrec .anon (.typed "x" .int) (Exp.var "x")).subst' "x" (Exp.lit (.int 99)) =
+    Exp.letrec .anon (.typed "x" .int) (Exp.var "x") := rfl
+-- typed binder as function name shadows correctly
+example : (Exp.letrec (.typed "f" (.arrow .int .int)) (.named "x") (Exp.var "f")).subst' "f" (Exp.lit (.int 99)) =
+    Exp.letrec (.typed "f" (.arrow .int .int)) (.named "x") (Exp.var "f") := rfl
+-- non-shadowed variable is substituted under typed binder
+example : (Exp.letrec .anon (.typed "x" .int) (Exp.var "y")).subst' "y" (Exp.lit (.int 7)) =
+    Exp.letrec .anon (.typed "x" .int) (Exp.lit (.int 7)) := rfl
+
+-- ---------------------------------------------------------------------------
+-- Edge cases in existing syntax
+-- ---------------------------------------------------------------------------
+
+-- fun with _ applied to a value
+example : pl((fun _, fail) #1) =
+    Exp.app (Exp.letrec .anon .anon Exp.fail) (Exp.lit (.int 1)) := rfl
+-- sequencing with fail
+example : pl(fail; x) =
+    Exp.app (Exp.letrec .anon .anon (Exp.var "x")) Exp.fail := rfl
+-- case where both arms use _
+example : pl(case inl(#1) | _ => #2 | _ => #3) =
+    Exp.case (Exp.inl (Exp.lit (.int 1)))
+      (Exp.letrec .anon .anon (Exp.lit (.int 2)))
+      (Exp.letrec .anon .anon (Exp.lit (.int 3))) := rfl
+-- deeply nested lets
+example : pl(let x := (let y := #1; y); x) =
+    Exp.app
+      (Exp.letrec .anon (.named "x") (Exp.var "x"))
+      (Exp.app (Exp.letrec .anon (.named "y") (Exp.var "y")) (Exp.lit (.int 1))) := rfl
+
+-- store/load with annotations
+example : pl(alloc((#0 : int))) =
+    Exp.alloc (Exp.annot (.ty .int) (Exp.lit (.int 0))) := rfl
+example : pl(!(r : ref(int))) =
+    Exp.load (Exp.annot (.ty (.ref .int)) (Exp.var "r")) := rfl
+
+-- ---------------------------------------------------------------------------
+-- Delaboration round-trips
+-- ---------------------------------------------------------------------------
+
+-- Typed binder in let round-trips
+/-- info: pl(let (x : int) := #(BaseLit.int 1); x) : Exp -/
+#guard_msgs in #check (Exp.app (Exp.letrec .anon (.typed "x" .int) (Exp.var "x")) (Exp.lit (.int 1)) : Exp)
+
+-- Multi-arg fun with mixed typed/untyped: typed binder prevents collapsing
+/-- info: pl(fun(x : int), fun y, (x + y)) : Exp -/
+#guard_msgs in #check (Exp.letrec .anon (.typed "x" .int)
+    (Exp.letrec .anon (.named "y")
+      (Exp.binop .plus (Exp.var "x") (Exp.var "y"))) : Exp)
+
+-- Annotated value inside a pair
+/-- info: pl(((#(BaseLit.int 1) : int), #(BaseLit.int 2))) : Exp -/
+#guard_msgs in #check (Exp.pair (Exp.annot (.ty .int) (Exp.lit (.int 1))) (Exp.lit (.int 2)) : Exp)
+
+-- Annotation on a compound expression
+/-- info: pl(((x + y) : int)) : Exp -/
+#guard_msgs in #check (Exp.annot (.ty .int) (Exp.binop .plus (Exp.var "x") (Exp.var "y")) : Exp)
+
+-- Nested type: ref of arrow
+/-- info: pl_ty(ref(int → bool)) : Ty -/
+#guard_msgs in #check (Ty.ref (.arrow .int .bool) : Ty)
+
+-- Typed binder with anonymous function name round-trips
+/-- info: pl(fun _, x) : Exp -/
+#guard_msgs in #check (Exp.letrec .anon .anon (Exp.var "x") : Exp)
 
 end Tests
 
