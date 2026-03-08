@@ -54,6 +54,18 @@ inductive UnOp | neg | minus
 inductive BinOp | plus | minus | mult | and | or | xor | eq
   deriving Inhabited, Countable, Repr, BEq
 
+inductive Ty
+  | int | bool | unit
+  | prod (τ1 τ2 : Ty)
+  | sum (τ1 τ2 : Ty)
+  | arrow (τ1 τ2 : Ty)
+  | ref (τ : Ty)
+  deriving Inhabited, DecidableEq, Countable, Repr, BEq
+
+inductive Annot
+  | ty (τ : Ty)
+  deriving Inhabited, DecidableEq, Countable, Repr, BEq
+
 inductive Exp
   | lit (b : BaseLit)
   | var (x : String)
@@ -74,6 +86,7 @@ inductive Exp
   | tape (e : Exp)
   | rand (en et : Exp)
   | fail
+  | annot (a : Annot) (e : Exp)
   deriving Inhabited, Countable, Repr, BEq
 
 -- TODO: Delete me
@@ -82,6 +95,7 @@ def Exp.isValue : Exp → Prop
   | lit _ | letrec _ _ _ => True
   | inl e | inr e => e.isValue
   | pair e1 e2 => e1.isValue ∧ e2.isValue
+  | annot _ e => e.isValue
   | _ => False
 
 @[simp]
@@ -89,6 +103,7 @@ def Exp.isValueB : Exp → Bool
   | .lit _ | .letrec _ _ _ => true
   | .inl e | .inr e => e.isValueB
   | .pair e1 e2 => e1.isValueB && e2.isValueB
+  | .annot _ e => e.isValueB
   | _ => false
 
 theorem Exp.isValueB_iff {e : Exp} : e.isValueB = true ↔ e.isValue := by
@@ -192,6 +207,7 @@ inductive EctxItem
   | tape
   | randL (v2 : Val)
   | randR (e1 : Exp)
+  | annot (a : Annot)
 
 def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
   match Ki with
@@ -215,6 +231,7 @@ def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
   | .tape => .tape e
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
+  | .annot a => .annot a e
 
 def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
   match e with
@@ -253,6 +270,8 @@ def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
     ec.toValB?.casesOn (some (.case el er, ec)) fun _ => none
   | tape e1 =>
     e1.toValB?.casesOn (some (.tape, e1)) fun _ => none
+  | annot a e1 =>
+    e1.toValB?.casesOn (some (.annot a, e1)) fun _ => none
   | _ => none
 
 def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
@@ -278,6 +297,7 @@ def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
   | store e1 e2 => store (e1.subst' x v) (e2.subst' x v)
   | rand e1 e2 => rand (e1.subst' x v) (e2.subst' x v)
   | tape e => tape (e.subst' x v)
+  | annot a e => annot a (e.subst' x v)
   | fail => fail
 
 def Exp.subst (mx : Binder) (v e : Exp) : Exp :=
@@ -370,6 +390,7 @@ def Exp.height : Exp → Nat
   | tape e => 1 + e.height
   | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+  | annot _ e => 1 + e.height
   | fail => 1
 
 theorem EctxItem.decompItem_fillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
