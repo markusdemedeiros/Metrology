@@ -109,19 +109,54 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
 -- Sums
 -- ---------------------------------------------------------------------------
 
--- [commented out: case tests, to be replaced by match+case]
--- #eval check "case inl"
---   pl(case inl(#1) | x => x + #10 | _ => #0)
---   pl(#11)
---
--- #eval check "case inr"
---   pl(case inr(#2) | _ => #0 | y => y + #20)
---   pl(#22)
---
--- -- case with a non-value scrutinee (redex is inside the scrutinee position)
--- #eval check "case: scrutinee is redex"
---   pl(case inl(#1 + #2) | x => x | _ => #0)
---   pl(#3)
+-- case with inl/inr patterns
+#eval check "case inl"
+  pl(case inl(#1) | inl(x) => x + #10 | inr(y) => #0)
+  pl(#11)
+
+#eval check "case inr"
+  pl(case inr(#2) | inl(_) => #0 | inr(y) => y + #20)
+  pl(#22)
+
+-- case with a non-value scrutinee (redex inside scrutinee)
+#eval check "case: scrutinee is redex"
+  pl(case inl(#1 + #2) | inl(x) => x | inr(_) => #0)
+  pl(#3)
+
+-- single-arm case (fails if no match)
+#eval check "case single arm inl"
+  pl(case inl(#5) | inl(x) => x)
+  pl(#5)
+
+#eval checkError "case single arm fail"
+  pl(case inr(#5) | inl(x) => x)
+
+-- let! destructuring
+#eval check "let! pair"
+  pl(let! (x, y) := (#1, #2); x + y)
+  pl(#3)
+
+#eval check "let! inl"
+  pl(let! inl(x) := inl(#7); x + #3)
+  pl(#10)
+
+#eval checkError "let! inl mismatch"
+  pl(let! inl(x) := inr(#7); x)
+
+-- case with wildcard fallback
+#eval check "case wildcard fallback"
+  pl(case #1 | #(.int 0) => #100 | _ => #200)
+  pl(#200)
+
+-- case with literal match
+#eval check "case literal match"
+  pl(case #1 | #(.int 1) => #100 | _ => #200)
+  pl(#100)
+
+-- nested pair destructuring
+#eval check "let! nested pair"
+  pl(let! (x, (y, z)) := (#1, (#2, #3)); x + y + z)
+  pl(#6)
 
 -- ---------------------------------------------------------------------------
 -- Heap

@@ -130,6 +130,12 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
     let n ← sampleUniform z
     return .lit (.int n)
 
+  -- Scrutinize: headStep (scrut v pat) = inl(bindings) | inr(unit)
+  | .scrut v p =>
+    match Pat.tryMatch p v with
+    | some bindings => return .inl bindings
+    | none          => return .inr (.lit .unit)
+
   -- Stuck / failure
   | .fail => throw' .fail
 

@@ -121,7 +121,8 @@ syntax:100 "assert(" pl_exp ")" : pl_exp
 -- completeness.
 private def reservedKeywords : List String :=
   ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "scrut",
-   "if", "then", "else", "let", "fun", "rec", "case"]
+   "if", "then", "else", "let", "fun", "rec", "case",
+   "__scrut", "__bind"]
 
 private def checkNotReserved (i : Lean.Ident) : Lean.MacroM Unit := do
   let s := i.getId.toString
@@ -208,12 +209,11 @@ partial def patBindings [Monad m] [MonadRef m] [MonadQuotation m]
 partial def buildCaseArm [Monad m] [MonadRef m] [MonadQuotation m]
     (scrutVar : TSyntax `pl_exp) (pat : TSyntax `pl_pat) (body : TSyntax `pl_exp)
     (fallback : Term) : m Term := do
-  let bName := (← Lean.MonadQuotation.addMacroScope `b).toString
-  let bVar ← `(pl_exp| $(Lean.mkIdent (.mkSimple bName)):ident)
+  let bVar ← `(pl_exp| {Exp.var "__bind"})
   let projected ← patBindings pat bVar body
   `(Exp.case
       (Exp.scrut pl($scrutVar) pl_pat($pat))
-      (Exp.letrec .anon (Binder.named $(quote bName)) pl($projected))
+      (Exp.letrec .anon (Binder.named "__bind") pl($projected))
       $fallback)
 
 /-- Build a chain of case arms, with fail at the end. -/
@@ -302,24 +302,22 @@ macro_rules
   --          | bindings => <project bindings> body
   --          | _ => fail
   | `(pl(let! $p := $e; $body)) => do
-      let bName := (← Lean.MonadQuotation.addMacroScope `b).toString
-      let bVar ← `(pl_exp| $(Lean.mkIdent (.mkSimple bName)):ident)
+      let bVar ← `(pl_exp| {Exp.var "__bind"})
       let projected ← patBindings p bVar body
       `(Exp.case
           (Exp.scrut pl($e) pl_pat($p))
-          (Exp.letrec .anon (Binder.named $(quote bName)) pl($projected))
+          (Exp.letrec .anon (Binder.named "__bind") pl($projected))
           (Exp.letrec .anon .anon Exp.fail))
   -- Pattern-matching case:
   --   case e | p1 => b1 | p2 => b2 | ...
   --     ↦  let tmp := e; <nested scrut+case chain, fail at end>
   | `(pl(case $e | $p => $b $[| $ps => $bs]*)) => do
-      let tmpName := (← Lean.MonadQuotation.addMacroScope `sc).toString
-      let tmpVar ← `(pl_exp| $(Lean.mkIdent (.mkSimple tmpName)):ident)
+      let tmpVar ← `(pl_exp| {Exp.var "__scrut"})
       let allPats := #[p] ++ ps
       let allBodies := #[b] ++ bs
       let chain ← buildCaseChain tmpVar allPats allBodies
       `(Exp.app
-          (Exp.letrec .anon (Binder.named $(quote tmpName)) $chain)
+          (Exp.letrec .anon (Binder.named "__scrut") $chain)
           pl($e))
   -- Assert: assert(e) = if e then #.unit else fail
   | `(pl(assert($e))) => `(pl(if $e then #.unit else fail))
@@ -1420,33 +1418,74 @@ example : pl(scrut x with (y : int)) =
 -- Destructuring let!
 -- ---------------------------------------------------------------------------
 
--- Simple variable pattern
-#check (pl(let! x := #1; x) : Exp)
--- Pair pattern
-#check (pl(let! (x, y) := e; x + y) : Exp)
--- Wildcard pattern
-#check (pl(let! _ := e; x) : Exp)
--- inl pattern (fails if e is not inl)
-#check (pl(let! inl(x) := e; x) : Exp)
--- inr pattern
-#check (pl(let! inr(y) := e; y) : Exp)
--- Nested pair pattern
-#check (pl(let! (x, (y, z)) := e; x + y + z) : Exp)
--- Literal pattern (no bindings, just tests)
-#check (pl(let! #(.int 1) := e; x) : Exp)
+-- Simple variable pattern: let! x := e; body
+example : pl(let! x := #1; x) =
+    Exp.case (Exp.scrut (Exp.lit (.int 1)) (.var (.named "x")))
+      (Exp.letrec .anon (.named "__bind")
+        (Exp.app (Exp.letrec .anon (.named "x") (Exp.var "x"))
+                 (Exp.var "__bind")))
+      (Exp.letrec .anon .anon Exp.fail) := rfl
+
+-- Pair pattern: let! (x, y) := e; x + y
+example : pl(let! (x, y) := e; x + y) =
+    Exp.case (Exp.scrut (Exp.var "e") (.pair (.var (.named "x")) (.var (.named "y"))))
+      (Exp.letrec .anon (.named "__bind")
+        (Exp.app (Exp.letrec .anon (.named "x")
+          (Exp.app (Exp.letrec .anon (.named "y")
+            (Exp.binop .plus (Exp.var "x") (Exp.var "y")))
+            (Exp.snd (Exp.var "__bind"))))
+          (Exp.fst (Exp.var "__bind"))))
+      (Exp.letrec .anon .anon Exp.fail) := rfl
+
+-- Wildcard pattern: no binding
+example : pl(let! _ := e; x) =
+    Exp.case (Exp.scrut (Exp.var "e") (.var .anon))
+      (Exp.letrec .anon (.named "__bind") (Exp.var "x"))
+      (Exp.letrec .anon .anon Exp.fail) := rfl
+
+-- inl pattern
+example : pl(let! inl(x) := e; x) =
+    Exp.case (Exp.scrut (Exp.var "e") (.inl (.var (.named "x"))))
+      (Exp.letrec .anon (.named "__bind")
+        (Exp.app (Exp.letrec .anon (.named "x") (Exp.var "x"))
+                 (Exp.var "__bind")))
+      (Exp.letrec .anon .anon Exp.fail) := rfl
+
+-- Literal pattern (no bindings)
+example : pl(let! #(.int 1) := e; x) =
+    Exp.case (Exp.scrut (Exp.var "e") (.lit (.int 1)))
+      (Exp.letrec .anon (.named "__bind") (Exp.var "x"))
+      (Exp.letrec .anon .anon Exp.fail) := rfl
 
 -- ---------------------------------------------------------------------------
 -- Case (pattern-matching with multiple arms)
 -- ---------------------------------------------------------------------------
 
--- Two-arm case on a sum
-#check (pl(case e | inl(x) => x | inr(y) => y) : Exp)
+-- Two-arm case on a sum (binds scrutinee to __scrut, tries each arm)
+example : pl(case e | inl(x) => x | inr(y) => y) =
+    Exp.app
+      (Exp.letrec .anon (.named "__scrut")
+        (Exp.case (Exp.scrut (Exp.var "__scrut") (.inl (.var (.named "x"))))
+          (Exp.letrec .anon (.named "__bind")
+            (Exp.app (Exp.letrec .anon (.named "x") (Exp.var "x"))
+                     (Exp.var "__bind")))
+          (Exp.case (Exp.scrut (Exp.var "__scrut") (.inr (.var (.named "y"))))
+            (Exp.letrec .anon (.named "__bind")
+              (Exp.app (Exp.letrec .anon (.named "y") (Exp.var "y"))
+                       (Exp.var "__bind")))
+            (Exp.letrec .anon .anon Exp.fail))))
+      (Exp.var "e") := rfl
 
--- Single-arm case (fails if no match)
-#check (pl(case e | inl(x) => x) : Exp)
-
--- Three-arm case
-#check (pl(case e | #(.int 0) => #1 | #(.int 1) => #2 | _ => #3) : Exp)
+-- Single-arm case
+example : pl(case e | inl(x) => x) =
+    Exp.app
+      (Exp.letrec .anon (.named "__scrut")
+        (Exp.case (Exp.scrut (Exp.var "__scrut") (.inl (.var (.named "x"))))
+          (Exp.letrec .anon (.named "__bind")
+            (Exp.app (Exp.letrec .anon (.named "x") (Exp.var "x"))
+                     (Exp.var "__bind")))
+          (Exp.letrec .anon .anon Exp.fail)))
+      (Exp.var "e") := rfl
 
 -- Pair destructuring via case
 #check (pl(case e | (x, y) => x + y) : Exp)
