@@ -199,3 +199,221 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
     if n > 6 then
       throw (IO.userError s!"FAIL [rand range]: got {n}, expected ≤ 6")
   | e => throw (IO.userError s!"FAIL [rand type]: got {repr e}")
+
+-- ---------------------------------------------------------------------------
+-- Type errors in operators (should all be stuck)
+-- ---------------------------------------------------------------------------
+
+#eval checkError "add bool + int"    pl(#true + #1)
+#eval checkError "add int + bool"    pl(#1 + #true)
+#eval checkError "add unit + unit"   pl(#.unit + #.unit)
+#eval checkError "mult bool"         pl(#true * #false)
+#eval checkError "minus bools"       pl(#true - #false)
+#eval checkError "and int"           pl(#1 && #2)
+#eval checkError "or int"            pl(#1 || #2)
+#eval checkError "xor int"           pl(#1 ^^ #2)
+#eval checkError "neg int"           pl(~ #5)
+#eval checkError "negate bool"       pl(- #true)
+
+-- ---------------------------------------------------------------------------
+-- Projection errors
+-- ---------------------------------------------------------------------------
+
+#eval checkError "fst of non-pair"   pl(fst(#1))
+#eval checkError "snd of non-pair"   pl(snd(#true))
+#eval checkError "fst of inl"        pl(fst(inl(#1)))
+
+-- ---------------------------------------------------------------------------
+-- Conditional errors
+-- ---------------------------------------------------------------------------
+
+#eval checkError "if int"            pl(if #1 then #2 else #3)
+#eval checkError "if unit"           pl(if #.unit then #1 else #2)
+
+-- ---------------------------------------------------------------------------
+-- Application errors
+-- ---------------------------------------------------------------------------
+
+#eval checkError "apply literal"     pl(#1 #2)
+#eval checkError "apply pair"        pl((#1, #2) #3)
+
+-- ---------------------------------------------------------------------------
+-- Arithmetic edge cases
+-- ---------------------------------------------------------------------------
+
+#eval check "0 - 1 = -1"            pl(#0 - #1)                 pl(#(.int (-1)))
+#eval check "neg 0"                  pl(- #0)                    pl(#0)
+#eval check "neg neg"                pl(- (- #5))                pl(#5)
+#eval check "not false"              pl(~ #false)                pl(#true)
+#eval check "not not"                pl(~ (~ #true))             pl(#true)
+#eval check "0 * anything"           pl(#0 * #999)               pl(#0)
+#eval check "eq bools"               pl(#true = #true)           pl(#true)
+#eval check "neq bools"              pl(#true = #false)          pl(#false)
+#eval check "eq unit"                pl(#.unit = #.unit)         pl(#true)
+#eval check "xor ff"                 pl(#false ^^ #false)        pl(#false)
+#eval check "xor tf"                 pl(#true ^^ #false)         pl(#true)
+#eval check "and tt"                 pl(#true && #true)          pl(#true)
+#eval check "or ff"                  pl(#false || #false)        pl(#false)
+
+-- ---------------------------------------------------------------------------
+-- Deep context decomposition stress tests
+-- ---------------------------------------------------------------------------
+
+-- snd then fst of nested pairs
+#eval check "deep decomp 1"
+  pl(snd((#99, fst((#42, #0)))))
+  pl(#42)
+
+-- Redex buried inside a pair value position
+#eval check "pair with redex in both"
+  pl(fst((#1 + #2, #3 + #4)))
+  pl(#3)
+
+-- Redex in condition, then in branch result
+#eval check "nested cond"
+  pl(if #true then (if #false then #1 else #2) else #3)
+  pl(#2)
+
+-- Chained lets
+#eval check "chained lets"
+  pl(let a := #1; let b := a + #2; let c := b + #3; c + #4)
+  pl(#10)
+
+-- ---------------------------------------------------------------------------
+-- Higher-order functions
+-- ---------------------------------------------------------------------------
+
+-- Function returning a function
+#eval check "higher-order: return fn"
+  pl((fun x, (fun y, x + y)) #10 #20)
+  pl(#30)
+
+-- Function as argument (apply twice)
+#eval check "apply twice"
+  pl(let f := (fun x, x + #1); f (f #0))
+  pl(#2)
+
+-- Recursive: sum 1..10 = 55
+private def sumExp : Exp := pl(rec sum n := if n = #0 then #0 else n + sum (n - #1))
+#eval check "sum 1..10"  pl({sumExp} #10)  pl(#55)
+
+-- Mutual recursion via pairs: is_even/is_odd
+private def isEvenOdd : Exp :=
+  pl(rec eo n := if n = #0 then (#true, #false) else (snd(eo (n - #1)), fst(eo (n - #1))))
+#eval check "is_even 4"   pl(fst({isEvenOdd} #4))   pl(#true)
+#eval check "is_odd 4"    pl(snd({isEvenOdd} #4))    pl(#false)
+#eval check "is_even 3"   pl(fst({isEvenOdd} #3))    pl(#false)
+#eval check "is_odd 3"    pl(snd({isEvenOdd} #3))     pl(#true)
+
+-- ---------------------------------------------------------------------------
+-- Heap: aliasing, multiple stores, store-after-store
+-- ---------------------------------------------------------------------------
+
+-- Store twice to same ref
+#eval check "store twice"
+  pl(let r := alloc(#0); r ← #1; r ← #2; !r)
+  pl(#2)
+
+-- Two refs: store to one doesn't affect the other
+#eval check "heap isolation"
+  pl(let r1 := alloc(#10); let r2 := alloc(#20); r1 ← #99; !r2)
+  pl(#20)
+
+-- Load after alloc without store (alloc initializes)
+#eval check "alloc initializes"
+  pl(let r := alloc(#7); !r)
+  pl(#7)
+
+-- Store a pair in a ref
+#eval check "store pair in ref"
+  pl(let r := alloc((#1, #2)); fst(!r))
+  pl(#1)
+
+-- Store a function in a ref and call it
+#eval check "store fn in ref"
+  pl(let r := alloc((fun x, x + #1)); (!r) #41)
+  pl(#42)
+
+-- Heap with computation in stored value
+#eval check "store computed value"
+  pl(let r := alloc(#0); r ← (#3 + #4); !r)
+  pl(#7)
+
+-- ---------------------------------------------------------------------------
+-- Sum/case edge cases
+-- ---------------------------------------------------------------------------
+
+-- case with computation in both branches
+#eval check "case inl: branch computes"
+  pl(case inl(#5) | inl(x) => x * x | inr(y) => y + y)
+  pl(#25)
+
+-- Nested case
+#eval check "nested case"
+  pl(case inl(inr(#7))
+     | inl(inner) => (case inner | inl(_) => #0 | inr(z) => z)
+     | inr(_) => #99)
+  pl(#7)
+
+-- let! with inr
+#eval check "let! inr"
+  pl(let! inr(y) := inr(#42); y)
+  pl(#42)
+
+#eval checkError "let! inr mismatch"
+  pl(let! inr(y) := inl(#42); y)
+
+-- let! pair where scrutinee needs evaluation first
+#eval check "let! pair with redex scrutinee"
+  pl(let p := (#1 + #2, #3 + #4); let! (a, b) := p; a + b)
+  pl(#10)
+
+-- ---------------------------------------------------------------------------
+-- Sequencing and unit
+-- ---------------------------------------------------------------------------
+
+#eval check "sequence"
+  pl(let _ := #.unit; #42)
+  pl(#42)
+
+-- Assert then continue
+#eval check "assert then compute"
+  pl(let _ := assert(#true); #1 + #2)
+  pl(#3)
+
+-- Multiple asserts
+#eval check "multi assert"
+  pl(let _ := assert(#true); let _ := assert(#true); #.unit)
+  pl(#.unit)
+
+-- ---------------------------------------------------------------------------
+-- Rand edge cases
+-- ---------------------------------------------------------------------------
+
+#eval checkError "rand 0 bound"  pl(rand(#0, #.unit))
+#eval checkError "rand negative" pl(rand(#(.int (-5)), #.unit))
+
+-- rand(1, unit) returns 0 or 1 (IO.rand 0 1 is inclusive)
+#eval do
+  let v ← run pl(rand(#1, #.unit))
+  match v.1 with
+  | .lit (.int n) =>
+    if n < 0 || n > 1 then
+      throw (IO.userError s!"FAIL [rand 1 range]: got {n}, expected 0 or 1")
+  | e => throw (IO.userError s!"FAIL [rand 1 type]: got {repr e}")
+
+-- ---------------------------------------------------------------------------
+-- Fail propagation through contexts
+-- ---------------------------------------------------------------------------
+
+#eval checkError "fail in binop left"   pl(fail + #1)
+#eval checkError "fail in binop right"  pl(#1 + fail)
+#eval checkError "fail in fst"          pl(fst(fail))
+#eval checkError "fail in snd"          pl(snd(fail))
+#eval checkError "fail in inl"          pl(inl(fail))
+#eval checkError "fail in cond"         pl(if fail then #1 else #2)
+#eval checkError "fail in alloc"        pl(alloc(fail))
+#eval checkError "fail in pair left"    pl((fail, #1))
+-- Note: (v, fail) only fails if the pair is forced; as a value it's fine.
+-- But since fail is not a value, decomp should find it.
+#eval checkError "fail in pair right"   pl((#1, fail))
