@@ -579,7 +579,7 @@ theorem Exp.decompItem_height {e : Exp} (h : e.decompItem = some (Ki, e')) :
     e'.height < e.height := by
   simp only [decompItem, toVal?] at h
   cases e <;> simp_all <;>
-    (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all) <;> try omega) <;>
+    (split at h <;> simp_all <;> try omega) <;>
     (split at h <;> simp_all <;> omega)
 
 def Exp.decomp (e : Exp) : Ectx × Exp :=

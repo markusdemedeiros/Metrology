@@ -119,132 +119,86 @@ macro "head_case_names" : tactic =>
     on_goal 16 => rename_goal default
   ))
 
--- TODO: Refactor
+/-- Decompose the Cfg equality hypothesis left by `split` on `headStep`, then substitute. -/
+macro "head_subst" : tactic =>
+  `(tactic| (rename_i h_eq
+             have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
+             subst_eqs))
+
+/-- Unfold `isValM`, split into redex/no_redex, and name goals.
+    Goal order after `split` on `if`: goal 1 = true (redex), goal 2 = false (no_redex). -/
+macro "head_split_isValM" redex:ident no_redex:ident : tactic =>
+  `(tactic| (unfold Exp.isValM; split
+             on_goal 2 => rename_goal $no_redex
+             on_goal 1 => rename_goal $redex))
+
+/-- Unfold `asValM`, split into no_redex/redex, and name goals.
+    Goal order after `split` on `match toVal?`: goal 1 = none (no_redex), goal 2 = some (redex). -/
+macro "head_split_asValM" no_redex:ident redex:ident : tactic =>
+  `(tactic| (unfold Exp.asValM; split
+             on_goal 1 => rename_goal $no_redex
+             on_goal 2 => rename_goal $redex))
+
+/-- Split a binary match (e.g. heap lookup) and name the two goals. -/
+macro "head_split2" goal1:ident goal2:ident : tactic =>
+  `(tactic| (split
+             on_goal 1 => rename_goal $goal1
+             on_goal 2 => rename_goal $goal2))
+
 macro "head_case" : tactic =>
   `(tactic| (
     head_case_names
     case' rand.tape =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      split
-      on_goal 1 => rename_goal rand.tape.unalloc
-      on_goal 2 =>
+      head_subst
+      head_split2 rand.tape.unalloc rand_tape_alloc
+      case' rand_tape_alloc =>
         split
-        on_goal 2 =>
-          rename_goal rand.tape.mismatch
+        on_goal 2 => rename_goal rand.tape.mismatch
         on_goal 1 =>
           subst_eqs
-          split
-          on_goal 1 => rename_goal rand.tape.empty
-          on_goal 2 => rename_goal rand.tape.deterministic
-    case' tape =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-    case' rand.plain =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
+          head_split2 rand.tape.empty rand.tape.deterministic
+    case' tape       => head_subst
+    case' rand.plain => head_subst
     case' store =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.asValM
-      split
+      head_subst
+      unfold Exp.asValM; split
       on_goal 1 => rename_goal store.no_redex
-      on_goal 2 =>
-        split
-        on_goal 1 => rename_goal store.segfault
-        on_goal 2 => rename_goal store.redex
+      on_goal 2 => head_split2 store.segfault store.redex
     case' load =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      split
-      on_goal 1 => rename_goal load.segfault
-      on_goal 2 => rename_goal load.redex
+      head_subst
+      head_split2 load.segfault load.redex
     case' alloc =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.asValM
-      split
-      on_goal 1 => rename_goal alloc.no_redex
-      on_goal 2 => rename_goal alloc.redex
+      head_subst
+      head_split_asValM alloc.no_redex alloc.redex
     case' case.right =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.isValM
-      split
-      on_goal 2 => rename_goal case.right.no_redex
-      on_goal 1 => rename_goal case.right.redex
+      head_subst
+      head_split_isValM case.right.redex case.right.no_redex
     case' case.left =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.isValM
-      split
-      on_goal 2 => rename_goal case.left.no_redex
-      on_goal 1 => rename_goal case.left.redex
+      head_subst
+      head_split_isValM case.left.redex case.left.no_redex
     case' snd =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.isValM
-      split
+      head_subst
+      unfold Exp.isValM; split
       on_goal 2 => rename_goal snd.no_redex_1
-      on_goal 1 =>
-        split
-        on_goal 2 => rename_goal snd.no_redex_2
-        on_goal 1 => rename_goal snd.redex
+      on_goal 1 => head_split2 snd.redex snd.no_redex_2
     case' fst =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.isValM
-      split
+      head_subst
+      unfold Exp.isValM; split
       on_goal 2 => rename_goal fst.no_redex_1
-      on_goal 1 =>
-        split
-        on_goal 2 => rename_goal fst.no_redex_2
-        on_goal 1 => rename_goal fst.redex
-    case' cond.false =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-    case' cond.true =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
+      on_goal 1 => head_split2 fst.redex fst.no_redex_2
+    case' cond.false => head_subst
+    case' cond.true  => head_subst
     case' binop =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.isValM
-      split
+      head_subst
+      unfold Exp.isValM; split
       on_goal 2 => rename_goal binop.no_redex_1
-      on_goal 1 =>
-        split
-        on_goal 2 => rename_goal binop.no_redex_2
-        on_goal 1 => rename_goal binop.redex
+      on_goal 1 => head_split2 binop.redex binop.no_redex_2
     case' unop =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.isValM
-      split
-      on_goal 2 => rename_goal unop.no_redex
-      on_goal 1 => rename_goal unop.redex
+      head_subst
+      head_split_isValM unop.redex unop.no_redex
     case' beta =>
-      rename_i h_eq
-      have ⟨Heq1, Heq2⟩ := (Cfg.mk.injEq ..) ▸ h_eq
-      subst_eqs
-      unfold Exp.isValM
-      split
-      on_goal 2 => rename_goal beta.no_redex
-      on_goal 1 => rename_goal beta.redex
+      head_subst
+      head_split_isValM beta.redex beta.no_redex
   ))
 
 def headStepKernel : Kernel Cfg Cfg where
