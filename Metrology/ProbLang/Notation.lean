@@ -214,14 +214,14 @@ partial def buildCaseArm [Monad m] [MonadRef m] [MonadQuotation m]
   `(Exp.case
       (Exp.scrut pl($scrutVar) pl_pat($pat))
       (Exp.letrec .anon (Binder.named "__bind") pl($projected))
-      $fallback)
+      (Exp.letrec .anon .anon $fallback))
 
 /-- Build a chain of case arms, with fail at the end. -/
 partial def buildCaseChain [Monad m] [MonadRef m] [MonadQuotation m]
     (scrutVar : TSyntax `pl_exp)
     (pats : Array (TSyntax `pl_pat)) (bodies : Array (TSyntax `pl_exp)) : m Term := do
-  -- Base: fail
-  let mut result ← `(Exp.letrec .anon .anon Exp.fail)
+  -- Base: fail (will be wrapped in a lambda by buildCaseArm)
+  let mut result ← `(Exp.fail)
   -- Build from last arm to first
   for i in List.range pats.size |>.reverse do
     result ← buildCaseArm scrutVar pats[i]! bodies[i]! result
@@ -1469,11 +1469,12 @@ example : pl(case e | inl(x) => x | inr(y) => y) =
           (Exp.letrec .anon (.named "__bind")
             (Exp.app (Exp.letrec .anon (.named "x") (Exp.var "x"))
                      (Exp.var "__bind")))
-          (Exp.case (Exp.scrut (Exp.var "__scrut") (.inr (.var (.named "y"))))
-            (Exp.letrec .anon (.named "__bind")
-              (Exp.app (Exp.letrec .anon (.named "y") (Exp.var "y"))
-                       (Exp.var "__bind")))
-            (Exp.letrec .anon .anon Exp.fail))))
+          (Exp.letrec .anon .anon
+            (Exp.case (Exp.scrut (Exp.var "__scrut") (.inr (.var (.named "y"))))
+              (Exp.letrec .anon (.named "__bind")
+                (Exp.app (Exp.letrec .anon (.named "y") (Exp.var "y"))
+                         (Exp.var "__bind")))
+              (Exp.letrec .anon .anon Exp.fail)))))
       (Exp.var "e") := rfl
 
 -- Single-arm case
