@@ -490,30 +490,24 @@ theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
 theorem head_step_mass (e : Exp) (σ : State) :
     (∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
   head_case
-  all_goals try (· simp) -- Handle all stuck cases
-  all_goals try (· infer_instance) -- Handle all immediate cases
-  case unop.redex heq =>
-    intro ⟨ρ, hρ⟩
-    rw [unwrapM_singleton_pos] at hρ
-    obtain ⟨e', he', _⟩ := hρ
-    simp [Option.unwrapM, he']; infer_instance
-  case binop.redex =>
-    rename_i heq1 heq2
-    intro ⟨ρ, hρ⟩
-    rw [unwrapM_singleton_pos] at hρ
-    obtain ⟨e', he', _⟩ := hρ
-    simp [Option.unwrapM, he']; infer_instance
-  case rand.plain =>
-    intro ⟨ρ, hρ⟩
-    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.uniform_singleton_pos_inv hρ
-    exact Cfg.uniform_isProbabilityMeasure Hz
-  case rand.tape =>
-    intro ⟨ρ, hρ⟩
-    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.uniform_singleton_pos_inv hρ
-    exact Cfg.uniform_isProbabilityMeasure Hz
-  case rand.tape.mismatch =>
-    intro ⟨ρ, hρ⟩
-    obtain ⟨Hz, _, _, _, _, _⟩ := Cfg.uniform_singleton_pos_inv hρ
-    exact Cfg.uniform_isProbabilityMeasure Hz
+  -- Stuck cases (measure is 0, hypothesis is vacuously false)
+  case default | beta.no_redex | unop.no_redex | binop.no_redex_1 | binop.no_redex_2
+     | fst.no_redex_1 | fst.no_redex_2 | snd.no_redex_1 | snd.no_redex_2
+     | case.left.no_redex | case.right.no_redex
+     | alloc.no_redex | store.no_redex | store.segfault
+     | load.segfault | rand.tape.unalloc => simp
+  -- Dirac cases (IsProbabilityMeasure (dirac _) is automatic)
+  case beta.redex | cond.true | cond.false
+     | fst.redex | snd.redex | case.left.redex | case.right.redex
+     | alloc.redex | load.redex | store.redex | tape
+     | rand.tape.deterministic => intro _; infer_instance
+  -- unwrapM cases: need to extract the `some` witness
+  case unop.redex | binop.redex =>
+    intro ⟨_, hρ⟩; rw [unwrapM_singleton_pos] at hρ
+    obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
+  -- Cfg.uniform cases
+  case rand.plain | rand.tape | rand.tape.mismatch =>
+    intro ⟨_, hρ⟩
+    exact Cfg.uniform_isProbabilityMeasure (Cfg.uniform_singleton_pos_inv hρ).1
 
 end ProbLang

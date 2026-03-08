@@ -531,10 +531,9 @@ theorem Exp.decompItem_fill {e e' : Exp} {Ki : EctxItem}
   simp only [decompItem, toVal?] at h
   have aux : ∀ x, IsVal.check? x = none → ¬Exp.isValue x :=
     fun x h => IsVal.not_isValue_of_check?_none h
-  cases e <;> simp_all [EctxItem.fillItem, ofVal] <;>
-    (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq]) <;>
-    (try (split at h <;> simp_all [Option.some.injEq, Prod.mk.injEq])) <;>
-    (try (obtain ⟨rfl, rfl⟩ := h; simp_all))
+  cases e <;> simp_all [Exp.ofVal] <;>
+    (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all)) <;>
+    (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all))
 
 theorem EctxItem.fillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
     ¬(Ki.fillItem e).isValue := (hv <| EctxItem.fillItem_isValue ·)
@@ -579,10 +578,9 @@ theorem Ectx.fill_isValue {K : Ectx} {e : Exp} (hv : (K.fill e).isValue) : e.isV
 theorem Exp.decompItem_height {e : Exp} (h : e.decompItem = some (Ki, e')) :
     e'.height < e.height := by
   simp only [decompItem, toVal?] at h
-  split at h
-  all_goals simp_all
-  all_goals (split at h <;> simp_all <;> try omega)
-  all_goals (split at h <;> simp_all <;> omega)
+  cases e <;> simp_all <;>
+    (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all) <;> try omega) <;>
+    (split at h <;> simp_all <;> omega)
 
 def Exp.decomp (e : Exp) : Ectx × Exp :=
   match _h : e.decompItem with
