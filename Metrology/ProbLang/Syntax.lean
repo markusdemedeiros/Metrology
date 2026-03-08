@@ -605,7 +605,6 @@ theorem Exp.decomp_inv_nil {e e' : Exp} (h : e.decomp = ([], e')) :
   · simp_all [List.append_eq_nil_iff]
   · exact ⟨by assumption, (Prod.mk.inj h).2⟩
 
--- TODO: Cleanup
 theorem Exp.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Exp}
     (h : e.decomp = (K ++ [Ki], e'')) :
     ∃ e', e.decompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
@@ -614,14 +613,15 @@ theorem Exp.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Exp}
   · next Ki' e' hd =>
     simp only at h
     obtain ⟨hK, he⟩ := Prod.mk.inj h
-    have hlen : (e'.decomp.1).length = K.length := by
-      have := congrArg List.length hK; simp at this; omega
+    have hlen : e'.decomp.1.length = K.length := by
+      have := congrArg List.length hK
+      simp at this
+      omega
     obtain ⟨hK', hKi⟩ := List.append_inj hK hlen
-    have hKi' : Ki' = Ki := List.singleton_inj.mp hKi
-    exact ⟨e', hd.symm ▸ hKi' ▸ rfl, Prod.ext hK' (by simp [he])⟩
+    rw [List.singleton_inj.mp hKi] at hd
+    exact ⟨e', hd, Prod.ext hK' (by simp [he])⟩
   · simp_all [List.append_eq_nil_iff]
 
--- TODO: Cleanup
 theorem Exp.decomp_fill {K : Ectx} {e e' : Exp} (h : e.decomp = (K, e')) :
     K.fill e' = e := by
   suffices ∀ n K (e e' : Exp), K.length = n → e.decomp = (K, e') → K.fill e' = e by
@@ -639,58 +639,49 @@ theorem Exp.decomp_fill {K : Ectx} {e e' : Exp} (h : e.decomp = (K, e')) :
       ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
     obtain ⟨e'', hKi, hK''⟩ := decomp_inv_cons hd
     simp only [Ectx.fill, List.foldl_append, List.foldl_cons, List.foldl_nil] at *
-    simp at hlen
-    have hlen'' : K''.length = n := Nat.add_right_cancel (congrFun (congrArg _ hlen) n)
-    rw [ih K'' e'' e' hlen'' hK'']
+    rw [ih K'' e'' e' (by simp at hlen; omega) hK'']
     exact (decompItem_fill hKi).1
 
--- TODO: Cleanup
 theorem Exp.decomp_val_empty {K : Ectx} {e e' : Exp}
     (hd : e.decomp = (K, e')) (hv : e'.isValue) : K = [] := by
   suffices ∀ n K (e e' : Exp), K.length = n → e.decomp = (K, e') → e'.isValue → K = [] by
     exact this K.length K e e' rfl hd hv
   intro n
   induction n with
-  | zero => intros; exact List.eq_nil_of_length_eq_zero ‹_›
+  | zero =>
+    intros
+    exact List.eq_nil_of_length_eq_zero ‹_›
   | succ n ih =>
     intro K e e' hlen hd hv
     have hne : K ≠ [] := by intro hK; simp [hK] at hlen
     obtain ⟨K'', Ki, rfl⟩ : ∃ K'' Ki, K = K'' ++ [Ki] :=
       ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
     obtain ⟨e'', hKi, hK''⟩ := decomp_inv_cons hd
-    have hlen'' : K''.length = n := by simp at hlen; omega
-    have hK''nil : K'' = [] := ih K'' e'' e' hlen'' hK'' hv
-    subst hK''nil
-    obtain ⟨_, he''⟩ := decomp_inv_nil hK''
-    subst he''
+    rw [ih K'' e'' e' (by simp at hlen; omega) hK'' hv] at hK''
+    rw [(decomp_inv_nil hK'').2] at hKi
     exact absurd hv (decompItem_fill hKi).2
 
--- TODO: Cleanup
 theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
     (hv : ¬e.isValue) (hd : e.decomp = (K', e')) :
     (K.fill e).decomp = (K' ++ K, e') := by
-  suffices ∀ n K, K.length = n →
-      (K.fill e).decomp = (K' ++ K, e') by
+  suffices ∀ n K, K.length = n → (K.fill e).decomp = (K' ++ K, e') by
     exact this K.length K rfl
   intro n
   induction n with
   | zero =>
     intro K hlen
-    have : K = [] := List.eq_nil_of_length_eq_zero hlen
-    subst this; simpa
+    obtain rfl := List.eq_nil_of_length_eq_zero hlen
+    simpa
   | succ n ih =>
     intro K hlen
     have hne : K ≠ [] := by intro hK; simp [hK] at hlen
     obtain ⟨K'', Ki, rfl⟩ : ∃ K'' Ki, K = K'' ++ [Ki] :=
       ⟨K.dropLast, K.getLast hne, (List.dropLast_concat_getLast hne).symm⟩
-    have hlen'' : K''.length = n := by simp at hlen; omega
-    have hfill_eq : Ectx.fill (K'' ++ [Ki]) e =
-        Ki.fillItem (Ectx.fill K'' e) := by
-      simp only [Ectx.fill, List.foldl_append, List.foldl_cons, List.foldl_nil]; rfl
-    rw [hfill_eq]
-    have hfill_noVal : ¬(Ectx.fill K'' e).isValue := Ectx.fill_noVal hv
-    rw [decomp_unfold, EctxItem.decompItem_fillItem Ki hfill_noVal]
-    have ih_applied : (Ectx.fill K'' e).decomp = (K' ++ K'', e') := ih K'' hlen''
-    simp only [ih_applied, List.append_assoc]
+    -- Rewrite fill (K'' ++ [Ki]) e = Ki.fillItem (fill K'' e).
+    simp only [Ectx.fill_snoc]
+    -- Unfold decomp one step. decompItem_fillItem peels off Ki (e is not a value, so fill K'' e isn't either).
+    rw [decomp_unfold, EctxItem.decompItem_fillItem Ki (Ectx.fill_noVal hv)]
+    -- By IH, (fill K'' e).decomp = (K' ++ K'', e'). Reassociate the append.
+    simp only [ih K'' (by simp at hlen; omega), List.append_assoc]
 
 end ProbLang
