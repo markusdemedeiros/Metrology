@@ -737,6 +737,99 @@ private def isEvenOdd : Exp :=
   pl(#30)
 
 -- ---------------------------------------------------------------------------
+-- Deeply nested pattern matching
+-- ---------------------------------------------------------------------------
+
+-- let! on nested pair: ((1, 2), (3, 4))
+#eval check "let! nested pair of pairs"
+  pl(let! ((a, b), (c, d)) := ((#1, #2), (#3, #4)); a + b + c + d)
+  pl(#10)
+
+-- case on inl(inl(x))
+#eval check "case inl(inl(...))"
+  pl(case inl(#5)
+     | inl(x) => (case x | #(.int 5) => #100 | _ => #0)
+     | inr(_) => #0)
+  pl(#100)
+
+-- let! inl of a pair
+#eval check "let! inl pair"
+  pl(let! inl((x, y)) := inl((#3, #7)); x + y)
+  pl(#10)
+
+-- let! inr of a pair
+#eval check "let! inr pair"
+  pl(let! inr((x, y)) := inr((#10, #20)); x * y)
+  pl(#200)
+
+-- Nested case: match on sum, then destructure the payload
+#eval check "nested case then let!"
+  pl(case inl((#1, #2))
+     | inl(p) => (let! (a, b) := p; a + b)
+     | inr(_) => #0)
+  pl(#3)
+
+-- Triple-nested pair destructuring
+#eval check "let! triple nested"
+  pl(let! (a, (b, (c, d))) := (#1, (#2, (#3, #4))); a + b + c + d)
+  pl(#10)
+
+-- case where first arm fails, second has nested match
+#eval check "case fallthrough to nested"
+  pl(case inr((#5, #6))
+     | inl(_) => #0
+     | inr(p) => (let! (x, y) := p; x + y))
+  pl(#11)
+
+-- Matching literal inside a pair
+#eval check "let! pair with literal check"
+  pl(let! (#(.int 1), x) := (#1, #42); x)
+  pl(#42)
+
+-- Matching literal inside a pair: mismatch
+#eval checkError "let! pair literal mismatch"
+  pl(let! (#(.int 99), x) := (#1, #42); x)
+
+-- Deeply nested inl/inr
+#eval check "case deeply nested sums"
+  pl(case inl(inr(inl(#7)))
+     | inl(a) => (case a
+       | inr(b) => (case b | inl(c) => c | inr(_) => #0)
+       | inl(_) => #0)
+     | inr(_) => #0)
+  pl(#7)
+
+-- Pattern match then compute with matched values
+#eval check "match and compute"
+  pl(case inl((#3, #4))
+     | inl(p) => (let! (x, y) := p; x * y + #1)
+     | inr(_) => #0)
+  pl(#13)
+
+-- 5-arm case: exercise long scrutinize chain
+#eval check "5-arm case"
+  pl(case #4
+     | #(.int 1) => #10
+     | #(.int 2) => #20
+     | #(.int 3) => #30
+     | #(.int 4) => #40
+     | _ => #50)
+  pl(#40)
+
+-- case on pair values (not sum)
+#eval check "case on pair"
+  pl(case (#1, #2)
+     | (#(.int 1), #(.int 2)) => #100
+     | _ => #0)
+  pl(#100)
+
+#eval check "case on pair mismatch"
+  pl(case (#1, #3)
+     | (#(.int 1), #(.int 2)) => #100
+     | _ => #0)
+  pl(#0)
+
+-- ---------------------------------------------------------------------------
 -- Rand with computed bound
 -- ---------------------------------------------------------------------------
 
