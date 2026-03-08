@@ -170,54 +170,46 @@ end IsVal
 instance : Checkable IsVal where check? := IsVal.check?
 
 -------------------------------------------------------------------------------
--- isValue (Prop bridge, decidable via IsVal.check?)
+-- isValue := Nonempty IsVal (Prop bridge, decidable via IsVal.check?)
 -------------------------------------------------------------------------------
 
-@[simp]
-def Exp.isValue : Exp → Prop
-  | lit _ | letrec _ _ _ => True
-  | inl e | inr e => e.isValue
-  | pair e1 e2 => e1.isValue ∧ e2.isValue
-  | annot _ e => e.isValue
-  | _ => False
+def Exp.isValue (e : Exp) : Prop := Nonempty (IsVal e)
 
-/-- Convert from `IsVal` witness to the `isValue` prop. -/
-def IsVal.toIsValue : IsVal e → e.isValue
-  | .lit => trivial
-  | .letrec => trivial
-  | .pair h1 h2 => ⟨h1.toIsValue, h2.toIsValue⟩
-  | .inl h => h.toIsValue
-  | .inr h => h.toIsValue
-  | .annot h => h.toIsValue
+/-- Introduce `isValue` from an `IsVal` witness. -/
+def IsVal.toIsValue (w : IsVal e) : e.isValue := ⟨w⟩
 
-/-- Convert from `isValue` Prop to `IsVal` witness. -/
-def IsVal.ofIsValue : {e : Exp} → e.isValue → IsVal e
-  | .lit _, _ => .lit
-  | .letrec _ _ _, _ => .letrec
-  | .pair _ _, ⟨h1, h2⟩ => .pair (ofIsValue h1) (ofIsValue h2)
-  | .inl _, h => .inl (ofIsValue h)
-  | .inr _, h => .inr (ofIsValue h)
-  | .annot _ _, h => .annot (ofIsValue h)
+/-- Extract an `IsVal` witness from `isValue`. Since `IsVal` is a subsingleton,
+    this is well-defined despite using `Nonempty.some`. -/
+noncomputable def IsVal.ofIsValue (h : e.isValue) : IsVal e := h.some
 
-instance Exp.decIsValue : (e : Exp) → Decidable e.isValue
-  | .lit _ | .letrec _ _ _ => isTrue trivial
-  | .pair e1 e2 =>
-    match decIsValue e1, decIsValue e2 with
-    | isTrue h1, isTrue h2 => isTrue ⟨h1, h2⟩
-    | isFalse h1, _ => isFalse (fun ⟨hv, _⟩ => h1 hv)
-    | _, isFalse h2 => isFalse (fun ⟨_, hv⟩ => h2 hv)
-  | .inl e | .inr e | .annot _ e =>
-    match decIsValue e with
-    | isTrue h => isTrue h
-    | isFalse h => isFalse h
-  | .var _ | .app _ _ | .unop _ _ | .binop _ _ _ | .cond _ _ _
-  | .fst _ | .snd _ | .case _ _ _ | .alloc _ | .load _ | .store _ _
-  | .rand _ _ | .tape _ | .fail => isFalse nofun
+-- simp lemmas for each constructor
+@[simp] theorem Exp.isValue_lit {l} : (Exp.lit l).isValue ↔ True := ⟨fun _ => trivial, fun _ => ⟨.lit⟩⟩
+@[simp] theorem Exp.isValue_letrec {f x e} : (Exp.letrec f x e).isValue ↔ True := ⟨fun _ => trivial, fun _ => ⟨.letrec⟩⟩
+@[simp] theorem Exp.isValue_pair {e1 e2} : (Exp.pair e1 e2).isValue ↔ e1.isValue ∧ e2.isValue :=
+  ⟨fun ⟨.pair h1 h2⟩ => ⟨⟨h1⟩, ⟨h2⟩⟩, fun ⟨⟨w1⟩, ⟨w2⟩⟩ => ⟨.pair w1 w2⟩⟩
+@[simp] theorem Exp.isValue_inl {e} : (Exp.inl e).isValue ↔ e.isValue :=
+  ⟨fun ⟨.inl h⟩ => ⟨h⟩, fun ⟨w⟩ => ⟨.inl w⟩⟩
+@[simp] theorem Exp.isValue_inr {e} : (Exp.inr e).isValue ↔ e.isValue :=
+  ⟨fun ⟨.inr h⟩ => ⟨h⟩, fun ⟨w⟩ => ⟨.inr w⟩⟩
+@[simp] theorem Exp.isValue_annot {a e} : (Exp.annot a e).isValue ↔ e.isValue :=
+  ⟨fun ⟨.annot h⟩ => ⟨h⟩, fun ⟨w⟩ => ⟨.annot w⟩⟩
+private theorem isValue_false {e : Exp} (h : IsVal e → False) : e.isValue ↔ False :=
+  Iff.intro (fun ⟨w⟩ => h w) False.elim
 
-theorem IsVal.check?_eq_none {e : Exp} (h : ¬e.isValue) : IsVal.check? e = none := by
-  cases hc : IsVal.check? e with
-  | none => rfl
-  | some w => exact absurd w.toIsValue h
+@[simp] theorem Exp.isValue_var {x} : (Exp.var x).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_app {e1 e2} : (Exp.app e1 e2).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_unop {op e} : (Exp.unop op e).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_binop {op e1 e2} : (Exp.binop op e1 e2).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_cond {ec et ef} : (Exp.cond ec et ef).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_fst {e} : (Exp.fst e).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_snd {e} : (Exp.snd e).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_case {ec el er} : (Exp.case ec el er).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_alloc {e} : (Exp.alloc e).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_load {e} : (Exp.load e).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_store {e1 e2} : (Exp.store e1 e2).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_rand {e1 e2} : (Exp.rand e1 e2).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_tape {e} : (Exp.tape e).isValue ↔ False := isValue_false (nomatch ·)
+@[simp] theorem Exp.isValue_fail : (Exp.fail).isValue ↔ False := isValue_false (nomatch ·)
 
 theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .lit => ⟨.lit, rfl⟩
@@ -230,9 +222,19 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .annot h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.annot w, by simp [check?, hw]⟩
 
 theorem IsVal.not_isValue_of_check?_none {e : Exp} (h : IsVal.check? e = none) : ¬e.isValue :=
-  fun hv => by obtain ⟨_, hw⟩ := (IsVal.ofIsValue hv).check?_some; simp_all
+  fun ⟨w⟩ => by obtain ⟨_, hw⟩ := w.check?_some; simp_all
 
-@[simp] theorem Val.isValue (v : Val) : v.1.isValue := v.2.toIsValue
+theorem IsVal.check?_eq_none {e : Exp} (h : ¬e.isValue) : IsVal.check? e = none := by
+  cases hc : IsVal.check? e with
+  | none => rfl
+  | some w => exact absurd ⟨w⟩ h
+
+instance Exp.decIsValue (e : Exp) : Decidable e.isValue :=
+  match hc : IsVal.check? e with
+  | some w => isTrue ⟨w⟩
+  | none => isFalse (IsVal.not_isValue_of_check?_none hc)
+
+@[simp] theorem Val.isValue (v : Val) : v.1.isValue := ⟨v.2⟩
 
 @[ext]
 theorem Val.ext {v1 v2 : Val} (h : v1.1 = v2.1) : v1 = v2 := by

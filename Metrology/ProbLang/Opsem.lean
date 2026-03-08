@@ -270,14 +270,14 @@ theorem head_ctx_step_val {Ki : EctxItem} :
   all_goals (rename_i Hk _; simp [EctxItem.fillItem] at Hk)
   all_goals try (obtain ⟨rfl, rfl⟩ := Hk)
   all_goals try (obtain ⟨rfl, rfl, rfl⟩ := Hk)
-  all_goals try (· simp [Exp.isValue])
+  all_goals try (· simp)
   all_goals try (rename_i Hk _; intro _; exact Hk)
   all_goals try (rename_i Hk _; intro _; exact Exp.toVal?_isValue Hk)
-  all_goals try simp [Exp.isValue]
+  all_goals try simp
   all_goals intro _
   all_goals try (· assumption)
   all_goals try (· apply And.intro <;> assumption)
-  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp [Exp.isValue])
+  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp)
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
 | BetaS :
