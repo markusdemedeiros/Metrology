@@ -19,13 +19,16 @@ def Exp.asValM [MeasurableSpace T] (e : Exp) (f : Val → Measure T) : Measure T
   match e.toVal? with | none => 0 | some v => f v
 
 def Exp.isValM [MeasurableSpace T] (e : Exp) (m : Measure T) : Measure T :=
-  if e.isValueB then m else 0
+  if e.isValue then m else 0
 
 @[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp} {m : Measure T} (He : e.isValue) :
-    e.isValM m = m := by simp [Exp.isValM, Exp.isValueB_iff.mpr He]
+    e.isValM m = m := by simp [Exp.isValM, He]
+
+theorem Exp.isValM_some' [MeasurableSpace T] {e : Exp} {m : Measure T} (w : IsVal e) :
+    e.isValM m = m := isValM_some w.toIsValue
 
 @[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp} {m : Measure T} (He : ¬ e.isValue) :
-    e.isValM m = 0 := by simp [Exp.isValM, Exp.isValueB_false_iff.mpr He]
+    e.isValM m = 0 := by simp [Exp.isValM, He]
 
 def Int.isPos (z : Int) : Option { z : Int // 0 < z } :=
   if H : 0 < z then some ⟨z, H⟩ else none
@@ -252,7 +255,7 @@ theorem val_head_stuck : 0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
   head_case <;> simp
 
 theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
-  simp [Exp.toVal?]; grind
+  intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
 -- FIXME: Long and horrid proof, needs some automation
 theorem head_ctx_step_val {Ki : EctxItem} :
@@ -268,12 +271,12 @@ theorem head_ctx_step_val {Ki : EctxItem} :
   all_goals try (obtain ⟨rfl, rfl⟩ := Hk)
   all_goals try (obtain ⟨rfl, rfl, rfl⟩ := Hk)
   all_goals try (· simp [Exp.isValue])
-  all_goals try (rename_i Hk _; intro _; exact Exp.isValueB_iff.mp Hk)
+  all_goals try (rename_i Hk _; intro _; exact Hk)
   all_goals try (rename_i Hk _; intro _; exact Exp.toVal?_isValue Hk)
   all_goals try simp [Exp.isValue]
   all_goals intro _
-  all_goals try (· apply Exp.isValueB_iff.mp; trivial)
-  all_goals try (· apply And.intro <;> apply Exp.isValueB_iff.mp <;> trivial)
+  all_goals try (· assumption)
+  all_goals try (· apply And.intro <;> assumption)
   all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp [Exp.isValue])
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
@@ -367,7 +370,7 @@ theorem dirac_singleton_pos {a b : Cfg} :
 theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp} {m : Measure T} {s : Set T} :
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
   unfold Exp.isValM
-  by_cases He : e.isValue <;> simp [Exp.isValueB_iff.mpr, Exp.isValueB_false_iff.mpr, He]
+  by_cases He : e.isValue <;> simp [He]
 
 @[simp]
 theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
@@ -415,7 +418,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .BetaS (Exp.isValueB_iff.mp heq) rfl
+      exact .BetaS (heq) rfl
     case unop.redex =>
       rename_i heq
       intro h
@@ -423,7 +426,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       obtain ⟨e', he', h'⟩ := h
       rw [dirac_singleton_pos] at h'
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
-      exact .UnOpS (Exp.isValueB_iff.mp heq) he'.symm
+      exact .UnOpS (heq) he'.symm
     case binop.redex =>
       rename_i heq1 heq2
       intro h
@@ -431,7 +434,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       obtain ⟨e', he', h'⟩ := h
       rw [dirac_singleton_pos] at h'
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
-      exact .BinOpS (Exp.isValueB_iff.mp heq1) (Exp.isValueB_iff.mp heq2) he'.symm
+      exact .BinOpS (heq1) (heq2) he'.symm
     case cond.true =>
       intro h
       rw [dirac_singleton_pos] at h
@@ -446,25 +449,25 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      refine .FstS (Exp.isValueB_iff.mp heq2) (Exp.isValueB_iff.mp heq3)
+      refine .FstS (heq2) (heq3)
     case snd.redex =>
       rename_i heq0 heq1 heq2 heq3
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .SndS (Exp.isValueB_iff.mp heq2) (Exp.isValueB_iff.mp heq3)
+      exact .SndS (heq2) (heq3)
     case case.left.redex =>
       rename_i heq
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .CaseLS (Exp.isValueB_iff.mp heq)
+      exact .CaseLS (heq)
     case case.right.redex =>
       rename_i heq
       intro h
       rw [dirac_singleton_pos] at h
       obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .CaseRS (Exp.isValueB_iff.mp heq)
+      exact .CaseRS (heq)
     case alloc.redex =>
       rename_i heq
       intro h
@@ -528,7 +531,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
-  simp [Exp.isValM, Exp.isValueB_iff.mpr he]; infer_instance
+  simp [Exp.isValM, he]; infer_instance
 
 theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {f : Val → Measure T}
     {v : Val} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :

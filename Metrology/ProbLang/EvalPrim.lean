@@ -98,7 +98,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
   | .alloc vd =>
     let heap ← σ.get
     let ℓ := heap.fresh
-    match vd.toValB? with
+    match vd.toVal? with
     | none    => throw' (.stuck "alloc: argument is not a value" vd)
     | some vd' =>
       σ.modify (·.insert ℓ vd')
@@ -111,7 +111,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
     | some v => return .ofVal v
 
   | .store (.lit (.loc ℓ)) v =>
-    match v.toValB? with
+    match v.toVal? with
     | none    => throw' (.stuck "store: value argument is not a value" v)
     | some v' =>
       let heap ← σ.get
@@ -162,7 +162,7 @@ If `e` is already a value, return it immediately — the decomposition of a
 value is `([], e)` and `headStep` would be stuck, so we check first.
 -/
 partial def eval (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Val := do
-  match e.toValB? with
+  match e.toVal? with
   | some v => return v
   | none   =>
     let e' ← primStep σ e

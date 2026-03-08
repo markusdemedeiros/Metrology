@@ -13,22 +13,22 @@ deriving instance ToExpr for BinOp
 deriving instance ToExpr for Ty
 deriving instance ToExpr for Annot
 deriving instance ToExpr for Exp
+deriving instance ToExpr for IsVal
 instance : ToExpr Val where
   toTypeExpr := mkConst ``Val
-  toExpr v :=
-    let e := toExpr v.1
-    let rfl_ := mkApp2 (mkConst ``Eq.refl [.succ .zero]) (mkConst ``Bool) (mkApp (mkConst ``Exp.isValueB) e)
-    mkApp2 (mkConst ``Val.ofValueB) e rfl_
+  toExpr v := mkApp4 (mkConst ``Sigma.mk [.zero, .zero])
+    (mkConst ``Exp) (mkConst ``IsVal) (toExpr v.1) (toExpr v.2)
 deriving instance ToExpr for EctxItem
 
 /-! ## Symbolic execution tactic -/
 
-private def isValueBPf (e : Expr) : MetaM (Option Expr) := do
-  let r ← reduce (mkApp (mkConst ``Exp.isValueB) e)
-  if r == mkConst ``Bool.true then
-    return some (mkApp2 (mkConst ``Eq.refl [.succ .zero]) (mkConst ``Bool) r)
-  else
-    return none
+/-- Try to build an `IsVal e` witness by reducing `IsVal.check? e`. -/
+private def mkIsValWitness (e : Expr) : MetaM (Option Expr) := do
+  let check := mkApp (mkConst ``IsVal.check?) e
+  let r ← reduce check
+  match r with
+  | .app (.app (.const ``Option.some _) _) w => return some w
+  | _ => return none
 
 open Term in
 unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
@@ -37,26 +37,26 @@ unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
   | .app (.const ``Exp.fst _) arg =>
     match ← whnf arg with
     | .app (.app (.const ``Exp.pair _) e1) e2 =>
-      let some h1 ← isValueBPf e1 | throwError "elabDetHeadStep: fst: e1 is not a value"
-      let some h2 ← isValueBPf e2 | throwError "elabDetHeadStep: fst: e2 is not a value"
+      let some h1 ← mkIsValWitness e1 | throwError "elabDetHeadStep: fst: e1 is not a value"
+      let some h2 ← mkIsValWitness e2 | throwError "elabDetHeadStep: fst: e2 is not a value"
       return mkApp5 (mkConst ``DetHeadStep.fst_pair) e1 e2 h1 h2 state
     | _ => throwError "elabDetHeadStep: fst argument is not a pair"
   | .app (.const ``Exp.snd _) arg =>
     match ← whnf arg with
     | .app (.app (.const ``Exp.pair _) e1) e2 =>
-      let some h1 ← isValueBPf e1 | throwError "elabDetHeadStep: snd: e1 is not a value"
-      let some h2 ← isValueBPf e2 | throwError "elabDetHeadStep: snd: e2 is not a value"
+      let some h1 ← mkIsValWitness e1 | throwError "elabDetHeadStep: snd: e1 is not a value"
+      let some h2 ← mkIsValWitness e2 | throwError "elabDetHeadStep: snd: e2 is not a value"
       return mkApp5 (mkConst ``DetHeadStep.snd_pair) e1 e2 h1 h2 state
     | _ => throwError "elabDetHeadStep: snd argument is not a pair"
   | .app (.app (.const ``Exp.app _) fn) arg =>
     match ← whnf fn with
     | .app (.app (.app (.const ``Exp.letrec _) f) x) body =>
-      let some hv ← isValueBPf arg | throwError "elabDetHeadStep: app: argument is not a value"
+      let some hv ← mkIsValWitness arg | throwError "elabDetHeadStep: app: argument is not a value"
       -- @DetHeadStep.app_letrec f x body arg hv state
       return mkApp6 (mkConst ``DetHeadStep.app_letrec) f x body arg hv state
     | _ => throwError "elabDetHeadStep: app: function is not a letrec"
   | .app (.app (.const ``Exp.unop _) op) e =>
-    let some hv ← isValueBPf e | throwError "elabDetHeadStep: unop: e is not a value"
+    let some hv ← mkIsValWitness e | throwError "elabDetHeadStep: unop: e is not a value"
     let opVal     ← evalExpr UnOp (mkConst ``UnOp) op
     let eVal      ← evalExpr Exp  (mkConst ``Exp)  e
     let some resultVal := UnOp.eval opVal eVal
@@ -68,8 +68,8 @@ unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
     -- @DetHeadStep.unop op e result hv heval state
     return mkApp6 (mkConst ``DetHeadStep.unop) op e result hv heval state
   | .app (.app (.app (.const ``Exp.binop _) op) e1) e2 =>
-    let some h1 ← isValueBPf e1 | throwError "elabDetHeadStep: binop: e1 is not a value"
-    let some h2 ← isValueBPf e2 | throwError "elabDetHeadStep: binop: e2 is not a value"
+    let some h1 ← mkIsValWitness e1 | throwError "elabDetHeadStep: binop: e1 is not a value"
+    let some h2 ← mkIsValWitness e2 | throwError "elabDetHeadStep: binop: e2 is not a value"
     -- Evaluate BinOp.eval op e1 e2 at meta-level using evalExpr
     let opVal  ← evalExpr BinOp (mkConst ``BinOp) op
     let e1Val  ← evalExpr Exp   (mkConst ``Exp)   e1
@@ -85,10 +85,10 @@ unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
   | .app (.app (.app (.const ``Exp.case _) scrut) el) er =>
     match ← whnf scrut with
     | .app (.const ``Exp.inl _) v =>
-      let some hv ← isValueBPf v | throwError "elabDetHeadStep: case_inl: scrutinee is not a value"
+      let some hv ← mkIsValWitness v | throwError "elabDetHeadStep: case_inl: scrutinee is not a value"
       return mkApp5 (mkConst ``DetHeadStep.case_inl) v el er hv state
     | .app (.const ``Exp.inr _) v =>
-      let some hv ← isValueBPf v | throwError "elabDetHeadStep: case_inr: scrutinee is not a value"
+      let some hv ← mkIsValWitness v | throwError "elabDetHeadStep: case_inr: scrutinee is not a value"
       return mkApp5 (mkConst ``DetHeadStep.case_inr) v el er hv state
     | _ => throwError "elabDetHeadStep: case: scrutinee is not inl/inr"
   | .app (.app (.app (.const ``Exp.cond _) cond_e) et) ef =>
@@ -99,7 +99,7 @@ unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
       return mkApp3 (mkConst ``DetHeadStep.cond_false) et ef state
     | _ => throwError "elabDetHeadStep: cond: condition is not a boolean literal"
   | .app (.const ``Exp.alloc _) v =>
-    let some hv ← isValueBPf v | throwError "elabDetHeadStep: alloc: argument is not a value"
+    let some hv ← mkIsValWitness v | throwError "elabDetHeadStep: alloc: argument is not a value"
     return mkApp3 (mkConst ``DetHeadStep.alloc) v hv state
   | .app (.const ``Exp.load _) addr =>
     match ← whnf addr with
@@ -119,21 +119,20 @@ unsafe def elabDetHeadStep (cfg1 : Expr) : TermElabM Expr := do
   | .app (.app (.const ``Exp.store _) addr) e =>
     match ← whnf addr with
     | .app (.const ``Exp.lit _) (.app (.const ``BaseLit.loc _) loc) =>
-      let some hv ← isValueBPf e | throwError "elabDetHeadStep: store: value is not a value"
+      let some hv ← mkIsValWitness e | throwError "elabDetHeadStep: store: value is not a value"
       let σVal   ← evalExpr State (mkConst ``State) state
       let locVal ← evalExpr Loc   (mkConst ``Loc)   loc
       let eVal   ← evalExpr Exp   (mkConst ``Exp)   e
       let some v_oldVal := σVal.heap[locVal]?
         | throwError "elabDetHeadStep: store: location not in heap"
-      let some v_newVal := eVal.toValB?
+      let some v_newVal := eVal.toVal?
         | throwError "elabDetHeadStep: store: expression not a value"
       let v_old := toExpr v_oldVal
       let v_new := toExpr v_newVal
-      let optValType := mkApp (mkConst ``Option [.zero]) (mkConst ``Val)
       let hlookupTy ← mkEq (← mkAppM ``getElem? #[mkApp (mkConst ``State.heap) state, loc])
                             (mkApp2 (mkConst ``Option.some [.zero]) (mkConst ``Val) v_old)
       let hlookup := mkApp2 (mkConst ``sorryAx [.zero]) hlookupTy (mkConst ``Bool.false)
-      let hnewTy ← mkEq (mkApp (mkConst ``Exp.toValB?) e)
+      let hnewTy ← mkEq (mkApp (mkConst ``Exp.toVal?) e)
                          (mkApp2 (mkConst ``Option.some [.zero]) (mkConst ``Val) v_new)
       let hnew := mkApp2 (mkConst ``sorryAx [.zero]) hnewTy (mkConst ``Bool.false)
       return mkApp8 (mkConst ``DetHeadStep.store) loc e v_old v_new hv state hlookup hnew
@@ -220,7 +219,7 @@ example : ∃ cfg2, DetStep ⟨pl(alloc(#42)), default⟩ cfg2 :=
 
 -- load directly from a known state
 def stateWith42 : State :=
-  (default : State).update_heap (·.insert 0 (Val.ofValueB pl(#42) rfl))
+  (default : State).update_heap (·.insert 0 ⟨pl(#42), .lit⟩)
 
 example : ∃ cfg2, DetStep ⟨pl(!(#(BaseLit.loc (0 : Loc)))), stateWith42⟩ cfg2 :=
   ⟨_, det_step_of ⟨pl(!(#(BaseLit.loc (0 : Loc)))), stateWith42⟩⟩

@@ -170,7 +170,7 @@ end IsVal
 instance : Checkable IsVal where check? := IsVal.check?
 
 -------------------------------------------------------------------------------
--- isValue (Prop bridge) / isValueB (Bool, derived from check?)
+-- isValue (Prop bridge, decidable via IsVal.check?)
 -------------------------------------------------------------------------------
 
 @[simp]
@@ -199,50 +199,38 @@ def IsVal.ofIsValue : {e : Exp} → e.isValue → IsVal e
   | .inr _, h => .inr (ofIsValue h)
   | .annot _ _, h => .annot (ofIsValue h)
 
-def Exp.isValueB (e : Exp) : Bool := (IsVal.check? e).isSome
-
-theorem Exp.isValueB_iff {e : Exp} : e.isValueB = true ↔ e.isValue := by
-  simp only [isValueB]
-  constructor
-  · intro h
-    obtain ⟨w, _⟩ := Option.isSome_iff_exists.mp h
-    exact w.toIsValue
-  · intro h
-    obtain ⟨w, hw⟩ := IsVal.check?_of_isValue h
-    simp [hw]
-where
-  IsVal.check?_of_isValue : {e : Exp} → e.isValue → ∃ w, IsVal.check? e = some w
-    | .lit _, _ => ⟨.lit, rfl⟩
-    | .letrec _ _ _, _ => ⟨.letrec, rfl⟩
-    | .pair e1 e2, ⟨h1, h2⟩ => by
-        obtain ⟨w1, hw1⟩ := IsVal.check?_of_isValue (e := e1) h1
-        obtain ⟨w2, hw2⟩ := IsVal.check?_of_isValue (e := e2) h2
-        exact ⟨.pair w1 w2, by simp [IsVal.check?, hw1, hw2]⟩
-    | .inl e, h => by
-        obtain ⟨w, hw⟩ := IsVal.check?_of_isValue (e := e) h
-        exact ⟨.inl w, by simp [IsVal.check?, hw]⟩
-    | .inr e, h => by
-        obtain ⟨w, hw⟩ := IsVal.check?_of_isValue (e := e) h
-        exact ⟨.inr w, by simp [IsVal.check?, hw]⟩
-    | .annot _ e, h => by
-        obtain ⟨w, hw⟩ := IsVal.check?_of_isValue (e := e) h
-        exact ⟨.annot w, by simp [IsVal.check?, hw]⟩
-
-theorem Exp.isValueB_false_iff {e : Exp} : e.isValueB = false ↔ ¬e.isValue := by
-  simp [← isValueB_iff, Bool.not_eq_true]
+instance Exp.decIsValue : (e : Exp) → Decidable e.isValue
+  | .lit _ | .letrec _ _ _ => isTrue trivial
+  | .pair e1 e2 =>
+    match decIsValue e1, decIsValue e2 with
+    | isTrue h1, isTrue h2 => isTrue ⟨h1, h2⟩
+    | isFalse h1, _ => isFalse (fun ⟨hv, _⟩ => h1 hv)
+    | _, isFalse h2 => isFalse (fun ⟨_, hv⟩ => h2 hv)
+  | .inl e | .inr e | .annot _ e =>
+    match decIsValue e with
+    | isTrue h => isTrue h
+    | isFalse h => isFalse h
+  | .var _ | .app _ _ | .unop _ _ | .binop _ _ _ | .cond _ _ _
+  | .fst _ | .snd _ | .case _ _ _ | .alloc _ | .load _ | .store _ _
+  | .rand _ _ | .tape _ | .fail => isFalse nofun
 
 theorem IsVal.check?_eq_none {e : Exp} (h : ¬e.isValue) : IsVal.check? e = none := by
   cases hc : IsVal.check? e with
   | none => rfl
   | some w => exact absurd w.toIsValue h
 
-theorem IsVal.not_isValue_of_check?_none {e : Exp} (h : IsVal.check? e = none) : ¬e.isValue := by
-  intro hv
-  obtain ⟨w, hw⟩ := Exp.isValueB_iff.IsVal.check?_of_isValue hv
-  simp [h] at hw
+theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
+  | .lit => ⟨.lit, rfl⟩
+  | .letrec => ⟨.letrec, rfl⟩
+  | .pair h1 h2 => by
+      obtain ⟨w1, hw1⟩ := check?_some h1; obtain ⟨w2, hw2⟩ := check?_some h2
+      exact ⟨.pair w1 w2, by simp [check?, hw1, hw2]⟩
+  | .inl h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inl w, by simp [check?, hw]⟩
+  | .inr h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inr w, by simp [check?, hw]⟩
+  | .annot h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.annot w, by simp [check?, hw]⟩
 
-@[simp]
-def Exp.noValue (e : Exp) : Prop := ¬ e.isValue
+theorem IsVal.not_isValue_of_check?_none {e : Exp} (h : IsVal.check? e = none) : ¬e.isValue :=
+  fun hv => by obtain ⟨_, hw⟩ := (IsVal.ofIsValue hv).check?_some; simp_all
 
 @[simp] theorem Val.isValue (v : Val) : v.1.isValue := v.2.toIsValue
 
@@ -251,8 +239,6 @@ theorem Val.ext {v1 v2 : Val} (h : v1.1 = v2.1) : v1 = v2 := by
   obtain ⟨e1, w1⟩ := v1; obtain ⟨e2, w2⟩ := v2
   simp at h; subst h; congr 1; exact IsVal.subsingleton w1 w2
 
-def Val.ofValueB (e : Exp) (h : e.isValueB = true) : Val :=
-  ⟨e, .ofIsValue (e.isValueB_iff.mp h)⟩
 
 instance : Countable Val := by
   unfold Val; exact instCountableSigma
@@ -268,28 +254,17 @@ instance instCountableTreeMapLocVal : Countable (ExtTreeMap Loc Val compare) := 
   intro H1 H2 He
   exact ExtTreeMap.ext_getElem? (congrFun (congrArg getElem? (Hf_items (Hf_v He))))
 
-open Classical in
-noncomputable def Exp.toVal? (e : Exp) : Option Val :=
-  if H : e.isValue then some ⟨e, .ofIsValue H⟩ else none
-
-def Exp.toValB? (e : Exp) : Option Val :=
+def Exp.toVal? (e : Exp) : Option Val :=
   match IsVal.check? e with
   | some w => some ⟨e, w⟩
   | none => none
 
-theorem Exp.toValB?_eq_toVal? (e : Exp) : e.toValB? = e.toVal? := by
-  simp only [toValB?, toVal?]
-  by_cases H : e.isValue
-  · obtain ⟨w, hw⟩ := Exp.isValueB_iff.IsVal.check?_of_isValue H
-    simp [hw, H, Val.ext_iff]
-  · have : IsVal.check? e = none := by
-      cases h : IsVal.check? e with
-      | none => rfl
-      | some w => exact absurd w.toIsValue H
-    simp [this, H]
-
 @[simp] theorem Exp.toVal?_eq_none {e : Exp} : e.toVal? = none ↔ ¬e.isValue := by
-  simp [Exp.toVal?]
+  constructor
+  · intro h
+    simp only [toVal?] at h
+    exact IsVal.not_isValue_of_check?_none (by cases hc : IsVal.check? e <;> simp_all)
+  · intro h; simp [toVal?, IsVal.check?_eq_none h]
 
 def Exp.ofVal (v : Val) : Exp := v.1
 
@@ -318,8 +293,10 @@ structure State where
 
 theorem Exp.toVal?_ofVal (v : Val) : (Exp.ofVal v).toVal? = some v := by
   obtain ⟨e, w⟩ := v
-  simp only [Exp.ofVal, Exp.toVal?, w.toIsValue, dite_true]
-  exact congrArg some (Val.ext rfl)
+  simp only [Exp.ofVal, Exp.toVal?]
+  cases hc : IsVal.check? e with
+  | none => exact absurd w.toIsValue (IsVal.not_isValue_of_check?_none hc)
+  | some w' => exact congrArg some (Val.ext rfl)
 
 theorem Exp.ofVal_of_toVal_some {e : Exp} {v : Val} (h : e.toVal? = some v) : Exp.ofVal v = e := by
   simp only [toVal?] at h
@@ -380,42 +357,42 @@ def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
 def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
   match e with
   | app e1 e2 =>
-    e2.toValB?.casesOn (some (.appR e1, e2)) fun v2 =>
-    e1.toValB?.casesOn (some (.appL v2, e1)) fun _ => none
+    e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.appL v2, e1)) fun _ => none
   | unop op e1 =>
-    e1.toValB?.casesOn (some (.unop op, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.unop op, e1)) fun _ => none
   | binop op e1 e2 =>
-    e2.toValB?.casesOn (some (.binopR op e1, e2)) fun v2 =>
-    e1.toValB?.casesOn (some (.binopL op v2, e1)) fun _ => none
+    e2.toVal?.casesOn (some (.binopR op e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.binopL op v2, e1)) fun _ => none
   | .cond ec et ef =>
-    ec.toValB?.casesOn (some (.condC et ef, ec)) fun _ => none
+    ec.toVal?.casesOn (some (.condC et ef, ec)) fun _ => none
   | pair e1 e2 =>
-    e2.toValB?.casesOn (some (.pairR e1, e2)) fun v2 =>
-    e1.toValB?.casesOn (some (.pairL v2, e1)) fun _ => none
+    e2.toVal?.casesOn (some (.pairR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.pairL v2, e1)) fun _ => none
   | fst e1 =>
-    e1.toValB?.casesOn (some (.fst, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.fst, e1)) fun _ => none
   | snd e1 =>
-    e1.toValB?.casesOn (some (.snd, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.snd, e1)) fun _ => none
   | inl e1 =>
-    e1.toValB?.casesOn (some (.inl, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.inl, e1)) fun _ => none
   | inr e1 =>
-    e1.toValB?.casesOn (some (.inr, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.inr, e1)) fun _ => none
   | alloc e1 =>
-    e1.toValB?.casesOn (some (.alloc, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.alloc, e1)) fun _ => none
   | load e1 =>
-    e1.toValB?.casesOn (some (.load, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.load, e1)) fun _ => none
   | store e1 e2 =>
-    e2.toValB?.casesOn (some (.storeR e1, e2)) fun v2 =>
-    e1.toValB?.casesOn (some (.storeL v2, e1)) fun _ => none
+    e2.toVal?.casesOn (some (.storeR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.storeL v2, e1)) fun _ => none
   | rand e1 e2 =>
-    e2.toValB?.casesOn (some (.randR e1, e2)) fun v2 =>
-    e1.toValB?.casesOn (some (.randL v2, e1)) fun _ => none
+    e2.toVal?.casesOn (some (.randR e1, e2)) fun v2 =>
+    e1.toVal?.casesOn (some (.randL v2, e1)) fun _ => none
   | .case ec el er =>
-    ec.toValB?.casesOn (some (.case el er, ec)) fun _ => none
+    ec.toVal?.casesOn (some (.case el er, ec)) fun _ => none
   | tape e1 =>
-    e1.toValB?.casesOn (some (.tape, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.tape, e1)) fun _ => none
   | annot a e1 =>
-    e1.toValB?.casesOn (some (.annot a, e1)) fun _ => none
+    e1.toVal?.casesOn (some (.annot a, e1)) fun _ => none
   | _ => none
 
 def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
@@ -537,26 +514,22 @@ def Exp.height : Exp → Nat
   | annot _ e => 1 + e.height
   | fail => 1
 
-private theorem Exp.toValB?_of_not_isValue {e : Exp} (hv : ¬e.isValue) : e.toValB? = none := by
-  simp [toValB?, IsVal.check?_eq_none hv]
-
-private theorem Exp.toValB?_of_isVal {e : Exp} (w : IsVal e) : ∃ v : Val, e.toValB? = some v ∧ v.1 = e := by
-  obtain ⟨w', hw'⟩ := Exp.isValueB_iff.IsVal.check?_of_isValue w.toIsValue
-  exact ⟨⟨e, w'⟩, by simp [toValB?, hw'], rfl⟩
+private theorem Exp.toVal?_of_isVal {e : Exp} (w : IsVal e) : ∃ v : Val, e.toVal? = some v ∧ v.1 = e :=
+  let ⟨w', hw'⟩ := w.check?_some; ⟨⟨e, w'⟩, by simp [toVal?, hw'], rfl⟩
 
 theorem EctxItem.decompItem_fillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
     (Ki.fillItem e).decompItem = some (Ki, e) := by
   cases Ki with
   | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
     obtain ⟨val, hval⟩ := v2
-    obtain ⟨v', hv', hv'e⟩ := Exp.toValB?_of_isVal hval
-    simp [EctxItem.fillItem, Exp.decompItem, Exp.toValB?_of_not_isValue hv,
+    obtain ⟨v', hv', hv'e⟩ := Exp.toVal?_of_isVal hval
+    simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv,
          hv', Exp.ofVal, Val.ext_iff, hv'e]
-  | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toValB?_of_not_isValue hv]
+  | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv]
 
 theorem Exp.decompItem_fill {e e' : Exp} {Ki : EctxItem}
     (h : e.decompItem = some (Ki, e')) : Ki.fillItem e' = e ∧ ¬e'.isValue := by
-  simp only [decompItem, toValB?] at h
+  simp only [decompItem, toVal?] at h
   have aux : ∀ x, IsVal.check? x = none → ¬Exp.isValue x :=
     fun x h => IsVal.not_isValue_of_check?_none h
   cases e <;> simp_all [EctxItem.fillItem, ofVal] <;>
@@ -602,11 +575,11 @@ theorem Ectx.fill_noVal {K : Ectx} {e : Exp} (hv : ¬e.isValue) : ¬(K.fill e).i
   | cons Ki K ih => exact ih (EctxItem.fillItem_noVal hv)
 
 theorem Ectx.fill_isValue {K : Ectx} {e : Exp} (hv : (K.fill e).isValue) : e.isValue :=
-  Classical.byContradiction fun h => absurd hv (Ectx.fill_noVal h)
+  if h : e.isValue then h else absurd hv (Ectx.fill_noVal h)
 
 theorem Exp.decompItem_height {e : Exp} (h : e.decompItem = some (Ki, e')) :
     e'.height < e.height := by
-  simp only [decompItem, toValB?] at h
+  simp only [decompItem, toVal?] at h
   split at h
   all_goals simp_all
   all_goals (split at h <;> simp_all <;> try omega)

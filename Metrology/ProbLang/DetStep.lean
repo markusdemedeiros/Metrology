@@ -51,13 +51,13 @@ theorem DetExec.succ {cfg1 cfg2 cfg3 : Cfg} {n : ℕ}
     DetExec (n + 1) cfg1 cfg3 where
   det_exec := ⟨cfg2, hstep, hrest.det_exec⟩
 
-theorem DetHeadStep.fst_pair {e1 e2 : Exp} (h1 : e1.isValueB = true) (h2 : e2.isValueB = true) (σ : State) :
+theorem DetHeadStep.fst_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State) :
     DetHeadStep ⟨.fst (.pair e1 e2), σ⟩ ⟨e1, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some (e1.isValueB_iff.mp h1), Exp.isValM_some (e2.isValueB_iff.mp h2)])
+  .of_det _ _ (by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2])
 
-theorem DetHeadStep.snd_pair {e1 e2 : Exp} (h1 : e1.isValueB = true) (h2 : e2.isValueB = true) (σ : State) :
+theorem DetHeadStep.snd_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State) :
     DetHeadStep ⟨.snd (.pair e1 e2), σ⟩ ⟨e2, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some (e1.isValueB_iff.mp h1), Exp.isValM_some (e2.isValueB_iff.mp h2)])
+  .of_det _ _ (by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2])
 
 theorem DetHeadStep.cond_true (et ef : Exp) (σ : State) :
     DetHeadStep ⟨.cond (.lit (.bool true)) et ef, σ⟩ ⟨et, σ⟩ :=
@@ -68,45 +68,45 @@ theorem DetHeadStep.cond_false (et ef : Exp) (σ : State) :
   .of_det _ _ (by simp [headStep])
 
 theorem DetHeadStep.app_letrec {f x : Binder} {body v : Exp}
-    (hv : v.isValueB = true) (σ : State) :
+    (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.app (.letrec f x body) v, σ⟩ ⟨Exp.subst x v (Exp.subst f (.letrec f x body) body), σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some (v.isValueB_iff.mp hv)])
+  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
 
 theorem DetHeadStep.unop {op : UnOp} {e result : Exp}
-    (hv : e.isValueB = true)
+    (hv : IsVal e)
     (heval : UnOp.eval op e = some result) (σ : State) :
     DetHeadStep ⟨.unop op e, σ⟩ ⟨result, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some (e.isValueB_iff.mp hv), heval])
+  .of_det _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some' hv, heval])
 
 theorem DetHeadStep.binop {op : BinOp} {e1 e2 result : Exp}
-    (h1 : e1.isValueB = true) (h2 : e2.isValueB = true)
+    (h1 : IsVal e1) (h2 : IsVal e2)
     (heval : BinOp.eval op e1 e2 = some result) (σ : State) :
     DetHeadStep ⟨.binop op e1 e2, σ⟩ ⟨result, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some (e1.isValueB_iff.mp h1), Exp.isValM_some (e2.isValueB_iff.mp h2), heval])
+  .of_det _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some' h1, Exp.isValM_some' h2, heval])
 
-theorem DetHeadStep.case_inl {v el er : Exp} (hv : v.isValueB = true) (σ : State) :
+theorem DetHeadStep.case_inl {v el er : Exp} (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.case (.inl v) el er, σ⟩ ⟨el.app v, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some (v.isValueB_iff.mp hv)])
+  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
 
-theorem DetHeadStep.case_inr {v el er : Exp} (hv : v.isValueB = true) (σ : State) :
+theorem DetHeadStep.case_inr {v el er : Exp} (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.case (.inr v) el er, σ⟩ ⟨er.app v, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some (v.isValueB_iff.mp hv)])
+  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
 
-theorem DetHeadStep.alloc {v : Exp} (hv : v.isValueB = true) (σ : State) :
-    DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, .ofIsValue (v.isValueB_iff.mp hv)⟩)⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.asValM, Exp.toVal?, v.isValueB_iff.mp hv])
+theorem DetHeadStep.alloc {v : Exp} (hv : IsVal v) (σ : State) :
+    DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, hv⟩)⟩ := by
+  obtain ⟨w, hw⟩ := hv.check?_some
+  exact .of_det _ _ (by simp [headStep, Exp.asValM, Exp.toVal?, hw, IsVal.subsingleton hv w])
 
 theorem DetHeadStep.load {ℓ : Loc} {v : Val} (σ : State) (hlookup : σ.heap[ℓ]? = some v) :
     DetHeadStep ⟨.load (.lit (.loc ℓ)), σ⟩ ⟨.ofVal v, σ⟩ :=
   .of_det _ _ (by simp [headStep, hlookup])
 
 theorem DetHeadStep.store {ℓ : Loc} {e : Exp} {v_old v_new : Val}
-    (_hv : e.isValueB = true) (σ : State)
+    (_hv : IsVal e) (σ : State)
     (hlookup : σ.heap[ℓ]? = some v_old)
-    (hnew : e.toValB? = some v_new) :
+    (hnew : e.toVal? = some v_new) :
     DetHeadStep ⟨.store (.lit (.loc ℓ)) e, σ⟩ ⟨.lit .unit, σ.update_heap (·.insert ℓ v_new)⟩ :=
-  have htoVal : e.toVal? = some v_new := by rwa [← Exp.toValB?_eq_toVal?]
-  .of_det _ _ (by simp [headStep, Exp.asValM, htoVal, hlookup])
+  .of_det _ _ (by simp [headStep, Exp.asValM, hnew, hlookup])
 
 theorem DetStep.fill (K : Ectx) {cfg1 cfg2 : Cfg} (h : DetStep cfg1 cfg2) :
     DetStep ⟨K.fill cfg1.expr, cfg1.state⟩ ⟨K.fill cfg2.expr, cfg2.state⟩ where
