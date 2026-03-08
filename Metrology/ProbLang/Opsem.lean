@@ -90,6 +90,11 @@ def headStep : Cfg → Measure Cfg
         | [] => Cfg.uniform z σ
         | n :: ns => dirac ⟨.lit <| .int n, σ.update_tapes fun t => t.insert α ⟨M, ns⟩⟩
       else Cfg.uniform z σ
+| ⟨.match e p, σ⟩ =>
+  e.isValM <|
+  match Pat.tryMatch p e with
+  | some bindings => dirac ⟨.inl bindings, σ⟩
+  | none => dirac ⟨.inr (.lit .unit), σ⟩
 | _ => 0
 
 elab "rename_goal" name:ident : tactic => do
@@ -116,7 +121,8 @@ macro "head_case_names" : tactic =>
     on_goal 13 => rename_goal rand.plain
     on_goal 14 => rename_goal tape
     on_goal 15 => rename_goal rand.tape
-    on_goal 16 => rename_goal default
+    on_goal 16 => rename_goal «match»
+    on_goal 17 => rename_goal default
   ))
 
 /-- Decompose the Cfg equality hypothesis left by `split` on `headStep`, then substitute. -/
@@ -196,6 +202,12 @@ macro "head_case" : tactic =>
     case' unop =>
       head_subst
       head_split_isValM unop.redex unop.no_redex
+    case' «match» =>
+      head_subst
+      unfold Exp.isValM; split
+      on_goal 2 => rename_goal match_no_redex
+      on_goal 1 =>
+        head_split2 match_success match_failure
     case' beta =>
       head_subst
       head_split_isValM beta.redex beta.no_redex
@@ -297,6 +309,14 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   v ≤ z →
   σ' = σ →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
+| MatchSuccessS :
+  e.isValue →
+  Pat.tryMatch p e = some bindings →
+  HeadStepSupport ⟨.match e p, σ⟩ ⟨.inl bindings, σ⟩
+| MatchFailureS :
+  e.isValue →
+  Pat.tryMatch p e = none →
+  HeadStepSupport ⟨.match e p, σ⟩ ⟨.inr (.lit .unit), σ⟩
 
 @[simp]
 theorem dirac_singleton_pos {a b : Cfg} :
@@ -395,10 +415,13 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
       simp at hv hσ; subst hv; subst hσ
       exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
+    case match_success => intro h; cfg_dirac h; exact .MatchSuccessS ‹_› ‹_›
+    case match_failure => intro h; cfg_dirac h; exact .MatchFailureS ‹_› ‹_›
   · intro hsupp
     cases hsupp with
     | BetaS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS
-    | TapeS | RandTapeS | AllocS | StoreS =>
+    | TapeS | RandTapeS | AllocS | StoreS
+    | MatchSuccessS | MatchFailureS =>
       simp_all [headStep]
     | RandNoTapeS | RandTapeEmptyS =>
       simp_all [headStep, Cfg.uniform_singleton_pos_of_mem]
@@ -435,7 +458,8 @@ theorem head_step_mass (e : Exp) (σ : State) :
   case beta.redex | cond.true | cond.false
      | fst.redex | snd.redex | case.left.redex | case.right.redex
      | alloc.redex | load.redex | store.redex | tape
-     | rand.tape.deterministic => intro _; infer_instance
+     | rand.tape.deterministic
+     | match_success | match_failure => intro _; infer_instance
   case unop.redex | binop.redex =>
     intro ⟨_, hρ⟩; rw [unwrapM_singleton_pos] at hρ
     obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
