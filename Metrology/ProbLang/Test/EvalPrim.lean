@@ -52,6 +52,18 @@ A failing assertion throws an IO error naming the test.
 
 ### Misc
 - [x] `assert` with a redex condition (e.g. `assert(#1 = #1)`)
+
+### Round 2
+- [x] Fix eval order tests: use `bump` counter to observe right-to-left decomp
+- [x] Fix `checkErrorMsg` catch-self bug: use `toBaseIO` to separate try/catch
+- [x] `fail` propagation: store, rand, load, app fn, case scrutinee, scrut
+- [x] `app` with non-value function (redex in function position, decomp through `appR`)
+- [x] `scrut` with non-value scrutinee (decomp through scrut context)
+- [x] `Binder.anon` rec name doesn't block substitution
+- [x] `eq` on compound values gets stuck (pairs aren't literals)
+- [x] Partial application: `(fun x y, ...) #3` returns a closure
+- [x] Fix `rec f f` test comment (misleading explanation)
+- [x] `rand` off-by-one: documented discrepancy between spec and implementation
 -/
 
 private def check (name : String) (prog : Exp) (expected : Exp) : IO Unit := do
@@ -284,7 +296,9 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
   pl(#.unit)
 
 -- ---------------------------------------------------------------------------
--- Rand (IO.rand 0 n returns values in [0, n] inclusive, so bound is z+1)
+-- Rand: `sampleUniform z` calls `IO.rand 0 z.toNat`, which returns [0, z]
+-- inclusive.  Note: the docstring says [0, z) exclusive — this is an off-by-one
+-- between the spec and the implementation.  Tests match the *implementation*.
 -- ---------------------------------------------------------------------------
 
 #eval do
@@ -578,6 +592,22 @@ private def isEvenOdd : Exp :=
 -- But since fail is not a value, decomp should find it.
 #eval checkError "fail in pair right"
   pl((#1, fail))
+#eval checkError "fail in store loc"
+  pl(fail ← #1)
+#eval checkError "fail in store val"
+  pl(let r := alloc(#0); r ← fail)
+#eval checkError "fail in load"
+  pl(!fail)
+#eval checkError "fail in rand bound"
+  pl(rand(fail, #.unit))
+#eval checkError "fail in rand tape"
+  pl(rand(#5, fail))
+#eval checkError "fail in app fn"
+  pl(fail #1)
+#eval checkError "fail in case scrutinee"
+  pl(case fail | inl(x) => x | inr(y) => y)
+#eval checkError "fail in scrut"
+  pl(case scrut fail with x | inl(b) => b | inr(_) => #0)
 
 -- ---------------------------------------------------------------------------
 -- Annotations (decomp through EctxItem.annot, preserved in result)
@@ -880,10 +910,10 @@ private def String.hasSubstr (haystack needle : String) : Bool :=
 
 /-- Like `checkError` but also checks the error message contains `needle`. -/
 private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Unit := do
-  try
-    let v ← run prog
+  match ← (run prog |>.toBaseIO) with
+  | .ok v =>
     throw (IO.userError s!"FAIL [{name}]: expected error, got {repr v.1}")
-  catch e =>
+  | .error e =>
     let msg := toString e
     if !msg.hasSubstr needle then
       throw (IO.userError s!"FAIL [{name}]: expected error containing \"{needle}\", got \"{msg}\"")
@@ -940,14 +970,11 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 -- Letrec: self-reference vs parameter name collision
 -- ---------------------------------------------------------------------------
 
--- `rec f f := f` — both binders are `f`, so subst stops for both.
--- The body `f` refers to the parameter (which shadows the self-ref).
--- But subst of the argument is blocked by the param binder, and subst of
--- the self-ref is blocked by the rec binder.  So the body is returned
--- literally as the letrec — it's the self-reference that wins because
--- the self-ref subst happens first (inner), then the param subst (outer)
--- is blocked.
-#eval check "rec f f shadows self-ref"
+-- `rec f f := f` — headStep does `subst f #42 (subst f (rec f f := f) (var "f"))`.
+-- Inner subst: replaces `f` in body with the letrec itself → `rec f f := f`.
+-- Outer subst: tries to replace `f` in the letrec, but both binders (`f` as
+-- rec name and `f` as param) block substitution.  Result: the letrec unchanged.
+#eval check "rec f f name collision"
   pl((rec f f := f) #42)
   pl(rec f f := f)
 
@@ -971,16 +998,23 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 -- Evaluation order with side effects (right-to-left decomp)
 -- ---------------------------------------------------------------------------
 
--- binop evaluates right arg first.  So `!r` (right) reduces before
--- `r ← #1` (left).  The load sees the initial value 0.
+-- `bump` increments a ref and returns the new value.  In `bump - bump`,
+-- right-to-left decomp means the right `bump` fires first (→ 1), then the
+-- left (→ 2), so the result is 2 - 1 = 1.  Left-to-right would give
+-- 1 - 2 = -1.
 #eval check "eval order: binop right before left"
-  pl(let r := alloc(#0); let a := !r; r ← #1; a)
-  pl(#0)
+  pl(let r := alloc(#0);
+     let bump := rec g _ := (let v := !r + #1; r ← v; v);
+     bump #.unit - bump #.unit)
+  pl(#1)
 
--- pair evaluates right arg first
+-- Same idea for pairs: right side of pair evaluates first.
+-- fst((bump, bump)) with right-first: right=1, left=2, fst=2.
 #eval check "eval order: pair right before left"
-  pl(let r := alloc(#0); let p := (r ← #99, !r); snd(p))
-  pl(#0)
+  pl(let r := alloc(#0);
+     let bump := rec g _ := (let v := !r + #1; r ← v; v);
+     fst((bump #.unit, bump #.unit)))
+  pl(#2)
 
 -- ---------------------------------------------------------------------------
 -- Store return value
@@ -1089,3 +1123,73 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 
 #eval checkError "assert redex false"
   pl(assert(#1 = #2))
+
+-- ---------------------------------------------------------------------------
+-- App with non-value function (decomp through appR)
+-- ---------------------------------------------------------------------------
+
+-- Function position is a redex: `if` selects which function to apply
+#eval check "app: redex in fn position"
+  pl((if #true then (fun x, x + #1) else (fun x, x)) #5)
+  pl(#6)
+
+-- Function comes from fst of a pair
+#eval check "app: fst as fn"
+  pl(fst(((fun x, x * #2), #0)) #7)
+  pl(#14)
+
+-- ---------------------------------------------------------------------------
+-- Scrut with non-value scrutinee (decomp through scrut context)
+-- ---------------------------------------------------------------------------
+
+#eval check "scrut: non-value scrutinee"
+  pl(case scrut (#1 + #2) with x | inl(b) => b | inr(_) => #0)
+  pl(#3)
+
+#eval check "scrut: scrutinee needs multi-step reduction"
+  pl(case scrut (fst((#10, #20))) with #(.int 10) | inl(_) => #99 | inr(_) => #0)
+  pl(#99)
+
+-- ---------------------------------------------------------------------------
+-- Binder.anon rec name doesn't block substitution
+-- ---------------------------------------------------------------------------
+
+-- `fun x, ...` desugars to `rec _ x := ...`.  The anon rec name should NOT
+-- block substitution of free variables in the body.
+#eval check "anon rec name allows subst"
+  pl(let y := #10; (fun x, x + y) #5)
+  pl(#15)
+
+-- Nested: outer variable captured through two anonymous rec binders
+#eval check "anon rec name nested"
+  pl(let z := #3; (fun x, (fun y, x + y + z)) #1 #2)
+  pl(#6)
+
+-- ---------------------------------------------------------------------------
+-- Equality on compound values gets stuck
+-- ---------------------------------------------------------------------------
+
+-- eq only works on BaseLit; pairs, sums, functions are not literals
+#eval checkErrorMsg "eq on pairs stuck"
+  pl((#1, #2) = (#1, #2))
+  "stuck"
+#eval checkErrorMsg "eq on inl stuck"
+  pl(inl(#1) = inl(#1))
+  "stuck"
+#eval checkErrorMsg "eq on fn stuck"
+  pl((fun x, x) = (fun x, x))
+  "stuck"
+
+-- ---------------------------------------------------------------------------
+-- Partial application
+-- ---------------------------------------------------------------------------
+
+-- `fun x y, x + y` desugars to nested letrecs.  Applying one argument
+-- should return a closure (letrec value), which can then be applied.
+#eval check "partial application"
+  pl(let f := (fun x y, x + y) #3; f #4)
+  pl(#7)
+
+#eval check "partial application: stored and reused"
+  pl(let add3 := (fun x y, x + y) #3; let a := add3 #10; let b := add3 #20; a + b)
+  pl(#36)
