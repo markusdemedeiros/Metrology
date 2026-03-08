@@ -93,7 +93,7 @@ theorem DetHeadStep.case_inr {v el er : Exp} (hv : v.isValueB = true) (σ : Stat
   .of_det _ _ (by simp [headStep, Exp.isValM_some (v.isValueB_iff.mp hv)])
 
 theorem DetHeadStep.alloc {v : Exp} (hv : v.isValueB = true) (σ : State) :
-    DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, v.isValueB_iff.mp hv⟩)⟩ :=
+    DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, .ofIsValue (v.isValueB_iff.mp hv)⟩)⟩ :=
   .of_det _ _ (by simp [headStep, Exp.asValM, Exp.toVal?, v.isValueB_iff.mp hv])
 
 theorem DetHeadStep.load {ℓ : Loc} {v : Val} (σ : State) (hlookup : σ.heap[ℓ]? = some v) :
