@@ -400,105 +400,55 @@ theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Icc, Hv0, Hvz, Set.mem_preimage]⟩
   · exact ENNReal.natCast_ne_top _
 
+/-- Decompose `0 < (dirac a) {b}` into Cfg component equalities, then substitute. -/
+macro "cfg_dirac" h:ident : tactic =>
+  `(tactic| (rw [dirac_singleton_pos] at $h:ident
+             have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
+
 theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
     0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
   · head_case
-    all_goals try (· simp) -- Handle all stuck cases
-    case beta.redex =>
-      rename_i heq
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .BetaS (heq) rfl
-    case unop.redex =>
-      rename_i heq
-      intro h
-      rw [unwrapM_singleton_pos] at h
-      obtain ⟨e', he', h'⟩ := h
-      rw [dirac_singleton_pos] at h'
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
-      exact .UnOpS (heq) he'.symm
-    case binop.redex =>
-      rename_i heq1 heq2
-      intro h
-      rw [unwrapM_singleton_pos] at h
-      obtain ⟨e', he', h'⟩ := h
-      rw [dirac_singleton_pos] at h'
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h'
-      exact .BinOpS (heq1) (heq2) he'.symm
-    case cond.true =>
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .IfTrueS
-    case cond.false =>
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .IfFalseS
-    case fst.redex heq0 heq1 heq2 heq3 =>
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      refine .FstS (heq2) (heq3)
-    case snd.redex =>
-      rename_i heq0 heq1 heq2 heq3
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .SndS (heq2) (heq3)
-    case case.left.redex =>
-      rename_i heq
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .CaseLS (heq)
-    case case.right.redex =>
-      rename_i heq
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .CaseRS (heq)
-    case alloc.redex =>
-      rename_i heq
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .AllocS heq rfl rfl
-    case load.redex =>
-      rename_i heq
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .LoadS heq rfl
+    -- Stuck cases (measure is 0)
+    case default | beta.no_redex | unop.no_redex | binop.no_redex_1 | binop.no_redex_2
+       | fst.no_redex_1 | fst.no_redex_2 | snd.no_redex_1 | snd.no_redex_2
+       | case.left.no_redex | case.right.no_redex
+       | alloc.no_redex | store.no_redex | store.segfault
+       | load.segfault | rand.tape.unalloc => simp
+    -- Pure dirac, constructor suffices
+    case cond.true | cond.false => intro h; cfg_dirac h; constructor
+    -- Dirac with hypotheses from head_case
+    case beta.redex => intro h; cfg_dirac h; exact .BetaS ‹_› rfl
+    case fst.redex => intro h; cfg_dirac h; exact .FstS ‹_› ‹_›
+    case snd.redex => intro h; cfg_dirac h; exact .SndS ‹_› ‹_›
+    case case.left.redex => intro h; cfg_dirac h; exact .CaseLS ‹_›
+    case case.right.redex => intro h; cfg_dirac h; exact .CaseRS ‹_›
+    case tape => intro h; cfg_dirac h; exact .TapeS rfl rfl
+    case load.redex => intro h; cfg_dirac h; exact .LoadS ‹_› rfl
+    case alloc.redex => intro h; cfg_dirac h; exact .AllocS ‹_› rfl rfl
     case store.redex =>
-      rename_i heq heq_val _ heq_heap
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .StoreS heq (by rw [Option.isSome_iff_exists]; exact ⟨_, heq_heap⟩) rfl
+      intro h; cfg_dirac h
+      exact .StoreS ‹_› (by rw [Option.isSome_iff_exists]; exact ⟨_, ‹_›⟩) rfl
+    case rand.tape.deterministic =>
+      intro h; cfg_dirac h; exact .RandTapeS (by omega) ‹_› rfl rfl rfl
+    -- unwrapM + dirac
+    case unop.redex =>
+      intro h; rw [unwrapM_singleton_pos] at h
+      obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .UnOpS ‹_› hr.symm
+    case binop.redex =>
+      intro h; rw [unwrapM_singleton_pos] at h
+      obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .BinOpS ‹_› ‹_› hr.symm
+    -- Cfg.uniform cases
     case rand.plain =>
-      -- Cfg.uniform z σ
       intro h
       obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
       simp at hv hσ; subst hv; subst hσ
       exact .RandNoTapeS Hz Hv0 Hvz
-    case tape =>
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      exact .TapeS rfl rfl
     case rand.tape =>
       intro h
       obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
       simp at hv hσ; subst hv; subst hσ
       exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
-    case rand.tape.deterministic =>
-      intro h
-      rw [dirac_singleton_pos] at h
-      obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h
-      refine .RandTapeS (by omega) ‹_› rfl rfl rfl
     case rand.tape.mismatch =>
       intro h
       obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
