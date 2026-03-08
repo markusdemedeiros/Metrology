@@ -25,6 +25,6 @@ name = "Metrology"
 name = "metrology"
 root = "Main"
 
-[[lean_lib]]
-name = "ProbLangTest"
-roots = ["Metrology.ProbLang.Test"]
+[[lean_exe]]
+name = "problangtests"
+root = "ProbLangTestMain"

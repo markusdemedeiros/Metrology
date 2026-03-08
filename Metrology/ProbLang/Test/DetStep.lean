@@ -3,7 +3,7 @@ import Metrology.ProbLang.Notation
 
 namespace ProbLang
 
-open Lean Meta Elab 
+open Lean Meta Elab
 
 /-! ## ToExpr instances for reflection -/
 deriving instance ToExpr for Binder
