@@ -275,11 +275,14 @@ theorem head_ctx_step_val {Ki : EctxItem} :
   all_goals try (rename_i Hk _; intro _; exact Exp.toVal?_isValue Hk)
   all_goals try simp_all
   all_goals intro _
-  all_goals try (· simp_all)
-  all_goals try (· apply And.intro <;> simp_all)
-  all_goals try (obtain ⟨H1, _⟩ := Hk; rw [H1]; simp_all)
-  all_goals try (simp only [Exp.isValue_eq_isSome] at *; simp_all [Option.isSome_iff_exists])
-  all_goals sorry
+  -- Remaining: pair value goals where check? expanded into Option.bind.
+  -- Convert hyps back to isValue, extract check? witnesses, let simp close bind.
+  all_goals simp only [← Exp.isValue_eq_isSome] at *
+  all_goals
+    have isVal_check (e : Exp) (h : e.isValue) : ∃ w, IsVal.check? e = some w :=
+      h.some.check?_some
+    try (obtain ⟨_, hw1⟩ := isVal_check _ ‹_›; obtain ⟨_, hw2⟩ := isVal_check _ ‹_›; simp_all)
+    try (obtain ⟨_, hw1⟩ := isVal_check _ ‹_›; simp_all)
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
 | BetaS :
