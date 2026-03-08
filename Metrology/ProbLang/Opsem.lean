@@ -422,7 +422,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       subst hσ
       simp only [headStep, htape]
       split
-      · rename_i hM; rw [hM] at hzN; exact absurd rfl hzN
+      · next hM => rw [hM] at hzN; exact absurd rfl hzN
       · exact Cfg.uniform_singleton_pos_of_mem Hz Hv0 Hvz
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {m : Measure T}

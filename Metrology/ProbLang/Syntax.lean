@@ -611,7 +611,7 @@ theorem Exp.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Exp}
     ∃ e', e.decompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
   rw [decomp_unfold] at h
   split at h
-  · rename_i Ki' e' hd
+  · next Ki' e' hd =>
     simp only at h
     obtain ⟨hK, he⟩ := Prod.mk.inj h
     have hlen : (e'.decomp.1).length = K.length := by
