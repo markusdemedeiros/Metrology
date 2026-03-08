@@ -160,6 +160,6 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
   | .lit (.int n) =>
     if n < 0 then
       throw (IO.userError s!"FAIL [rand range]: got {n}, expected ≥ 0")
-    if n > 5 then
-      throw (IO.userError s!"FAIL [rand range]: got {n}, expected ≤ 5")
+    if n > 6 then
+      throw (IO.userError s!"FAIL [rand range]: got {n}, expected ≤ 6")
   | e => throw (IO.userError s!"FAIL [rand type]: got {repr e}")

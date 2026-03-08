@@ -145,7 +145,7 @@ def Val := (e : Exp) × IsVal e
 namespace IsVal
 
 /-- Decidable check: the computable entry point for value testing. -/
-@[simp] def check? : (e : Exp) → Option (IsVal e)
+def check? : (e : Exp) → Option (IsVal e)
   | .lit _ => some .lit
   | .letrec _ _ _ => some .letrec
   | .pair e1 e2 => do return .pair (← check? e1) (← check? e2)
@@ -192,14 +192,29 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .inr h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inr w, by simp [check?, hw]⟩
   | .annot h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.annot w, by simp [check?, hw]⟩
 
--- Single simp lemma: reduce isValue via check? computation
-@[simp] theorem Exp.isValue_eq_isSome {e : Exp} :
-    e.isValue ↔ (IsVal.check? e).isSome = true := by
+/-- Recursive Prop-valued value predicate. Not the canonical definition
+    (`isValue := Nonempty (IsVal e)`) but useful for case-splitting proofs
+    since `simp` can unfold it on any constructor-headed expression. -/
+@[simp] def Exp.isValueR : Exp → Prop
+  | .lit _ | .letrec _ _ _ => True
+  | .pair e1 e2 => e1.isValueR ∧ e2.isValueR
+  | .inl e | .inr e | .annot _ e => e.isValueR
+  | _ => False
+
+theorem Exp.isValue_iff_isValueR {e : Exp} : e.isValue ↔ e.isValueR := by
   constructor
-  · rintro ⟨w⟩; obtain ⟨w', hw'⟩ := w.check?_some; simp [hw']
-  · intro h; cases hc : IsVal.check? e with
-    | none => simp [hc] at h
-    | some w => exact ⟨w⟩
+  · rintro ⟨w⟩; induction w with
+    | lit | letrec => trivial
+    | pair _ _ ih1 ih2 => exact ⟨ih1, ih2⟩
+    | inl _ ih | inr _ ih | annot _ ih => exact ih
+  · intro h; induction e with
+    | lit | letrec => exact ⟨by constructor⟩
+    | pair _ _ ih1 ih2 =>
+      obtain ⟨h1, h2⟩ := h; exact ⟨.pair (ih1 h1).some (ih2 h2).some⟩
+    | inl _ ih => exact ⟨.inl (ih h).some⟩
+    | inr _ ih => exact ⟨.inr (ih h).some⟩
+    | annot _ _ ih => exact ⟨.annot (ih h).some⟩
+    | _ => exact absurd h id
 
 theorem IsVal.not_isValue_of_check?_none {e : Exp} (h : IsVal.check? e = none) : ¬e.isValue :=
   fun ⟨w⟩ => by obtain ⟨_, hw⟩ := w.check?_some; simp_all
@@ -312,7 +327,7 @@ inductive EctxItem
   | randR (e1 : Exp)
   | annot (a : Annot)
 
-def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
+@[simp] def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
   match Ki with
   | appL v2 => .app e (.ofVal v2)
   | appR e1 => .app e1 e
@@ -474,7 +489,7 @@ theorem EctxItem.fillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Exp}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
     (h : Ki1.fillItem e1 = Ki2.fillItem e2) : Ki1 = Ki2 := by
   cases Ki1 <;> cases Ki2 <;> simp_all [EctxItem.fillItem, Exp.ofVal] <;>
-    grind [Val.ext_iff, Val.isValue, Exp.isValue_eq_isSome]
+    grind [Val.ext_iff, Val.isValue, Exp.isValue_iff_isValueR]
 
 @[simp]
 def Exp.height : Exp → Nat

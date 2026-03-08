@@ -252,37 +252,22 @@ def headStepKernel : Kernel Cfg Cfg where
   toFun := headStep
 
 theorem val_head_stuck : 0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
-  head_case <;> simp
+  head_case <;> simp [Exp.isValue_iff_isValueR]
 
 theorem Exp.toVal?_isValue {e : Exp} : e.toVal? = some v → e.isValue := by
   intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
--- FIXME: Long and horrid proof, needs some automation
 theorem head_ctx_step_val {Ki : EctxItem} :
     0 < headStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
+  -- headStep pattern-matches on the expression. Ki.fillItem e plugs e into a
+  -- context position. For headStep to fire, e must sit in a value slot.
   have Hzero : 0 < (0 : Measure Cfg) {ρ} → False := by simp
-  have Hdirac : ∀ {ρ' : Cfg}, 0 < dirac ρ' {ρ} → ρ = ρ' := by
-    simp [dirac, Pi.single, Function.update]; grind
+  -- Case-split on headStep rule, kill stuck cases, then case-split on Ki.
+  -- simp_all eliminates impossible Ki cases and closes value goals.
   head_case
-  all_goals try (exact fun H => (Hzero H).elim) -- Deal with all stuck cases
-  -- Now: the redexes remain
-  all_goals cases Ki
-  all_goals (rename_i Hk _; simp [EctxItem.fillItem] at Hk)
-  all_goals try (obtain ⟨rfl, rfl⟩ := Hk)
-  all_goals try (obtain ⟨rfl, rfl, rfl⟩ := Hk)
-  all_goals try (· simp)
-  all_goals try (rename_i Hk _; intro _; exact Hk)
-  all_goals try (rename_i Hk _; intro _; exact Exp.toVal?_isValue Hk)
-  all_goals try simp_all
-  all_goals intro _
-  -- Remaining: pair value goals where check? expanded into Option.bind.
-  -- Convert hyps back to isValue, extract check? witnesses, let simp close bind.
-  all_goals simp only [← Exp.isValue_eq_isSome] at *
-  all_goals
-    have isVal_check (e : Exp) (h : e.isValue) : ∃ w, IsVal.check? e = some w :=
-      h.some.check?_some
-    try (obtain ⟨_, hw1⟩ := isVal_check _ ‹_›; obtain ⟨_, hw2⟩ := isVal_check _ ‹_›; simp_all)
-    try (obtain ⟨_, hw1⟩ := isVal_check _ ‹_›; simp_all)
+  all_goals try (exact fun H => (Hzero H).elim)
+  all_goals cases Ki <;> (intro _; simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR])
+  all_goals exact (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue ‹_›))
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
 | BetaS :
