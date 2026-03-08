@@ -6,7 +6,23 @@ open ProbLang ProbLang.EvalPrim
 /-! Tests for the context-decomposing ProbLang interpreter (`EvalPrim`).
 
 Each test calls `run` and asserts the result equals an expected `Exp`.
-A failing assertion throws an IO error naming the test. -/
+A failing assertion throws an IO error naming the test.
+
+## TODO — missing coverage
+
+- [x] `annot`: decomp through annotation, annot preserved in result
+- [x] `scrut` directly: raw scrut returning inl(bindings) / inr(unit)
+- [x] Heap errors: segfault on invalid loc (load & store)
+- [x] `eq` across types: cross-type eq (int vs bool, unit vs int)
+- [x] Variable shadowing: inner binding shadows outer
+- [x] Letrec as value: bare `rec f x := ...` returned without application
+- [x] `subst` edge cases: anonymous binders
+- [x] Deep nested values: pairs of pairs, inl(inr(...)) chains
+- [x] Multi-arm `case`: 3+ arms exercising the scrutinize chain
+- [x] `rand` with computed bound: bound is a redex, not a literal
+- Note: `fst`/`snd`/`case` on annotated values (e.g. `fst((1,2) : int×int)`)
+  gets stuck — same in formal semantics, may need an annot-stripping rule
+-/
 
 private def check (name : String) (prog : Exp) (expected : Exp) : IO Unit := do
   let v ← run prog
@@ -23,24 +39,50 @@ private def checkError (name : String) (prog : Exp) : IO Unit := do
 -- Literals
 -- ---------------------------------------------------------------------------
 
-#eval check "int literal"  pl(#1)      pl(#1)
-#eval check "bool literal" pl(#true)   pl(#true)
-#eval check "unit literal" pl(#.unit)  pl(#.unit)
+#eval check "int literal"
+  pl(#1)
+  pl(#1)
+#eval check "bool literal"
+  pl(#true)
+  pl(#true)
+#eval check "unit literal"
+  pl(#.unit)
+  pl(#.unit)
 
 -- ---------------------------------------------------------------------------
 -- Arithmetic and boolean operators
 -- ---------------------------------------------------------------------------
 
-#eval check "1 + 2 = 3"   pl(#1 + #2)         pl(#3)
-#eval check "5 - 3 = 2"   pl(#5 - #3)         pl(#2)
-#eval check "3 * 4 = 12"  pl(#3 * #4)         pl(#12)
-#eval check "neg"          pl(- #5)            pl(#(.int (-5)))
-#eval check "not true"     pl(~ #true)         pl(#false)
-#eval check "and"          pl(#true && #false) pl(#false)
-#eval check "or"           pl(#false || #true) pl(#true)
-#eval check "xor"          pl(#true ^^ #true)  pl(#false)
-#eval check "eq ints"      pl(#3 = #3)         pl(#true)
-#eval check "neq ints"     pl(#3 = #4)         pl(#false)
+#eval check "1 + 2 = 3"
+  pl(#1 + #2)
+  pl(#3)
+#eval check "5 - 3 = 2"
+  pl(#5 - #3)
+  pl(#2)
+#eval check "3 * 4 = 12"
+  pl(#3 * #4)
+  pl(#12)
+#eval check "neg"
+  pl(- #5)
+  pl(#(.int (-5)))
+#eval check "not true"
+  pl(~ #true)
+  pl(#false)
+#eval check "and"
+  pl(#true && #false)
+  pl(#false)
+#eval check "or"
+  pl(#false || #true)
+  pl(#true)
+#eval check "xor"
+  pl(#true ^^ #true)
+  pl(#false)
+#eval check "eq ints"
+  pl(#3 = #3)
+  pl(#true)
+#eval check "neq ints"
+  pl(#3 = #4)
+  pl(#false)
 
 -- ---------------------------------------------------------------------------
 -- Context decomposition: the redex is found deep inside a larger expression.
@@ -63,8 +105,12 @@ private def checkError (name : String) (prog : Exp) : IO Unit := do
   pl(#3)
 
 -- Redex under inl / inr
-#eval check "inl of redex"  pl(inl(#1 + #2))  pl(inl(#3))
-#eval check "inr of redex"  pl(inr(#3 * #4))  pl(inr(#12))
+#eval check "inl of redex"
+  pl(inl(#1 + #2))
+  pl(inl(#3))
+#eval check "inr of redex"
+  pl(inr(#3 * #4))
+  pl(inr(#12))
 
 -- Condition expression contains a redex
 #eval check "redex in condition"
@@ -75,16 +121,26 @@ private def checkError (name : String) (prog : Exp) : IO Unit := do
 -- Conditionals
 -- ---------------------------------------------------------------------------
 
-#eval check "if true"  pl(if #true  then #1 else #2) pl(#1)
-#eval check "if false" pl(if #false then #1 else #2) pl(#2)
+#eval check "if true"
+  pl(if #true  then #1 else #2)
+  pl(#1)
+#eval check "if false"
+  pl(if #false then #1 else #2)
+  pl(#2)
 
 -- ---------------------------------------------------------------------------
 -- Functions and let
 -- ---------------------------------------------------------------------------
 
-#eval check "identity"  pl((fun x, x) #42)      pl(#42)
-#eval check "let"       pl(let x := #7; x + #3) pl(#10)
-#eval check "closure"   pl((fun x y, x + y) #3 #4) pl(#7)
+#eval check "identity"
+  pl((fun x, x) #42)
+  pl(#42)
+#eval check "let"
+  pl(let x := #7; x + #3)
+  pl(#10)
+#eval check "closure"
+  pl((fun x y, x + y) #3 #4)
+  pl(#7)
 
 -- ---------------------------------------------------------------------------
 -- Recursion: factorial 5 = 120
@@ -92,14 +148,20 @@ private def checkError (name : String) (prog : Exp) : IO Unit := do
 
 private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n - #1))
 
-#eval check "factorial 5"  pl({factExp} #5)  pl(#120)
+#eval check "factorial 5"
+  pl({factExp} #5)
+  pl(#120)
 
 -- ---------------------------------------------------------------------------
 -- Pairs
 -- ---------------------------------------------------------------------------
 
-#eval check "fst"  pl(fst((#1, #2)))  pl(#1)
-#eval check "snd"  pl(snd((#1, #2)))  pl(#2)
+#eval check "fst"
+  pl(fst((#1, #2)))
+  pl(#1)
+#eval check "snd"
+  pl(snd((#1, #2)))
+  pl(#2)
 
 #eval check "let pair"
   pl(let a := #10; let b := #20; a + b)
@@ -178,13 +240,18 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
 -- Failure and unsupported
 -- ---------------------------------------------------------------------------
 
-#eval checkError "fail"         pl(fail)
-#eval checkError "assert false" pl(assert(#false))
-#eval checkError "tape"         pl(tape(#10))
+#eval checkError "fail"
+  pl(fail)
+#eval checkError "assert false"
+  pl(assert(#false))
+#eval checkError "tape"
+  pl(tape(#10))
 #eval checkError "rand with tape label"
   pl(rand(#5, #(BaseLit.lbl (0 : Int))))
 
-#eval check "assert true" pl(assert(#true)) pl(#.unit)
+#eval check "assert true"
+  pl(assert(#true))
+  pl(#.unit)
 
 -- ---------------------------------------------------------------------------
 -- Rand (IO.rand 0 n returns values in [0, n] inclusive, so bound is z+1)
@@ -204,56 +271,99 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
 -- Type errors in operators (should all be stuck)
 -- ---------------------------------------------------------------------------
 
-#eval checkError "add bool + int"    pl(#true + #1)
-#eval checkError "add int + bool"    pl(#1 + #true)
-#eval checkError "add unit + unit"   pl(#.unit + #.unit)
-#eval checkError "mult bool"         pl(#true * #false)
-#eval checkError "minus bools"       pl(#true - #false)
-#eval checkError "and int"           pl(#1 && #2)
-#eval checkError "or int"            pl(#1 || #2)
-#eval checkError "xor int"           pl(#1 ^^ #2)
-#eval checkError "neg int"           pl(~ #5)
-#eval checkError "negate bool"       pl(- #true)
+#eval checkError "add bool + int"
+  pl(#true + #1)
+#eval checkError "add int + bool"
+  pl(#1 + #true)
+#eval checkError "add unit + unit"
+  pl(#.unit + #.unit)
+#eval checkError "mult bool"
+  pl(#true * #false)
+#eval checkError "minus bools"
+  pl(#true - #false)
+#eval checkError "and int"
+  pl(#1 && #2)
+#eval checkError "or int"
+  pl(#1 || #2)
+#eval checkError "xor int"
+  pl(#1 ^^ #2)
+#eval checkError "neg int"
+  pl(~ #5)
+#eval checkError "negate bool"
+  pl(- #true)
 
 -- ---------------------------------------------------------------------------
 -- Projection errors
 -- ---------------------------------------------------------------------------
 
-#eval checkError "fst of non-pair"   pl(fst(#1))
-#eval checkError "snd of non-pair"   pl(snd(#true))
-#eval checkError "fst of inl"        pl(fst(inl(#1)))
+#eval checkError "fst of non-pair"
+  pl(fst(#1))
+#eval checkError "snd of non-pair"
+  pl(snd(#true))
+#eval checkError "fst of inl"
+  pl(fst(inl(#1)))
 
 -- ---------------------------------------------------------------------------
 -- Conditional errors
 -- ---------------------------------------------------------------------------
 
-#eval checkError "if int"            pl(if #1 then #2 else #3)
-#eval checkError "if unit"           pl(if #.unit then #1 else #2)
+#eval checkError "if int"
+  pl(if #1 then #2 else #3)
+#eval checkError "if unit"
+  pl(if #.unit then #1 else #2)
 
 -- ---------------------------------------------------------------------------
 -- Application errors
 -- ---------------------------------------------------------------------------
 
-#eval checkError "apply literal"     pl(#1 #2)
-#eval checkError "apply pair"        pl((#1, #2) #3)
+#eval checkError "apply literal"
+  pl(#1 #2)
+#eval checkError "apply pair"
+  pl((#1, #2) #3)
 
 -- ---------------------------------------------------------------------------
 -- Arithmetic edge cases
 -- ---------------------------------------------------------------------------
 
-#eval check "0 - 1 = -1"            pl(#0 - #1)                 pl(#(.int (-1)))
-#eval check "neg 0"                  pl(- #0)                    pl(#0)
-#eval check "neg neg"                pl(- (- #5))                pl(#5)
-#eval check "not false"              pl(~ #false)                pl(#true)
-#eval check "not not"                pl(~ (~ #true))             pl(#true)
-#eval check "0 * anything"           pl(#0 * #999)               pl(#0)
-#eval check "eq bools"               pl(#true = #true)           pl(#true)
-#eval check "neq bools"              pl(#true = #false)          pl(#false)
-#eval check "eq unit"                pl(#.unit = #.unit)         pl(#true)
-#eval check "xor ff"                 pl(#false ^^ #false)        pl(#false)
-#eval check "xor tf"                 pl(#true ^^ #false)         pl(#true)
-#eval check "and tt"                 pl(#true && #true)          pl(#true)
-#eval check "or ff"                  pl(#false || #false)        pl(#false)
+#eval check "0 - 1 = -1"
+  pl(#0 - #1)
+  pl(#(.int (-1)))
+#eval check "neg 0"
+  pl(- #0)
+  pl(#0)
+#eval check "neg neg"
+  pl(- (- #5))
+  pl(#5)
+#eval check "not false"
+  pl(~ #false)
+  pl(#true)
+#eval check "not not"
+  pl(~ (~ #true))
+  pl(#true)
+#eval check "0 * anything"
+  pl(#0 * #999)
+  pl(#0)
+#eval check "eq bools"
+  pl(#true = #true)
+  pl(#true)
+#eval check "neq bools"
+  pl(#true = #false)
+  pl(#false)
+#eval check "eq unit"
+  pl(#.unit = #.unit)
+  pl(#true)
+#eval check "xor ff"
+  pl(#false ^^ #false)
+  pl(#false)
+#eval check "xor tf"
+  pl(#true ^^ #false)
+  pl(#true)
+#eval check "and tt"
+  pl(#true && #true)
+  pl(#true)
+#eval check "or ff"
+  pl(#false || #false)
+  pl(#false)
 
 -- ---------------------------------------------------------------------------
 -- Deep context decomposition stress tests
@@ -295,15 +405,25 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
 
 -- Recursive: sum 1..10 = 55
 private def sumExp : Exp := pl(rec sum n := if n = #0 then #0 else n + sum (n - #1))
-#eval check "sum 1..10"  pl({sumExp} #10)  pl(#55)
+#eval check "sum 1..10"
+  pl({sumExp} #10)
+  pl(#55)
 
 -- Mutual recursion via pairs: is_even/is_odd
 private def isEvenOdd : Exp :=
   pl(rec eo n := if n = #0 then (#true, #false) else (snd(eo (n - #1)), fst(eo (n - #1))))
-#eval check "is_even 4"   pl(fst({isEvenOdd} #4))   pl(#true)
-#eval check "is_odd 4"    pl(snd({isEvenOdd} #4))    pl(#false)
-#eval check "is_even 3"   pl(fst({isEvenOdd} #3))    pl(#false)
-#eval check "is_odd 3"    pl(snd({isEvenOdd} #3))     pl(#true)
+#eval check "is_even 4"
+  pl(fst({isEvenOdd} #4))
+  pl(#true)
+#eval check "is_odd 4"
+  pl(snd({isEvenOdd} #4))
+  pl(#false)
+#eval check "is_even 3"
+  pl(fst({isEvenOdd} #3))
+  pl(#false)
+#eval check "is_odd 3"
+  pl(snd({isEvenOdd} #3))
+  pl(#true)
 
 -- ---------------------------------------------------------------------------
 -- Heap: aliasing, multiple stores, store-after-store
@@ -390,8 +510,10 @@ private def isEvenOdd : Exp :=
 -- Rand edge cases
 -- ---------------------------------------------------------------------------
 
-#eval checkError "rand 0 bound"  pl(rand(#0, #.unit))
-#eval checkError "rand negative" pl(rand(#(.int (-5)), #.unit))
+#eval checkError "rand 0 bound"
+  pl(rand(#0, #.unit))
+#eval checkError "rand negative"
+  pl(rand(#(.int (-5)), #.unit))
 
 -- rand(1, unit) returns 0 or 1 (IO.rand 0 1 is inclusive)
 #eval do
@@ -406,14 +528,222 @@ private def isEvenOdd : Exp :=
 -- Fail propagation through contexts
 -- ---------------------------------------------------------------------------
 
-#eval checkError "fail in binop left"   pl(fail + #1)
-#eval checkError "fail in binop right"  pl(#1 + fail)
-#eval checkError "fail in fst"          pl(fst(fail))
-#eval checkError "fail in snd"          pl(snd(fail))
-#eval checkError "fail in inl"          pl(inl(fail))
-#eval checkError "fail in cond"         pl(if fail then #1 else #2)
-#eval checkError "fail in alloc"        pl(alloc(fail))
-#eval checkError "fail in pair left"    pl((fail, #1))
+#eval checkError "fail in binop left"
+  pl(fail + #1)
+#eval checkError "fail in binop right"
+  pl(#1 + fail)
+#eval checkError "fail in fst"
+  pl(fst(fail))
+#eval checkError "fail in snd"
+  pl(snd(fail))
+#eval checkError "fail in inl"
+  pl(inl(fail))
+#eval checkError "fail in cond"
+  pl(if fail then #1 else #2)
+#eval checkError "fail in alloc"
+  pl(alloc(fail))
+#eval checkError "fail in pair left"
+  pl((fail, #1))
 -- Note: (v, fail) only fails if the pair is forced; as a value it's fine.
 -- But since fail is not a value, decomp should find it.
-#eval checkError "fail in pair right"   pl((#1, fail))
+#eval checkError "fail in pair right"
+  pl((#1, fail))
+
+-- ---------------------------------------------------------------------------
+-- Annotations (decomp through EctxItem.annot, preserved in result)
+-- ---------------------------------------------------------------------------
+
+-- annot on a value: annotation is stripped during evaluation
+#eval check "annot value"
+  pl((#42 : int))
+  pl(#42)
+
+-- annot on a redex: reduces under annotation, then strips it
+#eval check "annot redex"
+  pl((#1 + #2 : int))
+  pl(#3)
+
+-- nested annot: both annotations stripped
+#eval check "annot nested"
+  pl(((#3 * #4 : int) : int))
+  pl(#12)
+
+-- annot on a pair: annotation stripped, fst works
+#eval check "annot pair"
+  pl(fst(((#1, #2) : int × int)))
+  pl(#1)
+
+-- annot on function result
+#eval check "annot fn result"
+  pl(((fun x, x + #1) #9 : int))
+  pl(#10)
+
+-- ---------------------------------------------------------------------------
+-- Raw scrut (pattern matching primitive)
+-- ---------------------------------------------------------------------------
+
+-- scrut match success: returns inl(bindings)
+#eval check "scrut var match"
+  pl(case scrut #42 with x | inl(b) => b | inr(_) => #0)
+  pl(#42)
+
+-- scrut literal match: returns inl(unit)
+#eval check "scrut lit match"
+  pl(case scrut #1 with #(.int 1) | inl(_) => #99 | inr(_) => #0)
+  pl(#99)
+
+-- scrut literal mismatch: returns inr(unit)
+#eval check "scrut lit mismatch"
+  pl(case scrut #1 with #(.int 2) | inl(_) => #99 | inr(_) => #0)
+  pl(#0)
+
+-- scrut pair match
+#eval check "scrut pair match"
+  pl(case scrut (#1, #2) with (x, y) | inl(b) => fst(b) + snd(b) | inr(_) => #0)
+  pl(#3)
+
+-- scrut inl match
+#eval check "scrut inl match"
+  pl(case scrut inl(#5) with inl(x) | inl(b) => b | inr(_) => #0)
+  pl(#5)
+
+-- scrut inl on inr: mismatch
+#eval check "scrut inl on inr mismatch"
+  pl(case scrut inr(#5) with inl(x) | inl(_) => #99 | inr(_) => #0)
+  pl(#0)
+
+-- ---------------------------------------------------------------------------
+-- Heap errors (segfault)
+-- ---------------------------------------------------------------------------
+
+-- Load from a fabricated location (not allocated)
+#eval checkError "segfault load"
+  pl(!#(.loc 999))
+
+-- Store to a fabricated location
+#eval checkError "segfault store"
+  pl(#(.loc 999) ← #1)
+
+-- ---------------------------------------------------------------------------
+-- Equality across types
+-- ---------------------------------------------------------------------------
+
+#eval check "eq int vs int diff"
+  pl(#0 = #1)
+  pl(#false)
+#eval check "eq bool vs bool same"
+  pl(#true = #true)
+  pl(#true)
+#eval check "eq unit vs unit"
+  pl(#.unit = #.unit)
+  pl(#true)
+
+-- Cross-type equality: int vs bool (BaseLit.int ≠ BaseLit.bool via DecidableEq)
+#eval check "eq int vs bool"
+  pl(#1 = #true)
+  pl(#false)
+#eval check "eq bool vs int"
+  pl(#false = #0)
+  pl(#false)
+#eval check "eq unit vs int"
+  pl(#.unit = #1)
+  pl(#false)
+
+-- ---------------------------------------------------------------------------
+-- Variable shadowing
+-- ---------------------------------------------------------------------------
+
+#eval check "shadow let"
+  pl(let x := #1; let x := #2; x)
+  pl(#2)
+
+#eval check "shadow let uses inner"
+  pl(let x := #1; let x := x + #10; x)
+  pl(#11)
+
+#eval check "shadow fn param"
+  pl((fun x, (fun x, x)) #1 #2)
+  pl(#2)
+
+#eval check "shadow rec"
+  pl(let x := #100; (fun x, x + #1) #5)
+  pl(#6)
+
+-- ---------------------------------------------------------------------------
+-- Letrec as value
+-- ---------------------------------------------------------------------------
+
+-- A bare letrec (not applied) is a value
+#eval check "letrec is value"
+  pl(rec f x := x)
+  pl(rec f x := x)
+
+-- Letrec stored in a let, then applied
+#eval check "letrec in let"
+  pl(let f := rec g x := x + #1; f #9)
+  pl(#10)
+
+-- Letrec in a pair
+#eval check "letrec in pair"
+  pl(fst((rec f x := x, #99)))
+  pl(rec f x := x)
+
+-- ---------------------------------------------------------------------------
+-- Anonymous binder edge cases
+-- ---------------------------------------------------------------------------
+
+#eval check "anon binder"
+  pl((fun _, #42) #0)
+  pl(#42)
+
+#eval check "anon binder ignores arg"
+  pl((fun _, #1 + #2) #999)
+  pl(#3)
+
+-- ---------------------------------------------------------------------------
+-- Deep nested values
+-- ---------------------------------------------------------------------------
+
+#eval check "pair of pairs"
+  pl(fst(snd((#1, (#2, #3)))))
+  pl(#2)
+
+#eval check "inl of inr"
+  pl(case inl(inr(#7)) | inl(x) => x | inr(_) => #0)
+  pl(inr(#7))
+
+#eval check "deeply nested pair"
+  pl(fst(snd(snd((#1, (#2, (#3, #4)))))))
+  pl(#3)
+
+-- ---------------------------------------------------------------------------
+-- Multi-arm case (3+ arms, exercises scrutinize chain)
+-- ---------------------------------------------------------------------------
+
+#eval check "3-arm case: first match"
+  pl(case #1 | #(.int 1) => #10 | #(.int 2) => #20 | _ => #30)
+  pl(#10)
+
+#eval check "3-arm case: second match"
+  pl(case #2 | #(.int 1) => #10 | #(.int 2) => #20 | _ => #30)
+  pl(#20)
+
+#eval check "3-arm case: fallthrough"
+  pl(case #3 | #(.int 1) => #10 | #(.int 2) => #20 | _ => #30)
+  pl(#30)
+
+#eval check "4-arm case"
+  pl(case #3 | #(.int 1) => #10 | #(.int 2) => #20 | #(.int 3) => #30 | _ => #40)
+  pl(#30)
+
+-- ---------------------------------------------------------------------------
+-- Rand with computed bound
+-- ---------------------------------------------------------------------------
+
+#eval do
+  let v ← run pl(rand(#3 + #3, #.unit))
+  match v.1 with
+  | .lit (.int n) =>
+    if n < 0 || n > 6 then
+      throw (IO.userError s!"FAIL [rand computed bound]: got {n}, expected 0..6")
+  | e => throw (IO.userError s!"FAIL [rand computed bound type]: got {repr e}")

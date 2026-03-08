@@ -58,7 +58,7 @@ inductive Ty
   | sum (τ1 τ2 : Ty)
   | arrow (τ1 τ2 : Ty)
   | ref (τ : Ty)
-  | tape (τ : Ty)
+  | tape
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
 inductive Binder | anon | named (s : String) | typed (s : String) (τ : Ty)
@@ -172,7 +172,6 @@ inductive IsVal : Exp → Type
   | pair : IsVal e1 → IsVal e2 → IsVal (.pair e1 e2)
   | inl  : IsVal e → IsVal (.inl e)
   | inr  : IsVal e → IsVal (.inr e)
-  | annot : IsVal e → IsVal (.annot a e)
 
 /-- A value is an expression paired with a Type-valued witness. -/
 def Val := (e : Exp) × IsVal e
@@ -186,7 +185,6 @@ def check? : (e : Exp) → Option (IsVal e)
   | .pair e1 e2 => do return .pair (← check? e1) (← check? e2)
   | .inl e => do return .inl (← check? e)
   | .inr e => do return .inr (← check? e)
-  | .annot _ e => do return .annot (← check? e)
   | _ => none
 
 /-- IsVal witnesses are unique for a given expression. -/
@@ -196,7 +194,6 @@ theorem subsingleton : (w1 w2 : IsVal e) → w1 = w2
   | .pair h1 h2, .pair h1' h2' => by rw [subsingleton h1 h1', subsingleton h2 h2']
   | .inl h, .inl h' => by rw [subsingleton h h']
   | .inr h, .inr h' => by rw [subsingleton h h']
-  | .annot h, .annot h' => by rw [subsingleton h h']
 
 instance : Subsingleton (IsVal e) := ⟨subsingleton⟩
 
@@ -225,7 +222,6 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
       exact ⟨.pair w1 w2, by simp [check?, hw1, hw2]⟩
   | .inl h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inl w, by simp [check?, hw]⟩
   | .inr h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inr w, by simp [check?, hw]⟩
-  | .annot h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.annot w, by simp [check?, hw]⟩
 
 /-- Recursive Prop-valued value predicate. Not the canonical definition
     (`isValue := Nonempty (IsVal e)`) but useful for case-splitting proofs
@@ -233,7 +229,7 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
 @[simp] def Exp.isValueR : Exp → Prop
   | .lit _ | .letrec _ _ _ => True
   | .pair e1 e2 => e1.isValueR ∧ e2.isValueR
-  | .inl e | .inr e | .annot _ e => e.isValueR
+  | .inl e | .inr e => e.isValueR
   | _ => False
 
 theorem Exp.isValue_iff_isValueR {e : Exp} : e.isValue ↔ e.isValueR := by
@@ -241,14 +237,13 @@ theorem Exp.isValue_iff_isValueR {e : Exp} : e.isValue ↔ e.isValueR := by
   · rintro ⟨w⟩; induction w with
     | lit | letrec => trivial
     | pair _ _ ih1 ih2 => exact ⟨ih1, ih2⟩
-    | inl _ ih | inr _ ih | annot _ ih => exact ih
+    | inl _ ih | inr _ ih => exact ih
   · intro h; induction e with
     | lit | letrec => exact ⟨by constructor⟩
     | pair _ _ ih1 ih2 =>
       obtain ⟨h1, h2⟩ := h; exact ⟨.pair (ih1 h1).some (ih2 h2).some⟩
     | inl _ ih => exact ⟨.inl (ih h).some⟩
     | inr _ ih => exact ⟨.inr (ih h).some⟩
-    | annot _ _ ih => exact ⟨.annot (ih h).some⟩
     | _ => exact absurd h id
 
 theorem IsVal.not_isValue_of_check?_none {e : Exp} (h : IsVal.check? e = none) : ¬e.isValue :=

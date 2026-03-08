@@ -40,7 +40,7 @@ syntax:35 pl_ty:36 " × " pl_ty:35 : pl_ty
 syntax:30 pl_ty:31 " + " pl_ty:30 : pl_ty
 syntax:25 pl_ty:26 " → " pl_ty:25 : pl_ty
 syntax:max "ref(" pl_ty ")" : pl_ty
-syntax:max "tape(" pl_ty ")" : pl_ty
+syntax:max "tape" : pl_ty
 
 /-- Pattern syntax -/
 syntax:max "_" : pl_pat
@@ -135,11 +135,11 @@ macro_rules
   | `(pl_ty(bool))         => `(Ty.bool)
   | `(pl_ty(unit))         => `(Ty.unit)
   | `(pl_ty(($τ)))         => `(pl_ty($τ))
-  | `(pl_ty($τ1 × $τ2))   => `(Ty.prod pl_ty($τ1) pl_ty($τ2))
-  | `(pl_ty($τ1 + $τ2))   => `(Ty.sum pl_ty($τ1) pl_ty($τ2))
+  | `(pl_ty($τ1 × $τ2))    => `(Ty.prod pl_ty($τ1) pl_ty($τ2))
+  | `(pl_ty($τ1 + $τ2))    => `(Ty.sum pl_ty($τ1) pl_ty($τ2))
   | `(pl_ty($τ1 → $τ2))   => `(Ty.arrow pl_ty($τ1) pl_ty($τ2))
   | `(pl_ty(ref($τ)))      => `(Ty.ref pl_ty($τ))
-  | `(pl_ty(tape($τ)))     => `(Ty.tape pl_ty($τ))
+  | `(pl_ty(tape))         => `(Ty.tape)
 
 /-- elaborating patterns -/
 macro_rules
@@ -400,8 +400,7 @@ def unexpTyRef : Unexpander
   | _ => throw ()
 @[app_unexpander Ty.tape]
 def unexpTyTape : Unexpander
-  | `($_ $τ) => do `(pl_ty(tape($(← unpackPLTy τ))))
-  | _ => throw ()
+  | `($_) => do `(pl_ty(tape))
 
 @[app_unexpander Annot.ty]
 def unexpAnnotTy : Unexpander

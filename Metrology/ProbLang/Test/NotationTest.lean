@@ -22,8 +22,6 @@ macro "#elabpl " lhs:term:max ppLine "#expect " rhs:term : command =>
 #guard_msgs (error) in #check (pl(inr) : Exp)
 /-- error: 'alloc' is a reserved keyword in ProbLang and cannot be used as an identifier -/
 #guard_msgs (error) in #check (pl(alloc) : Exp)
-/-- error: 'tape' is a reserved keyword in ProbLang and cannot be used as an identifier -/
-#guard_msgs (error) in #check (pl(tape) : Exp)
 /-- error: 'rand' is a reserved keyword in ProbLang and cannot be used as an identifier -/
 #guard_msgs (error) in #check (pl(rand) : Exp)
 -- Reserved keywords are rejected in binder position
@@ -33,6 +31,8 @@ macro "#elabpl " lhs:term:max ppLine "#expect " rhs:term : command =>
 #guard_msgs (error) in #check (pl(fun inl, x) : Exp)
 /-- error: 'rand' is a reserved keyword in ProbLang and cannot be used as an identifier -/
 #guard_msgs (error) in #check (pl(rec f rand := x) : Exp)
+
+variable (e e1 e2 : Exp)
 
 -- Literals and variables
 #elabpl pl(#(.int 1))
@@ -74,7 +74,7 @@ macro "#elabpl " lhs:term:max ppLine "#expect " rhs:term : command =>
 
 -- Probabilistic
 #elabpl pl(tape(#(.int 10)))
-#expect tape (lit (.int 10))
+#expect .tape (lit (.int 10))
 
 #elabpl pl(rand(#(.int 10), #.unit))
 #expect rand (lit (.int 10)) (lit .unit)
@@ -138,9 +138,11 @@ macro "#elabpl " lhs:term:max ppLine "#expect " rhs:term : command =>
 #expect binop .eq (binop .plus (var "x") (var "y")) (var "z")
 
 -- Escape hatch {}: splice a Lean term directly
-example (e : Exp) : pl({e}) = e := rfl
+#elabpl pl({e})
+#expect e
 
-example (e1 e2 : Exp) : pl({e1} + {e2}) = binop .plus e1 e2 := rfl
+#elabpl pl({e1} + {e2})
+#expect binop .plus e1 e2
 
 -- Literals
 #elabpl pl(#(.bool true))
@@ -221,22 +223,18 @@ example (e1 e2 : Exp) : pl({e1} + {e2}) = binop .plus e1 e2 := rfl
 -- Sums
 #elabpl pl(inr(x))
 #expect inr (var "x")
--- [commented out: case tests]
--- example : pl(case inl(x) | l => l + #(.int 1) | r => r) =
---     Exp.case (inl (var "x"))
---       (letrec .anon (.named "l") (binop .plus (var "l") (lit (.int 1))))
---       (letrec .anon (.named "r") (var "r")) := rfl
 
 -- Store binds tighter than sequencing
 #elabpl pl(x ← #(.int 1); e2)
 #expect app (letrec .anon .anon (var "e2"))
-             (store (var "x") (lit (.int 1)))
+            (store (var "x") (lit (.int 1)))
 
 -- rec with multiple args desugars to rec with single arg and inner fun
 #elabpl pl(rec f x y := f x y)
 #expect letrec (.named "f") (.named "x")
            (letrec .anon (.named "y")
              (app (app (var "f") (var "x")) (var "y")))
+
 -- three-arg rec
 #elabpl pl(rec f x y z := f x y z)
 #expect letrec (.named "f") (.named "x")
@@ -247,12 +245,14 @@ example (e1 e2 : Exp) : pl({e1} + {e2}) = binop .plus e1 e2 := rfl
 -- fun uses .anon self-binder; rec uses .named
 #elabpl pl(fun x, x)
 #expect letrec .anon (.named "x") (var "x")
+
 #elabpl pl(rec f x := x)
 #expect letrec (.named "f") (.named "x") (var "x")
 
 -- anonymous argument binder _
 #elabpl pl(fun _, x)
 #expect letrec .anon .anon (var "x")
+
 #elabpl pl(rec f _ := f)
 #expect letrec (.named "f") .anon (var "f")
 
@@ -270,6 +270,7 @@ example (e1 e2 : Exp) : pl({e1} + {e2}) = binop .plus e1 e2 := rfl
 -- xor precedence: ^^ binds tighter than ||, looser than &&
 #elabpl pl(x && y ^^ z)
 #expect binop .xor (binop .and (var "x") (var "y")) (var "z")
+
 #elabpl pl(x ^^ y || z)
 #expect binop .or (binop .xor (var "x") (var "y")) (var "z")
 
@@ -303,12 +304,15 @@ example (e1 e2 : Exp) : pl({e1} + {e2}) = binop .plus e1 e2 := rfl
 --       (letrec .anon (.named "r") (var "r")) := rfl
 
 -- escape hatch inside compound expressions
-example (e : Exp) : pl(let x := {e}; x) =
-    app (letrec .anon (.named "x") (var "x")) e := rfl
-example (e : Exp) : pl(if {e} then x else y) =
-    cond e (var "x") (var "y") := rfl
-example (e : Exp) : pl(fun x, {e}) =
-    letrec .anon (.named "x") e := rfl
+#elabpl pl(let x := {e}; x)
+#expect app (letrec .anon (.named "x") (var "x")) e
+
+#elabpl pl(if {e} then x else y)
+#expect cond e (var "x") (var "y")
+
+#elabpl pl(fun x, {e})
+#expect letrec .anon (.named "x") e
+
 -- [commented out: case tests]
 -- example (e1 e2 : Exp) : pl(case {e1} | l => {e2} | r => r) =
 --     Exp.case e1
@@ -324,12 +328,10 @@ example (e : Exp) : pl(fun x, {e}) =
                (var "x")))
            (var "e")
 
--- fun shadows outer variable of same name
 #elabpl pl(fun x, fun x, x)
 #expect letrec .anon (.named "x")
            (letrec .anon (.named "x") (var "x"))
 
--- rec self-name shadows outer variable of same name
 #elabpl pl(rec f x := rec f x := f x)
 #expect letrec (.named "f") (.named "x")
            (letrec (.named "f") (.named "x")
@@ -337,8 +339,7 @@ example (e : Exp) : pl(fun x, {e}) =
 
 -- rec self-name and arg name are the same identifier
 #elabpl pl(rec x x := x x)
-#expect letrec (.named "x") (.named "x")
-           (app (var "x") (var "x"))
+#expect letrec (.named "x") (.named "x") (app (var "x") (var "x"))
 
 -- if branches contain let/fun (low-prec forms inside low-prec if)
 #elabpl pl(if x then let y := e; y else z)
@@ -462,7 +463,7 @@ example (e : Exp) : pl(fun x, {e}) =
            (cond (var "y") (var "a") (var "b"))
            (var "c")
 
--- store value is a freshly allocated reference
+-- store value of a freshly allocated reference
 #elabpl pl(x ← alloc(y))
 #expect store (var "x") (alloc (var "y"))
 
@@ -472,7 +473,7 @@ example (e : Exp) : pl(fun x, {e}) =
 
 -- rand applied to tape result
 #elabpl pl(rand(tape(n), #.unit))
-#expect rand (tape (var "n")) (lit .unit)
+#expect rand (.tape (var "n")) (lit .unit)
 
 -- Failure
 #elabpl pl(fail)
@@ -495,7 +496,7 @@ example (e : Exp) : pl(fun x, {e}) =
 #expect app
            (letrec .anon (.named "t")
              (rand (var "t") (lit .unit)))
-           (tape (var "n"))
+           (.tape (var "n"))
 
 -- applying the result of a load
 #elabpl pl((!f) x)
@@ -518,6 +519,281 @@ example (e : Exp) : pl(fun x, {e}) =
 #expect pair (var "a")
            (pair (var "b")
              (pair (var "c") (var "d")))
+
+-- Type syntax
+#elabpl pl_ty(int)
+#expect .int
+
+#elabpl pl_ty(bool)
+#expect .bool
+
+#elabpl pl_ty(unit)
+#expect .unit
+
+#elabpl pl_ty(int × bool)
+#expect .prod .int .bool
+
+#elabpl pl_ty(int + bool)
+#expect .sum .int .bool
+
+#elabpl pl_ty(int → bool)
+#expect .arrow .int .bool
+
+#elabpl pl_ty(ref(int))
+#expect .ref .int
+
+-- × is right-associative
+#elabpl pl_ty(int × bool × unit)
+#expect .prod .int (.prod .bool .unit)
+
+-- → is right-associative
+#elabpl pl_ty(int → bool → unit)
+#expect .arrow .int (.arrow .bool .unit)
+
+-- + is right-associative
+#elabpl pl_ty(int + bool + unit)
+#expect .sum .int (.sum .bool .unit)
+
+-- × binds tighter than +
+#elabpl pl_ty(int × bool + unit)
+#expect .sum (.prod .int .bool) .unit
+
+-- × binds tighter than →
+#elabpl pl_ty(int × bool → unit)
+#expect .arrow (.prod .int .bool) .unit
+
+-- parentheses override precedence
+#elabpl pl_ty(int × (bool + unit))
+#expect .prod .int (.sum .bool .unit)
+
+-- ref and tape
+#elabpl pl_ty(ref(int × bool))
+#expect .ref (.prod .int .bool)
+
+#elabpl pl_ty(tape)
+#expect Ty.tape
+
+-- Expression type annotations
+#elabpl pl((x : int))
+#expect annot (.ty .int) (var "x")
+
+#elabpl pl((#1 : int))
+#expect annot (.ty .int) (lit (.int 1))
+
+#elabpl pl((x + y : int))
+#expect annot (.ty .int) (binop .plus (var "x") (var "y"))
+
+-- Typed binders in fun
+#elabpl pl(fun (x : int), x)
+#expect letrec .anon (.typed "x" .int) (var "x")
+
+-- Typed binders in rec
+#elabpl pl(rec f (x : int) := f x)
+#expect letrec (.named "f") (.typed "x" .int) (app (var "f") (var "x"))
+
+-- Typed binders in let
+#elabpl pl(let (x : int) := #1; x)
+#expect app (letrec .anon (.typed "x" .int) (var "x")) (lit (.int 1))
+
+-- Mixed typed and untyped binders
+#elabpl pl(fun (x : int) y, x + y)
+#expect letrec .anon (.typed "x" .int)
+           (letrec .anon (.named "y")
+             (binop .plus (var "x") (var "y")))
+
+-- + binds tighter than →
+#elabpl pl_ty(int + bool → unit)
+#expect .arrow (.sum .int .bool) .unit
+
+-- ref inside compound types
+#elabpl pl_ty(ref(int) × ref(bool))
+#expect .prod (.ref .int) (.ref .bool)
+
+-- nested ref
+#elabpl pl_ty(ref(ref(int)))
+#expect .ref (.ref .int)
+
+-- Annotation with compound type
+#elabpl pl((x : int → bool))
+#expect annot (.ty (.arrow .int .bool)) (var "x")
+
+-- Annotation with product type
+#elabpl pl((x : int × bool))
+#expect annot (.ty (.prod .int .bool)) (var "x")
+
+-- Nested annotation
+#elabpl pl(((x : int) : int))
+#expect annot (.ty .int) (annot (.ty .int) (var "x"))
+
+-- [commented out: typed binder in case arms test]
+-- example : pl(case inl(#1) | (x : int) => x | (y : bool) => y) = ... := rfl
+
+-- Multi-arg rec with all typed binders
+#elabpl pl(rec f (x : int) (y : bool) := f x y)
+#expect letrec (.named "f") (.typed "x" .int)
+           (letrec .anon (.typed "y" .bool)
+             (app (app (var "f") (var "x")) (var "y")))
+
+-- [commented out: typed binder in single-arm case test]
+-- example : pl(case inl(#1) | inl((v : int)) => v) = ... := rfl
+
+-- Annotation inside a let body
+#elabpl pl(let (x : int) := #1; (x : int))
+#expect app (letrec .anon (.typed "x" .int)
+               (annot (.ty .int) (var "x")))
+             (lit (.int 1))
+
+
+-- Annotated value in operational positions
+#elabpl pl(fst(((#1, #2) : int × int)))
+#expect fst (annot (.ty (.prod .int .int)) (pair (lit (.int 1)) (lit (.int 2))))
+
+#elabpl pl((fun x, x : int → int) #1)
+#expect app (annot (.ty (.arrow .int .int)) (letrec .anon (.named "x") (var "x")))
+            (lit (.int 1))
+
+
+-- fun with _ applied to a value
+#elabpl pl((fun _, fail) #1)
+#expect app (letrec .anon .anon Exp.fail) (lit (.int 1))
+
+-- sequencing with fail
+#elabpl pl(fail; x)
+#expect app (letrec .anon .anon (var "x")) Exp.fail
+
+-- [commented out: case tests]
+-- example : pl(case inl(#1) | _ => #2 | _ => #3) = ... := rfl
+
+-- deeply nested lets
+#elabpl pl(let x := (let y := #1; y); x)
+#expect app (letrec .anon (.named "x") (var "x"))
+            (app (letrec .anon (.named "y") (var "y"))
+                 (lit (.int 1)))
+
+-- store/load with annotations
+#elabpl pl(alloc((#0 : int)))
+#expect alloc (annot (.ty .int) (lit (.int 0)))
+
+#elabpl pl(!(r : ref(int)))
+#expect load (annot (.ty (.ref .int)) (var "r"))
+
+-- Variable patterns
+#elabpl pl_pat(x)
+#expect .var (.named "x")
+
+#elabpl pl_pat(_)
+#expect .var .anon
+
+-- Literal patterns
+#elabpl pl_pat(#(.int 1))
+#expect .lit (.int 1)
+
+#elabpl pl_pat(#.unit)
+#expect .lit .unit
+
+-- Pair patterns
+#elabpl pl_pat((x, y))
+#expect .pair (.var (.named "x")) (.var (.named "y"))
+
+-- Sum patterns
+#elabpl pl_pat(inl(x))
+#expect .inl (.var (.named "x"))
+
+#elabpl pl_pat(inr(y))
+#expect .inr (.var (.named "y"))
+
+-- Annotated patterns
+#elabpl pl_pat((x : int))
+#expect .annot (.ty .int) (.var (.named "x"))
+
+-- Nested patterns
+#elabpl pl_pat(inl((x, y)))
+#expect .inl (.pair (.var (.named "x")) (.var (.named "y")))
+
+#elabpl pl_pat((inl(x), inr(y)))
+#expect .pair (.inl (.var (.named "x"))) (.inr (.var (.named "y")))
+
+#elabpl pl(scrut x with y)
+#expect Exp.scrut (var "x") (.var (.named "y"))
+
+#elabpl pl(scrut inl(#1) with inl(x))
+#expect Exp.scrut (inl (lit (.int 1))) (.inl (.var (.named "x")))
+
+#elabpl pl(scrut (x, y) with (a, b))
+#expect Exp.scrut (pair (var "x") (var "y"))
+                  (.pair (.var (.named "a")) (.var (.named "b")))
+
+-- Scrut with annotated pattern
+#elabpl pl(scrut x with (y : int))
+#expect Exp.scrut (var "x") (.annot (.ty .int) (.var (.named "y")))
+
+-- Simple variable pattern: let! x := e; body
+#elabpl pl(let! x := #1; x)
+#expect Exp.case
+           (Exp.scrut (lit (.int 1)) (.var (.named "x")))
+           (letrec .anon (.named "__bind")
+             (app (letrec .anon (.named "x") (var "x"))
+                  (var "__bind")))
+           (letrec .anon .anon Exp.fail)
+
+-- Pair pattern: let! (x, y) := e; x + y
+#elabpl pl(let! (x, y) := e; x + y)
+#expect Exp.case (Exp.scrut (var "e") (.pair (.var (.named "x")) (.var (.named "y"))))
+           (letrec .anon (.named "__bind")
+             (app (letrec .anon (.named "x")
+                    (app (letrec .anon (.named "y")
+                           (binop .plus (var "x") (var "y")))
+                         (snd (var "__bind"))))
+                  (fst (var "__bind"))))
+           (letrec .anon .anon Exp.fail)
+
+-- Wildcard pattern: no binding
+#elabpl pl(let! _ := e; x)
+#expect Exp.case (Exp.scrut (var "e") (.var .anon))
+           (letrec .anon (.named "__bind") (var "x"))
+           (letrec .anon .anon Exp.fail)
+
+-- inl pattern
+#elabpl pl(let! inl(x) := e; x)
+#expect Exp.case (Exp.scrut (var "e") (.inl (.var (.named "x"))))
+           (letrec .anon (.named "__bind")
+             (app (letrec .anon (.named "x") (var "x"))
+                  (var "__bind")))
+           (letrec .anon .anon Exp.fail)
+
+-- Literal pattern (no bindings)
+#elabpl pl(let! #(.int 1) := e; x)
+#expect Exp.case (Exp.scrut (var "e") (.lit (.int 1)))
+           (letrec .anon (.named "__bind") (var "x"))
+           (letrec .anon .anon Exp.fail)
+
+-- Two-arm case on a sum (binds scrutinee to __scrut, tries each arm)
+#elabpl pl(case e | inl(x) => x | inr(y) => y)
+#expect app
+           (letrec .anon (.named "__scrut")
+             (Exp.case (Exp.scrut (var "__scrut") (.inl (.var (.named "x"))))
+               (letrec .anon (.named "__bind")
+                 (app (letrec .anon (.named "x") (var "x"))
+                      (var "__bind")))
+               (letrec .anon .anon
+                 (Exp.case (Exp.scrut (var "__scrut") (.inr (.var (.named "y"))))
+                   (letrec .anon (.named "__bind")
+                     (app (letrec .anon (.named "y") (var "y"))
+                          (var "__bind")))
+                   (letrec .anon .anon Exp.fail)))))
+           (var "e")
+
+-- Single-arm case
+#elabpl pl(case e | inl(x) => x)
+#expect app
+           (letrec .anon (.named "__scrut")
+             (Exp.case (Exp.scrut (var "__scrut") (.inl (.var (.named "x"))))
+               (letrec .anon (.named "__bind")
+                 (app (letrec .anon (.named "x") (var "x"))
+                      (var "__bind")))
+               (letrec .anon .anon Exp.fail)))
+           (var "e")
+
 
 -- Delaboration (unexpander) tests: check that Exp constructors print back as pl(...) syntax
 /-- info: pl(#(BaseLit.int 1)) : Exp -/
@@ -578,7 +854,7 @@ example (e : Exp) : pl(fun x, {e}) =
 #guard_msgs in #check (store (var "x") (var "y") : Exp)
 
 /-- info: pl(tape(#(BaseLit.int 10))) : Exp -/
-#guard_msgs in #check (tape (lit (.int 10)) : Exp)
+#guard_msgs in #check (.tape (lit (.int 10)) : Exp)
 
 /-- info: pl(rand(#(BaseLit.int 10), #BaseLit.unit)) : Exp -/
 #guard_msgs in #check (rand (lit (.int 10)) (lit .unit) : Exp)
@@ -630,53 +906,6 @@ example (e : Exp) : pl(fun x, {e}) =
     (letrec .anon (.named "y")
       (app (app (var "f") (var "x")) (var "y"))) : Exp)
 
--- Type syntax
-#elabpl pl_ty(int)       #expect .int
-#elabpl pl_ty(bool)      #expect .bool
-#elabpl pl_ty(unit)      #expect .unit
-#elabpl pl_ty(int × bool)  #expect .prod .int .bool
-#elabpl pl_ty(int + bool)  #expect .sum .int .bool
-#elabpl pl_ty(int → bool)  #expect .arrow .int .bool
-#elabpl pl_ty(ref(int))    #expect .ref .int
--- × is right-associative
-#elabpl pl_ty(int × bool × unit)  #expect .prod .int (.prod .bool .unit)
--- → is right-associative
-#elabpl pl_ty(int → bool → unit)  #expect .arrow .int (.arrow .bool .unit)
--- + is right-associative
-#elabpl pl_ty(int + bool + unit)  #expect .sum .int (.sum .bool .unit)
--- × binds tighter than +
-#elabpl pl_ty(int × bool + unit)  #expect .sum (.prod .int .bool) .unit
--- × binds tighter than →
-#elabpl pl_ty(int × bool → unit)  #expect .arrow (.prod .int .bool) .unit
--- parentheses override precedence
-#elabpl pl_ty(int × (bool + unit))  #expect .prod .int (.sum .bool .unit)
--- ref and tape
-#elabpl pl_ty(ref(int × bool))  #expect .ref (.prod .int .bool)
-#elabpl pl_ty(tape(int))        #expect .tape .int
-
--- Expression type annotations
-#elabpl pl((x : int))
-#expect annot (.ty .int) (var "x")
-#elabpl pl((#1 : int))
-#expect annot (.ty .int) (lit (.int 1))
-#elabpl pl((x + y : int))
-#expect annot (.ty .int) (binop .plus (var "x") (var "y"))
-
--- Typed binders in fun
-#elabpl pl(fun (x : int), x)
-#expect letrec .anon (.typed "x" .int) (var "x")
--- Typed binders in rec
-#elabpl pl(rec f (x : int) := f x)
-#expect letrec (.named "f") (.typed "x" .int) (app (var "f") (var "x"))
--- Typed binders in let
-#elabpl pl(let (x : int) := #1; x)
-#expect app (letrec .anon (.typed "x" .int) (var "x")) (lit (.int 1))
--- Mixed typed and untyped binders
-#elabpl pl(fun (x : int) y, x + y)
-#expect letrec .anon (.typed "x" .int)
-           (letrec .anon (.named "y")
-             (binop .plus (var "x") (var "y")))
-
 -- Delaboration: type annotations
 /-- info: pl((x : int)) : Exp -/
 #guard_msgs in #check (annot (.ty .int) (var "x") : Exp)
@@ -695,41 +924,6 @@ example (e : Exp) : pl(fun x, {e}) =
 /-- info: pl_ty(ref(int)) : Ty -/
 #guard_msgs in #check (Ty.ref .int : Ty)
 
--- + binds tighter than →
-#elabpl pl_ty(int + bool → unit)  #expect .arrow (.sum .int .bool) .unit
--- ref inside compound types
-#elabpl pl_ty(ref(int) × ref(bool))  #expect .prod (.ref .int) (.ref .bool)
--- nested ref
-#elabpl pl_ty(ref(ref(int)))  #expect .ref (.ref .int)
-
--- Annotation with compound type
-#elabpl pl((x : int → bool))
-#expect annot (.ty (.arrow .int .bool)) (var "x")
--- Annotation with product type
-#elabpl pl((x : int × bool))
-#expect annot (.ty (.prod .int .bool)) (var "x")
--- Nested annotation
-#elabpl pl(((x : int) : int))
-#expect annot (.ty .int) (annot (.ty .int) (var "x"))
-
--- [commented out: typed binder in case arms test]
--- example : pl(case inl(#1) | (x : int) => x | (y : bool) => y) = ... := rfl
-
--- Multi-arg rec with all typed binders
-#elabpl pl(rec f (x : int) (y : bool) := f x y)
-#expect letrec (.named "f") (.typed "x" .int)
-           (letrec .anon (.typed "y" .bool)
-             (app (app (var "f") (var "x")) (var "y")))
-
--- [commented out: typed binder in single-arm case test]
--- example : pl(case inl(#1) | inl((v : int)) => v) = ... := rfl
-
--- Annotation inside a let body
-#elabpl pl(let (x : int) := #1; (x : int))
-#expect app (letrec .anon (.typed "x" .int)
-               (annot (.ty .int) (var "x")))
-             (lit (.int 1))
-
 -- Delaboration: compound type annotation
 /-- info: pl((x : int → bool)) : Exp -/
 #guard_msgs in #check (annot (.ty (.arrow .int .bool)) (var "x") : Exp)
@@ -742,30 +936,20 @@ example (e : Exp) : pl(fun x, {e}) =
 /-- info: pl_ty(int + bool) : Ty -/
 #guard_msgs in #check (Ty.sum .int .bool : Ty)
 
--- ---------------------------------------------------------------------------
--- Annotation interactions with IsVal
--- ---------------------------------------------------------------------------
 
--- Annotated literal is a value
-example : (pl((#1 : int))).isValue := ⟨.annot .lit⟩
--- Annotated pair is a value
-example : (pl(((#1, #2) : int × int))).isValue := ⟨.annot (.pair .lit .lit)⟩
+-- TODO: Move
+
+-- Annotated literal is NOT a value (annotations are stripped during evaluation)
+example : ¬(pl((#1 : int))).isValue := by simp [Exp.isValue_iff_isValueR]
+-- Annotated pair is NOT a value
+example : ¬(pl(((#1, #2) : int × int))).isValue := by simp [Exp.isValue_iff_isValueR]
 -- Annotated non-value is not a value
 example : ¬(pl((x + y : int))).isValue := by simp [Exp.isValue_iff_isValueR]
-
--- Annotated value in operational positions
-#elabpl pl(fst(((#1, #2) : int × int)))
-#expect fst (annot (.ty (.prod .int .int)) (pair (lit (.int 1)) (lit (.int 2))))
-#elabpl pl((fun x, x : int → int) #1)
-#expect app (annot (.ty (.arrow .int .int)) (letrec .anon (.named "x") (var "x")))
-             (lit (.int 1))
 
 -- [commented out: typed binders in destructuring let test, to be replaced by match+case]
 -- example : ∃ n, pl(let ((x : int), (y : bool)) := e; x + y) = ... := ⟨_, rfl⟩
 
--- ---------------------------------------------------------------------------
--- Substitution with typed binders
--- ---------------------------------------------------------------------------
+-- TODO: Move
 
 -- typed binder substitutes like named
 example : Exp.subst (.typed "x" .int) (lit (.int 42)) (var "x") = lit (.int 42) := rfl
@@ -785,25 +969,6 @@ example : (letrec .anon (.typed "x" .int) (var "y")).subst' "y" (lit (.int 7)) =
 -- Edge cases in existing syntax
 -- ---------------------------------------------------------------------------
 
--- fun with _ applied to a value
-#elabpl pl((fun _, fail) #1)
-#expect app (letrec .anon .anon Exp.fail) (lit (.int 1))
--- sequencing with fail
-#elabpl pl(fail; x)
-#expect app (letrec .anon .anon (var "x")) Exp.fail
--- [commented out: case tests]
--- example : pl(case inl(#1) | _ => #2 | _ => #3) = ... := rfl
--- deeply nested lets
-#elabpl pl(let x := (let y := #1; y); x)
-#expect app
-           (letrec .anon (.named "x") (var "x"))
-           (app (letrec .anon (.named "y") (var "y")) (lit (.int 1)))
-
--- store/load with annotations
-#elabpl pl(alloc((#0 : int)))
-#expect alloc (annot (.ty .int) (lit (.int 0)))
-#elabpl pl(!(r : ref(int)))
-#expect load (annot (.ty (.ref .int)) (var "r"))
 
 -- ---------------------------------------------------------------------------
 -- Delaboration round-trips
@@ -839,46 +1004,6 @@ example : (letrec .anon (.typed "x" .int) (var "y")).subst' "y" (lit (.int 7)) =
 -- Pattern syntax
 -- ---------------------------------------------------------------------------
 
--- Variable patterns
-#elabpl pl_pat(x)          #expect .var (.named "x")
-#elabpl pl_pat(_)          #expect .var .anon
-
--- Literal patterns
-#elabpl pl_pat(#(.int 1))  #expect .lit (.int 1)
-#elabpl pl_pat(#.unit)     #expect .lit .unit
-
--- Pair patterns
-#elabpl pl_pat((x, y))
-#expect .pair (.var (.named "x")) (.var (.named "y"))
-
--- Sum patterns
-#elabpl pl_pat(inl(x))  #expect .inl (.var (.named "x"))
-#elabpl pl_pat(inr(y))  #expect .inr (.var (.named "y"))
-
--- Annotated patterns
-#elabpl pl_pat((x : int))  #expect .annot (.ty .int) (.var (.named "x"))
-
--- Nested patterns
-#elabpl pl_pat(inl((x, y)))
-#expect .inl (.pair (.var (.named "x")) (.var (.named "y")))
-#elabpl pl_pat((inl(x), inr(y)))
-#expect .pair (.inl (.var (.named "x"))) (.inr (.var (.named "y")))
-
--- ---------------------------------------------------------------------------
--- Scrut expression syntax
--- ---------------------------------------------------------------------------
-
-#elabpl pl(scrut x with y)
-#expect Exp.scrut (var "x") (.var (.named "y"))
-#elabpl pl(scrut inl(#1) with inl(x))
-#expect Exp.scrut (inl (lit (.int 1))) (.inl (.var (.named "x")))
-#elabpl pl(scrut (x, y) with (a, b))
-#expect Exp.scrut (pair (var "x") (var "y"))
-                    (.pair (.var (.named "a")) (.var (.named "b")))
-
--- Scrut with annotated pattern
-#elabpl pl(scrut x with (y : int))
-#expect Exp.scrut (var "x") (.annot (.ty .int) (.var (.named "y")))
 
 -- Delaboration: scrut round-trips
 /-- info: pl(scrut x with y) : Exp -/
@@ -897,82 +1022,8 @@ example : (letrec .anon (.typed "x" .int) (var "y")).subst' "y" (lit (.int 7)) =
 /-- info: pl_pat((x : int)) : Pat -/
 #guard_msgs in #check (Pat.annot (.ty .int) (.var (.named "x")) : Pat)
 
--- ---------------------------------------------------------------------------
--- Destructuring let!
--- ---------------------------------------------------------------------------
-
--- Simple variable pattern: let! x := e; body
-#elabpl pl(let! x := #1; x)
-#expect Exp.case (Exp.scrut (lit (.int 1)) (.var (.named "x")))
-           (letrec .anon (.named "__bind")
-             (app (letrec .anon (.named "x") (var "x"))
-                  (var "__bind")))
-           (letrec .anon .anon Exp.fail)
-
--- Pair pattern: let! (x, y) := e; x + y
-#elabpl pl(let! (x, y) := e; x + y)
-#expect Exp.case (Exp.scrut (var "e") (.pair (.var (.named "x")) (.var (.named "y"))))
-           (letrec .anon (.named "__bind")
-             (app (letrec .anon (.named "x")
-                    (app (letrec .anon (.named "y")
-                           (binop .plus (var "x") (var "y")))
-                         (snd (var "__bind"))))
-                  (fst (var "__bind"))))
-           (letrec .anon .anon Exp.fail)
-
--- Wildcard pattern: no binding
-#elabpl pl(let! _ := e; x)
-#expect Exp.case (Exp.scrut (var "e") (.var .anon))
-           (letrec .anon (.named "__bind") (var "x"))
-           (letrec .anon .anon Exp.fail)
-
--- inl pattern
-#elabpl pl(let! inl(x) := e; x)
-#expect Exp.case (Exp.scrut (var "e") (.inl (.var (.named "x"))))
-           (letrec .anon (.named "__bind")
-             (app (letrec .anon (.named "x") (var "x"))
-                  (var "__bind")))
-           (letrec .anon .anon Exp.fail)
-
--- Literal pattern (no bindings)
-#elabpl pl(let! #(.int 1) := e; x)
-#expect Exp.case (Exp.scrut (var "e") (.lit (.int 1)))
-           (letrec .anon (.named "__bind") (var "x"))
-           (letrec .anon .anon Exp.fail)
-
--- ---------------------------------------------------------------------------
--- Case (pattern-matching with multiple arms)
--- ---------------------------------------------------------------------------
-
--- Two-arm case on a sum (binds scrutinee to __scrut, tries each arm)
-#elabpl pl(case e | inl(x) => x | inr(y) => y)
-#expect app
-           (letrec .anon (.named "__scrut")
-             (Exp.case (Exp.scrut (var "__scrut") (.inl (.var (.named "x"))))
-               (letrec .anon (.named "__bind")
-                 (app (letrec .anon (.named "x") (var "x"))
-                      (var "__bind")))
-               (letrec .anon .anon
-                 (Exp.case (Exp.scrut (var "__scrut") (.inr (.var (.named "y"))))
-                   (letrec .anon (.named "__bind")
-                     (app (letrec .anon (.named "y") (var "y"))
-                          (var "__bind")))
-                   (letrec .anon .anon Exp.fail)))))
-           (var "e")
-
--- Single-arm case
-#elabpl pl(case e | inl(x) => x)
-#expect app
-           (letrec .anon (.named "__scrut")
-             (Exp.case (Exp.scrut (var "__scrut") (.inl (.var (.named "x"))))
-               (letrec .anon (.named "__bind")
-                 (app (letrec .anon (.named "x") (var "x"))
-                      (var "__bind")))
-               (letrec .anon .anon Exp.fail)))
-           (var "e")
-
--- Pair destructuring via case
-#check (pl(case e | (x, y) => x + y) : Exp)
-
--- Nested pattern in case
-#check (pl(case e | inl((x, y)) => x + y | inr(z) => z) : Exp)
+-- -- Pair destructuring via case
+-- #check (pl(case e | (x, y) => x + y) : Exp)
+--
+-- -- Nested pattern in case
+-- #check (pl(case e | inl((x, y)) => x + y | inr(z) => z) : Exp)

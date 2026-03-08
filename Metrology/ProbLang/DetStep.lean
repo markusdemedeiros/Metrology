@@ -92,6 +92,10 @@ theorem DetHeadStep.case_inr {v el er : Exp} (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.case (.inr v) el er, σ⟩ ⟨er.app v, σ⟩ :=
   .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
 
+theorem DetHeadStep.annot {a : Annot} {e : Exp} (hv : IsVal e) (σ : State) :
+    DetHeadStep ⟨.annot a e, σ⟩ ⟨e, σ⟩ :=
+  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
+
 theorem DetHeadStep.alloc {v : Exp} (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, hv⟩)⟩ := by
   obtain ⟨w, hw⟩ := hv.check?_some
