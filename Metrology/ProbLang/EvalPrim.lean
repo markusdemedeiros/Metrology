@@ -1,4 +1,5 @@
 import Metrology.ProbLang.Syntax
+import Metrology.LibCrypto
 import Std.Data.ExtTreeMap.Lemmas
 
 open Std
