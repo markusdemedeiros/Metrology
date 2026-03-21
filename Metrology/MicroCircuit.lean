@@ -12,6 +12,7 @@ This roughly will follow the paper
 abbrev Wire := Nat
 
 inductive GateT | And | Xor
+  deriving Repr
 
 def GateT.eval : GateT → Bool → Bool → Bool
 | .And => and
@@ -21,6 +22,7 @@ structure Gate where
   prim : GateT
   wA : Wire
   wB : Wire
+  deriving Repr
 
 /-- A circuit is a list of gates.
 Each gate pushes its result to a list of wires, and each wire is indexed from the end of the list. -/
@@ -101,13 +103,13 @@ def Encoding.decode (e : Encoding) : WireState where
   key := e &&& (2^128 - 1)
   perm := (e >>> 128) == 1
 
--- theorem WireState.encode_decode {w : WireState} (Hk : w.key < 2^128) :
---     w.encode.decode = w := by
---   obtain ⟨k, p⟩ := w
---   simp only [WireState.encode, Encoding.decode, mk.injEq] at Hk ⊢
---   refine ⟨?_, ?_⟩
---   · sorry
---   · sorry
+theorem WireState.encode_decode {w : WireState} (Hk : w.key < 2^128) :
+    w.encode.decode = w := by
+  obtain ⟨k, p⟩ := w
+  simp only [WireState.encode, Encoding.decode, Nat.shiftLeft_eq, mk.injEq] at Hk ⊢
+  rw [Nat.and_two_pow_sub_one_eq_mod, Nat.shiftRight_eq_div_pow]
+  cases p <;> simp [Bool.toNat, Nat.add_mod_right, Nat.mod_eq_of_lt Hk,
+    Nat.add_div_right _ (by omega : (0:Nat) < 2^128), Nat.div_eq_of_lt Hk] <;> omega
 
 -- #eval Encoding.decode (WireState.encode ⟨2^128-1, false⟩)
 
@@ -159,22 +161,22 @@ def GarbleState.key (g : GarbleState) (b : Bool) (id : Nat) : Nat :=
 abbrev GarbleM := StateT GarbleState IO
 
 -- Encrypt a WireState by two keys
-def encryptTableEntry (k1 k2 : Key) (payload : WireState) : Id ByteArray := do
+def encryptTableEntry (k1 k2 : Key) (payload : WireState) : ByteArray :=
   let enc_256 := payload.encode.toByteArrayLE 32 |>.get!
   let iv_128  := GARBLE_IV.toByteArrayLE 16 |>.get!
   let k1_128  := k1.toByteArrayLE 16 |>.get!
   let k2_128  := k2.toByteArrayLE 16 |>.get!
   let cipher2 := LibCrypto.encAes128 enc_256 iv_128 k2_128
   let cipher1 := LibCrypto.encAes128 cipher2 iv_128 k1_128
-  return cipher1
+  cipher1
 
-def decryptTableEntry (k1 k2 : Key) (cipher1 : ByteArray) : Id WireState := do
+def decryptTableEntry (k1 k2 : Key) (cipher1 : ByteArray) : WireState :=
   let iv_128  := GARBLE_IV.toByteArrayLE 16 |>.get!
   let k1_128  := k1.toByteArrayLE 16 |>.get!
   let k2_128  := k2.toByteArrayLE 16 |>.get!
   let cipher2 := LibCrypto.decAes128 cipher1 iv_128 k1_128
   let plaintx := LibCrypto.decAes128 cipher2 iv_128 k2_128
-  return Encoding.decode (Nat.ofByteArrayLE plaintx)
+  Encoding.decode (Nat.ofByteArrayLE plaintx)
 
 
 /--
@@ -205,6 +207,45 @@ def decryptTable (wi wj : WireState) (t : Table ByteArray) : Id WireState := do
   let ⟨kj, sj⟩ := wj
   decryptTableEntry ki kj (t.get si sj)
 
+
+/-- Garble an entire circuit. For each gate, generate fresh keys and a permutation bit
+for the output wire, then encrypt the gate's truth table. -/
+instance : Inhabited WireState := ⟨{ key := 0, perm := false }⟩
+
+def garbleCircuit (c : Circuit) : GarbleM Unit :=
+  match c with
+  | [] => return
+  | (g :: c) => do
+    let s ← StateT.get
+    let kt ← keygen
+    let kf ← keygen
+    let r  ← permgen
+    let ki := fun b => s.key b g.wA
+    let kj := fun b => s.key b g.wB
+    let ri := s.perm_r[g.wA]!
+    let rj := s.perm_r[g.wB]!
+    let kk := fun b => if b then kt else kf
+    let t : Table ByteArray := encryptTable ki kj kk ri rj r g.prim.eval
+    StateT.set {
+      key_true  := kt :: s.key_true
+      key_false := kf :: s.key_false
+      perm_r    := r  :: s.perm_r
+      tables    := s.tables ++ [t]
+    }
+    garbleCircuit c
+
+/-- Evaluate a garbled circuit. Given initial wire labels and garbled tables,
+decrypt each gate's table using the two input wire labels to obtain the output label. -/
+def evalGarbledCircuit (c : Circuit) (tables : List (Table ByteArray))
+    (wires : List WireState) : List WireState :=
+  match c, tables with
+  | [], _ => wires
+  | (g :: c), (t :: tables) =>
+    let wi := wires[g.wA]!
+    let wj := wires[g.wB]!
+    let wk : WireState := decryptTable wi wj t
+    evalGarbledCircuit c tables (wk :: wires)
+  | (_ :: _), [] => wires  -- shouldn't happen if tables match circuit
 
 end BasicGarbling
 
@@ -298,6 +339,12 @@ private def shadowGate : Circuit := circuit(
   A ← xor A B
   A ← and A B )
 
+#guard
+  ((Circuit.eval [{ prim := GateT.Xor, wA := 1, wB := 0 },
+                 { prim := GateT.And, wA := 0, wB := 1 }]).run [true, true]).2 =
+  [false, false, true, true]
+
+
 #guard runCircuit andGate [true, true]   = [true, true, true]
 #guard runCircuit andGate [true, false]  = [false, true, false]
 #guard runCircuit andGate [false, true]  = [false, false, true]
@@ -318,4 +365,31 @@ private def shadowGate : Circuit := circuit(
 #guard runCircuit shadowGate [false, true]  = [false, true, false, true]
 #guard runCircuit shadowGate [false, false] = [false, false, false, false]
 
+private def adder : Circuit := circuit(
+  input A
+  input B
+  input Cin
+  AB   ← xor A B
+  S    ← xor AB Cin
+  AB2  ← and A B
+  CAB  ← and Cin AB
+  Cout ← xor AB2 CAB )
+
+private def adderCorrect (a b cin : Bool) : Bool :=
+  let r := runCircuit adder [cin, b, a]
+  let cout := r[0]!
+  let s    := r[3]!
+  cout.toNat * 2 + s.toNat == a.toNat + b.toNat + cin.toNat
+
+#guard adderCorrect false false false
+#guard adderCorrect false false true
+#guard adderCorrect false true  false
+#guard adderCorrect false true  true
+#guard adderCorrect true  false false
+#guard adderCorrect true  false true
+#guard adderCorrect true  true  false
+#guard adderCorrect true  true  true
+
 end Tests
+
+
