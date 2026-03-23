@@ -44,3 +44,8 @@ lean_exe LibCryptoTest where
   root := `LibCryptoTest
   moreLinkObjs := linkObjs
   moreLinkArgs := linkArgs
+
+lean_lib MicroCircuit
+
+lean_exe MicroCircuitTest where
+  root := `MicroCircuitTest
