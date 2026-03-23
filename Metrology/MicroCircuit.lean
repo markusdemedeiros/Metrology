@@ -11,44 +11,162 @@ This roughly will follow the paper
 
 abbrev Wire := Nat
 
-inductive GateT | And | Xor
+inductive GateT (α : Type _)
+  | And (wA wB : α)
+  | Xor (wA wB : α)
+  | Not (wA : α)
+  | Const0
+  | Const1
   deriving Repr
 
-def GateT.eval : GateT → Bool → Bool → Bool
-| .And => and
-| .Xor => xor
+def GateT.eval : GateT Bool → Bool
+  | .And wA wB => and wA wB
+  | .Xor wA wB => xor wA wB
+  | .Not wA => !wA
+  | .Const0 => false
+  | .Const1 => true
 
 structure Gate where
-  prim : GateT
-  wA : Wire
-  wB : Wire
+  prim : GateT Wire
+  id : Nat
   deriving Repr
 
 /-- A circuit is a list of gates.
 Each gate pushes its result to a list of wires, and each wire is indexed from the end of the list. -/
-abbrev Circuit := List Gate
+abbrev Circuit := Array Gate
+
+/- ## Monadic circuit builders -/
+
+section Construction
+
+structure CircuitBuilderState where
+  pc : Nat
+  id : Nat
+  circuit : Circuit
+
+abbrev CircuitBuilderM := StateT CircuitBuilderState Id
+
+def freshWire : CircuitBuilderM Wire :=
+  modifyGet (fun σ => (σ.pc, { σ with pc := σ.pc + 1 }))
+
+def input1 : CircuitBuilderM Wire := freshWire
+
+def emitGate (g : GateT Wire) : CircuitBuilderM Wire := do
+  let w ← freshWire
+  modify (fun σ => { σ with circuit := σ.circuit.push { prim := g, id := w } })
+  return w
+
+def and1 (a b : Wire) : CircuitBuilderM Wire := emitGate (.And a b)
+def xor1 (a b : Wire) : CircuitBuilderM Wire := emitGate (.Xor a b)
+def not1 (a : Wire) : CircuitBuilderM Wire := emitGate (.Not a)
+
+def buildCircuit (m : CircuitBuilderM α) : α × Circuit :=
+  let (a, σ) := m.run { pc := 0, id := 0, circuit := #[] }
+  (a, σ.circuit)
+
+structure Bundle (n : Nat) where
+  wires : Array Wire
+  deriving Inhabited
+
+instance : GetElem (Bundle n) Nat Wire (fun _ i => i < n) where
+  getElem b i _ := b.wires[i]!
+
+def Bundle.toList (b : Bundle n) : List Wire := b.wires.toList
+
+def inputN (n : Nat) : CircuitBuilderM (Bundle n) := do
+  let mut b : Array Wire := #[]
+  for _ in [:n] do
+    b := b.push (← freshWire)
+  return ⟨b⟩
+
+def andN (a b : Bundle n) : CircuitBuilderM (Bundle n) := do
+  let mut out : Array Wire := #[]
+  for i in [:n] do
+    out := out.push (← and1 a.wires[i]! b.wires[i]!)
+  return ⟨out⟩
+
+def xorN (a b : Bundle n) : CircuitBuilderM (Bundle n) := do
+  let mut out : Array Wire := #[]
+  for i in [:n] do
+    out := out.push (← xor1 a.wires[i]! b.wires[i]!)
+  return ⟨out⟩
+
+def notN (a : Bundle n) : CircuitBuilderM (Bundle n) := do
+  let mut out : Array Wire := #[]
+  for i in [:n] do
+    out := out.push (← not1 a.wires[i]!)
+  return ⟨out⟩
+
+/-- Right rotation by a constant — pure wire permutation, no gates. -/
+def rotrN (a : Bundle n) (k : Nat) : Bundle n :=
+  ⟨Array.ofFn (n := n) (fun i => a.wires[(i.val + k) % n]!)⟩
+
+/-- Right shift by a constant — shifted-in positions become wire 0 from a constant-zero bundle.
+    Requires a bundle of constant-zero wires to fill the top bits. -/
+def shrN (a : Bundle n) (k : Nat) (zeroW : Wire) : Bundle n :=
+  ⟨Array.ofFn (n := n) (fun i => if i.val + k < n then a.wires[(i.val + k)]! else zeroW)⟩
+
+def const0 : CircuitBuilderM Wire := emitGate .Const0
+def const1 : CircuitBuilderM Wire := emitGate .Const1
+
+def const32 (v : UInt32) : CircuitBuilderM (Bundle 32) := do
+  let mut out : Array Wire := #[]
+  for i in [:32] do
+    if (v >>> i.toUInt32) &&& 1 == 1
+    then out := out.push (← const1)
+    else out := out.push (← const0)
+  return ⟨out⟩
+
+end Construction
+
 
 
 /- ## Spec evaluation of a circuit -/
 
 section Evaluation
 
-abbrev CircuitEvalM := StateT (List Bool) Id
+structure CircuitState where
+  pc : Nat
+  wires : Array Bool
 
-def Gate.eval (g : Gate) (l : List Bool) : Bool :=
-  let vA := l[g.wA]!
-  let vB := l[g.wB]!
-  g.prim.eval vA vB
+abbrev CircuitEvalM := StateT CircuitState Id
 
-def Circuit.eval (c : Circuit) : CircuitEvalM Unit :=
-  match c with
-  | [] => return
-  | (g :: c) => do
-    let l ← StateT.get
-    StateT.set (g.eval l :: l)
-    Circuit.eval c
+def setWireVal (i : Nat) (b : Bool) : CircuitEvalM Unit :=
+  modifyGet (fun σ => ((), { σ with wires := σ.wires.set! i b }))
+
+def getWireVal (i : Nat) : CircuitEvalM Bool := do
+  let σ ← get
+  return σ.wires[i]!
+
+def getFreshWire : CircuitEvalM Wire := do
+  modifyGet (fun σ => (σ.pc, { σ with pc := σ.pc + 1 }))
+
+def Gate.eval (g : Gate) : CircuitEvalM Bool :=
+  match g.prim with
+  | .And wA wB => do
+    let vA ← getWireVal wA
+    let vB ← getWireVal wB
+    return GateT.eval (.And vA vB)
+  | .Xor wA wB => do
+    let vA ← getWireVal wA
+    let vB ← getWireVal wB
+    return GateT.eval (.Xor vA vB)
+  | .Not wA => do
+    let vA ← getWireVal wA
+    return GateT.eval (.Not vA)
+  | .Const0 => return false
+  | .Const1 => return true
+
+def Circuit.eval (c : Circuit) : CircuitEvalM Unit := do
+  for g in c do
+    let v ← g.eval
+    let w ← getFreshWire
+    setWireVal w v
 
 end Evaluation
+
+
+/-
 
 /-- Generate a 16-byte key -/
 def keygen : IO Nat := IO.rand 0 ((2 ^ 128) - 1)
@@ -248,148 +366,4 @@ def evalGarbledCircuit (c : Circuit) (tables : List (Table ByteArray))
   | (_ :: _), [] => wires  -- shouldn't happen if tables match circuit
 
 end BasicGarbling
-
-
-
-
-/- ## DSL for circuits with friendlier names -/
-
-section CircuitDSL
-
-declare_syntax_cat gate_type
-declare_syntax_cat circuit_stmt
-
-syntax "and" : gate_type
-syntax "xor" : gate_type
-syntax "input" ident : circuit_stmt
-syntax ident " ← " gate_type ident ident : circuit_stmt
-
-syntax "circuit(" circuit_stmt* ")" : term
-
-private def findWire : List (String × Nat) → String → Option Nat
-  | [], _ => none
-  | (n, idx) :: rest, name => if n == name then some idx else findWire rest name
-
-open Lean in
-macro_rules
-  | `(circuit( $stmts* )) => do
-    let mut numInputs := 0
-    for stmt in stmts do
-      if let `(circuit_stmt| input $_:ident) := stmt then numInputs := numInputs + 1
-    let mut inputIdx := 0
-    let mut map : List (String × Nat) := []
-    let mut gates : Array (TSyntax `term) := #[]
-    for stmt in stmts do
-      match stmt with
-      | `(circuit_stmt| input $name:ident) =>
-        map := map ++ [(toString name.getId, numInputs - 1 - inputIdx)]
-        inputIdx := inputIdx + 1
-      | `(circuit_stmt| $out:ident ← $gt:gate_type $a:ident $b:ident) =>
-        let nA := toString a.getId
-        let nB := toString b.getId
-        let some idxA := findWire map nA | Macro.throwError s!"unknown wire: {nA}"
-        let some idxB := findWire map nB | Macro.throwError s!"unknown wire: {nB}"
-        let gtSyn ← match gt with
-          | `(gate_type| and) => `(GateT.And)
-          | `(gate_type| xor) => `(GateT.Xor)
-          | _ => Macro.throwError "unknown gate type"
-        gates := gates.push (← `({ prim := $gtSyn, wA := $(quote idxA), wB := $(quote idxB) : Gate}))
-        map := map.map fun (n, idx) => (n, idx + 1)
-        map := (toString out.getId, 0) :: map
-      | _ => Macro.throwError "unknown circuit statement"
-    `([$gates,*])
-
-end CircuitDSL
-
-
-/- ## Tests
-
-`runCircuit c inputs` returns the full wire state after evaluation.
-The input list is positional (index 0, 1, …).  The circuit DSL assigns inputs
-in *reverse* declaration order, so `input A  input B` maps A → idx 1, B → idx 0.
-Passing `[true, false]` therefore sets B = true, A = false.
-
-Each gate prepends its result, so the output list reads newest-first:
-for `input A  input B  C ← and A B  D ← xor A C`, the result is `[D, C, B, A]`. -/
-
-section Tests
-
-private def runCircuit (c : Circuit) (inputs : List Bool) : List Bool :=
-  (c.eval.run inputs).2
-
-private def andGate : Circuit := circuit(
-  input A
-  input B
-  C ← and A B )
-
-private def xorGate : Circuit := circuit(
-  input A
-  input B
-  C ← xor A B )
-
-private def twoGate : Circuit := circuit(
-  input A
-  input B
-  C ← and A B
-  D ← xor A C )
-
-private def shadowGate : Circuit := circuit(
-  input A
-  input B
-  A ← xor A B
-  A ← and A B )
-
-#guard
-  ((Circuit.eval [{ prim := GateT.Xor, wA := 1, wB := 0 },
-                 { prim := GateT.And, wA := 0, wB := 1 }]).run [true, true]).2 =
-  [false, false, true, true]
-
-
-#guard runCircuit andGate [true, true]   = [true, true, true]
-#guard runCircuit andGate [true, false]  = [false, true, false]
-#guard runCircuit andGate [false, true]  = [false, false, true]
-#guard runCircuit andGate [false, false] = [false, false, false]
-
-#guard runCircuit xorGate [true, true]   = [false, true, true]
-#guard runCircuit xorGate [true, false]  = [true, true, false]
-#guard runCircuit xorGate [false, true]  = [true, false, true]
-#guard runCircuit xorGate [false, false] = [false, false, false]
-
-#guard runCircuit twoGate [true, true]   = [false, true, true, true]
-#guard runCircuit twoGate [true, false]  = [false, false, true, false]
-#guard runCircuit twoGate [false, true]  = [true, false, false, true]
-#guard runCircuit twoGate [false, false] = [false, false, false, false]
-
-#guard runCircuit shadowGate [true, true]   = [false, false, true, true]
-#guard runCircuit shadowGate [true, false]  = [true, true, true, false]
-#guard runCircuit shadowGate [false, true]  = [false, true, false, true]
-#guard runCircuit shadowGate [false, false] = [false, false, false, false]
-
-private def adder : Circuit := circuit(
-  input A
-  input B
-  input Cin
-  AB   ← xor A B
-  S    ← xor AB Cin
-  AB2  ← and A B
-  CAB  ← and Cin AB
-  Cout ← xor AB2 CAB )
-
-private def adderCorrect (a b cin : Bool) : Bool :=
-  let r := runCircuit adder [cin, b, a]
-  let cout := r[0]!
-  let s    := r[3]!
-  cout.toNat * 2 + s.toNat == a.toNat + b.toNat + cin.toNat
-
-#guard adderCorrect false false false
-#guard adderCorrect false false true
-#guard adderCorrect false true  false
-#guard adderCorrect false true  true
-#guard adderCorrect true  false false
-#guard adderCorrect true  false true
-#guard adderCorrect true  true  false
-#guard adderCorrect true  true  true
-
-end Tests
-
-
+-/
