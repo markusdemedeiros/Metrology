@@ -174,6 +174,82 @@ def sha256Circuit : Circuit :=
   : CircuitBuilderM Unit).run { pc := 0, id := 0, circuit := #[] }
   σ.circuit
 
+/- ## Garbling tests -/
+
+/-- Build a circuit, garble it, evaluate the garbled circuit on given inputs,
+    and check the garbled output matches plain evaluation. -/
+def testGarble (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO Bool := do
+  let spec := buildSpec builder
+  let c := spec.gates
+  let numInputs := spec.numInputs
+  -- Generate key pairs for input wires
+  let mut initState : GarbleState := { key_false := #[], key_true := #[], tables := #[] }
+  for _ in [:numInputs] do
+    let (k0, k1) ← keygenPair
+    initState := { initState with
+      key_false := initState.key_false.push k0
+      key_true := initState.key_true.push k1 }
+  -- Garble the circuit
+  let ((), finalState) ← garbleCircuit c |>.run initState
+  -- Build input labels from truth values
+  let inputLabels := inputVals.toArray.mapIdx fun i v =>
+    finalState.keyFor i v
+  -- Evaluate garbled circuit
+  let resultLabels := evalGarbledCircuit c finalState.tables inputLabels
+  -- Compare with plain evaluation
+  let plainOutputs := spec.evalOutputs inputVals
+  let mut ok := true
+  for i in [:spec.outputs.length] do
+    let wireId := spec.outputs[i]!
+    let garbledVal := readOutput finalState wireId resultLabels[wireId]!
+    let plainVal := plainOutputs[i]!
+    if garbledVal != plainVal then
+      IO.println s!"FAIL at output {i}: garbled={garbledVal}, plain={plainVal}"
+      ok := false
+  return ok
+
+def exhaustive2 (builder : CircuitBuilderM (List Wire)) : IO Bool := do
+  let mut ok := true
+  for vi in [false, true] do
+    for vj in [false, true] do
+      unless (← testGarble builder [vi, vj]) do ok := false
+  return ok
+
+def exhaustive3 (builder : CircuitBuilderM (List Wire)) : IO Bool := do
+  let mut ok := true
+  for a in [false, true] do
+    for b in [false, true] do
+      for c in [false, true] do
+        unless (← testGarble builder [a, b, c]) do ok := false
+  return ok
+
+def andBuilder : CircuitBuilderM (List Wire) := do
+  let a ← input1; let b ← input1; let c ← and1 a b; return [c]
+
+def xorBuilder : CircuitBuilderM (List Wire) := do
+  let a ← input1; let b ← input1; let c ← xor1 a b; return [c]
+
+def twoGateBuilder : CircuitBuilderM (List Wire) := do
+  let a ← input1; let b ← input1
+  let c ← and1 a b; let d ← xor1 a c; return [c, d]
+
+def adderBuilder : CircuitBuilderM (List Wire) := do
+  let a ← input1; let b ← input1; let cin ← input1
+  let (s, cout) ← fullAdder a b cin; return [s, cout]
+
 def main : IO Unit := do
   IO.println "SHA-256 circuit:"
   CircuitCount sha256Circuit
+  IO.println ""
+  IO.println "Garbling tests:"
+  let mut allOk := true
+  if ← exhaustive2 andBuilder then IO.println "  AND gate: passed"
+  else IO.println "  AND gate: FAILED"; allOk := false
+  if ← exhaustive2 xorBuilder then IO.println "  XOR gate: passed"
+  else IO.println "  XOR gate: FAILED"; allOk := false
+  if ← exhaustive2 twoGateBuilder then IO.println "  two-gate: passed"
+  else IO.println "  two-gate: FAILED"; allOk := false
+  if ← exhaustive3 adderBuilder then IO.println "  adder: passed"
+  else IO.println "  adder: FAILED"; allOk := false
+  if allOk then IO.println "All garbling tests passed!"
+  else IO.println "Some garbling tests FAILED!"
