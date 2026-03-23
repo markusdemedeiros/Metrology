@@ -184,39 +184,36 @@ def sha256Circuit : Circuit :=
   : CircuitBuilderM Unit).run { pc := 0, id := 0, circuit := #[] }
   σ.circuit
 
-/- ## Garbling tests -/
+/- ## Generic garbling test harness -/
 
-/-- Build a circuit, garble it, evaluate the garbled circuit on given inputs,
-    and check the garbled output matches plain evaluation. -/
-def testGarble (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO Bool := do
+/-- Test a garbling scheme on a circuit with given inputs.
+    Garbles the circuit, evaluates the garbled version, and checks
+    that the output matches plain evaluation. -/
+def testGarbleGeneric [GarblingScheme Label GTable] [Inhabited Label] [Inhabited GTable]
+    (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO Bool := do
   let spec := buildSpec builder
   let c := spec.gates
-  let numInputs := spec.numInputs
-  -- Generate key pairs for input wires
-  let mut initState : GarbleState := { key_false := #[], key_true := #[], tables := #[] }
-  for _ in [:numInputs] do
-    let (k0, k1) ← keygenPair
-    initState := { initState with
-      key_false := initState.key_false.push k0
-      key_true := initState.key_true.push k1 }
-  -- Garble the circuit
-  let ((), finalState) ← garbleCircuit c |>.run initState
+  -- Garble
+  let gs ← GarblingScheme.garble (Label := Label) (GTable := GTable) c spec.numInputs
   -- Build input labels from truth values
   let inputLabels := inputVals.toArray.mapIdx fun i v =>
-    finalState.keyFor i v
+    gs.keyFor i v
   -- Evaluate garbled circuit
-  let resultLabels := evalGarbledCircuit c finalState.tables inputLabels
+  let resultLabels := GarblingScheme.eval c gs.tables inputLabels
   -- Compare with plain evaluation
   let plainOutputs := spec.evalOutputs inputVals
   let mut ok := true
   for i in [:spec.outputs.length] do
     let wireId := spec.outputs[i]!
-    let garbledVal := readOutput finalState wireId resultLabels[wireId]!
+    let garbledVal := GarblingScheme.readOutput (GTable := GTable) resultLabels[wireId]! (gs.keyFor wireId true)
     let plainVal := plainOutputs[i]!
     if garbledVal != plainVal then
       IO.println s!"FAIL at output {i}: garbled={garbledVal}, plain={plainVal}"
       ok := false
   return ok
+
+/-- Concrete test using our point-and-permute scheme. -/
+def testGarble := testGarbleGeneric (Label := Key) (GTable := Table Key)
 
 def exhaustive2 (builder : CircuitBuilderM (List Wire)) : IO Bool := do
   let mut ok := true

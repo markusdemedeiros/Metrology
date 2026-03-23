@@ -1,4 +1,4 @@
-import MicroCircuit.Circuits
+import MicroCircuit.GarbleGen
 
 /-! ## Circuit garbling with point-and-permute (BMR90)
 
@@ -153,5 +153,23 @@ def evalGarbledCircuit (c : Circuit) (tables : Array (Table Key))
 /-- Read an output wire's truth value by checking which key it matches. -/
 def readOutput (s : GarbleState) (wireId : Nat) (label : WireLabel) : Bool :=
   label == s.keyFor wireId true
+
+/-- Point-and-permute garbling with XOR one-time pad. -/
+instance : GarblingScheme Key (Table Key) where
+  garble c numInputs := do
+    let mut initState : GarbleState := { key_false := #[], key_true := #[], tables := #[] }
+    for _ in [:numInputs] do
+      let (k0, k1) ← keygenPair
+      initState := { initState with
+        key_false := initState.key_false.push k0
+        key_true := initState.key_true.push k1 }
+    let ((), s) ← garbleCircuit c |>.run initState
+    return { key_false := s.key_false, key_true := s.key_true, tables := s.tables }
+
+  eval c tables inputLabels :=
+    evalGarbledCircuit c tables inputLabels
+
+  readOutput label trueLabel :=
+    label == trueLabel
 
 end Garbling
