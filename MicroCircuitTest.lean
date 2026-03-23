@@ -103,16 +103,16 @@ end BundleTests
 
 section SHA256Tests
 
-private def uint32ToBools (v : UInt32) : List Bool :=
+def uint32ToBools (v : UInt32) : List Bool :=
   List.range 32 |>.map (fun i => (v >>> i.toUInt32) &&& 1 == 1)
 
-private def boolsToUInt32 (bs : List Bool) : UInt32 :=
+def boolsToUInt32 (bs : List Bool) : UInt32 :=
   bs.foldl (init := ((0 : UInt32), (0 : UInt32))) (fun ⟨acc, i⟩ b =>
     (acc ||| (b.toUInt32 <<< i), i + 1))
   |>.1
 
 -- SHA-256("abc") padded to 512 bits (big-endian 32-bit words)
-private def abcPaddedBlock : Array UInt32 := #[
+def abcPaddedBlock : Array UInt32 := #[
   0x61626380, 0x00000000, 0x00000000, 0x00000000,
   0x00000000, 0x00000000, 0x00000000, 0x00000000,
   0x00000000, 0x00000000, 0x00000000, 0x00000000,
@@ -120,7 +120,7 @@ private def abcPaddedBlock : Array UInt32 := #[
 ]
 
 -- Expected: ba7816bf 8f01cfea 414140de 5dae2223 b00361a3 96177a9c b410ff61 f20015ad
-private def abcExpected : Array UInt32 := #[
+def abcExpected : Array UInt32 := #[
   0xba7816bf, 0x8f01cfea, 0x414140de, 0x5dae2223,
   0xb00361a3, 0x96177a9c, 0xb410ff61, 0xf20015ad
 ]
@@ -163,6 +163,16 @@ def CircuitCount (c : Circuit) : IO Unit := do
     | .Const1 => do numConst1 := numConst1 + 1
   let tot := numAnd + numXor + numNot + numConst0 + numConst1
   IO.println s!"[Gates] Tot {tot} / And {numAnd} / Xor {numXor} / Not {numNot} / Const {numConst0 + numConst1}"
+
+def sha256Builder : CircuitBuilderM (List Wire) := do
+  let mut msgWords : Array (Bundle 32) := #[]
+  for _ in [:16] do
+    msgWords := msgWords.push (← inputN 32)
+  let hashWords ← sha256_block msgWords
+  let mut outs : List Wire := []
+  for w in hashWords do
+    outs := outs ++ w.toList
+  return outs
 
 def sha256Circuit : Circuit :=
   let (_, σ) := (do
@@ -251,5 +261,9 @@ def main : IO Unit := do
   else IO.println "  two-gate: FAILED"; allOk := false
   if ← exhaustive3 adderBuilder then IO.println "  adder: passed"
   else IO.println "  adder: FAILED"; allOk := false
+  IO.println "  SHA-256 garble (this may take a moment)..."
+  let abcBits := abcPaddedBlock.foldl (init := ([] : List Bool)) (fun acc w => acc ++ uint32ToBools w)
+  if ← testGarble sha256Builder abcBits then IO.println "  SHA-256: passed"
+  else IO.println "  SHA-256: FAILED"; allOk := false
   if allOk then IO.println "All garbling tests passed!"
   else IO.println "Some garbling tests FAILED!"

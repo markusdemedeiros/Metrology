@@ -18,13 +18,10 @@ def keygen : IO Key := IO.rand 0 ((2 ^ 128) - 1)
 
 /-- Generate a key pair for a wire: two 128-bit keys with opposite LSBs. -/
 def keygenPair : IO (Key × Key) := do
-  let a ← keygen
-  let b ← keygen
-  let k0 := a &&& ((2 ^ 128) - 2)  -- force LSB=0 → color=false
-  let k1 := b ||| 1                  -- force LSB=1 → color=true
-  -- Two independently random keys with opposite LSBs.
-  -- The color bits are leaked by design (point-and-permute).
-  return (k0, k1)
+  let ka ← keygen
+  let kb ← keygen
+  -- Strip off the last bit of kb, and replace it with the negated last bit of ka.
+  return (ka, (0xFFFFFFFE &&& kb) ||| (0x1 ^^^ (0x1 &&& ka)))
 
 section Garbling
 
@@ -77,7 +74,7 @@ def garbleGateTable (ki kj kk : Bool → Key) (f : Bool → Bool → Bool) : Tab
   let mut t : Table Key := ⟨0, 0, 0, 0⟩
   for vi in [false, true] do
     for vj in [false, true] do
-      let ci := (ki vi).color  -- color bit = LSB, used as table index
+      let ci := (ki vi).color
       let cj := (kj vj).color
       let vk := f vi vj
       let payload := kk vk
@@ -92,7 +89,6 @@ def evalGarbledGate (li lj : WireLabel) (t : Table Key) : WireLabel :=
 /-- Garble an entire circuit. -/
 def garbleCircuit (c : Circuit) : GarbleM Unit := do
   for g in c do
-    let s ← get
     let (kf, kt) ← keygenPair
     -- Record keys for the output wire
     modify fun s => { s with
