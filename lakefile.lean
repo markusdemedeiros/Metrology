@@ -49,3 +49,8 @@ lean_lib MicroCircuit
 
 lean_exe MicroCircuitTest where
   root := `MicroCircuitTest
+
+-- lake env lean --run MicroCircuitViz.lean sha256.dot
+-- sfdp -Tpng sha256.dot -o sha256.png   
+lean_exe MicroCircuitViz where
+  root := `MicroCircuitViz
