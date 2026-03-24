@@ -20,3 +20,6 @@ class GarblingScheme (Label : Type) (State : Type) where
 
   /-- Decode the truth value of an output wire (garbler-side). -/
   decodeOutput (s : State) (wireId : Nat) (label : Label) : Bool
+
+  /-- Number of ciphertexts in the garbled circuit. -/
+  numCiphertexts (s : State) : Nat

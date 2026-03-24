@@ -22,6 +22,8 @@ structure GarbleState where
   key_true : Array Key
   /-- List of garbled tables so far -/
   tables : Array GarbledGate
+  /-- Running count of ciphertexts emitted -/
+  numCiphertexts : Nat := 0
 
 abbrev GarbleM := StateT GarbleState IO
 
@@ -58,8 +60,8 @@ def garbleGateTable2 (ki kk : Bool → Key) (f : Bool → Bool) : Table Key := I
 def evalGarbledGate (li lj : Key) (t : Table Key) : Key :=
   li.decrypt <| lj.decrypt <| t.get li.colour lj.colour
 
-def pushTable (t : GarbledGate) : GarbleM Unit :=
-  modify fun s => { s with tables := s.tables.push t }
+def pushTable (t : GarbledGate) (ct : Nat) : GarbleM Unit :=
+  modify fun s => { s with tables := s.tables.push t, numCiphertexts := s.numCiphertexts + ct }
 
 /-- Garble an entire circuit. -/
 def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
@@ -82,11 +84,11 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
 
     -- Garble the gate and push it to the circuit.
     match g.prim with
-    | .And wA wB => pushTable <| .And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)
-    | .Xor wA wB => pushTable <| .Xor <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· ^^ ·)
-    | .Not _     => pushTable <| .Not
-    | .Const0    => pushTable <| .Const (kk false)
-    | .Const1    => pushTable <| .Const (kk true)
+    | .And wA wB => pushTable (.And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)) 4
+    | .Xor wA wB => pushTable (.Xor <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· ^^ ·)) 4
+    | .Not _     => pushTable .Not 0
+    | .Const0    => pushTable (.Const (kk false)) 1
+    | .Const1    => pushTable (.Const (kk true)) 1
 
 instance : Inhabited Gate := ⟨{ prim := .Const0, id := 0 }⟩
 instance : Inhabited (Table Key) := ⟨(0, 0, 0, 0)⟩
@@ -126,5 +128,7 @@ instance : GarblingScheme Key GarbleState where
   eval s c inputLabels := evalGarbledCircuit c s.tables inputLabels
 
   decodeOutput s wireId label := label == s.keyFor wireId true
+
+  numCiphertexts s := s.numCiphertexts
 
 end FreeNotGarbling

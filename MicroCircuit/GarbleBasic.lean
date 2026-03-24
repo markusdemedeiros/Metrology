@@ -22,6 +22,8 @@ structure GarbleState where
   key_true : Array Key
   /-- List of garbled tables so far -/
   tables : Array GarbledGate
+  /-- Running count of ciphertexts emitted -/
+  numCiphertexts : Nat := 0
 
 abbrev GarbleM := StateT GarbleState IO
 
@@ -58,8 +60,8 @@ def garbleGateTable2 (ki kk : Bool → Key) (f : Bool → Bool) : Table Key := I
 def evalGarbledGate (li lj : Key) (t : Table Key) : Key :=
   li.decrypt <| lj.decrypt <| t.get li.colour lj.colour
 
-def pushTable (t : GarbledGate) : GarbleM Unit :=
-  modify fun s => { s with tables := s.tables.push t }
+def pushTable (t : GarbledGate) (ct : Nat) : GarbleM Unit :=
+  modify fun s => { s with tables := s.tables.push t, numCiphertexts := s.numCiphertexts + ct }
 
 /-- Garble an entire circuit. -/
 def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
@@ -72,11 +74,11 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
     outWire := outWire + 1
     -- Garble the gate and push it to the circuit.
     match g.prim with
-    | .And wA wB => pushTable <| .And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)
-    | .Xor wA wB => pushTable <| .Xor <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· ^^ ·)
-    | .Not wA    => pushTable <| .Not <| garbleGateTable2 (s.keyFor wA) kk (! ·)
-    | .Const0    => pushTable <| .Const0 <| ⟨kk false, 0, 0, 0⟩
-    | .Const1    => pushTable <| .Const1 <| ⟨kk true, 0, 0, 0⟩
+    | .And wA wB => pushTable (.And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)) 4
+    | .Xor wA wB => pushTable (.Xor <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· ^^ ·)) 4
+    | .Not wA    => pushTable (.Not <| garbleGateTable2 (s.keyFor wA) kk (! ·)) 2
+    | .Const0    => pushTable (.Const0 <| ⟨kk false, 0, 0, 0⟩) 1
+    | .Const1    => pushTable (.Const1 <| ⟨kk true, 0, 0, 0⟩) 1
 
 instance : Inhabited Gate := ⟨{ prim := .Const0, id := 0 }⟩
 instance : Inhabited (Table Key) := ⟨(0, 0, 0, 0)⟩
@@ -115,5 +117,7 @@ instance : GarblingScheme Key GarbleState where
   eval s c inputLabels := evalGarbledCircuit c s.tables inputLabels
 
   decodeOutput s wireId label := label == s.keyFor wireId true
+
+  numCiphertexts s := s.numCiphertexts
 
 end BasicGarbling

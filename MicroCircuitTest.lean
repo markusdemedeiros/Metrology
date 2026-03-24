@@ -208,18 +208,41 @@ def testGarbleGeneric [GarblingScheme Label State] [Inhabited Label]
       ok := false
   return ok
 
+/-- Garble a circuit and return (ok, numCiphertexts). -/
+def garbleAndCount [GarblingScheme Label State] [Inhabited Label]
+    (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO (Bool × Nat) := do
+  let spec := buildSpec builder
+  let c := spec.gates
+  let gs ← GarblingScheme.garble (Label := Label) (State := State) c spec.numInputs
+  let inputLabels := inputVals.toArray.mapIdx fun i v =>
+    GarblingScheme.inputLabel gs i v
+  let resultLabels := GarblingScheme.eval gs c inputLabels
+  let plainOutputs := spec.evalOutputs inputVals
+  let mut ok := true
+  for i in [:spec.outputs.length] do
+    let wireId := spec.outputs[i]!
+    let garbledVal := GarblingScheme.decodeOutput (Label := Label) gs wireId resultLabels[wireId]!
+    let plainVal := plainOutputs[i]!
+    if garbledVal != plainVal then
+      IO.println s!"FAIL at output {i}: garbled={garbledVal}, plain={plainVal}"
+      ok := false
+  return (ok, GarblingScheme.numCiphertexts (Label := Label) gs)
+
 /-- A named garbling scheme runner, wrapping the type parameters. -/
 structure SchemeRunner where
   name : String
   test : CircuitBuilderM (List Wire) → List Bool → IO Bool
+  count : CircuitBuilderM (List Wire) → List Bool → IO (Bool × Nat)
 
 def basicRunner : SchemeRunner :=
   { name := "Basic"
-    test := testGarbleGeneric (Label := Key) (State := BasicGarbling.GarbleState) }
+    test := testGarbleGeneric (Label := Key) (State := BasicGarbling.GarbleState)
+    count := garbleAndCount (Label := Key) (State := BasicGarbling.GarbleState) }
 
 def freeNotRunner : SchemeRunner :=
   { name := "FreeNot"
-    test := testGarbleGeneric (Label := Key) (State := FreeNotGarbling.GarbleState) }
+    test := testGarbleGeneric (Label := Key) (State := FreeNotGarbling.GarbleState)
+    count := garbleAndCount (Label := Key) (State := FreeNotGarbling.GarbleState) }
 
 def allSchemes : List SchemeRunner := [basicRunner, freeNotRunner]
 
@@ -269,7 +292,8 @@ def main : IO Unit := do
     if ← exhaustive3 runner adderBuilder then IO.println s!"  adder: passed"
     else IO.println s!"  adder: FAILED"; allOk := false
     IO.println s!"  SHA-256 garble (this may take a moment)..."
-    if ← runner.test sha256Builder abcBits then IO.println s!"  SHA-256: passed"
+    let (ok, ct) ← runner.count sha256Builder abcBits
+    if ok then IO.println s!"  SHA-256: passed ({ct} ciphertexts)"
     else IO.println s!"  SHA-256: FAILED"; allOk := false
     IO.println ""
   if allOk then IO.println "All garbling tests passed!"
