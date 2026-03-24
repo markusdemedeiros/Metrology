@@ -3,3 +3,4 @@ import MicroCircuit.Lib
 import MicroCircuit.GarbleBasic
 import MicroCircuit.GarbleFreeNot
 import MicroCircuit.GarbleFreeXor
+import MicroCircuit.GarbleRowReduction
