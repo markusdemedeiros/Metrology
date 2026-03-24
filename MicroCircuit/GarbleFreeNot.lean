@@ -1,19 +1,19 @@
 import MicroCircuit.GarbleGen
 import MicroCircuit.Common
 
-namespace BasicGarbling
+namespace FreeNotGarbling
 
 /-! ## Base implementation for circuit garbling
 - Point-and-permute
 - OTP Encryption
+- Free NOT optimization
 -/
 
 inductive GarbledGate
 | And (t : Table Key)
 | Xor (t : Table Key)
-| Not (t : Table Key)
-| Const0 (t : Table Key)
-| Const1 (t : Table Key)
+| Not
+| Const (k : Key)
 
 structure GarbleState where
   /-- Keys representing False -/
@@ -65,18 +65,28 @@ def pushTable (t : GarbledGate) : GarbleM Unit :=
 def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
   let mut outWire := numInputs
   for g in c do
-    -- Generate the keys for the current output wire
-    GarbleM.genKeysFor outWire
+    if let .Not wA := g.prim
+      then
+        -- For a not gate, set the keys to be the swapped keys for the input wire
+        let kA := (← get).keyFor wA
+        modify fun s => { s with
+          key_false := s.key_false.set! outWire (kA true)
+          key_true := s.key_true.set! outWire (kA false) }
+      else
+        -- Generate new keys for the current output wire
+        GarbleM.genKeysFor outWire
+
     let s ← get
     let kk := s.keyFor outWire
     outWire := outWire + 1
+
     -- Garble the gate and push it to the circuit.
     match g.prim with
     | .And wA wB => pushTable <| .And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)
     | .Xor wA wB => pushTable <| .Xor <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· ^^ ·)
-    | .Not wA    => pushTable <| .Not <| garbleGateTable2 (s.keyFor wA) kk (! ·)
-    | .Const0    => pushTable <| .Const0 <| ⟨kk false, 0, 0, 0⟩
-    | .Const1    => pushTable <| .Const1 <| ⟨kk true, 0, 0, 0⟩
+    | .Not _     => pushTable <| .Not
+    | .Const0    => pushTable <| .Const (kk false)
+    | .Const1    => pushTable <| .Const (kk true)
 
 instance : Inhabited Gate := ⟨{ prim := .Const0, id := 0 }⟩
 instance : Inhabited (Table Key) := ⟨(0, 0, 0, 0)⟩
@@ -88,14 +98,15 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate) (inputLabels :
   let mut wireStates := inputLabels
   for i in [:c.size] do
     let g := c[i]!
-    let t : Table Key :=
-      match (tables[i]! : GarbledGate)  with | .And t | .Xor t | .Not t | .Const0 t | .Const1 t => t
-    let lk := match g.prim with
-      | GateT.And wA wB => evalGarbledGate wireStates[wA]! wireStates[wB]! t
-      | GateT.Xor wA wB => evalGarbledGate wireStates[wA]! wireStates[wB]! t
-      | GateT.Not wA => evalGarbledGate wireStates[wA]! .nil t
-      | GateT.Const0 => t.get false false
-      | GateT.Const1 => t.get false false
+    let lk := match g.prim, tables[i]! with
+      | GateT.And wA wB, .And t => evalGarbledGate wireStates[wA]! wireStates[wB]! t
+      | GateT.Xor wA wB, .Xor t => evalGarbledGate wireStates[wA]! wireStates[wB]! t
+      -- Not evaluates by id, because from here on out, any gates will have been garbled
+      -- as if this meant the opposite of what it did before.
+      | GateT.Not wA, .Not => wireStates[wA]!
+      | GateT.Const0, .Const k => k
+      | GateT.Const1, .Const k => k
+      | _, _ => panic! "Bad circuit"
     wireStates := wireStates.push lk
   return wireStates
 
@@ -116,4 +127,4 @@ instance : GarblingScheme Key GarbleState where
 
   decodeOutput s wireId label := label == s.keyFor wireId true
 
-end BasicGarbling
+end FreeNotGarbling

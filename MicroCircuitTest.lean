@@ -193,14 +193,10 @@ def testGarbleGeneric [GarblingScheme Label State] [Inhabited Label]
     (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO Bool := do
   let spec := buildSpec builder
   let c := spec.gates
-  -- Garble
   let gs ← GarblingScheme.garble (Label := Label) (State := State) c spec.numInputs
-  -- Build input labels from truth values
   let inputLabels := inputVals.toArray.mapIdx fun i v =>
     GarblingScheme.inputLabel gs i v
-  -- Evaluate garbled circuit
   let resultLabels := GarblingScheme.eval gs c inputLabels
-  -- Compare with plain evaluation
   let plainOutputs := spec.evalOutputs inputVals
   let mut ok := true
   for i in [:spec.outputs.length] do
@@ -212,22 +208,34 @@ def testGarbleGeneric [GarblingScheme Label State] [Inhabited Label]
       ok := false
   return ok
 
-/-- Concrete test using our point-and-permute scheme. -/
-def testGarble := testGarbleGeneric (Label := Key) (State := GarbleState)
+/-- A named garbling scheme runner, wrapping the type parameters. -/
+structure SchemeRunner where
+  name : String
+  test : CircuitBuilderM (List Wire) → List Bool → IO Bool
 
-def exhaustive2 (builder : CircuitBuilderM (List Wire)) : IO Bool := do
+def basicRunner : SchemeRunner :=
+  { name := "Basic"
+    test := testGarbleGeneric (Label := Key) (State := BasicGarbling.GarbleState) }
+
+def freeNotRunner : SchemeRunner :=
+  { name := "FreeNot"
+    test := testGarbleGeneric (Label := Key) (State := FreeNotGarbling.GarbleState) }
+
+def allSchemes : List SchemeRunner := [basicRunner, freeNotRunner]
+
+def exhaustive2 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do
   let mut ok := true
   for vi in [false, true] do
     for vj in [false, true] do
-      unless (← testGarble builder [vi, vj]) do ok := false
+      unless (← runner.test builder [vi, vj]) do ok := false
   return ok
 
-def exhaustive3 (builder : CircuitBuilderM (List Wire)) : IO Bool := do
+def exhaustive3 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do
   let mut ok := true
   for a in [false, true] do
     for b in [false, true] do
       for c in [false, true] do
-        unless (← testGarble builder [a, b, c]) do ok := false
+        unless (← runner.test builder [a, b, c]) do ok := false
   return ok
 
 def andBuilder : CircuitBuilderM (List Wire) := do
@@ -248,19 +256,21 @@ def main : IO Unit := do
   IO.println "SHA-256 circuit:"
   CircuitCount sha256Circuit
   IO.println ""
-  IO.println "Garbling tests:"
-  let mut allOk := true
-  if ← exhaustive2 andBuilder then IO.println "  AND gate: passed"
-  else IO.println "  AND gate: FAILED"; allOk := false
-  if ← exhaustive2 xorBuilder then IO.println "  XOR gate: passed"
-  else IO.println "  XOR gate: FAILED"; allOk := false
-  if ← exhaustive2 twoGateBuilder then IO.println "  two-gate: passed"
-  else IO.println "  two-gate: FAILED"; allOk := false
-  if ← exhaustive3 adderBuilder then IO.println "  adder: passed"
-  else IO.println "  adder: FAILED"; allOk := false
-  IO.println "  SHA-256 garble (this may take a moment)..."
   let abcBits := abcPaddedBlock.foldl (init := ([] : List Bool)) (fun acc w => acc ++ uint32ToBools w)
-  if ← testGarble sha256Builder abcBits then IO.println "  SHA-256: passed"
-  else IO.println "  SHA-256: FAILED"; allOk := false
+  let mut allOk := true
+  for runner in allSchemes do
+    IO.println s!"Garbling tests [{runner.name}]:"
+    if ← exhaustive2 runner andBuilder then IO.println s!"  AND gate: passed"
+    else IO.println s!"  AND gate: FAILED"; allOk := false
+    if ← exhaustive2 runner xorBuilder then IO.println s!"  XOR gate: passed"
+    else IO.println s!"  XOR gate: FAILED"; allOk := false
+    if ← exhaustive2 runner twoGateBuilder then IO.println s!"  two-gate: passed"
+    else IO.println s!"  two-gate: FAILED"; allOk := false
+    if ← exhaustive3 runner adderBuilder then IO.println s!"  adder: passed"
+    else IO.println s!"  adder: FAILED"; allOk := false
+    IO.println s!"  SHA-256 garble (this may take a moment)..."
+    if ← runner.test sha256Builder abcBits then IO.println s!"  SHA-256: passed"
+    else IO.println s!"  SHA-256: FAILED"; allOk := false
+    IO.println ""
   if allOk then IO.println "All garbling tests passed!"
   else IO.println "Some garbling tests FAILED!"
