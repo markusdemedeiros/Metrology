@@ -1,7 +1,7 @@
 import MicroCircuit.GarbleGen
 import MicroCircuit.Common
 
-namespace GRR3Garbling
+namespace GRR2Garbling
 
 /-! ## Base implementation for circuit garbling
 - Point-and-permute
@@ -91,7 +91,10 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
         -- What truth values do the colour-true keys represent?
         let va := s.keyFor wA true == kA
         let vb := s.keyFor wB true == kB
-        -- kC corresponds to output value (va && vb); derive key_true from that
+        -- kC corresponds to output value (va && vb)
+        -- Now we have to pick if kC means true or false.
+        -- If kA and kB are both the keys for true, then kC is the key for true
+        -- Otherwise, kC is the key for false, so the key for true is kC xor Δ.
         let kTrue := if va && vb then kC else kC ^^^ s.key_Δ
         modify fun s => { s with key_true := s.key_true.set! outWire kTrue }
     | _ =>  GarbleM.genKeysFor outWire
@@ -148,4 +151,4 @@ instance : GarblingScheme Key GarbleState where
 
   numCiphertexts s := s.numCiphertexts
 
-end GRR3Garbling
+end GRR2Garbling
