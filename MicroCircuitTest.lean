@@ -244,7 +244,12 @@ def freeNotRunner : SchemeRunner :=
     test := testGarbleGeneric (Label := Key) (State := FreeNotGarbling.GarbleState)
     count := garbleAndCount (Label := Key) (State := FreeNotGarbling.GarbleState) }
 
-def allSchemes : List SchemeRunner := [basicRunner, freeNotRunner]
+def freeXorRunner : SchemeRunner :=
+  { name := "FreeXor"
+    test := testGarbleGeneric (Label := Key) (State := FreeXorGarbling.GarbleState)
+    count := garbleAndCount (Label := Key) (State := FreeXorGarbling.GarbleState) }
+
+def allSchemes : List SchemeRunner := [basicRunner, freeNotRunner, freeXorRunner]
 
 def exhaustive2 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do
   let mut ok := true
