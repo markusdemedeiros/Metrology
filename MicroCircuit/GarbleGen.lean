@@ -3,29 +3,20 @@ import MicroCircuit.Circuits
 /-! ## Generic garbling scheme interface
 
 A `GarblingScheme` abstracts over:
-- The wire label type (keys held by the evaluator)
-- The garbled table type (one per gate)
-- How to garble a circuit, evaluate a garbled circuit, and read outputs
+- The wire label type (held by the evaluator)
+- An opaque garble state type (held by the garbler)
+- How to garble, evaluate, encode inputs, and decode outputs
 -/
 
-/-- State for garbling a circuit under any scheme. -/
-structure GenGarbleState (Label GTable : Type) where
-  key_false : Array Label
-  key_true  : Array Label
-  tables    : Array GTable
+class GarblingScheme (Label : Type) (State : Type) where
+  /-- Garble an entire circuit with `numInputs` input wires. -/
+  garble (c : Circuit) (numInputs : Nat) : IO State
 
-def GenGarbleState.keyFor [Inhabited Label] (s : GenGarbleState Label GTable) (wireId : Nat) (b : Bool) : Label :=
-  if b then s.key_true[wireId]! else s.key_false[wireId]!
+  /-- Get the input label for a given wire and truth value (garbler-side). -/
+  inputLabel (s : State) (wireId : Nat) (v : Bool) : Label
 
-/-- A garbling scheme parameterized by the wire label and garbled table types. -/
-class GarblingScheme (Label : Type) (GTable : Type) where
-  /-- Garble an entire circuit, producing the garble state (keys + tables).
-      `numInputs` is the number of input wires (keys are generated for these first). -/
-  garble (c : Circuit) (numInputs : Nat) : IO (GenGarbleState Label GTable)
+  /-- Evaluate a garbled circuit given input labels (evaluator-side). -/
+  eval (s : State) (c : Circuit) (inputLabels : Array Label) : Array Label
 
-  /-- Evaluate a garbled circuit given input labels and the garbled tables. -/
-  eval (c : Circuit) (tables : Array GTable) (inputLabels : Array Label) : Array Label
-
-  /-- Determine the truth value of an output wire by comparing the label
-      against the true-label. -/
-  readOutput (label trueLabel : Label) : Bool
+  /-- Decode the truth value of an output wire (garbler-side). -/
+  decodeOutput (s : State) (wireId : Nat) (label : Label) : Bool

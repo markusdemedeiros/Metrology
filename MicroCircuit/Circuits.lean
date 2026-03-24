@@ -203,3 +203,61 @@ def CircuitSpec.evalOutputs (cs : CircuitSpec) (inputs : List Bool) : List Bool 
 def buildSpec (m : CircuitBuilderM (List Wire)) : CircuitSpec :=
   let (outputs, σ) := m.run { pc := 0, id := 0, circuit := #[] }
   { gates := σ.circuit, numInputs := σ.pc - σ.circuit.size, numWires := σ.pc, outputs }
+
+
+/-
+/-! ## Constant propagation optimization in a circuit -/
+
+section ConstantProp
+
+structure CPAbstractCircuitState where
+  pc : Nat
+  wires : Array (Option Bool)
+
+abbrev CPAbstractCircuitEvalM := StateT CPAbstractCircuitState Id
+
+def CPsetWireVal (i : Nat) (b : Bool) : CPAbstractCircuitEvalM Unit :=
+  modifyGet (fun σ => ((), { σ with wires := σ.wires.set! i b }))
+
+def CPgetWireVal (i : Nat) : CircuitEvalM Bool := do
+  let σ ← get
+  return σ.wires[i]!
+
+-- Read the state, return a gate that does the same thing.
+def Gate.constProp (g : Gate) : CPAbstractCircuitEvalM Gate :=
+  match g.prim with
+  | .And wA wB => do
+    sorry
+    -- let vA ← getWireVal wA
+    -- let vB ← getWireVal wB
+    -- return GateT.eval (.And vA vB)
+  | .Xor wA wB => do
+    sorry
+    -- let vA ← getWireVal wA
+    -- let vB ← getWireVal wB
+    -- return GateT.eval (.Xor vA vB)
+  | .Not wA => do
+    sorry
+    -- let vA ← getWireVal wA
+    -- return GateT.eval (.Not vA)
+  | .Const0 =>
+    sorry
+    -- return false
+  | .Const1 =>
+    sorry
+    -- return true
+--
+-- def Circuit.eval (c : Circuit) : CircuitEvalM Unit := do
+--   for g in c do
+--     let v ← g.eval
+--     let w ← getFreshWire
+--     setWireVal w v
+
+end ConstantProp
+
+/-! ## Dead code elimination through a circuit -/
+
+section DeadCodeProp
+
+end DeadCodeProp
+-/

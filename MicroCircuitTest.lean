@@ -189,23 +189,23 @@ def sha256Circuit : Circuit :=
 /-- Test a garbling scheme on a circuit with given inputs.
     Garbles the circuit, evaluates the garbled version, and checks
     that the output matches plain evaluation. -/
-def testGarbleGeneric [GarblingScheme Label GTable] [Inhabited Label] [Inhabited GTable]
+def testGarbleGeneric [GarblingScheme Label State] [Inhabited Label]
     (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO Bool := do
   let spec := buildSpec builder
   let c := spec.gates
   -- Garble
-  let gs ← GarblingScheme.garble (Label := Label) (GTable := GTable) c spec.numInputs
+  let gs ← GarblingScheme.garble (Label := Label) (State := State) c spec.numInputs
   -- Build input labels from truth values
   let inputLabels := inputVals.toArray.mapIdx fun i v =>
-    gs.keyFor i v
+    GarblingScheme.inputLabel gs i v
   -- Evaluate garbled circuit
-  let resultLabels := GarblingScheme.eval c gs.tables inputLabels
+  let resultLabels := GarblingScheme.eval gs c inputLabels
   -- Compare with plain evaluation
   let plainOutputs := spec.evalOutputs inputVals
   let mut ok := true
   for i in [:spec.outputs.length] do
     let wireId := spec.outputs[i]!
-    let garbledVal := GarblingScheme.readOutput (GTable := GTable) resultLabels[wireId]! (gs.keyFor wireId true)
+    let garbledVal := GarblingScheme.decodeOutput (Label := Label) gs wireId resultLabels[wireId]!
     let plainVal := plainOutputs[i]!
     if garbledVal != plainVal then
       IO.println s!"FAIL at output {i}: garbled={garbledVal}, plain={plainVal}"
@@ -213,7 +213,7 @@ def testGarbleGeneric [GarblingScheme Label GTable] [Inhabited Label] [Inhabited
   return ok
 
 /-- Concrete test using our point-and-permute scheme. -/
-def testGarble := testGarbleGeneric (Label := Key) (GTable := Table Key)
+def testGarble := testGarbleGeneric (Label := Key) (State := GarbleState)
 
 def exhaustive2 (builder : CircuitBuilderM (List Wire)) : IO Bool := do
   let mut ok := true
