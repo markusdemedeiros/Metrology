@@ -1,7 +1,7 @@
 import MicroCircuit.GarbleGen
 import MicroCircuit.Common
 
-namespace GRR2Garbling
+namespace GRR3Garbling
 
 /-! ## Base implementation for circuit garbling
 - Point-and-permute
@@ -151,4 +151,4 @@ instance : GarblingScheme Key GarbleState where
 
   numCiphertexts s := s.numCiphertexts
 
-end GRR2Garbling
+end GRR3Garbling
