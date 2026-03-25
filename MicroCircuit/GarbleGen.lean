@@ -9,8 +9,9 @@ A `GarblingScheme` abstracts over:
 -/
 
 structure GarblingScheme (Label : Type) (State : Type) where
-  /-- Preprocess a circuit before garbling (e.g. optimization passes). -/
-  preprocess : Nat → Circuit → Circuit := fun _ => id
+  /-- Preprocess a circuit before garbling (e.g. optimization passes).
+      Takes numInputs, circuit, output wire IDs; returns new circuit and new output wire IDs. -/
+  preprocess : Nat → Circuit → List Wire → Circuit × List Wire := fun _ c outs => (c, outs)
 
   /-- Garble an entire circuit with `numInputs` input wires. -/
   garble : Circuit → Nat → IO State
@@ -27,5 +28,5 @@ structure GarblingScheme (Label : Type) (State : Type) where
   /-- Number of ciphertexts in the garbled circuit. -/
   numCiphertexts : State → Nat
 
-def GarblingScheme.withPP (s : GarblingScheme L S) (f : Nat → Circuit → Circuit) : GarblingScheme L S :=
-  { s with preprocess := fun n c => f n (s.preprocess n c) }
+def GarblingScheme.withPP (s : GarblingScheme L S) (f : Nat → Circuit → List Wire → Circuit × List Wire) : GarblingScheme L S :=
+  { s with preprocess := fun n c outs => let (c', outs') := s.preprocess n c outs; f n c' outs' }

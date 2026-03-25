@@ -290,10 +290,49 @@ def constantPropM (c : Circuit) : CPEvalM Unit := do
     let w ← getFreshWire
     setWire w v
 
-def constantProp (numInputs : Nat) (c : Circuit) : Circuit :=
-  let initWires := Array.replicate (numInputs + c.size) .Unk
-  let ((), s) := constantPropM c |>.run ⟨numInputs, initWires, #[]⟩
-  s.optimized
-
 end ConstantProp
+
+def constProp (numInputs : Nat) (c : Circuit) (outs : List Wire) : Circuit × List Wire :=
+  let initWires := Array.replicate (numInputs + c.size) .Unk
+  let ((), s) := ConstantProp.constantPropM c |>.run ⟨numInputs, initWires, #[]⟩
+  (s.optimized, outs)
+
+/-- Delete constant gates and compact wire IDs. -/
+def constElim (numInputs : Nat) (c : Circuit) (outs : List Wire) : Circuit × List Wire := Id.run do
+  let mut wireMap : Array Nat := Array.ofFn (n := numInputs) (fun i => i.val)
+  let mut nextId := numInputs
+  for g in c do
+    match g.prim with
+    | .Const0 | .Const1 => wireMap := wireMap.push 0
+    | _ => wireMap := wireMap.push nextId; nextId := nextId + 1
+  let r (w : Wire) : Wire := wireMap[w]!
+  let mut out : Circuit := #[]
+  for g in c do
+    match g.prim with
+    | .Const0 | .Const1 => pure ()
+    | .And wA wB => out := out.push { prim := .And (r wA) (r wB), id := r g.id }
+    | .Xor wA wB => out := out.push { prim := .Xor (r wA) (r wB), id := r g.id }
+    | .Not wA    => out := out.push { prim := .Not (r wA),         id := r g.id }
+    | .Id wA     => out := out.push { prim := .Id (r wA),          id := r g.id }
+  return (out, outs.map r)
+
+/-- Inline Id gates: replace references with the Id's input, then delete. -/
+def idElim (numInputs : Nat) (c : Circuit) (outs : List Wire) : Circuit × List Wire := Id.run do
+  let mut wireMap : Array Nat := Array.ofFn (n := numInputs) (fun i => i.val)
+  let mut nextId := numInputs
+  for g in c do
+    match g.prim with
+    | .Id wA => wireMap := wireMap.push wireMap[wA]!
+    | _ => wireMap := wireMap.push nextId; nextId := nextId + 1
+  let r (w : Wire) : Wire := wireMap[w]!
+  let mut out : Circuit := #[]
+  for g in c do
+    match g.prim with
+    | .Id _ => pure ()
+    | .And wA wB => out := out.push { prim := .And (r wA) (r wB), id := r g.id }
+    | .Xor wA wB => out := out.push { prim := .Xor (r wA) (r wB), id := r g.id }
+    | .Not wA    => out := out.push { prim := .Not (r wA),         id := r g.id }
+    | .Const0    => out := out.push { prim := .Const0,              id := r g.id }
+    | .Const1    => out := out.push { prim := .Const1,              id := r g.id }
+  return (out, outs.map r)
 

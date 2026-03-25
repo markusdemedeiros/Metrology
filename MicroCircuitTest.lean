@@ -196,15 +196,15 @@ def garbleAndCount {Label State : Type} [Inhabited Label]
     (scheme : GarblingScheme Label State)
     (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO (Bool × Nat) := do
   let spec := buildSpec builder
-  let c := scheme.preprocess spec.numInputs spec.gates
+  let (c, outputs) := scheme.preprocess spec.numInputs spec.gates spec.outputs
   let gs ← scheme.garble c spec.numInputs
   let inputLabels := inputVals.toArray.mapIdx fun i v =>
     scheme.inputLabel gs i v
   let resultLabels := scheme.eval gs c inputLabels
   let plainOutputs := spec.evalOutputs inputVals
   let mut ok := true
-  for i in [:spec.outputs.length] do
-    let wireId := spec.outputs[i]!
+  for i in [:outputs.length] do
+    let wireId := outputs[i]!
     let garbledVal := scheme.decodeOutput gs wireId resultLabels[wireId]!
     let plainVal := plainOutputs[i]!
     if garbledVal != plainVal then
@@ -223,12 +223,26 @@ def mkRunner (name : String) (scheme : GarblingScheme Key S) [Inhabited Key] : S
 
 
 def allSchemes : List SchemeRunner :=
-  [ mkRunner "Basic" BasicGarbling.scheme
-  , mkRunner "Basic + ConstProp" (BasicGarbling.scheme.withPP ConstantProp.constantProp)
-  , mkRunner "FreeNot" FreeNotGarbling.scheme
-  , mkRunner "FreeXor" FreeXorGarbling.scheme
-  , mkRunner "GRR3" GRR3Garbling.scheme
-  , mkRunner "GRR3 + ConstProp" (GRR3Garbling.scheme.withPP ConstantProp.constantProp)
+  [ mkRunner "Basic"
+      BasicGarbling.scheme
+  , mkRunner "Basic + ConstProp"
+      (BasicGarbling.scheme.withPP constProp)
+  , mkRunner "Basic + ConstProp + ConstElim"
+      (BasicGarbling.scheme.withPP constProp |>.withPP constElim)
+  , mkRunner "Basic + ConstProp + ConstElim + IdElim"
+      (BasicGarbling.scheme.withPP constProp |>.withPP constElim |>.withPP idElim)
+  , mkRunner "FreeNot"
+      FreeNotGarbling.scheme
+  , mkRunner "FreeXor"
+      FreeXorGarbling.scheme
+  , mkRunner "GRR3"
+      GRR3Garbling.scheme
+  , mkRunner "GRR3 + ConstProp"
+      (GRR3Garbling.scheme.withPP constProp)
+  , mkRunner "GRR3 + ConstProp + ConstElim"
+      (GRR3Garbling.scheme.withPP constProp |>.withPP constElim)
+  , mkRunner "GRR3 + ConstProp + ConstElim + IdElim"
+      (GRR3Garbling.scheme.withPP constProp |>.withPP constElim |>.withPP idElim)
   ]
 
 def exhaustive2 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do
@@ -289,12 +303,13 @@ def main : IO Unit := do
     IO.println "All garbling tests passed!"
     IO.println ""
     IO.println "SHA-256 garbled circuit size:"
-    IO.println "  Scheme                         | Ciphertexts | % of Basic"
-    IO.println "  -------------------------------|-------------|------------"
+    let col := shaCounts.foldl (fun mx (n, _) => max mx n.length) 6  -- min "Scheme"
+    let pad (s : String) (w : Nat) := s ++ String.ofList (List.replicate (w - s.length) ' ')
+    IO.println s!"  {pad "Scheme" col} | Ciphertexts | % of Basic"
+    IO.println s!"  {String.ofList (List.replicate (col + 1) '-')}|-------------|------------"
     let baseline := (shaCounts[0]!.2).toFloat
     for (name, ct) in shaCounts do
       let pct := ct.toFloat / baseline * 100.0
       let pctStr := s!"{pct.round |>.toUInt64}%"
-      let padded := name ++ String.ofList (List.replicate (30 - name.length) ' ')
-      IO.println s!"  {padded} | {ct}      | {pctStr}"
+      IO.println s!"  {pad name col} | {ct}      | {pctStr}"
   else IO.println "Some garbling tests FAILED!"
