@@ -79,9 +79,6 @@ def decrypt (k : Key) (c : Nat) : Nat := k ^^^ c
 
 def nil : Key := 0
 
--- The half-gates optimization uses our implementation of SHA as the hash
--- function (the hash function here is x ↦ sha256(x) ^^^ x).
-
 end Key
 
 /-- Hash a 128-bit key. Input as Nat, output as Nat (big-endian, truncated to 256 bits). -/
@@ -99,8 +96,28 @@ def SHA256.hashKey (k : Key) : Nat := Id.run do
   return result
 
 /-- Correlation-robust hash: H(x) = SHA256(x) ^^^ x, truncated to 128 bits. -/
-def Key.hash (k : Key) : Key :=
+def Key.sha256 (k : Key) : Key :=
   (SHA256.hashKey k ^^^ k) &&& ((2 ^ 128) - 1)
+
+/- ## Lazy random functions of type Key → Key -/
+abbrev RandomFunction : Type _ := Key → Option Key
+
+namespace RandomFunction
+
+def new : RandomFunction := fun _ => none
+
+def hash (r : RandomFunction) (k : Key) : IO (RandomFunction × Key) :=
+  match r k with
+  | some v => return (r, v)
+  | none => do
+    let v ← Key.gen
+    let r' := fun k' => if k' = k then some v else r k'
+    return (r', v)
+
+end RandomFunction
+
+
+
 
 def Table (α : Type _) : Type _ := α × α × α × α
 
