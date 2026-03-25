@@ -5,3 +5,4 @@ import MicroCircuit.GarbleFreeNot
 import MicroCircuit.GarbleFreeXor
 import MicroCircuit.GarbleRowReduction
 import MicroCircuit.GarbleHalfGatesNaive
+import MicroCircuit.GarbleHalfGates
