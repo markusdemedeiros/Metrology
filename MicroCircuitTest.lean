@@ -228,6 +228,7 @@ def allSchemes : List SchemeRunner :=
   , mkRunner "FreeNot" FreeNotGarbling.scheme
   , mkRunner "FreeXor" FreeXorGarbling.scheme
   , mkRunner "GRR3" GRR3Garbling.scheme
+  , mkRunner "GRR3 + ConstProp" (GRR3Garbling.scheme.withPP ConstantProp.constantProp)
   ]
 
 def exhaustive2 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do
@@ -288,7 +289,7 @@ def main : IO Unit := do
     IO.println "All garbling tests passed!"
     IO.println ""
     IO.println "SHA-256 garbled circuit size:"
-    IO.println "  Scheme                         | Ciphertexts |  % of Basic"
+    IO.println "  Scheme                         | Ciphertexts | % of Basic"
     IO.println "  -------------------------------|-------------|------------"
     let baseline := (shaCounts[0]!.2).toFloat
     for (name, ct) in shaCounts do

@@ -130,6 +130,7 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate) (inputLabels :
       -- Here, the output key is simply the xor of the input keys
       | GateT.Xor wA wB, .Xor => wireStates[wA]! ^^^ wireStates[wB]!
       | GateT.Not wA, .Not => wireStates[wA]!
+      | GateT.Id wA, .Id => wireStates[wA]!
       | GateT.Const0, .Const k => k
       | GateT.Const1, .Const k => k
       | _, _ => panic! "Bad circuit"
