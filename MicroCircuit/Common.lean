@@ -58,17 +58,46 @@ def hashShort (msg : Array UInt32) : Array UInt32 := Id.run do
 end SHA256
 
 
-abbrev Key := Nat
+/-- A 128-bit key, stored as a 16-byte ByteArray. -/
+structure Key where
+  bytes : ByteArray
+  deriving Inhabited, BEq, Hashable
 
 namespace Key
 
-def colour (k : Key) : Bool := k &&& 1 == 1
+def keySize : Nat := 16
 
-def set_colour (k : Key) (b : Bool) : Key :=
-  (0xFFFFFFFE &&& k) ||| b.toNat
+/-- The zero key. -/
+def nil : Key := ⟨ByteArray.mk (Array.replicate keySize 0)⟩
+
+instance : OfNat Key 0 := ⟨nil⟩
+
+/-- Byte-wise XOR of two keys. -/
+def xor (a b : Key) : Key := Id.run do
+  let mut out := ByteArray.mk (Array.replicate keySize 0)
+  for i in [:keySize] do
+    out := out.set! i (a.bytes[i]! ^^^ b.bytes[i]!)
+  return ⟨out⟩
+
+instance : HXor Key Key Key := ⟨Key.xor⟩
+
+/-- Colour bit = LSB of first byte. -/
+def colour (k : Key) : Bool := k.bytes[0]! &&& 1 == 1
+
+/-- Set the LSB of the first byte. -/
+def set_colour (k : Key) (b : Bool) : Key := Id.run do
+  let mut bs := k.bytes
+  let old := bs[0]!
+  bs := bs.set! 0 ((old &&& 0xFE) ||| (if b then 1 else 0))
+  return ⟨bs⟩
 
 /-- Generate a random 128-bit key. -/
-def gen : IO Key := IO.rand 0 ((2 ^ 128) - 1)
+def gen : IO Key := do
+  let mut bs := ByteArray.mk (Array.replicate keySize 0)
+  for i in [:keySize] do
+    let b ← IO.rand 0 255
+    bs := bs.set! i b.toUInt8
+  return ⟨bs⟩
 
 /-- Generate a key pair for a wire: two 128-bit keys with opposite LSBs. -/
 def gen_colour_pair : IO (Key × Key) := do
@@ -76,38 +105,23 @@ def gen_colour_pair : IO (Key × Key) := do
   let kb ← gen
   return (ka, kb.set_colour !ka.colour)
 
-def encrypt (k : Key) (p : Nat) : Nat := k ^^^ p
+/-- Encrypt (XOR-based one-time pad). -/
+def encrypt (k : Key) (p : Key) : Key := k ^^^ p
 
-def decrypt (k : Key) (c : Nat) : Nat := k ^^^ c
+/-- Decrypt (XOR-based one-time pad). -/
+def decrypt (k : Key) (c : Key) : Key := k ^^^ c
 
-def nil : Key := 0
+/-- Correlation-robust hash via OpenSSL: H(x) = SHA256(x) ^^^ x, truncated to 128 bits. -/
+def sha256FFI (k : Key) : Key :=
+  let hash := LibCrypto.sha256 k.bytes
+  -- Truncate to first 16 bytes, then XOR with key
+  let trunc : Key := ⟨hash.extract 0 keySize⟩
+  trunc ^^^ k
+
+instance : DecidableEq Key := fun a b =>
+  if a.bytes == b.bytes then isTrue (by sorry) else isFalse (by sorry)
 
 end Key
-
-/-- Hash a 128-bit key. Input as Nat, output as Nat (big-endian, truncated to 256 bits). -/
-def SHA256.hashKey (k : Key) : Nat := Id.run do
-  -- Split 128-bit Nat into 4 big-endian UInt32 words
-  let w3 := (k &&& 0xFFFFFFFF).toUInt64.toUInt32
-  let w2 := ((k >>> 32) &&& 0xFFFFFFFF).toUInt64.toUInt32
-  let w1 := ((k >>> 64) &&& 0xFFFFFFFF).toUInt64.toUInt32
-  let w0 := ((k >>> 96) &&& 0xFFFFFFFF).toUInt64.toUInt32
-  let hash := hashShort #[w0, w1, w2, w3]
-  -- Reassemble into a Nat
-  let mut result : Nat := 0
-  for i in [:8] do
-    result := (result <<< 32) ||| hash[i]!.toNat
-  return result
-
-/-- Correlation-robust hash (pure Lean): H(x) = SHA256(x) ^^^ x, truncated to 128 bits. -/
-def Key.sha256 (k : Key) : Key :=
-  (SHA256.hashKey k ^^^ k) &&& ((2 ^ 128) - 1)
-
-/-- Correlation-robust hash (OpenSSL FFI): H(x) = SHA256(x) ^^^ x, truncated to 128 bits. -/
-def Key.sha256FFI (k : Key) : Key :=
-  let ba := (Nat.toByteArrayLE k 16).getD default
-  let hash := LibCrypto.sha256 ba
-  let hashNat := Nat.ofByteArrayLE hash
-  (hashNat ^^^ k) &&& ((2 ^ 128) - 1)
 
 /- ## Lazy random functions of type Key → Key -/
 structure RandomFunction where

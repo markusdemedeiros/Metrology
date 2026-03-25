@@ -38,3 +38,22 @@ SHA-256 garbled circuit size:
   HalfGates                                  | 10495ms | 131768 | 100280      | 20%
   HalfGates + ConstProp + ConstElim + IdElim | 8665 ms | 119602 | 89458       | 17%
 
+FFI + Byte packing
+
+SHA-256 garbled circuit size:
+  Scheme                                     | Garble  | Gates  | Ciphertexts | %
+  -------------------------------------------|---------|--------|-------------|------
+  Basic                                      | 356  ms | 131768 | 513976      | 100%
+  Basic + ConstProp                          | 343  ms | 131768 | 489890      | 95%
+  Basic + ConstProp + ConstElim              | 331  ms | 125508 | 483630      | 94%
+  Basic + ConstProp + ConstElim + IdElim     | 316  ms | 119602 | 471818      | 92%
+  FreeNot                                    | 970  ms | 131768 | 509880      | 99%
+  FreeXor                                    | 103  ms | 131768 | 197560      | 38%
+  GRR3                                       | 56   ms | 131768 | 148920      | 29%
+  GRR3 + ConstProp                           | 55   ms | 131768 | 140447      | 27%
+  GRR3 + ConstProp + ConstElim               | 49   ms | 125508 | 134187      | 26%
+  GRR3 + ConstProp + ConstElim + IdElim      | 49   ms | 119602 | 134187      | 26%
+  HalfGates (naive)                          | 11368ms | 131768 | 197560      | 38%
+  HalfGates                                  | 10507ms | 131768 | 100280      | 20%
+  HalfGates + ConstProp + ConstElim + IdElim | 8646 ms | 119602 | 89458       | 17%
+
