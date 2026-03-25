@@ -144,6 +144,9 @@ private def sha256Test : Bool :=
 
 #guard sha256Test
 
+-- Word-level SHA-256 test against same vector
+#guard SHA256.block abcPaddedBlock == abcExpected
+
 end SHA256Tests
 
 /- ## Gate count -/
@@ -152,6 +155,7 @@ def CircuitCount (c : Circuit) : IO Unit := do
   let mut numAnd : Nat := 0
   let mut numXor : Nat := 0
   let mut numNot : Nat := 0
+  let mut numId : Nat := 0
   let mut numConst0 : Nat := 0
   let mut numConst1 : Nat := 0
   for g in c do
@@ -159,6 +163,7 @@ def CircuitCount (c : Circuit) : IO Unit := do
     | .And _ _ => do numAnd := numAnd + 1
     | .Xor _ _ => do numXor := numXor + 1
     | .Not _ => do numNot := numNot + 1
+    | .Id _ => do numId := numId + 1
     | .Const0 => do numConst0 := numConst0 + 1
     | .Const1 => do numConst1 := numConst1 + 1
   let tot := numAnd + numXor + numNot + numConst0 + numConst1
@@ -186,81 +191,51 @@ def sha256Circuit : Circuit :=
 
 /- ## Generic garbling test harness -/
 
-/-- Test a garbling scheme on a circuit with given inputs.
-    Garbles the circuit, evaluates the garbled version, and checks
-    that the output matches plain evaluation. -/
-def testGarbleGeneric [GarblingScheme Label State] [Inhabited Label]
-    (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO Bool := do
-  let spec := buildSpec builder
-  let c := spec.gates
-  let gs ← GarblingScheme.garble (Label := Label) (State := State) c spec.numInputs
-  let inputLabels := inputVals.toArray.mapIdx fun i v =>
-    GarblingScheme.inputLabel gs i v
-  let resultLabels := GarblingScheme.eval gs c inputLabels
-  let plainOutputs := spec.evalOutputs inputVals
-  let mut ok := true
-  for i in [:spec.outputs.length] do
-    let wireId := spec.outputs[i]!
-    let garbledVal := GarblingScheme.decodeOutput (Label := Label) gs wireId resultLabels[wireId]!
-    let plainVal := plainOutputs[i]!
-    if garbledVal != plainVal then
-      IO.println s!"FAIL at output {i}: garbled={garbledVal}, plain={plainVal}"
-      ok := false
-  return ok
-
 /-- Garble a circuit and return (ok, numCiphertexts). -/
-def garbleAndCount [GarblingScheme Label State] [Inhabited Label]
+def garbleAndCount {Label State : Type} [Inhabited Label]
+    (scheme : GarblingScheme Label State)
     (builder : CircuitBuilderM (List Wire)) (inputVals : List Bool) : IO (Bool × Nat) := do
   let spec := buildSpec builder
-  let c := spec.gates
-  let gs ← GarblingScheme.garble (Label := Label) (State := State) c spec.numInputs
+  let c := scheme.preprocess spec.numInputs spec.gates
+  let gs ← scheme.garble c spec.numInputs
   let inputLabels := inputVals.toArray.mapIdx fun i v =>
-    GarblingScheme.inputLabel gs i v
-  let resultLabels := GarblingScheme.eval gs c inputLabels
+    scheme.inputLabel gs i v
+  let resultLabels := scheme.eval gs c inputLabels
   let plainOutputs := spec.evalOutputs inputVals
   let mut ok := true
   for i in [:spec.outputs.length] do
     let wireId := spec.outputs[i]!
-    let garbledVal := GarblingScheme.decodeOutput (Label := Label) gs wireId resultLabels[wireId]!
+    let garbledVal := scheme.decodeOutput gs wireId resultLabels[wireId]!
     let plainVal := plainOutputs[i]!
     if garbledVal != plainVal then
       IO.println s!"FAIL at output {i}: garbled={garbledVal}, plain={plainVal}"
       ok := false
-  return (ok, GarblingScheme.numCiphertexts (Label := Label) gs)
+  return (ok, scheme.numCiphertexts gs)
 
 /-- A named garbling scheme runner, wrapping the type parameters. -/
 structure SchemeRunner where
   name : String
-  test : CircuitBuilderM (List Wire) → List Bool → IO Bool
   count : CircuitBuilderM (List Wire) → List Bool → IO (Bool × Nat)
 
-def basicRunner : SchemeRunner :=
-  { name := "Basic"
-    test := testGarbleGeneric (Label := Key) (State := BasicGarbling.GarbleState)
-    count := garbleAndCount (Label := Key) (State := BasicGarbling.GarbleState) }
+def mkRunner (name : String) (scheme : GarblingScheme Key S) [Inhabited Key] : SchemeRunner :=
+  { name,
+    count := garbleAndCount scheme }
 
-def freeNotRunner : SchemeRunner :=
-  { name := "FreeNot"
-    test := testGarbleGeneric (Label := Key) (State := FreeNotGarbling.GarbleState)
-    count := garbleAndCount (Label := Key) (State := FreeNotGarbling.GarbleState) }
 
-def freeXorRunner : SchemeRunner :=
-  { name := "FreeXor"
-    test := testGarbleGeneric (Label := Key) (State := FreeXorGarbling.GarbleState)
-    count := garbleAndCount (Label := Key) (State := FreeXorGarbling.GarbleState) }
-
-def grr3Runner : SchemeRunner :=
-  { name := "GRR3"
-    test := testGarbleGeneric (Label := Key) (State := GRR3Garbling.GarbleState)
-    count := garbleAndCount (Label := Key) (State := GRR3Garbling.GarbleState) }
-
-def allSchemes : List SchemeRunner := [basicRunner, freeNotRunner, freeXorRunner, grr3Runner]
+def allSchemes : List SchemeRunner :=
+  [ mkRunner "Basic" BasicGarbling.scheme
+  , mkRunner "Basic + ConstProp" (BasicGarbling.scheme.withPP ConstantProp.constantProp)
+  , mkRunner "FreeNot" FreeNotGarbling.scheme
+  , mkRunner "FreeXor" FreeXorGarbling.scheme
+  , mkRunner "GRR3" GRR3Garbling.scheme
+  ]
 
 def exhaustive2 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do
   let mut ok := true
   for vi in [false, true] do
     for vj in [false, true] do
-      unless (← runner.test builder [vi, vj]) do ok := false
+      let (r, _) ← runner.count builder [vi, vj]
+      unless r do ok := false
   return ok
 
 def exhaustive3 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do
@@ -268,7 +243,8 @@ def exhaustive3 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) 
   for a in [false, true] do
     for b in [false, true] do
       for c in [false, true] do
-        unless (← runner.test builder [a, b, c]) do ok := false
+        let (r, _) ← runner.count builder [a, b, c]
+        unless r do ok := false
   return ok
 
 def andBuilder : CircuitBuilderM (List Wire) := do
@@ -291,6 +267,7 @@ def main : IO Unit := do
   IO.println ""
   let abcBits := abcPaddedBlock.foldl (init := ([] : List Bool)) (fun acc w => acc ++ uint32ToBools w)
   let mut allOk := true
+  let mut shaCounts : Array (String × Nat) := #[]
   for runner in allSchemes do
     IO.println s!"Garbling tests [{runner.name}]:"
     if ← exhaustive2 runner andBuilder then IO.println s!"  AND gate: passed"
@@ -305,6 +282,18 @@ def main : IO Unit := do
     let (ok, ct) ← runner.count sha256Builder abcBits
     if ok then IO.println s!"  SHA-256: passed ({ct} ciphertexts)"
     else IO.println s!"  SHA-256: FAILED"; allOk := false
+    shaCounts := shaCounts.push (runner.name, ct)
     IO.println ""
-  if allOk then IO.println "All garbling tests passed!"
+  if allOk then
+    IO.println "All garbling tests passed!"
+    IO.println ""
+    IO.println "SHA-256 garbled circuit size:"
+    IO.println "  Scheme                         | Ciphertexts |  % of Basic"
+    IO.println "  -------------------------------|-------------|------------"
+    let baseline := (shaCounts[0]!.2).toFloat
+    for (name, ct) in shaCounts do
+      let pct := ct.toFloat / baseline * 100.0
+      let pctStr := s!"{pct.round |>.toUInt64}%"
+      let padded := name ++ String.ofList (List.replicate (30 - name.length) ' ')
+      IO.println s!"  {padded} | {ct}      | {pctStr}"
   else IO.println "Some garbling tests FAILED!"

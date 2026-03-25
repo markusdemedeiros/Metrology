@@ -15,6 +15,7 @@ def Circuit.toDot (c : Circuit) (numInputs : Nat) (name : String := "circuit") :
       | .And _ _ => "goldenrod"
       | .Xor _ _ => "green"
       | .Not _   => "red"
+      | .Id _    => "red"
       | .Const0  => "gray"
       | .Const1  => "gray"
     lines := lines.push s!"  w{g.id} [color={color}];"
@@ -28,6 +29,8 @@ def Circuit.toDot (c : Circuit) (numInputs : Nat) (name : String := "circuit") :
       lines := lines.push s!"  w{wA} -> w{g.id};"
       lines := lines.push s!"  w{wB} -> w{g.id};"
     | .Not wA =>
+      lines := lines.push s!"  w{wA} -> w{g.id};"
+    | .Id wA =>
       lines := lines.push s!"  w{wA} -> w{g.id};"
     | .Const0 => pure ()
     | .Const1 => pure ()

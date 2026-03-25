@@ -12,6 +12,7 @@ inductive GateT (α : Type _)
   | And (wA wB : α)
   | Xor (wA wB : α)
   | Not (wA : α)
+  | Id (wA : α)
   | Const0
   | Const1
   deriving Repr
@@ -20,6 +21,7 @@ def GateT.eval : GateT Bool → Bool
   | .And wA wB => and wA wB
   | .Xor wA wB => xor wA wB
   | .Not wA => !wA
+  | .Id wA => wA
   | .Const0 => false
   | .Const1 => true
 
@@ -146,6 +148,9 @@ def Gate.eval (g : Gate) : CircuitEvalM Bool :=
   | .Not wA => do
     let vA ← getWireVal wA
     return GateT.eval (.Not vA)
+  | .Id wA => do
+    let vA ← getWireVal wA
+    return vA
   | .Const0 => return false
   | .Const1 => return true
 
@@ -163,16 +168,18 @@ structure GateCounts where
   ands : Nat := 0
   xors : Nat := 0
   nots : Nat := 0
+  ids : Nat := 0
   const0s : Nat := 0
   const1s : Nat := 0
+  deads : Nat := 0
   deriving Repr
 
 def GateCounts.total (gc : GateCounts) : Nat :=
-  gc.ands + gc.xors + gc.nots + gc.const0s + gc.const1s
+  gc.ands + gc.xors + gc.nots + gc.ids + gc.const0s + gc.const1s + gc.deads
 
 instance : ToString GateCounts where
   toString gc :=
-    s!"AND: {gc.ands}, XOR: {gc.xors}, NOT: {gc.nots}, Const0: {gc.const0s}, Const1: {gc.const1s}, Total: {gc.total}"
+    s!"AND: {gc.ands}, XOR: {gc.xors}, NOT: {gc.nots}, ID: {gc.ids}, Const0: {gc.const0s}, Const1: {gc.const1s}, Dead: {gc.deads}, Total: {gc.total}"
 
 def Circuit.gateCounts (c : Circuit) : GateCounts :=
   c.foldl (init := {}) fun gc g =>
@@ -180,6 +187,7 @@ def Circuit.gateCounts (c : Circuit) : GateCounts :=
     | .And _ _  => { gc with ands := gc.ands + 1 }
     | .Xor _ _  => { gc with xors := gc.xors + 1 }
     | .Not _    => { gc with nots := gc.nots + 1 }
+    | .Id _     => { gc with ids := gc.ids + 1 }
     | .Const0   => { gc with const0s := gc.const0s + 1 }
     | .Const1   => { gc with const1s := gc.const1s + 1 }
 
@@ -205,59 +213,87 @@ def buildSpec (m : CircuitBuilderM (List Wire)) : CircuitSpec :=
   { gates := σ.circuit, numInputs := σ.pc - σ.circuit.size, numWires := σ.pc, outputs }
 
 
-/-
-/-! ## Constant propagation optimization in a circuit -/
+/-! ## Constant and equality propagation optimization in a circuit.
+  disequality constraints to increase the number of gates that are eliminated. -/
 
-section ConstantProp
+namespace ConstantProp
 
-structure CPAbstractCircuitState where
+inductive AbstractValue where
+  | Cst (b : Bool)
+  | Unk
+  deriving Inhabited
+
+structure AbstractState where
   pc : Nat
-  wires : Array (Option Bool)
+  wires : Array AbstractValue
+  optimized : Circuit
 
-abbrev CPAbstractCircuitEvalM := StateT CPAbstractCircuitState Id
+abbrev CPEvalM := StateT AbstractState Id
 
-def CPsetWireVal (i : Nat) (b : Bool) : CPAbstractCircuitEvalM Unit :=
+def setWire (i : Nat) (b : AbstractValue) : CPEvalM Unit :=
   modifyGet (fun σ => ((), { σ with wires := σ.wires.set! i b }))
 
-def CPgetWireVal (i : Nat) : CircuitEvalM Bool := do
+def getWire (i : Nat) : CPEvalM AbstractValue := do
   let σ ← get
   return σ.wires[i]!
 
--- Read the state, return a gate that does the same thing.
-def Gate.constProp (g : Gate) : CPAbstractCircuitEvalM Gate :=
+def getFreshWire : CPEvalM Wire := do
+  modifyGet (fun σ => (σ.pc, { σ with pc := σ.pc + 1 }))
+
+def pushGate (g : Gate) : CPEvalM Unit :=
+  modifyGet (fun σ => ((), { σ with optimized := σ.optimized.push g }))
+
+def pushGateAs (g : Gate) (p : GateT Wire) : CPEvalM Unit :=
+  pushGate { g with prim := p}
+
+def toConst : Bool → GateT Wire | true => .Const1 | false => .Const0
+
+-- Read the state, push an optimized gate, and return the new abstract value
+def Gate.constPropGate (g : Gate) : CPEvalM AbstractValue :=
   match g.prim with
   | .And wA wB => do
-    sorry
-    -- let vA ← getWireVal wA
-    -- let vB ← getWireVal wB
-    -- return GateT.eval (.And vA vB)
+    let vA ← getWire wA
+    let vB ← getWire wB
+    match vA, vB with
+    | .Unk,       .Unk        => do pushGate g; return .Unk
+    | .Cst true,  .Unk        => do pushGateAs g (.Id wB); return .Unk
+    | .Cst false, .Unk        => do pushGateAs g (toConst false); return .Cst false
+    | .Unk,       .Cst true   => do pushGateAs g (.Id wA); return .Unk
+    | .Unk,       .Cst false  => do pushGateAs g (toConst false); return .Cst false
+    | .Cst bA,    .Cst bB     => do pushGateAs g (toConst <| bA && bB); return .Cst (bA && bB)
   | .Xor wA wB => do
-    sorry
-    -- let vA ← getWireVal wA
-    -- let vB ← getWireVal wB
-    -- return GateT.eval (.Xor vA vB)
+    let vA ← getWire wA
+    let vB ← getWire wB
+    match vA, vB with
+    | .Unk,       .Unk        => do pushGate g; return .Unk
+    | .Cst true,  .Unk        => do pushGateAs g (.Not wB); return .Unk
+    | .Cst false, .Unk        => do pushGateAs g (.Id wB); return .Unk
+    | .Unk,       .Cst true   => do pushGateAs g (.Not wA); return .Unk
+    | .Unk,       .Cst false  => do pushGateAs g (.Id wA); return .Unk
+    | .Cst bA,    .Cst bB     => do pushGateAs g (toConst <| bA ^^ bB); return .Cst (bA ^^ bB)
   | .Not wA => do
-    sorry
-    -- let vA ← getWireVal wA
-    -- return GateT.eval (.Not vA)
-  | .Const0 =>
-    sorry
-    -- return false
-  | .Const1 =>
-    sorry
-    -- return true
---
--- def Circuit.eval (c : Circuit) : CircuitEvalM Unit := do
---   for g in c do
---     let v ← g.eval
---     let w ← getFreshWire
---     setWireVal w v
+    let vA ← getWire wA
+    match vA with
+    | .Unk                    => do pushGate g; return .Unk
+    | .Cst b                  => do pushGateAs g (toConst !b); return .Cst !b
+  | .Id wA => do
+    let vA ← getWire wA
+    match vA with
+    | .Unk                    => do pushGate g; return .Unk
+    | .Cst b                  => do pushGateAs g (toConst b); return .Cst b
+  | .Const0                   => do pushGate g; return .Cst false
+  | .Const1                   => do pushGate g; return .Cst true
+
+def constantPropM (c : Circuit) : CPEvalM Unit := do
+  for g in c do
+    let v ← Gate.constPropGate g
+    let w ← getFreshWire
+    setWire w v
+
+def constantProp (numInputs : Nat) (c : Circuit) : Circuit :=
+  let initWires := Array.replicate (numInputs + c.size) .Unk
+  let ((), s) := constantPropM c |>.run ⟨numInputs, initWires, #[]⟩
+  s.optimized
 
 end ConstantProp
 
-/-! ## Dead code elimination through a circuit -/
-
-section DeadCodeProp
-
-end DeadCodeProp
--/

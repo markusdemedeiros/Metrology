@@ -13,6 +13,7 @@ inductive GarbledGate
 | And (t : Table Key)
 | Xor (t : Table Key)
 | Not
+| Id
 | Const (k : Key)
 
 structure GarbleState where
@@ -51,16 +52,20 @@ def pushTable (t : GarbledGate) (ct : Nat) : GarbleM Unit :=
 def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
   let mut outWire := numInputs
   for g in c do
-    if let .Not wA := g.prim
-      then
-        -- For a not gate, set the keys to be the swapped keys for the input wire
+    match g.prim with
+    -- For a not gate, set the keys to be the swapped keys for the input wire
+    | .Not wA => do
         let kA := (← get).keyFor wA
         modify fun s => { s with
           key_false := s.key_false.set! outWire (kA true)
           key_true := s.key_true.set! outWire (kA false) }
-      else
-        -- Generate new keys for the current output wire
-        GarbleM.genKeysFor outWire
+    | .Id wA => do
+        let kA := (← get).keyFor wA
+        modify fun s => { s with
+          key_false := s.key_false.set! outWire (kA false)
+          key_true := s.key_true.set! outWire (kA true) }
+    -- Otherwise, generate new keys for the current output wire
+    | _ =>  GarbleM.genKeysFor outWire
 
     let s ← get
     let kk := s.keyFor outWire
@@ -71,6 +76,7 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
     | .And wA wB => pushTable (.And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)) 4
     | .Xor wA wB => pushTable (.Xor <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· ^^ ·)) 4
     | .Not _     => pushTable .Not 0
+    | .Id _      => pushTable .Id 0
     | .Const0    => pushTable (.Const (kk false)) 1
     | .Const1    => pushTable (.Const (kk true)) 1
 
@@ -89,6 +95,7 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate) (inputLabels :
       -- Not evaluates by id, because from here on out, any gates will have been garbled
       -- as if this meant the opposite of what it did before.
       | GateT.Not wA, .Not => wireStates[wA]!
+      | GateT.Id wA, .Id => wireStates[wA]!
       | GateT.Const0, .Const k => k
       | GateT.Const1, .Const k => k
       | _, _ => panic! "Bad circuit"
@@ -96,7 +103,7 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate) (inputLabels :
   return wireStates
 
 /-- Point-and-permute garbling with XOR one-time pad. -/
-instance : GarblingScheme Key GarbleState where
+def scheme : GarblingScheme Key GarbleState where
   garble c numInputs := do
     let pairs ← (Array.range numInputs).mapM (fun _ => Key.gen_colour_pair)
     let initState : GarbleState :=

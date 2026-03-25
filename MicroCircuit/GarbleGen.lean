@@ -8,18 +8,24 @@ A `GarblingScheme` abstracts over:
 - How to garble, evaluate, encode inputs, and decode outputs
 -/
 
-class GarblingScheme (Label : Type) (State : Type) where
+structure GarblingScheme (Label : Type) (State : Type) where
+  /-- Preprocess a circuit before garbling (e.g. optimization passes). -/
+  preprocess : Nat → Circuit → Circuit := fun _ => id
+
   /-- Garble an entire circuit with `numInputs` input wires. -/
-  garble (c : Circuit) (numInputs : Nat) : IO State
+  garble : Circuit → Nat → IO State
 
   /-- Get the input label for a given wire and truth value (garbler-side). -/
-  inputLabel (s : State) (wireId : Nat) (v : Bool) : Label
+  inputLabel : State → Nat → Bool → Label
 
   /-- Evaluate a garbled circuit given input labels (evaluator-side). -/
-  eval (s : State) (c : Circuit) (inputLabels : Array Label) : Array Label
+  eval : State → Circuit → Array Label → Array Label
 
   /-- Decode the truth value of an output wire (garbler-side). -/
-  decodeOutput (s : State) (wireId : Nat) (label : Label) : Bool
+  decodeOutput : State → Nat → Label → Bool
 
   /-- Number of ciphertexts in the garbled circuit. -/
-  numCiphertexts (s : State) : Nat
+  numCiphertexts : State → Nat
+
+def GarblingScheme.withPP (s : GarblingScheme L S) (f : Nat → Circuit → Circuit) : GarblingScheme L S :=
+  { s with preprocess := fun n c => f n (s.preprocess n c) }

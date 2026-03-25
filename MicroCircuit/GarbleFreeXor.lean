@@ -14,6 +14,7 @@ inductive GarbledGate
 | And (t : Table Key)
 | Xor
 | Not
+| Id
 | Const (k : Key)
 
 structure GarbleState where
@@ -55,6 +56,9 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
     | .Not wA => do
         let kA := (← get).keyFor wA
         modify fun s => { s with key_true := s.key_true.set! outWire (kA false) }
+    | .Id wA => do
+        let kA := (← get).keyFor wA
+        modify fun s => { s with key_true := s.key_true.set! outWire (kA true) }
     | .Xor wA wB => do
         let s ← get
         let kC := s.key_true[wA]! ^^^ s.key_true[wB]! ^^^ s.key_Δ
@@ -70,6 +74,7 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
     | .And wA wB => pushTable (.And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)) 4
     | .Xor _ _   => pushTable .Xor 0
     | .Not _     => pushTable .Not 0
+    | .Id _      => pushTable .Id 0
     | .Const0    => pushTable (.Const (kk false)) 1
     | .Const1    => pushTable (.Const (kk true)) 1
 
@@ -93,7 +98,7 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate) (inputLabels :
     wireStates := wireStates.push lk
   return wireStates
 
-instance : GarblingScheme Key GarbleState where
+def scheme : GarblingScheme Key GarbleState where
   garble c numInputs := do
     -- Generate the key difference, with first bit set to 1 so it switches colours as well
     let key_Δ := (← Key.gen).set_colour true

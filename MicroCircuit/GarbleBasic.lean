@@ -12,6 +12,7 @@ inductive GarbledGate
 | And (t : Table Key)
 | Xor (t : Table Key)
 | Not (t : Table Key)
+| Id (t : Table Key)
 | Const0 (t : Table Key)
 | Const1 (t : Table Key)
 
@@ -77,6 +78,7 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
     | .And wA wB => pushTable (.And <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· && ·)) 4
     | .Xor wA wB => pushTable (.Xor <| garbleGateTable4 (s.keyFor wA) (s.keyFor wB) kk (· ^^ ·)) 4
     | .Not wA    => pushTable (.Not <| garbleGateTable2 (s.keyFor wA) kk (! ·)) 2
+    | .Id wA     => pushTable (.Id <| garbleGateTable2 (s.keyFor wA) kk (·)) 2
     | .Const0    => pushTable (.Const0 <| ⟨kk false, 0, 0, 0⟩) 1
     | .Const1    => pushTable (.Const1 <| ⟨kk true, 0, 0, 0⟩) 1
 
@@ -91,18 +93,19 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate) (inputLabels :
   for i in [:c.size] do
     let g := c[i]!
     let t : Table Key :=
-      match (tables[i]! : GarbledGate)  with | .And t | .Xor t | .Not t | .Const0 t | .Const1 t => t
+      match (tables[i]! : GarbledGate)  with | .And t | .Xor t | .Not t | .Const0 t | .Const1 t | .Id t => t
     let lk := match g.prim with
       | GateT.And wA wB => evalGarbledGate wireStates[wA]! wireStates[wB]! t
       | GateT.Xor wA wB => evalGarbledGate wireStates[wA]! wireStates[wB]! t
       | GateT.Not wA => evalGarbledGate wireStates[wA]! .nil t
+      | GateT.Id wA => evalGarbledGate wireStates[wA]! .nil t
       | GateT.Const0 => t.get false false
       | GateT.Const1 => t.get false false
     wireStates := wireStates.push lk
   return wireStates
 
 /-- Point-and-permute garbling with XOR one-time pad. -/
-instance : GarblingScheme Key GarbleState where
+def scheme : GarblingScheme Key GarbleState where
   garble c numInputs := do
     let pairs ← (Array.range numInputs).mapM (fun _ => Key.gen_colour_pair)
     let initState : GarbleState :=
