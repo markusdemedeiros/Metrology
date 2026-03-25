@@ -330,7 +330,7 @@ def main : IO Unit := do
     let pad (s : String) (w : Nat) := s ++ String.ofList (List.replicate (w - s.length) ' ')
     let rpad (n : Nat) (w : Nat) := pad (toString n) w
     IO.println s!"  {pad "Scheme" col} | Garble  | Gates  | Ciphertexts | %"
-    IO.println s!"  {String.ofList (List.replicate (col + 1) '-')}|---------|--------|-------------|----"
+    IO.println s!"  {String.ofList (List.replicate (col + 1) '-')}|---------|--------|-------------|------"
     let baseline := (shaResults[0]!.2).numCiphertexts.toFloat
     for (name, res) in shaResults do
       let pct := res.numCiphertexts.toFloat / baseline * 100.0

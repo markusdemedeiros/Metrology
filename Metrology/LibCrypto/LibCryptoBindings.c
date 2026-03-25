@@ -102,3 +102,21 @@ LEAN_EXPORT lean_obj_res dec_aes128_c (lean_obj_arg cipher256, lean_obj_arg iv12
 
     return result;
 }
+
+LEAN_EXPORT lean_obj_res sha256_c (lean_obj_arg input) {
+    uint8_t *data = lean_sarray_cptr(input);
+    size_t data_len = lean_sarray_size(input);
+
+    unsigned char md[32];
+    unsigned int md_len = 0;
+
+    if (1 != EVP_Digest(data, data_len, md, &md_len, EVP_sha256(), NULL))
+        handleErrors();
+
+    lean_obj_res result = lean_alloc_sarray(1, 32, 32);
+    uint8_t *out = lean_sarray_cptr(result);
+    memcpy(out, md, 32);
+
+    lean_dec(input);
+    return result;
+}

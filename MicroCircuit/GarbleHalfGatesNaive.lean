@@ -92,8 +92,8 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
       -- Garbler half-gate: computes (a ∧ r) into the internal wire kCG.
       --   a=false → output = false → CGf
       --   a=true  → output = r     → (if r then CGt else CGf)
-      let ctAT := (kA true).sha256.encrypt  (if r then kCG true else kCG false)
-      let ctAF := (kA false).sha256.encrypt (kCG false)
+      let ctAT := (kA true).sha256FFI.encrypt  (if r then kCG true else kCG false)
+      let ctAF := (kA false).sha256FFI.encrypt (kCG false)
 
       -- Permute the garbler half-gate labels
       let kG0 := if p_a then ctAF else ctAT
@@ -103,8 +103,8 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
       -- v=0 (colour_b=false) → encrypted under key with colour false
       -- v=1 (colour_b=true)  → encrypted under key with colour true
       let keyForColour (c : Bool) := if c == p_b then kB true else kB false
-      let kEv0 := (keyForColour false).sha256.encrypt (kCE false)
-      let kEv1 := (keyForColour true).sha256.encrypt (kCE false ^^^ kA false)
+      let kEv0 := (keyForColour false).sha256FFI.encrypt (kCE false)
+      let kEv1 := (keyForColour true).sha256FFI.encrypt (kCE false ^^^ kA false)
 
       pushTable (.And kG0 kG1 kEv0 kEv1) 4
 
@@ -121,8 +121,8 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate)
       | GateT.And wA wB, .And kG0 kG1 kEv0 kEv1 =>
         let lA := wireStates[wA]!
         let lB := wireStates[wB]!
-        let hA := lA.sha256
-        let hB := lB.sha256
+        let hA := lA.sha256FFI
+        let hB := lB.sha256FFI
         -- Garbler half-gate: pick row by colour_a (permuted), decrypt
         let gOut := hA.decrypt (if lA.colour then kG1 else kG0)
         -- Evaluator half-gate: v = b⊕r = colour_b. Pick row by v, decrypt, XOR in lA if v=true

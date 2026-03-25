@@ -1,4 +1,5 @@
 import Std.Data.HashMap
+import Metrology.LibCrypto.LibCryptoLean
 
 /- ## Word-level SHA-256
 Reference: https://www.movable-type.co.uk/scripts/sha256.html
@@ -97,9 +98,16 @@ def SHA256.hashKey (k : Key) : Nat := Id.run do
     result := (result <<< 32) ||| hash[i]!.toNat
   return result
 
-/-- Correlation-robust hash: H(x) = SHA256(x) ^^^ x, truncated to 128 bits. -/
+/-- Correlation-robust hash (pure Lean): H(x) = SHA256(x) ^^^ x, truncated to 128 bits. -/
 def Key.sha256 (k : Key) : Key :=
   (SHA256.hashKey k ^^^ k) &&& ((2 ^ 128) - 1)
+
+/-- Correlation-robust hash (OpenSSL FFI): H(x) = SHA256(x) ^^^ x, truncated to 128 bits. -/
+def Key.sha256FFI (k : Key) : Key :=
+  let ba := (Nat.toByteArrayLE k 16).getD default
+  let hash := LibCrypto.sha256 ba
+  let hashNat := Nat.ofByteArrayLE hash
+  (hashNat ^^^ k) &&& ((2 ^ 128) - 1)
 
 /- ## Lazy random functions of type Key → Key -/
 structure RandomFunction where

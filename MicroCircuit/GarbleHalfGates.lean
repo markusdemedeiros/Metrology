@@ -78,29 +78,29 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
       let r := !p_b
 
       -- Row reduction: We want to pick a value for CEt such that kEv1 = Key.nil
-      -- +  Suffices for (keyBForColour true).sha256.encrypt (kCE false ^^^ kA false) = Key.nil
-      --    Suffices for (keyBForColour true).sha256 = kCE false ^^^ kA false
-      --    Suffices for (keyBForColour true).sha256 ^^^ kA false = kCE false
-      --    Suffices for CEt = (keyBForColour true).sha256 ^^^ kA false ^^^ Δ
-      let CEt := (keyBForColour true).sha256 ^^^ kA false ^^^ Δ
+      -- +  Suffices for (keyBForColour true).sha256FFI.encrypt (kCE false ^^^ kA false) = Key.nil
+      --    Suffices for (keyBForColour true).sha256FFI = kCE false ^^^ kA false
+      --    Suffices for (keyBForColour true).sha256FFI ^^^ kA false = kCE false
+      --    Suffices for CEt = (keyBForColour true).sha256FFI ^^^ kA false ^^^ Δ
+      let CEt := (keyBForColour true).sha256FFI ^^^ kA false ^^^ Δ
 
       -- Row reduction: We want to pick a value for CGt such that kG1 is Key.nil.
       -- + p_a = true: Requires ctAT to be Key.nil
-      --   * Suffices for (if r then kCG true else kCG false) = (kA true).sha256
+      --   * Suffices for (if r then kCG true else kCG false) = (kA true).sha256FFI
       --   * r = true:
-      --     + Suffices for (kCG true) = (kA true).sha256
-      --     + Set CGt = (kA true).sha256
+      --     + Suffices for (kCG true) = (kA true).sha256FFI
+      --     + Set CGt = (kA true).sha256FFI
       --   * r = false
-      --     + Suffices for (kCG false) = (kA true).sha256
-      --     + Set CGt = (kA true).sha256 ^^^ Δ
+      --     + Suffices for (kCG false) = (kA true).sha256FFI
+      --     + Set CGt = (kA true).sha256FFI ^^^ Δ
       -- + p_a = false: Requires ctAF to be Key.nil
-      --   * Suffices for (kCG false) = (kA false).sha256
-      --   * Set CGt = (kA false).sha256 ^^^ Δ
+      --   * Suffices for (kCG false) = (kA false).sha256FFI
+      --   * Set CGt = (kA false).sha256FFI ^^^ Δ
       let CGt :=
         match p_a, r with
-        | true, true  => (kA true).sha256
-        | true, false => (kA true).sha256 ^^^ Δ
-        | false, _    => (kA false).sha256 ^^^ Δ
+        | true, true  => (kA true).sha256FFI
+        | true, false => (kA true).sha256FFI ^^^ Δ
+        | false, _    => (kA false).sha256FFI ^^^ Δ
 
       -- Keys for internal wires
       let kCE (b : Bool) := if b then CEt else CEt ^^^ Δ
@@ -110,12 +110,12 @@ def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
       modify fun s => { s with key_true := s.key_true.set! outWire kCT }
       outWire := outWire + 1
 
-      let ctAT := (kA true).sha256.encrypt (if r then kCG true else kCG false)
-      let ctAF := (kA false).sha256.encrypt (kCG false)
+      let ctAT := (kA true).sha256FFI.encrypt (if r then kCG true else kCG false)
+      let ctAF := (kA false).sha256FFI.encrypt (kCG false)
 
       let kG0 := if p_a then ctAF else ctAT
 
-      let kEv0 := (keyBForColour false).sha256.encrypt (kCE false)
+      let kEv0 := (keyBForColour false).sha256FFI.encrypt (kCE false)
 
       pushTable (.And kG0 kEv0) 2
 
@@ -132,8 +132,8 @@ def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate)
       | GateT.And wA wB, .And kG0 kEv0 =>
         let lA := wireStates[wA]!
         let lB := wireStates[wB]!
-        let hA := lA.sha256
-        let hB := lB.sha256
+        let hA := lA.sha256FFI
+        let hB := lB.sha256FFI
         -- Garbler half-gate: pick row by colour_a (permuted), decrypt
         let gOut := hA.decrypt (if lA.colour then Key.nil else kG0)
         -- Evaluator half-gate: v = b⊕r = colour_b. Pick row by v, decrypt, XOR in lA if v=true

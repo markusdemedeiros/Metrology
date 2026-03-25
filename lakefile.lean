@@ -45,10 +45,14 @@ lean_exe LibCryptoTest where
   moreLinkObjs := linkObjs
   moreLinkArgs := linkArgs
 
-lean_lib MicroCircuit
+lean_lib MicroCircuit where
+  moreLinkObjs := linkObjs
+  moreLinkArgs := linkArgs
 
 lean_exe MicroCircuitTest where
   root := `MicroCircuitTest
+  moreLinkObjs := linkObjs
+  moreLinkArgs := linkArgs
 
 -- lake env lean --run MicroCircuitViz.lean sha256.dot
 -- sfdp -Tpng sha256.dot -o sha256.png   

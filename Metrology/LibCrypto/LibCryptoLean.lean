@@ -25,4 +25,7 @@ opaque encAes128 : ByteArray → ByteArray → ByteArray → ByteArray
 @[extern "dec_aes128_c"]
 opaque decAes128 : ByteArray → ByteArray → ByteArray → ByteArray
 
+@[extern "sha256_c"]
+opaque sha256 : ByteArray → ByteArray
+
 end LibCrypto
