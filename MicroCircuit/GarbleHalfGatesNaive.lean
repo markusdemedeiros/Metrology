@@ -1,0 +1,159 @@
+import MicroCircuit.GarbleGen
+import MicroCircuit.Common
+
+namespace NaiveHalfGateGarbling
+
+/-! ## Base implementation for circuit garbling
+- Point-and-permute
+- OTP Encryption
+- Free NOT optimization
+- Free XOR optimization
+- Half gates optimization (naive, no row reduction)
+
+Each half-gate has 2 ciphertexts (no row reduction), so AND costs 4 ciphertexts.
+Uses SHA-256 as the hash function (deterministic, no shared state needed). -/
+
+inductive GarbledGate
+| And (kG0 kG1 kEv0 kEv1 : Key)  -- garbler half-gate (colour 0, 1), evaluator half-gate (b⊕r=0, b⊕r=1)
+| Xor
+| Not
+| Id
+| Const (k : Key)
+
+structure GarbleState where
+  key_true : Array Key
+  key_Δ : Key
+  tables : Array GarbledGate
+  numCiphertexts : Nat := 0
+
+abbrev GarbleM := StateT GarbleState IO
+
+def GarbleM.genKeysFor (wireId : Nat) : GarbleM Unit := do
+  let kt ← Key.gen
+  modify fun s => { s with key_true := s.key_true.set! wireId kt }
+
+def GarbleState.keyFor (s : GarbleState) (wireId : Nat) (b : Bool) : Key :=
+  let k := s.key_true[wireId]!
+  if b then k else k ^^^ s.key_Δ
+
+def pushTable (t : GarbledGate) (ct : Nat) : GarbleM Unit :=
+  modify fun s => { s with tables := s.tables.push t, numCiphertexts := s.numCiphertexts + ct }
+
+/-- Garble an entire circuit. -/
+def garbleCircuit (c : Circuit) (numInputs : Nat) : GarbleM Unit := do
+  let mut outWire := numInputs
+  for g in c do
+    match g.prim with
+    | .Not wA => do
+        let kA := (← get).keyFor wA
+        modify fun s => { s with key_true := s.key_true.set! outWire (kA false) }
+        outWire := outWire + 1
+        pushTable .Not 0
+    | .Id wA => do
+        let kA := (← get).keyFor wA
+        modify fun s => { s with key_true := s.key_true.set! outWire (kA true) }
+        outWire := outWire + 1
+        pushTable .Id 0
+    | .Const0 => do
+        GarbleM.genKeysFor outWire
+        let kk := (← get).keyFor outWire
+        outWire := outWire + 1
+        pushTable (.Const (kk false)) 1
+    | .Const1 => do
+        GarbleM.genKeysFor outWire
+        let kk := (← get).keyFor outWire
+        outWire := outWire + 1
+        pushTable (.Const (kk true)) 1
+    | .Xor wA wB => do
+        let s ← get
+        let kC := s.key_true[wA]! ^^^ s.key_true[wB]! ^^^ s.key_Δ
+        modify fun s => { s with key_true := s.key_true.set! outWire kC }
+        outWire := outWire + 1
+        pushTable .Xor 0
+    | .And wA wB => do
+      let Δ := (← get).key_Δ
+      let kA := (← get).keyFor wA
+      let kB := (← get).keyFor wB
+      let p_a := (kA true).colour
+      let p_b := (kB true).colour
+      let r := !p_b
+
+      -- Internal wire keys for the two half-gates
+      let CEt ← Key.gen
+      let CGt ← Key.gen
+      let kCE (b : Bool) := if b then CEt else CEt ^^^ Δ
+      let kCG (b : Bool) := if b then CGt else CGt ^^^ Δ
+
+      -- Output wire = free XOR of the two half-gate outputs
+      let kCT := (kCE true) ^^^ (kCG true) ^^^ Δ
+      modify fun s => { s with key_true := s.key_true.set! outWire kCT }
+      outWire := outWire + 1
+
+      -- Garbler half-gate: computes (a ∧ r) into the internal wire kCG.
+      --   a=false → output = false → CGf
+      --   a=true  → output = r     → (if r then CGt else CGf)
+      let ctAT := (kA true).sha256.encrypt  (if r then kCG true else kCG false)
+      let ctAF := (kA false).sha256.encrypt (kCG false)
+
+      -- Permute the garbler half-gate labels
+      let kG0 := if p_a then ctAF else ctAT
+      let kG1 := if p_a then ctAT else ctAF
+
+      -- Evaluator half-gate: v = b⊕r = colour_b. Rows indexed by v.
+      -- v=0 (colour_b=false) → encrypted under key with colour false
+      -- v=1 (colour_b=true)  → encrypted under key with colour true
+      let keyForColour (c : Bool) := if c == p_b then kB true else kB false
+      let kEv0 := (keyForColour false).sha256.encrypt (kCE false)
+      let kEv1 := (keyForColour true).sha256.encrypt (kCE false ^^^ kA false)
+
+      pushTable (.And kG0 kG1 kEv0 kEv1) 4
+
+instance : Inhabited Gate := ⟨{ prim := .Const0, id := 0 }⟩
+instance : Inhabited (Table Key) := ⟨(0, 0, 0, 0)⟩
+instance : Inhabited GarbledGate := ⟨.Xor⟩
+
+def evalGarbledCircuit (c : Circuit) (tables : Array GarbledGate)
+    (inputLabels : Array Key) : Array Key := Id.run do
+  let mut wireStates := inputLabels
+  for i in [:c.size] do
+    let g := c[i]!
+    let lk := match g.prim, tables[i]! with
+      | GateT.And wA wB, .And kG0 kG1 kEv0 kEv1 =>
+        let lA := wireStates[wA]!
+        let lB := wireStates[wB]!
+        let hA := lA.sha256
+        let hB := lB.sha256
+        -- Garbler half-gate: pick row by colour_a (permuted), decrypt
+        let gOut := hA.decrypt (if lA.colour then kG1 else kG0)
+        -- Evaluator half-gate: v = b⊕r = colour_b. Pick row by v, decrypt, XOR in lA if v=true
+        let v := lB.colour
+        let eRow := if v then kEv1 else kEv0
+        let eOut := hB.decrypt eRow ^^^ (if v then lA else 0)
+        -- Combine the two half-gate outputs (free XOR of the internal wires)
+        gOut ^^^ eOut
+      | GateT.Xor wA wB, .Xor => wireStates[wA]! ^^^ wireStates[wB]!
+      | GateT.Not wA, .Not => wireStates[wA]!
+      | GateT.Id wA, .Id => wireStates[wA]!
+      | GateT.Const0, .Const k => k
+      | GateT.Const1, .Const k => k
+      | _, _ => panic! "Bad circuit"
+    wireStates := wireStates.push lk
+  return wireStates
+
+def scheme : GarblingScheme Key GarbleState where
+  garble c numInputs := do
+    let key_Δ := (← Key.gen).set_colour true
+    let key_true ← (Array.range numInputs).mapM (fun _ => Key.gen)
+    let initState : GarbleState :=
+      { key_true := key_true ++ Array.replicate c.size 0
+        key_Δ := key_Δ
+        tables := #[] }
+    let (_, s) ← (garbleCircuit c numInputs) |>.run initState
+    return s
+
+  inputLabel s wireId v := s.keyFor wireId v
+  eval s c inputLabels := evalGarbledCircuit c s.tables inputLabels
+  decodeOutput s wireId label := label == s.keyFor wireId true
+  numCiphertexts s := s.numCiphertexts
+
+end NaiveHalfGateGarbling

@@ -243,6 +243,8 @@ def allSchemes : List SchemeRunner :=
       (GRR3Garbling.scheme.withPP constProp |>.withPP constElim)
   , mkRunner "GRR3 + ConstProp + ConstElim + IdElim"
       (GRR3Garbling.scheme.withPP constProp |>.withPP constElim |>.withPP idElim)
+  , mkRunner "HalfGates (naive)"
+      NaiveHalfGateGarbling.scheme
   ]
 
 def exhaustive2 (runner : SchemeRunner) (builder : CircuitBuilderM (List Wire)) : IO Bool := do

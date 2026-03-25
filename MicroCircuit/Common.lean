@@ -1,3 +1,5 @@
+import Std.Data.HashMap
+
 /- ## Word-level SHA-256
 Reference: https://www.movable-type.co.uk/scripts/sha256.html
 NOTE: THIS IS NOT A VERIFIED IMPLEMENTATION AND IT HAS NOT BEEN EXTENSIVELY TESTED.
@@ -100,19 +102,22 @@ def Key.sha256 (k : Key) : Key :=
   (SHA256.hashKey k ^^^ k) &&& ((2 ^ 128) - 1)
 
 /- ## Lazy random functions of type Key → Key -/
-abbrev RandomFunction : Type _ := Key → Option Key
+structure RandomFunction where
+  map : Std.HashMap Key Key := {}
 
 namespace RandomFunction
 
-def new : RandomFunction := fun _ => none
+def new : RandomFunction := {}
 
 def hash (r : RandomFunction) (k : Key) : IO (RandomFunction × Key) :=
-  match r k with
+  match r.map[k]? with
   | some v => return (r, v)
   | none => do
     let v ← Key.gen
-    let r' := fun k' => if k' = k then some v else r k'
-    return (r', v)
+    return (⟨r.map.insert k v⟩, v)
+
+def lookup (r : RandomFunction) (k : Key) : Option Key :=
+  r.map[k]?
 
 end RandomFunction
 
