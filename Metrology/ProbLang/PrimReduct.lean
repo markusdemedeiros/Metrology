@@ -313,5 +313,52 @@ theorem Stuck.fill (K : Ectx) {e : Exp} {σ : State}
   ⟨fun hv => h.1 (Ectx.fill_isValue hv),
    fun hred => h.2 (hred.of_fill K h.1)⟩
 
+def execN (n : Nat) (ρ : Cfg) : Measure Cfg :=
+  match n with
+  | 0 => 0
+  | n + 1 => if ρ.expr.isValue then dirac ρ else (primStep ρ).bind (execN n)
+
+/-- The distribution over states that reach a value in exactly N steps. -/
+def execExactN (N : Nat) (ρ : Cfg) : Measure Cfg :=
+  match N with
+  | 0 => if ρ.expr.isValue then dirac ρ else 0
+  | N + 1 => if ρ.expr.isValue then 0 else (primStep ρ).bind (execExactN N)
+
+/-- execN can be written as the sum of subdistributions conditioned on their terminiation time. -/
+theorem execExactN_sum (n : Nat) (ρ : Cfg) S :
+    execN n ρ S = ∑'(N : Nat), if N < n then execExactN N ρ S else 0 := by
+  induction n generalizing ρ with
+  | zero => simp [execN]
+  | succ n ih =>
+    simp only [execN]
+    split
+    · -- isValue case
+      rename_i hv
+      rw [tsum_eq_zero_add' ENNReal.summable]
+      simp only [Nat.zero_lt_succ, ↓reduceIte, execExactN, hv]
+      simp
+    · -- not isValue case
+      rename_i hv
+      rw [tsum_eq_zero_add' ENNReal.summable]
+      simp only [Nat.zero_lt_succ, ↑reduceIte, execExactN, hv, Measure.coe_zero,
+        Pi.zero_apply, zero_add, show ∀ k, k + 1 < n + 1 ↔ k < n from fun k => by omega]
+      rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+      simp_rw [ih]
+      rw [lintegral_tsum (fun k => Measurable.of_discrete.aemeasurable)]
+      congr 1; ext k
+      by_cases hk : k < n
+      · simp only [hk, ↑reduceIte]
+        rw [← bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+      · simp [hk]
+
+theorem execExactN_le (n : Nat) (ρ : Cfg) S :
+    execExactN n ρ S ≤ execN (n + 1) ρ S := by
+  rw [execExactN_sum (n + 1) ρ S]
+  have : execExactN n ρ S = (if n < n + 1 then execExactN n ρ S else 0) := by simp
+  rw [this]
+  exact ENNReal.le_tsum n
+
+def limExec (ρ : Cfg) : Measure Cfg := ⨆ (i : ℕ), execN i ρ
+
 end ProbLang
 end

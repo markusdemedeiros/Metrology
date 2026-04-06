@@ -13,6 +13,10 @@ require mathlib from git
 require iris from git
   "https://github.com/leanprover-community/iris-lean.git" @ "master"
 
+require sampcert from git
+  "https://github.com/leanprover/SampCert.git" @ "4c0ed99d1431628cd0bebf8de3bae02bc9f828b6"
+
+
 @[default_target]
 lean_lib Metrology
 

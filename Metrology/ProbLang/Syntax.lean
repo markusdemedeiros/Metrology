@@ -756,4 +756,31 @@ theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
     rw [decomp_unfold, EctxItem.decompItem_fillItem Ki (Ectx.fill_noVal hv)]
     simp only [ih K'' (by simp at hlen; omega), List.append_assoc]
 
+-- TODO: Used in SLang embedding. We should just change to locally nameless so we can
+-- generate fresh local binders for free.
+def Fresh (x : String) : Exp → Prop
+  | .lit _ => True
+  | .var y => x ≠ y
+  | .letrec f y e => f.binds x ∨ y.binds x ∨ Fresh x e
+  | .app e1 e2 => Fresh x e1 ∧ Fresh x e2
+  | .unop _ e => Fresh x e
+  | .binop _ e1 e2 => Fresh x e1 ∧ Fresh x e2
+  | .cond ec et ef => Fresh x ec ∧ Fresh x et ∧ Fresh x ef
+  | .pair e1 e2 => Fresh x e1 ∧ Fresh x e2
+  | .fst e => Fresh x e
+  | .snd e => Fresh x e
+  | .inl e => Fresh x e
+  | .inr e => Fresh x e
+  | .case ec el er => Fresh x ec ∧ Fresh x el ∧ Fresh x er
+  | .alloc e => Fresh x e
+  | .load e => Fresh x e
+  | .store e1 e2 => Fresh x e1 ∧ Fresh x e2
+  | .tape e => Fresh x e
+  | .rand e1 e2 => Fresh x e1 ∧ Fresh x e2
+  | .fail => True
+  | .annot _ e => Fresh x e
+  | .scrut e _ => Fresh x e
+  | .enc_aes128 e1 e2 e3 => Fresh x e1 ∧ Fresh x e2 ∧ Fresh x e3
+  | .dec_aes128 e1 e2 e3 => Fresh x e1 ∧ Fresh x e2 ∧ Fresh x e3
+
 end ProbLang

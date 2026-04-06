@@ -128,13 +128,13 @@ section MeasurableProjections
 
 variable {R Z B : Type _} [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B]
 
-theorem LitSyntax.real.π.measurable : Measurable (@LitSyntax.real.π R Z B) := by
-  intros S HS
-  have X := measurableSet_iff_int_some_measurableSet.mp HS
-  refine MeasurableSpace.measurableSet_generateFrom ?_
-  simp only [MeasurableSyntax.cylinder, MeasurableSyntax.base, MeasurableSyntax.flatten, mem_image]
-  -- This is something that should be metaprogrammed
-  sorry
+-- theorem LitSyntax.real.π.measurable : Measurable (@LitSyntax.real.π R Z B) := by
+--   intros S HS
+--   have X := measurableSet_iff_int_some_measurableSet.mp HS
+--   refine MeasurableSpace.measurableSet_generateFrom ?_
+--   simp only [MeasurableSyntax.cylinder, MeasurableSyntax.base, MeasurableSyntax.flatten, mem_image]
+--   -- This is something that should be metaprogrammed
+--   sorry
 
 
 end MeasurableProjections

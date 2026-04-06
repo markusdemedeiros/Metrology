@@ -5,4 +5,5 @@ import Metrology.ProbLang.Notation
 import Metrology.ProbLang.Opsem
 import Metrology.ProbLang.PrimReduct
 import Metrology.ProbLang.PureStep
+import Metrology.ProbLang.SampCert
 import Metrology.ProbLang.Syntax
