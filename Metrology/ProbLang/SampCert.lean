@@ -13,7 +13,7 @@ noncomputable section
 /-## Experiment: Translation validation from SLang to ProbLang. -/
 namespace EmbedSLang
 
-open SLang ProbLang Classical MeasureTheory ProbabilityTheory Measure PMF
+open SLang ProbLang Classical MeasureTheory ProbabilityTheory Measure PMF Measurable
 
 
 class abbrev SLangType (T : Type) := Countable T, MeasurableSpace T, MeasurableSingletonClass T
@@ -25,30 +25,18 @@ export ProbLangEmbeddable (as_expr as_expr_isVal)
 
 /-! ## Discrete measure theory helpers -/
 
-theorem Measure.bind_map_discrete {α β γ : Type} [MeasurableSpace α] [MeasurableSpace β]
-    [MeasurableSpace γ] [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β] (μ : Measure α)
-    (f : α → β) (g : β → Measure γ) : g ∘ₘ (μ.map f) = (g ∘ f) ∘ₘ μ := by
-  unfold Measure.bind
-  rw [map_map Measurable.of_discrete Measurable.of_discrete]
-
-theorem count_withDensity_singleton [MeasurableSpace T] [Countable T] [MeasurableSingletonClass T]
-    (f : T → ENNReal) (t : T) : (Measure.count.withDensity f) {t} = f t := by
-  rw [withDensity_apply _ MeasurableSet.of_discrete]; simp
-
-open Measurable in
-theorem SLang.count_withDensity_bind [SLangType T] [SLangType U] (s1 : SLang T) (s2 : T → SLang U) :
-    (fun t => Measure.count.withDensity (s2 t)) ∘ₘ Measure.count.withDensity s1 =
-    Measure.count.withDensity (s1.probBind s2) := by
-  refine Measure.ext_of_singleton fun u => ?_
+theorem SLang.count_bind_probBind [SLangType T] [SLangType U] {s1 : SLang T} {s2 : T → SLang U} :
+    (count <| s2 ·) ∘ₘ (count s1) = count (s1.probBind s2) := by
+  refine ext_of_singleton fun u => ?_
   simp [bind_apply .of_discrete of_discrete.aemeasurable,
     lintegral_withDensity_eq_lintegral_mul₀ of_discrete.aemeasurable of_discrete.aemeasurable,
-    lintegral_count, SLang.probBind]
+    lintegral_count, probBind]
 
 /-! ## SLang embedding -/
 
 /-- Convert a SLang term into a distribution over ProbLang states. -/
 def SLang.spec [SLangType T] [ProbLangEmbeddable T] (s : SLang T) (σ : State) : Measure Cfg :=
-  Measure.count.withDensity s |>.map as_expr |>.map (⟨·, σ⟩)
+  count s |>.map as_expr |>.map (⟨·, σ⟩)
 
 /-- A SLang program is the denotation of a ProbLang program -/
 def IsEmbedding [SLangType T] [ProbLangEmbeddable T] (s : SLang T) (e : Exp) : Prop :=
@@ -57,69 +45,7 @@ def IsEmbedding [SLangType T] [ProbLangEmbeddable T] (s : SLang T) (e : Exp) : P
 -- NOTE: Some of these theorems may need additional hypotheses.
 
 -- fillItem version of primStep_fill
-theorem primStep_fillItem (Ki : EctxItem) {e : Exp} {σ : State} (hv : ¬e.isValue) :
-    primStep ⟨Ki.fillItem e, σ⟩ =
-      (primStep ⟨e, σ⟩).map (fun ρ => ⟨Ki.fillItem ρ.expr, ρ.state⟩) := by
-  have : Ki.fillItem e = Ectx.fill [Ki] e := by simp [Ectx.fill, List.foldl, flip]
-  rw [this, primStep_fill hv]; congr 1
-
--- Exact step-count decomposition of execN through an evaluation context
-theorem execN_fill_item_eq (Ki : EctxItem) (n : Nat) {e : Exp} {σ : State} {c : Cfg} :
-    execN n ⟨Ki.fillItem e, σ⟩ {c} =
-      ∑' (j : Nat) (a : Cfg),
-        execExactN j ⟨e, σ⟩ {a} * execN (n - j) ⟨Ki.fillItem a.expr, a.state⟩ {c} := by
-  induction n generalizing e σ with
-  | zero =>
-    -- execN 0 = 0, and RHS: execExactN j ... * execN (0 - j) ... = ... * execN 0 ... = ... * 0 = 0
-    simp [execN]
-  | succ n ih =>
-    by_cases hv : e.isValue
-    · -- e is a value: RHS collapses to j=0 term = dirac ⟨e,σ⟩ ⊗ execN(n+1)
-      rw [ENNReal.tsum_comm]
-      rw [show (∑' (a : Cfg) (j : ℕ), execExactN j ⟨e, σ⟩ {a} *
-          execN (n + 1 - j) ⟨Ki.fillItem a.expr, a.state⟩ {c}) =
-          ∑' (a : Cfg), execExactN 0 ⟨e, σ⟩ {a} *
-          execN (n + 1) ⟨Ki.fillItem a.expr, a.state⟩ {c} from by
-        congr 1; ext a
-        rw [tsum_eq_zero_add' ENNReal.summable]
-        simp [execExactN, hv]]
-      simp only [execExactN, hv, ↑reduceIte, dirac_apply, Set.indicator_apply,
-        Set.mem_singleton_iff, Pi.one_apply, ite_mul, one_mul, zero_mul, eq_comm]
-      rw [tsum_ite_eq]
-    · -- e is not a value: step through primStep, apply IH
-      -- LHS: execN (n+1) ⟨Ki.fillItem e, σ⟩ = (primStep ⟨Ki.fillItem e, σ⟩).bind (execN n)
-      --     = (primStep ⟨e, σ⟩).bind (fun ⟨e', σ'⟩ => execN n ⟨Ki.fillItem e', σ'⟩)  by primStep_fillItem
-      -- Apply IH to each execN n ⟨Ki.fillItem e', σ'⟩:
-      --     = (primStep ⟨e, σ⟩).bind (fun ⟨e', σ'⟩ => ∑' j' a, execExactN j' ⟨e', σ'⟩ {a} * ...)
-      -- RHS: shift j → j+1, use execExactN (j+1) ⟨e, σ⟩ = (primStep ⟨e, σ⟩).bind (execExactN j)
-      -- Then swap integral and sum.
-      have hfv : ¬(Ki.fillItem e).isValue := EctxItem.fillItem_noVal hv
-      have lhs_eq : execN (n + 1) ⟨Ki.fillItem e, σ⟩ = (primStep ⟨Ki.fillItem e, σ⟩).bind (execN n) := by
-        unfold execN; rw [if_neg hfv]
-      have step2 : (primStep ⟨Ki.fillItem e, σ⟩).bind (execN n) = (primStep ⟨e, σ⟩).bind (fun ρ => execN n ⟨Ki.fillItem ρ.expr, ρ.state⟩) := by
-        rw [primStep_fillItem Ki hv, Measure.bind_map_discrete]; rfl
-      have lhs_eq2 := lhs_eq.trans step2
-      rw [show (execN (n + 1) ⟨Ki.fillItem e, σ⟩) {c} = ((primStep ⟨e, σ⟩).bind (fun ρ => execN n ⟨Ki.fillItem ρ.expr, ρ.state⟩)) {c} from by rw [lhs_eq2]]
-      -- Unfold bind, apply IH
-      rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-      simp_rw [ih]
-      -- Swap integral and outer sum over j (Tonelli)
-      rw [lintegral_tsum (fun j => Measurable.of_discrete.aemeasurable)]
-      simp_rw [lintegral_tsum (fun a => Measurable.of_discrete.aemeasurable)]
-      simp_rw [lintegral_mul_const _ Measurable.of_discrete]
-      -- Recognize integral as bind = execExactN (i+1)
-      have bind_exact : ∀ i (a : Cfg), ∫⁻ (ρ : Cfg), execExactN i ⟨ρ.expr, ρ.state⟩ {a} ∂primStep ⟨e, σ⟩ =
-          execExactN (i + 1) ⟨e, σ⟩ {a} := by
-        intro i a
-        rw [← bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-        simp [execExactN, hv]
-      simp_rw [bind_exact]
-      -- Index shift: RHS j=0 term vanishes, then j=i+1 with n+1-(i+1)=n-i
-      symm
-      rw [tsum_eq_zero_add' ENNReal.summable]
-      simp only [execExactN, hv, ↑reduceIte,
-        show ∀ i, n + 1 - (i + 1) = n - i from fun i => by omega,
-        Measure.coe_zero, Pi.zero_apply, zero_mul, tsum_zero, zero_add]
+-- #check primStep_fill
 
 -- Admitted: (⨆ i, f i) {c} = ⨆ i, f i {c} for measures on a discrete space
 theorem iSup_measure_apply {f : ℕ → Measure Cfg} {c : Cfg} :
@@ -259,13 +185,13 @@ theorem limExec_step (ρ : Cfg) :
 
 -- Split: n steps of Ki[e] can be bounded by splitting through intermediate configs
 theorem execN_fill_item_le (Ki : EctxItem) (n : Nat) {e : Exp} {σ : State} {c : Cfg} :
-    execN n ⟨Ki.fillItem e, σ⟩ {c} ≤
+    execN n (Ki.fillItemCfg ⟨e, σ⟩) {c} ≤
       ∑' a, execN n ⟨Ki.fillItem a.expr, a.state⟩ {c} * execN n ⟨e, σ⟩ {a} := by
   rw [execN_fill_item_eq]
   rw [ENNReal.tsum_comm]
   apply ENNReal.tsum_le_tsum; intro a
   -- RHS per a: expand execN n {a} via execExactN_sum, distribute
-  rw [mul_comm, execExactN_sum n ⟨e, σ⟩ {a}]
+  rw [mul_comm, execExactN_sum]
   rw [← ENNReal.tsum_mul_right]
   apply ENNReal.tsum_le_tsum; intro j
   by_cases hj : j < n
@@ -276,18 +202,18 @@ theorem execN_fill_item_le (Ki : EctxItem) (n : Nat) {e : Exp} {σ : State} {c :
 
 -- Combine: j steps for e to reach a, then i steps for Ki[a] to reach c, takes i+j steps total
 theorem execN_fill_item_ge (Ki : EctxItem) (i j : Nat) {e : Exp} {σ : State} {c : Cfg} :
-    ∑' a, execN i ⟨Ki.fillItem a.expr, a.state⟩ {c} * execN j ⟨e, σ⟩ {a} ≤
-      execN (i + j) ⟨Ki.fillItem e, σ⟩ {c} := by
+    ∑' a, execN i (Ki.fillItemCfg a) {c} * execN j ⟨e, σ⟩ {a} ≤
+      execN (i + j) (Ki.fillItemCfg ⟨e, σ⟩) {c} := by
   rw [execN_fill_item_eq]
   -- RHS = ∑' k a, execExactN k ... {a} * execN ((i+j)-k) ... {c}
   -- Bound: restrict to k < j terms, and use (i+j)-k ≥ i for k < j
   rw [ENNReal.tsum_comm]
   apply ENNReal.tsum_le_tsum; intro a
-  rw [show execN i ⟨Ki.fillItem a.expr, a.state⟩ {c} * execN j ⟨e, σ⟩ {a} =
-      execN j ⟨e, σ⟩ {a} * execN i ⟨Ki.fillItem a.expr, a.state⟩ {c} from mul_comm _ _]
+  rw [show execN i (Ki.fillItemCfg a) {c} * execN j ⟨e, σ⟩ {a} =
+      execN j ⟨e, σ⟩ {a} * execN i (Ki.fillItemCfg a) {c} from mul_comm _ _]
   -- LHS: execN j {a} * execN i {c}
   -- = (∑' k, if k < j then execExactN k {a} else 0) * execN i {c}   (execExactN_sum)
-  rw [execExactN_sum j ⟨e, σ⟩ {a}]
+  rw [execExactN_sum]
   -- LHS: (∑' k, if k < j then execExactN k {a} else 0) * execN i {c}
   -- Distribute: ∑' k, (if k < j then execExactN k {a} else 0) * execN i {c}
   rw [← ENNReal.tsum_mul_right]
@@ -428,7 +354,7 @@ theorem probLangBind_isEmbedding [SLangType T] [ProbLangEmbeddable T] [SLangType
   intro σ
   rw [probLangBind, limExec_app, h1 σ]
   unfold SLang.spec
-  rw [Measure.bind_map_discrete, Measure.bind_map_discrete]
+  rw [Measure.bind_map .of_discrete .of_discrete, Measure.bind_map .of_discrete .of_discrete]
   -- Rewrite the kernel: limExec_beta + h2
   conv_lhs =>
     arg 2; ext t; simp only [Function.comp]
@@ -438,9 +364,9 @@ theorem probLangBind_isEmbedding [SLangType T] [ProbLangEmbeddable T] [SLangType
       (μ.map as_expr).map (fun e => (⟨e, σ⟩ : Cfg)) =
       (fun u => dirac (⟨as_expr u, σ⟩ : Cfg)) ∘ₘ μ := by
     intro μ
-    rw [← Measure.bind_dirac_eq_map _ Measurable.of_discrete, Measure.bind_map_discrete]; rfl
+    rw [← Measure.bind_dirac_eq_map _ Measurable.of_discrete, Measure.bind_map .of_discrete .of_discrete]; rfl
   simp_rw [fuse]
-  rw [← SLang.count_withDensity_bind s1 s2,
+  rw [← SLang.count_bind_probBind,
       Measure.bind_bind Measurable.of_discrete.aemeasurable Measurable.of_discrete.aemeasurable]
 
 /-! ## Uniform byte embedding -/
@@ -478,7 +404,7 @@ theorem probLangUniformByte_isEmbedding :
     -- These are all value configs, so limExec = dirac on each.
     unfold Cfg.uniform Int.isPos Option.unwrapM
     simp only [show (0 : Int) < 255 from by norm_num, dite_true]
-    rw [Measure.bind_map_discrete]
+    rw [Measure.bind_map .of_discrete .of_discrete]
     -- Goal: (limExec ∘ f) ∘ₘ μ = μ.map f where f v = ⟨.lit (.int v), σ⟩
     -- Since limExec ⟨.lit (.int v), σ⟩ = dirac ⟨.lit (.int v), σ⟩, we get (dirac ∘ f) ∘ₘ μ = μ.map f
     show (limExec ∘ fun v => (⟨.lit (.int v), σ⟩ : Cfg)) ∘ₘ _ = _
@@ -501,7 +427,7 @@ theorem probLangUniformByte_isEmbedding :
     rw [Measure.map_apply Measurable.of_discrete MeasurableSet.of_discrete]
     -- LHS: uniformOfFinset(.Icc 0 255).toMeasure {v | ⟨.lit (.int v), σ⟩ = ⟨e', σ⟩}
     --     = uniformOfFinset(.Icc 0 255).toMeasure {v | .lit (.int v) = e'}
-    simp only [Set.preimage, Cfg.mk.injEq, and_true, Set.mem_setOf_eq]
+    simp only [Set.preimage]
     simp only [Set.mem_singleton_iff, Cfg.mk.injEq, and_true]
     rw [PMF.toMeasure_apply]
     swap; exact MeasurableSet.of_discrete
@@ -538,7 +464,7 @@ theorem probLangUniformByte_isEmbedding :
       intro a; split_ifs with h
       · have : (↑a.toNat : ℤ) ≤ 255 := by
           have := a.toNat_lt; omega
-        exact absurd this (not_le.mpr (he _ h (Int.ofNat_nonneg _)))
+        exact absurd this (not_le.mpr (he _ h (Int.natCast_nonneg _)))
       · rfl
   · have : {x : UInt8 | as_expr x = e' ∧ σ = σ'} = ∅ := by ext; simp [hσ]
     simp only [this, Measure.restrict_empty, lintegral_zero_measure]
@@ -662,8 +588,6 @@ theorem twoByteEq_isEmbedding : IsEmbedding twoByteEq plTwoByteEq := by
   -- hfresh: Fresh "a" probLangUniformByte
   · unfold probLangUniformByte Fresh
     exact ⟨trivial, trivial⟩
-
-#print axioms twoByteEq_isEmbedding
 
 end EmbedSLang
 end

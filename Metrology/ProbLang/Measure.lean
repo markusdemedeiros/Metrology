@@ -26,3 +26,15 @@ theorem map_singleton_pos {α β : Type _}
   obtain ⟨a, ha, hpos⟩ := measure_pos_of_singleton_pos μ _ h
   simp [Set.mem_preimage, Set.mem_singleton_iff] at ha
   exact ⟨a, ha, hpos⟩
+
+theorem Measure.bind_map {α β γ : Type} [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
+    [DiscreteMeasurableSpace β] {μ : Measure α} {f : α → β} {g : β → Measure γ}
+    (hf : Measurable f) (hg : Measurable g) : g ∘ₘ (μ.map f) = (g ∘ f) ∘ₘ μ := by
+  refine ext fun S HS => ?_
+  unfold Measure.bind
+  rw [map_map hg hf]
+
+abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDensity f
+
+theorem count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
+    (f : T → ENNReal) (t : T) : count f {t} = f t := by simp

@@ -18,6 +18,14 @@ theorem Ectx.fillCfg_injective (K : Ectx) : Function.Injective K.fillCfg := by
   rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ h
   simpa [Cfg.mk.injEq, Ectx.fill_injective K |>.eq_iff] using h
 
+@[simp] def EctxItem.fillItemCfg (K : EctxItem) (ρ : Cfg) : Cfg := ⟨K.fillItem ρ.expr, ρ.state⟩
+
+theorem Ectx.fillItemCfg_injective (K : EctxItem) : Function.Injective K.fillItemCfg  := by
+  rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ ha
+  simp only [EctxItem.fillItemCfg, Cfg.mk.injEq] at ha
+  have _ := @Ectx.fillItem_injective K e1 e2
+  grind
+
 def primStep (cfg : Cfg) : Measure Cfg :=
   let (K, e') := cfg.expr.decomp
   (headStep ⟨e', cfg.state⟩).map K.fillCfg
@@ -67,6 +75,11 @@ theorem primStep_fill {K : Ectx} (hv : ¬e.isValue) :
   congr 1
   funext ⟨e', σ'⟩
   simp [Function.comp, fill_app]
+
+theorem primStep_fillItem (Ki : EctxItem) {e : Exp} {σ : State} (hv : ¬e.isValue) :
+    primStep ⟨Ki.fillItem e, σ⟩ = (primStep ⟨e, σ⟩).map (fun ρ => ⟨Ki.fillItem ρ.expr, ρ.state⟩) := by
+  have : Ki.fillItem e = Ectx.fill [Ki] e := by simp [Ectx.fill, List.foldl, flip]
+  rw [this, primStep_fill hv]; congr 1
 
 theorem primStep_fill_singleton {K : Ectx} {e1 e2 : Exp} {σ1 σ2 : State}
     (hv : ¬e1.isValue) :
@@ -318,45 +331,93 @@ def execN (n : Nat) (ρ : Cfg) : Measure Cfg :=
   | 0 => 0
   | n + 1 => if ρ.expr.isValue then dirac ρ else (primStep ρ).bind (execN n)
 
-/-- The distribution over states that reach a value in exactly N steps. -/
+/-- execN conditioned on terminating in exactly N steps -/
 def execExactN (N : Nat) (ρ : Cfg) : Measure Cfg :=
   match N with
   | 0 => if ρ.expr.isValue then dirac ρ else 0
   | N + 1 => if ρ.expr.isValue then 0 else (primStep ρ).bind (execExactN N)
 
-/-- execN can be written as the sum of subdistributions conditioned on their terminiation time. -/
-theorem execExactN_sum (n : Nat) (ρ : Cfg) S :
+/-- execN is the sum of its conditional distributions -/
+theorem execExactN_sum {n : Nat} {ρ : Cfg} {S} :
     execN n ρ S = ∑'(N : Nat), if N < n then execExactN N ρ S else 0 := by
   induction n generalizing ρ with
   | zero => simp [execN]
   | succ n ih =>
     simp only [execN]
-    split
-    · -- isValue case
-      rename_i hv
+    by_cases hv : ρ.expr.isValue
+    · simp only [↓reduceIte, hv]
       rw [tsum_eq_zero_add' ENNReal.summable]
       simp only [Nat.zero_lt_succ, ↓reduceIte, execExactN, hv]
       simp
-    · -- not isValue case
-      rename_i hv
+    · simp only [↓reduceIte, hv]
       rw [tsum_eq_zero_add' ENNReal.summable]
-      simp only [Nat.zero_lt_succ, ↑reduceIte, execExactN, hv, Measure.coe_zero,
-        Pi.zero_apply, zero_add, show ∀ k, k + 1 < n + 1 ↔ k < n from fun k => by omega]
-      rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+      have Hzero : (if 0 < n + 1 then (execExactN 0 ρ) S else 0) = 0 := by simp [execExactN, hv]
+      rw [Hzero, zero_add]; clear Hzero
+      rw [bind_apply .of_discrete Measurable.of_discrete.aemeasurable]
       simp_rw [ih]
       rw [lintegral_tsum (fun k => Measurable.of_discrete.aemeasurable)]
       congr 1; ext k
       by_cases hk : k < n
-      · simp only [hk, ↑reduceIte]
+      · have hk' : ∀ k, k + 1 < n + 1 ↔ k < n  := by omega
+        simp only [hk, hk', ↑reduceIte]
         rw [← bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+        simp only [execExactN, hv, ↑reduceIte]
       · simp [hk]
 
-theorem execExactN_le (n : Nat) (ρ : Cfg) S :
-    execExactN n ρ S ≤ execN (n + 1) ρ S := by
-  rw [execExactN_sum (n + 1) ρ S]
-  have : execExactN n ρ S = (if n < n + 1 then execExactN n ρ S else 0) := by simp
-  rw [this]
+theorem execExactN_mono {n : Nat} {ρ : Cfg} {S} : execExactN n ρ S ≤ execN (n + 1) ρ S := by
+  have Hunfold : execExactN n ρ S = (if n < n + 1 then execExactN n ρ S else 0) := by simp
+  rw [execExactN_sum, Hunfold]
   exact ENNReal.le_tsum n
+
+/-- execN term decomposition lemma. Relates execN of K[e] with the execution of e.
+Note: the theorem is untrue when execExactN is replaced with execN. -/
+theorem execN_fill_item_eq (Ki : EctxItem) (n : Nat) {ρ ρ'' : Cfg} :
+    execN n (Ki.fillItemCfg ρ) {ρ''} =
+      ∑' (j : Nat) (ρ' : Cfg), execExactN j ρ {ρ'} * execN (n - j) (Ki.fillItemCfg ρ') {ρ''} := by
+  induction n generalizing ρ with
+  | zero => simp [execN]
+  | succ n ih =>
+    let ⟨e, σ⟩ := ρ
+    by_cases hv : e.isValue
+    · -- e is a value: RHS collapses to j=0 term = dirac ⟨e,σ⟩ ⊗ execN(n+1)
+      rw [ENNReal.tsum_comm]
+      rw [show (∑' (a : Cfg) (j : ℕ), execExactN j ⟨e, σ⟩ {a} *
+          execN (n + 1 - j) (Ki.fillItemCfg a) {ρ''}) =
+          ∑' (a : Cfg), execExactN 0 ⟨e, σ⟩ {a} *
+          execN (n + 1) ⟨Ki.fillItem a.expr, a.state⟩ {ρ''} from by
+        congr 1; ext a
+        rw [tsum_eq_zero_add' ENNReal.summable]
+        simp [execExactN, hv]]
+      simp only [execExactN, hv, ↑reduceIte, dirac_apply, Set.indicator_apply,
+        Set.mem_singleton_iff, Pi.one_apply, ite_mul, one_mul, zero_mul, eq_comm]
+      rw [tsum_ite_eq]
+      exact DFunLike.congr rfl rfl
+    · have hfv : ¬(Ki.fillItem e).isValue := EctxItem.fillItem_noVal hv
+      have lhs_eq : execN (n + 1) ⟨Ki.fillItem e, σ⟩ = (primStep ⟨Ki.fillItem e, σ⟩).bind (execN n) := by
+        unfold execN; rw [if_neg hfv]
+      have step2 : (primStep (Ki.fillItemCfg ⟨e, σ⟩)).bind (execN n) = (primStep ⟨e, σ⟩).bind (fun ρ => execN n (Ki.fillItemCfg ρ)) := by
+        sorry
+        -- rw [primStep_fillItem Ki hv, Measure.bind_map .of_discrete .of_discrete]; rfl
+      have lhs_eq2 := lhs_eq.trans step2
+      rw [show (execN (n + 1) (Ki.fillItemCfg ⟨e, σ⟩) {ρ''} = ((primStep ⟨e, σ⟩).bind (fun ρ => execN n (Ki.fillItemCfg ρ))) {ρ''}) from by sorry /- rw [lhs_eq2] -/]
+      rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+      simp_rw [ih]
+      rw [lintegral_tsum (fun j => Measurable.of_discrete.aemeasurable)]
+      simp_rw [lintegral_tsum (fun a => Measurable.of_discrete.aemeasurable)]
+      simp_rw [lintegral_mul_const _ Measurable.of_discrete]
+      have bind_exact : ∀ i (a : Cfg), ∫⁻ (ρ : Cfg), execExactN i ⟨ρ.expr, ρ.state⟩ {a} ∂primStep ⟨e, σ⟩ =
+          execExactN (i + 1) ⟨e, σ⟩ {a} := by
+        intro i a
+        rw [← bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+        simp [execExactN, hv]
+      simp_rw [bind_exact]
+      symm
+      rw [tsum_eq_zero_add' ENNReal.summable]
+      simp only [execExactN, hv, ↑reduceIte,
+        show ∀ i, n + 1 - (i + 1) = n - i from fun i => by omega,
+        Measure.coe_zero, Pi.zero_apply, zero_mul, tsum_zero, zero_add]
+
+
 
 def limExec (ρ : Cfg) : Measure Cfg := ⨆ (i : ℕ), execN i ρ
 
