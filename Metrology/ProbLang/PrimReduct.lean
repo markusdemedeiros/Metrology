@@ -396,10 +396,10 @@ theorem execN_fill_item_eq (Ki : EctxItem) (n : Nat) {ρ ρ'' : Cfg} :
       have lhs_eq : execN (n + 1) ⟨Ki.fillItem e, σ⟩ = (primStep ⟨Ki.fillItem e, σ⟩).bind (execN n) := by
         unfold execN; rw [if_neg hfv]
       have step2 : (primStep (Ki.fillItemCfg ⟨e, σ⟩)).bind (execN n) = (primStep ⟨e, σ⟩).bind (fun ρ => execN n (Ki.fillItemCfg ρ)) := by
-        sorry
-        -- rw [primStep_fillItem Ki hv, Measure.bind_map .of_discrete .of_discrete]; rfl
+        simp only [EctxItem.fillItemCfg]
+        rw [primStep_fillItem Ki hv, Measure.bind_map .of_discrete .of_discrete]; rfl
       have lhs_eq2 := lhs_eq.trans step2
-      rw [show (execN (n + 1) (Ki.fillItemCfg ⟨e, σ⟩) {ρ''} = ((primStep ⟨e, σ⟩).bind (fun ρ => execN n (Ki.fillItemCfg ρ))) {ρ''}) from by sorry /- rw [lhs_eq2] -/]
+      rw [show (execN (n + 1) (Ki.fillItemCfg ⟨e, σ⟩) {ρ''} = ((primStep ⟨e, σ⟩).bind (fun ρ => execN n (Ki.fillItemCfg ρ))) {ρ''}) from congr_arg (· {ρ''}) lhs_eq2]
       rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
       simp_rw [ih]
       rw [lintegral_tsum (fun j => Measurable.of_discrete.aemeasurable)]
