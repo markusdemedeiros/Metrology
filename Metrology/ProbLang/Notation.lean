@@ -106,10 +106,6 @@ syntax:100 "rand(" pl_exp ", " pl_exp ")" : pl_exp
 /-- Scrutinize (pattern match) -/
 syntax:10 "scrut " pl_exp " with " pl_pat : pl_exp
 
-/-- Encryption -/
-syntax:100 "enc_aes128(" pl_exp ", " pl_exp ", " pl_exp ")" : pl_exp
-syntax:100 "dec_aes128(" pl_exp ", " pl_exp ", " pl_exp ")" : pl_exp
-
 /-- Failure -/
 syntax:max "fail" : pl_exp
 
@@ -124,7 +120,7 @@ syntax:100 "assert(" pl_exp ")" : pl_exp
 -- rejected by the Lean lexer before our rules fire, but are listed here for
 -- completeness.
 private def reservedKeywords : List String :=
-  ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "scrut", "enc_aes128", "dec_aes128",
+  ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "scrut",
    "if", "then", "else", "let", "fun", "rec", "case",
    "__scrut", "__bind"]
 
@@ -296,9 +292,6 @@ macro_rules
   -- Probabilistic
   | `(pl(tape($e)))              => `(Exp.tape pl($e))
   | `(pl(rand($e1, $e2)))        => `(Exp.rand pl($e1) pl($e2))
-  -- Encryption
-  | `(pl(enc_aes128($e1, $e2, $e3))) => `(Exp.enc_aes128 pl($e1) pl($e2) pl($e3))
-  | `(pl(dec_aes128($e1, $e2, $e3))) => `(Exp.dec_aes128 pl($e1) pl($e2) pl($e3))
   -- Failure
   | `(pl(fail))                  => `(Exp.fail)
   -- Scrutinize (pattern match)
@@ -591,16 +584,6 @@ def unexpPatAnnot : Unexpander
     match a with
     | `(pl_ty($τ)) => `(pl_pat(($(← unpackPLPat p) : $τ)))
     | _ => throw ()
-  | _ => throw ()
-
-@[app_unexpander Exp.enc_aes128]
-def unexpEncAes128 : Unexpander
-  | `($_ $e1 $e2 $e3) => do `(pl(enc_aes128($(← unpackPLExp e1), $(← unpackPLExp e2), $(← unpackPLExp e3))))
-  | _ => throw ()
-
-@[app_unexpander Exp.dec_aes128]
-def unexpDecAes128 : Unexpander
-  | `($_ $e1 $e2 $e3) => do `(pl(dec_aes128($(← unpackPLExp e1), $(← unpackPLExp e2), $(← unpackPLExp e3))))
   | _ => throw ()
 
 @[app_unexpander Exp.scrut]

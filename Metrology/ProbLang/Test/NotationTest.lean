@@ -1028,16 +1028,3 @@ example : (letrec .anon (.typed "x" .int) (var "y")).subst' "y" (lit (.int 7)) =
 -- -- Nested pattern in case
 -- #check (pl(case e | inl((x, y)) => x + y | inr(z) => z) : Exp)
 
--- Encryption / decryption notation
-#elabpl pl(enc_aes128(p, iv, k))
-#expect enc_aes128 (var "p") (var "iv") (var "k")
-
-#elabpl pl(dec_aes128(c, iv, k))
-#expect dec_aes128 (var "c") (var "iv") (var "k")
-
--- Delaboration round-trips
-/-- info: pl(enc_aes128(p, iv, k)) : Exp -/
-#guard_msgs in #check (enc_aes128 (var "p") (var "iv") (var "k") : Exp)
-
-/-- info: pl(dec_aes128(c, iv, k)) : Exp -/
-#guard_msgs in #check (dec_aes128 (var "c") (var "iv") (var "k") : Exp)

@@ -102,8 +102,6 @@ inductive Exp
   | fail
   | annot (a : Annot) (e : Exp)
   | scrut (e : Exp) (pat : Pat)
-  | enc_aes128 (plaintext iv key : Exp)
-  | dec_aes128 (plaintext iv key : Exp)
   deriving Inhabited, Countable, Repr, BEq
 
 /-- Try to match an expression against a pattern.
@@ -359,12 +357,6 @@ inductive EctxItem
   | randR (e1 : Exp)
   | annot (a : Annot)
   | scrut (p : Pat)
-  | enc_aes128L (v_iv v_key : Val)
-  | enc_aes128M (e_pt : Exp) (v_key : Val)
-  | enc_aes128R (e_pt e_iv : Exp)
-  | dec_aes128L (v_iv v_key : Val)
-  | dec_aes128M (e_ct : Exp) (v_key : Val)
-  | dec_aes128R (e_ct e_iv : Exp)
 
 @[simp] def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
   match Ki with
@@ -390,12 +382,6 @@ inductive EctxItem
   | .randR e1 => .rand e1 e
   | .annot a => .annot a e
   | .scrut p => .scrut e p
-  | .enc_aes128L v_iv v_key => .enc_aes128 e (.ofVal v_iv) (.ofVal v_key)
-  | .enc_aes128M e_pt v_key => .enc_aes128 e_pt e (.ofVal v_key)
-  | .enc_aes128R e_pt e_iv => .enc_aes128 e_pt e_iv e
-  | .dec_aes128L v_iv v_key => .dec_aes128 e (.ofVal v_iv) (.ofVal v_key)
-  | .dec_aes128M e_ct v_key => .dec_aes128 e_ct e (.ofVal v_key)
-  | .dec_aes128R e_ct e_iv => .dec_aes128 e_ct e_iv e
 
 def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
   match e with
@@ -438,14 +424,6 @@ def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
     e1.toVal?.casesOn (some (.annot a, e1)) fun _ => none
   | scrut e1 p =>
     e1.toVal?.casesOn (some (.scrut p, e1)) fun _ => none
-  | enc_aes128 e1 e2 e3 =>
-    e3.toVal?.casesOn (some (.enc_aes128R e1 e2, e3)) fun v3 =>
-    e2.toVal?.casesOn (some (.enc_aes128M e1 v3, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.enc_aes128L v2 v3, e1)) fun _ => none
-  | dec_aes128 e1 e2 e3 =>
-    e3.toVal?.casesOn (some (.dec_aes128R e1 e2, e3)) fun v3 =>
-    e2.toVal?.casesOn (some (.dec_aes128M e1 v3, e2)) fun v2 =>
-    e1.toVal?.casesOn (some (.dec_aes128L v2 v3, e1)) fun _ => none
   | _ => none
 
 def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
@@ -473,8 +451,6 @@ def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
   | tape e => tape (e.subst' x v)
   | annot a e => annot a (e.subst' x v)
   | scrut e p => scrut (e.subst' x v) p
-  | enc_aes128 ep eiv ek => enc_aes128 (ep.subst' x v) (eiv.subst' x v) (ek.subst' x v)
-  | dec_aes128 ec eiv ek => dec_aes128 (ec.subst' x v) (eiv.subst' x v) (ek.subst' x v)
   | fail => fail
 
 def Exp.subst (mx : Binder) (v e : Exp) : Exp :=
@@ -571,8 +547,6 @@ def Exp.height : Exp → Nat
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | annot _ e => 1 + e.height
   | scrut e _ => 1 + e.height
-  | enc_aes128 e1 e2 e3 => 1 + e1.height + e2.height + e3.height
-  | dec_aes128 e1 e2 e3 => 1 + e1.height + e2.height + e3.height
   | fail => 1
 
 private theorem Exp.toVal?_of_isVal {e : Exp} (w : IsVal e) : ∃ v : Val, e.toVal? = some v ∧ v.1 = e :=
@@ -586,17 +560,6 @@ theorem EctxItem.decompItem_fillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue
     obtain ⟨v', hv', hv'e⟩ := Exp.toVal?_of_isVal hval
     simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv,
          hv', Exp.ofVal, Val.ext_iff, hv'e]
-  | enc_aes128L v_iv v_key | dec_aes128L v_iv v_key =>
-    obtain ⟨val_iv, hval_iv⟩ := v_iv; obtain ⟨val_key, hval_key⟩ := v_key
-    obtain ⟨v_iv', hv_iv', hv_iv'e⟩ := Exp.toVal?_of_isVal hval_iv
-    obtain ⟨v_key', hv_key', hv_key'e⟩ := Exp.toVal?_of_isVal hval_key
-    simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv,
-         hv_iv', hv_key', Exp.ofVal, Val.ext_iff, hv_iv'e, hv_key'e]
-  | enc_aes128M _ v_key | dec_aes128M _ v_key =>
-    obtain ⟨val_key, hval_key⟩ := v_key
-    obtain ⟨v_key', hv_key', hv_key'e⟩ := Exp.toVal?_of_isVal hval_key
-    simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv,
-         hv_key', Exp.ofVal, Val.ext_iff, hv_key'e]
   | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv]
 
 theorem Exp.decompItem_fill {e e' : Exp} {Ki : EctxItem}
@@ -780,7 +743,5 @@ def Fresh (x : String) : Exp → Prop
   | .fail => True
   | .annot _ e => Fresh x e
   | .scrut e _ => Fresh x e
-  | .enc_aes128 e1 e2 e3 => Fresh x e1 ∧ Fresh x e2 ∧ Fresh x e3
-  | .dec_aes128 e1 e2 e3 => Fresh x e1 ∧ Fresh x e2 ∧ Fresh x e3
 
 end ProbLang
