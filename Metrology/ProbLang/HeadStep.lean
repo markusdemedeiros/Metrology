@@ -1,4 +1,4 @@
-import Metrology.ProbLang.Syntax
+import Metrology.ProbLang.Syntax.Syntax
 import Mathlib.MeasureTheory.MeasurableSpace.Defs
 import Mathlib.Probability.ProbabilityMassFunction.Basic
 import Mathlib.Probability.Kernel.Defs

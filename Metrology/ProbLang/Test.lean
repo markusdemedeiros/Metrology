@@ -1,3 +1,3 @@
-import Metrology.ProbLang.Test.DetStep
-import Metrology.ProbLang.Test.EvalPrim
-import Metrology.ProbLang.Test.NotationTest
+import Metrology.ProbLang.Test.CtxInterp
+import Metrology.ProbLang.Test.Notation
+import Metrology.ProbLang.Test.StepTactics

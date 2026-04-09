@@ -1,5 +1,5 @@
 import Metrology.ProbLang.DetStep
-import Metrology.ProbLang.Notation
+import Metrology.ProbLang.Syntax.Notation
 
 namespace ProbLang
 

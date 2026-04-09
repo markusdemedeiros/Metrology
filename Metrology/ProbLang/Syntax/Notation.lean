@@ -1,5 +1,5 @@
 import Lean.PrettyPrinter.Delaborator
-import Metrology.ProbLang.Syntax
+import Metrology.ProbLang.Syntax.Syntax
 
 namespace ProbLang
 

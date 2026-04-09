@@ -1,5 +1,5 @@
-import Metrology.ProbLang.Syntax
-import Metrology.ProbLang.Notation
+import Metrology.ProbLang.Syntax.Syntax
+import Metrology.ProbLang.Syntax.Notation
 
 open ProbLang Exp Binder Ty Annot
 

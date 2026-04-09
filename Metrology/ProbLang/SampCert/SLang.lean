@@ -1,6 +1,7 @@
-import Metrology.ProbLang.Syntax
-import Metrology.ProbLang.Opsem
+import Metrology.ProbLang.Syntax.Syntax
+import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.DetStep
+import Metrology.ProbLang.Exec
 import SampCert.SLang
 import Mathlib.MeasureTheory.MeasurableSpace.Defs
 import Mathlib.Probability.ProbabilityMassFunction.Basic

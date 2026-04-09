@@ -569,7 +569,6 @@ theorem Exp.decompItem_fill {e e' : Exp} {Ki : EctxItem}
     fun x h => IsVal.not_isValue_of_check?_none h
   cases e <;> simp_all [Exp.ofVal] <;>
     (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all)) <;>
-    (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all)) <;>
     (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all))
 
 theorem EctxItem.fillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
@@ -617,8 +616,7 @@ theorem Exp.decompItem_height {e : Exp} (h : e.decompItem = some (Ki, e')) :
   simp only [decompItem, toVal?] at h
   cases e <;> simp_all <;>
     (split at h <;> simp_all <;> try omega) <;>
-    (split at h <;> simp_all <;> try omega) <;>
-    (split at h <;> simp_all <;> omega)
+    (split at h <;> simp_all <;> try omega)
 
 def Exp.decomp (e : Exp) : Ectx × Exp :=
   match _h : e.decompItem with

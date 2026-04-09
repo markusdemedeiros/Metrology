@@ -1,5 +1,5 @@
-import Metrology.ProbLang.Notation
-import Metrology.ProbLang.EvalPrim
+import Metrology.ProbLang.Syntax.Notation
+import Metrology.ProbLang.Interp.CtxInterp
 
 open ProbLang ProbLang.EvalPrim
 
