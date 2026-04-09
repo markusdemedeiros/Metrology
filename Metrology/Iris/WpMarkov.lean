@@ -494,8 +494,8 @@ class WpMarkov (GF : BundledGFunctors) (T : Type _) [MeasurableSpace T] where
   state_γ : GName
 
 export WpMarkov (ec_γ state_γ)
-attribute [instance] WpMarkov.ec
-attribute [instance] WpMarkov.state
+attribute [reducible, instance] WpMarkov.ec
+attribute [reducible, instance] WpMarkov.state
 
 section logic
 

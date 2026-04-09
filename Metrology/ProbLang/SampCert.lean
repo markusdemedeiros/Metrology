@@ -449,7 +449,7 @@ theorem probLangUniformByte_isEmbedding :
       rw [tsum_ite_eq]
       simp [UInt8.size]
     · -- e' doesn't match any valid UInt8 literal
-      push_neg at he
+      push Not at he
       -- LHS = 0
       have lhs_zero : ∀ x : ℤ, (if Exp.lit (BaseLit.int x) = e' then
           if 0 ≤ x ∧ x ≤ 255 then (↑(Finset.Icc (0 : ℤ) 255).card)⁻¹ else 0 else 0) =

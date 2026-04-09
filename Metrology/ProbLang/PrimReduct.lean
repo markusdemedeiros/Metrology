@@ -171,7 +171,7 @@ theorem step_by_val (K' K_redex : Ectx) (e1' e1_redex : Exp) (σ : State) (ρ : 
 
 theorem not_head_reducible {e : Exp} {σ : State} :
     (¬ ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) ↔ (∀ ρ : Cfg, headStep ⟨e, σ⟩ {ρ} = 0) := by
-  push_neg; exact forall_congr' fun _ => nonpos_iff_eq_zero
+  push Not; exact forall_congr' fun _ => nonpos_iff_eq_zero
 
 theorem head_redex_unique (K K' : Ectx) (e e' : Exp) (σ : State)
     (hfill : K.fill e = K'.fill e')

@@ -8,13 +8,13 @@ package metrology where
   testDriver := "ProbLangTest"
 
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4" @ "v4.28.0"
+  "https://github.com/leanprover-community/mathlib4" @ "v4.29.0"
 
 require iris from git
   "https://github.com/leanprover-community/iris-lean.git" @ "master"
 
 require sampcert from git
-  "https://github.com/leanprover/SampCert.git" @ "4c0ed99d1431628cd0bebf8de3bae02bc9f828b6"
+  "https://github.com/leanprover/SampCert.git" @ "v4.29.0"
 
 
 @[default_target]
