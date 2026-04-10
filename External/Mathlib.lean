@@ -54,25 +54,29 @@ Rocq's `distr` bakes in `SeriesC μ ≤ 1`; here we take sub-probability as an
 explicit hypothesis (`h : μ Set.univ ≤ 1`) or assume a probability-measure
 instance where appropriate. -/
 
+/-- On a countable discrete space, the total mass is the tsum of singleton
+masses. -/
+theorem Measure.univ_eq_tsum_singletons {α : Type _}
+    [MeasurableSpace α] [MeasurableSingletonClass α] [Countable α]
+    (μ : Measure α) : μ Set.univ = ∑' a, μ {a} := by
+  rw [show (Set.univ : Set α) = ⋃ a, {a} from by ext; simp]
+  rw [measure_iUnion (fun i j hij => by simpa [Set.disjoint_singleton] using hij)
+    (fun _ => MeasurableSet.singleton _)]
+
 /-- Rocq `pmf_1_eq_SeriesC`: if a singleton has full mass `1` and `μ` is a
 sub-probability measure, then `μ univ = 1`. -/
 theorem pmf_1_eq_SeriesC {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     {μ : Measure α} {a : α} (hμ : μ {a} = 1) (hsub : μ Set.univ ≤ 1) :
-    μ Set.univ = 1 := by
-  have h1 : 1 ≤ μ Set.univ := by
-    rw [← hμ]; exact measure_mono (Set.subset_univ _)
-  exact le_antisymm hsub h1
+    μ Set.univ = 1 :=
+  le_antisymm hsub (hμ ▸ measure_mono (Set.subset_univ _))
 
 /-- Rocq `pmf_plus_neq_SeriesC`: singleton masses at distinct points sum to
 at most the total mass. -/
 theorem pmf_plus_neq_SeriesC {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     (μ : Measure α) {a a' : α} (h : a ≠ a') :
     μ {a} + μ {a'} ≤ μ Set.univ := by
-  have hdisj : Disjoint ({a} : Set α) ({a'} : Set α) := by
-    simpa [Set.disjoint_singleton] using h
-  have hunion : μ ({a} ∪ {a'}) = μ {a} + μ {a'} :=
-    measure_union hdisj (MeasurableSet.singleton a')
-  rw [← hunion]
+  rw [← measure_union (by simpa [Set.disjoint_singleton] using h)
+      (MeasurableSet.singleton a')]
   exact measure_mono (Set.subset_univ _)
 
 /-- Rocq `pmf_1_not_eq`: if a singleton `{a}` has full mass, then singletons
@@ -80,13 +84,10 @@ at other points have zero mass. -/
 theorem pmf_1_not_eq {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     {μ : Measure α} {a b : α} (ha : μ {a} = 1) (hsub : μ Set.univ ≤ 1)
     (hne : b ≠ a) : μ {b} = 0 := by
-  have hsum : μ {a} + μ {b} ≤ μ Set.univ := pmf_plus_neq_SeriesC μ hne.symm
-  have hmass : μ Set.univ = 1 := pmf_1_eq_SeriesC ha hsub
-  rw [ha, hmass] at hsum
-  have hsum' : (1 : ENNReal) + μ {b} ≤ 1 + 0 := by simpa using hsum
-  have : μ {b} ≤ 0 :=
-    (ENNReal.add_le_add_iff_left ENNReal.one_ne_top).mp hsum'
-  exact le_antisymm this bot_le
+  have hsum := (pmf_plus_neq_SeriesC μ hne.symm).trans_eq (pmf_1_eq_SeriesC ha hsub)
+  rw [ha] at hsum
+  exact le_antisymm ((ENNReal.add_le_add_iff_left ENNReal.one_ne_top).mp
+    (by simpa using hsum)) bot_le
 
 /-- Rocq `pmf_1_eq_dret`: a sub-probability measure with a full-mass singleton
 equals the Dirac at that point. -/
@@ -94,10 +95,10 @@ theorem pmf_1_eq_dret {α : Type _} [MeasurableSpace α] [MeasurableSingletonCla
     [Countable α] {μ : Measure α} {a : α} (ha : μ {a} = 1) (hsub : μ Set.univ ≤ 1) :
     μ = Measure.dirac a := by
   refine Measure.ext_of_singleton fun c => ?_
+  rw [Measure.dirac_apply' _ (MeasurableSet.singleton c)]
   by_cases hca : c = a
-  · subst hca; rw [ha]; simp
-  · rw [pmf_1_not_eq ha hsub hca]
-    simp [Measure.dirac_apply' _ (MeasurableSet.singleton c), hca]
+  · subst hca; simp [ha]
+  · simp [pmf_1_not_eq ha hsub hca, hca]
 
 /-- Rocq `pmf_1_supp_eq`: if a singleton `{a}` has full mass and `{a'}` has
 positive mass, then `a = a'`. -/
@@ -105,14 +106,7 @@ theorem pmf_1_supp_eq {α : Type _} [MeasurableSpace α] [MeasurableSingletonCla
     {μ : Measure α} {a a' : α} (ha : μ {a} = 1) (hsub : μ Set.univ ≤ 1)
     (ha' : 0 < μ {a'}) : a = a' := by
   by_contra hne
-  have hsum : μ {a} + μ {a'} ≤ μ Set.univ := pmf_plus_neq_SeriesC μ hne
-  have hmass : μ Set.univ = 1 := pmf_1_eq_SeriesC ha hsub
-  rw [ha, hmass] at hsum
-  -- `1 + μ {a'} ≤ 1` with `μ {a'} > 0` is a contradiction in ENNReal.
-  have hsum' : (1 : ENNReal) + μ {a'} ≤ 1 + 0 := by simpa using hsum
-  have hle : μ {a'} ≤ 0 :=
-    (ENNReal.add_le_add_iff_left ENNReal.one_ne_top).mp hsum'
-  exact absurd (le_antisymm hle bot_le) ha'.ne'
+  exact ha'.ne' (pmf_1_not_eq ha hsub (Ne.symm hne))
 
 /-! ## Ports from `theories/prob/distribution.v` §3 (dbind workhorses) -/
 
@@ -146,24 +140,9 @@ theorem dbind_comm {α β γ : Type _}
     μ₁.bind (fun a => μ₂.bind (fun b => f a b))
       = μ₂.bind (fun b => μ₁.bind (fun a => f a b)) := by
   refine Measure.ext_of_singleton fun c => ?_
-  have hlhs : (μ₁.bind (fun a => μ₂.bind (fun b => f a b))) {c}
-            = ∑' a, (∑' b, (f a b) {c} * μ₂ {b}) * μ₁ {a} := by
-    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun a => (μ₂.bind (fun b => f a b)) {c})]
-    refine tsum_congr fun a => ?_
-    congr 1
-    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun b => (f a b) {c})]
-  have hrhs : (μ₂.bind (fun b => μ₁.bind (fun a => f a b))) {c}
-            = ∑' b, (∑' a, (f a b) {c} * μ₁ {a}) * μ₂ {b} := by
-    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun b => (μ₁.bind (fun a => f a b)) {c})]
-    refine tsum_congr fun b => ?_
-    congr 1
-    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun a => (f a b) {c})]
-  rw [hlhs, hrhs]
-  simp_rw [← ENNReal.tsum_mul_right]
+  simp_rw [Measure.bind_apply (MeasurableSet.singleton _)
+    Measurable.of_discrete.aemeasurable, lintegral_countable' _,
+    ← ENNReal.tsum_mul_right]
   rw [ENNReal.tsum_comm]
   refine tsum_congr fun b => tsum_congr fun a => ?_
   ring
@@ -191,19 +170,10 @@ theorem dbind_Sup_seq {α β : Type _}
     (hsup : ∀ a, (f' a) {b} = ⨆ n, (f n a) {b})
     (hmono : ∀ n a, (f n a) {b} ≤ (f (n + 1) a) {b}) :
     (μ.bind f') {b} = ⨆ n, (μ.bind (f n)) {b} := by
-  -- Expand via bind_apply + lintegral_countable' on both sides.
-  have hrhs : ∀ n, (μ.bind (f n)) {b} = ∑' a, (f n a) {b} * μ {a} := by
-    intro n
-    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun a => (f n a) {b})]
-  rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      lintegral_countable' (fun a => (f' a) {b})]
-  simp_rw [hrhs]
-  -- Now: ∑' a, (f' a) {b} * μ {a} = ⨆ n, ∑' a, (f n a) {b} * μ {a}
-  simp_rw [hsup, ENNReal.iSup_mul]
+  simp_rw [Measure.bind_apply (MeasurableSet.singleton _)
+    Measurable.of_discrete.aemeasurable, lintegral_countable' _, hsup, ENNReal.iSup_mul]
   refine ENNReal.tsum_iSup_of_monotone' fun a i j hij => ?_
   refine mul_le_mul_of_nonneg_right ?_ (by positivity)
-  -- (f i a) {b} ≤ (f j a) {b} from hmono + induction on j - i
   clear hsup
   induction hij with
   | refl => exact le_refl _
@@ -218,14 +188,12 @@ theorem dbind_dret_pmf_map {α β : Type _}
     (μ : Measure α) (a : α) {f : α → β} (hf : Function.Injective f) :
     (μ.bind (fun a' => Measure.dirac (f a'))) {f a} = μ {a} := by
   rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      lintegral_countable' (fun a' => (Measure.dirac (f a')) {f a})]
-  rw [tsum_eq_single a]
-  · rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    simp
+      lintegral_countable' (fun a' => (Measure.dirac (f a')) {f a}),
+      tsum_eq_single a]
+  · simp [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
   · intro a' hne
-    rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    have : f a' ≠ f a := fun heq => hne (hf heq)
-    simp [Set.mem_singleton_iff, this]
+    have : f a' ≠ f a := fun h => hne (hf h)
+    simp [Measure.dirac_apply' _ (MeasurableSet.singleton _), this]
 
 /-- Rocq `dbind_dret_pmf_map_ne`: if `b` is not in the image of `f` on the
 support of `μ`, then the pushforward singleton mass is zero. -/
@@ -241,10 +209,9 @@ theorem dbind_dret_pmf_map_ne {α β : Type _}
   refine ENNReal.tsum_eq_zero.mpr fun a => ?_
   rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
   by_cases hμa : 0 < μ {a}
-  · have hfab : f a ≠ b := fun heq => hne ⟨a, hμa, heq⟩
-    simp [Set.mem_singleton_iff, hfab]
-  · have : μ {a} = 0 := le_antisymm (not_lt.mp hμa) bot_le
+  · have : f a ≠ b := fun heq => hne ⟨a, hμa, heq⟩
     simp [this]
+  · simp [le_antisymm (not_lt.mp hμa) bot_le]
 theorem dbind_mass {α β : Type _}
     [MeasurableSpace α] [MeasurableSpace β]
     [DiscreteMeasurableSpace α]
@@ -271,13 +238,10 @@ theorem dbind_inhabited_ex {α β : Type _}
     (μ : Measure α) (f : α → Measure β)
     (h : ∃ a, 0 < μ {a} ∧ 0 < (f a) Set.univ) :
     0 < (μ.bind f) Set.univ := by
-  rw [dbind_mass, lintegral_countable' (fun a => (f a) Set.univ)]
   obtain ⟨a, hμa, hfa⟩ := h
-  rw [pos_iff_ne_zero, ne_eq, ENNReal.tsum_eq_zero, not_forall]
-  refine ⟨a, ?_⟩
-  simp only [mul_eq_zero, not_or]
-  exact ⟨hfa.ne', hμa.ne'⟩
-
+  rw [dbind_mass, lintegral_countable' (fun a => (f a) Set.univ),
+      pos_iff_ne_zero, ne_eq, ENNReal.tsum_eq_zero, not_forall]
+  exact ⟨a, by simp [mul_eq_zero, hfa.ne', hμa.ne']⟩
 
 /-- Rocq `dbind_inhabited`: positivity of bind from two separate positivities. -/
 theorem dbind_inhabited {α β : Type _}
@@ -297,13 +261,10 @@ theorem dbind_dret_pair_left {α α' : Type _}
     (μ : Measure α) (a' : α') (b : α) :
     (μ.bind (fun a => Measure.dirac (a, a'))) {(b, a')} = μ {b} := by
   rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      lintegral_countable' (fun a => (Measure.dirac (a, a')) {(b, a')})]
-  rw [tsum_eq_single b]
-  · rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    simp
+      lintegral_countable' (fun a => (Measure.dirac (a, a')) {(b, a')}), tsum_eq_single b]
+  · simp [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
   · intro a hab
-    rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    simp [Set.mem_singleton_iff, Prod.mk.injEq, hab]
+    simp [Measure.dirac_apply' _ (MeasurableSet.singleton _), Prod.mk.injEq, hab]
 
 /-- Rocq `dbind_dret_pair_right`: bind into a pair on the right. -/
 theorem dbind_dret_pair_right {α α' : Type _}
@@ -313,13 +274,10 @@ theorem dbind_dret_pair_right {α α' : Type _}
     (μ : Measure α') (a : α) (b : α') :
     (μ.bind (fun a' => Measure.dirac (a, a'))) {(a, b)} = μ {b} := by
   rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      lintegral_countable' (fun a' => (Measure.dirac (a, a')) {(a, b)})]
-  rw [tsum_eq_single b]
-  · rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    simp
+      lintegral_countable' (fun a' => (Measure.dirac (a, a')) {(a, b)}), tsum_eq_single b]
+  · simp [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
   · intro x hxb
-    rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    simp [Set.mem_singleton_iff, Prod.mk.injEq, hxb]
+    simp [Measure.dirac_apply' _ (MeasurableSet.singleton _), Prod.mk.injEq, hxb]
 
 /-- Rocq `dbind_det`: if the base measure has total mass `1` and every kernel
 on the support has total mass `1`, so does the bind. -/
@@ -331,19 +289,11 @@ theorem dbind_det {α β : Type _}
     (hf : ∀ a, 0 < μ {a} → (f a) Set.univ = 1) :
     (μ.bind f) Set.univ = 1 := by
   rw [dbind_mass, lintegral_countable' (fun a => (f a) Set.univ)]
-  have hrw : ∀ a, (f a) Set.univ * μ {a} = μ {a} := by
-    intro a
+  have hrw : ∀ a, (f a) Set.univ * μ {a} = μ {a} := fun a => by
     by_cases hμa : 0 < μ {a}
     · rw [hf a hμa, one_mul]
-    · have : μ {a} = 0 := le_antisymm (not_lt.mp hμa) bot_le
-      rw [this, mul_zero]
-  simp_rw [hrw]
-  -- Now need ∑' a, μ {a} = μ univ = 1
-  have : μ Set.univ = ∑' a, μ {a} := by
-    rw [show (Set.univ : Set α) = ⋃ a, {a} from by ext; simp, measure_iUnion]
-    · exact fun i j hij => by simpa [Set.disjoint_singleton] using hij
-    · exact fun _ => MeasurableSet.singleton _
-  rw [← this]; exact hμ
+    · rw [le_antisymm (not_lt.mp hμa) bot_le, mul_zero]
+  simp_rw [hrw, ← Measure.univ_eq_tsum_singletons]; exact hμ
 
 /-- Rocq `dbind_det_inv_l`: if the bind has a full-mass singleton, the base
 measure has total mass `1`. Requires the kernels to be sub-probability. -/
@@ -356,14 +306,11 @@ theorem dbind_det_inv_l {α β : Type _}
     (hbind : (μ.bind f) {b} = 1) :
     μ Set.univ = 1 := by
   refine le_antisymm hsub ?_
-  -- (bind μ f) {b} ≤ (bind μ f) univ = ∫⁻ a, (f a) univ ∂μ ≤ ∫⁻ a, 1 ∂μ = μ univ
-  have h1 : (1 : ENNReal) = (μ.bind f) {b} := hbind.symm
-  rw [h1]
-  have h2 : (μ.bind f) {b} ≤ (μ.bind f) Set.univ := measure_mono (Set.subset_univ _)
-  refine h2.trans ?_
-  rw [dbind_mass]
-  refine (lintegral_mono fun a => hfsub a).trans ?_
-  simp
+  calc (1 : ENNReal) = (μ.bind f) {b} := hbind.symm
+    _ ≤ (μ.bind f) Set.univ := measure_mono (Set.subset_univ _)
+    _ = ∫⁻ a, (f a) Set.univ ∂μ := dbind_mass _ _
+    _ ≤ ∫⁻ _, 1 ∂μ := lintegral_mono hfsub
+    _ = μ Set.univ := by simp
 
 /-- Rocq `dbind_det_inv_r`: if the bind has a full-mass singleton, every kernel
 on the support has singleton mass `1`. -/
@@ -375,42 +322,26 @@ theorem dbind_det_inv_r {α β : Type _}
     (hsub : μ Set.univ ≤ 1) (hfsub : ∀ a, (f a) Set.univ ≤ 1)
     (hbind : (μ.bind f) {b} = 1) :
     ∀ a, 0 < μ {a} → (f a) {b} = 1 := by
-  have hμ1 : μ Set.univ = 1 := dbind_det_inv_l μ f b hsub hfsub hbind
   have hbind' : ∑' a, (f a) {b} * μ {a} = 1 := by
     rw [← hbind, Measure.bind_apply (MeasurableSet.singleton _)
          Measurable.of_discrete.aemeasurable,
         lintegral_countable' (fun a => (f a) {b})]
-  have htotal : ∑' a, μ {a} = 1 := by
-    have h : μ Set.univ = ∑' a, μ {a} := by
-      rw [show (Set.univ : Set α) = ⋃ a, {a} from by ext; simp, measure_iUnion]
-      · exact fun i j hij => by simpa [Set.disjoint_singleton] using hij
-      · exact fun _ => MeasurableSet.singleton _
-    rw [← h]; exact hμ1
+  have htotal : ∑' a, μ {a} = 1 :=
+    (Measure.univ_eq_tsum_singletons μ).symm.trans (dbind_det_inv_l μ f b hsub hfsub hbind)
   have hterm : ∀ a, (f a) {b} * μ {a} ≤ μ {a} := fun a => by
     calc (f a) {b} * μ {a}
-        ≤ 1 * μ {a} := by
-          gcongr
-          calc (f a) {b} ≤ (f a) Set.univ := measure_mono (Set.subset_univ _)
-            _ ≤ 1 := hfsub a
+        ≤ 1 * μ {a} := by gcongr; exact (measure_mono (Set.subset_univ _)).trans (hfsub a)
       _ = μ {a} := one_mul _
-  have hsum_ne_top : ∑' a, (f a) {b} * μ {a} ≠ ⊤ := by
-    rw [hbind']; exact ENNReal.one_ne_top
-  have hpointwise : ∀ a, (f a) {b} * μ {a} = μ {a} := by
-    intro a
+  have hpointwise : ∀ a, (f a) {b} * μ {a} = μ {a} := fun a => by
     by_contra hne
-    have hlt : (f a) {b} * μ {a} < μ {a} := lt_of_le_of_ne (hterm a) hne
-    have hstrict : ∑' a, (f a) {b} * μ {a} < ∑' a, μ {a} :=
-      ENNReal.tsum_lt_tsum (i := a) hsum_ne_top hterm hlt
-    rw [hbind', htotal] at hstrict
-    exact lt_irrefl _ hstrict
+    have := ENNReal.tsum_lt_tsum (i := a) (hbind'.trans_ne ENNReal.one_ne_top)
+      hterm (lt_of_le_of_ne (hterm a) hne)
+    rw [hbind', htotal] at this
+    exact lt_irrefl _ this
   intro a ha
-  have heq := hpointwise a
-  -- Cancel μ {a} on the right: it is nonzero (by `ha`) and ≠ ⊤ (sub-prob).
-  have hμa_ne_top : μ {a} ≠ ⊤ := by
-    have : μ {a} ≤ 1 := (measure_mono (Set.subset_univ _)).trans hsub
-    exact this.trans_lt ENNReal.one_lt_top |>.ne
-  have h1 : (f a) {b} * μ {a} = 1 * μ {a} := by rw [heq, one_mul]
-  exact (ENNReal.mul_left_inj ha.ne' hμa_ne_top).mp h1
+  have hμa_ne_top : μ {a} ≠ ⊤ :=
+    ((measure_mono (Set.subset_univ _)).trans hsub).trans_lt ENNReal.one_lt_top |>.ne
+  exact (ENNReal.mul_left_inj ha.ne' hμa_ne_top).mp ((hpointwise a).trans (one_mul _).symm)
 
 /-! ## Ports from `theories/prob/distribution.v` §7 tail (dmap) -/
 
@@ -436,20 +367,11 @@ theorem dmap_elem_ne {α β : Type _}
     (μ : Measure α) {f : α → β} {b : β}
     (hne : ¬ ∃ a, 0 < μ {a} ∧ f a = b) :
     (μ.map f) {b} = 0 := by
-  rw [Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _)]
-  -- Show that on the preimage, every singleton has zero mass.
-  have : μ (f ⁻¹' {b}) ≤ 0 := by
-    rw [show (f ⁻¹' {b}) = ⋃ a ∈ {a | f a = b}, ({a} : Set α) by
-      ext x; simp]
-    refine (measure_biUnion_le _ (Set.to_countable _) _).trans ?_
-    refine tsum_nonpos ?_
-    intro ⟨a, ha⟩
-    simp only
-    by_cases hμa : 0 < μ {a}
-    · exact absurd ⟨a, hμa, ha⟩ hne
-    · have : μ {a} = 0 := le_antisymm (not_lt.mp hμa) bot_le
-      rw [this]
-  exact le_antisymm this bot_le
+  rw [Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _),
+      show (f ⁻¹' {b}) = ⋃ a ∈ {a | f a = b}, ({a} : Set α) from by ext x; simp]
+  refine (measure_biUnion_null_iff (Set.to_countable _)).mpr fun a ha => ?_
+  by_contra h
+  exact hne ⟨a, lt_of_le_of_ne bot_le (Ne.symm h), ha⟩
 
 /-- Rocq `dmap_rearrange`: if `f` is injective and `f` covers the support of
 `μ₁`, and `μ₁ (f a) = μ₂ a`, then `μ₁ = map f μ₂`. -/
@@ -466,12 +388,8 @@ theorem dmap_rearrange {α : Type _}
     rw [dmap_elem_eq μ₂ a' hf, hpt]
   · have h1 : μ₁ {a} = 0 := by
       by_contra hne
-      have : 0 < μ₁ {a} := lt_of_le_of_ne bot_le (Ne.symm hne)
-      exact h (hcov a this)
-    have h2 : (μ₂.map f) {a} = 0 := by
-      refine dmap_elem_ne μ₂ ?_
-      rintro ⟨a', _, heq⟩; exact h ⟨a', heq⟩
-    rw [h1, h2]
+      exact h (hcov a (lt_of_le_of_ne bot_le (Ne.symm hne)))
+    rw [h1, dmap_elem_ne μ₂ (fun ⟨a', _, heq⟩ => h ⟨a', heq⟩)]
 
 /-! ## Ports from `theories/prob/distribution.v` §15 (dunif/dunifP) -/
 
@@ -587,14 +505,10 @@ theorem distr_le_dbind {α β : Type _}
     {μ₁ μ₂ : Measure α} {f₁ f₂ : α → Measure β}
     (hμ : ∀ a, μ₁ {a} ≤ μ₂ {a})
     (hf : ∀ a b, (f₁ a) {b} ≤ (f₂ a) {b}) :
-    ∀ b, (μ₁.bind f₁) {b} ≤ (μ₂.bind f₂) {b} := by
-  intro b
-  rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      lintegral_countable' (fun a => (f₁ a) {b}),
-      lintegral_countable' (fun a => (f₂ a) {b})]
-  refine ENNReal.tsum_le_tsum fun a => ?_
-  exact mul_le_mul' (hf a b) (hμ a)
+    ∀ b, (μ₁.bind f₁) {b} ≤ (μ₂.bind f₂) {b} := fun b => by
+  simp_rw [Measure.bind_apply (MeasurableSet.singleton _)
+    Measurable.of_discrete.aemeasurable, lintegral_countable' _]
+  exact ENNReal.tsum_le_tsum fun a => mul_le_mul' (hf a b) (hμ a)
 
 /-- Rocq `distr_le_dmap_1`: `map f` is monotone (singleton form). -/
 theorem distr_le_dmap_1 {α β : Type _}
@@ -602,30 +516,17 @@ theorem distr_le_dmap_1 {α β : Type _}
     [MeasurableSingletonClass α] [MeasurableSingletonClass β]
     [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β] [Countable α]
     {μ₁ μ₂ : Measure α} (f : α → β) (hμ : ∀ a, μ₁ {a} ≤ μ₂ {a}) :
-    ∀ b, (μ₁.map f) {b} ≤ (μ₂.map f) {b} := by
-  -- Express `map f μ = bind μ (dirac ∘ f)`, then use `distr_le_dbind`.
-  intro b
-  have hrw : ∀ (μ : Measure α), (μ.map f) {b}
-               = (μ.bind (fun a => Measure.dirac (f a))) {b} := by
-    intro μ
-    rw [Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _),
-        Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun a => (Measure.dirac (f a)) {b})]
-    -- μ (f⁻¹' {b}) = ∑' a, (dirac (f a)) {b} * μ {a}
-    have hunion : (f ⁻¹' ({b} : Set β)) = ⋃ a ∈ {a | f a = b}, ({a} : Set α) := by
-      ext x; simp
-    rw [hunion, measure_biUnion (Set.to_countable _)
+    ∀ b, (μ₁.map f) {b} ≤ (μ₂.map f) {b} := fun b => by
+  rw [Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _),
+      Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _),
+      show (f ⁻¹' ({b} : Set β)) = ⋃ a ∈ {a | f a = b}, ({a} : Set α) from by ext; simp]
+  rw [measure_biUnion (Set.to_countable _)
+      (fun i _ j _ hij => by simpa [Set.disjoint_singleton] using hij)
+      (fun _ _ => MeasurableSet.singleton _),
+    measure_biUnion (Set.to_countable _)
       (fun i _ j _ hij => by simpa [Set.disjoint_singleton] using hij)
       (fun _ _ => MeasurableSet.singleton _)]
-    rw [tsum_subtype {a | f a = b} (fun a => μ {a})]
-    refine tsum_congr fun a => ?_
-    simp only [Set.indicator_apply, Set.mem_setOf_eq]
-    rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    by_cases h : f a = b
-    · simp [Set.mem_singleton_iff, h]
-    · simp [Set.mem_singleton_iff, h]
-  rw [hrw μ₁, hrw μ₂]
-  exact distr_le_dbind hμ (fun a b => le_refl _) b
+  exact ENNReal.tsum_le_tsum fun a => hμ a
 
 /-- Rocq `distr_le_dmap_2`: injective pushforward reflects `≤` pointwise. -/
 theorem distr_le_dmap_2 {α β : Type _}
@@ -655,20 +556,16 @@ theorem ddiag_pmf {α : Type _}
       lintegral_countable' (fun x => (Measure.dirac (x, x)) {(a, a')})]
   by_cases hne : a = a'
   · subst hne
-    rw [if_pos rfl]
-    rw [tsum_eq_single a]
-    · rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-      simp
+    rw [if_pos rfl, tsum_eq_single a]
+    · simp [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
     · intro b hba
-      rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-      simp [Prod.mk.injEq, hba.symm]
+      simp [Measure.dirac_apply' _ (MeasurableSet.singleton _), Prod.mk.injEq, hba.symm]
   · rw [if_neg hne]
     refine ENNReal.tsum_eq_zero.mpr fun x => ?_
     rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-    by_cases hxa : x = a
-    · subst hxa
-      simp [Set.mem_singleton_iff, Prod.mk.injEq, hne]
-    · simp [Set.mem_singleton_iff, Prod.mk.injEq, hxa]
+    have : (x, x) ∉ ({(a, a')} : Set (α × α)) := by
+      simp only [Set.mem_singleton_iff, Prod.mk.injEq]; rintro ⟨rfl, rfl⟩; exact hne rfl
+    simp [Set.indicator_of_notMem this]
 
 /-- Rocq `dprod`: independent product of two measures via bind/dret. -/
 def dprod {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
@@ -683,28 +580,30 @@ theorem dprod_pmf {α β : Type _}
     [Countable α] [Countable β]
     (μ₁ : Measure α) (μ₂ : Measure β) (a : α) (b : β) :
     (dprod μ₁ μ₂) {(a, b)} = μ₁ {a} * μ₂ {b} := by
+  have key : ∀ x : α, (μ₂.bind (fun y => Measure.dirac (x, y))) {(a, b)}
+               = if x = a then μ₂ {b} else 0 := by
+    intro x
+    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
+        lintegral_countable' (fun y => (Measure.dirac (x, y)) {(a, b)})]
+    by_cases hxa : x = a
+    · subst hxa
+      rw [if_pos rfl, tsum_eq_single b]
+      · simp [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
+      · intro y hyb
+        simp [Measure.dirac_apply' _ (MeasurableSet.singleton _), Prod.mk.injEq, hyb]
+    · rw [if_neg hxa]
+      refine ENNReal.tsum_eq_zero.mpr fun y => ?_
+      rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
+      have : (x, y) ∉ ({(a, b)} : Set (α × β)) := by
+        simp only [Set.mem_singleton_iff, Prod.mk.injEq]; rintro ⟨rfl, _⟩; exact hxa rfl
+      simp [Set.indicator_of_notMem this]
   unfold dprod
   rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
       lintegral_countable' (fun x => (μ₂.bind (fun y => Measure.dirac (x, y))) {(a, b)})]
+  simp_rw [key]
   rw [tsum_eq_single a]
-  · rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun y => (Measure.dirac (a, y)) {(a, b)})]
-    rw [tsum_eq_single b]
-    · rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-      simp
-      ring
-    · intro y hyb
-      rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-      simp [Set.mem_singleton_iff, Prod.mk.injEq, hyb]
-  · intro x hxa
-    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun y => (Measure.dirac (x, y)) {(a, b)})]
-    -- All dirac terms at (x, y) = (a, b) are zero since x ≠ a.
-    have : ∀ y, (Measure.dirac (x, y)) ({(a, b)} : Set (α × β)) = 0 := by
-      intro y
-      rw [Measure.dirac_apply' _ (MeasurableSet.singleton _)]
-      simp [Set.mem_singleton_iff, Prod.mk.injEq, hxa]
-    simp [this]
+  · simp [mul_comm]
+  · intro x hxa; simp [hxa]
 
 /-- Rocq `dprod_pos`: support of the product is the conjunction of supports. -/
 theorem dprod_pos {α β : Type _}
@@ -746,11 +645,10 @@ theorem dswap_pos {α β : Type _}
     [DiscreteMeasurableSpace (α × β)] [Countable (α × β)]
     (μ : Measure (α × β)) (a : α) (b : β) :
     (dswap μ) {(b, a)} = μ {(a, b)} := by
-  unfold dswap
-  rw [Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _)]
+  rw [dswap, Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _)]
   congr 1
   ext ⟨x, y⟩
-  simp [Prod.swap, Set.mem_singleton_iff, Prod.mk.injEq, and_comm]
+  simp [Prod.swap, and_comm]
 
 /-- Rocq `lmarg`: left marginal. -/
 def lmarg {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
@@ -769,16 +667,14 @@ theorem lmarg_pmf {α β : Type _}
     [DiscreteMeasurableSpace (α × β)] [Countable β]
     (μ : Measure (α × β)) (a : α) :
     (lmarg μ) {a} = ∑' b, μ {(a, b)} := by
-  unfold lmarg
-  rw [Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _)]
-  have hunion : (Prod.fst ⁻¹' ({a} : Set α)) = ⋃ b, ({(a, b)} : Set (α × β)) := by
-    ext ⟨x, y⟩; simp [eq_comm]
-  rw [hunion]
-  rw [measure_iUnion
-    (fun i j hij => by
-      simp only [Set.disjoint_singleton, ne_eq, Prod.mk.injEq, not_and]
-      intro _; exact hij)
-    (fun _ => MeasurableSet.singleton _)]
+  rw [lmarg, Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _),
+      show (Prod.fst ⁻¹' ({a} : Set α)) = ⋃ b, ({(a, b)} : Set (α × β)) from by
+        ext ⟨x, y⟩; simp [eq_comm],
+      measure_iUnion
+        (fun i j hij => by
+          simp only [Set.disjoint_singleton, ne_eq, Prod.mk.injEq, not_and]
+          intro _; exact hij)
+        (fun _ => MeasurableSet.singleton _)]
 
 /-- Rocq `rmarg_pmf`. -/
 theorem rmarg_pmf {α β : Type _}
@@ -787,16 +683,14 @@ theorem rmarg_pmf {α β : Type _}
     [DiscreteMeasurableSpace (α × β)] [Countable α]
     (μ : Measure (α × β)) (b : β) :
     (rmarg μ) {b} = ∑' a, μ {(a, b)} := by
-  unfold rmarg
-  rw [Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _)]
-  have hunion : (Prod.snd ⁻¹' ({b} : Set β)) = ⋃ a, ({(a, b)} : Set (α × β)) := by
-    ext ⟨x, y⟩; simp [eq_comm]
-  rw [hunion]
-  rw [measure_iUnion
-    (fun i j hij => by
-      simp only [Set.disjoint_singleton, ne_eq, Prod.mk.injEq, not_and]
-      intro h _; exact hij h)
-    (fun _ => MeasurableSet.singleton _)]
+  rw [rmarg, Measure.map_apply Measurable.of_discrete (MeasurableSet.singleton _),
+      show (Prod.snd ⁻¹' ({b} : Set β)) = ⋃ a, ({(a, b)} : Set (α × β)) from by
+        ext ⟨x, y⟩; simp [eq_comm],
+      measure_iUnion
+        (fun i j hij => by
+          simp only [Set.disjoint_singleton, ne_eq, Prod.mk.injEq, not_and]
+          intro h _; exact hij h)
+        (fun _ => MeasurableSet.singleton _)]
 
 /-- Rocq `lmarg_dprod_pmf`: marginal of a product, pointwise. -/
 theorem lmarg_dprod_pmf {α β : Type _}
@@ -809,13 +703,7 @@ theorem lmarg_dprod_pmf {α β : Type _}
     (lmarg (dprod μ₁ μ₂)) {a} = μ₁ {a} * μ₂ Set.univ := by
   rw [lmarg_pmf]
   simp_rw [dprod_pmf]
-  rw [ENNReal.tsum_mul_left]
-  congr 1
-  have : μ₂ Set.univ = ∑' b, μ₂ {b} := by
-    rw [show (Set.univ : Set β) = ⋃ b, {b} from by ext; simp, measure_iUnion]
-    · exact fun i j hij => by simpa [Set.disjoint_singleton] using hij
-    · exact fun _ => MeasurableSet.singleton _
-  rw [this]
+  rw [ENNReal.tsum_mul_left, Measure.univ_eq_tsum_singletons]
 
 /-- Rocq `rmarg_dprod_pmf`. -/
 theorem rmarg_dprod_pmf {α β : Type _}
@@ -828,12 +716,7 @@ theorem rmarg_dprod_pmf {α β : Type _}
     (rmarg (dprod μ₁ μ₂)) {b} = μ₂ {b} * μ₁ Set.univ := by
   rw [rmarg_pmf]
   simp_rw [dprod_pmf]
-  rw [ENNReal.tsum_mul_right]
-  have htotal : μ₁ Set.univ = ∑' a, μ₁ {a} := by
-    rw [show (Set.univ : Set α) = ⋃ a, {a} from by ext; simp, measure_iUnion]
-    · exact fun i j hij => by simpa [Set.disjoint_singleton] using hij
-    · exact fun _ => MeasurableSet.singleton _
-  rw [htotal, mul_comm]
+  rw [ENNReal.tsum_mul_right, Measure.univ_eq_tsum_singletons, mul_comm]
 
 /-- Rocq `lmarg_dprod`: left marginal of a product on a prob measure. -/
 theorem lmarg_dprod {α β : Type _}
@@ -897,9 +780,7 @@ theorem lmarg_dswap {α β : Type _}
     [Countable β]
     (μ : Measure (α × β)) :
     lmarg (dswap μ) = rmarg μ := by
-  unfold lmarg dswap rmarg
-  rw [Measure.map_map Measurable.of_discrete Measurable.of_discrete]
-  rfl
+  rw [lmarg, dswap, rmarg, Measure.map_map Measurable.of_discrete Measurable.of_discrete]; rfl
 
 /-- Rocq `rmarg_dswap`. -/
 theorem rmarg_dswap {α β : Type _}
@@ -909,9 +790,7 @@ theorem rmarg_dswap {α β : Type _}
     [Countable α]
     (μ : Measure (α × β)) :
     rmarg (dswap μ) = lmarg μ := by
-  unfold rmarg dswap lmarg
-  rw [Measure.map_map Measurable.of_discrete Measurable.of_discrete]
-  rfl
+  rw [rmarg, dswap, lmarg, Measure.map_map Measurable.of_discrete Measurable.of_discrete]; rfl
 
 /-! ## Ports from `theories/prob/distribution.v` §9 (iterM) -/
 
@@ -937,12 +816,9 @@ theorem iterM_plus {α : Type _}
   induction n generalizing a with
   | zero => simp [Measure.dirac_bind Measurable.of_discrete]
   | succ n ih =>
-    simp only [Nat.succ_add, iterM_Sn]
-    rw [Measure.bind_bind Measurable.of_discrete.aemeasurable
-        Measurable.of_discrete.aemeasurable]
-    congr 1
-    funext a'
-    exact ih a'
+    simp only [Nat.succ_add, iterM_Sn, Measure.bind_bind Measurable.of_discrete.aemeasurable
+      Measurable.of_discrete.aemeasurable]
+    exact congrArg _ (funext ih)
 
 /-- Rocq `iterM_mono`: iterated bind is monotone at a fixed endpoint singleton
 in its kernel argument. -/
@@ -955,13 +831,9 @@ theorem iterM_mono {α : Type _}
   induction n generalizing a with
   | zero => simp
   | succ n ih =>
-    simp only [iterM_Sn]
-    rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-        lintegral_countable' (fun x => (iterM n f x) {a'}),
-        lintegral_countable' (fun x => (iterM n g x) {a'})]
-    refine ENNReal.tsum_le_tsum fun x => ?_
-    exact mul_le_mul' (ih x) (h a x)
+    simp_rw [iterM_Sn, Measure.bind_apply (MeasurableSet.singleton _)
+      Measurable.of_discrete.aemeasurable, lintegral_countable' _]
+    exact ENNReal.tsum_le_tsum fun x => mul_le_mul' (ih x) (h a x)
 
 /-! ## Ports from `theories/prob/distribution.v` §8 (strength) -/
 
@@ -983,9 +855,8 @@ theorem dbind_strength_l {α β δ : Type _}
     [DiscreteMeasurableSpace (α × β)] [Countable β]
     (f : α × β → Measure δ) (a : α) (μ : Measure β) :
     (strength_l a μ).bind f = μ.bind (fun b => f (a, b)) := by
-  unfold strength_l
   ext s hs
-  rw [Measure.bind_apply hs Measurable.of_discrete.aemeasurable,
+  rw [strength_l, Measure.bind_apply hs Measurable.of_discrete.aemeasurable,
       lintegral_map Measurable.of_discrete Measurable.of_discrete,
       Measure.bind_apply hs Measurable.of_discrete.aemeasurable]
 
@@ -997,9 +868,8 @@ theorem dbind_strength_r {α β δ : Type _}
     [DiscreteMeasurableSpace (α × β)] [Countable α]
     (f : α × β → Measure δ) (μ : Measure α) (b : β) :
     (strength_r μ b).bind f = μ.bind (fun a => f (a, b)) := by
-  unfold strength_r
   ext s hs
-  rw [Measure.bind_apply hs Measurable.of_discrete.aemeasurable,
+  rw [strength_r, Measure.bind_apply hs Measurable.of_discrete.aemeasurable,
       lintegral_map Measurable.of_discrete Measurable.of_discrete,
       Measure.bind_apply hs Measurable.of_discrete.aemeasurable]
 
@@ -1121,23 +991,18 @@ measure. (We take the countable-singleton extensionality view.) -/
 theorem SeriesC_zero_dzero {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     [Countable α] {μ : Measure α} (h : μ Set.univ = 0) : μ = 0 := by
   refine Measure.ext_of_singleton fun a => ?_
-  have hle : μ {a} ≤ μ Set.univ := measure_mono (Set.subset_univ _)
-  rw [h, nonpos_iff_eq_zero] at hle
-  rw [hle]
-  simp
+  rw [nonpos_iff_eq_zero.mp ((measure_mono (Set.subset_univ _)).trans_eq h)]; simp
 
 /-- Rocq `not_dzero_gt_0`: a nonzero measure has positive total mass. -/
 theorem not_dzero_gt_0 {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
-    [Countable α] {μ : Measure α} (h : μ ≠ 0) : 0 < μ Set.univ := by
-  rw [pos_iff_ne_zero]
-  intro hzero
-  exact h (SeriesC_zero_dzero hzero)
+    [Countable α] {μ : Measure α} (h : μ ≠ 0) : 0 < μ Set.univ :=
+  pos_iff_ne_zero.mpr fun hzero => h (SeriesC_zero_dzero hzero)
 
 /-- Existential form: a nonzero measure has some singleton with positive mass. -/
 theorem not_dzero_exists_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
-    [Countable α] {μ : Measure α} (h : μ ≠ 0) : ∃ a, 0 < μ {a} := by
-  obtain ⟨a, _, ha⟩ := measure_pos_of_singleton_pos μ _ (not_dzero_gt_0 h)
-  exact ⟨a, ha⟩
+    [Countable α] {μ : Measure α} (h : μ ≠ 0) : ∃ a, 0 < μ {a} :=
+  let ⟨a, _, ha⟩ := measure_pos_of_singleton_pos μ _ (not_dzero_gt_0 h)
+  ⟨a, ha⟩
 
 /-- Rocq `dbind_dzero_strong`: a bind is zero iff every kernel on the support
 is zero. (The "only if" direction: from the pointwise hypothesis we conclude
@@ -1154,9 +1019,8 @@ theorem dbind_dzero_strong {α β : Type _}
   rw [dbind_mass, lintegral_countable' (fun a => (f a) Set.univ)]
   refine ENNReal.tsum_eq_zero.mpr fun a => ?_
   by_cases hμa : 0 < μ {a}
-  · rw [h a hμa]; simp
-  · have : μ {a} = 0 := le_antisymm (not_lt.mp hμa) bot_le
-    rw [this, mul_zero]
+  · simp [h a hμa]
+  · simp [le_antisymm (not_lt.mp hμa) bot_le]
 
 /-- Rocq `dmap_dzero_inv`: if a pushforward is the zero measure, the source is
 zero. -/
@@ -1165,9 +1029,9 @@ theorem dmap_dzero_inv {α β : Type _}
     [Countable α]
     (f : α → β) {μ : Measure α} (h : μ.map f = 0) : μ = 0 := by
   refine SeriesC_zero_dzero ?_
-  have h1 : (μ.map f) Set.univ = 0 := by rw [h]; simp
+  have : (μ.map f) Set.univ = 0 := by simp [h]
   rwa [Measure.map_apply_of_aemeasurable Measurable.of_discrete.aemeasurable
-        MeasurableSet.univ, Set.preimage_univ] at h1
+        MeasurableSet.univ, Set.preimage_univ] at this
 
 /-- Rocq `dbind_eq`: congruence for `dbind` under pointwise equality on the
 support and total agreement of the base measures. -/
@@ -1181,14 +1045,11 @@ theorem dbind_eq {α β : Type _}
     μ₁.bind f = μ₂.bind g := by
   subst hμ
   refine Measure.ext_of_singleton fun b => ?_
-  rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
-      lintegral_countable' (fun a => (f a) {b}),
-      lintegral_countable' (fun a => (g a) {b})]
+  simp_rw [Measure.bind_apply (MeasurableSet.singleton _)
+    Measurable.of_discrete.aemeasurable, lintegral_countable' _]
   refine tsum_congr fun a => ?_
   by_cases hμa : 0 < μ₁ {a}
   · rw [hfg a hμa]
-  · have : μ₁ {a} = 0 := le_antisymm (not_lt.mp hμa) bot_le
-    simp [this]
+  · simp [le_antisymm (not_lt.mp hμa) bot_le]
 
 end
