@@ -45,18 +45,17 @@ theorem mono_rel {ε : ENNReal} {S S' : Set (α × β)} {μₗ : Measure α} {μ
   ARCoupling.mono_rel HS H
 
 /-- Enlarging the error slack weakens the coupling. -/
-theorem mono_ε {ε ε' : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
+theorem mono_grading {ε ε' : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
     (Hε : ε ≤ ε') (H : AddCoupl ε S μₗ μᵣ) : AddCoupl ε' S μₗ μᵣ :=
   ARCoupling.mono_F (fun x => by gcongr) H
 
 /-- The zero measure is trivially coupled on the left. -/
-theorem zero_left {ε : ENNReal} (S : Set (α × β)) (μᵣ : Measure β) :
-    AddCoupl ε S (0 : Measure α) μᵣ :=
+theorem zero_left {ε : ENNReal} (S : Set (α × β)) (μᵣ : Measure β) : AddCoupl ε S 0 μᵣ :=
   ARCoupling.zero_left S μᵣ
 
 /-- Coupling against the zero measure on the right requires `μₗ .univ ≤ ε`. -/
-theorem zero_right {ε : ENNReal} (S : Set (α × β)) {μₗ : Measure α}
-    (Hε : μₗ .univ ≤ ε) : AddCoupl ε S μₗ (0 : Measure β) :=
+theorem zero_right {ε : ENNReal} (S : Set (α × β)) {μₗ : Measure α} (Hε : μₗ .univ ≤ ε) :
+    AddCoupl ε S μₗ 0 :=
   ARCoupling.zero_right S (by simpa using Hε)
 
 /-- Monad bind for `ARcoupl`: the error slacks add.
@@ -64,19 +63,18 @@ theorem zero_right {ε : ENNReal} (S : Set (α × β)) {μₗ : Measure α}
 Given `ARcoupl ε` between `μₗ` and `μᵣ`, and `ARcoupl ε'` between `f a` and `g b` whenever
 `S (a, b)`, we get `ARcoupl (ε + ε')` between the bound measures `μₗ.bind f` and `μᵣ.bind g`,
 provided `μₗ` and each `f a` are sub-probability measures. -/
-theorem bind {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β')}
-    {μₗ : Measure α} {μᵣ : Measure β} {f : α → Measure α'} {g : β → Measure β'}
+theorem bind {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β')}{μₗ : Measure α} {μᵣ : Measure β}
+    {f : α → Measure α'} {g : β → Measure β'}
     (Hfm : Measurable f) (Hgm : Measurable g)
     (Hμₗ : μₗ .univ ≤ 1) (Hfsprob : ∀ a, (f a) .univ ≤ 1)
     (Hcpl : AddCoupl ε S μₗ μᵣ)
     (Hbind : ∀ {a b}, S (a, b) → AddCoupl ε' T (f a) (g b)) :
     AddCoupl (ε + ε') T (μₗ.bind f) (μᵣ.bind g) := by
   rintro ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
-  /- Subprobability of `f a` gives `∫⁻ f' ∂(f a) ≤ 1`. Nothing similar is assumed on `g`, so
-     we truncate the right-hand test function with `⊓ 1` to keep it in `[0,1]`. -/
-  have HFle a : ∫⁻ y, f' y ∂(f a) ≤ 1 :=
-    (lintegral_le_meas (s := .univ) Hf'b (fun _ => (·.elim trivial))).trans (Hfsprob a)
-  /- Build `Fh a := ∫⁻ f' ∂(f a) - ε'` and `Gh b := (∫⁻ g' ∂(g b)) ⊓ 1`. -/
+  have HFle a :=
+    calc ∫⁻ y, f' y ∂f a
+      _ ≤ (f a) .univ := lintegral_le_meas Hf'b (by simp)
+      _ ≤ 1 := Hfsprob _
   let Fh : CouplingFunction α := .mk (fun a => ∫⁻ y, f' y ∂(f a) - ε') ⟨?Fm, fun a => ?Fb⟩
   case Fm => exact (measurable_lintegral Hf'm |>.comp Hfm).sub measurable_const
   case Fb => exact (tsub_le_self).trans (HFle a)
