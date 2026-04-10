@@ -478,4 +478,23 @@ theorem head_step_mass (e : Exp) (σ : State) :
     intro ⟨_, hρ⟩
     exact Cfg.uniform_isProbabilityMeasure (Cfg.uniform_singleton_pos_inv hρ).1
 
+/-- `headStep` is a sub-probability measure: total mass is at most 1.
+Case split on whether any singleton has positive mass: if so, `headStep ρ`
+is a probability measure (by `head_step_mass`); if not, it is the zero
+measure (since `Cfg` is countable, the total mass is a tsum of singletons). -/
+theorem headStep_univ_le_one (ρ : Cfg) : (headStep ρ) Set.univ ≤ 1 := by
+  by_cases hred : ∃ ρ' : Cfg, 0 < (headStep ρ) {ρ'}
+  · obtain ⟨e, σ⟩ := ρ
+    have := head_step_mass e σ hred
+    exact (measure_univ (μ := headStep ⟨e, σ⟩)).le
+  · have hzero : ∀ ρ', (headStep ρ) {ρ'} = 0 := fun ρ' =>
+      le_antisymm (by simpa using (not_exists.mp hred ρ')) bot_le
+    have hunivzero : (headStep ρ) Set.univ = 0 := by
+      rw [show (Set.univ : Set Cfg) = ⋃ c : Cfg, ({c} : Set Cfg) from by ext; simp]
+      rw [measure_iUnion
+          (fun i j hij => by simp only [Set.disjoint_singleton]; exact hij)
+          (fun _ => .of_discrete)]
+      simp [hzero]
+    rw [hunivzero]; exact zero_le_one
+
 end ProbLang

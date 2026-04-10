@@ -45,6 +45,14 @@ theorem val_stuck (h : 0 < primStep ⟨e, σ⟩ {ρ}) : ¬e.isValue := by
   rw [← Exp.decomp_fill hd.symm]
   exact Ectx.fill_noVal (val_head_stuck (map_singleton_pos h).choose_spec.2)
 
+/-- `primStep` is a sub-probability measure: total mass is at most 1.
+Follows from `headStep_univ_le_one` via `Measure.map` preserving total mass. -/
+theorem primStep_univ_le_one (ρ : Cfg) : (primStep ρ) Set.univ ≤ 1 := by
+  obtain ⟨e, σ⟩ := ρ
+  simp only [primStep]
+  rw [Measure.map_apply .of_discrete MeasurableSet.univ]
+  simpa using headStep_univ_le_one ⟨e.decomp.2, σ⟩
+
 /-! ## Bridge: headStep ↔ primStep -/
 
 theorem primStep_eq_headStep (hred : ∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) :

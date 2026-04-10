@@ -1,6 +1,7 @@
 import Metrology.ProbLang.Measure
 import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.DetStep
+import Metrology.Couplings.AdditiveCouplings
 
 noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure ProbLang
@@ -101,6 +102,366 @@ theorem execN_fill_item_eq (Ki : EctxItem) (n : Nat) {ρ ρ'' : Cfg} :
 
 
 def limExec (ρ : Cfg) : Measure Cfg := ⨆ (i : ℕ), execN i ρ
+
+/-! ## `execN` / `limExec` metatheory — ported from Rocq `theories/prob/markov.v`.
+
+We do not port the `markov` structure itself. Rocq's `step_or_final`, `pexec n`
+and `exec n` all collapse to our `execN` because `mstate_ret = Cfg`. See
+`notes/plan-markov.md` for the full port plan. -/
+
+/-- `∑'` and `⨆` commute for monotone ℕ-indexed ENNReal sequences. -/
+theorem ENNReal.tsum_iSup_of_monotone {f : ℕ → Cfg → ENNReal} (hf : ∀ a, Monotone (f · a)) :
+    ∑' a, ⨆ n, f n a = ⨆ n, ∑' a, f n a := by
+  simp_rw [← MeasureTheory.lintegral_count]
+  exact MeasureTheory.lintegral_iSup (fun _ => Measurable.of_discrete) (fun _ _ hmn a => hf a hmn)
+
+/-- Apply an `iSup` of measures at a singleton of a discrete space (specialized
+to `Cfg`). Mathlib does not provide a `Measure.iSup_apply` for general sets;
+this is the specialized form we need. -/
+theorem iSup_measure_apply {f : ℕ → Measure Cfg} {c : Cfg} :
+    (⨆ i, f i) {c} = ⨆ i, f i {c} := by
+  apply le_antisymm
+  · let w : Cfg → ENNReal := fun a => ⨆ i, f i {a}
+    let μ : Measure Cfg := Measure.sum (fun (a : Cfg) => w a • Measure.dirac a)
+    have hval : μ {c} = w c := by
+      simp only [μ, Measure.sum_apply _ MeasurableSet.of_discrete,
+        Measure.smul_apply, smul_eq_mul, Measure.dirac_apply' _ MeasurableSet.of_discrete,
+        Set.mem_singleton_iff, Set.indicator_apply, Pi.one_apply]
+      simp only [mul_ite, mul_one, mul_zero]
+      rw [tsum_eq_single c (by intro b hb; simp [hb])]
+      simp
+    have hub : ∀ i, f i ≤ μ := by
+      intro i
+      rw [Measure.le_iff]
+      intro s hs
+      rw [Measure.sum_apply _ hs]
+      simp only [Measure.smul_apply, smul_eq_mul, Measure.dirac_apply' _ hs,
+        Set.indicator_apply, Pi.one_apply, mul_ite, mul_one, mul_zero]
+      rw [← Measure.sum_smul_dirac (f i)]
+      rw [Measure.sum_apply _ hs]
+      simp only [Measure.smul_apply, smul_eq_mul, Measure.dirac_apply' _ hs,
+        Set.indicator_apply, Pi.one_apply, mul_ite, mul_one, mul_zero]
+      apply ENNReal.tsum_le_tsum
+      intro a
+      split
+      · exact le_iSup (fun i => f i {a}) i
+      · exact le_refl _
+    have := Measure.le_iff'.mp (iSup_le hub) ({c} : Set Cfg)
+    simp only [hval] at this
+    exact this
+  · exact iSup_le (fun i => by gcongr; exact le_iSup f i)
+
+/-- `Measure.bind` is monotone in its kernel argument (discrete case). -/
+private theorem Measure.bind_mono_right {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β]
+    (μ : Measure α) (f g : α → Measure β)
+    (h : ∀ a, f a ≤ g a) :
+    μ.bind f ≤ μ.bind g := by
+  intro S
+  rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable,
+      bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+  exact lintegral_mono (fun a => h a S)
+
+/-- Helper: `execN n ≤ execN (n+1)`. -/
+private theorem execN_succ_le (n : ℕ) (ρ : Cfg) : execN n ρ ≤ execN (n + 1) ρ := by
+  induction n generalizing ρ with
+  | zero => exact bot_le
+  | succ k ih =>
+    simp only [execN]
+    split
+    · exact le_refl _
+    · exact Measure.bind_mono_right _ _ _ (fun a => ih a)
+
+/-! ### Primitive unfoldings -/
+
+-- Rocq: (boundary; no direct analogue — `stepN_O` / `exec 0` cases)
+@[simp] theorem execN_zero (ρ : Cfg) : execN 0 ρ = 0 := rfl
+
+-- Rocq: Lemma exec_is_final — applied to the successor case
+@[simp] theorem execN_succ_isValue {ρ : Cfg} (hv : ρ.expr.isValue) (n : Nat) :
+    execN (n + 1) ρ = dirac ρ := by
+  simp [execN, hv]
+
+-- Rocq: Lemma exec_Sn_not_final
+theorem execN_succ_not_isValue {ρ : Cfg} (hv : ¬ ρ.expr.isValue) (n : Nat) :
+    execN (n + 1) ρ = (primStep ρ).bind (execN n) := by
+  simp [execN, hv]
+
+/-- "Step-or-final": the one-step transition that absorbs at values.
+Corresponds to Rocq `step_or_final`. Note that our `execN` does **not**
+iterate this directly — `execN 0 = 0` (no fuel), while iterating
+`stepOrFinal` starting from `dirac ρ` would give `dirac ρ` at the zero-step
+mark. The two agree modulo a shift: `execN (n+1) ρ` is the subdistribution
+after running `stepOrFinal` up to `n` times, provided we only count those
+that have reached a value. -/
+def stepOrFinal (ρ : Cfg) : Measure Cfg :=
+  if ρ.expr.isValue then dirac ρ else primStep ρ
+
+theorem stepOrFinal_isValue {ρ : Cfg} (hv : ρ.expr.isValue) :
+    stepOrFinal ρ = dirac ρ := by
+  simp [stepOrFinal, hv]
+
+theorem stepOrFinal_not_isValue {ρ : Cfg} (hv : ¬ ρ.expr.isValue) :
+    stepOrFinal ρ = primStep ρ := by
+  simp [stepOrFinal, hv]
+
+/-! ### Monotonicity (ported from `SampCert/SLang.lean`) -/
+
+-- Rocq: exec_mono / exec_mono'
+theorem execN_mono : ∀ {n m : ℕ} (_ : n ≤ m) (ρ : Cfg), execN n ρ ≤ execN m ρ := by
+  intro n m h ρ
+  induction h with
+  | refl => exact le_refl _
+  | step h ih => exact le_trans ih (execN_succ_le _ ρ)
+
+-- Corollary: pointwise monotonicity at singletons
+theorem execN_mono_singleton {n m : ℕ} (h : n ≤ m) (ρ : Cfg) (c : Cfg) :
+    execN n ρ {c} ≤ execN m ρ {c} :=
+  execN_mono h ρ {c}
+
+/-! ### Sub-probability -/
+
+/-- `execN` is a sub-probability measure: total mass is at most 1.
+Follows from `primStep_univ_le_one` by induction on the fuel. -/
+theorem execN_univ_le_one (n : Nat) (ρ : Cfg) : (execN n ρ) Set.univ ≤ 1 := by
+  induction n generalizing ρ with
+  | zero => simp [execN]
+  | succ k ih =>
+    unfold execN
+    by_cases hv : ρ.expr.isValue
+    · simp [hv]
+    · simp only [hv, ↓reduceIte]
+      rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+      calc ∫⁻ a, (execN k a) Set.univ ∂(primStep ρ)
+          ≤ ∫⁻ _, 1 ∂(primStep ρ) := lintegral_mono fun a => ih a
+        _ = (primStep ρ) Set.univ := by simp
+        _ ≤ 1 := primStep_univ_le_one ρ
+
+/-! ### Algebraic laws
+
+We do **not** port Rocq's `exec_plus` / `stepN_plus` directly: our `execN`
+collapses Rocq's `pexec` (whose `iterM 0 = dret`) and `exec` (whose
+`exec 0 non-final = dzero`) into a single function with `execN 0 = 0`.
+Because of the 0-fuel boundary, the clean Rocq identity
+`exec (n + m) = pexec n ≫= exec m` has no clean analogue in our port.
+Instead, we work with `stepOrFinal` iterates when we need factoring, and
+with `execN` directly otherwise. -/
+
+/-! ### `limExec` basics (ported from `SampCert/SLang.lean`) -/
+
+-- Rocq: lim_exec_final (value case)
+theorem limExec_of_isVal {e : Exp} {σ : State} (Hv : IsVal e) :
+    limExec ⟨e, σ⟩ = dirac ⟨e, σ⟩ := by
+  unfold limExec
+  have hv : e.isValue := ⟨Hv⟩
+  apply le_antisymm
+  · apply iSup_le; intro n; cases n with
+    | zero => exact bot_le
+    | succ n => simp [execN, hv]
+  · exact le_iSup_of_le 1 (by simp [execN, hv])
+
+-- Rocq: lim_exec_not_final
+theorem limExec_not_final {e : Exp} {σ : State} (Hnv : ¬ e.isValue) :
+    limExec ⟨e, σ⟩ = (primStep ⟨e, σ⟩).bind limExec := by
+  unfold limExec
+  have hmono : Monotone (fun n => execN n ⟨e, σ⟩) := fun _ _ h => execN_mono h _
+  rw [← hmono.iSup_nat_add 1]
+  simp_rw [show ∀ n, execN (n + 1) ⟨e, σ⟩ = (primStep ⟨e, σ⟩).bind (execN n)
+    from fun n => by simp [execN, Hnv]]
+  apply Measure.ext_of_singleton; intro c
+  simp_rw [iSup_measure_apply]
+  rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+  simp_rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+  rw [← lintegral_iSup (fun n => Measurable.of_discrete)
+      (fun n m hnm => fun a => execN_mono hnm a {c})]
+  congr 1; ext a; exact iSup_measure_apply.symm
+
+-- Rocq: lim_exec_step
+theorem limExec_step (ρ : Cfg) :
+    limExec ρ = (if ρ.expr.isValue then dirac ρ else primStep ρ).bind limExec := by
+  obtain ⟨e, σ⟩ := ρ
+  by_cases hv : e.isValue
+  · simp only [hv, ↑reduceIte]
+    rw [Measure.dirac_bind Measurable.of_discrete]
+  · simp only [hv, ↑reduceIte]
+    exact limExec_not_final hv
+
+/-- `limExec_step` written in terms of `stepOrFinal`. -/
+theorem limExec_step' (ρ : Cfg) : limExec ρ = (stepOrFinal ρ).bind limExec := by
+  rw [limExec_step]; rfl
+
+/-! ### `pexecN` — iterated `stepOrFinal`
+
+Corresponds directly to Rocq `pexec n a = iterM n step_or_final a`. Unlike
+`execN`, this is the iterate of `stepOrFinal` starting from `dirac ρ`, so
+`pexecN 0 ρ = dirac ρ` (identity), and `pexecN (n+1) ρ` takes one more
+`stepOrFinal`. This is the Lean analogue of Rocq `pexec`; our `execN` is
+the Lean analogue of Rocq `exec` (shifted by 1, and keeping mstate_ret = Cfg).
+
+The two functions are not the same up to indexing — `execN` filters out
+non-values at the final layer, while `pexecN` does not. They relate via
+`execN (n+1) ρ = (pexecN n ρ).bind (fun ρ' => if isValue ρ' then dirac ρ' else 0)`. -/
+def pexecN (n : Nat) (ρ : Cfg) : Measure Cfg :=
+  match n with
+  | 0 => dirac ρ
+  | n + 1 => (stepOrFinal ρ).bind (pexecN n)
+
+@[simp] theorem pexecN_zero (ρ : Cfg) : pexecN 0 ρ = dirac ρ := rfl
+
+theorem pexecN_succ (n : Nat) (ρ : Cfg) :
+    pexecN (n + 1) ρ = (stepOrFinal ρ).bind (pexecN n) := rfl
+
+-- Rocq: pexec_1 / stepN_1
+theorem pexecN_one (ρ : Cfg) : pexecN 1 ρ = stepOrFinal ρ := by
+  show (stepOrFinal ρ).bind (pexecN 0) = stepOrFinal ρ
+  show (stepOrFinal ρ).bind dirac = stepOrFinal ρ
+  exact Measure.bind_dirac
+
+-- Rocq: pexec_plus / stepN_plus
+theorem pexecN_plus (n m : Nat) (ρ : Cfg) :
+    pexecN (n + m) ρ = (pexecN n ρ).bind (pexecN m) := by
+  induction n generalizing ρ with
+  | zero =>
+    rw [pexecN_zero, Nat.zero_add, Measure.dirac_bind Measurable.of_discrete]
+  | succ k ih =>
+    rw [show k + 1 + m = (k + m) + 1 from by ring, pexecN_succ, pexecN_succ]
+    rw [Measure.bind_bind
+        (Measurable.aemeasurable .of_discrete)
+        (Measurable.aemeasurable .of_discrete)]
+    congr 1
+    funext ρ'
+    exact ih ρ'
+
+-- Rocq: lim_exec_pexec
+-- `limExec` factors through any finite iterate of `stepOrFinal`.
+theorem limExec_pexecN (n : Nat) (ρ : Cfg) :
+    limExec ρ = (pexecN n ρ).bind limExec := by
+  induction n generalizing ρ with
+  | zero =>
+    rw [pexecN_zero, Measure.dirac_bind Measurable.of_discrete]
+  | succ k ih =>
+    rw [pexecN_succ]
+    conv_lhs => rw [limExec_step']
+    rw [Measure.bind_bind
+        (Measurable.aemeasurable .of_discrete)
+        (Measurable.aemeasurable .of_discrete)]
+    congr 1
+    funext ρ'
+    exact ih ρ'
+
+/-! ### `limExec` application and mass -/
+
+-- Apply `limExec` at a singleton — sup of finite unrollings
+theorem limExec_apply (ρ : Cfg) (c : Cfg) :
+    limExec ρ {c} = ⨆ n, (execN n ρ) {c} :=
+  iSup_measure_apply
+
+-- Rocq: lim_exec_Sup_seq
+theorem limExec_univ (ρ : Cfg) :
+    (limExec ρ) Set.univ = ⨆ n, (execN n ρ) Set.univ := by
+  have hdecomp : ∀ μ : Measure Cfg, μ Set.univ = ∑' c : Cfg, μ {c} := by
+    intro μ
+    rw [show (Set.univ : Set Cfg) = ⋃ c : Cfg, ({c} : Set Cfg) from by ext; simp]
+    rw [measure_iUnion
+        (fun i j hij => by simp only [Set.disjoint_singleton]; exact hij)
+        (fun _ => .of_discrete)]
+  rw [hdecomp (limExec ρ)]
+  simp_rw [hdecomp (execN _ ρ), limExec_apply]
+  exact ENNReal.tsum_iSup_of_monotone (fun c _ _ h => execN_mono_singleton h _ _)
+
+/-! ### Pointwise and mass bounds -/
+
+-- Rocq: lim_exec_leq
+theorem limExec_leq_pointwise {ρ : Cfg} {c : Cfg} {r : ENNReal}
+    (H : ∀ n, (execN n ρ) {c} ≤ r) : (limExec ρ) {c} ≤ r := by
+  rw [limExec_apply]; exact iSup_le H
+
+-- Rocq: lim_exec_leq_mass
+theorem limExec_leq_mass {ρ : Cfg} {r : ENNReal}
+    (H : ∀ n, (execN n ρ) Set.univ ≤ r) : (limExec ρ) Set.univ ≤ r := by
+  rw [limExec_univ]; exact iSup_le H
+
+-- Rocq: lim_exec_term
+-- If at some fuel level `n` the execN mass is 1 (total termination), limExec collapses to it.
+theorem limExec_term {ρ : Cfg} {n : Nat}
+    (Hv : (execN n ρ) Set.univ = 1) : limExec ρ = execN n ρ := by
+  -- For k ≥ n we have (execN n ρ) ≤ (execN k ρ) as measures; their univ masses both
+  -- sit between 1 (the n-level) and 1 (sub-probability bound), so they match. Hence
+  -- execN k ρ = execN n ρ for all k ≥ n. Thus ⨆ k, execN k ρ = execN n ρ.
+  -- We use `Measure.eq_of_le_of_measure_univ_eq` at each such k.
+  have hfin_n : IsFiniteMeasure (execN n ρ) :=
+    ⟨by rw [Hv]; exact ENNReal.one_lt_top⟩
+  have hk_eq : ∀ k, n ≤ k → execN k ρ = execN n ρ := by
+    intro k hk
+    have hk_univ : (execN k ρ) Set.univ = 1 := by
+      refine le_antisymm (execN_univ_le_one k ρ) ?_
+      calc (1 : ENNReal) = (execN n ρ) Set.univ := Hv.symm
+        _ ≤ (execN k ρ) Set.univ := (execN_mono hk ρ) _
+    exact (Measure.eq_of_le_of_measure_univ_eq (execN_mono hk ρ) (Hv.trans hk_univ.symm)).symm
+  refine Measure.ext_of_singleton fun c => ?_
+  rw [limExec_apply]
+  apply le_antisymm
+  · apply iSup_le; intro k
+    by_cases hkn : k ≤ n
+    · exact execN_mono_singleton hkn ρ c
+    · rw [hk_eq k (Nat.le_of_not_le hkn)]
+  · exact le_iSup_of_le n (le_refl _)
+
+/-! ### Deterministic trace -/
+
+-- Rocq: lim_exec_det_final (specialized: our return type is Cfg, so we phrase it at a value-Cfg)
+theorem limExec_det_final {ρ ρ' : Cfg} {n : Nat}
+    (_hv : ρ'.expr.isValue) (H : (execN n ρ) {ρ'} = 1) :
+    limExec ρ = dirac ρ' := by
+  -- execN n ρ has singleton mass 1 at ρ'. Sub-probability (total ≤ 1) then forces
+  -- the whole measure to concentrate at ρ'. Combine with limExec_term.
+  have htot : (execN n ρ) Set.univ = 1 := by
+    refine le_antisymm (execN_univ_le_one n ρ) ?_
+    calc (1 : ENNReal) = (execN n ρ) {ρ'} := H.symm
+      _ ≤ (execN n ρ) Set.univ := measure_mono (Set.subset_univ _)
+  have hother : ∀ c ≠ ρ', (execN n ρ) {c} = 0 := by
+    intro c hc
+    have h_disj : Disjoint ({ρ'} : Set Cfg) {c} :=
+      Set.disjoint_singleton.mpr (Ne.symm hc)
+    have hunion : (execN n ρ) ({ρ'} ∪ {c}) = (execN n ρ) {ρ'} + (execN n ρ) {c} :=
+      measure_union (μ := execN n ρ) h_disj (MeasurableSet.singleton c)
+    have hsub : (execN n ρ) ({ρ'} ∪ {c}) ≤ (execN n ρ) Set.univ :=
+      measure_mono (Set.subset_univ _)
+    rw [htot, hunion, H] at hsub
+    -- hsub : 1 + (execN n ρ) {c} ≤ 1
+    have h1 : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
+    have hzero : (execN n ρ) {c} ≤ 0 := by
+      have hle : 1 + (execN n ρ) {c} ≤ 1 + 0 := by simpa using hsub
+      exact (ENNReal.add_le_add_iff_left h1).mp hle
+    exact le_antisymm hzero bot_le
+  rw [limExec_term htot]
+  refine Measure.ext_of_singleton fun c => ?_
+  by_cases hcρ' : c = ρ'
+  · subst hcρ'; rw [H]; simp
+  · rw [hother c hcρ']
+    simp [Measure.dirac_apply' _ MeasurableSet.of_discrete, hcρ']
+
+/-! ### lintegral against limExec -/
+
+/-- `lintegral` commutes with monotone `⨆` of measures on `Cfg`. -/
+theorem lintegral_limExec (ρ : Cfg) (f : Cfg → ENNReal) :
+    ∫⁻ x, f x ∂(limExec ρ) = ⨆ n, ∫⁻ x, f x ∂(execN n ρ) := by
+  simp_rw [lintegral_countable' f, limExec_apply, ENNReal.mul_iSup]
+  refine ENNReal.tsum_iSup_of_monotone (fun c i j hij => ?_)
+  exact mul_le_mul' (le_refl _) (execN_mono_singleton hij _ _)
+
+/-! ### Additive coupling lift (Approxis glue) -/
+
+-- Rocq: lim_exec_ARcoupl, specialized to additive form.
+-- If every finite unrolling is AddCoupl-related to μ₂ at slack ε, so is limExec.
+theorem limExec_AddCoupl {β : Type*} [MeasurableSpace β] {ε : ENNReal}
+    {Φ : Set (Cfg × β)} {ρ : Cfg} {μ₂ : Measure β}
+    (H : ∀ n, AddCoupl ε Φ (execN n ρ) μ₂) :
+    AddCoupl ε Φ (limExec ρ) μ₂ := by
+  intro ⟨f, hf, hfb⟩ ⟨g, hg, hgb⟩ hfg
+  rw [lintegral_limExec ρ f]
+  refine iSup_le fun n => ?_
+  exact H n ⟨f, hf, hfb⟩ ⟨g, hg, hgb⟩ hfg
 
 end ProbLang
 end
