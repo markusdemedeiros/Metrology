@@ -2,6 +2,7 @@ import Metrology.ProbLang.ContextualRefinement
 import Metrology.ProbLang.CtxStep
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Erasable
+import Metrology.ProbLang.Erasure
 import Metrology.ProbLang.Exec
 import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.Interp.CtxInterp
