@@ -15,6 +15,15 @@ This is the core notion used in Clutch's `erasure.v` (lazy/eager sampling
 equivalence) and in the tape-coupling rules of `coupling_rules.v`. The
 language-parametric version is specialized here to ProbLang.
 
+**Caveat on strength.** Clutch's `erasable` is phrased over `distr val`
+(val-projected `exec`), so it collapses tape differences at final values.
+Our `Erasable` is phrased over `Measure Cfg` (unprojected), so it is
+strictly stronger: a `dret σ` distribution satisfies it, but a
+`tapePresample σ α`-style distribution does **not** (presampling genuinely
+changes the final tape content). The `tapePresample` theorems in
+`Erasure.lean` are therefore expressed as **couplings** (using `AddCoupl`
+with an expression-projection relation), not as erasability witnesses.
+
 We also port the companion notion of *rewritable*: a configuration
 distribution `μ` is rewritable at `ρ` when `limExec ρ = μ >>= limExec`.
 -/
@@ -55,7 +64,9 @@ theorem Cfg.measure_ext_singletons {μ ν : Measure Cfg}
 
 namespace Erasable
 
-/-- The dirac distribution at `σ` is erasable at `σ`. -/
+/-- The dirac distribution at `σ` is erasable at `σ`. The bind collapses
+to a single evaluation at `σ`, after which the projection is trivially
+equal. -/
 theorem dret (σ : State) : Erasable (Measure.dirac σ) σ := by
   intro e m
   rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) Measurable.of_discrete]

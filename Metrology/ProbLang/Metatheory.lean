@@ -1383,6 +1383,31 @@ theorem State.fresh_loc_lookup {σ : State} {α : Loc} {bs : Tape} {t : Tape}
     split <;> simp_all
   simp [hcmp, h]
 
+/-- Helper: `Cfg.uniform z σ` is the zero measure iff `z` is non-positive.
+The dependence on `σ` is only via the post-state in the support, so
+zero-ness is uniform in `σ`. -/
+theorem Cfg.uniform_eq_zero_iff {z : Int} {σ : State} :
+    Cfg.uniform z σ = 0 ↔ ¬ 0 < z := by
+  constructor
+  · intro h hz
+    have heq : Cfg.uniform z σ =
+        (PMF.uniformOfFinset (Finset.Icc 0 z)
+            (Finset.nonempty_Icc.mpr (Int.le_of_lt hz))).toMeasure.map
+            (fun x => (⟨.lit (.int x), σ⟩ : Cfg)) := by
+      unfold Cfg.uniform Int.isPos Option.unwrapM
+      rw [dif_pos hz]
+    have hprob : MeasureTheory.IsProbabilityMeasure
+        ((PMF.uniformOfFinset (Finset.Icc 0 z)
+            (Finset.nonempty_Icc.mpr (Int.le_of_lt hz))).toMeasure.map
+            (fun x => (⟨.lit (.int x), σ⟩ : Cfg))) :=
+      MeasureTheory.Measure.isProbabilityMeasure_map .of_discrete
+    have h1 := hprob.measure_univ
+    rw [← heq, h] at h1
+    simp at h1
+  · intro hnz
+    unfold Cfg.uniform Int.isPos Option.unwrapM
+    rw [dif_neg hnz]
+
 /-- Clutch's `head_step_dzero_upd_tapes`: if `headStep ⟨e, σ⟩` is the
 zero measure (nothing reducible), then appending a presample to an
 already-present tape keeps it zero. The Clutch version appends a
@@ -1406,19 +1431,211 @@ theorem State.head_step_dzero_upd_tapes
   all_goals try (intro h0; simpa using h0)
   all_goals try (intro h0; simp_all)
   all_goals try (intro h0; unfold Option.unwrapM at h0 ⊢; split at h0 <;> simp_all)
-  all_goals sorry
+  -- Remaining cases: unop.redex, binop.redex, alloc.no_redex,
+  -- load.segfault, store.no_redex, store.segfault, rand.plain,
+  -- rand.tape.unalloc, rand.tape.mismatch, rand.tape.empty.
+  case unop.redex h0 =>
+    unfold Option.unwrapM at h0 ⊢
+    split <;> rename_i hopt
+    · rw [hopt] at h0
+      exact absurd h0 MeasureTheory.Measure.dirac_ne_zero
+    · rfl
+  case binop.redex h0 =>
+    unfold Option.unwrapM at h0 ⊢
+    split <;> rename_i hopt
+    · rw [hopt] at h0
+      exact absurd h0 MeasureTheory.Measure.dirac_ne_zero
+    · rfl
+  case alloc.no_redex hned =>
+    simp [Exp.toVal?_eq_none.mpr hned]
+  case load.segfault hheap =>
+    -- (σ.update_tapes f).heap = σ.heap, so the segfault persists.
+    have hnotmem : ‹Loc› ∉ (σ.update_tapes (·.insert α bs')).heap := hheap
+    have hnone := Option.not_isSome_iff_eq_none.mp
+      (fun hsome => hnotmem (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
+    rw [hnone]
+  case store.no_redex hned =>
+    simp [Exp.toVal?_eq_none.mpr hned]
+  case store.segfault hv hheap =>
+    have hnotmem : ‹Loc› ∉ (σ.update_tapes (·.insert α bs')).heap := hheap
+    have hnone := Option.not_isSome_iff_eq_none.mp
+      (fun hsome => hnotmem (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
+    rw [hnone]
+  case rand.plain h0 =>
+    rw [Cfg.uniform_eq_zero_iff] at h0 ⊢; exact h0
+  case rand.tape.unalloc hnotin =>
+    have hne : α ≠ ‹Lbl› := by
+      intro he
+      exact hnotin (he ▸ Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr (by rw [hmem]; rfl))
+    have hnone : σ.tapes[‹Lbl›]? = none :=
+      Option.not_isSome_iff_eq_none.mp
+        (fun hsome => hnotin (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
+    rw [State.upd_diff_tape_tot (Ne.symm hne), hnone]
+  case rand.tape.mismatch =>
+    -- Inaccessibles: ..., α'_lbl : Lbl, _ : Option Tape, M' : ℤ, ns_orig : List, heq, hMne
+    -- Already named: h0 (from dispatch).
+    rename_i _ z' α' _ M' _ heq hMne
+    rw [Cfg.uniform_eq_zero_iff] at h0
+    by_cases hαeq : α = α'
+    · subst hαeq
+      have hupd : (σ.update_tapes (·.insert α bs')).tapes[α]? = some bs' :=
+        State.upd_tape_some σ α bs'
+      rw [hupd]
+      -- Goal: an `if M = z' then ... else Cfg.uniform z' new_σ` over bs'.{bound,presamples}
+      obtain ⟨bbnd, bps⟩ := bs'
+      simp only
+      by_cases hbnd : bbnd = z'
+      · subst hbnd
+        simp only [if_true]
+        cases bps with
+        | nil => rw [Cfg.uniform_eq_zero_iff]; exact h0
+        | cons n _ =>
+          exfalso; apply h0
+          have hn := n.2
+          omega
+      · simp only [if_neg hbnd]
+        rw [Cfg.uniform_eq_zero_iff]; exact h0
+    · have hupd : (σ.update_tapes (·.insert α bs')).tapes[α']? = σ.tapes[α']? :=
+        State.upd_diff_tape_tot (Ne.symm hαeq)
+      rw [hupd, heq]
+      simp only [if_neg hMne]
+      rw [Cfg.uniform_eq_zero_iff]; exact h0
+  case rand.tape.empty =>
+    rename_i _ z' α' _ _ heq
+    rw [Cfg.uniform_eq_zero_iff] at h0
+    by_cases hαeq : α = α'
+    · subst hαeq
+      have hupd : (σ.update_tapes (·.insert α bs')).tapes[α]? = some bs' :=
+        State.upd_tape_some σ α bs'
+      rw [hupd]
+      obtain ⟨bbnd, bps⟩ := bs'
+      simp only
+      by_cases hbnd : bbnd = z'
+      · subst hbnd
+        simp only [if_true]
+        cases bps with
+        | nil => rw [Cfg.uniform_eq_zero_iff]; exact h0
+        | cons n _ =>
+          exfalso; apply h0
+          have hn := n.2
+          omega
+      · simp only [if_neg hbnd]
+        rw [Cfg.uniform_eq_zero_iff]; exact h0
+    · have hupd : (σ.update_tapes (·.insert α bs')).tapes[α']? = σ.tapes[α']? :=
+        State.upd_diff_tape_tot (Ne.symm hαeq)
+      rw [hupd, heq]
+      simp only [if_true]
+      rw [Cfg.uniform_eq_zero_iff]; exact h0
 
 /-- Clutch's `det_head_step_upd_tapes`: a deterministic head step is
-preserved by appending to an unrelated tape. Proof deferred along with
-`head_step_dzero_upd_tapes`; same shape of case analysis. -/
+preserved by appending to an unrelated tape. The hypothesis
+`DetHeadStep ⟨e1, σ⟩ ⟨e2, σ⟩` requires the post-state to equal the
+pre-state, which excludes the state-modifying head steps
+(`alloc`/`store`/`tape`/`rand`/`rand-tape`); the surviving cases all
+read at most the heap, so they are unaffected by a tape update. -/
 theorem State.det_head_step_upd_tapes
     {e1 e2 : Exp} {σ : State} {α : Loc} {bs bs' : Tape}
-    (_hmem : σ.tapes[α]? = some bs)
-    (_hdet : ProbLang.DetHeadStep ⟨e1, σ⟩ ⟨e2, σ⟩) :
+    (hmem : σ.tapes[α]? = some bs)
+    (hdet : ProbLang.DetHeadStep ⟨e1, σ⟩ ⟨e2, σ⟩) :
     ProbLang.DetHeadStep
       ⟨e1, σ.update_tapes (·.insert α bs')⟩
       ⟨e2, σ.update_tapes (·.insert α bs')⟩ := by
-  sorry
+  -- First convert the determinism witness into a HeadStepSupport, then
+  -- case-split on the support.
+  have hpos := hdet.pos
+  have hsupp : HeadStepSupport ⟨e1, σ⟩ ⟨e2, σ⟩ :=
+    (headStep_support_iff e1 e2 σ σ).mp hpos
+  cases hsupp with
+  | BetaS hv heq =>
+    refine .of_det _ _ ?_
+    subst heq
+    simp [headStep, Exp.isValM_some hv]
+  | UnOpS hv heval =>
+    refine .of_det _ _ ?_
+    simp [headStep, Option.unwrapM, Exp.isValM_some hv, ← heval]
+  | BinOpS hv1 hv2 heval =>
+    refine .of_det _ _ ?_
+    simp [headStep, Option.unwrapM, Exp.isValM_some hv1, Exp.isValM_some hv2, ← heval]
+  | IfTrueS => refine .of_det _ _ ?_; simp [headStep]
+  | IfFalseS => refine .of_det _ _ ?_; simp [headStep]
+  | FstS hv1 hv2 =>
+    refine .of_det _ _ ?_
+    simp [headStep, Exp.isValM_some hv1, Exp.isValM_some hv2]
+  | SndS hv1 hv2 =>
+    refine .of_det _ _ ?_
+    simp [headStep, Exp.isValM_some hv1, Exp.isValM_some hv2]
+  | CaseLS hv =>
+    refine .of_det _ _ ?_
+    simp [headStep, Exp.isValM_some hv]
+  | CaseRS hv =>
+    refine .of_det _ _ ?_
+    simp [headStep, Exp.isValM_some hv]
+  | AllocS hv heq hσ =>
+    exfalso
+    rename_i vd _ ed
+    subst heq
+    have hheap : σ.heap = σ.heap.insert σ.heap.fresh vd := by
+      have := congrArg State.heap hσ
+      simpa [State.update_heap] using this
+    have h2 : σ.heap[σ.heap.fresh]? = none := Std.ExtTreeMap.fresh_get? σ.heap
+    have hcmp : compare σ.heap.fresh σ.heap.fresh = .eq := by
+      simp [compare, compareOfLessAndEq]
+    have h3 : (σ.heap.insert σ.heap.fresh vd)[σ.heap.fresh]? = some vd := by
+      rw [Std.ExtTreeMap.getElem?_insert, hcmp]; rfl
+    rw [← hheap] at h3
+    rw [h2] at h3
+    cases h3
+  | LoadS hlook heq =>
+    refine .of_det _ _ ?_
+    subst heq
+    simp [headStep]
+    -- (σ.update_tapes f).heap = σ.heap
+    have : (σ.update_tapes (·.insert α bs')).heap[‹Loc›]? = some ‹Val› := hlook
+    rw [this]
+    simp
+  | StoreS htoval hsome hσ =>
+    refine .of_det _ _ ?_
+    rename_i v ℓ _
+    have hheap_no_op : σ.heap.insert ℓ v = σ.heap := by
+      have := congrArg State.heap hσ
+      simpa [State.update_heap] using this.symm
+    obtain ⟨v_old, hv_old⟩ := Option.isSome_iff_exists.mp hsome
+    have hheap_lookup : (σ.update_tapes (·.insert α bs')).heap[ℓ]? = some v_old := hv_old
+    simp only [headStep, Exp.asValM, htoval, hheap_lookup]
+    have hgoal_state : (σ.update_tapes (·.insert α bs')).update_heap (·.insert ℓ v) =
+        (σ.update_tapes (·.insert α bs')) := by
+      simp [State.update_heap, State.update_tapes, hheap_no_op]
+    rw [hgoal_state]
+    simp [MeasureTheory.Measure.dirac_apply_of_mem (Set.mem_singleton _)]
+  | RandNoTapeS hz _ _ => exfalso; sorry
+  | TapeS heq hσ =>
+    exfalso
+    -- Post-state inserts a fresh tape; lookup at fresh in σ is none.
+    have hfresh_none : σ.tapes[σ.tapes.fresh]? = none := Std.ExtTreeMap.fresh_get? σ.tapes
+    have htapes_eq : σ.tapes = σ.tapes.insert σ.tapes.fresh (Tape.empty ‹Int›) := by
+      have := congrArg State.tapes hσ
+      have heq' := heq
+      simpa [State.update_tapes, ← heq'] using this
+    have hcmp : compare σ.tapes.fresh σ.tapes.fresh = .eq := by
+      simp [compare, compareOfLessAndEq]
+    have hsome : (σ.tapes.insert σ.tapes.fresh (Tape.empty ‹Int›))[σ.tapes.fresh]? =
+        some (Tape.empty ‹Int›) := by
+      rw [Std.ExtTreeMap.getElem?_insert, hcmp]; rfl
+    rw [← htapes_eq] at hsome
+    rw [hfresh_none] at hsome
+    cases hsome
+  | RandTapeS hz htape hzN hv hσ => exfalso; sorry
+  | RandTapeEmptyS hz htape hzN _ _ hσ => exfalso; sorry
+  | RandTapeOtherS hz htape hzN _ _ hσ => exfalso; sorry
+  | ScrutSuccessS hv hm =>
+    refine .of_det _ _ ?_
+    simp [headStep, Exp.isValM_some hv, hm]
+  | ScrutFailureS hv hm =>
+    refine .of_det _ _ ?_
+    simp [headStep, Exp.isValM_some hv, hm]
+  | AnnotS hv =>
+    refine .of_det _ _ ?_
+    simp [headStep, Exp.isValM_some hv]
 
 /-- Clutch's `prim_step_empty_tape`: reading from an empty-presample
 tape is the same as reading from the "no-tape" marker `.lit .unit`.

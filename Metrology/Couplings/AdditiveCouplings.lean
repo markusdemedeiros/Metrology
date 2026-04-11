@@ -108,6 +108,115 @@ theorem bind {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β')}{μ�
       _ = ∫⁻ b, ∫⁻ x, g' x ∂(g b) ∂μᵣ + (ε + ε') := by
             rw [add_assoc]
 
+/-- **Advanced-composition bind**: the continuation's slack is allowed to
+depend on the RHS sample, and the final slack is bounded by the expected
+value of the variable slack plus the outer slack.
+
+Compared to `bind`, the key difference is that the continuation hypothesis
+`Hbind` provides `AddCoupl (E₂ b) T (f a) (g b)` with `E₂ b` depending on
+the RHS sample, and we only need `∫⁻ b, E₂ b ∂μᵣ ≤ ε'` (the expected
+slack). This is weaker than requiring a pointwise bound. -/
+theorem bind_adv {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β')}
+    {μₗ : Measure α} {μᵣ : Measure β}
+    {f : α → Measure α'} {g : β → Measure β'} {E₂ : β → ENNReal}
+    (Hfm : Measurable f) (Hgm : Measurable g) (HE₂m : Measurable E₂)
+    (Hfsprob : ∀ a, (f a) .univ ≤ 1)
+    (HE₂sum : ∫⁻ b, E₂ b ∂μᵣ ≤ ε')
+    (Hcpl : AddCoupl ε S μₗ μᵣ)
+    (Hbind : ∀ {a b}, S (a, b) → AddCoupl (E₂ b) T (f a) (g b)) :
+    AddCoupl (ε + ε') T (μₗ.bind f) (μᵣ.bind g) := by
+  rintro ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
+  have HFle a :=
+    calc ∫⁻ y, f' y ∂f a
+      _ ≤ (f a) .univ := lintegral_le_meas Hf'b (by simp)
+      _ ≤ 1 := Hfsprob _
+  -- Core idea: define Fh a := ∫ f' ∂(f a), Gh b := (∫ g' ∂(g b)) + E₂ b,
+  -- capped at 1. Then `S a b → Fh a ≤ Gh b` because the inner coupling
+  -- gives `∫ f' ∂(f a) ≤ ∫ g' ∂(g b) + E₂ b`. We use `Hcpl` to get
+  -- `∫ Fh ∂μₗ ≤ ∫ Gh ∂μᵣ + ε`. The RHS expands to `∫ (∫ g') ∂μᵣ + ∫ E₂ ∂μᵣ + ε`,
+  -- which is bounded by the target `∫ (∫ g') ∂μᵣ + (ε + ε')` via `HE₂sum`.
+  let Fh : CouplingFunction α := .mk (fun a => ∫⁻ y, f' y ∂(f a)) ⟨?Fm, fun a => ?Fb⟩
+  case Fm => exact (measurable_lintegral Hf'm |>.comp Hfm)
+  case Fb => exact HFle a
+  let Gh : CouplingFunction β := .mk (fun b => (∫⁻ y, g' y ∂(g b) + E₂ b) ⊓ 1) ⟨?Gm, fun b => ?Gb⟩
+  case Gm =>
+    refine Measurable.inf ?_ measurable_const
+    exact ((measurable_lintegral Hg'm).comp Hgm).add HE₂m
+  case Gb => exact inf_le_right
+  have HFhGh {a b} (HS : S (a, b)) : Fh.1 a ≤ Gh.1 b := by
+    have Hinner : ∫⁻ y, f' y ∂(f a) ≤ ∫⁻ y, g' y ∂(g b) + E₂ b :=
+      Hbind HS ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
+    simp only [Fh, Gh, le_inf_iff]
+    exact ⟨Hinner, (HFle a).trans (by simp)⟩
+  -- Apply the outer coupling to Fh, Gh.
+  rw [lintegral_bind Hfm.aemeasurable Hf'm.aemeasurable,
+      lintegral_bind Hgm.aemeasurable Hg'm.aemeasurable]
+  calc ∫⁻ a, ∫⁻ x, f' x ∂(f a) ∂μₗ
+      _ = ∫⁻ a, Fh.1 a ∂μₗ := by rfl
+      _ ≤ ∫⁻ b, Gh.1 b ∂μᵣ + ε := Hcpl Fh Gh HFhGh
+      _ ≤ ∫⁻ b, (∫⁻ x, g' x ∂(g b) + E₂ b) ∂μᵣ + ε := by
+            gcongr with b
+            exact inf_le_left
+      _ = ∫⁻ b, ∫⁻ x, g' x ∂(g b) ∂μᵣ + ∫⁻ b, E₂ b ∂μᵣ + ε := by
+            rw [lintegral_add_right _ HE₂m]
+      _ ≤ ∫⁻ b, ∫⁻ x, g' x ∂(g b) ∂μᵣ + ε' + ε := by
+            gcongr
+      _ = ∫⁻ b, ∫⁻ x, g' x ∂(g b) ∂μᵣ + (ε + ε') := by
+            rw [add_assoc, add_comm ε' ε]
+
+/-- Advanced-composition bind with **LHS-indexed variable slack**: the
+continuation's slack `E₂` depends on the LHS sample `a`, and the final
+slack is bounded by `ε + ε'` where `∫⁻ a, E₂ a ∂μₗ ≤ ε'`.
+
+This is the LHS-symmetric companion of `bind_adv`. -/
+theorem bind_adv_lhs {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β')}
+    {μₗ : Measure α} {μᵣ : Measure β}
+    {f : α → Measure α'} {g : β → Measure β'} {E₂ : α → ENNReal}
+    (Hfm : Measurable f) (Hgm : Measurable g) (HE₂m : Measurable E₂)
+    (Hfsprob : ∀ a, (f a) .univ ≤ 1)
+    (HE₂sum : ∫⁻ a, E₂ a ∂μₗ ≤ ε')
+    (Hcpl : AddCoupl ε S μₗ μᵣ)
+    (Hbind : ∀ {a b}, S (a, b) → AddCoupl (E₂ a) T (f a) (g b)) :
+    AddCoupl (ε + ε') T (μₗ.bind f) (μᵣ.bind g) := by
+  rintro ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
+  have HFle a :=
+    calc ∫⁻ y, f' y ∂f a
+      _ ≤ (f a) .univ := lintegral_le_meas Hf'b (by simp)
+      _ ≤ 1 := Hfsprob _
+  -- Define Fh a := max(0, ∫ f' ∂f a - E₂ a) so that the inner coupling
+  -- `∫ f' ∂(f a) ≤ ∫ g' ∂(g b) + E₂ a` gives `Fh a ≤ ∫ g' ∂(g b)`.
+  -- For the outer `Hcpl` application, we take Gh b := ∫ g' ∂g b (capped at 1).
+  let Fh : CouplingFunction α := .mk (fun a => ∫⁻ y, f' y ∂(f a) - E₂ a)
+    ⟨?Fm, fun a => ?Fb⟩
+  case Fm => exact ((measurable_lintegral Hf'm |>.comp Hfm)).sub HE₂m
+  case Fb => exact (tsub_le_self).trans (HFle a)
+  let Gh : CouplingFunction β := .mk (fun b => (∫⁻ y, g' y ∂(g b)) ⊓ 1) ⟨?Gm, fun b => ?Gb⟩
+  case Gm => exact (measurable_lintegral Hg'm |>.comp Hgm).inf measurable_const
+  case Gb => exact inf_le_right
+  have HFhGh {a b} (HS : S (a, b)) : Fh.1 a ≤ Gh.1 b := by
+    have Hinner : ∫⁻ y, f' y ∂(f a) ≤ ∫⁻ y, g' y ∂(g b) + E₂ a :=
+      Hbind HS ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
+    simp only [Fh, Gh, le_inf_iff]
+    refine ⟨?_, ?_⟩
+    · exact tsub_le_iff_right.mpr Hinner
+    · exact (tsub_le_self).trans (HFle a)
+  rw [lintegral_bind Hfm.aemeasurable Hf'm.aemeasurable,
+      lintegral_bind Hgm.aemeasurable Hg'm.aemeasurable]
+  calc ∫⁻ a, ∫⁻ x, f' x ∂(f a) ∂μₗ
+      _ ≤ ∫⁻ a, Fh.1 a + E₂ a ∂μₗ := by
+            refine lintegral_mono (fun a => ?_); exact le_tsub_add
+      _ = ∫⁻ a, Fh.1 a ∂μₗ + ∫⁻ a, E₂ a ∂μₗ := by
+            rw [lintegral_add_right _ HE₂m]
+      _ ≤ ∫⁻ a, Fh.1 a ∂μₗ + ε' := by gcongr
+      _ ≤ (∫⁻ b, Gh.1 b ∂μᵣ + ε) + ε' := by
+            gcongr
+            exact Hcpl Fh Gh HFhGh
+      _ ≤ (∫⁻ b, ∫⁻ x, g' x ∂(g b) ∂μᵣ + ε) + ε' := by
+            gcongr with b
+            exact inf_le_left
+      _ = ∫⁻ b, ∫⁻ x, g' x ∂(g b) ∂μᵣ + (ε + ε') := by
+            rw [add_assoc]
+
 /-- Mass comparison: `ARcoupl ε` bounds the total mass of `μₗ` by that of `μᵣ` plus `ε`.
 Obtained by testing against the constant-`1` coupling function. -/
 theorem mass_leq {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
