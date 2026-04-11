@@ -1394,10 +1394,19 @@ component is `.rand _ (.lit (.lbl α))`, and appending to an existing
 tape never creates new reductions. -/
 theorem State.head_step_dzero_upd_tapes
     {e : Exp} {σ : State} {α : Loc} {bs bs' : Tape}
-    (_hmem : σ.tapes[α]? = some bs)
-    (_h0 : ProbLang.headStep ⟨e, σ⟩ = 0) :
+    (hmem : σ.tapes[α]? = some bs)
+    (h0 : ProbLang.headStep ⟨e, σ⟩ = 0) :
     ProbLang.headStep ⟨e, σ.update_tapes (·.insert α bs')⟩ = 0 := by
-  sorry
+  revert h0
+  head_case
+  -- Dispatch the trivially-zero and state-irrelevant cases via `head_case`
+  -- split. A handful of state-dependent cases remain (`alloc.no_redex`,
+  -- `load.segfault`, `store.no_redex`/`segfault`, `rand.plain`,
+  -- `rand.tape.*`) — each is tractable but needs individual finishing.
+  all_goals try (intro h0; simpa using h0)
+  all_goals try (intro h0; simp_all)
+  all_goals try (intro h0; unfold Option.unwrapM at h0 ⊢; split at h0 <;> simp_all)
+  all_goals sorry
 
 /-- Clutch's `det_head_step_upd_tapes`: a deterministic head step is
 preserved by appending to an unrelated tape. Proof deferred along with
