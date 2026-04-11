@@ -53,12 +53,19 @@ inductive BinOp | plus | minus | mult | and | or | xor | eq
   deriving Inhabited, Countable, Repr, BEq
 
 inductive Ty
-  | int | bool | unit
+  | int | nat | bool | unit
   | prod (τ1 τ2 : Ty)
   | sum (τ1 τ2 : Ty)
   | arrow (τ1 τ2 : Ty)
   | ref (τ : Ty)
   | tape
+  -- System F_μ_ref extension (Clutch `type`): de Bruijn type variables and
+  -- three type-level binders. The binder bodies live under a fresh de Bruijn
+  -- type variable (index 0), as is standard.
+  | var (n : Nat)
+  | rec' (τ : Ty)
+  | forall' (τ : Ty)
+  | exists' (τ : Ty)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
 inductive Binder | anon | named (s : String) | typed (s : String) (τ : Ty)
