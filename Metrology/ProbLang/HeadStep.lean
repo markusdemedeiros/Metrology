@@ -38,14 +38,16 @@ instance : MeasurableSpace State := ⊤
 instance : MeasurableSpace Val := ⊤
 instance : MeasurableSpace Cfg := ⊤
 
+/-- `Cfg.uniform z σ` is the measure putting uniform mass on configs
+`⟨.lit (.int n), σ⟩` for `n ∈ {0, 1, …, z−1}` (i.e. `Finset.Ico 0 z`),
+matching the semantics of `rand z` sampling from `{0, …, z−1}`. The
+state fiber is constant at `σ`. If `z ≤ 0`, the measure is `0`. -/
 def Cfg.uniform (z : Int) (σ : State) : Measure Cfg :=
   z.isPos.unwrapM fun ⟨z, Hz⟩ =>
-  PMF.uniformOfFinset (.Icc 0 z) (Finset.nonempty_Icc.mpr <| Int.le_of_lt Hz)
+  PMF.uniformOfFinset (.Ico 0 z) (Finset.nonempty_Ico.mpr Hz)
     |>.toMeasure.map (⟨.lit <| .int ·, σ⟩)
 
 -- TODO: What if we change Cfg to Option (Exp × State)?
--- NB. Rand is currently off-by-one from Eris. I'm going to see if sticking `by grind`
--- as a default term everywhere will solve all the positvity side conditions.
 -- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
 -- order, should be governed by the reduction context.
 def headStep : Cfg → Measure Cfg
@@ -287,7 +289,7 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
 | RandNoTapeS :
   0 < z →
   0 ≤ v →
-  v ≤ z →
+  v < z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ ⟨.lit (.int v), σ⟩
 | TapeS :
   ℓ = σ.tapes.fresh →
@@ -305,7 +307,7 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   σ.tapes[α]? = some ⟨N, []⟩ →
   z = N →
   0 ≤ v →
-  v ≤ z →
+  v < z →
   σ' = σ →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 | RandTapeOtherS :
@@ -313,7 +315,7 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   σ.tapes[α]? = some ⟨N, L⟩ →
   z ≠ N →
   0 ≤ v →
-  v ≤ z →
+  v < z →
   σ' = σ →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 | ScrutSuccessS :
@@ -358,7 +360,7 @@ theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp} {f : Val → Measure 
 theorem Cfg.uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
     (h : 0 < Cfg.uniform z σ {ρ}) :
     0 < z ∧ ρ.state = σ ∧
-    ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v ≤ z := by
+    ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v < z := by
   unfold Cfg.uniform Int.isPos Option.unwrapM at h
   by_cases Hz : 0 < z
   case neg => simp_all
@@ -368,7 +370,7 @@ theorem Cfg.uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
     simp_all
 
 theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State}
-    (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v ≤ z) :
+    (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) :
     0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩} := by
   unfold Cfg.uniform Int.isPos Option.unwrapM
   simp only [Hz, dite_true]
@@ -377,7 +379,7 @@ theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State}
   rw [ENNReal.div_pos_iff]
   refine ⟨?_, ?_⟩
   · rw [ne_eq, Nat.cast_eq_zero]
-    exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Icc, Hv0, Hvz, Set.mem_preimage]⟩
+    exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz, Set.mem_preimage]⟩
   · exact ENNReal.natCast_ne_top _
 
 /-- Decompose `0 < (dirac a) {b}` into Cfg component equalities, then substitute. -/

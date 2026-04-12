@@ -261,8 +261,9 @@ instance : ProbLangEmbeddable UInt8 where
   as_expr_isVal _ := .lit
 
 -- ProbLang expression: rand 255 ()
--- Cfg.uniform 255 σ samples uniformly from Finset.Icc 0 255 = {0,...,255}
-def probLangUniformByte : Exp := .rand (.lit (.int 255)) (.lit .unit)
+-- Cfg.uniform 256 σ samples uniformly from Finset.Ico 0 256 = {0,...,255}
+-- (matches UInt8's 256-outcome uniform distribution).
+def probLangUniformByte : Exp := .rand (.lit (.int 256)) (.lit .unit)
 
 theorem probLangUniformByte_isEmbedding :
     IsEmbedding probUniformByte probLangUniformByte := by
@@ -270,21 +271,21 @@ theorem probLangUniformByte_isEmbedding :
   have hnv : ¬ probLangUniformByte.isValue := by intro ⟨h⟩; cases h
   rw [limExec_not_final hnv]
   have hred : ∃ ρ, 0 < headStep ⟨probLangUniformByte, σ⟩ {ρ} := by
-    rw [show probLangUniformByte = Exp.rand (.lit (.int 255)) (.lit .unit) from rfl]
+    rw [show probLangUniformByte = Exp.rand (.lit (.int 256)) (.lit .unit) from rfl]
     simp only [headStep]
     exact ⟨_, Cfg.uniform_singleton_pos_of_mem (v := 0) (by norm_num) (by norm_num) (by norm_num)⟩
   rw [primStep_eq_headStep hred]
   show (headStep ⟨probLangUniformByte, σ⟩).bind limExec = _
-  have hhead : headStep ⟨probLangUniformByte, σ⟩ = Cfg.uniform 255 σ := by
+  have hhead : headStep ⟨probLangUniformByte, σ⟩ = Cfg.uniform 256 σ := by
     simp [probLangUniformByte, headStep]
   rw [hhead]
-  -- limExec ∘ₘ Cfg.uniform 255 σ = Cfg.uniform 255 σ
+  -- limExec ∘ₘ Cfg.uniform 256 σ = Cfg.uniform 256 σ
   -- because Cfg.uniform only produces value configs
-  have bind_dirac : limExec ∘ₘ Cfg.uniform 255 σ = Cfg.uniform 255 σ := by
-    -- Cfg.uniform 255 σ = PMF.toMeasure(...).map (⟨.lit (.int ·), σ⟩)
+  have bind_dirac : limExec ∘ₘ Cfg.uniform 256 σ = Cfg.uniform 256 σ := by
+    -- Cfg.uniform 256 σ = PMF.toMeasure(...).map (⟨.lit (.int ·), σ⟩)
     -- These are all value configs, so limExec = dirac on each.
     unfold Cfg.uniform Int.isPos Option.unwrapM
-    simp only [show (0 : Int) < 255 from by norm_num, dite_true]
+    simp only [show (0 : Int) < 256 from by norm_num, dite_true]
     rw [Measure.bind_map .of_discrete .of_discrete]
     -- Goal: (limExec ∘ f) ∘ₘ μ = μ.map f where f v = ⟨.lit (.int v), σ⟩
     -- Since limExec ⟨.lit (.int v), σ⟩ = dirac ⟨.lit (.int v), σ⟩, we get (dirac ∘ f) ∘ₘ μ = μ.map f
@@ -292,7 +293,7 @@ theorem probLangUniformByte_isEmbedding :
     conv_lhs => arg 2; ext v; rw [Function.comp, limExec_of_isVal (.lit (b := .int v))]
     rw [Measure.bind_dirac_eq_map _ Measurable.of_discrete]
   rw [bind_dirac]
-  -- Cfg.uniform 255 σ = SLang.spec probUniformByte σ
+  -- Cfg.uniform 256 σ = SLang.spec probUniformByte σ
   unfold SLang.spec
   apply Measure.ext_of_singleton; intro ⟨e', σ'⟩
   rw [Measure.map_apply Measurable.of_discrete MeasurableSet.of_discrete,
@@ -301,26 +302,26 @@ theorem probLangUniformByte_isEmbedding :
   simp only [Set.preimage, Set.mem_singleton_iff, Cfg.mk.injEq, Set.mem_setOf_eq]
   by_cases hσ : σ = σ'
   · subst hσ; simp only [and_true]
-    -- LHS: Cfg.uniform 255 σ {⟨e', σ⟩}
-    -- Unfold Cfg.uniform: PMF.uniformOfFinset(.Icc 0 255).toMeasure.map (⟨.lit (.int ·), σ⟩)
+    -- LHS: Cfg.uniform 256 σ {⟨e', σ⟩}
+    -- Unfold Cfg.uniform: PMF.uniformOfFinset(.Ico 0 256).toMeasure.map (⟨.lit (.int ·), σ⟩)
     unfold Cfg.uniform Int.isPos Option.unwrapM
-    simp only [show (0 : Int) < 255 from by norm_num, dite_true]
+    simp only [show (0 : Int) < 256 from by norm_num, dite_true]
     rw [Measure.map_apply Measurable.of_discrete MeasurableSet.of_discrete]
-    -- LHS: uniformOfFinset(.Icc 0 255).toMeasure {v | ⟨.lit (.int v), σ⟩ = ⟨e', σ⟩}
-    --     = uniformOfFinset(.Icc 0 255).toMeasure {v | .lit (.int v) = e'}
+    -- LHS: uniformOfFinset(.Ico 0 256).toMeasure {v | ⟨.lit (.int v), σ⟩ = ⟨e', σ⟩}
+    --     = uniformOfFinset(.Ico 0 256).toMeasure {v | .lit (.int v) = e'}
     simp only [Set.preimage]
     simp only [Set.mem_singleton_iff, Cfg.mk.injEq, and_true]
     rw [PMF.toMeasure_apply]
     swap; exact MeasurableSet.of_discrete
     conv_rhs => rw [← lintegral_indicator (f := probUniformByte) MeasurableSet.of_discrete, lintegral_count]
-    simp only [Set.indicator, Set.mem_setOf_eq, as_expr, SLang.probUniformByte, PMF.uniformOfFinset_apply, Finset.mem_Icc]
-    by_cases he : ∃ (v : ℤ), Exp.lit (BaseLit.int v) = e' ∧ 0 ≤ v ∧ v ≤ 255
-    · -- e' = .lit (.int v) for some v ∈ [0, 255]
-      obtain ⟨v, rfl, hv0, hv255⟩ := he
+    simp only [Set.indicator, Set.mem_setOf_eq, as_expr, SLang.probUniformByte, PMF.uniformOfFinset_apply, Finset.mem_Ico]
+    by_cases he : ∃ (v : ℤ), Exp.lit (BaseLit.int v) = e' ∧ 0 ≤ v ∧ v < 256
+    · -- e' = .lit (.int v) for some v ∈ [0, 256)
+      obtain ⟨v, rfl, hv0, hv256⟩ := he
       simp only [Exp.lit.injEq, BaseLit.int.injEq]
       -- LHS: ∑' x : ℤ, if x = v then ... else 0
       rw [tsum_ite_eq]
-      simp only [hv0, hv255, and_self, ↓reduceIte]
+      simp only [hv0, hv256, and_self, ↓reduceIte]
       -- RHS: ∑' a : UInt8, if a.toNat = v then 1/256 else 0
       have hu : ∃ (u : UInt8), (↑u.toNat : ℤ) = v :=
         ⟨⟨v.toNat, by omega⟩, by simp; omega⟩
@@ -333,19 +334,19 @@ theorem probLangUniformByte_isEmbedding :
       push Not at he
       -- LHS = 0
       have lhs_zero : ∀ x : ℤ, (if Exp.lit (BaseLit.int x) = e' then
-          if 0 ≤ x ∧ x ≤ 255 then (↑(Finset.Icc (0 : ℤ) 255).card)⁻¹ else 0 else 0) =
+          if 0 ≤ x ∧ x < 256 then (↑(Finset.Ico (0 : ℤ) 256).card)⁻¹ else 0 else 0) =
           (0 : ENNReal) := by
         intro x; split_ifs with h1 h2
-        · exact absurd h2.2 (not_le.mpr (he x h1 h2.1))
+        · exact absurd h2.2 (not_lt.mpr (he x h1 h2.1))
         · rfl
         · rfl
       simp_rw [lhs_zero, tsum_zero]
       -- RHS = 0
       symm; simp only [ENNReal.tsum_eq_zero]
       intro a; split_ifs with h
-      · have : (↑a.toNat : ℤ) ≤ 255 := by
+      · have : (↑a.toNat : ℤ) < 256 := by
           have := a.toNat_lt; omega
-        exact absurd this (not_le.mpr (he _ h (Int.natCast_nonneg _)))
+        exact absurd this (not_lt.mpr (he _ h (Int.natCast_nonneg _)))
       · rfl
   · have : {x : UInt8 | as_expr x = e' ∧ σ = σ'} = ∅ := by ext; simp [hσ]
     simp only [this, Measure.restrict_empty, lintegral_zero_measure]

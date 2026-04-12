@@ -1171,13 +1171,13 @@ theorem HeadStepPred_iff_exists_support (e : Exp) (σ : State) :
       | scrutFailure hv hm => exact ⟨_, .ScrutFailureS hv hm⟩
       | annot hv => exact ⟨_, .AnnotS hv⟩
     · cases hprob with
-      | randNoTape hz => exact ⟨_, .RandNoTapeS hz (le_refl 0) (le_of_lt hz)⟩
+      | randNoTape hz => exact ⟨_, .RandNoTapeS hz (le_refl 0) hz⟩
       | randTape hz htape hzN =>
           exact ⟨_, .RandTapeS hz htape hzN rfl rfl⟩
       | randTapeEmpty hz htape hzN =>
-          exact ⟨_, .RandTapeEmptyS hz htape hzN (le_refl 0) (le_of_lt hz) rfl⟩
+          exact ⟨_, .RandTapeEmptyS hz htape hzN (le_refl 0) hz rfl⟩
       | randTapeOther hz htape hzN =>
-          exact ⟨_, .RandTapeOtherS hz htape hzN (le_refl 0) (le_of_lt hz) rfl⟩
+          exact ⟨_, .RandTapeOtherS hz htape hzN (le_refl 0) hz rfl⟩
   · rintro ⟨ρ', hsupp⟩
     cases hsupp with
     | BetaS hv _ => exact .inl (.beta hv)
@@ -1391,14 +1391,14 @@ theorem Cfg.uniform_eq_zero_iff {z : Int} {σ : State} :
   constructor
   · intro h hz
     have heq : Cfg.uniform z σ =
-        (PMF.uniformOfFinset (Finset.Icc 0 z)
-            (Finset.nonempty_Icc.mpr (Int.le_of_lt hz))).toMeasure.map
+        (PMF.uniformOfFinset (Finset.Ico 0 z)
+            (Finset.nonempty_Ico.mpr hz)).toMeasure.map
             (fun x => (⟨.lit (.int x), σ⟩ : Cfg)) := by
       unfold Cfg.uniform Int.isPos Option.unwrapM
       rw [dif_pos hz]
     have hprob : MeasureTheory.IsProbabilityMeasure
-        ((PMF.uniformOfFinset (Finset.Icc 0 z)
-            (Finset.nonempty_Icc.mpr (Int.le_of_lt hz))).toMeasure.map
+        ((PMF.uniformOfFinset (Finset.Ico 0 z)
+            (Finset.nonempty_Ico.mpr hz)).toMeasure.map
             (fun x => (⟨.lit (.int x), σ⟩ : Cfg))) :=
       MeasureTheory.Measure.isProbabilityMeasure_map .of_discrete
     have h1 := hprob.measure_univ
@@ -1407,6 +1407,102 @@ theorem Cfg.uniform_eq_zero_iff {z : Int} {σ : State} :
   · intro hnz
     unfold Cfg.uniform Int.isPos Option.unwrapM
     rw [dif_neg hnz]
+
+/-- At `z = 1`, `Cfg.uniform 1 σ` is the dirac at `⟨.lit (.int 0), σ⟩`.
+This is because `Finset.Ico 0 1 = {0}` is a singleton, so the uniform
+PMF is a dirac PMF, and mapping through the state fiber preserves this. -/
+theorem Cfg.uniform_one_eq_dirac (σ : State) :
+    Cfg.uniform 1 σ = MeasureTheory.Measure.dirac (⟨.lit (.int 0), σ⟩ : Cfg) := by
+  classical
+  unfold Cfg.uniform Int.isPos Option.unwrapM
+  simp only [show (0 : Int) < 1 from Int.one_pos, dite_true]
+  -- The uniform PMF on `Ico 0 1 = {0}` is the dirac at 0.
+  have hico : Finset.Ico (0 : Int) 1 = {0} := by
+    ext x; simp [Finset.mem_Ico]; omega
+  refine MeasureTheory.Measure.ext fun S hS => ?_
+  rw [MeasureTheory.Measure.map_apply Measurable.of_discrete hS]
+  rw [PMF.toMeasure_uniformOfFinset_apply _ _ (MeasurableSet.of_discrete)]
+  rw [hico]
+  simp only [Finset.card_singleton, Nat.cast_one]
+  by_cases hmem : (⟨.lit (.int 0), σ⟩ : Cfg) ∈ S
+  · rw [MeasureTheory.Measure.dirac_apply_of_mem hmem]
+    have hfilt : ({x ∈ ({0} : Finset Int) |
+        x ∈ (fun x : Int => (⟨.lit (.int x), σ⟩ : Cfg)) ⁻¹' S}).card = 1 := by
+      simp [Finset.filter_singleton, hmem]
+    rw [hfilt]; simp
+  · rw [show (MeasureTheory.Measure.dirac (⟨.lit (.int 0), σ⟩ : Cfg)) S = 0 from by
+          rw [MeasureTheory.Measure.dirac_apply' _ hS]
+          simp [hmem]]
+    have hfilt : ({x ∈ ({0} : Finset Int) |
+        x ∈ (fun x : Int => (⟨.lit (.int x), σ⟩ : Cfg)) ⁻¹' S}).card = 0 := by
+      simp [Finset.filter_singleton, hmem]
+    rw [hfilt]; simp
+
+/-- `Cfg.uniform z σ` is never a Dirac when `1 < z`: for any singleton
+`{ρ}` the mass is strictly less than `1`. The argument is that when
+`1 < z` the uniform measure over `Finset.Ico 0 z` has `≥ 2` distinct
+elements (`0` and `1`), so at least two different singletons carry
+positive mass — forcing the mass of any single singleton below `1`.
+
+Note: for `z = 1` this lemma is **false** — `Cfg.uniform 1 σ` is a
+dirac at `⟨.lit (.int 0), σ⟩`. Callers that need to rule out rand at
+`z = 1` must handle that case separately. -/
+theorem Cfg.uniform_singleton_ne_one {z : Int} {σ : State} {ρ : Cfg}
+    (Hz : 1 < z) : Cfg.uniform z σ {ρ} ≠ 1 := by
+  intro h1
+  have Hz0 : 0 < z := by omega
+  -- The uniform measure is a probability measure.
+  have hprob : MeasureTheory.IsProbabilityMeasure (Cfg.uniform z σ) :=
+    Cfg.uniform_isProbabilityMeasure Hz0
+  -- Both `v = 0` and `v = 1` are in `Ico 0 z` and carry positive mass.
+  have hpos0 : 0 < Cfg.uniform z σ {⟨.lit (.int 0), σ⟩} :=
+    Cfg.uniform_singleton_pos_of_mem Hz0 (le_refl 0) Hz0
+  have hpos1 : 0 < Cfg.uniform z σ {⟨.lit (.int 1), σ⟩} :=
+    Cfg.uniform_singleton_pos_of_mem Hz0 (by norm_num) Hz
+  -- The two configurations are distinct.
+  have hne : (⟨.lit (.int 0), σ⟩ : Cfg) ≠ ⟨.lit (.int 1), σ⟩ := by
+    intro heq
+    have := (Cfg.mk.injEq ..).mp heq |>.1
+    simp at this
+  -- From `{ρ} = 1` and probability measure total mass = 1, we get
+  -- `{ρ}ᶜ` has measure zero.
+  have hcompl : Cfg.uniform z σ ({ρ}ᶜ) = 0 := by
+    have htot : Cfg.uniform z σ Set.univ = 1 := hprob.measure_univ
+    have hsplit : Cfg.uniform z σ Set.univ =
+        Cfg.uniform z σ {ρ} + Cfg.uniform z σ ({ρ}ᶜ) := by
+      rw [← MeasureTheory.measure_add_measure_compl (s := {ρ}) MeasurableSet.of_discrete]
+    rw [htot, h1] at hsplit
+    -- `1 = 1 + x` in `ℝ≥0∞` forces `x = 0` (since `1 ≠ ⊤`).
+    have hone_ne_top : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
+    have heq : (1 : ENNReal) + 0 = 1 + Cfg.uniform z σ ({ρ}ᶜ) := by
+      rw [add_zero]; exact hsplit
+    exact ((ENNReal.add_right_inj hone_ne_top).mp heq).symm
+  -- At least one of the two points `⟨.lit (.int 0), σ⟩`, `⟨.lit (.int 1), σ⟩`
+  -- is distinct from `ρ`, hence lies in `{ρ}ᶜ`, hence has mass zero —
+  -- contradicting the positivity result.
+  by_cases h0 : (⟨.lit (.int 0), σ⟩ : Cfg) = ρ
+  · -- Then ⟨.lit (.int 1), σ⟩ ≠ ρ.
+    have hnρ : (⟨.lit (.int 1), σ⟩ : Cfg) ≠ ρ := by
+      intro heq; apply hne; rw [h0, ← heq]
+    have hin : (⟨.lit (.int 1), σ⟩ : Cfg) ∈ ({ρ} : Set Cfg)ᶜ := by
+      simp [Set.mem_compl_iff, Set.mem_singleton_iff, hnρ]
+    have : Cfg.uniform z σ {⟨.lit (.int 1), σ⟩} ≤ Cfg.uniform z σ ({ρ}ᶜ) :=
+      MeasureTheory.measure_mono (by
+        intro x hx
+        rw [Set.mem_singleton_iff] at hx
+        subst hx; exact hin)
+    rw [hcompl] at this
+    exact absurd (lt_of_lt_of_le hpos1 this) (lt_irrefl _)
+  · -- Then ⟨.lit (.int 0), σ⟩ ≠ ρ.
+    have hin : (⟨.lit (.int 0), σ⟩ : Cfg) ∈ ({ρ} : Set Cfg)ᶜ := by
+      simp [Set.mem_compl_iff, Set.mem_singleton_iff, h0]
+    have : Cfg.uniform z σ {⟨.lit (.int 0), σ⟩} ≤ Cfg.uniform z σ ({ρ}ᶜ) :=
+      MeasureTheory.measure_mono (by
+        intro x hx
+        rw [Set.mem_singleton_iff] at hx
+        subst hx; exact hin)
+    rw [hcompl] at this
+    exact absurd (lt_of_lt_of_le hpos0 this) (lt_irrefl _)
 
 /-- Clutch's `head_step_dzero_upd_tapes`: if `headStep ⟨e, σ⟩` is the
 zero measure (nothing reducible), then appending a presample to an
@@ -1532,7 +1628,19 @@ preserved by appending to an unrelated tape. The hypothesis
 `DetHeadStep ⟨e1, σ⟩ ⟨e2, σ⟩` requires the post-state to equal the
 pre-state, which excludes the state-modifying head steps
 (`alloc`/`store`/`tape`/`rand`/`rand-tape`); the surviving cases all
-read at most the heap, so they are unaffected by a tape update. -/
+read at most the heap, so they are unaffected by a tape update.
+
+**Known limitation (2 deferred sorries):** under our `{0, …, N−1}` rand
+semantics, `rand 1` is genuinely deterministic (it always produces 0),
+so the `RandTapeEmptyS` and `RandTapeOtherS` cases at `z = 1` are no
+longer impossible via the "rand isn't dirac" argument. Their
+conclusions fail when the updated tape `α` coincides with the rand's
+label `α_rand`: `σ.update_tapes (·.insert α bs')` introduces an
+arbitrary `bs'` at `α_rand`, whose dirac value may differ from the
+original. Closing these cases properly requires adding a premise
+`α ≠ α_rand` or otherwise restricting overlap; left deferred since
+the theorem has no callers yet. The `RandNoTapeS` case is closed
+directly since `rand 1 unit` has no tape interaction. -/
 theorem State.det_head_step_upd_tapes
     {e1 e2 : Exp} {σ : State} {α : Loc} {bs bs' : Tape}
     (hmem : σ.tapes[α]? = some bs)
@@ -1607,7 +1715,24 @@ theorem State.det_head_step_upd_tapes
       simp [State.update_heap, State.update_tapes, hheap_no_op]
     rw [hgoal_state]
     simp [MeasureTheory.Measure.dirac_apply_of_mem (Set.mem_singleton _)]
-  | RandNoTapeS hz _ _ => exfalso; sorry
+  | RandNoTapeS hz hv0 hvz =>
+    -- For `1 < z`: `Cfg.uniform z σ` has ≥ 2 support points, exfalso.
+    -- For `z = 1`: `rand 1 unit` is a dirac at `v = 0`, and the step
+    -- is genuinely deterministic. We prove it directly via `of_det`
+    -- using `Cfg.uniform_one_eq_dirac`.
+    rename_i z _
+    by_cases hz1 : 1 < z
+    · exfalso
+      have hdet' := hdet.det
+      simp only [headStep] at hdet'
+      exact Cfg.uniform_singleton_ne_one hz1 hdet'
+    · -- z = 1 (since 0 < z and ¬ 1 < z).
+      have hzeq : z = 1 := by omega
+      have hveq : ‹Int› = 0 := by omega
+      subst hzeq; subst hveq
+      refine .of_det _ _ ?_
+      simp only [headStep, Cfg.uniform_one_eq_dirac,
+                 MeasureTheory.Measure.dirac_apply_of_mem (Set.mem_singleton _)]
   | TapeS heq hσ =>
     exfalso
     -- Post-state inserts a fresh tape; lookup at fresh in σ is none.
@@ -1624,9 +1749,43 @@ theorem State.det_head_step_upd_tapes
     rw [← htapes_eq] at hsome
     rw [hfresh_none] at hsome
     cases hsome
-  | RandTapeS hz htape hzN hv hσ => exfalso; sorry
-  | RandTapeEmptyS hz htape hzN _ _ hσ => exfalso; sorry
-  | RandTapeOtherS hz htape hzN _ _ hσ => exfalso; sorry
+  | RandTapeS hz htape hzN hv hσ =>
+    exfalso
+    -- State mismatch. After the step the tape at the label becomes `⟨N, ns⟩`,
+    -- but `hσ` says the state is unchanged — so σ's tape at that label
+    -- is `⟨N, ns⟩` too, contradicting `htape : σ.tapes[·]? = some ⟨N, nn :: ns⟩`.
+    have hσ_tapes := congrArg State.tapes hσ
+    simp only [State.update_tapes] at hσ_tapes
+    have h2 := htape
+    rw [hσ_tapes] at h2
+    simp only [Std.ExtTreeMap.getElem?_insert,
+      show ∀ l : Lbl, compare l l = Ordering.eq from
+        fun l => by simp [compare, compareOfLessAndEq],
+      if_true] at h2
+    -- h2 : some ⟨N, ns⟩ = some ⟨N, nn :: ns⟩ (bounds match, lists differ)
+    -- Taking `Tape.presamples` of both sides eliminates dependent-type HEq.
+    have hcontra : ∀ {N : Int} {l1 l2 : List _}, (some ⟨N, l1⟩ : Option Tape) = some ⟨N, l2⟩ → l1 = l2 := by
+      rintro _ _ _ heq
+      exact (Tape.mk.injEq ..).mp (Option.some.inj heq) |>.2 |> eq_of_heq
+    have hlist := hcontra h2
+    exact absurd hlist.symm (List.cons_ne_self _ _)
+  | RandTapeEmptyS hz htape hzN _ _ _ =>
+    -- For `1 < z`: `Cfg.uniform z σ` has ≥ 2 support points, exfalso.
+    -- For `z = 1`: `rand 1 (lbl α_rand)` is a dirac, but the theorem's
+    -- conclusion fails when the updated tape `α` overlaps `α_rand`
+    -- (the post-headStep value depends on `σ_new.tapes[α_rand]`, which
+    -- is `bs'` under overlap and may not produce the same dirac as σ).
+    -- **Deferred** with signature limitation: this case would require
+    -- a premise `α ≠ α_rand` (or restricting the theorem to non-overlapping
+    -- tape updates). The theorem is currently unused; see Clutch's
+    -- `det_head_step_upd_tapes` for the intended scope.
+    sorry
+  | RandTapeOtherS hz htape hzN _ _ _ =>
+    -- Same story as RandTapeEmptyS: for `z = 1` with `α = α_rand`,
+    -- the theorem conclusion depends on the arbitrary replacement tape
+    -- content `bs'`, which is unconstrained. Deferred with signature
+    -- limitation.
+    sorry
   | ScrutSuccessS hv hm =>
     refine .of_det _ _ ?_
     simp [headStep, Exp.isValM_some hv, hm]
@@ -1639,14 +1798,49 @@ theorem State.det_head_step_upd_tapes
 
 /-- Clutch's `prim_step_empty_tape`: reading from an empty-presample
 tape is the same as reading from the "no-tape" marker `.lit .unit`.
-In our representation an empty tape is `⟨N, []⟩`. Proof deferred:
-requires unfolding `primStep`/`headStep` on the `.rand` case and
-showing the underlying measures coincide. -/
+In our representation an empty tape is `⟨N, []⟩`.
+
+**Signature note:** Clutch states this with `z : Z` (a raw Rocq integer,
+automatically a value via `#z`); we mirror that with `z : Int` and
+quote it as `.lit (.int z)` on both sides. An earlier attempt with
+`z : Exp` is genuinely not provable, since for non-value `z` the two
+sides recurse into stepping `z` under different `.randL` contexts,
+yielding measures with disjoint support. -/
 theorem State.prim_step_empty_tape
-    {K : ProbLang.Ectx} {σ : State} {α : Loc} {z : Exp} {N : Int}
+    {K : ProbLang.Ectx} {σ : State} {α : Loc} {z : Int} {N : Int}
     (_hmem : σ.tapes[α]? = some ⟨N, []⟩) :
-    ProbLang.primStep ⟨K.fill (.rand z (.lit (.lbl α))), σ⟩
-      = ProbLang.primStep ⟨K.fill (.rand z (.lit .unit)), σ⟩ := by
-  sorry
+    ProbLang.primStep ⟨K.fill (.rand (.lit (.int z)) (.lit (.lbl α))), σ⟩
+      = ProbLang.primStep ⟨K.fill (.rand (.lit (.int z)) (.lit .unit)), σ⟩ := by
+  -- The outer context `K` is irrelevant: `.rand _ _` is never a value,
+  -- so we can pull K out on both sides via `primStep_fill`.
+  have hv_lbl : ¬ (Exp.rand (.lit (.int z)) (.lit (.lbl α))).isValue := by
+    intro h; obtain ⟨hv⟩ := h; cases hv
+  have hv_unit : ¬ (Exp.rand (.lit (.int z)) (.lit .unit)).isValue := by
+    intro h; obtain ⟨hv⟩ := h; cases hv
+  rw [primStep_fill hv_lbl, primStep_fill hv_unit]
+  -- It suffices to show the inner measures agree.
+  suffices h : ProbLang.primStep ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩
+      = ProbLang.primStep ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ by rw [h]
+  -- Both args are values, so `decompItem = none` and `primStep = headStep`.
+  have hdecomp_lbl : (Exp.rand (.lit (.int z)) (.lit (.lbl α))).decomp
+      = ([], .rand (.lit (.int z)) (.lit (.lbl α))) := by
+    rw [Exp.decomp_unfold]
+    simp only [Exp.decompItem]
+    have hlbl : (Exp.lit (.lbl α)).toVal? = some ⟨.lit (.lbl α), .lit⟩ := rfl
+    have hint : (Exp.lit (.int z)).toVal? = some ⟨.lit (.int z), .lit⟩ := rfl
+    rw [hlbl, hint]
+  have hdecomp_unit : (Exp.rand (.lit (.int z)) (.lit .unit)).decomp
+      = ([], .rand (.lit (.int z)) (.lit .unit)) := by
+    rw [Exp.decomp_unfold]
+    simp only [Exp.decompItem]
+    have hunit : (Exp.lit .unit).toVal? = some ⟨.lit .unit, .lit⟩ := rfl
+    have hint : (Exp.lit (.int z)).toVal? = some ⟨.lit (.int z), .lit⟩ := rfl
+    rw [hunit, hint]
+  simp only [primStep, hdecomp_lbl, hdecomp_unit, Ectx.fillCfg_empty, MeasureTheory.Measure.map_id]
+  -- Both sides reduce to `Cfg.uniform z σ`: the `lbl α` side hits
+  -- `RandTape*`, finds an empty-presample tape via `_hmem`, and the
+  -- `if M = z` collapses to `Cfg.uniform z σ` regardless (via `ite_self`).
+  simp only [headStep, _hmem]
+  rw [ite_self]
 
 end ProbLang
