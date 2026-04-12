@@ -218,57 +218,6 @@ theorem err_amp_mult {ε ε' : ℝ≥0∞} {k : ℝ≥0} (hε : 0 < ε) (hle : �
     rw [hcoe]
     exact_mod_cast h1
 
-theorem amp_external {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF}
-    (hε : 0 < ε) (hk : 1 < k)
-    (hamp : ∀ {ε'}, 0 < ε' → □ (↯((k : ℝ≥0∞) * ε') -∗ P) ∗ ↯ε' ⊢ P) :
-    ↯ε ⊢ P := by
-  iintro Hε
-  obtain ⟨n, Hn⟩ := err_amp_power hε hk
-  induction n generalizing ε
-  next =>
-    iexfalso
-    iapply contradict Hn
-    simp
-  next n ih =>
-    iapply hamp hε
-    isplitr <;> first | iassumption | skip
-    iintro !> hε
-    have ha : 1 ≤ (k : ℝ≥0∞) * ε * (k : ℝ≥0∞) ^ n := by
-      rwa [show (k : ℝ≥0∞) * ε * k ^ n = ε * k ^ (n + 1) by ring]
-    iapply ih (lt_mul_of_one_lt_of_lt' (by exact_mod_cast hk) hε) ha $$ hε
-
-theorem external_simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k)
-    (hamp : (↯(k * ε) -∗ P) ∗ ↯ε ⊢ P) : ↯ε ⊢ P := by
-  suffices haux : ∀ ε', ε ≤ ε' → ↯ε' ⊢ P by iapply haux _ le_rfl
-  iintro  %ε' %Hhle Hε
-  obtain ⟨n, Hn⟩ := err_amp_mult hε Hhle hk
-  induction n generalizing ε'
-  next =>
-    iexfalso
-    iapply contradict Hn
-    simp
-  next n IH =>
-    have hk1 : (1 : ℝ≥0∞) ≤ (k : ℝ≥0∞) := by exact_mod_cast hk.le
-    have Hkε : (k : ℝ≥0∞) * ε = ((k : ℝ≥0∞) - 1) * ε + ε := by
-      conv_lhs => rw [← tsub_add_cancel_of_le hk1, add_mul, one_mul]
-    have Hεeq : ε' = (ε' - ε) + ε := (tsub_add_cancel_of_le Hhle).symm
-    rw [Hεeq]
-    ihave ⟨Hε₁, Hε₂⟩ := split (GF := GF) $$ Hε
-    iapply hamp $$ [Hε₁ Hε₂]
-    isplitr [Hε₂] <;> try · iexact Hε₂
-    iintro Hε
-    set ε'' : ℝ≥0∞ := ε' + ((k : ℝ≥0∞) - 1) * ε
-    have Hε''eq : (ε' - ε) + (k : ℝ≥0∞) * ε = ε'' := by
-      rw [Hkε, ← add_assoc, add_right_comm, ← Hεeq]
-    ihave Hε₃ := combine (GF := GF) $$ [Hε₁ Hε]
-    · isplitl [Hε₁] <;> iassumption
-    ihave Hε₄ := ext (GF := GF) Hε''eq $$ Hε₃
-    iapply IH ε'' (Hhle.trans le_self_add) $$ Hε₄
-    refine Hn.trans (Std.le_of_eq ?_)
-    show _ = _ * _ + (ε' + _)
-    rw [Nat.cast_add, Nat.cast_one, add_mul, one_mul, add_mul,
-        add_assoc, add_comm (_ * ε) ε', ← add_assoc]
-
 --   #[local] Lemma ec_ind_simpl_aux (ε ε' k : R) P :
 --     0 < ε →
 --     ε <= ε' ->
@@ -339,6 +288,12 @@ theorem simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk
     · iexact Hamp
     · iapply ext (GF := GF) Hε''eq $$ Hε₃
 
+theorem external_simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k)
+    (hamp : (↯(k * ε) -∗ P) ∗ ↯ε ⊢ P) : ↯ε ⊢ P := by
+  iapply simple hε hk
+  iintro !> H
+  iapply hamp $$ H
+
 theorem increasing {ε : ℝ≥0∞} {ε' : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hε' : ε < ε') :
     □ ((↯ε' -∗ P) ∗ ↯ε -∗ P) ⊢@{IProp GF} ↯ε -∗ P := by
   iintro #Hamp Hε
@@ -383,6 +338,15 @@ theorem amplifying {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε)
       ring_nf
       exact le_rfl
     · isplitr <;> first | iexact Hamp | iexact Hε
+
+theorem amp_external {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF}
+    (hε : 0 < ε) (hk : 1 < k)
+    (hamp : ∀ {ε'}, 0 < ε' → □ (↯((k : ℝ≥0∞) * ε') -∗ P) ∗ ↯ε' ⊢ P) :
+    ↯ε ⊢ P := by
+  iapply amplifying hε hk
+  iintro !> %ε' %hε' #H Hε
+  iapply hamp hε'
+  isplitr [Hε] <;> first | iexact H | iexact Hε
 
 end Induction
 
