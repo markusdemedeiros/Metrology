@@ -218,42 +218,6 @@ theorem err_amp_mult {ε ε' : ℝ≥0∞} {k : ℝ≥0} (hε : 0 < ε) (hle : �
     rw [hcoe]
     exact_mod_cast h1
 
---   #[local] Lemma ec_ind_simpl_aux (ε ε' k : R) P :
---     0 < ε →
---     ε <= ε' ->
---     1 < k →
---     □ ((↯ (k * ε) -∗ P) ∗ ↯ ε -∗ P) ⊢
---     (↯ ε' -∗ P).
---   Proof.
---     iIntros (Hε Hleq Hk) "#Hamp Herr".
---     destruct (err_amp_mult ε ε' k) as [n Hn]; auto.
---     iInduction n as [|m] "IH" forall (ε ε' Hε Hleq Hn Hk) "Hamp Herr".
---     - iDestruct (ec_contradict with "Herr") as %[].
---       simpl in Hn.
---       lra.
---     - replace (ε') with (ε + (ε' - ε)) by lra.
---       iDestruct (ec_split with "Herr") as "[Herr1 Herr2]"; [lra | lra |].
---       iApply ("Hamp" with "[$Herr1 Herr2]").
---       iIntros "Herr".
---       assert (k * ε = (k-1)*ε + ε) as ->; [lra |].
---       iDestruct (ec_split with "Herr") as "[Herr3 Herr4]"; [ real_solver | lra |].
---       iDestruct (ec_combine with "[$Herr2 $Herr3]") as "Herr".
---       iDestruct (ec_combine with "[$Herr $Herr4]") as "Herr".
---       iApply ("IH" $! ε with "[] [] [] [] [] Herr"); auto.
---       + iPureIntro.
---         replace (ε' - ε + (k-1) * ε + ε) with (ε' + (k-1) * ε) by lra.
---         rewrite <- (Rplus_0_r ε) at 1.
---         apply Rplus_le_compat; auto.
---         apply Rmult_le_pos; lra.
---       + iPureIntro.
---         replace (ε' - ε + (k - 1) * ε + ε) with (ε' + (k - 1) * ε) by lra.
---         replace (m * (k - 1) * ε + (ε' + (k - 1) * ε)) with ((m + 1) * (k - 1) * ε + ε') by lra.
---         etrans; eauto.
---         rewrite S_INR //.
---       + replace ((k - 1) * ε + ε) with (k * ε) by lra.
---         auto.
---   Qed.
-
 theorem simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k) :
     □ ((↯(k * ε) -∗ P) ∗ ↯ε -∗ P) ⊢@{IProp GF} ↯ε -∗ P := by
   suffices haux : ∀ ε', ε ≤ ε' → □ ((↯(k * ε) -∗ P) ∗ ↯ε -∗ P) ⊢@{IProp GF} ↯ε' -∗ P by
