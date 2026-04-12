@@ -78,31 +78,31 @@ instance [MeasurableSpace α] : UCMRA (Measure α) where
   pcore_unit := by simp [CMRA.pcore]
 
 
-class WpMarkov (GF : BundledGFunctors) (T : Type _) [MeasurableSpace T] where
-  state : ElemG GF (constOF (Measure T))
-  state_γ : GName
-
-export WpMarkov (state_γ)
-attribute [reducible, instance] WpMarkov.state
-
-section logic
-
-variable {GF : BundledGFunctors} {T : Type _} [MeasurableSpace T] [WpMarkov GF T]
-
-def bound (μ : Measure T) := @iOwn GF _ _ WpMarkov.state (WpMarkov.state_γ GF T) μ
-
-
-variable (κ : Kernel T T)
-
-def step (μ : Measure T) : Measure T := μ.bind κ
-
-def is_value (μ : Measure T) : Prop := step κ μ = μ
-
-def twp_F (μΦ : Measure T × (Measure T → IProp GF))
-    (twp : (Measure T × (Measure T → IProp GF)) → IProp GF) : IProp GF := iprop(
-  (⌜is_value κ μΦ.1⌝ ∗ |==> μΦ.2 μΦ.1) ∨
-  (|==> (twp (step κ μΦ.1, μΦ.2))))
-
-end logic
+-- class WpMarkov (GF : BundledGFunctors) (T : Type _) [MeasurableSpace T] where
+--   state : ElemG GF (constOF (Measure T))
+--   state_γ : GName
+--
+-- export WpMarkov (state_γ)
+-- attribute [reducible, instance] WpMarkov.state
+--
+-- section logic
+--
+-- variable {GF : BundledGFunctors} {T : Type _} [MeasurableSpace T] [WpMarkov GF T]
+--
+-- def bound (μ : Measure T) := @iOwn GF _ _ WpMarkov.state (WpMarkov.state_γ GF T) μ
+--
+--
+-- variable (κ : Kernel T T)
+--
+-- def step (μ : Measure T) : Measure T := μ.bind κ
+--
+-- def is_value (μ : Measure T) : Prop := step κ μ = μ
+--
+-- def twp_F (μΦ : Measure T × (Measure T → IProp GF))
+--     (twp : (Measure T × (Measure T → IProp GF)) → IProp GF) : IProp GF := iprop(
+--   (⌜is_value κ μΦ.1⌝ ∗ |==> μΦ.2 μΦ.1) ∨
+--   (|==> (twp (step κ μΦ.1, μΦ.2))))
+--
+-- end logic
 end
 end AlgebraTest

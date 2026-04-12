@@ -92,6 +92,7 @@ theorem tapePresample_univ_eq_one {σ : State} {α : Loc} {t : Tape}
     Pi.one_apply, lintegral_one]
   exact tapeIndexUniform_univ_eq_one hN
 
+
 /-! ## Bind-map distributivity (local helper)
 
 A small helper used throughout this file: `.map` distributes over `.bind`.
@@ -1158,6 +1159,23 @@ This is Clutch's `prim_coupl_upd_tapes_dom` almost verbatim: Clutch states
 it as an `Rcoupl` under `eq` on the `dmap (λ x, x.1)` projection, which is
 the same thing. -/
 
+/-- Inserting the same tape value at an existing key is the identity on `State`. -/
+theorem State.update_tapes_insert_id {σ : State} {α : Loc} {t : Tape}
+    (h : σ.tapes[α]? = some t) :
+    σ.update_tapes (·.insert α t) = σ := by
+  sorry
+
+/-- Mapping `tapeIndexUniform N` through the Cfg embedding `a ↦ ⟨lit (int ↑a), σ⟩`
+gives `Cfg.uniform N σ`. Both are the uniform distribution on
+`{⟨lit (int n), σ⟩ | n ∈ [0, N)}`. -/
+theorem tapeIndexUniform_lintegral_eq_cfg_uniform
+    {N : Int} (hN : 0 < N) (σ : State)
+    (f : Cfg → ENNReal) :
+    ∫⁻ (a : { z : Int // 0 ≤ z ∧ z < N }),
+        f ⟨.lit (.int ↑a), σ⟩ ∂tapeIndexUniform N
+      = ∫⁻ (ρ : Cfg), f ρ ∂Cfg.uniform N σ := by
+  sorry
+
 /-- **Main theorem (Clutch `prim_coupl_upd_tapes_dom`, projected form).**
 Appending a uniformly-sampled value onto an existing tape `α` of `σ` with
 positive bound is invisible to `execN m ⟨e, σ⟩` **at the expression level**.
@@ -1679,7 +1697,82 @@ theorem execN_tape_presample_expr_eq
             have ht_eq : t = ⟨z_r, nn :: ns⟩ := by
               rw [h] at htapes; exact Option.some.inj htapes
             subst ht_eq
-            sorry
+            -- After tapePresample: σ' has tape α = ⟨z_r, (nn::ns) ++ [n']⟩.
+            -- headStep reads nn (head), pops to ⟨z_r, ns ++ [n']⟩.
+            -- Expression is .lit (.int nn) (fixed).
+            -- The resulting state is σ.update_tapes (·.insert α ⟨z_r, ns ++ [n']⟩),
+            -- which is exactly the tapePresample distribution at
+            -- (σ.update_tapes (·.insert α ⟨z_r, ns⟩)).
+            -- So ih_fill at that updated state closes the goal.
+            --
+            -- Strategy: unfold tapePresample, reduce bind/dirac on both sides,
+            -- then apply ih_fill at σ_popped := σ.update_tapes(insert α ⟨z_r, ns⟩).
+            -- Step 1: Rewrite the LHS integral.
+            -- tapePresample σ α unfolds to (tapeIndexUniform z_r).bind (dirac of update).
+            -- For each n' in the support, σ' has tape α = ⟨z_r, nn::ns++[n']⟩.
+            -- headStep reads nn, produces dirac at ⟨lit nn, σ'.upd(insert α ⟨z_r,ns++[n']⟩)⟩.
+            -- The double update simplifies to σ.upd(insert α ⟨z_r,ns++[n']⟩).
+            -- After dirac collapse: integrand = f(⟨lit nn, σ.upd(insert α ⟨z_r,ns++[n']⟩)⟩).
+            -- This is exactly ∫ n' ∂tapeIndexUniform z_r, which matches
+            -- ih_fill at σ_popped := σ.update_tapes(insert α ⟨z_r, ns⟩).
+            --
+            -- Step 2: Rewrite the RHS.
+            -- headStep at σ with tape ⟨z_r, nn::ns⟩ gives
+            -- dirac ⟨lit nn, σ.upd(insert α ⟨z_r,ns⟩)⟩.
+            -- After dirac collapse: f(⟨lit nn, σ.upd(insert α ⟨z_r,ns⟩)⟩).
+            --
+            -- So goal = ih_fill at σ_popped.
+
+            -- Step 1: Reduce the RHS.
+            -- headStep at σ with tape ⟨z_r, nn::ns⟩ → dirac ⟨lit nn, σ_popped⟩
+            have hrhs : headStep ⟨.rand (.lit (.int z_r)) (.lit (.lbl α)), σ⟩ =
+                Measure.dirac ⟨.lit (.int nn),
+                  σ.update_tapes (·.insert α ⟨z_r, ns⟩)⟩ := by
+              simp [headStep, htapes]
+            rw [hrhs, lintegral_dirac' _ Measurable.of_discrete]
+            -- RHS = ((execN m ∘ K.fillCfg) ⟨lit nn, σ_popped⟩) (preimage)
+            -- Goal: LHS = ((execN m ∘ K.fillCfg) ⟨lit nn, σ_popped⟩) (preimage)
+
+            -- Step 2: Unfold tapePresample in LHS and reduce outer integral.
+            -- tapePresample σ α = (tapeIndexUniform z_r).bind(fun n' => dirac(σ.upd(...nn::ns++[n'])))
+            simp only [tapePresample, h]
+            rw [lintegral_bind Measurable.of_discrete.aemeasurable Measurable.of_discrete.aemeasurable]
+            simp_rw [lintegral_dirac' _ Measurable.of_discrete]
+            -- LHS = ∫⁻ n', (∫⁻ ρ, f(ρ) ∂headStep ⟨rand, σ.upd(insert α ⟨z_r, nn::ns++[n']⟩)⟩)
+            --       ∂tapeIndexUniform z_r
+
+            -- Step 3: Reduce headStep at each updated state.
+            -- Tape α has ⟨z_r, nn :: (ns ++ [n'])⟩, headStep pops nn.
+            have hstep_upd : ∀ n' : { z : Int // 0 ≤ z ∧ z < z_r },
+                headStep ⟨.rand (.lit (.int z_r)) (.lit (.lbl α)),
+                  σ.update_tapes (·.insert α ⟨z_r, (nn :: ns) ++ [↑n']⟩)⟩ =
+                Measure.dirac ⟨.lit (.int ↑nn),
+                  σ.update_tapes (·.insert α ⟨z_r, ns ++ [↑n']⟩)⟩ := by
+              intro ⟨n', hn'⟩
+              -- headStep unfolds, looks up tape at the updated state, finds
+              -- ⟨z_r, nn :: (ns ++ [n'])⟩, pops nn.
+              -- The double update_tapes at the same key α needs to simplify.
+              simp only [headStep, State.upd_tape_some, List.cons_append, ↓reduceIte]
+              -- Remaining: double update_tapes at key α simplifies
+              rw [State.update_tapes_twice]
+            simp_rw [hstep_upd, lintegral_dirac' _ Measurable.of_discrete]
+            -- LHS = ∫⁻ n', f(⟨lit nn, σ.upd(insert α ⟨z_r, ns++[n']⟩)⟩) ∂tapeIndexUniform z_r
+
+            -- Step 4: fold back to tapePresample form and apply ih_fill.
+            -- Get ih_fill at σ_popped:
+            have htape_popped : (σ.update_tapes (·.insert α ⟨z_r, ns⟩)).tapes[α]? =
+                some ⟨z_r, ns⟩ := State.upd_tape_some _ _ _
+            have hgoal := ih_fill (.lit (.int ↑nn))
+                (σ.update_tapes (·.insert α ⟨z_r, ns⟩)) ⟨z_r, ns⟩ htape_popped hN
+            -- hgoal: ∫⁻ σ'', f(⟨lit nn, σ''⟩) ∂tapePresample σ_popped α
+            --      = f(⟨lit nn, σ_popped⟩)
+            -- Our goal: ∫⁻ n', f(⟨lit nn, σ.upd(ns++[n'])⟩) ∂tapeIndexUniform = f(⟨lit nn, σ.upd(ns)⟩)
+            -- Use convert to unify, letting Lean generate subgoals for mismatches.
+            convert hgoal using 1
+            simp only [tapePresample, htape_popped]
+            simp_rw [State.update_tapes_twice]
+            rw [lintegral_bind Measurable.of_discrete.aemeasurable Measurable.of_discrete.aemeasurable]
+            simp_rw [lintegral_dirac' _ Measurable.of_discrete]
           · -- α_lbl ≠ α: tapePresample doesn't affect tape α_lbl.
             have hstep_rw : ∀ (σ₀ : State), σ₀.tapes[α_lbl]? = some ⟨z_r, nn :: ns⟩ →
                 headStep (⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ₀⟩ : Cfg) =
@@ -1740,7 +1833,54 @@ theorem execN_tape_presample_expr_eq
             have ht_eq : t = ⟨z_r, []⟩ := by
               rw [h] at htapes; exact Option.some.inj htapes
             subst ht_eq
-            sorry
+            -- Step 1: Reduce RHS. headStep at σ with empty tape → Cfg.uniform z_r σ.
+            have hrhs : headStep ⟨.rand (.lit (.int z_r)) (.lit (.lbl α)), σ⟩ =
+                Cfg.uniform z_r σ := by simp [headStep, htapes]
+            rw [hrhs]
+            -- Step 2: Unfold tapePresample in LHS.
+            simp only [tapePresample, h]
+            rw [lintegral_bind Measurable.of_discrete.aemeasurable Measurable.of_discrete.aemeasurable]
+            simp_rw [lintegral_dirac' _ Measurable.of_discrete]
+            -- LHS = ∫⁻ n', (∫⁻ ρ, f(ρ) ∂headStep ⟨rand, σ.upd(insert α ⟨z_r, [n']⟩)⟩)
+            --       ∂tapeIndexUniform z_r
+            -- Step 3: Reduce headStep at each updated state.
+            -- Tape α has ⟨z_r, [n']⟩, headStep reads n', pops to [].
+            -- Result: dirac ⟨lit (int n'), σ.upd(insert α ⟨z_r, [n']⟩).upd(insert α ⟨z_r, []⟩)⟩
+            --       = dirac ⟨lit (int n'), σ.upd(insert α ⟨z_r, []⟩)⟩  by update_tapes_twice
+            --       = dirac ⟨lit (int n'), σ⟩  since σ.tapes[α] = ⟨z_r, []⟩ already.
+            have hstep_upd : ∀ n' : { z : Int // 0 ≤ z ∧ z < z_r },
+                headStep ⟨.rand (.lit (.int z_r)) (.lit (.lbl α)),
+                  σ.update_tapes (·.insert α ⟨z_r, [n']⟩)⟩ =
+                Measure.dirac ⟨.lit (.int ↑n'),
+                  σ.update_tapes (·.insert α ⟨z_r, []⟩)⟩ := by
+              intro ⟨n', hn'⟩
+              simp only [headStep, State.upd_tape_some, ↓reduceIte]
+              rw [State.update_tapes_twice]
+            simp only [List.nil_append]
+            simp_rw [hstep_upd, lintegral_dirac' _ Measurable.of_discrete]
+            -- LHS = ∫⁻ n', f(⟨lit (int n'), σ.upd(insert α ⟨z_r, []⟩)⟩) ∂tapeIndexUniform z_r
+            -- Goal should be:
+            -- ∫⁻ n', f(⟨lit (int n'), σ.upd(insert α ⟨z_r, []⟩)⟩) ∂tapeIndexUniform z_r
+            -- = ∫⁻ ρ, f(ρ) ∂Cfg.uniform z_r σ
+            -- Both are uniform integrals, but over different types.
+            -- Cfg.uniform z_r σ = PMF.uniformOfFinset(Ico 0 z_r).toMeasure.map(fun n => ⟨lit (int n), σ⟩)
+            -- tapeIndexUniform z_r = PMF.uniformOfFinset(Ico 0 z_r).toMeasure.map(fun n => ⟨n, ...⟩)
+            -- We need σ.upd(insert α ⟨z_r, []⟩) = σ for the states to match.
+            -- Need: σ.update_tapes(insert α ⟨z_r, []⟩) = σ
+            -- (insert at existing key with same value is no-op)
+            rw [State.update_tapes_insert_id htapes]
+            -- Now goal is:
+            -- ∫⁻ a:{z//...}, f(⟨lit (int ↑a), σ⟩) ∂tapeIndexUniform z_r
+            -- = ∫⁻ ρ:Cfg, f(ρ) ∂Cfg.uniform z_r σ
+            -- Both are integrals of f over the uniform distribution on
+            -- {lit (int n) | n ∈ [0, z_r)} × {σ}, just packaged differently.
+            -- Cfg.uniform z_r σ = PMF.uniformOfFinset(Ico 0 z_r).toMeasure.map(fun n => ⟨lit(int n), σ⟩)
+            -- tapeIndexUniform z_r = PMF.uniformOfFinset(Ico 0 z_r).toMeasure.map(fun n => ⟨n, ...⟩)
+            -- LHS: ∫⁻ a:{z//...}, f(⟨lit(int ↑a), σ⟩) ∂tapeIndexUniform z_r
+            -- RHS: ∫⁻ ρ:Cfg, f(ρ) ∂Cfg.uniform z_r σ
+            -- Fold LHS into map form, then apply tapeIndexUniform_map_eq_cfg_uniform.
+            exact tapeIndexUniform_lintegral_eq_cfg_uniform hz σ
+              (fun ρ => ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S))
           · -- α_lbl ≠ α: tape is still empty after tapePresample.
             -- headStep = Cfg.uniform z_r σ' for all σ' in support.
             -- Same Fubini + ih_fill argument as randNoTape.
@@ -1815,22 +1955,26 @@ theorem execN_tape_presample_expr_eq
             rw [Measure.dirac_apply' _ MeasurableSet.of_discrete,
                 Set.indicator_of_notMem]
             simp only [Set.mem_setOf_eq, not_not]
-            have hNN : N_b = N := by
-              have := htapes.symm.trans h; exact (Option.some.inj this).1
             by_cases hαeq : α = α_lbl
             · subst hαeq
+              have hNN : N_b = N := by
+                have heq := Option.some.inj (htapes.symm.trans h)
+                exact congrArg Tape.bound heq
+              -- After insert at α, lookup at α returns the new value
+              have hlook : (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)).tapes[α]?
+                  = some ⟨N, bs ++ [n]⟩ := by
+                simp [State.update_tapes]
               show (match (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)).tapes[α]? with
                     | none => _ | some ⟨M, ns⟩ => _) = _
-              simp only [State.update_tapes, Std.ExtTreeMap.getElem?_insert]
-              simp only [show (α == α) = true from by simp, ↓reduceIte]
+              rw [hlook]; simp only
               -- if N = z_r: false because z_r ≠ N_b = N
               have hNz : ¬(N = z_r) := fun h => hzN (hNN ▸ h.symm)
-              simp [hNz]
+              rw [if_neg hNz]
             · show (match (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)).tapes[α_lbl]? with
                     | none => _ | some ⟨M, ns⟩ => _) = _
-              rw [State.upd_diff_tape_tot (Ne.symm hαeq), htapes]
+              rw [State.upd_diff_tape_tot (Ne.symm hαeq), htapes]; simp only
               have hNz : ¬(N_b = z_r) := fun h => hzN h.symm
-              simp [hNz]
+              rw [if_neg hNz]
           -- Now same as randNoTape: use Fubini + ih_fill.
           calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
                         ∂headStep ⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ'⟩
@@ -1858,7 +2002,8 @@ theorem execN_tape_presample_expr_eq
                   ∂headStep ⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ⟩ := by
                 -- RHS headStep also gives Cfg.uniform
                 show _ = ∫⁻ ρ, _ ∂(match σ.tapes[α_lbl]? with | none => _ | some ⟨M, ns⟩ => _)
-                rw [htapes]; simp [hzN]
+                rw [htapes]; simp only
+                rw [if_neg (Ne.symm hzN)]
       · -- Zero case: headStep ⟨e_red, σ⟩ = 0, both sides are trivially 0.
         rw [hzero, lintegral_zero_measure]
         -- LHS: show the integrand is 0 a.e. on tapePresample σ α.
