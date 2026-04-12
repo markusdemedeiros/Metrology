@@ -79,7 +79,7 @@ theorem execN_fill_item_le (Ki : EctxItem) (n : Nat) {e : Exp} {σ : State} {c :
   · simp only [hj, ↑reduceIte]
     exact mul_le_mul' le_rfl (execN_mono_singleton (Nat.sub_le n j) _ c)
   · have : n - j = 0 := Nat.sub_eq_zero_of_le (not_lt.mp hj)
-    simp [this, execN, hj]
+    simp [this, hj]
 
 -- Combine: j steps for e to reach a, then i steps for Ki[a] to reach c, takes i+j steps total
 theorem execN_fill_item_ge (Ki : EctxItem) (i j : Nat) {e : Exp} {σ : State} {c : Cfg} :

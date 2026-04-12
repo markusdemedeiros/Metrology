@@ -592,7 +592,7 @@ theorem Exp.substMap_insert {x : String} {v : Exp} (e : Exp) :
     simp only [substMap, SubstMap.insert, SubstMap.delete]
     by_cases hxy : y = x
     · subst hxy
-      simp only [if_pos rfl]
+      simp only []
       simp [subst']
     · simp only [if_neg hxy]
       cases hvsy : vs y with
@@ -666,10 +666,10 @@ theorem Exp.substMap_insert {x : String} {v : Exp} (e : Exp) :
                 | anon => simp [Binder.binds] at hfx
                 | named s =>
                   simp only [Binder.binds, beq_iff_eq] at hfx; subst hfx
-                  simp [SubstMap.deleteB, SubstMap.delete, SubstMap.insert]
+                  simp [SubstMap.deleteB, SubstMap.delete]
                 | typed s _ =>
                   simp only [Binder.binds, beq_iff_eq] at hfx; subst hfx
-                  simp [SubstMap.deleteB, SubstMap.delete, SubstMap.insert]
+                  simp [SubstMap.deleteB, SubstMap.delete]
               cases z with
               | anon => exact h1
               | named s =>
@@ -1320,7 +1320,7 @@ theorem Std.ExtTreeMap.fresh_insert_of_mem
     by_cases heq : α = km
     · have hcmp : compare km α = .eq := by
         simp [compare, compareOfLessAndEq, heq.symm]
-      simp [hcmp, Ordering.isLE, heq.symm]
+      simp [Ordering.isLE, heq.symm]
     · have hlt : α < km := lt_of_le_of_ne hα_le_km heq
       have hcmp : compare km α = .gt := by
         show compareOfLessAndEq km α = .gt
@@ -1504,6 +1504,7 @@ theorem Cfg.uniform_singleton_ne_one {z : Int} {σ : State} {ρ : Cfg}
     rw [hcompl] at this
     exact absurd (lt_of_lt_of_le hpos0 this) (lt_irrefl _)
 
+set_option linter.unnecessarySimpa false in
 /-- Clutch's `head_step_dzero_upd_tapes`: if `headStep ⟨e, σ⟩` is the
 zero measure (nothing reducible), then appending a presample to an
 already-present tape keeps it zero. The Clutch version appends a
@@ -1526,7 +1527,7 @@ theorem State.head_step_dzero_upd_tapes
   -- `rand.tape.*`) — each is tractable but needs individual finishing.
   all_goals try (intro h0; simpa using h0)
   all_goals try (intro h0; simp_all)
-  all_goals try (intro h0; unfold Option.unwrapM at h0 ⊢; split at h0 <;> simp_all)
+  -- all_goals try (intro h0; unfold Option.unwrapM at h0 ⊢; split at h0 <;> simp_all)
   -- Remaining cases: unop.redex, binop.redex, alloc.no_redex,
   -- load.segfault, store.no_redex, store.segfault, rand.plain,
   -- rand.tape.unalloc, rand.tape.mismatch, rand.tape.empty.
