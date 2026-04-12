@@ -1,23 +1,21 @@
-import Iris
-import Mathlib.Probability.Kernel.Basic
 import Mathlib.Data.ENNReal.Basic
-import Mathlib.MeasureTheory.Measure.Sub
-import Mathlib.MeasureTheory.Measure.MeasureSpaceDef
+import Iris
 import Iris.Algebra.View
 import Iris.Instances.IProp.Instance
 import Iris.Algebra.Auth
 import Iris.Algebra.Numbers
-
 import Metrology.Iris.Algebra
 
 noncomputable section
 
-open Std Iris COFE ProbabilityTheory MeasureTheory
+open Std Iris COFE
+open scoped ENNReal NNReal
 
-abbrev ErrorCredit : Type _ := ENNReal
+abbrev ErrorCredit : Type _ := ℝ≥0∞
 
 instance : COFE ErrorCredit := COFE.ofDiscrete _ Eq_Equivalence
 instance : OFE.Discrete ErrorCredit := ⟨id⟩
+instance (x : ErrorCredit) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
 instance : CMRA ErrorCredit where
   pcore _ := some 0
@@ -37,6 +35,9 @@ instance : CMRA ErrorCredit where
   pcore_op_mono {_ _} := by rintro ⟨rfl⟩ _; exists 0; simp
   extend _ h := ⟨_, _, OFE.discrete h, .rfl, .rfl⟩
 
+instance : CMRA.Discrete ErrorCredit where
+  discrete_valid := id
+
 instance : UCMRA ErrorCredit where
   unit := 0
   unit_valid := by simp [CMRA.Valid]
@@ -48,43 +49,31 @@ theorem ErrorCredit.included_iff {ε₁ ε₂ : ErrorCredit} : ε₁ ≼ ε₂ �
   rintro ⟨ε₃, rfl⟩
   exact le_self_add
 
+theorem ErrorCredit.includedN_iff {ε₁ ε₂ : ErrorCredit} : ε₁ ≼{n} ε₂ ↔ ε₁ ≤ ε₂ :=
+  ErrorCredit.included_iff
+
 instance {ε : ErrorCredit} : CMRA.Cancelable ε where
   cancelableN {n ε₁ ε₂} := by
     simp [CMRA.ValidN, CMRA.op, OFE.Dist]
     intro H1 H2
-    -- refine (ENNReal.toReal_eq_toReal_iff' ?_ ?_).mp ?_
-    -- · rintro rfl; simp at H1
-    -- · rintro rfl
-    --   simp only [add_top, ENNReal.add_eq_top] at H2
-    --   rcases H2 with (rfl|rfl) <;> simp at H1
-    sorry
-
-
---   Lemma nonnegreal_local_update (x y x' y' : nonnegreal) :
---     y' <= y → x + y' = x' + y → (x,y) ~l~> (x',y').
---   Proof.
---     intros ??; apply (local_update_unital_discrete x y x' y') => z H1 H2.
---     compute in H2; simplify_eq; simpl.
---     destruct y, x', y', z; simplify_eq; simpl.
---     split.
---     - compute; compute in *.
---       eapply Rle_lt_trans; [| eapply H1].
---       lra.
---     - compute.
---       apply nnreal_ext; simpl in *; lra.
---   Qed.
+    refine (ENNReal.add_right_inj ?_).mp H2
+    rintro rfl; simp at H1
 
 theorem ErrorCredit.localUpdate {ε₁ ε₂ ε₁' ε₂' : ErrorCredit} (h1 : ε₂' <= ε₂)
     (h2 : ε₁ + ε₂' = ε₁' + ε₂) : (ε₁, ε₂) ~l~> (ε₁', ε₂') := by
   rintro n (_|ε) <;> simp only [OFE.Dist, CMRA.op?, CMRA.ValidN, CMRA.op]
   · rintro H rfl
-    refine ⟨?_, ?_⟩
-    · sorry
-    · sorry
+    symm at h2
+    obtain rfl : ε₁' = ε₂' := ENNReal.add_left_inj H.ne_top |>.mp (by grind)
+    exact ⟨Std.lt_of_le_of_lt h1 H, rfl⟩
   · rintro H rfl
-    refine ⟨?_, ?_⟩
-    · sorry
-    · sorry
+    have Hnt : ε₂ ≠ ∞ := by rintro rfl; simp at H
+    obtain rfl : (ε + ε₂') = ε₁' :=
+      ENNReal.add_left_inj Hnt |>.mp (.trans (add_rotate ..).symm h2)
+    refine ⟨?_, by grind⟩
+    refine Std.lt_of_le_of_lt ?_ H
+    rw [add_comm]
+    exact (add_le_add_left h1 ε)
 
 instance : Iris.IsUnit (◯ 0 : Auth ℕ+ ErrorCredit) where
   unit_valid := Auth.frag_valid.mpr (by simp [CMRA.Valid])
@@ -103,10 +92,13 @@ section Resources
 
 variable {GF : BundledGFunctors} [IEC : ECGS GF]
 
-def ecAuth (ε : ENNReal) : IProp GF := iOwn (E := IEC.ec) IEC.γec (● ε)
-def ec (ε : ENNReal) : IProp GF := iOwn (E := IEC.ec) IEC.γec (◯ ε)
+def ecAuth (ε : ℝ≥0∞) : IProp GF := iOwn (E := IEC.ec) IEC.γec (● ε)
+def ec (ε : ℝ≥0∞) : IProp GF := iOwn (E := IEC.ec) IEC.γec (◯ ε)
 notation "↯" r:50 => ec r
 notation "●↯" r:50 => ecAuth r
+
+instance : CMRA.Discrete (Auth ℕ+ ErrorCredit) := by infer_instance
+instance : OFE.DiscreteE (◯ r : Auth ℕ+ ErrorCredit) := Auth.frag_discrete (by infer_instance)
 
 end Resources
 
@@ -137,322 +129,284 @@ theorem combine {ε₁ ε₂} : ↯ε₁ ∗ ↯ε₂ ⊢@{IProp GF} ↯(ε₁ +
 
 theorem zero : ⊢@{IProp GF} |==> ↯0 := iOwn_unit
 
-
--- Lemma ec_supply_bound (ε1 : R) (ε2 : nonnegreal) :
---   ec_supply ε2 -∗ ↯ ε1 -∗ ⌜ε1 <= ε2⌝.
--- Proof.
---   rewrite ec_unseal /ec_def ec_supply_unseal /ec_supply_def.
---   iIntros "H1 (%r & <- & H2)".
---   iDestruct (own_valid_2 with "H1 H2") as "%Hop".
---   by eapply auth_both_valid_discrete in Hop as [Hlt%nonnegreal_included ?].
--- Qed.
-
-theorem supply_bound {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ ⌜ε ≤ εₛ ⌝:= by
+theorem supply_bound {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ ⌜ε ≤ εₛ⌝ := by
   unfold ec ecAuth
   iintro Hs Hε
-  ihave _ := iOwn_op (E := IEC.ec) |>.mpr $$ [Hs Hε]
-  all_goals sorry
+  ihave Hv := iOwn_cmraValid_op (E := IEC.ec) $$ [Hs Hε]
+  · isplitl [Hs] <;> first | iexact Hs | iexact Hε
+  ihave %hv := internalCmraValid_discrete (A := Auth ℕ+ ErrorCredit) (PROP := IProp GF) $$ Hv
+  ipure_intro
+  obtain ⟨hinc, _⟩ := Auth.auth_both_valid.mp hv
+  exact ErrorCredit.includedN_iff.mp (hinc 0)
 
--- theorem supply_decrease {εₛ ε} :
---   ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ |==> ∃ (εₛ' ε' : ENNReal), ⌜εₛ = εₛ' + ε'⌝ ∗
+theorem supply_decrease {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ |==> ●↯ (εₛ - ε) := by
+  iintro Hs Hε
+  ihave %Hle := supply_bound (GF := GF) $$ Hs Hε
+  unfold ec ecAuth
+  ihave Hc := iOwn_op (E := IEC.ec) |>.mpr $$ [Hs Hε]
+  · isplitl [Hs] <;> first | iexact Hs | iexact Hε
+  refine iOwn_update <| Auth.auth_update_dealloc ?_
+  simp only [UCMRA.unit]
+  refine localUpdate (zero_le _) ?_
+  simpa [add_zero] using (tsub_add_cancel_of_le Hle).symm
+
+theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
+    ●↯ ε₁ ⊢@{IProp GF} |==> (●↯ (ε₁ + ε₂) ∗ ↯ε₂) := by
+  unfold ec ecAuth
+  -- FIXME: Rocq avoids this by `iMod (own_update with "H") as "[$ $]"; [|done].`.
+  -- Not sure if we support this yet?
+  suffices Hup :
+      iOwn (E := IEC.ec) (ECGS.γec GF) (● ε₁)
+      ⊢ |==> iOwn (E := IEC.ec) (ECGS.γec GF) ((● ε₁ + ε₂) • (◯ ε₂)) by
+    refine .trans Hup ?_
+    iintro H
+    imod H
+    imodintro
+    iapply iOwn_op
+    iexact H
+  iintro Hε
+  refine iOwn_update <| Auth.auth_update_alloc <| (local_update_unital_discrete ..).mpr ?_
+  simp only [CMRA.Valid, OFE.Equiv, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
+  exact fun _ => ⟨h, add_comm _ _⟩
+
+theorem weaken {ε₁ ε₂ : ℝ≥0∞} (h : ε₂ ≤ ε₁) : ↯ε₁ ⊢@{IProp GF} ↯ε₂ := by
+  iintro Hε
+  have hsplit : ε₁ = (ε₁ - ε₂) + ε₂ := (tsub_add_cancel_of_le h).symm
+  rw [hsplit]
+  ihave ⟨_, H⟩ := split (GF := GF) $$ Hε
+  iexact H
+
+theorem valid {ε : ℝ≥0∞} : ↯ε ⊢@{IProp GF} ⌜ε < 1⌝ := by
+  unfold ec
+  iintro Hε
+  ihave Hv := iOwn_cmraValid (E := IEC.ec) $$ Hε
+  ihave %hv := internalCmraValid_discrete (A := Auth ℕ+ ErrorCredit) (PROP := IProp GF) $$ Hv
+  ipure_intro
+  exact Auth.frag_valid.mp hv
+
+theorem contradict {ε : ℝ≥0∞} (h : 1 ≤ ε) : ↯ε ⊢@{IProp GF} False := by
+  iintro Hε
+  ihave %hle := valid (GF := GF) $$ Hε
+  exact absurd h (Std.not_le.mpr hle)
+
+namespace Induction
+
+theorem err_amp_power {ε : ℝ≥0∞} {k : ℝ≥0} (hε : 0 < ε) (hk : 1 < k) :
+    ∃ n : ℕ, 1 ≤ ε * (k : ℝ≥0∞) ^ n := by
+  rcases eq_or_ne ε ∞ with (rfl | hε')
+  · exact ⟨0, by simp⟩
+  · lift ε to ℝ≥0 using hε' with ε
+    obtain ⟨n, hn⟩ := pow_unbounded_of_one_lt ε⁻¹ (by exact_mod_cast hk)
+    have hlift : (1 : ℝ≥0) ≤ ε * k ^ n := by
+      rw [mul_comm]
+      refine (inv_le_iff_one_le_mul₀ ?_).mp hn.le
+      exact_mod_cast hε
+    exact ⟨n, by exact_mod_cast hlift⟩
+
+theorem err_amp_mult {ε ε' : ℝ≥0∞} {k : ℝ≥0} (hε : 0 < ε) (hle : ε ≤ ε') (hk : 1 < k) :
+    ∃ n : ℕ, 1 ≤ (n : ℝ≥0∞) * ((k : ℝ≥0∞) - 1) * ε + ε' := by
+  rcases eq_or_ne ε ∞ with rfl | hεne
+  · exact ⟨0, by simp [top_le_iff.mp hle]⟩
+  · lift ε to ℝ≥0 using hεne with ε
+    obtain ⟨n, hn⟩ := exists_nat_ge ((k - 1) * ε)⁻¹
+    refine ⟨n, le_add_right ?_⟩
+    have h1 : (1 : ℝ≥0) ≤ n * (k - 1) * ε := by
+      rw [mul_assoc]
+      refine (inv_le_iff_one_le_mul₀ ?_).mp hn
+      exact mul_pos (tsub_pos_of_lt hk) (by exact_mod_cast hε)
+    have hcoe : ((k : ℝ≥0∞) - 1) = ((k - 1 : ℝ≥0) : ℝ≥0∞) := by push_cast; rfl
+    rw [hcoe]
+    exact_mod_cast h1
+
+theorem amp_external {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF}
+    (hε : 0 < ε) (hk : 1 < k)
+    (hamp : ∀ {ε'}, 0 < ε' → □ (↯((k : ℝ≥0∞) * ε') -∗ P) ∗ ↯ε' ⊢ P) :
+    ↯ε ⊢ P := by
+  iintro Hε
+  obtain ⟨n, Hn⟩ := err_amp_power hε hk
+  induction n generalizing ε
+  next =>
+    iexfalso
+    iapply contradict Hn
+    simp
+  next n ih =>
+    iapply hamp hε
+    isplitr <;> first | iassumption | skip
+    iintro !> hε
+    have ha : 1 ≤ (k : ℝ≥0∞) * ε * (k : ℝ≥0∞) ^ n := by
+      rwa [show (k : ℝ≥0∞) * ε * k ^ n = ε * k ^ (n + 1) by ring]
+    iapply ih (lt_mul_of_one_lt_of_lt' (by exact_mod_cast hk) hε) ha $$ hε
+
+theorem external_simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k)
+    (hamp : (↯(k * ε) -∗ P) ∗ ↯ε ⊢ P) : ↯ε ⊢ P := by
+  suffices haux : ∀ ε', ε ≤ ε' → ↯ε' ⊢ P by iapply haux _ le_rfl
+  iintro  %ε' %Hhle Hε
+  obtain ⟨n, Hn⟩ := err_amp_mult hε Hhle hk
+  induction n generalizing ε'
+  next =>
+    iexfalso
+    iapply contradict Hn
+    simp
+  next n IH =>
+    have hk1 : (1 : ℝ≥0∞) ≤ (k : ℝ≥0∞) := by exact_mod_cast hk.le
+    have Hkε : (k : ℝ≥0∞) * ε = ((k : ℝ≥0∞) - 1) * ε + ε := by
+      conv_lhs => rw [← tsub_add_cancel_of_le hk1, add_mul, one_mul]
+    have Hεeq : ε' = (ε' - ε) + ε := (tsub_add_cancel_of_le Hhle).symm
+    rw [Hεeq]
+    ihave ⟨Hε₁, Hε₂⟩ := split (GF := GF) $$ Hε
+    iapply hamp $$ [Hε₁ Hε₂]
+    isplitr [Hε₂] <;> try · iexact Hε₂
+    iintro Hε
+    set ε'' : ℝ≥0∞ := ε' + ((k : ℝ≥0∞) - 1) * ε
+    have Hε''eq : (ε' - ε) + (k : ℝ≥0∞) * ε = ε'' := by
+      rw [Hkε, ← add_assoc, add_right_comm, ← Hεeq]
+    ihave Hε₃ := combine (GF := GF) $$ [Hε₁ Hε]
+    · isplitl [Hε₁] <;> iassumption
+    ihave Hε₄ := ext (GF := GF) Hε''eq $$ Hε₃
+    iapply IH ε'' (Hhle.trans le_self_add) $$ Hε₄
+    refine Hn.trans (Std.le_of_eq ?_)
+    show _ = _ * _ + (ε' + _)
+    rw [Nat.cast_add, Nat.cast_one, add_mul, one_mul, add_mul,
+        add_assoc, add_comm (_ * ε) ε', ← add_assoc]
+
+--   #[local] Lemma ec_ind_simpl_aux (ε ε' k : R) P :
+--     0 < ε →
+--     ε <= ε' ->
+--     1 < k →
+--     □ ((↯ (k * ε) -∗ P) ∗ ↯ ε -∗ P) ⊢
+--     (↯ ε' -∗ P).
+--   Proof.
+--     iIntros (Hε Hleq Hk) "#Hamp Herr".
+--     destruct (err_amp_mult ε ε' k) as [n Hn]; auto.
+--     iInduction n as [|m] "IH" forall (ε ε' Hε Hleq Hn Hk) "Hamp Herr".
+--     - iDestruct (ec_contradict with "Herr") as %[].
+--       simpl in Hn.
+--       lra.
+--     - replace (ε') with (ε + (ε' - ε)) by lra.
+--       iDestruct (ec_split with "Herr") as "[Herr1 Herr2]"; [lra | lra |].
+--       iApply ("Hamp" with "[$Herr1 Herr2]").
+--       iIntros "Herr".
+--       assert (k * ε = (k-1)*ε + ε) as ->; [lra |].
+--       iDestruct (ec_split with "Herr") as "[Herr3 Herr4]"; [ real_solver | lra |].
+--       iDestruct (ec_combine with "[$Herr2 $Herr3]") as "Herr".
+--       iDestruct (ec_combine with "[$Herr $Herr4]") as "Herr".
+--       iApply ("IH" $! ε with "[] [] [] [] [] Herr"); auto.
+--       + iPureIntro.
+--         replace (ε' - ε + (k-1) * ε + ε) with (ε' + (k-1) * ε) by lra.
+--         rewrite <- (Rplus_0_r ε) at 1.
+--         apply Rplus_le_compat; auto.
+--         apply Rmult_le_pos; lra.
+--       + iPureIntro.
+--         replace (ε' - ε + (k - 1) * ε + ε) with (ε' + (k - 1) * ε) by lra.
+--         replace (m * (k - 1) * ε + (ε' + (k - 1) * ε)) with ((m + 1) * (k - 1) * ε + ε') by lra.
+--         etrans; eauto.
+--         rewrite S_INR //.
+--       + replace ((k - 1) * ε + ε) with (k * ε) by lra.
+--         auto.
+--   Qed.
+
+theorem simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k) :
+    □ ((↯(k * ε) -∗ P) ∗ ↯ε -∗ P) ⊢@{IProp GF} ↯ε -∗ P := by
+  suffices haux : ∀ ε', ε ≤ ε' → □ ((↯(k * ε) -∗ P) ∗ ↯ε -∗ P) ⊢@{IProp GF} ↯ε' -∗ P by
+    iapply haux _ le_rfl
+  iintro %ε' %Hhle #Hamp Hε
+  obtain ⟨n, Hn⟩ := err_amp_mult hε Hhle hk
+  induction n generalizing ε'
+  next =>
+    iexfalso; simp at Hn; iapply contradict Hn $$ Hε
+  next n IH =>
+    have hk1 : (1 : ℝ≥0∞) ≤ (k : ℝ≥0∞) := by exact_mod_cast hk.le
+    have Hkε : (k : ℝ≥0∞) * ε = ((k : ℝ≥0∞) - 1) * ε + ε := by
+      conv_lhs => rw [← tsub_add_cancel_of_le hk1, add_mul, one_mul]
+    have Hεeq : ε' = (ε' - ε) + ε := (tsub_add_cancel_of_le Hhle).symm
+    set ε'' : ℝ≥0∞ := ε' + ((k : ℝ≥0∞) - 1) * ε
+    have Hε''eq : (ε' - ε) + (k : ℝ≥0∞) * ε = ε'' := by
+      rw [Hkε, ← add_assoc, add_right_comm, ← Hεeq]
+    have Hn' : 1 ≤ (n : ℝ≥0∞) * ((k : ℝ≥0∞) - 1) * ε + ε'' := by
+      refine Hn.trans (Std.le_of_eq ?_)
+      show _ = _ * _ + (ε' + _)
+      rw [Nat.cast_add, Nat.cast_one, add_mul, one_mul, add_mul,
+          add_assoc, add_comm (_ * ε) ε', ← add_assoc]
+    rw [Hεeq]
+    ihave ⟨Hε₁, Hε₂⟩ := split (GF := GF) $$ Hε
+    iapply Hamp
+    isplitr [Hε₂] <;> try · iexact Hε₂
+    iintro Hε
+    ihave Hε₃ := combine (GF := GF) $$ [Hε₁ Hε]
+    · isplitl [Hε₁] <;> iassumption
+    iapply IH ε'' (Hhle.trans le_self_add) Hn'
+    isplitr [Hε₃]
+    · iexact Hamp
+    · iapply ext (GF := GF) Hε''eq $$ Hε₃
+
+theorem increasing {ε : ℝ≥0∞} {ε' : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hε' : ε < ε') :
+    □ ((↯ε' -∗ P) ∗ ↯ε -∗ P) ⊢@{IProp GF} ↯ε -∗ P := by
+  iintro #Hamp Hε
+  ihave %hε'' := valid (GF := GF) $$ Hε
+  let k' : ℝ≥0∞ := ε' / ε
+  have hk1 : 1 < k' := ENNReal.lt_div_iff_mul_lt (by simp) (by simp) |>.mpr (by simp [hε'])
+  have Hk' : k' ≠ ∞ := ENNReal.div_ne_top ENNReal.coe_ne_top (Std.ne_of_lt hε).symm
+  have Hkeq : ε' = k' * ε := by
+    dsimp [k']
+    have Hε : ε / ε = 1 := ENNReal.div_self (Std.ne_of_lt hε).symm (LT.lt.ne_top hε')
+    simp [ENNReal.mul_comm_div, Hε]
+  lift k' to ℝ≥0 using Hk' with k
+  have Hk : 1 < k := ENNReal.one_lt_coe_iff.mp hk1
+  iapply simple (ε := ε) (k := k) hε Hk $$ [] Hε
+  imodintro
+  iintro ⟨Hc, Hε⟩
+  iapply Hamp
+  isplitr [Hε]
+  · iintro Hε
+    iapply Hc
+    iapply ext $$ Hε
+    exact Hkeq
+  · iexact Hε
+
+theorem amplifying {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k) :
+    □ (∀ {ε' : ℝ≥0∞}, ⌜0 < ε'⌝ -∗ □ (↯(k * ε') -∗ P) -∗ ↯ε' -∗ P)
+    ⊢@{IProp GF} ↯ε -∗ P := by
+  iintro #Hamp Hε
+  obtain ⟨n, Hn⟩ := err_amp_power hε hk
+  induction n generalizing ε
+  next =>
+    iexfalso
+    simp at Hn
+    iapply contradict Hn $$ Hε
+  next n ih =>
+    iapply Hamp $$ %_ %hε [] Hε
+    imodintro
+    iintro Hε
+    iapply ih (ε := k * ε)
+    · exact ENNReal.mul_pos_iff.mpr ⟨ENNReal.coe_pos.mpr (pos_of_gt hk), pos_of_gt hε⟩
+    · refine Hn.trans ?_
+      ring_nf
+      exact le_rfl
+    · isplitr <;> first | iexact Hamp | iexact Hε
+
+end Induction
+
+instance ec_timeless (ε : ℝ≥0∞) : BI.Timeless (↯ε : IProp GF) := iOwn_timeless
 
 end ErrorCredit
 
-
-/-
-
-
-  Lemma ec_supply_ec_inv r1 x2 :
-    ec_supply x2 -∗ ↯ r1 -∗ ∃ x1 x3, ⌜x2 = (x1 + x3)%NNR⌝ ∗ ⌜x1.(nonneg) = r1⌝.
-  Proof.
-    iIntros "Hx2 Hr1".
-    iDestruct (ec_supply_bound with "Hx2 Hr1") as %Hb.
-    iDestruct "Hr1" as (x1) "[<- Hx1]".
-    set (x3 := nnreal_minus x2 x1 Hb).
-    iExists _, x3. iSplit; [|done].
-    iPureIntro. apply nnreal_ext=>/=; lra.
-  Qed.
-
-  (** The statement of this lemma is a bit convoluted, because only implicitly (by validity and
-      unfolding) can we conclude that [0 <= r1 <= x2] so thus that [x2 - r1] is nonnegative *)
-  Lemma ec_supply_decrease (r1 : R) (x2 : nonnegreal) :
-    ec_supply x2 -∗ ↯ r1 -∗ |==> ∃ x1 x3, ⌜(x2 = x3 + x1)%NNR⌝ ∗ ⌜x1.(nonneg) = r1⌝ ∗ ec_supply x3.
-  Proof.
-    iIntros "Hx2 Hr1".
-    iDestruct (ec_supply_ec_inv with "Hx2 Hr1") as %(x1 & x3 & -> & <-).
-    iDestruct "Hr1" as (x1') "[% Hx1]".
-    rewrite ec_unseal /ec_def ec_supply_unseal /ec_supply_def.
-    iMod (own_update_2 with "Hx2 Hx1") as "Hown".
-    { eapply (auth_update_dealloc _ _ x3), nonnegreal_local_update.
-      - apply cond_nonneg.
-      - apply nnreal_ext =>/=. lra. }
-    iModIntro.
-    iExists _, _. iFrame. iSplit; [|done].
-    iPureIntro. apply nnreal_ext=>/=; lra.
-  Qed.
-
-  Lemma ec_supply_increase (ε1 ε2 : nonnegreal) :
-    ε1 + ε2 < 1 →
-    ec_supply ε1 -∗ |==> ec_supply (ε1 + ε2)%NNR ∗ ↯ ε2.
-  Proof.
-    rewrite ec_unseal /ec_def.
-    rewrite ec_supply_unseal /ec_supply_def.
-    iIntros (?) "H".
-    iMod (own_update with "H") as "[$ $]"; [|done].
-    eapply auth_update_alloc.
-    apply (local_update_unital_discrete _ _ _ _) => z H1 H2.
-    split; [done|].
-    apply nnreal_ext. simpl.
-    rewrite Rplus_comm.
-    apply Rplus_eq_compat_l.
-    rewrite H2 /=. lra.
-  Qed.
-
-  Lemma ec_weaken (r1 r2 : R) :
-    0 <= r2 <= r1 → ↯ r1 -∗ ↯ r2.
-  Proof.
-    iIntros (?) "Hr1".
-    assert (r1 = (r1 - r2) + r2) as -> by lra.
-    iDestruct (ec_split with "Hr1") as "[? $]"; lra.
-  Qed.
-
-  Lemma ec_supply_eq x1 x2 :
-    (x1.(nonneg) = x2.(nonneg)) → ec_supply x1 -∗ ec_supply x2.
-  Proof.
-    iIntros (?) "?".
-    replace x1 with x2; [iFrame|by apply nnreal_ext].
-  Qed.
-
-  Lemma ec_contradict (ε : R) :
-    1 <= ε → ↯ ε ⊢ False.
-  Proof.
-    iIntros (Hge1) "(% & <- & Hε)".
-    rewrite ec_unseal /ec_def.
-    iDestruct (own_valid with "Hε") as %?%auth_frag_valid_1.
-    destruct x.
-    compute in H.
-    simpl in *.
-    lra.
-  Qed.
-
-  Lemma ec_valid (ε : R) : ↯ ε -∗ ⌜(0<=ε<1)%R⌝.
-  Proof.
-    iIntros "(%&<-&H)".
-    rewrite ec_unseal /ec_def.
-    iDestruct (own_valid with "H") as %?%auth_frag_valid_1.
-    destruct x. compute in H. simpl in *. iPureIntro. lra.
-  Qed.
-
-  #[local] Lemma err_amp_power ε k :
-    0 < ε →
-    1 < k →
-    ∃ n, 1 <= ε * k ^ n.
-  Proof.
-    intros Hε Hk.
-    destruct (Lim_seq.is_lim_seq_geom_p k Hk (λ r, / ε <= r)) as [n Hn] => /=.
-    - exists (/ ε). real_solver.
-    - exists n.
-      apply (Rmult_le_reg_l (/ ε)).
-      + apply Rinv_0_lt_compat, Hε.
-      + rewrite -Rmult_assoc Rinv_l; [|lra].
-        rewrite Rmult_1_l Rmult_1_r. by apply Hn.
-  Qed.
-
-  #[local] Lemma err_amp_mult ε ε' k :
-    0 < ε →
-    ε <= ε' ->
-    1 < k →
-    (exists n:nat, 1 <= n*(k-1)*ε + ε').
-  Proof.
-    intros Hε Hleq Hk.
-    edestruct (Rcomplements.nfloor_ex (1/((k-1)*ε))) as [n [Hn1 Hn2]].
-    - apply Rmult_le_pos; [lra|].
-      left.
-      apply Rinv_0_lt_compat.
-      real_solver.
-    - exists (S n).
-      rewrite S_INR.
-      transitivity ((1 / ((k - 1) * ε)) * (k - 1) * ε + ε').
-      + rewrite Rmult_assoc.
-        rewrite /Rdiv Rmult_1_l.
-        rewrite Rinv_l; [lra |].
-        assert (0<(k-1)*ε); real_solver.
-      + apply Rplus_le_compat_r.
-        apply Rmult_le_compat_r; [lra|].
-        apply Rmult_le_compat_r; lra.
-  Qed.
-
-  Lemma ec_ind_amp_external (ε k : R) P :
-    0 < ε →
-    1 < k →
-    (∀ (ε' : R), 0 < ε' → □ (↯ (k * ε') -∗ P) ∗ ↯ ε' ⊢ P) →
-    (↯ ε ⊢ P).
-  Proof.
-    iIntros (Hε Hk Hamp) "Herr".
-    destruct (err_amp_power ε k) as [n Hn]; [done|done|].
-    iInduction n as [|m] "IH" forall (ε Hε Hn Hk) "Herr".
-    - iDestruct (ec_contradict with "Herr") as %[]. lra.
-    - iApply (Hamp with "[$Herr]"); [done|].
-      iIntros "!> Herr".
-      iApply ("IH" with "[] [] [//] Herr"); iPureIntro.
-      + real_solver.
-      + simpl in Hn. lra.
-  Qed.
-
-
-  #[local] Lemma ec_ind_simpl_external_aux (ε ε' k : R) P :
-    0 < ε →
-    ε <= ε' ->
-    1 < k →
-    ((↯ (k * ε) -∗ P) ∗ ↯ ε ⊢ P) →
-    (↯ ε' ⊢ P).
-  Proof.
-    iIntros (Hε Hleq Hk Hamp) "Herr".
-    destruct (err_amp_mult ε ε' k) as [n Hn]; auto.
-    iInduction n as [|m] "IH" forall (ε ε' Hε Hleq Hn Hk Hamp) "Herr".
-    - iDestruct (ec_contradict with "Herr") as %[].
-      simpl in Hn.
-      lra.
-    - replace (ε') with (ε + (ε' - ε)) by lra.
-      iDestruct (ec_split with "Herr") as "[Herr1 Herr2]"; [lra | lra |].
-      iApply (Hamp with "[$Herr1 Herr2]").
-      iIntros "Herr".
-      assert (k * ε = (k-1)*ε + ε) as ->; [lra |].
-      iDestruct (ec_split with "Herr") as "[Herr3 Herr4]"; [ real_solver | lra |].
-      iDestruct (ec_combine with "[$Herr2 $Herr3]") as "Herr".
-      iDestruct (ec_combine with "[$Herr $Herr4]") as "Herr".
-      iApply ("IH" $! ε with "[] [] [] [] [] Herr"); auto.
-      + iPureIntro.
-        replace (ε' - ε + (k-1) * ε + ε) with (ε' + (k-1) * ε) by lra.
-        rewrite <- (Rplus_0_r ε) at 1.
-        apply Rplus_le_compat; auto.
-        apply Rmult_le_pos; lra.
-      + iPureIntro.
-        replace (ε' - ε + (k - 1) * ε + ε) with (ε' + (k - 1) * ε) by lra.
-        replace (m * (k - 1) * ε + (ε' + (k - 1) * ε)) with ((m + 1) * (k - 1) * ε + ε') by lra.
-        etrans; eauto.
-        rewrite S_INR //.
-  Qed.
-
-
-  Lemma ec_ind_simpl_external (ε k : R) P :
-    0 < ε →
-    1 < k →
-    ((↯ (k * ε) -∗ P) ∗ ↯ ε ⊢ P) →
-    (↯ ε ⊢ P).
-  Proof.
-    iIntros (Hε HK Hamp).
-    eapply ec_ind_simpl_external_aux; eauto.
-    lra.
-  Qed.
-
-  #[local] Lemma ec_ind_simpl_aux (ε ε' k : R) P :
-    0 < ε →
-    ε <= ε' ->
-    1 < k →
-    □ ((↯ (k * ε) -∗ P) ∗ ↯ ε -∗ P) ⊢
-    (↯ ε' -∗ P).
-  Proof.
-    iIntros (Hε Hleq Hk) "#Hamp Herr".
-    destruct (err_amp_mult ε ε' k) as [n Hn]; auto.
-    iInduction n as [|m] "IH" forall (ε ε' Hε Hleq Hn Hk) "Hamp Herr".
-    - iDestruct (ec_contradict with "Herr") as %[].
-      simpl in Hn.
-      lra.
-    - replace (ε') with (ε + (ε' - ε)) by lra.
-      iDestruct (ec_split with "Herr") as "[Herr1 Herr2]"; [lra | lra |].
-      iApply ("Hamp" with "[$Herr1 Herr2]").
-      iIntros "Herr".
-      assert (k * ε = (k-1)*ε + ε) as ->; [lra |].
-      iDestruct (ec_split with "Herr") as "[Herr3 Herr4]"; [ real_solver | lra |].
-      iDestruct (ec_combine with "[$Herr2 $Herr3]") as "Herr".
-      iDestruct (ec_combine with "[$Herr $Herr4]") as "Herr".
-      iApply ("IH" $! ε with "[] [] [] [] [] Herr"); auto.
-      + iPureIntro.
-        replace (ε' - ε + (k-1) * ε + ε) with (ε' + (k-1) * ε) by lra.
-        rewrite <- (Rplus_0_r ε) at 1.
-        apply Rplus_le_compat; auto.
-        apply Rmult_le_pos; lra.
-      + iPureIntro.
-        replace (ε' - ε + (k - 1) * ε + ε) with (ε' + (k - 1) * ε) by lra.
-        replace (m * (k - 1) * ε + (ε' + (k - 1) * ε)) with ((m + 1) * (k - 1) * ε + ε') by lra.
-        etrans; eauto.
-        rewrite S_INR //.
-      + replace ((k - 1) * ε + ε) with (k * ε) by lra.
-        auto.
-  Qed.
-
-  Lemma ec_ind_simpl (ε k : R) P :
-    0 < ε →
-    1 < k →
-    □((↯ (k * ε) -∗ P) ∗ ↯ ε -∗ P) ⊢
-    (↯ ε -∗ P).
-  Proof.
-    iIntros (Hε Hk) "#Hamp Herr".
-    iApply ec_ind_simpl_aux; eauto.
-    lra.
-  Qed.
-
-
-  Lemma ec_ind_incr (ε ε': R) P :
-    0 < ε →
-    ε < ε' →
-    □((↯ ε' -∗ P) ∗ ↯ ε -∗ P) ⊢
-    (↯ ε -∗ P).
-  Proof.
-    iIntros (Hε Hε') "#Hamp Herr".
-    iApply (ec_ind_simpl ε (ε'/ε) with "[Hamp]"); auto.
-    - apply Rcomplements.Rlt_div_r; lra.
-    - iModIntro.
-      iIntros "(H & Herr)".
-      iApply ("Hamp" with "[H $Herr]").
-      iIntros "Herr".
-      iApply "H".
-      rewrite /Rdiv Rmult_assoc Rinv_l; [|lra].
-      rewrite Rmult_1_r.
-      iFrame.
-  Qed.
-
-
-
-  (* TODO: can [ec_ind_amp] be derived from [ec_ind_amp_external] ? *)
-  Lemma ec_ind_amp (ε k : R) P :
-    0 < ε →
-    1 < k →
-    □ (∀ (ε' : R), ⌜0 < ε'⌝ -∗ □ (↯ (k * ε') -∗ P) -∗ ↯ ε' -∗ P) ⊢
-    (↯ ε -∗ P).
-  Proof.
-    iIntros (Hpos Hgt1) "#Hamp Herr".
-    destruct (err_amp_power ε k) as [n Hn]; [done|done|].
-    iInduction n as [|m] "IH" forall (ε Hpos Hn Hgt1) "Herr".
-    - iDestruct (ec_contradict with "Herr") as %[].
-      simpl in Hn. lra.
-    - iApply ("Hamp" with "[//] [] Herr").
-      iIntros "!# Herr".
-      iApply ("IH" with "[] [] [//] Herr"); iPureIntro.
-      + real_solver.
-      + simpl in Hn. lra.
-  Qed.
-
-  Global Instance ec_timeless r : Timeless (↯ r).
-  Proof. rewrite ec_unseal /ec_def. apply _. Qed.
-
-End error_credit_theory.
-
-Lemma ec_alloc `{!ecGpreS Σ} (n : nonnegreal) :
-  (n < 1)%R → ⊢ |==> ∃ _ : ecGS Σ, ec_supply n ∗ ↯ n.
-Proof.
-  iIntros (?).
-  rewrite ec_unseal /ec_def ec_supply_unseal /ec_supply_def.
-  iMod (own_alloc (● n ⋅ ◯ n)) as (γEC) "[H● H◯]".
-  - apply auth_both_valid_2.
-    + compute. destruct n; simpl in H. lra.
-    + apply nonnegreal_included; lra.
-  - pose (C := EcGS _ _ γEC).
-    iModIntro. iExists C. by iFrame.
-Qed.
-
-#[global] Hint Resolve cond_nonneg : core.
--/
+theorem ec_alloc {GF : BundledGFunctors} [IEC : ECPreGS GF] (ε : ℝ≥0∞) (h : ε < 1) :
+    ⊢@{IProp GF} |==> ∃ γ : GName,
+      ecAuth (IEC := { toECPreGS := IEC, γec := γ }) ε ∗
+      ec (IEC := { toECPreGS := IEC, γec := γ }) ε := by
+  unfold ec ecAuth
+  -- FIXME: Rocq: `iMod (own_alloc (● n ⋅ ◯ n)) as (γEC) "[H● H◯]".`
+  suffices Hup : ⊢ |==> ∃ γ, iOwn (E := IEC.ec) γ ((● ε) • (◯ ε)) by
+    ihave Hup := Hup
+    imod Hup with ⟨%γ, Hγ⟩
+    imodintro
+    iexists γ
+    iapply iOwn_op
+    iexact Hγ
+  ihave Halloc := iOwn_alloc (E := IEC.ec) ((● ε) • (◯ ε)) (Auth.auth_both_valid_2 h .rfl)
+  imod Halloc with ⟨%γ, Hγ⟩
+  imodintro
+  iexists γ
+  iexact Hγ
 
 end
