@@ -1,72 +1,24 @@
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Exec
 
-/-!
-# Metatheory for ProbLang
-
-Port of `theories/prob_lang/metatheory.v` from Clutch. We port three
-self-contained groups of material:
-
-* **Group A** — closed-ness and parallel substitution: `Exp.isClosed`,
-  `Exp.substMap`, weakening/substitution lemmas. Purely syntactic, no
-  probability content.
-* **Group D** — deterministic / probabilistic head-step characterization:
-  `DetHeadStepPred`, `ProbHeadStepPred`, `HeadStepPred`, a Boolean test
-  `isDetHeadStep`, and the partitioning lemma
-  `det_or_prob_or_zero`. We reuse our existing `HeadStepSupport`
-  (from `HeadStep.lean`) as the Clutch `head_step_rel` / `det_head_step_rel`
-  relation — no duplicate inductive.
-* **Group E** — tape and fresh-location update lemmas:
-  `upd_diff_tape_comm`, `fresh_loc_upd_some`, `fresh_loc_upd_swap`,
-  `headStep_zero_upd_tapes`, `detHeadStep_upd_tapes`, and the
-  empty-tape / no-tape interchange `primStep_empty_tape`.
-
-**Omissions from Clutch:**
-* Laplace-related material (`AllocTapeLaplace`, `Laplace`, `Tick` —
-  not in our port).
-* Value-reduction cases (`RecDS`, `PairDS`, `InjLDS`, `InjRDS`) — our
-  `Exp` has no separate `Val` type and values live inside `Exp` via
-  `IsVal`, so there is no "rec-to-recV" reduction step.
-* Groups B/C (coupling-specific metatheory) — deferred until the
-  coupling-rules layer lands.
-
-**Representation choices:**
-* Closed-ness sets and substitution maps are plain functions
-  (`String → Bool`, `String → Option Exp`), matching the `Tctx` idiom
-  in `Types.lean` and avoiding a dependency on `Std.HashMap`.
--/
-
 namespace ProbLang
 
-/-! ## Group A — Closed-ness and parallel substitution
-
-`Exp.isClosed X e` holds iff every free variable of `e` lies in `X`,
-where `X : String → Bool` is a predicate. We adapt Clutch's
-`is_closed_expr`/`is_closed_val` into a single recursive function on
-`Exp` because our values are already carved out of `Exp` via `IsVal`. -/
-
-/-- A "closedness context" — a decidable predicate on free variable names. -/
 abbrev ClosedCtx := String → Bool
 
 namespace ClosedCtx
 
-/-- The empty closedness context: no free variables permitted. -/
 def empty : ClosedCtx := fun _ => false
 
-/-- Add `x` to a closedness context. -/
 def insert (X : ClosedCtx) (x : String) : ClosedCtx :=
   fun y => y == x || X y
 
-/-- Insert a `Binder`: `named`/`typed` adds the name, `anon` is a no-op. -/
 def insertB (X : ClosedCtx) : Binder → ClosedCtx
   | .anon       => X
   | .named s    => X.insert s
   | .typed s _  => X.insert s
 
-/-- Pointwise inclusion of closedness contexts. -/
 def subset (X Y : ClosedCtx) : Prop := ∀ x, X x = true → Y x = true
 
-/-- Subset is preserved by `insert`. -/
 theorem subset.insert {X Y : ClosedCtx} (h : X.subset Y) (x : String) :
     (X.insert x).subset (Y.insert x) := by
   intro z hz
@@ -75,7 +27,6 @@ theorem subset.insert {X Y : ClosedCtx} (h : X.subset Y) (x : String) :
   · exact .inl rfl
   · exact .inr (h _ hz)
 
-/-- Subset is preserved by `insertB`. -/
 theorem subset.insertB {X Y : ClosedCtx} (h : X.subset Y) (b : Binder) :
     (X.insertB b).subset (Y.insertB b) := by
   cases b with
@@ -85,7 +36,6 @@ theorem subset.insertB {X Y : ClosedCtx} (h : X.subset Y) (b : Binder) :
 
 end ClosedCtx
 
-/-- `Exp.isClosed X e` — every free variable of `e` lies in `X`. -/
 def Exp.isClosed (X : ClosedCtx) : Exp → Bool
   | .lit _             => true
   | .var x             => X x
@@ -109,7 +59,6 @@ def Exp.isClosed (X : ClosedCtx) : Exp → Bool
   | .annot _ e         => e.isClosed X
   | .scrut e _         => e.isClosed X
 
-/-- If `e` is closed w.r.t. `X` and `X ⊆ Y`, then `e` is closed w.r.t. `Y`. -/
 theorem Exp.isClosed_weaken {X Y : ClosedCtx} (hXY : X.subset Y) :
     ∀ {e : Exp}, e.isClosed X = true → e.isClosed Y = true := by
   intro e
@@ -148,14 +97,10 @@ theorem Exp.isClosed_weaken {X Y : ClosedCtx} (hXY : X.subset Y) :
     exact ih hXY h
   | fail => intro _; rfl
 
-/-- If `e` is closed with no free variables, it is closed in any context. -/
 theorem Exp.isClosed_weaken_empty {X : ClosedCtx} {e : Exp}
     (h : e.isClosed .empty = true) : e.isClosed X = true :=
   isClosed_weaken (fun _ h => by simp [ClosedCtx.empty] at h) h
 
-/-- `insertB` on a `Binder` reduces to either the identity (for `anon`)
-or `insert` on a string. This helper lets subsequent proofs avoid case
-analysis on `Binder` for each individual step. -/
 @[simp] theorem ClosedCtx.insertB_anon (X : ClosedCtx) :
     X.insertB .anon = X := rfl
 
@@ -165,12 +110,6 @@ analysis on `Binder` for each individual step. -/
 @[simp] theorem ClosedCtx.insertB_typed (X : ClosedCtx) (s : String) (τ : Ty) :
     X.insertB (.typed s τ) = X.insert s := rfl
 
-/-- `insertB b` commutes with `insert x` when `x` isn't bound by `b`.
-
-The `b = anon` case is definitional; the `named s` / `typed s _` cases
-both reduce to the pointwise equation
-`(z == x) || ((z == s) || X z) = (z == s) || ((z == x) || X z)`,
-which is just `Bool.or_left_comm`. -/
 theorem ClosedCtx.insertB_insert_comm {X : ClosedCtx} {b : Binder} {x : String}
     (_hb : b.binds x = false) :
     (X.insertB b).insert x = (X.insert x).insertB b := by
@@ -185,11 +124,6 @@ theorem ClosedCtx.insertB_insert_comm {X : ClosedCtx} {b : Binder} {x : String}
     simp only [insertB_typed, insert]
     exact Bool.or_left_comm _ _ _
 
-/-- `insertB b` absorbs an `insert x` when `x` *is* bound by `b`.
-
-When `b = .named x` or `b = .typed x _`, we need to show
-`(z == x) || ((z == x) || X z) = (z == x) || X z`,
-which is `Bool.or_self` after regrouping. -/
 theorem ClosedCtx.insertB_insert_absorb {X : ClosedCtx} {b : Binder} {x : String}
     (hb : b.binds x = true) :
     (X.insert x).insertB b = X.insertB b := by
@@ -206,8 +140,6 @@ theorem ClosedCtx.insertB_insert_absorb {X : ClosedCtx} {b : Binder} {x : String
     simp only [insertB_typed, insert]
     rw [← Bool.or_assoc, Bool.or_self]
 
-/-- Substituting a closed replacement into a closed expression yields a
-closed expression. Clutch's `is_closed_subst`. -/
 theorem Exp.isClosed_subst {e v : Exp} {x : String}
     (hv : v.isClosed .empty = true) :
     ∀ {X : ClosedCtx},
@@ -232,14 +164,11 @@ theorem Exp.isClosed_subst {e v : Exp} {x : String}
       simp only [isClosed]
       obtain ⟨hf, hy⟩ := hbinds
       simp only [Bool.not_eq_true'] at hf hy
-      -- Rewrite `he` so that `.insert x` is innermost, then apply `ih`.
       rw [← ClosedCtx.insertB_insert_comm (b := f) hf,
           ← ClosedCtx.insertB_insert_comm (b := y) hy] at he
       exact ih he
     · rw [if_neg hbinds]
       simp only [isClosed]
-      -- `x` is bound by `f` or `y`; the insert collapses. From the negation of
-      -- `!f.binds x ∧ !y.binds x`, we get `f.binds x ∨ y.binds x`.
       have hxbinds : f.binds x = true ∨ y.binds x = true := by
         rcases hf : f.binds x with _ | _
         · rcases hy : y.binds x with _ | _
@@ -284,29 +213,23 @@ theorem Exp.isClosed_subst {e v : Exp} {x : String}
     exact ih he
   | fail => intro X _; rfl
 
-/-- A parallel-substitution environment: variable name → replacement expression. -/
 abbrev SubstMap := String → Option Exp
 
 namespace SubstMap
 
-/-- Empty environment. -/
 def empty : SubstMap := fun _ => none
 
-/-- Insert a single binding. -/
 def insert (vs : SubstMap) (x : String) (v : Exp) : SubstMap :=
   fun y => if y = x then some v else vs y
 
-/-- Remove a binding (used when entering a binder that shadows `x`). -/
 def delete (vs : SubstMap) (x : String) : SubstMap :=
   fun y => if y = x then none else vs y
 
-/-- `Binder` variant of `delete`: `named`/`typed` deletes, `anon` is no-op. -/
 def deleteB (vs : SubstMap) : Binder → SubstMap
   | .anon       => vs
   | .named s    => vs.delete s
   | .typed s _  => vs.delete s
 
-/-- `Binder` variant of `insert`. -/
 def insertB (vs : SubstMap) : Binder → Exp → SubstMap
   | .anon,       _ => vs
   | .named s,    v => vs.insert s v
@@ -314,8 +237,6 @@ def insertB (vs : SubstMap) : Binder → Exp → SubstMap
 
 end SubstMap
 
-/-- Parallel substitution. Under a binder we delete the bound names from
-the environment so that shadowed variables are not replaced. -/
 def Exp.substMap (vs : SubstMap) : Exp → Exp
   | .lit l             => .lit l
   | .var y             => (vs y).getD (.var y)
@@ -339,7 +260,6 @@ def Exp.substMap (vs : SubstMap) : Exp → Exp
   | .annot a e         => .annot a (e.substMap vs)
   | .scrut e p         => .scrut (e.substMap vs) p
 
-/-- Substituting the empty environment is a no-op. -/
 theorem Exp.substMap_empty (e : Exp) : e.substMap .empty = e := by
   induction e with
   | lit _ => rfl
@@ -372,7 +292,6 @@ theorem Exp.substMap_empty (e : Exp) : e.substMap .empty = e := by
   | scrut e _ ih =>
     simp only [substMap, ih]
 
-/-- `Binder`-variant of `isClosed_subst`. -/
 theorem Exp.isClosed_subst' {X : ClosedCtx} {e v : Exp} {b : Binder}
     (hv : v.isClosed .empty = true)
     (he : e.isClosed (X.insertB b) = true) :
@@ -382,7 +301,6 @@ theorem Exp.isClosed_subst' {X : ClosedCtx} {e v : Exp} {b : Binder}
   | named s    => exact isClosed_subst hv he
   | typed s _  => exact isClosed_subst hv he
 
-/-- If `x` isn't bound by `b` and `X x = false`, then `(X.insertB b) x = false`. -/
 theorem ClosedCtx.insertB_false {X : ClosedCtx} {b : Binder} {x : String}
     (hb : b.binds x = false) (hx : X x = false) :
     (X.insertB b) x = false := by
@@ -397,8 +315,6 @@ theorem ClosedCtx.insertB_false {X : ClosedCtx} {b : Binder} {x : String}
     simp only [insertB_typed, insert, hx, Bool.or_false]
     exact beq_eq_false_iff_ne.mpr (fun h => hb h.symm)
 
-/-- Substituting for a variable not in the closedness context is a no-op.
-Clutch's `subst_is_closed`. -/
 theorem Exp.subst_is_closed {e : Exp} {x : String} {es : Exp} :
     ∀ {X : ClosedCtx}, e.isClosed X = true → X x = false → e.subst' x es = e := by
   induction e with
@@ -449,17 +365,10 @@ theorem Exp.subst_is_closed {e : Exp} {x : String} {es : Exp} :
     simp only [subst', ih he hx]
   | fail => intros; rfl
 
-/-- Substituting into a closed expression is a no-op. -/
 theorem Exp.subst_is_closed_empty {e : Exp} {x : String} {v : Exp}
     (he : e.isClosed .empty = true) : e.subst' x v = e :=
   subst_is_closed he (by simp [ClosedCtx.empty])
 
-/-- Idempotent substitution with a closed replacement.
-
-Clutch's `subst_subst` works without a closedness hypothesis because their
-`subst` is non-recursive on the `Val` constructor, so a `val` replacement
-is inert. Our `subst'` recursively descends into the replacement, so we
-need `v'` to be closed for the equation to hold. -/
 theorem Exp.subst_subst {e v v' : Exp} {x : String}
     (hv' : v'.isClosed .empty = true) :
     (e.subst' x v').subst' x v = e.subst' x v' := by
@@ -500,7 +409,6 @@ theorem Exp.subst_subst {e v v' : Exp} {x : String}
     simp only [subst', ih]
   | fail => rfl
 
-/-- `Binder`-variant of `subst_subst`. -/
 theorem Exp.subst_subst_b {e v v' : Exp} {b : Binder}
     (hv' : v'.isClosed .empty = true) :
     Exp.subst b v (Exp.subst b v' e) = Exp.subst b v' e := by
@@ -509,7 +417,6 @@ theorem Exp.subst_subst_b {e v v' : Exp} {b : Binder}
   | named s => exact subst_subst hv'
   | typed s _ => exact subst_subst hv'
 
-/-- `delete` at one name commutes with `deleteB` at a binder (always). -/
 theorem SubstMap.delete_deleteB_comm (vs : SubstMap) (x : String) (b : Binder) :
     (vs.delete x).deleteB b = (vs.deleteB b).delete x := by
   funext y
@@ -1624,178 +1531,43 @@ theorem State.head_step_dzero_upd_tapes
       simp only [if_true]
       rw [Cfg.uniform_eq_zero_iff]; exact h0
 
-/-- Clutch's `det_head_step_upd_tapes`: a deterministic head step is
-preserved by appending to an unrelated tape. The hypothesis
-`DetHeadStep ⟨e1, σ⟩ ⟨e2, σ⟩` requires the post-state to equal the
-pre-state, which excludes the state-modifying head steps
-(`alloc`/`store`/`tape`/`rand`/`rand-tape`); the surviving cases all
-read at most the heap, so they are unaffected by a tape update.
+/-- Clutch's `det_head_step_upd_tapes`: a deterministic head step predicate
+is preserved by updating any tape. Since `DetHeadStepPred` covers only
+the purely deterministic head steps (no `rand` cases), and these steps
+interact only with the heap (never with tapes), the predicate is
+invariant under arbitrary tape updates.
 
-**Known limitation (2 deferred sorries):** under our `{0, …, N−1}` rand
-semantics, `rand 1` is genuinely deterministic (it always produces 0),
-so the `RandTapeEmptyS` and `RandTapeOtherS` cases at `z = 1` are no
-longer impossible via the "rand isn't dirac" argument. Their
-conclusions fail when the updated tape `α` coincides with the rand's
-label `α_rand`: `σ.update_tapes (·.insert α bs')` introduces an
-arbitrary `bs'` at `α_rand`, whose dirac value may differ from the
-original. Closing these cases properly requires adding a premise
-`α ≠ α_rand` or otherwise restricting overlap; left deferred since
-the theorem has no callers yet. The `RandNoTapeS` case is closed
-directly since `rand 1 unit` has no tape interaction. -/
+Note: Clutch's `det_head_step_rel` is an inductive relating pre/post
+configurations. Our `DetHeadStepPred` mirrors its constructor set
+(all non-`rand` head steps). The stronger `DetHeadStep` (a measure
+property, `headStep cfg {cfg'} = 1`) also admits `rand 1` as
+deterministic, which is NOT stable under tape updates — see the
+`RandTapeEmptyS`/`RandTapeOtherS` cases where replacing the rand's
+tape content changes the result. -/
 theorem State.det_head_step_upd_tapes
-    {e1 e2 : Exp} {σ : State} {α : Loc} {bs bs' : Tape}
-    (hmem : σ.tapes[α]? = some bs)
-    (hdet : ProbLang.DetHeadStep ⟨e1, σ⟩ ⟨e2, σ⟩) :
-    ProbLang.DetHeadStep
-      ⟨e1, σ.update_tapes (·.insert α bs')⟩
-      ⟨e2, σ.update_tapes (·.insert α bs')⟩ := by
-  -- First convert the determinism witness into a HeadStepSupport, then
-  -- case-split on the support.
-  have hpos := hdet.pos
-  have hsupp : HeadStepSupport ⟨e1, σ⟩ ⟨e2, σ⟩ :=
-    (headStep_support_iff e1 e2 σ σ).mp hpos
-  cases hsupp with
-  | BetaS hv heq =>
-    refine .of_det _ _ ?_
-    subst heq
-    simp [headStep, Exp.isValM_some hv]
-  | UnOpS hv heval =>
-    refine .of_det _ _ ?_
-    simp [headStep, Option.unwrapM, Exp.isValM_some hv, ← heval]
-  | BinOpS hv1 hv2 heval =>
-    refine .of_det _ _ ?_
-    simp [headStep, Option.unwrapM, Exp.isValM_some hv1, Exp.isValM_some hv2, ← heval]
-  | IfTrueS => refine .of_det _ _ ?_; simp [headStep]
-  | IfFalseS => refine .of_det _ _ ?_; simp [headStep]
-  | FstS hv1 hv2 =>
-    refine .of_det _ _ ?_
-    simp [headStep, Exp.isValM_some hv1, Exp.isValM_some hv2]
-  | SndS hv1 hv2 =>
-    refine .of_det _ _ ?_
-    simp [headStep, Exp.isValM_some hv1, Exp.isValM_some hv2]
-  | CaseLS hv =>
-    refine .of_det _ _ ?_
-    simp [headStep, Exp.isValM_some hv]
-  | CaseRS hv =>
-    refine .of_det _ _ ?_
-    simp [headStep, Exp.isValM_some hv]
-  | AllocS hv heq hσ =>
-    exfalso
-    rename_i vd _ ed
-    subst heq
-    have hheap : σ.heap = σ.heap.insert σ.heap.fresh vd := by
-      have := congrArg State.heap hσ
-      simpa [State.update_heap] using this
-    have h2 : σ.heap[σ.heap.fresh]? = none := Std.ExtTreeMap.fresh_get? σ.heap
-    have hcmp : compare σ.heap.fresh σ.heap.fresh = .eq := by
-      simp [compare, compareOfLessAndEq]
-    have h3 : (σ.heap.insert σ.heap.fresh vd)[σ.heap.fresh]? = some vd := by
-      rw [Std.ExtTreeMap.getElem?_insert, hcmp]; rfl
-    rw [← hheap] at h3
-    rw [h2] at h3
-    cases h3
-  | LoadS hlook heq =>
-    refine .of_det _ _ ?_
-    subst heq
-    simp [headStep]
+    {e : Exp} {σ : State} {α : Loc} {bs' : Tape}
+    (hdet : ProbLang.DetHeadStepPred e σ) :
+    ProbLang.DetHeadStepPred e (σ.update_tapes (·.insert α bs')) := by
+  cases hdet with
+  | beta hv => exact .beta hv
+  | unop hv heval => exact .unop hv heval
+  | binop hv1 hv2 heval => exact .binop hv1 hv2 heval
+  | ifTrue => exact .ifTrue
+  | ifFalse => exact .ifFalse
+  | fst hv1 hv2 => exact .fst hv1 hv2
+  | snd hv1 hv2 => exact .snd hv1 hv2
+  | caseL hv => exact .caseL hv
+  | caseR hv => exact .caseR hv
+  | alloc hv => exact .alloc hv
+  | load hlook =>
     -- (σ.update_tapes f).heap = σ.heap
-    have : (σ.update_tapes (·.insert α bs')).heap[‹Loc›]? = some ‹Val› := hlook
-    rw [this]
-    simp
-  | StoreS htoval hsome hσ =>
-    refine .of_det _ _ ?_
-    rename_i v ℓ _
-    have hheap_no_op : σ.heap.insert ℓ v = σ.heap := by
-      have := congrArg State.heap hσ
-      simpa [State.update_heap] using this.symm
-    obtain ⟨v_old, hv_old⟩ := Option.isSome_iff_exists.mp hsome
-    have hheap_lookup : (σ.update_tapes (·.insert α bs')).heap[ℓ]? = some v_old := hv_old
-    simp only [headStep, Exp.asValM, htoval, hheap_lookup]
-    have hgoal_state : (σ.update_tapes (·.insert α bs')).update_heap (·.insert ℓ v) =
-        (σ.update_tapes (·.insert α bs')) := by
-      simp [State.update_heap, State.update_tapes, hheap_no_op]
-    rw [hgoal_state]
-    simp [MeasureTheory.Measure.dirac_apply_of_mem (Set.mem_singleton _)]
-  | RandNoTapeS hz hv0 hvz =>
-    -- For `1 < z`: `Cfg.uniform z σ` has ≥ 2 support points, exfalso.
-    -- For `z = 1`: `rand 1 unit` is a dirac at `v = 0`, and the step
-    -- is genuinely deterministic. We prove it directly via `of_det`
-    -- using `Cfg.uniform_one_eq_dirac`.
-    rename_i z _
-    by_cases hz1 : 1 < z
-    · exfalso
-      have hdet' := hdet.det
-      simp only [headStep] at hdet'
-      exact Cfg.uniform_singleton_ne_one hz1 hdet'
-    · -- z = 1 (since 0 < z and ¬ 1 < z).
-      have hzeq : z = 1 := by omega
-      have hveq : ‹Int› = 0 := by omega
-      subst hzeq; subst hveq
-      refine .of_det _ _ ?_
-      simp only [headStep, Cfg.uniform_one_eq_dirac,
-                 MeasureTheory.Measure.dirac_apply_of_mem (Set.mem_singleton _)]
-  | TapeS heq hσ =>
-    exfalso
-    -- Post-state inserts a fresh tape; lookup at fresh in σ is none.
-    have hfresh_none : σ.tapes[σ.tapes.fresh]? = none := Std.ExtTreeMap.fresh_get? σ.tapes
-    have htapes_eq : σ.tapes = σ.tapes.insert σ.tapes.fresh (Tape.empty ‹Int›) := by
-      have := congrArg State.tapes hσ
-      have heq' := heq
-      simpa [State.update_tapes, ← heq'] using this
-    have hcmp : compare σ.tapes.fresh σ.tapes.fresh = .eq := by
-      simp [compare, compareOfLessAndEq]
-    have hsome : (σ.tapes.insert σ.tapes.fresh (Tape.empty ‹Int›))[σ.tapes.fresh]? =
-        some (Tape.empty ‹Int›) := by
-      rw [Std.ExtTreeMap.getElem?_insert, hcmp]; rfl
-    rw [← htapes_eq] at hsome
-    rw [hfresh_none] at hsome
-    cases hsome
-  | RandTapeS hz htape hzN hv hσ =>
-    exfalso
-    -- State mismatch. After the step the tape at the label becomes `⟨N, ns⟩`,
-    -- but `hσ` says the state is unchanged — so σ's tape at that label
-    -- is `⟨N, ns⟩` too, contradicting `htape : σ.tapes[·]? = some ⟨N, nn :: ns⟩`.
-    have hσ_tapes := congrArg State.tapes hσ
-    simp only [State.update_tapes] at hσ_tapes
-    have h2 := htape
-    rw [hσ_tapes] at h2
-    simp only [Std.ExtTreeMap.getElem?_insert,
-      show ∀ l : Lbl, compare l l = Ordering.eq from
-        fun l => by simp [compare, compareOfLessAndEq],
-      if_true] at h2
-    -- h2 : some ⟨N, ns⟩ = some ⟨N, nn :: ns⟩ (bounds match, lists differ)
-    -- Taking `Tape.presamples` of both sides eliminates dependent-type HEq.
-    have hcontra : ∀ {N : Int} {l1 l2 : List _}, (some ⟨N, l1⟩ : Option Tape) = some ⟨N, l2⟩ → l1 = l2 := by
-      rintro _ _ _ heq
-      exact (Tape.mk.injEq ..).mp (Option.some.inj heq) |>.2 |> eq_of_heq
-    have hlist := hcontra h2
-    exact absurd hlist.symm (List.cons_ne_self _ _)
-  | RandTapeEmptyS hz htape hzN _ _ _ =>
-    -- For `1 < z`: `Cfg.uniform z σ` has ≥ 2 support points, exfalso.
-    -- For `z = 1`: `rand 1 (lbl α_rand)` is a dirac, but the theorem's
-    -- conclusion fails when the updated tape `α` overlaps `α_rand`
-    -- (the post-headStep value depends on `σ_new.tapes[α_rand]`, which
-    -- is `bs'` under overlap and may not produce the same dirac as σ).
-    -- **Deferred** with signature limitation: this case would require
-    -- a premise `α ≠ α_rand` (or restricting the theorem to non-overlapping
-    -- tape updates). The theorem is currently unused; see Clutch's
-    -- `det_head_step_upd_tapes` for the intended scope.
-    sorry
-  | RandTapeOtherS hz htape hzN _ _ _ =>
-    -- Same story as RandTapeEmptyS: for `z = 1` with `α = α_rand`,
-    -- the theorem conclusion depends on the arbitrary replacement tape
-    -- content `bs'`, which is unconstrained. Deferred with signature
-    -- limitation.
-    sorry
-  | ScrutSuccessS hv hm =>
-    refine .of_det _ _ ?_
-    simp [headStep, Exp.isValM_some hv, hm]
-  | ScrutFailureS hv hm =>
-    refine .of_det _ _ ?_
-    simp [headStep, Exp.isValM_some hv, hm]
-  | AnnotS hv =>
-    refine .of_det _ _ ?_
-    simp [headStep, Exp.isValM_some hv]
+    exact .load hlook
+  | store hv hsome =>
+    exact .store hv hsome
+  | tape => exact .tape
+  | scrutSuccess hv hm => exact .scrutSuccess hv hm
+  | scrutFailure hv hm => exact .scrutFailure hv hm
+  | annot hv => exact .annot hv
 
 /-- Clutch's `prim_step_empty_tape`: reading from an empty-presample
 tape is the same as reading from the "no-tape" marker `.lit .unit`.

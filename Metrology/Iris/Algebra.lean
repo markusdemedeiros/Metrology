@@ -8,12 +8,11 @@ import Iris.Instances.IProp.Instance
 import Iris.Algebra.Auth
 import Iris.Algebra.Numbers
 
-namespace AlgebraTest
 open Std Iris COFE ProbabilityTheory MeasureTheory
 
 noncomputable section
 
-local instance : UFraction ℕ+ where
+instance : UFraction ℕ+ where
   Proper := (· ≤ 1)
   add_comm := by grind
   add_assoc := by grind
@@ -105,4 +104,3 @@ instance [MeasurableSpace α] : UCMRA (Measure α) where
 --
 -- end logic
 end
-end AlgebraTest

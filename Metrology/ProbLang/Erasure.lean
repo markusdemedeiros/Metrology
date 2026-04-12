@@ -1162,8 +1162,8 @@ the same thing. -/
 /-- Inserting the same tape value at an existing key is the identity on `State`. -/
 theorem State.update_tapes_insert_id {σ : State} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) :
-    σ.update_tapes (·.insert α t) = σ := by
-  sorry
+    σ.update_tapes (·.insert α t) = σ :=
+  State.update_tapes_no_change h
 
 /-- Mapping `tapeIndexUniform N` through the Cfg embedding `a ↦ ⟨lit (int ↑a), σ⟩`
 gives `Cfg.uniform N σ`. Both are the uniform distribution on
@@ -1174,7 +1174,43 @@ theorem tapeIndexUniform_lintegral_eq_cfg_uniform
     ∫⁻ (a : { z : Int // 0 ≤ z ∧ z < N }),
         f ⟨.lit (.int ↑a), σ⟩ ∂tapeIndexUniform N
       = ∫⁻ (ρ : Cfg), f ρ ∂Cfg.uniform N σ := by
-  sorry
+  -- Unfold both definitions to PMF.uniformOfFinset level
+  unfold tapeIndexUniform Cfg.uniform Int.isPos Option.unwrapM
+  have hNonempty : (Finset.Ico 0 N).Nonempty := ⟨0, Finset.mem_Ico.mpr ⟨le_refl _, hN⟩⟩
+  rw [dif_pos hNonempty, dif_pos hN]
+  simp only
+  -- Now both sides are lintegrals over `Measure.map` of the same PMF.toMeasure
+  -- LHS: ∫⁻ a, f ⟨lit (int ↑a), σ⟩ ∂(pmf.toMeasure.map (subtypeEmbed))
+  -- RHS: ∫⁻ ρ, f ρ ∂(pmf.toMeasure.map (cfgEmbed))
+  -- Use lintegral_map on both sides to push through the map
+  have hm_sub : Measurable (fun z : Int => if hz : 0 ≤ z ∧ z < N then (⟨z, hz⟩ : {z // 0 ≤ z ∧ z < N}) else ⟨0, ⟨le_refl _, by omega⟩⟩) := Measurable.of_discrete
+  have hm_cfg : Measurable (fun x : Int => (⟨Exp.lit (BaseLit.int x), σ⟩ : Cfg)) := Measurable.of_discrete
+  -- Both sides are lintegrals over Measure.map of the same PMF.toMeasure.
+  -- Strategy: rewrite both to lintegrals over the base PMF.toMeasure on ℤ using lintegral_map,
+  -- then show the integrands agree on the PMF support.
+  have hm_f_sub : Measurable (fun (a : {z // 0 ≤ z ∧ z < N}) => f ⟨.lit (.int ↑a), σ⟩) :=
+    Measurable.of_discrete
+  have hm_f_cfg : Measurable f := Measurable.of_discrete
+  -- Both sides integrate f over a uniform measure on {⟨lit(int n), σ⟩ | n ∈ Ico 0 N}.
+  -- Step 1: Push both lintegrals through the Measure.map using lintegral_map
+  rw [lintegral_map hm_f_sub hm_sub, lintegral_map hm_f_cfg hm_cfg]
+  -- Both are: ∫⁻ a:ℤ, ... ∂pmf.toMeasure
+  -- Step 2: Show integrands agree a.e. on pmf.toMeasure
+  -- The PMF support is Ico 0 N. On support, dite takes the then-branch.
+  apply lintegral_congr_ae
+  -- Use PMF.ae_iff: ∀ᵐ a ∂pmf.toMeasure, P a ↔ ∀ a ∈ support, P a
+  rw [Filter.eventuallyEq_iff_exists_mem]
+  use (PMF.uniformOfFinset (Finset.Ico 0 N) hNonempty).support
+  constructor
+  · -- support ∈ ae(pmf.toMeasure): complement has measure 0
+    rw [mem_ae_iff]
+    rw [(PMF.uniformOfFinset (Finset.Ico 0 N) hNonempty).toMeasure_apply_eq_zero_iff (MeasurableSet.of_discrete)]
+    exact disjoint_compl_right
+  · intro a ha
+    have hmem : a ∈ Finset.Ico 0 N := by
+      rwa [PMF.mem_support_uniformOfFinset_iff] at ha
+    have hab : 0 ≤ a ∧ a < N := Finset.mem_Ico.mp hmem
+    simp [dif_pos hab]
 
 /-- **Main theorem (Clutch `prim_coupl_upd_tapes_dom`, projected form).**
 Appending a uniformly-sampled value onto an existing tape `α` of `σ` with
