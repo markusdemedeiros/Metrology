@@ -293,6 +293,7 @@ The old Clutch `letrec f x body` corresponds to `fix (lam body)` in LN;
 there's no dedicated `Typed.letrec` rule — derive it from `fix` + `lam`.
 -/
 
+/-- `Typed Γ e τ` — expression `e` has type `τ` under typing context `Γ`. -/
 inductive Typed : Tctx → Exp → Ty → Prop
   | fvar {Γ x τ} :
       Γ x = some τ →
@@ -450,7 +451,7 @@ theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp} {τ : Ty}
 /-- Rename one variable in a typing context: if `Γ x = some τ_x` and `y` is
     fresh, then `Γ.insert y τ_x = (Γ.insert x τ_x) ∘ rename` … but cleaner
     just to inline the structural manipulation case-by-case. -/
-def Tctx.swapInsert (Γ : Tctx) (x y : Var) (τ : Ty) : Tctx :=
+def Tctx.swapInsert (Γ : Tctx) (_x y : Var) (τ : Ty) : Tctx :=
   Γ.insert y τ
 
 theorem Tctx.insert_swap (Γ : Tctx) {x z : Var} (hxz : x ≠ z) (τ τ' : Ty) :
@@ -507,7 +508,7 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       by_cases hxz : x = z
       · subst hxz
         rw [if_pos rfl]
-        simp only [Tctx.insert, if_pos rfl] at hz
+        simp only [Tctx.insert] at hz
         have : τ = τ_x := (Option.some.inj hz).symm
         subst this
         exact .fvar (by simp [Tctx.insert])
@@ -531,8 +532,8 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .binop_int (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_) hop
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | binop_bool _ _ hop ih1 ih2 =>
       intro x y τ_x Γ heq hy
       subst heq
@@ -540,8 +541,8 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .binop_bool (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_) hop
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | unop_int _ hop ih =>
       intro x y τ_x Γ heq hy
       subst heq; simp only [Exp.subst]
@@ -557,8 +558,8 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .unboxed_eq hu (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_)
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | pair _ _ ih1 ih2 =>
       intro x y τ_x Γ heq hy
       subst heq
@@ -566,8 +567,8 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .pair (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_)
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | fst _ ih =>
       intro x y τ_x Γ heq hy; subst heq; simp only [Exp.subst]
       exact .fst (ih x y τ_x Γ rfl hy)
@@ -586,14 +587,14 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨⟨h0, h1⟩, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .case (ih0 x y τ_x Γ rfl ?_) (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_) <;>
-        simp [Finset.mem_union, h0, h1, h2, hx]
+        simp [h0, h1, h2, hx]
   | cond _ _ _ ih0 ih1 ih2 =>
       intro x y τ_x Γ heq hy; subst heq
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
       obtain ⟨⟨⟨h0, h1⟩, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .cond (ih0 x y τ_x Γ rfl ?_) (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_) <;>
-        simp [Finset.mem_union, h0, h1, h2, hx]
+        simp [h0, h1, h2, hx]
   | @lam L Γ' e τ1 τ2 _ ih =>
       intro x y τ_x Γ heq hy; subst heq
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
@@ -645,8 +646,8 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .app (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_)
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | @tlam Γ' e τ _ ih =>
       intro x y τ_x Γ heq hy; subst heq
       simp only [Exp.subst]
@@ -660,7 +661,7 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
       obtain ⟨⟨h1, _⟩, hx⟩ := hy
       refine .tapp (ih x y τ_x Γ rfl ?_)
-      simp [Finset.mem_union, Finset.mem_singleton, h1, hx]
+      simp [h1, hx]
   | tfold _ ih =>
       intro x y τ_x Γ heq hy; subst heq
       exact .tfold (ih x y τ_x Γ rfl hy)
@@ -673,7 +674,7 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
       obtain ⟨⟨_, h1⟩, hx⟩ := hy
       refine .tunfold (ih x y τ_x Γ rfl ?_)
-      simp [Finset.mem_union, Finset.mem_singleton, h1, hx]
+      simp [h1, hx]
   | tpack _ ih =>
       intro x y τ_x Γ heq hy; subst heq
       exact .tpack (ih x y τ_x Γ rfl hy)
@@ -683,7 +684,7 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨hye2, hye1⟩, hyx⟩ := hy
       simp only [Exp.subst]
       refine .tunpack (L ∪ {x, y} ∪ e2.fv) (ih1 x y τ_x Γ rfl ?_) ?_
-      · simp [Finset.mem_union, hye1, hyx]
+      · simp [hye1, hyx]
       intro z hz
       have hzL : z ∉ L :=
         fun h => hz (Finset.mem_union_left _ (Finset.mem_union_left _ h))
@@ -716,8 +717,8 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .store (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_)
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | alloc_tape _ ih =>
       intro x y τ_x Γ heq hy; subst heq; simp only [Exp.subst]
       exact .alloc_tape (ih x y τ_x Γ rfl hy)
@@ -727,16 +728,16 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .rand (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_)
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | rand_unit _ _ ih1 ih2 =>
       intro x y τ_x Γ heq hy; subst heq
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
       obtain ⟨⟨h1, h2⟩, hx⟩ := hy
       simp only [Exp.subst]
       refine .rand_unit (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_)
-      · simp [Finset.mem_union, h1, hx]
-      · simp [Finset.mem_union, h2, hx]
+      · simp [h1, hx]
+      · simp [h2, hx]
   | scrut _ hp ih =>
       intro x y τ_x Γ heq hy; subst heq; simp only [Exp.subst]
       simp only [Exp.fv] at hy
@@ -760,7 +761,7 @@ LN renaming theory; deferred. -/
 
 /-- Cofinite α-rename: a typing at one fresh atom can be lifted to all fresh atoms. -/
 theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp} {τ τ' : Ty}
-    (hx : x ∉ e.fv) (he : Typed (Γ.insert x τ) e τ') :
+    (_hx : x ∉ e.fv) (he : Typed (Γ.insert x τ) e τ') :
     ∀ y ∉ insert x e.fv,
       Typed (Γ.insert y τ) (Exp.open' (Exp.close e x) (Exp.fvar y)) τ' := by
   intro y hy
@@ -778,7 +779,7 @@ theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp} {τ τ' : Ty}
   exact Typed.rename x y he hyu
 
 theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp} {τ τ' : Ty}
-    (hf : f ∉ e.fv) (he : Typed (Γ.insert f (.arrow τ τ')) e (.arrow τ τ')) :
+    (_hf : f ∉ e.fv) (he : Typed (Γ.insert f (.arrow τ τ')) e (.arrow τ τ')) :
     ∀ g ∉ insert f e.fv,
       Typed (Γ.insert g (.arrow τ τ'))
         (Exp.open' (Exp.close e f) (Exp.fvar g)) (.arrow τ τ') := by
@@ -795,7 +796,7 @@ theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp} {τ τ' : Ty}
   exact Typed.rename f g he hgu
 
 theorem Typed.rename_unpack {Γ : Tctx} {x : Var} {e2 : Exp} {τ τ2 : Ty}
-    (hx : x ∉ e2.fv)
+    (_hx : x ∉ e2.fv)
     (he2 : Typed ((Γ.shift).insert x τ) e2 τ2.shift) :
     ∀ y ∉ insert x e2.fv,
       Typed ((Γ.shift).insert y τ)

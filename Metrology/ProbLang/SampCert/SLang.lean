@@ -476,11 +476,11 @@ theorem twoByteEq_isEmbedding : IsEmbedding twoByteEq plTwoByteEq := by
     · intro b
       have ha_subst : Exp.subst (as_expr a) "b" (as_expr b) = as_expr a := by
         apply Exp.subst_fresh
-        intro h; simp [as_expr, Exp.fv] at h
+        intro h; simp [Exp.fv] at h
       have hgoal2 : Exp.subst (probLangEq (as_expr a) (.fvar "b")) "b" (as_expr b)
           = probLangEq (as_expr a) (as_expr b) := by
         unfold probLangEq
-        simp only [Exp.subst, ha_subst]
+        simp only [Exp.subst]
         rfl
       rw [hgoal2]
       exact probLangEq_uint8_isEmbedding a b

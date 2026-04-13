@@ -126,8 +126,7 @@ theorem Exp.subst_subst {e v v' : Exp} {x : Var} {y : Var}
       by_cases h1 : x = z <;> by_cases h2 : y = z
       · subst h1; exact absurd h2 hne.symm
       · subst h1
-        have hs : Exp.subst v' x v' = v' := Exp.subst_fresh _ _ _ hv'
-        simp [Exp.subst, h2, hs]
+        simp [Exp.subst, h2]
       · subst h2
         have hv'_fresh : Exp.subst v' x (Exp.subst v y v') = v' :=
           Exp.subst_fresh _ _ _ hv'
@@ -146,7 +145,7 @@ theorem Exp.subst_subst {e v v' : Exp} {x : Var} {y : Var}
 /-- Independence of substitutions at distinct, mutually-fresh variables. -/
 theorem Exp.subst_subst_ne {e v v' : Exp} {x y : Var}
     (hne : x ≠ y) (hxv' : x ∉ v'.fv) (hyv : y ∉ v.fv)
-    (hv_lc : v.IsLocallyClosed) (hv'_lc : v'.IsLocallyClosed) :
+    (_hv_lc : v.IsLocallyClosed) (hv'_lc : v'.IsLocallyClosed) :
     Exp.subst (Exp.subst e x v) y v' = Exp.subst (Exp.subst e y v') x v := by
   rw [Exp.subst_subst hne hxv' hv'_lc]
   rw [Exp.subst_fresh y v v' hyv]

@@ -49,7 +49,7 @@ abbrev Var : Type := String
 instance : Cslib.HasFresh String where
   fresh s :=
     let maxLen : Nat := s.sup (fun str => str.length)
-    String.mk (List.replicate (maxLen + 1) 'x')
+    String.ofList (List.replicate (maxLen + 1) 'x')
   fresh_notMem _ := by sorry
 
 abbrev Loc : Type := Int

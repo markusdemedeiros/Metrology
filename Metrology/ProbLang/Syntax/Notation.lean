@@ -283,13 +283,8 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
       `(Exp.app $lam $v1)
   | `(pl_exp|scrut $e with $p)   => do `(Exp.scrut $(← elabPL env st e) pl_pat($p))
   | `(pl_exp|let! $p:pl_pat := $e; $body) => do
-      -- `let! p := e; body` ≡ `case e | p => body | _ => fail` with a single branch.
-      let branch ← mkCaseBranch env st p body
-      let failLam ← mkAnonLam (← `(Exp.fail))
-      `(Exp.case
-         (Exp.scrut $(← elabPL env st e) pl_pat($p))
-         $branch
-         $failLam)
+      -- Desugar to a single-branch `case`; the `case` arm handles everything.
+      elabPL env st (← `(pl_exp|case $e | $p => $body))
   | `(pl_exp|case $e | $p:pl_pat => $b $[| $ps:pl_pat => $bs]*) => do
       -- Build `(λ scrut. <chain>) e`, where `<chain>` matches `scrut` against
       -- each pattern right-to-left, falling through to `fail`.
@@ -405,17 +400,17 @@ namespace ProbLang
 open Lean Lean.PrettyPrinter
 
 /-- Strip the `pl(...)` wrapper to get a raw `pl_exp`, or fall back to `{t}` escape. -/
-partial def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
+def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
   | `(pl($e)) => `(pl_exp|$e)
   | `($t)     => `(pl_exp|{$t})
 
 /-- Strip the `pl_ty(...)` wrapper to get a raw `pl_ty`. -/
-partial def unpackPLTy [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
+def unpackPLTy [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
   | `(pl_ty($τ)) => pure τ
   | `($_)        => panic! "unknown type"
 
 /-- Strip the `pl_pat(...)` wrapper to get a raw `pl_pat`. -/
-partial def unpackPLPat [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_pat)
+def unpackPLPat [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_pat)
   | `(pl_pat($p)) => pure p
   | `($_)         => panic! "unknown pattern"
 
@@ -612,13 +607,12 @@ def buildArgFromName [Monad m] [MonadRef m] [MonadQuotation m]
     `(pl_arg|$ident:ident)
 
 /-- Strip a leading `Exp.close ... <atom>` so the lam body renders without
-    explicit closing. Monad-polymorphic. -/
+    explicit closing. -/
 def stripClose [Monad m] [MonadRef m] [MonadQuotation m]
     (e : Term) : m Term := do
   match e with
-  | `($body |>.close $_) => return body
   | `(Exp.close $body $_) => return body
-  | _ => return e
+  | _                     => return e
 
 open Lean.PrettyPrinter.Delaborator in
 /-- Delaborator dispatched when the `mdata` contains exactly our
@@ -642,30 +636,23 @@ def delabPlBinderMeta : Delab := do
       `(pl(rec $arg _ := $bodyPL))
   | _ => failure
 
-/-! ### Applications — special-cased for `let` and `;` -/
+/-! ### Applications — special-cased for `let` and `;`
 
-/-- Check if a `pl_arg` represents a named binder (non-anonymous). -/
-def isNamedArg (bi : TSyntax `pl_arg) : Bool :=
-  if bi.raw.getNumArgs > 1 then true        -- typed binder
-  else
-    let c := bi.raw[0]!
-    if c.getNumArgs > 0 then c[0]!.isIdent
-    else false
+A unary `λ` applied to an argument displays as either `let x := arg; body`
+(named binder) or `arg; body` (anonymous). Everything else renders as a
+plain application. -/
 
 @[app_unexpander Exp.app]
 def unexpApp : Unexpander
-  | `($_ $e1 $e2) => do
-    match e1 with
-    | `(pl(fun $xs*, $body)) =>
-        if xs.size = 1 then
-          let bi := xs[0]!
-          if isNamedArg bi then
-            return (← `(pl(let $bi := $(← unpackPLExp e2); $body)))
-          else
-            return (← `(pl($(← unpackPLExp e2); $body)))
-        `(pl($(← unpackPLExp e1) $(← unpackPLExp e2)))
-    | _ =>
-        `(pl($(← unpackPLExp e1) $(← unpackPLExp e2)))
+  | `($_ $fn $arg) => do
+    let rhs ← unpackPLExp arg
+    match fn with
+    | `(pl(fun $a:pl_arg, $body)) =>
+        match a with
+        | `(pl_arg|$_:ident)        => `(pl(let $a := $rhs; $body))
+        | `(pl_arg|($_:ident : $_)) => `(pl(let $a := $rhs; $body))
+        | _                         => `(pl($rhs; $body))
+    | _ => `(pl($(← unpackPLExp fn) $rhs))
   | _ => throw ()
 
 /-! ### `Exp.annotated` delab (gated by `pp.problang.annot`) -/
