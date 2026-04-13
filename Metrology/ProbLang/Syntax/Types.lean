@@ -1,17 +1,22 @@
 import Metrology.ProbLang.Syntax.Syntax
+import Metrology.ProbLang.Syntax.Properties
 
 /-!
-# Syntactic typing for ProbLang (System F_μ_ref with tapes)
+# Syntactic typing for ProbLang (System F_μ_ref with tapes) — LN edition
 
-Port of `theories/prob_lang/typing/types.v` from the Clutch development
-(https://github.com/logsem/clutch).
+Port of `theories/prob_lang/typing/types.v` from Clutch (logsem/clutch),
+adapted to the locally-nameless encoding. Typing contexts now map atoms
+(`Var = Nat`) to types. Binder rules use cofinite quantification: `Γ ⊢
+lam e : τ1 → τ2` iff for every fresh atom `x ∉ L`, `Γ, x : τ1 ⊢ e^x : τ2`.
 
-Typing contexts are represented as plain partial functions `String → Option Ty`
-rather than as a `stringmap`; this matches `Γ !! x = Some τ` lookup directly
-and avoids pulling in finite-map machinery the typing judgment doesn't need.
+Type-level de-Bruijn (`Ty.var`, `Ty.rec'`, `Ty.forall'`, `Ty.exists'`) is
+unchanged from Clutch — types were de-Bruijn already.
 -/
 
 namespace ProbLang
+open Cslib Exp
+
+/-! ## Ty renaming / substitution (de Bruijn) — unchanged from the old Types -/
 
 @[simp] def upren (ξ : Nat → Nat) : Nat → Nat
   | 0     => 0
@@ -192,6 +197,8 @@ theorem upN_ge : ∀ {k n : Nat} (σ : Nat → Ty), k ≤ n →
     rfl
   | _ + 1, 0,     _, h => absurd h (by omega)
 
+/-! ## Value classes -/
+
 inductive UnboxedType : Ty → Prop
   | unit                           : UnboxedType .unit
   | int                            : UnboxedType .int
@@ -231,35 +238,39 @@ def UnOp.boolResTy : UnOp → Option Ty
   | .neg   => some .bool
   | .minus => none
 
-abbrev Tctx := String → Option Ty
+/-! ## Typing contexts
+
+A typing context `Tctx` maps atoms (`Var = Nat`) to types. -/
+
+abbrev Tctx := Var → Option Ty
 
 namespace Tctx
 
 def empty : Tctx := fun _ => none
 
-def insert (Γ : Tctx) (x : String) (τ : Ty) : Tctx :=
+/-- Insert at an atom. -/
+def insert (Γ : Tctx) (x : Var) (τ : Ty) : Tctx :=
   fun y => if y = x then some τ else Γ y
 
-def insertB (Γ : Tctx) : Binder → Ty → Tctx
-  | .anon,       _ => Γ
-  | .named x,    τ => Γ.insert x τ
-  | .typed x _,  τ => Γ.insert x τ
-
+/-- Pointwise shift on type-level de-Bruijn. -/
 def shift (Γ : Tctx) : Tctx := fun x => (Γ x).map Ty.shift
 
 end Tctx
 
-/-- The `rec_unfold` value: `λ x, x`. Wrapping `unfold` in this identity makes
-unfolding a recursive type take a real computation step rather than a pure
-subsumption — needed so contextual refinement can't eliminate an `unfold`
-past a diverging `fold`. -/
-def recUnfold : Exp :=
-  .letrec .anon (.named "x") (.var "x")
+/-! ## The `rec_unfold` value: `λ x, x` = `lam (bvar 0)` -/
+
+/-- Wrapping `unfold` in this identity makes unfolding a recursive type take a
+    real computation step. Under LN, `λ x. x` is `lam (bvar 0)`. -/
+def recUnfold : Exp := .lam (.bvar 0)
+
+/-! ## Pattern typing -/
 
 /-- `PatTyped τs p τb` — pattern `p` matched against a scrutinee of type `τs`
-produces bindings of type `τb`. -/
+    yields bindings of type `τb`. The LN `.wildcard` pattern binds the whole
+    scrutinee (there is no separate `.var` pattern since bindings live outside
+    `Pat`). -/
 inductive PatTyped : Ty → Pat → Ty → Prop
-  | var {τ x}          : PatTyped τ (.var x) τ
+  | wildcard {τ}        : PatTyped τ .wildcard τ
   | lit_int {z}        : PatTyped .int  (.lit (.int z))  .unit
   | lit_bool {b}       : PatTyped .bool (.lit (.bool b)) .unit
   | lit_unit           : PatTyped .unit (.lit .unit)     .unit
@@ -269,11 +280,23 @@ inductive PatTyped : Ty → Pat → Ty → Prop
   | inl {τ1 τ2 p b}    : PatTyped τ1 p b → PatTyped (.sum τ1 τ2) (.inl p) b
   | inr {τ1 τ2 p b}    : PatTyped τ2 p b → PatTyped (.sum τ1 τ2) (.inr p) b
 
-/-- `Γ ⊢ₜ e : τ` — the expression `e` has type `τ` in context `Γ`. -/
+/-! ## Typing judgment
+
+Binder rules use cofinite quantification over finite sets of atoms.
+
+`.lam e` : introduce a `λ`. Under LN, `e` has a dangling `bvar 0`; to type
+it we open with a fresh atom.
+
+`.fix e` : introduce a fixpoint (the body binds its recursive self).
+
+The old Clutch `letrec f x body` corresponds to `fix (lam body)` in LN;
+there's no dedicated `Typed.letrec` rule — derive it from `fix` + `lam`.
+-/
+
 inductive Typed : Tctx → Exp → Ty → Prop
-  | var {Γ x τ} :
+  | fvar {Γ x τ} :
       Γ x = some τ →
-      Typed Γ (.var x) τ
+      Typed Γ (.fvar x) τ
   | lit_int  {Γ z} : Typed Γ (.lit (.int z)) .int
   | lit_bool {Γ b} : Typed Γ (.lit (.bool b)) .bool
   | lit_unit {Γ}   : Typed Γ (.lit .unit)     .unit
@@ -315,16 +338,19 @@ inductive Typed : Tctx → Exp → Ty → Prop
       Typed Γ e0 .bool →
       Typed Γ e1 τ → Typed Γ e2 τ →
       Typed Γ (.cond e0 e1 e2) τ
-  | letrec {Γ f x e τ1 τ2} :
-      Typed ((Γ.insertB f (.arrow τ1 τ2)).insertB x τ1) e τ2 →
-      Typed Γ (.letrec f x e) (.arrow τ1 τ2)
+  | lam (L : Finset Var) {Γ e τ1 τ2} :
+      (∀ x ∉ L, Typed (Γ.insert x τ1) (Exp.open' e (.fvar x)) τ2) →
+      Typed Γ (.lam e) (.arrow τ1 τ2)
+  | fix (L : Finset Var) {Γ e τ1 τ2} :
+      (∀ f ∉ L, Typed (Γ.insert f (.arrow τ1 τ2)) (Exp.open' e (.fvar f)) (.arrow τ1 τ2)) →
+      Typed Γ (.fix e) (.arrow τ1 τ2)
   | app {Γ e1 e2 τ1 τ2} :
       Typed Γ e1 (.arrow τ1 τ2) →
       Typed Γ e2 τ1 →
       Typed Γ (.app e1 e2) τ2
   | tlam {Γ e τ} :
       Typed Γ.shift e τ →
-      Typed Γ (.letrec .anon .anon e) (.forall' τ)
+      Typed Γ (.lam e) (.forall' τ)
   | tapp {Γ e τ τ'} :
       Typed Γ e (.forall' τ) →
       Typed Γ (.app e (.lit .unit)) (τ.single τ')
@@ -337,10 +363,10 @@ inductive Typed : Tctx → Exp → Ty → Prop
   | tpack {Γ e τ τ'} :
       Typed Γ e (τ.single τ') →
       Typed Γ e (.exists' τ)
-  | tunpack {Γ e1 x e2 τ τ2} :
+  | tunpack (L : Finset Var) {Γ e1 e2 τ τ2} :
       Typed Γ e1 (.exists' τ) →
-      Typed ((Γ.shift).insert x τ) e2 τ2.shift →
-      Typed Γ (.app (.letrec .anon (.named x) e2) e1) τ2
+      (∀ x ∉ L, Typed ((Γ.shift).insert x τ) (Exp.open' e2 (.fvar x)) τ2.shift) →
+      Typed Γ (.app (.lam e2) e1) τ2
   | alloc {Γ e τ} :
       Typed Γ e τ → Typed Γ (.alloc e) (.ref τ)
   | load {Γ e τ} :

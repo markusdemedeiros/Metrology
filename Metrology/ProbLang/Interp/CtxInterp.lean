@@ -61,10 +61,12 @@ It corresponds 1-to-1 with the cases of `headStep`.
     `primStep`. -/
 def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
   match e with
-  -- Beta reduction: headStep (app (letrec f x e1) e2) = subst …
-  -- Precondition: e2 is a value (enforced by the evaluation context).
-  | .app (.letrec f x body) e2 =>
-    return Exp.subst x e2 (Exp.subst f (.letrec f x body) body)
+  -- Beta reduction: app (lam e) v ↦ e[0 := v]
+  | .app (.lam body) e2 =>
+    return Exp.open' body e2
+  -- Fix unfolding: app (fix e) v ↦ app (e[0 := fix e]) v
+  | .app (.fix body) e2 =>
+    return Exp.app (Exp.open' body (.fix body)) e2
 
   -- Unary operator: headStep (unop op e) = op.eval e
   | .unop op v =>

@@ -3,8 +3,11 @@ import Std.Data.ExtTreeMap.Lemmas
 import Mathlib.Data.Countable.Basic
 import Mathlib.Tactic.DeriveCountable
 import Mathlib.Logic.Equiv.List
+import Cslib.Foundations.Data.HasFresh
+import Cslib.Foundations.Syntax.HasSubstitution
 
 open Std
+open Cslib
 
 def Std.ExtTreeMap.fresh (t : ExtTreeMap Int V) : Int :=
   match t.maxKey? with | none => 1 | some v => v + 1
@@ -18,9 +21,6 @@ theorem Std.ExtTreeMap.fresh_get? (t : ExtTreeMap Int V) :
     intro hmem
     have hle := ExtTreeMap.le_maxKey?_of_mem hmem (Option.get_of_eq_some (isSome_maxKey?_of_mem hmem) HM)
     simp [compare, compareOfLessAndEq] at hle
-    split at hle; grind
-    split at hle; grind
-    simp at hle
 
 -- TODO: PR back to mathlib
 instance instCountableChar : Countable Char where
@@ -38,6 +38,9 @@ instance instCountableString : Countable String where
     exact fun _ _ H => String.toList_inj.mp (Hf H)
 
 namespace ProbLang
+
+/-- Free variables are natural numbers. CSlib provides `HasFresh ℕ`. -/
+abbrev Var : Type := Nat
 
 abbrev Loc : Type := Int
 
@@ -59,33 +62,33 @@ inductive Ty
   | arrow (τ1 τ2 : Ty)
   | ref (τ : Ty)
   | tape
-  -- System F_μ_ref extension (Clutch `type`): de Bruijn type variables and
-  -- three type-level binders. The binder bodies live under a fresh de Bruijn
-  -- type variable (index 0), as is standard.
   | var (n : Nat)
   | rec' (τ : Ty)
   | forall' (τ : Ty)
   | exists' (τ : Ty)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
-inductive Binder | anon | named (s : String) | typed (s : String) (τ : Ty)
-  deriving Inhabited, DecidableEq, Countable, Repr, BEq
-
-def Binder.binds (b : Binder) (x : String) : Bool :=
-  match b with | .named s | .typed s _ => s == x | .anon => false
-
 inductive Pat
-  | var (x : Binder)
+  | wildcard
   | lit (b : BaseLit)
   | pair (p1 p2 : Pat)
   | inl (p : Pat)
   | inr (p : Pat)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
+/-- Locally-nameless expressions.
+  * `bvar` : de-Bruijn-indexed bound variables.
+  * `fvar` : free variables named by `Var = Nat`.
+  * `lam`  : lambda abstraction, binds one variable (`bvar 0` in body).
+  * `fix`  : recursive fixpoint, binds one variable (`bvar 0` in body = the recursive self).
+    The usual surface form `letrec f x. e` desugars to `fix (lam e')`.
+-/
 inductive Exp
+  | bvar (n : Nat)
+  | fvar (x : Var)
   | lit (b : BaseLit)
-  | var (x : String)
-  | letrec (f x : Binder) (e : Exp)
+  | lam (e : Exp)
+  | fix (e : Exp)
   | app (e1 e2 : Exp)
   | unop (u : UnOp) (e : Exp)
   | binop (b : BinOp) (e1 e2 : Exp)
@@ -106,20 +109,163 @@ inductive Exp
   deriving Inhabited, Countable, Repr, BEq
 
 /-- Phantom type annotation: carries a `Ty` alongside an `Exp` for display
-    purposes but is definitionally equal to the expression. The unexpander
-    reads this wrapper to render `(e : τ)` when `pp.problang.annot` requests it. -/
+    purposes but is definitionally equal to the expression. -/
 @[reducible] def Exp.annotated (_τ : Ty) (e : Exp) : Exp := e
 
-/-- Try to match an expression against a pattern.
-    Returns `some bindings` on success, `none` on failure.
-    `bindings` is a (possibly nested) pair of the matched components.
-    - `var _` always matches, bindings = the scrutinee
-    - `lit b` matches if scrutinee is `lit b`, bindings = unit
-    - `pair p1 p2` matches pairs, bindings = `(b1, b2)`
-    - `inl p` / `inr p` match sum injections, bindings = sub-bindings
-    - `annot _ p` strips the annotation and matches `p` -/
+/-- Phantom name-hint wrapper for `lam`: carries the Lean identifier the user
+    wrote for the bound variable so delaborators can restore it. Reducibly
+    equal to `Exp.lam e`. -/
+@[reducible] def Exp.lamN (_name : String) (_τ : Option Ty) (e : Exp) : Exp := Exp.lam e
+
+/-- Phantom name-hint wrapper for `fix`. -/
+@[reducible] def Exp.fixN (_name : String) (_τ : Option Ty) (e : Exp) : Exp := Exp.fix e
+
+namespace Exp
+
+/-- Recursive variable opening. Replace `bvar i` with `sub` at depth `i`. -/
+@[simp, scoped grind =] def openRec (i : Nat) (sub : Exp) : Exp → Exp
+  | bvar j => if i = j then sub else bvar j
+  | fvar x => fvar x
+  | lit b => lit b
+  | lam e => lam (openRec (i+1) sub e)
+  | fix e => fix (openRec (i+1) sub e)
+  | app e1 e2 => app (openRec i sub e1) (openRec i sub e2)
+  | unop op e => unop op (openRec i sub e)
+  | binop op e1 e2 => binop op (openRec i sub e1) (openRec i sub e2)
+  | cond ec et ef => cond (openRec i sub ec) (openRec i sub et) (openRec i sub ef)
+  | pair e1 e2 => pair (openRec i sub e1) (openRec i sub e2)
+  | fst e => fst (openRec i sub e)
+  | snd e => snd (openRec i sub e)
+  | inl e => inl (openRec i sub e)
+  | inr e => inr (openRec i sub e)
+  | case ec el er => case (openRec i sub ec) (openRec i sub el) (openRec i sub er)
+  | alloc e => alloc (openRec i sub e)
+  | load e => load (openRec i sub e)
+  | store e1 e2 => store (openRec i sub e1) (openRec i sub e2)
+  | tape e => tape (openRec i sub e)
+  | rand e1 e2 => rand (openRec i sub e1) (openRec i sub e2)
+  | fail => fail
+  | scrut e p => scrut (openRec i sub e) p
+
+/-- Open the outermost binder. -/
+@[simp, scoped grind =] def open' (e sub : Exp) : Exp := openRec 0 sub e
+
+/-- Recursive variable closing. Replace `fvar x` with `bvar i` at depth `i`. -/
+@[simp, scoped grind =] def closeRec (i : Nat) (x : Var) : Exp → Exp
+  | bvar j => bvar j
+  | fvar y => if x = y then bvar i else fvar y
+  | lit b => lit b
+  | lam e => lam (closeRec (i+1) x e)
+  | fix e => fix (closeRec (i+1) x e)
+  | app e1 e2 => app (closeRec i x e1) (closeRec i x e2)
+  | unop op e => unop op (closeRec i x e)
+  | binop op e1 e2 => binop op (closeRec i x e1) (closeRec i x e2)
+  | cond ec et ef => cond (closeRec i x ec) (closeRec i x et) (closeRec i x ef)
+  | pair e1 e2 => pair (closeRec i x e1) (closeRec i x e2)
+  | fst e => fst (closeRec i x e)
+  | snd e => snd (closeRec i x e)
+  | inl e => inl (closeRec i x e)
+  | inr e => inr (closeRec i x e)
+  | case ec el er => case (closeRec i x ec) (closeRec i x el) (closeRec i x er)
+  | alloc e => alloc (closeRec i x e)
+  | load e => load (closeRec i x e)
+  | store e1 e2 => store (closeRec i x e1) (closeRec i x e2)
+  | tape e => tape (closeRec i x e)
+  | rand e1 e2 => rand (closeRec i x e1) (closeRec i x e2)
+  | fail => fail
+  | scrut e p => scrut (closeRec i x e) p
+
+/-- Close the outermost binder. -/
+@[simp, scoped grind =] def close (e : Exp) (x : Var) : Exp := closeRec 0 x e
+
+/-- Free-variable substitution (capture-avoiding by construction, because LN has no named binders). -/
+@[simp, scoped grind =] def subst (e : Exp) (x : Var) (sub : Exp) : Exp :=
+  match e with
+  | bvar j => bvar j
+  | fvar y => if x = y then sub else fvar y
+  | lit b => lit b
+  | lam e => lam (subst e x sub)
+  | fix e => fix (subst e x sub)
+  | app e1 e2 => app (subst e1 x sub) (subst e2 x sub)
+  | unop op e => unop op (subst e x sub)
+  | binop op e1 e2 => binop op (subst e1 x sub) (subst e2 x sub)
+  | cond ec et ef => cond (subst ec x sub) (subst et x sub) (subst ef x sub)
+  | pair e1 e2 => pair (subst e1 x sub) (subst e2 x sub)
+  | fst e => fst (subst e x sub)
+  | snd e => snd (subst e x sub)
+  | inl e => inl (subst e x sub)
+  | inr e => inr (subst e x sub)
+  | case ec el er => case (subst ec x sub) (subst el x sub) (subst er x sub)
+  | alloc e => alloc (subst e x sub)
+  | load e => load (subst e x sub)
+  | store e1 e2 => store (subst e1 x sub) (subst e2 x sub)
+  | tape e => tape (subst e x sub)
+  | rand e1 e2 => rand (subst e1 x sub) (subst e2 x sub)
+  | fail => fail
+  | scrut e p => scrut (subst e x sub) p
+
+instance : HasSubstitution Exp Var Exp where
+  subst := Exp.subst
+
+/-- Free variables of an expression. -/
+@[simp, scoped grind =] def fv : Exp → Finset Var
+  | bvar _ => {}
+  | fvar x => {x}
+  | lit _ => {}
+  | lam e => fv e
+  | fix e => fv e
+  | app e1 e2 => fv e1 ∪ fv e2
+  | unop _ e => fv e
+  | binop _ e1 e2 => fv e1 ∪ fv e2
+  | cond ec et ef => fv ec ∪ fv et ∪ fv ef
+  | pair e1 e2 => fv e1 ∪ fv e2
+  | fst e => fv e
+  | snd e => fv e
+  | inl e => fv e
+  | inr e => fv e
+  | case ec el er => fv ec ∪ fv el ∪ fv er
+  | alloc e => fv e
+  | load e => fv e
+  | store e1 e2 => fv e1 ∪ fv e2
+  | tape e => fv e
+  | rand e1 e2 => fv e1 ∪ fv e2
+  | fail => {}
+  | scrut e _ => fv e
+
+/-- Locally-closed terms: no dangling de-Bruijn indices. Binder cases use
+    cofinite quantification. -/
+inductive LC : Exp → Prop
+  | fvar (x : Var) : LC (fvar x)
+  | lit (b : BaseLit) : LC (lit b)
+  | lam (L : Finset Var) (e : Exp) : (∀ x ∉ L, LC (open' e (fvar x))) → LC (lam e)
+  | fix (L : Finset Var) (e : Exp) : (∀ x ∉ L, LC (open' e (fvar x))) → LC (fix e)
+  | app {e1 e2} : LC e1 → LC e2 → LC (app e1 e2)
+  | unop (op : UnOp) {e} : LC e → LC (unop op e)
+  | binop (op : BinOp) {e1 e2} : LC e1 → LC e2 → LC (binop op e1 e2)
+  | cond {ec et ef} : LC ec → LC et → LC ef → LC (cond ec et ef)
+  | pair {e1 e2} : LC e1 → LC e2 → LC (pair e1 e2)
+  | fst {e} : LC e → LC (fst e)
+  | snd {e} : LC e → LC (snd e)
+  | inl {e} : LC e → LC (inl e)
+  | inr {e} : LC e → LC (inr e)
+  | case {ec el er} : LC ec → LC el → LC er → LC (case ec el er)
+  | alloc {e} : LC e → LC (alloc e)
+  | load {e} : LC e → LC (load e)
+  | store {e1 e2} : LC e1 → LC e2 → LC (store e1 e2)
+  | tape {e} : LC e → LC (tape e)
+  | rand {e1 e2} : LC e1 → LC e2 → LC (rand e1 e2)
+  | fail : LC fail
+  | scrut {e} (p : Pat) : LC e → LC (scrut e p)
+
+attribute [scoped grind .] LC.fvar LC.lit LC.app LC.unop LC.binop LC.cond
+  LC.pair LC.fst LC.snd LC.inl LC.inr LC.case LC.alloc LC.load LC.store
+  LC.tape LC.rand LC.fail LC.scrut
+
+end Exp
+
+/-- Try to match an expression against a pattern. -/
 def Pat.tryMatch : Pat → Exp → Option Exp
-  | .var _, e => some e
+  | .wildcard, e => some e
   | .lit b, .lit b' => if b == b' then some (.lit .unit) else none
   | .pair p1 p2, .pair e1 e2 => do
       let b1 ← p1.tryMatch e1
@@ -131,9 +277,6 @@ def Pat.tryMatch : Pat → Exp → Option Exp
 
 -------------------------------------------------------------------------------
 -- Fragment abstraction
---
--- A `Fragment` is a Type-valued predicate on `Exp`. Pairing an expression
--- with a witness (`FragExp F`) auto-eliminates impossible match branches.
 -------------------------------------------------------------------------------
 
 abbrev Fragment := Exp → Type
@@ -166,14 +309,16 @@ instance [Checkable F] [Checkable G] : Checkable (Both F G) where
   check? e := do return (← Checkable.check? e, ← Checkable.check? e)
 
 -------------------------------------------------------------------------------
--- IsVal / Val — the single source of truth for "is a value"
+-- IsVal / Val
 -------------------------------------------------------------------------------
 
-/-- Type-valued witness that an expression is a value.
-    Pattern matching on `⟨e, w⟩ : Val` auto-eliminates non-value constructors. -/
+/-- Type-valued witness that an expression is a value. Values are:
+    literals, lambda abstractions (which are closed-over functions), fixpoints
+    (also functions), and pair/inl/inr of values. -/
 inductive IsVal : Exp → Type
   | lit  : IsVal (.lit b)
-  | letrec : IsVal (.letrec f x e)
+  | lam  : IsVal (.lam e)
+  | fix  : IsVal (.fix e)
   | pair : IsVal e1 → IsVal e2 → IsVal (.pair e1 e2)
   | inl  : IsVal e → IsVal (.inl e)
   | inr  : IsVal e → IsVal (.inr e)
@@ -183,19 +328,20 @@ def Val := (e : Exp) × IsVal e
 
 namespace IsVal
 
-/-- Decidable check: the computable entry point for value testing. -/
+/-- Decidable check. -/
 def check? : (e : Exp) → Option (IsVal e)
   | .lit _ => some .lit
-  | .letrec _ _ _ => some .letrec
+  | .lam _ => some .lam
+  | .fix _ => some .fix
   | .pair e1 e2 => do return .pair (← check? e1) (← check? e2)
   | .inl e => do return .inl (← check? e)
   | .inr e => do return .inr (← check? e)
   | _ => none
 
-/-- IsVal witnesses are unique for a given expression. -/
 theorem subsingleton : (w1 w2 : IsVal e) → w1 = w2
   | .lit, .lit => rfl
-  | .letrec, .letrec => rfl
+  | .lam, .lam => rfl
+  | .fix, .fix => rfl
   | .pair h1 h2, .pair h1' h2' => by rw [subsingleton h1 h1', subsingleton h2 h2']
   | .inl h, .inl h' => by rw [subsingleton h h']
   | .inr h, .inr h' => by rw [subsingleton h h']
@@ -206,33 +352,25 @@ end IsVal
 
 instance : Checkable IsVal where check? := IsVal.check?
 
--------------------------------------------------------------------------------
--- isValue := Nonempty IsVal (Prop bridge, decidable via IsVal.check?)
--------------------------------------------------------------------------------
-
 def Exp.isValue (e : Exp) : Prop := Nonempty (IsVal e)
 
-/-- Introduce `isValue` from an `IsVal` witness. -/
 def IsVal.toIsValue (w : IsVal e) : e.isValue := ⟨w⟩
 
-/-- Extract an `IsVal` witness from `isValue`. Since `IsVal` is a subsingleton,
-    this is well-defined despite using `Nonempty.some`. -/
 noncomputable def IsVal.ofIsValue (h : e.isValue) : IsVal e := h.some
 
 theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .lit => ⟨.lit, rfl⟩
-  | .letrec => ⟨.letrec, rfl⟩
+  | .lam => ⟨.lam, rfl⟩
+  | .fix => ⟨.fix, rfl⟩
   | .pair h1 h2 => by
       obtain ⟨w1, hw1⟩ := check?_some h1; obtain ⟨w2, hw2⟩ := check?_some h2
       exact ⟨.pair w1 w2, by simp [check?, hw1, hw2]⟩
   | .inl h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inl w, by simp [check?, hw]⟩
   | .inr h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inr w, by simp [check?, hw]⟩
 
-/-- Recursive Prop-valued value predicate. Not the canonical definition
-    (`isValue := Nonempty (IsVal e)`) but useful for case-splitting proofs
-    since `simp` can unfold it on any constructor-headed expression. -/
+/-- Recursive Prop-valued value predicate. -/
 @[simp] def Exp.isValueR : Exp → Prop
-  | .lit _ | .letrec _ _ _ => True
+  | .lit _ | .lam _ | .fix _ => True
   | .pair e1 e2 => e1.isValueR ∧ e2.isValueR
   | .inl e | .inr e => e.isValueR
   | _ => False
@@ -240,11 +378,11 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
 theorem Exp.isValue_iff_isValueR {e : Exp} : e.isValue ↔ e.isValueR := by
   constructor
   · rintro ⟨w⟩; induction w with
-    | lit | letrec => trivial
+    | lit | lam | fix => trivial
     | pair _ _ ih1 ih2 => exact ⟨ih1, ih2⟩
     | inl _ ih | inr _ ih => exact ih
   · intro h; induction e with
-    | lit | letrec => exact ⟨by constructor⟩
+    | lit | lam | fix => exact ⟨by constructor⟩
     | pair _ _ ih1 ih2 =>
       obtain ⟨h1, h2⟩ := h; exact ⟨.pair (ih1 h1).some (ih2 h2).some⟩
     | inl _ ih => exact ⟨.inl (ih h).some⟩
@@ -270,7 +408,6 @@ instance Exp.decIsValue (e : Exp) : Decidable e.isValue :=
 theorem Val.ext {v1 v2 : Val} (h : v1.1 = v2.1) : v1 = v2 := by
   obtain ⟨e1, w1⟩ := v1; obtain ⟨e2, w2⟩ := v2
   simp at h; subst h; congr 1; exact IsVal.subsingleton w1 w2
-
 
 instance : Countable Val := by
   unfold Val; exact instCountableSigma
@@ -427,35 +564,6 @@ def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
     e1.toVal?.casesOn (some (.scrut p, e1)) fun _ => none
   | _ => none
 
-def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
-  match e with
-  | lit l => lit l
-  | var y => if x = y then v else var y
-  | letrec f y e =>
-    if !f.binds x ∧ !y.binds x
-    then letrec f y (e.subst' x v)
-    else letrec f y e
-  | app e1 e2 => app (e1.subst' x v) (e2.subst' x v)
-  | unop op e => unop op (e.subst' x v)
-  | binop op e1 e2 => binop op (e1.subst' x v) (e2.subst' x v)
-  | .cond ec et ef => .cond (ec.subst' x v) (et.subst' x v) (ef.subst' x v)
-  | pair e1 e2 => pair (e1.subst' x v) (e2.subst' x v)
-  | fst e => fst (e.subst' x v)
-  | snd e => snd (e.subst' x v)
-  | inl e => inl (e.subst' x v)
-  | inr e => inr (e.subst' x v)
-  | case ec el er => case (ec.subst' x v) (el.subst' x v) (er.subst' x v)
-  | alloc e => alloc (e.subst' x v)
-  | load e => load (e.subst' x v)
-  | store e1 e2 => store (e1.subst' x v) (e2.subst' x v)
-  | rand e1 e2 => rand (e1.subst' x v) (e2.subst' x v)
-  | tape e => tape (e.subst' x v)
-  | scrut e p => scrut (e.subst' x v) p
-  | fail => fail
-
-def Exp.subst (mx : Binder) (v e : Exp) : Exp :=
-  match mx with | .named x | .typed x _ => e.subst' x v | .anon => e
-
 def UnOp.eval (op : UnOp) (v : Exp) : Option Exp :=
   match op, v with
   | neg, .lit (.bool b) => some <| .lit <| .bool <| ¬ b
@@ -528,8 +636,9 @@ theorem EctxItem.fillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Exp}
 
 @[simp]
 def Exp.height : Exp → Nat
-  | lit _ | var _ => 1
-  | letrec _ _ e => 1 + e.height
+  | bvar _ | fvar _ | lit _ => 1
+  | lam e => 1 + e.height
+  | fix e => 1 + e.height
   | app e1 e2 => 1 + e1.height + e2.height
   | binop _ e1 e2 => 1 + e1.height + e2.height
   | pair e1 e2 => 1 + e1.height + e2.height
@@ -716,28 +825,7 @@ theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
     rw [decomp_unfold, EctxItem.decompItem_fillItem Ki (Ectx.fill_noVal hv)]
     simp only [ih K'' (by simp at hlen; omega), List.append_assoc]
 
--- TODO: Used in SLang embedding. We should just change to locally nameless so we can
--- generate fresh local binders for free.
-def Fresh (x : String) : Exp → Prop
-  | .lit _ => True
-  | .var y => x ≠ y
-  | .letrec f y e => f.binds x ∨ y.binds x ∨ Fresh x e
-  | .app e1 e2 => Fresh x e1 ∧ Fresh x e2
-  | .unop _ e => Fresh x e
-  | .binop _ e1 e2 => Fresh x e1 ∧ Fresh x e2
-  | .cond ec et ef => Fresh x ec ∧ Fresh x et ∧ Fresh x ef
-  | .pair e1 e2 => Fresh x e1 ∧ Fresh x e2
-  | .fst e => Fresh x e
-  | .snd e => Fresh x e
-  | .inl e => Fresh x e
-  | .inr e => Fresh x e
-  | .case ec el er => Fresh x ec ∧ Fresh x el ∧ Fresh x er
-  | .alloc e => Fresh x e
-  | .load e => Fresh x e
-  | .store e1 e2 => Fresh x e1 ∧ Fresh x e2
-  | .tape e => Fresh x e
-  | .rand e1 e2 => Fresh x e1 ∧ Fresh x e2
-  | .fail => True
-  | .scrut e _ => Fresh x e
+/-- `x ∉ fv e` — LN replacement for the old string-based Fresh predicate. -/
+def Exp.Fresh (x : Var) (e : Exp) : Prop := x ∉ e.fv
 
 end ProbLang

@@ -32,10 +32,19 @@ open MeasureTheory
 /-! ## Single-frame context items -/
 
 /-- A single-frame evaluation-context hole. Every constructor corresponds
-to a position in an `Exp` where a sub-expression could sit. -/
+to a position in an `Exp` where a sub-expression could sit.
+
+Under locally-nameless, binder frames carry the atoms to close over. For
+`lam x` the hole is the body (open at `x`); `fill` closes: `.lam (close hole x)`.
+`fix f` is similar. The Clutch `letrec f x body` corresponds to `fix f .
+lam x . body`, i.e. two nested `CtxItem` frames: `fix f :: lam x :: K`. -/
 inductive CtxItem
-  -- Base lambda calculus
-  | letrec (f x : Binder)
+  -- Base lambda calculus: `lam x` frame takes body open at atom `x`.
+  | lam (x : Var)
+  -- `fix f` frame: body is a `.lam …` open at recursive atom `f`.
+  | fix (f : Var)
+  -- `Λ` frame (anonymous lam for type abstraction).
+  | tlam
   | appL (e2 : Exp)
   | appR (e1 : Exp)
   -- Base types and their operations
@@ -64,13 +73,14 @@ inductive CtxItem
   -- Recursive types (Fold is subsumption, Unfold wraps in `recUnfold`)
   | fold
   | unfold
-  -- Polymorphic types (Λ: = letrec anon anon; TApp = app · unit)
-  | tlam
+  -- TApp = app · unit
   | tapp
-  -- Existential types: unpack x := e in e' = app (λ x, e') e
-  -- (we have no explicit PACK frame, matching Clutch)
-  | unpackL (x : String) (e2 : Exp)
-  | unpackR (x : String) (e1 : Exp)
+  -- Existential types: unpack x := e in e2 = app (lam e2_closed_over_x) e.
+  -- `unpackL x e2`: hole fills in for the `e` scrutinee; `x` atom says how
+  -- to close `e2` into a lam. `unpackR x e1`: hole fills in for the body
+  -- `e2` (which is open at `x`); `e1` is the scrutinee.
+  | unpackL (x : Var) (e2 : Exp)
+  | unpackR (x : Var) (e1 : Exp)
   -- Tapes
   | allocTape
   | randL (e2 : Exp)
@@ -80,7 +90,11 @@ namespace CtxItem
 
 /-- Fill the hole in a single context frame. -/
 def fill : CtxItem → Exp → Exp
-  | .letrec f x,     e => .letrec f x e
+  -- LN binders: close the hole over the stored atom.
+  | .lam x,          e => .lam (Exp.close e x)
+  | .fix f,          e => .fix (Exp.close e f)
+  -- tlam is an anonymous `lam`: the hole body doesn't reference the binder.
+  | .tlam,           e => .lam e
   | .appL e2,        e => .app e e2
   | .appR e1,        e => .app e1 e
   | .unop op,        e => .unop op e
@@ -106,13 +120,13 @@ def fill : CtxItem → Exp → Exp
   | .fold,           e => e
   -- Unfold wraps in `recUnfold` (Clutch: `| CTX_Unfold => rec_unfold e`)
   | .unfold,         e => .app _root_.ProbLang.recUnfold e
-  -- Λ: e = letrec anon anon e
-  | .tlam,           e => .letrec .anon .anon e
   -- TApp e = app e ()
   | .tapp,           e => .app e (.lit .unit)
-  -- unpack: x := e in e2 = app (λ x, e2) e
-  | .unpackL x e2,   e => .app (.letrec .anon (.named x) e2) e
-  | .unpackR x e1,   e => .app (.letrec .anon (.named x) e) e1
+  -- unpack: x := e in e2 = app (lam (close e2 x)) e
+  -- unpackL: hole is the scrutinee `e`; `e2` already stored.
+  | .unpackL x e2,   e => .app (.lam (Exp.close e2 x)) e
+  -- unpackR: hole is the body `e2` (open at `x`); `e1` is the scrutinee.
+  | .unpackR x e1,   e => .app (.lam (Exp.close e x)) e1
   | .allocTape,      e => .tape e
   | .randL e2,       e => .rand e e2
   | .randR e1,       e => .rand e1 e
@@ -151,10 +165,12 @@ end Ctx
 in context `Γ` into the frame `k` produces an expression of type `τ'`
 in context `Γ'`. Direct 1:1 port of Clutch's `typed_ctx_item`. -/
 inductive TypedCtxItem : CtxItem → Tctx → Ty → Tctx → Ty → Prop
-  -- Base lambda calculus
-  | letrec {Γ τ τ' f x} :
-      TypedCtxItem (.letrec f x)
-        ((Γ.insertB f (.arrow τ τ')).insertB x τ) τ'
+  -- Base lambda calculus: `lam x` (open at `x : τ1`) producing `τ1 → τ2`.
+  | lam {Γ x τ τ'} :
+      TypedCtxItem (.lam x) (Γ.insert x τ) τ' Γ (.arrow τ τ')
+  -- `fix f`: body has type `τ → τ'` open at `f : τ → τ'`.
+  | fix {Γ f τ τ'} :
+      TypedCtxItem (.fix f) (Γ.insert f (.arrow τ τ')) (.arrow τ τ')
         Γ (.arrow τ τ')
   | appL {Γ e2 τ τ'} :
       Typed Γ e2 τ →
@@ -240,10 +256,10 @@ inductive TypedCtxItem : CtxItem → Tctx → Ty → Tctx → Ty → Prop
   | tapp {Γ τ τ'} :
       TypedCtxItem .tapp Γ (.forall' τ) Γ (τ.single τ')
   -- No explicit PACK frame, matching Clutch.
-  | unpackL {x e2 Γ τ τ2} :
+  | unpackL {x : Var} {e2 Γ τ τ2} :
       Typed ((Γ.shift).insert x τ) e2 τ2.shift →
       TypedCtxItem (.unpackL x e2) Γ (.exists' τ) Γ τ2
-  | unpackR {x e1 Γ τ τ2} :
+  | unpackR {x : Var} {e1 Γ τ τ2} :
       Typed Γ e1 (.exists' τ) →
       TypedCtxItem (.unpackR x e1)
         ((Γ.shift).insert x τ) τ2.shift Γ τ2
@@ -278,7 +294,14 @@ theorem TypedCtxItem.fill_typed {k : CtxItem} {Γ τ Γ' τ' e}
     (he : Typed Γ e τ) (hk : TypedCtxItem k Γ τ Γ' τ') :
     Typed Γ' (k.fill e) τ' := by
   induction hk with
-  | letrec      => exact .letrec he
+  | @lam Γ x τ τ' =>
+      -- goal: Typed Γ (.lam (close e x)) (.arrow τ τ')
+      -- we have: he : Typed (Γ.insert x τ) e τ'
+      refine Typed.lam (insert x e.fv) (fun y hy => ?_)
+      sorry  -- weakening + subst_intro style argument; deferred
+  | @fix Γ f τ τ' =>
+      refine Typed.fix (insert f e.fv) (fun y hy => ?_)
+      sorry  -- weakening + subst_intro style argument; deferred
   | appL h2     => exact .app he h2
   | appR h1     => exact .app h1 he
   | unop_int hop       => exact .unop_int he hop
@@ -309,8 +332,14 @@ theorem TypedCtxItem.fill_typed {k : CtxItem} {Γ τ Γ' τ' e}
   | unfold      => exact (.tunfold he : Typed _ (.app _root_.ProbLang.recUnfold _) _)
   | tlam        => exact .tlam he
   | tapp        => exact .tapp he
-  | unpackL h2  => exact .tunpack he h2
-  | unpackR h1  => exact .tunpack h1 he
+  | @unpackL x e2 Γ τ τ2 h2 =>
+      -- Goal: Typed Γ (.app (.lam (close e2 x)) e) τ2
+      -- Build the tunpack rule with fresh cofinite set.
+      refine Typed.tunpack (insert x e2.fv) he (fun y hy => ?_)
+      sorry  -- weakening + α-rename; deferred
+  | @unpackR x e1 Γ τ τ2 h1 =>
+      refine Typed.tunpack (insert x e.fv) h1 (fun y hy => ?_)
+      sorry  -- weakening + α-rename; deferred
   | allocTape   => exact .alloc_tape he
   | randL_unit h2 => exact .rand_unit he h2
   | randL_tape h2 => exact .rand he h2

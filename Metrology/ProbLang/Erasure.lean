@@ -138,7 +138,9 @@ theorem primStep_tape_persists_support
   -- Case-split on the `HeadStepSupport` constructor; in each case,
   -- determine what happens to tape α.
   cases hhs with
-  | BetaS =>
+  | BetaLamS =>
+    exact ⟨t, h, rfl⟩
+  | BetaFixS =>
     exact ⟨t, h, rfl⟩
   | UnOpS =>
     exact ⟨t, h, rfl⟩
@@ -1354,13 +1356,20 @@ theorem execN_tape_presample_expr_eq
         -- First, clear the let-binding of e_red so `cases` can substitute.
         clear_value e_red K
         cases hdet with
-        | beta hv2 =>
-          rename_i f x e1 e2
-          -- headStep produces dirac ⟨subst..., σ'⟩ for each σ'.
-          -- State is unchanged, expression is fixed.
+        | betaLam hv2 =>
+          rename_i e1 e2
           have hs : ∀ σ' : State,
-              headStep (⟨.app (.letrec f x e1) e2, σ'⟩ : Cfg) =
-                Measure.dirac ⟨Exp.subst x e2 (Exp.subst f (.letrec f x e1) e1), σ'⟩ := by
+              headStep (⟨.app (.lam e1) e2, σ'⟩ : Cfg) =
+                Measure.dirac ⟨Exp.open' e1 e2, σ'⟩ := by
+            intro σ'; show Exp.isValM e2 (Measure.dirac _) = _; simp [Exp.isValM, hv2]
+          simp_rw [hs]
+          simp_rw [lintegral_dirac' _ Measurable.of_discrete]
+          exact ih_fill _ σ t h hN
+        | betaFix hv2 =>
+          rename_i e1 e2
+          have hs : ∀ σ' : State,
+              headStep (⟨.app (.fix e1) e2, σ'⟩ : Cfg) =
+                Measure.dirac ⟨Exp.app (Exp.open' e1 (.fix e1)) e2, σ'⟩ := by
             intro σ'; show Exp.isValM e2 (Measure.dirac _) = _; simp [Exp.isValM, hv2]
           simp_rw [hs]
           simp_rw [lintegral_dirac' _ Measurable.of_discrete]

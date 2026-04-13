@@ -140,9 +140,15 @@ theorem DetHeadStep.cond_false (et ef : Exp) (σ : State) :
     DetHeadStep ⟨.cond (.lit (.bool false)) et ef, σ⟩ ⟨ef, σ⟩ :=
   .of_det _ _ (by simp [headStep])
 
-theorem DetHeadStep.app_letrec {f x : Binder} {body v : Exp}
+theorem DetHeadStep.app_lam {body v : Exp}
     (hv : IsVal v) (σ : State) :
-    DetHeadStep ⟨.app (.letrec f x body) v, σ⟩ ⟨Exp.subst x v (Exp.subst f (.letrec f x body) body), σ⟩ :=
+    DetHeadStep ⟨.app (.lam body) v, σ⟩ ⟨Exp.open' body v, σ⟩ :=
+  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
+
+theorem DetHeadStep.app_fix {body v : Exp}
+    (hv : IsVal v) (σ : State) :
+    DetHeadStep ⟨.app (.fix body) v, σ⟩
+      ⟨Exp.app (Exp.open' body (.fix body)) v, σ⟩ :=
   .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
 
 theorem DetHeadStep.unop {op : UnOp} {e result : Exp}

@@ -10,6 +10,9 @@ package metrology where
 require mathlib from git
   "https://github.com/leanprover-community/mathlib4" @ "v4.29.0"
 
+require cslib from git 
+   "https://github.com/leanprover/cslib" @ "v4.29.0"
+
 require iris from git
   "https://github.com/leanprover-community/iris-lean.git" @ "master"
 

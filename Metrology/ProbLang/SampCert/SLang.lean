@@ -152,14 +152,14 @@ theorem limExec_app {ef e : Exp} {σ : State} :
     limExec ⟨.app ef e, σ⟩ = (limExec ⟨e, σ⟩).bind (fun c => limExec ⟨.app ef c.expr, c.state⟩) :=
   limExec_fill_item (.appR ef)
 
-theorem limExec_beta {x : Binder} {body v : Exp} {σ : State} (hv : IsVal v) :
-    limExec ⟨.app (.letrec .anon x body) v, σ⟩ = limExec ⟨Exp.subst x v body, σ⟩ := by
-  have hnv : ¬ (Exp.app (.letrec .anon x body) v).isValue := by intro ⟨h⟩; cases h
+theorem limExec_beta {body v : Exp} {σ : State} (hv : IsVal v) :
+    limExec ⟨.app (.lam body) v, σ⟩ = limExec ⟨Exp.open' body v, σ⟩ := by
+  have hnv : ¬ (Exp.app (.lam body) v).isValue := by intro ⟨h⟩; cases h
   rw [limExec_not_final hnv]
-  have hred : ∃ ρ, 0 < headStep ⟨.app (.letrec .anon x body) v, σ⟩ {ρ} := by
-    refine ⟨⟨Exp.subst x v body, σ⟩, ?_⟩; simp [headStep, Exp.isValM_some' hv, Exp.subst]
+  have hred : ∃ ρ, 0 < headStep ⟨.app (.lam body) v, σ⟩ {ρ} := by
+    refine ⟨⟨Exp.open' body v, σ⟩, ?_⟩; simp [headStep, Exp.isValM_some' hv]
   rw [primStep_eq_headStep hred]
-  simp [headStep, Exp.isValM_some' hv, Exp.subst, Measure.dirac_bind Measurable.of_discrete]
+  simp [headStep, Exp.isValM_some' hv, Measure.dirac_bind Measurable.of_discrete]
 
 /-! ## ProbLang combinators -/
 
@@ -193,7 +193,9 @@ def probLangAnd (e1 e2 : Exp) : Exp := .binop .and e1 e2
 -- Control flow
 def probLangCond (ec et ef : Exp) : Exp := .cond ec et ef
 def probLangApp (ef ea : Exp) : Exp := .app ef ea
-def probLangLam (x : String) (body : Exp) : Exp := .letrec .anon (.named x) body
+/-- Build a lambda from an atom-indexed body: user passes `body` using `fvar x`,
+    we close over the atom to produce `lam (close body x)`. -/
+def probLangLam (x : Var) (body : Exp) : Exp := .lam (Exp.close body x)
 
 theorem probLangPure_isEmbedding [SLangType T] [ProbLangEmbeddable T] {t : T} :
     IsEmbedding (probPure t) (probLangPure t) := by

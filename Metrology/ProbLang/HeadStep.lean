@@ -51,9 +51,12 @@ def Cfg.uniform (z : Int) (σ : State) : Measure Cfg :=
 -- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
 -- order, should be governed by the reduction context.
 def headStep : Cfg → Measure Cfg
-| ⟨.app (.letrec f x e1) e2, σ⟩ =>
+| ⟨.app (.lam e1) e2, σ⟩ =>
   e2.isValM <|
-  dirac ⟨Exp.subst x e2 (Exp.subst f (.letrec f x e1) e1), σ⟩
+  dirac ⟨Exp.open' e1 e2, σ⟩
+| ⟨.app (.fix e1) e2, σ⟩ =>
+  e2.isValM <|
+  dirac ⟨Exp.app (Exp.open' e1 (.fix e1)) e2, σ⟩
 | ⟨.unop op e, σ⟩ =>
   e.isValM <|
   (op.eval e).unwrapM <|
@@ -108,23 +111,24 @@ macro "head_case_names" : tactic =>
   `(tactic| (
     unfold headStep
     split
-    on_goal 1  => rename_goal beta
-    on_goal 2  => rename_goal unop
-    on_goal 3  => rename_goal binop
-    on_goal 4  => rename_goal cond.true
-    on_goal 5  => rename_goal cond.false
-    on_goal 6  => rename_goal fst
-    on_goal 7  => rename_goal snd
-    on_goal 8  => rename_goal case.left
-    on_goal 9  => rename_goal case.right
-    on_goal 10 => rename_goal alloc
-    on_goal 11 => rename_goal load
-    on_goal 12 => rename_goal store
-    on_goal 13 => rename_goal rand.plain
-    on_goal 14 => rename_goal tape
-    on_goal 15 => rename_goal rand.tape
-    on_goal 16 => rename_goal scrut
-    on_goal 17 => rename_goal default
+    on_goal 1  => rename_goal beta.lam
+    on_goal 2  => rename_goal beta.fix
+    on_goal 3  => rename_goal unop
+    on_goal 4  => rename_goal binop
+    on_goal 5  => rename_goal cond.true
+    on_goal 6  => rename_goal cond.false
+    on_goal 7  => rename_goal fst
+    on_goal 8  => rename_goal snd
+    on_goal 9  => rename_goal case.left
+    on_goal 10 => rename_goal case.right
+    on_goal 11 => rename_goal alloc
+    on_goal 12 => rename_goal load
+    on_goal 13 => rename_goal store
+    on_goal 14 => rename_goal rand.plain
+    on_goal 15 => rename_goal tape
+    on_goal 16 => rename_goal rand.tape
+    on_goal 17 => rename_goal scrut
+    on_goal 18 => rename_goal default
   ))
 
 /-- Decompose the Cfg equality hypothesis left by `split` on `headStep`, then substitute. -/
@@ -210,9 +214,12 @@ macro "head_case" : tactic =>
       on_goal 2 => rename_goal scrut_no_redex
       on_goal 1 =>
         head_split2 scrut_success scrut_failure
-    case' beta =>
+    case' beta.lam =>
       head_subst
-      head_split_isValM beta.redex beta.no_redex
+      head_split_isValM beta.lam.redex beta.lam.no_redex
+    case' beta.fix =>
+      head_subst
+      head_split_isValM beta.fix.redex beta.fix.no_redex
   ))
 
 def headStepKernel : Kernel Cfg Cfg where
@@ -234,10 +241,14 @@ theorem head_ctx_step_val {Ki : EctxItem} :
   all_goals exact (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue ‹_›))
 
 inductive HeadStepSupport : Cfg → Cfg → Prop
-| BetaS :
+| BetaLamS :
   e2.isValue →
-  e' = Exp.subst x e2 (Exp.subst f (.letrec f x e1) e1) →
-  HeadStepSupport ⟨.app (.letrec f x e1) e2, σ⟩ ⟨e', σ⟩
+  e' = Exp.open' e1 e2 →
+  HeadStepSupport ⟨.app (.lam e1) e2, σ⟩ ⟨e', σ⟩
+| BetaFixS :
+  e2.isValue →
+  e' = Exp.app (Exp.open' e1 (.fix e1)) e2 →
+  HeadStepSupport ⟨.app (.fix e1) e2, σ⟩ ⟨e', σ⟩
 | UnOpS :
   e.isValue →
   some e' = op.eval e →
@@ -383,7 +394,8 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
   · head_case
     all_goals try (· simp)
     case cond.true | cond.false => intro h; cfg_dirac h; constructor
-    case beta.redex => intro h; cfg_dirac h; exact .BetaS ‹_› rfl
+    case beta.lam.redex => intro h; cfg_dirac h; exact .BetaLamS ‹_› rfl
+    case beta.fix.redex => intro h; cfg_dirac h; exact .BetaFixS ‹_› rfl
     case fst.redex => intro h; cfg_dirac h; exact .FstS ‹_› ‹_›
     case snd.redex => intro h; cfg_dirac h; exact .SndS ‹_› ‹_›
     case case.left.redex => intro h; cfg_dirac h; exact .CaseLS ‹_›
@@ -421,7 +433,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
     case scrut_failure => intro h; cfg_dirac h; exact .ScrutFailureS ‹_› ‹_›
   · intro hsupp
     cases hsupp with
-    | BetaS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS
+    | BetaLamS | BetaFixS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS
     | TapeS | RandTapeS | AllocS | StoreS
     | ScrutSuccessS | ScrutFailureS =>
       simp_all [headStep]
@@ -457,7 +469,7 @@ theorem head_step_mass (e : Exp) (σ : State) :
     (∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
   head_case
   all_goals try (· simp)
-  case beta.redex | cond.true | cond.false
+  case beta.lam.redex | beta.fix.redex | cond.true | cond.false
      | fst.redex | snd.redex | case.left.redex | case.right.redex
      | alloc.redex | load.redex | store.redex | tape
      | rand.tape.deterministic
