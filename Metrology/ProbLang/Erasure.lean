@@ -202,8 +202,6 @@ theorem primStep_tape_persists_support
     exact ⟨t, h, rfl⟩
   | ScrutFailureS =>
     exact ⟨t, h, rfl⟩
-  | AnnotS =>
-    exact ⟨t, h, rfl⟩
 
 /-- Tape persistence, a.e. form: the set of `ρ`s where tape `α` is either
 absent or has a different bound from `t` has measure 0 under `primStep ⟨e, σ⟩`.
@@ -1441,14 +1439,6 @@ theorem execN_tape_presample_expr_eq
               headStep (⟨.scrut e_s p, σ'⟩ : Cfg) = Measure.dirac ⟨.inr (.lit .unit), σ'⟩ := by
             intro σ'; show Exp.isValM e_s (match Pat.tryMatch p e_s with | some b => _ | none => _) = _
             simp [Exp.isValM, hv, hmatch]
-          simp_rw [hs, lintegral_dirac' _ Measurable.of_discrete]
-          exact ih_fill _ σ t h hN
-        | annot hv =>
-          rename_i a e_a
-          have hs : ∀ σ' : State,
-              headStep (⟨.annot a e_a, σ'⟩ : Cfg) = Measure.dirac ⟨e_a, σ'⟩ := by
-            intro σ'; show Exp.isValM e_a (Measure.dirac _) = _
-            simp [Exp.isValM, hv]
           simp_rw [hs, lintegral_dirac' _ Measurable.of_discrete]
           exact ih_fill _ σ t h hN
         | load hlook =>

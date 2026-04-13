@@ -56,7 +56,6 @@ def Exp.isClosed (X : ClosedCtx) : Exp → Bool
   | .rand e1 e2        => e1.isClosed X && e2.isClosed X
   | .tape e            => e.isClosed X
   | .fail              => true
-  | .annot _ e         => e.isClosed X
   | .scrut e _         => e.isClosed X
 
 theorem Exp.isClosed_weaken {X Y : ClosedCtx} (hXY : X.subset Y) :
@@ -90,7 +89,6 @@ theorem Exp.isClosed_weaken {X Y : ClosedCtx} (hXY : X.subset Y) :
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     intro h
     simp only [isClosed] at h ⊢
@@ -206,7 +204,6 @@ theorem Exp.isClosed_subst {e v : Exp} {x : String}
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     intro X he
     simp only [subst', isClosed] at he ⊢
@@ -257,7 +254,6 @@ def Exp.substMap (vs : SubstMap) : Exp → Exp
   | .rand e1 e2        => .rand (e1.substMap vs) (e2.substMap vs)
   | .tape e            => .tape (e.substMap vs)
   | .fail              => .fail
-  | .annot a e         => .annot a (e.substMap vs)
   | .scrut e p         => .scrut (e.substMap vs) p
 
 theorem Exp.substMap_empty (e : Exp) : e.substMap .empty = e := by
@@ -288,7 +284,6 @@ theorem Exp.substMap_empty (e : Exp) : e.substMap .empty = e := by
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     simp only [substMap, ih]
 
@@ -358,7 +353,6 @@ theorem Exp.subst_is_closed {e : Exp} {x : String} {es : Exp} :
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     intro X he hx
     simp only [isClosed] at he
@@ -404,7 +398,6 @@ theorem Exp.subst_subst {e v v' : Exp} {x : String}
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     simp only [subst', ih]
   | fail => rfl
@@ -680,7 +673,6 @@ theorem Exp.substMap_insert {x : String} {v : Exp} (e : Exp) :
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     intro vs hvs
     simp only [substMap, subst', ih hvs]
@@ -788,7 +780,6 @@ theorem Exp.substMap_isClosed {e : Exp} :
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     intro X vs he hvs
     simp only [isClosed] at he
@@ -870,7 +861,6 @@ theorem Exp.subst_subst_ne {e v v' : Exp} {x y : String}
   | alloc e ih
   | load e ih
   | tape e ih
-  | annot _ e ih
   | scrut e _ ih =>
     simp only [subst', ih]
   | fail => rfl
@@ -919,7 +909,6 @@ inductive DetHeadStepPred : Exp → State → Prop
       DetHeadStepPred (.scrut e p) σ
   | scrutFailure {e p σ} : e.isValue → Pat.tryMatch p e = none →
       DetHeadStepPred (.scrut e p) σ
-  | annot {a e σ} : e.isValue → DetHeadStepPred (.annot a e) σ
 
 /-- Expressions that take a *probabilistic* head step in state `σ`. Only
 the four `rand` cases (no Laplace in our port). -/
@@ -956,7 +945,6 @@ def isDetHeadStep (e : Exp) (σ : State) : Bool :=
   | .store (.lit (.loc ℓ)) e => decide e.isValue && σ.heap[ℓ]?.isSome
   | .tape (.lit (.int _)) => true
   | .scrut e _ => decide e.isValue
-  | .annot _ e => decide e.isValue
   | _ => false
 
 /-- Values don't take head steps. Clutch's `val_not_head_step`. -/
@@ -1021,9 +1009,6 @@ theorem isDetHeadStep_iff_pred (e : Exp) (σ : State) :
       cases hm : Pat.tryMatch p e with
       | some bindings => exact .scrutSuccess h hm
       | none => exact .scrutFailure h hm
-    · rename_i a e
-      rw [decide_eq_true_eq] at h
-      exact .annot h
     · simp at h
   · intro hpred
     cases hpred with
@@ -1042,7 +1027,6 @@ theorem isDetHeadStep_iff_pred (e : Exp) (σ : State) :
     | tape => simp [isDetHeadStep]
     | scrutSuccess hv _ => simp [isDetHeadStep, hv]
     | scrutFailure hv _ => simp [isDetHeadStep, hv]
-    | annot hv => simp [isDetHeadStep, hv]
 
 /-- `HeadStepPred ↔ a successor exists in `HeadStepSupport`.
 Clutch's `head_step_pred_ex_rel`. -/
@@ -1076,7 +1060,6 @@ theorem HeadStepPred_iff_exists_support (e : Exp) (σ : State) :
       | tape => exact ⟨_, .TapeS rfl rfl⟩
       | scrutSuccess hv hm => exact ⟨_, .ScrutSuccessS hv hm⟩
       | scrutFailure hv hm => exact ⟨_, .ScrutFailureS hv hm⟩
-      | annot hv => exact ⟨_, .AnnotS hv⟩
     · cases hprob with
       | randNoTape hz => exact ⟨_, .RandNoTapeS hz (le_refl 0) hz⟩
       | randTape hz htape hzN =>
@@ -1104,7 +1087,6 @@ theorem HeadStepPred_iff_exists_support (e : Exp) (σ : State) :
     | TapeS _ _ => exact .inl .tape
     | ScrutSuccessS hv hm => exact .inl (.scrutSuccess hv hm)
     | ScrutFailureS hv hm => exact .inl (.scrutFailure hv hm)
-    | AnnotS hv => exact .inl (.annot hv)
     | RandNoTapeS hz _ _ => exact .inr (.randNoTape hz)
     | RandTapeS hz htape hzN _ _ => exact .inr (.randTape hz htape hzN)
     | RandTapeEmptyS hz htape hzN _ _ _ => exact .inr (.randTapeEmpty hz htape hzN)
@@ -1567,7 +1549,6 @@ theorem State.det_head_step_upd_tapes
   | tape => exact .tape
   | scrutSuccess hv hm => exact .scrutSuccess hv hm
   | scrutFailure hv hm => exact .scrutFailure hv hm
-  | annot hv => exact .annot hv
 
 /-- Clutch's `prim_step_empty_tape`: reading from an empty-presample
 tape is the same as reading from the "no-tape" marker `.lit .unit`.

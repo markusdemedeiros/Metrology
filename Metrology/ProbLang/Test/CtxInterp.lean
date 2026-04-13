@@ -1038,40 +1038,9 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
       throw (IO.userError s!"FAIL [rand both redex]: got {n}, expected 0..3")
   | e => throw (IO.userError s!"FAIL [rand both redex type]: got {repr e}")
 
--- ---------------------------------------------------------------------------
--- Pat.annot matching via scrut
--- ---------------------------------------------------------------------------
-
--- Pat.annot in tryMatch is dead code in the interpreter: decomp always strips
--- annotations before scrut fires (annot is not a value, so decompItem
--- decomposes through it).  We verify this: an annotated-pattern scrut on
--- a value that *was* annotated still works, because the annotation is gone
--- by the time tryMatch runs, so Pat.annot mismatches and we fall through.
-#eval check "scrut annot stripped before match"
-  pl(case scrut (#42 : int) with (x : int)
-     | inl(_) => #99
-     | inr(_) => #0)
-  pl(#0)
-
--- Plain var pattern still matches after annotation stripping
-#eval check "scrut after annot strip"
-  pl(case scrut (#42 : int) with x
-     | inl(b) => b
-     | inr(_) => #0)
-  pl(#42)
-
--- Direct test of Pat.tryMatch with annot (bypassing the interpreter)
-#eval show IO Unit from do
-  -- Both annotated: should match
-  let r1 := Pat.tryMatch (.annot (.ty .int) (.var (.named "x")))
-                          (Exp.annot (.ty .int) (Exp.lit (.int 7)))
-  if r1 != some (Exp.lit (.int 7)) then
-    throw (IO.userError s!"FAIL [Pat.annot match]: got {repr r1}")
-  -- Pattern annotated, value not: should fail
-  let r2 := Pat.tryMatch (.annot (.ty .int) (.var (.named "x")))
-                          (Exp.lit (.int 7))
-  if r2 != none then
-    throw (IO.userError s!"FAIL [Pat.annot mismatch]: got {repr r2}")
+-- (Pat.annot removed: pattern annotations are now discarded at elaboration,
+-- so `Pat.tryMatch` has no annot case. Previous tests targeting this
+-- behaviour have been deleted.)
 
 -- ---------------------------------------------------------------------------
 -- Multi-arm case with variable-binding pattern in non-first arm

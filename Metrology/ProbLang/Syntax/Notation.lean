@@ -8,6 +8,14 @@ namespace ProbLang
 
 open Lean Lean.PrettyPrinter Elab Parser
 
+/-- Controls rendering of ProbLang type annotations by the delaborator.
+    Valid values: `0` (default — hide all), `1` (show annotations on
+    let/fun/rec binders only), `2` (show every annotation). -/
+register_option pp.problang.annot : Nat := {
+  defValue := 0
+  descr := "ProbLang: display type annotations (0=none | 1=binders | 2=all)"
+}
+
 declare_syntax_cat pl_exp
 declare_syntax_cat pl_ty
 declare_syntax_cat pl_arg
@@ -152,7 +160,8 @@ macro_rules
   | `(pl_pat(($p1, $p2)))         => `(Pat.pair pl_pat($p1) pl_pat($p2))
   | `(pl_pat(inl($p)))            => `(Pat.inl pl_pat($p))
   | `(pl_pat(inr($p)))            => `(Pat.inr pl_pat($p))
-  | `(pl_pat(($p : $τ)))          => `(Pat.annot (.ty pl_ty($τ)) pl_pat($p))
+  -- Pattern annotations are currently discarded (no `Pat.annot` constructor).
+  | `(pl_pat(($p : $_τ)))         => `(pl_pat($p))
 
 /-- elaborating binders -/
 macro_rules
@@ -180,7 +189,7 @@ macro_rules
     - `pair p q`  → bindings = (b1, b2);  recurse on p with fst, q with snd
     - `inl p`     → bindings = sub;  recurse on p
     - `inr p`     → bindings = sub;  recurse on p
-    - `annot _ p` → bindings = sub;  recurse on p
+    - `(p : τ)`   → annotation is discarded;  recurse on p
     - `(p)`       → transparent parens;  recurse on p -/
 partial def patBindings [Monad m] [MonadRef m] [MonadQuotation m]
     (pat : TSyntax `pl_pat) (bindings : TSyntax `pl_exp) (body : TSyntax `pl_exp) :
@@ -229,8 +238,8 @@ partial def buildCaseChain [Monad m] [MonadRef m] [MonadQuotation m]
 
 /-- elaborating expressions -/
 macro_rules
-  -- Type annotation (must precede parentheses)
-  | `(pl(($e : $τ)))        => `(Exp.annot (.ty pl_ty($τ)) pl($e))
+  -- Type annotation (must precede parentheses): phantom wrapper — reducibly `pl($e)`.
+  | `(pl(($e : $τ)))        => `(Exp.annotated pl_ty($τ) pl($e))
   -- Parentheses (transparent)
   | `(pl(($e)))             => `(pl($e))
   -- Escape hatch
@@ -370,11 +379,24 @@ def unexpNamed : Unexpander
   | `($_ $s:str) => `(pl_binder($(Lean.mkIdent $ Name.mkSimple s.getString):ident))
   | _ => throw ()
 
-@[app_unexpander Binder.typed]
-def unexpTyped : Unexpander
-  | `($_ $s:str $τ) => do
-    `(pl_binder(($(Lean.mkIdent $ Name.mkSimple s.getString):ident : $(← unpackPLTy τ))))
-  | _ => throw ()
+open Lean.PrettyPrinter.Delaborator in
+/-- Delaborator for `Binder.typed s τ`. Consults `pp.problang.annot`:
+    - `none`                 → render as plain `pl_binder(s)` (type hidden).
+    - `binders` / `all`      → render `pl_binder((s : τ))`. -/
+@[delab app.ProbLang.Binder.typed]
+def delabBinderTyped : Delab := do
+  let e ← SubExpr.getExpr
+  unless e.getAppNumArgs == 2 do failure
+  let sExpr := e.appFn!.appArg!
+  let .lit (.strVal s) := sExpr | failure
+  let mode := pp.problang.annot.get (← getOptions)
+  let ident := Lean.mkIdent (Name.mkSimple s)
+  if mode ≥ 1 then
+    let τStx ← SubExpr.withAppArg delab
+    let τSyn ← unpackPLTy τStx
+    `(pl_binder(($ident:ident : $τSyn)))
+  else
+    `(pl_binder($ident:ident))
 
 @[app_unexpander Ty.int]
 def unexpTyInt : Unexpander | `($_) => `(pl_ty(int))
@@ -401,19 +423,6 @@ def unexpTyRef : Unexpander
 @[app_unexpander Ty.tape]
 def unexpTyTape : Unexpander
   | `($_) => do `(pl_ty(tape))
-
-@[app_unexpander Annot.ty]
-def unexpAnnotTy : Unexpander
-  | `($_ $τ) => pure τ  -- pass through the pl_ty(...) wrapper
-  | _ => throw ()
-
-@[app_unexpander Exp.annot]
-def unexpAnnot : Unexpander
-  | `($_ $a $e) => do
-    match a with
-    | `(pl_ty($τ)) => `(pl(($(← unpackPLExp e) : $τ)))
-    | _ => throw ()
-  | _ => throw ()
 
 @[app_unexpander Exp.var]
 def unexpVar : Unexpander
@@ -548,6 +557,29 @@ def unexpRand : Unexpander
 def unexpFail : Unexpander
   | `($_) => do `(pl(fail))
 
+open Lean.PrettyPrinter.Delaborator in
+/-- Delaborator for `Exp.annotated τ e`.
+
+    Consults `pp.problang.annot`:
+    - `none` / unknown   → render as plain `pl($e)` (annotation hidden).
+    - `binders`          → also hidden here; handled by let/fun/rec unexpanders.
+    - `all`              → render `pl(($e : $τ))`.
+
+    The wrapper is definitionally `e`, so dropping it is always sound. -/
+@[delab app.ProbLang.Exp.annotated]
+def delabExpAnnotated : Delab := do
+  let e ← SubExpr.getExpr
+  unless e.getAppNumArgs == 2 do failure
+  let mode := pp.problang.annot.get (← getOptions)
+  let eStx ← SubExpr.withAppArg delab
+  if mode ≥ 2 then
+    let τStx ← SubExpr.withAppFn (SubExpr.withAppArg delab)
+    let eSyn ← unpackPLExp eStx
+    let τSyn ← unpackPLTy τStx
+    `(pl(($eSyn : $τSyn)))
+  else
+    pure eStx
+
 @[app_unexpander Pat.var]
 def unexpPatVar : Unexpander
   | `($_ $b) => do
@@ -576,14 +608,6 @@ def unexpPatInl : Unexpander
 @[app_unexpander Pat.inr]
 def unexpPatInr : Unexpander
   | `($_ $p) => do `(pl_pat(inr($(← unpackPLPat p))))
-  | _ => throw ()
-
-@[app_unexpander Pat.annot]
-def unexpPatAnnot : Unexpander
-  | `($_ $a $p) => do
-    match a with
-    | `(pl_ty($τ)) => `(pl_pat(($(← unpackPLPat p) : $τ)))
-    | _ => throw ()
   | _ => throw ()
 
 @[app_unexpander Exp.scrut]

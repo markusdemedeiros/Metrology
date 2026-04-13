@@ -11,7 +11,6 @@ deriving instance ToExpr for UnOp
 deriving instance ToExpr for BinOp
 deriving instance ToExpr for Ty
 deriving instance ToExpr for Binder
-deriving instance ToExpr for Annot
 deriving instance ToExpr for Pat
 deriving instance ToExpr for Exp
 deriving instance ToExpr for IsVal

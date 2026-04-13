@@ -1,7 +1,7 @@
 import Metrology.ProbLang.Syntax.Syntax
 import Metrology.ProbLang.Syntax.Notation
 
-open ProbLang Exp Binder Ty Annot
+open ProbLang Exp Binder Ty
 
 /-- Check that a ProbLang expression elaborates to the expected AST.
     Usage:
@@ -573,15 +573,15 @@ variable (e e1 e2 : Exp)
 #elabpl pl_ty(tape)
 #expect Ty.tape
 
--- Expression type annotations
+-- Expression type annotations (now phantom: `Exp.annotated` reduces to the term)
 #elabpl pl((x : int))
-#expect annot (.ty .int) (var "x")
+#expect Exp.annotated .int (var "x")
 
 #elabpl pl((#1 : int))
-#expect annot (.ty .int) (lit (.int 1))
+#expect Exp.annotated .int (lit (.int 1))
 
 #elabpl pl((x + y : int))
-#expect annot (.ty .int) (binop .plus (var "x") (var "y"))
+#expect Exp.annotated .int (binop .plus (var "x") (var "y"))
 
 -- Typed binders in fun
 #elabpl pl(fun (x : int), x)
@@ -615,15 +615,15 @@ variable (e e1 e2 : Exp)
 
 -- Annotation with compound type
 #elabpl pl((x : int → bool))
-#expect annot (.ty (.arrow .int .bool)) (var "x")
+#expect Exp.annotated (.arrow .int .bool) (var "x")
 
 -- Annotation with product type
 #elabpl pl((x : int × bool))
-#expect annot (.ty (.prod .int .bool)) (var "x")
+#expect Exp.annotated (.prod .int .bool) (var "x")
 
 -- Nested annotation
 #elabpl pl(((x : int) : int))
-#expect annot (.ty .int) (annot (.ty .int) (var "x"))
+#expect Exp.annotated .int (Exp.annotated .int (var "x"))
 
 -- [commented out: typed binder in case arms test]
 -- example : pl(case inl(#1) | (x : int) => x | (y : bool) => y) = ... := rfl
@@ -640,16 +640,16 @@ variable (e e1 e2 : Exp)
 -- Annotation inside a let body
 #elabpl pl(let (x : int) := #1; (x : int))
 #expect app (letrec .anon (.typed "x" .int)
-               (annot (.ty .int) (var "x")))
+               (Exp.annotated .int (var "x")))
              (lit (.int 1))
 
 
 -- Annotated value in operational positions
 #elabpl pl(fst(((#1, #2) : int × int)))
-#expect fst (annot (.ty (.prod .int .int)) (pair (lit (.int 1)) (lit (.int 2))))
+#expect fst (Exp.annotated (.prod .int .int) (pair (lit (.int 1)) (lit (.int 2))))
 
 #elabpl pl((fun x, x : int → int) #1)
-#expect app (annot (.ty (.arrow .int .int)) (letrec .anon (.named "x") (var "x")))
+#expect app (Exp.annotated (.arrow .int .int) (letrec .anon (.named "x") (var "x")))
             (lit (.int 1))
 
 
@@ -672,10 +672,10 @@ variable (e e1 e2 : Exp)
 
 -- store/load with annotations
 #elabpl pl(alloc((#0 : int)))
-#expect alloc (annot (.ty .int) (lit (.int 0)))
+#expect alloc (Exp.annotated .int (lit (.int 0)))
 
 #elabpl pl(!(r : ref(int)))
-#expect load (annot (.ty (.ref .int)) (var "r"))
+#expect load (Exp.annotated (.ref .int) (var "r"))
 
 -- Variable patterns
 #elabpl pl_pat(x)
@@ -702,9 +702,9 @@ variable (e e1 e2 : Exp)
 #elabpl pl_pat(inr(y))
 #expect .inr (.var (.named "y"))
 
--- Annotated patterns
+-- Annotated patterns (annotation is discarded — patterns carry no type)
 #elabpl pl_pat((x : int))
-#expect .annot (.ty .int) (.var (.named "x"))
+#expect Pat.var (.named "x")
 
 -- Nested patterns
 #elabpl pl_pat(inl((x, y)))
@@ -723,9 +723,9 @@ variable (e e1 e2 : Exp)
 #expect Exp.scrut (pair (var "x") (var "y"))
                   (.pair (.var (.named "a")) (.var (.named "b")))
 
--- Scrut with annotated pattern
+-- Scrut with annotated pattern (annotation discarded)
 #elabpl pl(scrut x with (y : int))
-#expect Exp.scrut (var "x") (.annot (.ty .int) (.var (.named "y")))
+#expect Exp.scrut (var "x") (Pat.var (.named "y"))
 
 -- Simple variable pattern: let! x := e; body
 #elabpl pl(let! x := #1; x)
@@ -907,13 +907,23 @@ variable (e e1 e2 : Exp)
       (app (app (var "f") (var "x")) (var "y"))) : Exp)
 
 -- Delaboration: type annotations
+-- Default (`pp.problang.annot = none`): annotation is hidden.
+/-- info: pl(x) : Exp -/
+#guard_msgs in #check (Exp.annotated .int (var "x") : Exp)
+-- `all`: annotation is shown.
+set_option pp.problang.annot 2 in
 /-- info: pl((x : int)) : Exp -/
-#guard_msgs in #check (annot (.ty .int) (var "x") : Exp)
+#guard_msgs in #check (Exp.annotated .int (var "x") : Exp)
 
 -- Delaboration: typed binders
+-- Default: type hidden; binder renders as plain name.
+/-- info: pl(fun x, x) : Exp -/
+#guard_msgs in #check (letrec .anon (.typed "x" .int) (var "x") : Exp)
+set_option pp.problang.annot 1 in
 /-- info: pl(fun(x : int), x) : Exp -/
 #guard_msgs in #check (letrec .anon (.typed "x" .int) (var "x") : Exp)
 
+set_option pp.problang.annot 1 in
 /-- info: pl(rec f (x : int) := f x) : Exp -/
 #guard_msgs in #check (letrec (.named "f") (.typed "x" .int) (app (var "f") (var "x")) : Exp)
 
@@ -925,8 +935,9 @@ variable (e e1 e2 : Exp)
 #guard_msgs in #check (Ty.ref .int : Ty)
 
 -- Delaboration: compound type annotation
+set_option pp.problang.annot 2 in
 /-- info: pl((x : int → bool)) : Exp -/
-#guard_msgs in #check (annot (.ty (.arrow .int .bool)) (var "x") : Exp)
+#guard_msgs in #check (Exp.annotated (.arrow .int .bool) (var "x") : Exp)
 
 -- Delaboration: product type
 /-- info: pl_ty(int × bool) : Ty -/
@@ -939,12 +950,12 @@ variable (e e1 e2 : Exp)
 
 -- TODO: Move
 
--- Annotated literal is NOT a value (annotations are stripped during evaluation)
-example : ¬(pl((#1 : int))).isValue := by simp [Exp.isValue_iff_isValueR]
--- Annotated pair is NOT a value
-example : ¬(pl(((#1, #2) : int × int))).isValue := by simp [Exp.isValue_iff_isValueR]
--- Annotated non-value is not a value
-example : ¬(pl((x + y : int))).isValue := by simp [Exp.isValue_iff_isValueR]
+-- Annotated literal IS a value (phantom annotation reduces away)
+example : (pl((#1 : int))).isValue := by simp [Exp.isValue_iff_isValueR, Exp.annotated]
+-- Annotated pair IS a value
+example : (pl(((#1, #2) : int × int))).isValue := by simp [Exp.isValue_iff_isValueR, Exp.annotated]
+-- Annotated non-value is still not a value
+example : ¬(pl((x + y : int))).isValue := by simp [Exp.isValue_iff_isValueR, Exp.annotated]
 
 -- [commented out: typed binders in destructuring let test, to be replaced by match+case]
 -- example : ∃ n, pl(let ((x : int), (y : bool)) := e; x + y) = ... := ⟨_, rfl⟩
@@ -975,22 +986,26 @@ example : (letrec .anon (.typed "x" .int) (var "y")).subst' "y" (lit (.int 7)) =
 -- ---------------------------------------------------------------------------
 
 -- Typed binder in let round-trips
+set_option pp.problang.annot 1 in
 /-- info: pl(let (x : int) := #(BaseLit.int 1); x) : Exp -/
 #guard_msgs in #check (app (letrec .anon (.typed "x" .int) (var "x")) (lit (.int 1)) : Exp)
 
 -- Multi-arg fun with mixed typed/untyped: typed binder prevents collapsing
+set_option pp.problang.annot 1 in
 /-- info: pl(fun(x : int), fun y, (x + y)) : Exp -/
 #guard_msgs in #check (letrec .anon (.typed "x" .int)
     (letrec .anon (.named "y")
       (binop .plus (var "x") (var "y"))) : Exp)
 
 -- Annotated value inside a pair
+set_option pp.problang.annot 2 in
 /-- info: pl(((#(BaseLit.int 1) : int), #(BaseLit.int 2))) : Exp -/
-#guard_msgs in #check (pair (annot (.ty .int) (lit (.int 1))) (lit (.int 2)) : Exp)
+#guard_msgs in #check (pair (Exp.annotated .int (lit (.int 1))) (lit (.int 2)) : Exp)
 
 -- Annotation on a compound expression
+set_option pp.problang.annot 2 in
 /-- info: pl(((x + y) : int)) : Exp -/
-#guard_msgs in #check (annot (.ty .int) (binop .plus (var "x") (var "y")) : Exp)
+#guard_msgs in #check (Exp.annotated .int (binop .plus (var "x") (var "y")) : Exp)
 
 -- Nested type: ref of arrow
 /-- info: pl_ty(ref(int → bool)) : Ty -/
@@ -1019,8 +1034,7 @@ example : (letrec .anon (.typed "x" .int) (var "y")).subst' "y" (lit (.int 7)) =
 /-- info: pl_pat(inl(x)) : Pat -/
 #guard_msgs in #check (Pat.inl (.var (.named "x")) : Pat)
 
-/-- info: pl_pat((x : int)) : Pat -/
-#guard_msgs in #check (Pat.annot (.ty .int) (.var (.named "x")) : Pat)
+-- `Pat.annot` has been removed; pattern annotations are discarded at elab time.
 
 -- -- Pair destructuring via case
 -- #check (pl(case e | (x, y) => x + y) : Exp)

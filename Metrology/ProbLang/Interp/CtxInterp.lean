@@ -136,9 +136,6 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
     | some bindings => return .inl bindings
     | none          => return .inr (.lit .unit)
 
-  -- Annotation stripping: headStep (annot a v) = v
-  | .annot _ v => return v
-
   -- Stuck / failure
   | .fail => throw' .fail
 

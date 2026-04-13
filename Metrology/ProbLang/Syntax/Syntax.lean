@@ -74,17 +74,12 @@ inductive Binder | anon | named (s : String) | typed (s : String) (τ : Ty)
 def Binder.binds (b : Binder) (x : String) : Bool :=
   match b with | .named s | .typed s _ => s == x | .anon => false
 
-inductive Annot
-  | ty (τ : Ty)
-  deriving Inhabited, DecidableEq, Countable, Repr, BEq
-
 inductive Pat
   | var (x : Binder)
   | lit (b : BaseLit)
   | pair (p1 p2 : Pat)
   | inl (p : Pat)
   | inr (p : Pat)
-  | annot (a : Annot) (p : Pat)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
 inductive Exp
@@ -107,9 +102,13 @@ inductive Exp
   | tape (e : Exp)
   | rand (en et : Exp)
   | fail
-  | annot (a : Annot) (e : Exp)
   | scrut (e : Exp) (pat : Pat)
   deriving Inhabited, Countable, Repr, BEq
+
+/-- Phantom type annotation: carries a `Ty` alongside an `Exp` for display
+    purposes but is definitionally equal to the expression. The unexpander
+    reads this wrapper to render `(e : τ)` when `pp.problang.annot` requests it. -/
+@[reducible] def Exp.annotated (_τ : Ty) (e : Exp) : Exp := e
 
 /-- Try to match an expression against a pattern.
     Returns `some bindings` on success, `none` on failure.
@@ -128,7 +127,6 @@ def Pat.tryMatch : Pat → Exp → Option Exp
       return .pair b1 b2
   | .inl p, .inl e => p.tryMatch e
   | .inr p, .inr e => p.tryMatch e
-  | .annot _ p, .annot _ e => p.tryMatch e
   | _, _ => none
 
 -------------------------------------------------------------------------------
@@ -362,7 +360,6 @@ inductive EctxItem
   | tape
   | randL (v2 : Val)
   | randR (e1 : Exp)
-  | annot (a : Annot)
   | scrut (p : Pat)
 
 @[simp] def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
@@ -387,7 +384,6 @@ inductive EctxItem
   | .tape => .tape e
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
-  | .annot a => .annot a e
   | .scrut p => .scrut e p
 
 def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
@@ -427,8 +423,6 @@ def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
     ec.toVal?.casesOn (some (.case el er, ec)) fun _ => none
   | tape e1 =>
     e1.toVal?.casesOn (some (.tape, e1)) fun _ => none
-  | annot a e1 =>
-    e1.toVal?.casesOn (some (.annot a, e1)) fun _ => none
   | scrut e1 p =>
     e1.toVal?.casesOn (some (.scrut p, e1)) fun _ => none
   | _ => none
@@ -456,7 +450,6 @@ def Exp.subst' (e : Exp) (x : String) (v : Exp) : Exp :=
   | store e1 e2 => store (e1.subst' x v) (e2.subst' x v)
   | rand e1 e2 => rand (e1.subst' x v) (e2.subst' x v)
   | tape e => tape (e.subst' x v)
-  | annot a e => annot a (e.subst' x v)
   | scrut e p => scrut (e.subst' x v) p
   | fail => fail
 
@@ -552,7 +545,6 @@ def Exp.height : Exp → Nat
   | tape e => 1 + e.height
   | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
-  | annot _ e => 1 + e.height
   | scrut e _ => 1 + e.height
   | fail => 1
 
@@ -746,7 +738,6 @@ def Fresh (x : String) : Exp → Prop
   | .tape e => Fresh x e
   | .rand e1 e2 => Fresh x e1 ∧ Fresh x e2
   | .fail => True
-  | .annot _ e => Fresh x e
   | .scrut e _ => Fresh x e
 
 end ProbLang
