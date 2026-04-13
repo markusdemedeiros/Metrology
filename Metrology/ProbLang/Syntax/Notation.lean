@@ -159,42 +159,35 @@ macro_rules
   | `(pl_pat(inl($p)))            => `(Pat.inl pl_pat($p))
   | `(pl_pat(inr($p)))            => `(Pat.inr pl_pat($p))
 
-/-! ## Expression elaboration (with name-env threading)
+/-! ## Expression elaboration
 
-Atoms are allocated from a monotonic counter, fresh per `pl(…)` invocation.
-Each binder grabs the next free `Nat`; each unbound top-level identifier
-also grabs one, deduped within the invocation via `topEnv`. -/
+Now that `Var = String`, free identifiers map directly to their string atoms:
+`pl(x)` elaborates to `Exp.fvar "x"`. Different identifiers always have
+different atoms by string equality.
 
-/-- Map from Lean identifier names to the `Nat` atom assigned at binding time. -/
-abbrev NameEnv := Lean.NameMap Nat
+For binders, we still need to gensym to avoid shadowing pathologies. The
+allocator threads a counter and prepends `"_"` to the identifier name to
+generate `"_x_0"`, `"_x_1"`, etc. (The leading `_` ensures binder atoms
+can't collide with surface free identifiers.) -/
+
+/-- Map from Lean identifier names to the `String` atom assigned at binding time. -/
+abbrev NameEnv := Lean.NameMap String
 
 /-- Allocator state held in an `IO.Ref` for the duration of one `pl(…)` call:
-    the next free atom and the top-level name→atom environment (shared across
-    free identifiers within the invocation). -/
+    just a fresh-atom counter for binder gensyms. -/
 structure AtomState where
-  next   : Nat := 0
-  topEnv : NameEnv := {}
+  next : Nat := 0
 
--- (Display-name recovery for `Exp.fvar` is handled per-term via
--- `plFvarHint!` mdata, not via a global registry.)
-
-/-- Allocate a fresh atom. The optional `displayName?` is unused; kept for
-    callsite ergonomics in case a future reverse registry needs it. -/
-private def freshAtom (st : IO.Ref AtomState) (_displayName? : Option String := none)
-    : TermElabM Nat := do
+/-- Allocate a fresh string atom for a binder, using the identifier's name
+    as a base (so `fun x, ...` produces atom `"_x_0"` etc.). -/
+private def freshAtom (st : IO.Ref AtomState) (base : String := "x") : TermElabM String := do
   let s ← st.get
-  st.set { s with next := s.next + 1 }
-  return s.next
+  st.set { next := s.next + 1 }
+  return "_" ++ base ++ "_" ++ toString s.next
 
-/-- Look up (or allocate) the atom for a top-level free identifier. -/
-private def freshTopAtom (st : IO.Ref AtomState) (n : Lean.Name) : TermElabM Nat := do
-  let s ← st.get
-  match s.topEnv.find? n with
-  | some v => return v
-  | none =>
-      let a := s.next
-      st.set { next := s.next + 1, topEnv := s.topEnv.insert n a }
-      return a
+/-- Top-level free identifier: use the identifier's name verbatim. -/
+private def freshTopAtom (_st : IO.Ref AtomState) (n : Lean.Name) : TermElabM String :=
+  return n.toString
 
 /-- Extract the `ident` (or hole) and optional type from a `pl_arg`. -/
 private def unpackArg (a : TSyntax `pl_arg) :
@@ -222,13 +215,12 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
   | `(pl_exp|# $e)         => `(Exp.lit $e)
   | `(pl_exp|$i:ident)     => do
       checkNotReserved i
-      let nameStr := Syntax.mkStrLit i.getId.toString
       match env.find? i.getId with
-      | some v =>
-          `(plFvarHint! $nameStr (Exp.fvar $(Syntax.mkNatLit v)))
+      | some atomStr =>
+          `(Exp.fvar $(Syntax.mkStrLit atomStr))
       | none   =>
-          let v ← freshTopAtom st i.getId
-          `(plFvarHint! $nameStr (Exp.fvar $(Syntax.mkNatLit v)))
+          let atomStr ← freshTopAtom st i.getId
+          `(Exp.fvar $(Syntax.mkStrLit atomStr))
   -- Binary / unary ops
   | `(pl_exp|$e1 + $e2)    => do `(Exp.binop .plus  $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|$e1 - $e2)    => do `(Exp.binop .minus $(← elabPL env st e1) $(← elabPL env st e2))
@@ -282,7 +274,7 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
       -- de-Bruijn index is correct regardless of nested pattern binders.
       let bindAtom ← freshAtom st
       let projected ← projectPattern env st p
-        (← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit bindAtom)})) body patBindings bindIdents
+        (← `(pl_exp|{Exp.fvar $(Syntax.mkStrLit bindAtom)})) body patBindings bindIdents
       let bodyClose ← closeMaybe projected bindAtom none none
       `(Exp.case
          (Exp.scrut $(← elabPL env st e) pl_pat($p))
@@ -292,7 +284,7 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
       let allPats := #[p] ++ ps
       let allBodies := #[b] ++ bs
       let scrutAtom ← freshAtom st
-      let scrutVar ← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit scrutAtom)})
+      let scrutVar ← `(pl_exp|{Exp.fvar $(Syntax.mkStrLit scrutAtom)})
       let chain2 ← buildCaseChainWith env st scrutVar allPats allBodies
       let closed ← closeMaybe chain2 scrutAtom none none
       `(Exp.app $closed $(← elabPL env st e))
@@ -303,18 +295,18 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
 
 /-- Emit `Exp.close body atom`, wrapped in a bare `Exp.lam` with display
     metadata attached via `plBinderHint!`. -/
-partial def closeMaybe (body : Term) (atom : Nat) (name : Option String) (τ : Option (TSyntax `pl_ty))
+partial def closeMaybe (body : Term) (atom : String) (name : Option String) (τ : Option (TSyntax `pl_ty))
     : TermElabM Term := do
-  let closed ← `(Exp.close $body $(Syntax.mkNatLit atom))
+  let closed ← `(Exp.close $body $(Syntax.mkStrLit atom))
   let nm := name.getD "_"
   let τExpr : Term ← match τ with
     | some τ' => `((some pl_ty($τ')))
     | none    => `((none : Option Ty))
   `(plBinderHint! $(Syntax.mkStrLit nm) $τExpr (Exp.lam $closed))
 
-partial def closeMaybeFix (body : Term) (atom : Nat) (name : Option String) (τ : Option (TSyntax `pl_ty))
+partial def closeMaybeFix (body : Term) (atom : String) (name : Option String) (τ : Option (TSyntax `pl_ty))
     : TermElabM Term := do
-  let closed ← `(Exp.close $body $(Syntax.mkNatLit atom))
+  let closed ← `(Exp.close $body $(Syntax.mkStrLit atom))
   let nm := name.getD "_"
   let τExpr : Term ← match τ with
     | some τ' => `((some pl_ty($τ')))
@@ -333,7 +325,7 @@ partial def elabLamArg (env : NameEnv) (st : IO.Ref AtomState)
   | some i =>
       checkNotReserved i
       let nm := i.getId
-      let atom ← freshAtom st (some nm.toString)
+      let atom ← freshAtom st nm.toString
       let env' := env.insert nm atom
       let body' ← elabPL env' st body
       closeMaybe body' atom (some nm.toString) τOpt
@@ -349,13 +341,13 @@ partial def elabRec (env : NameEnv) (st : IO.Ref AtomState) (f : TSyntax `pl_arg
   | some fi =>
       checkNotReserved fi
       let fnm := fi.getId
-      let fatom ← freshAtom st (some fnm.toString)
+      let fatom ← freshAtom st fnm.toString
       let env' := env.insert fnm fatom
       let lamBody ← match xOpt with
         | some xi =>
             checkNotReserved xi
             let xnm := xi.getId
-            let xatom ← freshAtom st (some xnm.toString)
+            let xatom ← freshAtom st xnm.toString
             let env'' := env'.insert xnm xatom
             let b ← elabPL env'' st body
             closeMaybe b xatom (some xnm.toString) xτ
@@ -368,7 +360,7 @@ partial def elabRec (env : NameEnv) (st : IO.Ref AtomState) (f : TSyntax `pl_arg
         | some xi =>
             checkNotReserved xi
             let xnm := xi.getId
-            let xatom ← freshAtom st (some xnm.toString)
+            let xatom ← freshAtom st xnm.toString
             let env' := env.insert xnm xatom
             let b ← elabPL env' st body
             closeMaybe b xatom (some xnm.toString) xτ
@@ -408,12 +400,12 @@ partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
     : TermElabM Term := do
   -- Pass 1: collect pattern-bound idents in order, allocating atoms.
   let rec collect (env : NameEnv) (pat : TSyntax `pl_pat) :
-      TermElabM (NameEnv × Array (Lean.Ident × Nat)) := do
+      TermElabM (NameEnv × Array (Lean.Ident × String)) := do
     match pat with
     | `(pl_pat|$i:ident) => do
         checkNotReserved i
         let nm := i.getId
-        let atom ← freshAtom st (some nm.toString)
+        let atom ← freshAtom st nm.toString
         return (env.insert nm atom, #[(i, atom)])
     | `(pl_pat|_) | `(pl_pat|# $_) => return (env, #[])
     | `(pl_pat|($p)) | `(pl_pat|($p : $_)) => collect env p
@@ -453,7 +445,7 @@ partial def buildCaseChainWith (env : NameEnv) (st : IO.Ref AtomState)
     let pat := pats[i]!
     let body := bodies[i]!
     let bindAtom ← freshAtom st
-    let bindVar ← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit bindAtom)})
+    let bindVar ← `(pl_exp|{Exp.fvar $(Syntax.mkStrLit bindAtom)})
     let projected ← projectPattern env st pat bindVar body #[] #[]
     let bodyClose ← closeMaybe projected bindAtom none none
     let fallback ← `(plBinderHint! "_" (none : Option Ty) (Exp.lam $result))
@@ -795,14 +787,17 @@ def delabPlFvarMeta : Delab := do
   `(pl($ident:ident))
 
 open Lean.PrettyPrinter.Delaborator in
-/-- Fallback delaborator for bare `Exp.fvar` (no mdata wrapper). Prints the
-    raw atom in escape-hatch form. -/
+/-- Delaborator for `Exp.fvar`. Since `Var = String` and free identifiers
+    elaborate to `Exp.fvar "x"` directly, just emit `pl(x)` from the string. -/
 @[delab app.ProbLang.Exp.fvar]
 def delabExpFvar : Delab := do
   let e ← SubExpr.getExpr
   unless e.getAppNumArgs == 1 do failure
   let argExpr := e.appArg!
-  let some n := argExpr.nat? | failure
-  `(pl({Exp.fvar $(Syntax.mkNatLit n)}))
+  match argExpr with
+  | .lit (.strVal s) =>
+      let ident := Lean.mkIdent (Name.mkSimple s)
+      `(pl($ident:ident))
+  | _ => failure
 
 end ProbLang

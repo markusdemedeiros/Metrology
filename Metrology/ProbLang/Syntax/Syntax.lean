@@ -39,8 +39,18 @@ instance instCountableString : Countable String where
 
 namespace ProbLang
 
-/-- Free variables are natural numbers. CSlib provides `HasFresh ℕ`. -/
-abbrev Var : Type := Nat
+/-- Free-variable atoms are strings. Each surface identifier `x` elaborates to
+    `Exp.fvar "x"`. Bound variables use de-Bruijn `Nat` indices via `Exp.bvar`. -/
+abbrev Var : Type := String
+
+/-- `HasFresh String`: produce a string longer than every string in the set.
+    The `fresh_notMem` proof is a routine string/list-length inequality;
+    deferred (a small `String.length` lemma needed). -/
+instance : Cslib.HasFresh String where
+  fresh s :=
+    let maxLen : Nat := s.sup (fun str => str.length)
+    String.mk (List.replicate (maxLen + 1) 'x')
+  fresh_notMem _ := by sorry
 
 abbrev Loc : Type := Int
 

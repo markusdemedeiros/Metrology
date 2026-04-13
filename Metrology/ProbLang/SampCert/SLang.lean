@@ -409,12 +409,11 @@ instance : ProbLangEmbeddable Bool where
   as_expr_isVal _ := .lit
   as_expr_lc _ := .lit _
 
-/-- ProbLang translation: `let a := rand 255 (); let b := rand 255 (); a = b`.
-    Atoms 0 and 1 are arbitrary fresh atoms for `a` and `b`. -/
+/-- ProbLang translation: `let a := rand 255 (); let b := rand 255 (); a = b`. -/
 def plTwoByteEq : Exp :=
-  probLangBind 0 probLangUniformByte $
-    probLangBind 1 probLangUniformByte $
-      probLangEq (.fvar 0) (.fvar 1)
+  probLangBind "a" probLangUniformByte $
+    probLangBind "b" probLangUniformByte $
+      probLangEq (.fvar "a") (.fvar "b")
 
 -- The ProbLang equality operator on embedded UInt8 values computes the same Bool.
 -- After substitution, probLangEq (as_expr a) (as_expr b) = .binop .eq (.lit (.int a.toNat)) (.lit (.int b.toNat))
@@ -462,31 +461,23 @@ theorem twoByteEq_isEmbedding : IsEmbedding twoByteEq plTwoByteEq := by
     · exact .binop _ (.fvar _) (.fvar _)
   · -- h1 : IsEmbedding probUniformByte probLangUniformByte
     exact probLangUniformByte_isEmbedding
-  · -- h2 : ∀ a, IsEmbedding (...) (subst <body> 0 (as_expr a))
+  · -- h2 : ∀ a, IsEmbedding (...) (subst <body> "a" (as_expr a))
     intro a
-    -- The substitution rewrites the inner term to
-    --   probLangBind 1 probLangUniformByte (probLangEq (as_expr a) (fvar 1)).
-    have hgoal : Exp.subst (probLangBind 1 probLangUniformByte
-                              (probLangEq (.fvar 0) (.fvar 1))) 0 (as_expr a)
-        = probLangBind 1 probLangUniformByte (probLangEq (as_expr a) (.fvar 1)) := by
+    have hgoal : Exp.subst (probLangBind "b" probLangUniformByte
+                              (probLangEq (.fvar "a") (.fvar "b"))) "a" (as_expr a)
+        = probLangBind "b" probLangUniformByte (probLangEq (as_expr a) (.fvar "b")) := by
       unfold probLangBind probLangUniformByte probLangEq
-      -- subst over `app (lam (close (eq (fvar 0) (fvar 1)) 1)) (rand ...)` at 0/(as_expr a)
-      -- The rand and lit subterms have no fvars, so subst is identity there.
-      -- The lam body is `close (eq (fvar 0) (fvar 1)) 1`; closeRec preserves
-      -- fvar 0 and turns fvar 1 into bvar 0; subst at 0 hits fvar 0 → as_expr a.
       simp only [Exp.subst, Exp.close, Exp.closeRec]
       rfl
     rw [hgoal]
-    -- Inner bind.
     apply probLangBind_isEmbedding
-    · -- LC of inner body
-      exact .binop _ (as_expr_lc a) (.fvar _)
+    · exact .binop _ (as_expr_lc a) (.fvar _)
     · exact probLangUniformByte_isEmbedding
     · intro b
-      have ha_subst : Exp.subst (as_expr a) 1 (as_expr b) = as_expr a := by
+      have ha_subst : Exp.subst (as_expr a) "b" (as_expr b) = as_expr a := by
         apply Exp.subst_fresh
         intro h; simp [as_expr, Exp.fv] at h
-      have hgoal2 : Exp.subst (probLangEq (as_expr a) (.fvar 1)) 1 (as_expr b)
+      have hgoal2 : Exp.subst (probLangEq (as_expr a) (.fvar "b")) "b" (as_expr b)
           = probLangEq (as_expr a) (as_expr b) := by
         unfold probLangEq
         simp only [Exp.subst, ha_subst]

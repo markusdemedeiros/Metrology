@@ -948,7 +948,7 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 -- ---------------------------------------------------------------------------
 
 #eval checkErrorMsg "free variable"
-  (.binop .plus (.fvar 99999) (.lit (.int 1)))
+  (.binop .plus (.fvar "unbound_x") (.lit (.int 1)))
   "stuck"
 
 -- ---------------------------------------------------------------------------

@@ -361,10 +361,22 @@ theorem Exp.close_fv_subset (e : Exp) (x : Var) :
 
 /-- The free variables of `k.fill body` are contained in the union of
     `k`'s payload fvs and the body's fvs (binder-induced removals only
-    decrease the set). **Sorry**: 26-case structural induction; deferred. -/
+    decrease the set). -/
 theorem CtxItem.fv_fill_subset (k : CtxItem) (body : Exp) :
     (k.fill body).fv ⊆ k.payloadFv ∪ body.fv := by
-  sorry
+  intro y hy
+  cases k <;>
+    simp only [CtxItem.fill, CtxItem.payloadFv, Exp.fv,
+      Finset.mem_union, Finset.empty_union, ProbLang.recUnfold] at hy ⊢
+  all_goals first
+    | tauto
+    | (rename_i x; exact Exp.close_fv_subset _ x hy)
+    | (rename_i x e2; rcases hy with h | h
+       · exact Or.inl (Exp.close_fv_subset _ x h)
+       · exact Or.inr h)
+    | (rename_i x e1; rcases hy with h | h
+       · exact Or.inr (Exp.close_fv_subset _ x h)
+       · exact Or.inl h)
 
 /-- Plugging a well-typed term into a well-typed single frame produces a
 well-typed term. (Clutch `typed_ctx_item_typed`.)
@@ -434,6 +446,24 @@ def Ctx.binderAtoms (K : Ctx) : Finset Var :=
 def Ctx.payloadFv (K : Ctx) : Finset Var :=
   K.foldr (fun k acc => k.payloadFv ∪ acc) ∅
 
+/-- Multi-frame fv bound: fvs of `K.fill e` are bounded by payload fvs + fvs of `e`. -/
+theorem Ctx.fv_fill_subset (K : Ctx) (e : Exp) :
+    (K.fill e).fv ⊆ Ctx.payloadFv K ∪ e.fv := by
+  induction K with
+  | nil => intro y hy; exact Finset.mem_union_right _ hy
+  | cons k K ih =>
+      intro y hy
+      simp only [Ctx.fill, List.foldr_cons] at hy
+      have hk := CtxItem.fv_fill_subset k (K.foldr CtxItem.fill e) hy
+      simp only [Ctx.payloadFv, List.foldr_cons, Finset.mem_union] at hk ⊢
+      rcases hk with h | h
+      · exact Or.inl (Or.inl h)
+      · have := ih h
+        simp only [Finset.mem_union] at this
+        rcases this with h | h
+        · exact Or.inl (Or.inr h)
+        · exact Or.inr h
+
 /-- Plugging a well-typed term into a well-typed multi-frame context
 produces a well-typed term. (Clutch `typed_ctx_typed`.)
 
@@ -446,11 +476,28 @@ theorem TypedCtx.fill_typed {K : Ctx} {Γ τ Γ' τ' e}
   induction hK with
   | nil => exact he
   | @cons K k Γ1 τ1 Γ2 τ2 Γ3 τ3 hk hKrest ih =>
-      -- Goal: Typed Γ3 ((k :: K).fill e) τ3 = Typed Γ3 (k.fill (K.fill e)) τ3.
-      -- Compose the per-frame fill_typed with the IH. The freshness premise
-      -- for the outer frame `k` requires k.binderAtoms ∩ (K.fill e).fv = ∅,
-      -- which follows from `fv_fill_subset` + the input freshness.
-      sorry
+      have hfreshK : ∀ x ∈ Ctx.binderAtoms K, x ∉ e.fv ∧ x ∉ Ctx.payloadFv K := by
+        intro x hx
+        have hxmem : x ∈ Ctx.binderAtoms (k :: K) := by
+          simp [Ctx.binderAtoms, List.foldr_cons, Finset.mem_union]; exact Or.inr hx
+        obtain ⟨hxe, hxpay⟩ := hfresh x hxmem
+        refine ⟨hxe, ?_⟩
+        intro h
+        apply hxpay
+        simp [Ctx.payloadFv, List.foldr_cons, Finset.mem_union]; exact Or.inr h
+      have hIH : Typed Γ2 (K.fill e) τ2 := ih he hfreshK
+      have hfreshk : ∀ x ∈ k.binderAtoms, x ∉ (K.fill e).fv := by
+        intro x hx
+        have hxmem : x ∈ Ctx.binderAtoms (k :: K) := by
+          simp [Ctx.binderAtoms, List.foldr_cons, Finset.mem_union]; exact Or.inl hx
+        obtain ⟨hxe, hxpay⟩ := hfresh x hxmem
+        intro hfv
+        rcases Finset.mem_union.mp (Ctx.fv_fill_subset K e hfv) with h | h
+        · apply hxpay
+          simp [Ctx.payloadFv, List.foldr_cons, Finset.mem_union]; exact Or.inr h
+        · exact hxe h
+      show Typed Γ3 (k.fill (K.fill e)) τ3
+      exact TypedCtxItem.fill_typed hIH hk hfreshk
 
 /-- Composing well-typed contexts. (Clutch `typed_ctx_compose`.) -/
 theorem TypedCtx.compose {K K' : Ctx} {Γ1 Γ2 Γ3 τ1 τ2 τ3}
