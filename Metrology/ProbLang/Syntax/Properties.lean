@@ -293,5 +293,57 @@ theorem open_close_subst_lc (x y : Var) (e : Exp) (he : IsLocallyClosed e) :
     open' (close e x) (fvar y) = subst e x (fvar y) :=
   open_close_to_subst e x y 0 he
 
+/-- Generalised: outermost open ∘ close equals substitution by an arbitrary
+    LC value. Proved via `subst_intro` with a fresh atom and the `fvar`-only
+    version `open_close_subst_lc`. -/
+theorem open_close_subst_lc_gen (x : Var) (e v : Exp)
+    (he : IsLocallyClosed e) (hv : IsLocallyClosed v) :
+    open' (close e x) v = subst e x v := by
+  -- Pick a fresh atom z disjoint from `e.fv ∪ v.fv ∪ {x}`, then use
+  -- `subst_intro` to factor `open' (close e x) v` through `subst _ z v`.
+  obtain ⟨z, hz⟩ := HasFresh.fresh_exists (insert x (e.fv ∪ v.fv))
+  have hzx : z ≠ x := fun h => hz (h ▸ Finset.mem_insert_self _ _)
+  have hze : z ∉ e.fv := fun h => hz (Finset.mem_insert_of_mem (Finset.mem_union_left _ h))
+  have hzv : z ∉ v.fv := fun h => hz (Finset.mem_insert_of_mem (Finset.mem_union_right _ h))
+  -- close e x has z ∉ fv (since z ∉ e.fv and close only removes fvars).
+  have hzcl : z ∉ (close e x).fv := close_preserve_not_fvar e hze
+  -- subst_intro: open' (close e x) v = subst (open' (close e x) (fvar z)) z v.
+  rw [subst_intro z v (close e x) hzcl hv]
+  -- open' (close e x) (fvar z) = subst e x (fvar z) by open_close_subst_lc.
+  rw [open_close_subst_lc x z e he]
+  -- Now the goal is: subst (subst e x (fvar z)) z v = subst e x v.
+  -- Use subst_subst to commute, exploiting hzv (z ∉ v.fv) and hze (z ∉ e.fv).
+  -- subst_subst: subst (subst e x v_inner) y v_outer
+  --                = subst (subst e y v_outer) x (subst v_inner y v_outer)
+  -- with x → x, y → z, v_inner → fvar z, v_outer → v, side cond: x ≠ z, x ∉ v.fv? No.
+  -- Easier: directly induct on e, but better — use that z ∉ subst e x (fvar z).fv
+  -- is false (we just put z in!). Instead, use subst_subst_ne style:
+  -- Substitute z by v in subst e x (fvar z): the only z is the one we just put in,
+  -- so it becomes v, giving subst e x v.
+  -- This is provable by induction on e. Let me use a direct lemma:
+  have aux : ∀ (e : Exp), z ∉ e.fv →
+      subst (subst e x (fvar z)) z v = subst e x v := by
+    intro e hze
+    induction e with
+    | fvar y =>
+        by_cases hxy : x = y
+        · subst hxy; simp [subst]
+        · -- x ≠ y; inner subst leaves fvar y, outer subst hits z vs y.
+          have hzy : z ≠ y := fun h => hze (by rw [h]; simp [fv])
+          simp [subst, hxy, hzy]
+    | bvar _ | lit _ | fail => simp [subst]
+    | lam e ih | fix e ih | unop _ e ih | fst e ih | snd e ih
+    | inl e ih | inr e ih | alloc e ih | load e ih | tape e ih | scrut e _ ih =>
+        simp only [subst, fv] at hze ⊢
+        rw [ih hze]
+    | app e1 e2 ih1 ih2 | binop _ e1 e2 ih1 ih2 | pair e1 e2 ih1 ih2
+    | store e1 e2 ih1 ih2 | rand e1 e2 ih1 ih2 =>
+        simp only [subst, fv, Finset.mem_union, not_or] at hze ⊢
+        rw [ih1 hze.1, ih2 hze.2]
+    | cond e0 e1 e2 ih0 ih1 ih2 | case e0 e1 e2 ih0 ih1 ih2 =>
+        simp only [subst, fv, Finset.mem_union, not_or] at hze ⊢
+        rw [ih0 hze.1.1, ih1 hze.1.2, ih2 hze.2]
+  exact aux e hze
+
 end Exp
 end ProbLang

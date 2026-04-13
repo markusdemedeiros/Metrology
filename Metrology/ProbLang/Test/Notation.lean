@@ -121,7 +121,7 @@ variable (e e1 e2 : Exp)
 #expect Exp.lam (.fvar 0)
 
 #elabpl pl(fun x y, x)
-#expect Exp.lam (close (Exp.lam (close (.fvar 0) 1)) 0)
+#expect Exp.lam (Exp.lam (.bvar 1))
 
 #elabpl pl(rec f x := f x)
 #expect Exp.fix (close (Exp.lam (close (app (.fvar 0) (.fvar 1)) 1)) 0)
