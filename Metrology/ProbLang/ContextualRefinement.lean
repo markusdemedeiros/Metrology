@@ -1,4 +1,4 @@
-import Metrology.ProbLang.Types
+import Metrology.ProbLang.Syntax.Types
 import Metrology.ProbLang.Exec
 
 /-!
@@ -249,15 +249,15 @@ inductive TypedCtxItem : CtxItem → Tctx → Ty → Tctx → Ty → Prop
         ((Γ.shift).insert x τ) τ2.shift Γ τ2
   -- Tapes
   | allocTape {Γ} :
-      TypedCtxItem .allocTape Γ .nat Γ .tape
+      TypedCtxItem .allocTape Γ .int Γ .tape
   | randL_unit {Γ e2} :
-      Typed Γ e2 .unit → TypedCtxItem (.randL e2) Γ .nat Γ .nat
+      Typed Γ e2 .unit → TypedCtxItem (.randL e2) Γ .int Γ .int
   | randL_tape {Γ e2} :
-      Typed Γ e2 .tape → TypedCtxItem (.randL e2) Γ .nat Γ .nat
+      Typed Γ e2 .tape → TypedCtxItem (.randL e2) Γ .int Γ .int
   | randR_unit {Γ e1} :
-      Typed Γ e1 .nat → TypedCtxItem (.randR e1) Γ .unit Γ .nat
+      Typed Γ e1 .int → TypedCtxItem (.randR e1) Γ .unit Γ .int
   | randR_tape {Γ e1} :
-      Typed Γ e1 .nat → TypedCtxItem (.randR e1) Γ .tape Γ .nat
+      Typed Γ e1 .int → TypedCtxItem (.randR e1) Γ .tape Γ .int
 
 /-! ## Well-typed multi-frame contexts -/
 

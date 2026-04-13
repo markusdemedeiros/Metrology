@@ -12,5 +12,5 @@ import Metrology.ProbLang.SampCert.SLang
 import Metrology.ProbLang.SampCert.Samplers
 import Metrology.ProbLang.Syntax.Syntax
 import Metrology.ProbLang.Syntax.Notation
+import Metrology.ProbLang.Syntax.Types
 import Metrology.ProbLang.Test
-import Metrology.ProbLang.Types

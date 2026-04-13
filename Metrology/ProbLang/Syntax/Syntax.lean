@@ -53,7 +53,7 @@ inductive BinOp | plus | minus | mult | and | or | xor | eq
   deriving Inhabited, Countable, Repr, BEq
 
 inductive Ty
-  | int | nat | bool | unit
+  | int | bool | unit
   | prod (τ1 τ2 : Ty)
   | sum (τ1 τ2 : Ty)
   | arrow (τ1 τ2 : Ty)
