@@ -25,34 +25,30 @@ syntax:max "pl_ty(" pl_ty ")" : term
 syntax:max "pl_pat(" pl_pat ")" : term
 
 /-! ## `plBinderHint!`: attach display metadata to a binder expression.
-
 `plBinderHint! name τ? e` elaborates `e` into an `Expr` and wraps it in an
 `Expr.mdata` that carries the binder's display name and optional type
-annotation. The `mdata` is transparent to the kernel, `simp`, `grind`,
-`rfl`, etc. — only the delaborator reads it. -/
+annotation. -/
 
 /-- Opaque syntax for the binder-hint wrapper; only the elaborator consumes it. -/
 syntax (name := plBinderHint) "plBinderHint!" str term:max term:max : term
 
 /-- Metadata keys used by `plBinderHint!`. -/
 def plBinderNameKey : Name := `ProbLang.plBinderName
+
 /-- Serialized display form of the optional type annotation (for delab). -/
 def plBinderTyStrKey : Name := `ProbLang.plBinderTyStr
 
-/-- Term elaborator for `plBinderHint! "name" τ? e`. Elaborates `e` to an
-    `Expr`, then wraps in an `Expr.mdata` carrying the display name/type. -/
+/-- Elaborates `e` to an `Expr`, then wraps in an `Expr.mdata` carrying the display name/type. -/
 @[term_elab plBinderHint]
 def elabPlBinderHint : Lean.Elab.Term.TermElab := fun stx expectedType? => do
   match stx with
   | `(plBinderHint! $nameStr:str $_τTerm $eTerm) =>
       let e ← Lean.Elab.Term.elabTerm eTerm expectedType?
-      let kv : KVMap := ({} : KVMap).insert plBinderNameKey
-        (DataValue.ofString nameStr.getString)
+      let kv : KVMap := ({} : KVMap).insert plBinderNameKey (DataValue.ofString nameStr.getString)
       return Expr.mdata kv e
   | _ => throwError "plBinderHint!: unexpected syntax"
 
-/-- Free-variable display hint: `plFvarHint! "name" e` attaches a name to a
-    free variable for delab. Like `plBinderHint!` but for `Exp.fvar`. -/
+/-- `plFvarHint! "name" e` attaches a name to a free variable for delab. -/
 syntax (name := plFvarHint) "plFvarHint!" str term:max : term
 
 def plFvarNameKey : Name := `ProbLang.plFvarName
@@ -62,8 +58,7 @@ def elabPlFvarHint : Lean.Elab.Term.TermElab := fun stx expectedType? => do
   match stx with
   | `(plFvarHint! $nameStr:str $eTerm) =>
       let e ← Lean.Elab.Term.elabTerm eTerm expectedType?
-      let kv : KVMap := ({} : KVMap).insert plFvarNameKey
-        (DataValue.ofString nameStr.getString)
+      let kv : KVMap := ({} : KVMap).insert plFvarNameKey (DataValue.ofString nameStr.getString)
       return Expr.mdata kv e
   | _ => throwError "plFvarHint!: unexpected syntax"
 
@@ -163,7 +158,6 @@ macro_rules
   | `(pl_pat(($p1, $p2)))         => `(Pat.pair pl_pat($p1) pl_pat($p2))
   | `(pl_pat(inl($p)))            => `(Pat.inl pl_pat($p))
   | `(pl_pat(inr($p)))            => `(Pat.inr pl_pat($p))
-  | `(pl_pat(($p : $_τ)))         => `(pl_pat($p))
 
 /-! ## Expression elaboration (with name-env threading)
 

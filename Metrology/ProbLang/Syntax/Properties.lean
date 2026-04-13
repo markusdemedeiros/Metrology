@@ -207,5 +207,91 @@ theorem beta_lc (L : Finset Var) (e u : Exp)
   have hxfv : x ∉ e.fv := fun h => hx (Finset.mem_union_right _ h)
   grind [subst_intro x u e hxfv hu, subst_lc (he x hxL) hu]
 
+/-- The "open ∘ close = subst" lemma for LC terms.
+    Mirrors `Cslib...Untyped.Properties.open_close_to_subst`. -/
+@[scoped grind =]
+theorem open_close_to_subst (e : Exp) (x y : Var) (k : Nat) (he : IsLocallyClosed e) :
+    openRec k (fvar y) (closeRec k x e) = subst e x (fvar y) := by
+  induction he generalizing k with
+  | lam L t _ ih =>
+      simp only [closeRec, openRec, subst]
+      congr 1
+      have ⟨x', hx'⟩ := HasFresh.fresh_exists (L ∪ t.fv ∪ {x, y})
+      have hx'L : x' ∉ L := fun h => hx' (Finset.mem_union_left _ (Finset.mem_union_left _ h))
+      have hx'fv : x' ∉ t.fv := fun h => hx'
+        (Finset.mem_union_left _ (Finset.mem_union_right _ h))
+      have hx'x : x' ≠ x := fun h => hx' (by
+        rw [h]; exact Finset.mem_union_right _ (by simp))
+      have hx'y : x' ≠ y := fun h => hx' (by
+        rw [h]; exact Finset.mem_union_right _ (by simp))
+      -- IH at fresh x', depth k+1, on open' t (fvar x')
+      have hih := ih x' hx'L (k+1)
+      -- Reshape both sides to use open_injective.
+      have hLfv : x' ∉ (openRec (k+1) (fvar y) (closeRec (k+1) x t)).fv :=
+        open_fresh_preserve_not_fvar _ (close_preserve_not_fvar _ hx'fv) hx'y
+      have hRfv : x' ∉ (subst t x (fvar y)).fv := by
+        apply subst_preserve_not_fvar
+        simp only [Finset.mem_union, fv, not_or]
+        refine ⟨hx'fv, ?_⟩
+        intro h
+        rw [Finset.mem_singleton] at h
+        exact hx'y h
+      -- Goal: openRec (k+1) (fvar y) (closeRec (k+1) x t) = subst t x (fvar y)
+      -- Prove the open'-applied equality and then use open_injective.
+      have hLHS :
+          open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
+            = openRec (k+1) (fvar y) (closeRec (k+1) x (open' t (fvar x'))) := by
+        simp only [open']
+        rw [swap_open_fvars 0 (k+1) x' y _ (by omega)]
+        rw [swap_open_fvar_close (k+1) 0 x x' t (by omega) hx'x.symm]
+      have hIH := ih x' hx'L (k+1)
+      have hRHS :
+          open' (subst t x (fvar y)) (fvar x')
+            = subst (open' t (fvar x')) x (fvar y) := by
+        rw [subst_open_var x' x (fvar y) t hx'x.symm (.fvar y)]
+      have heq : open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
+            = open' (subst t x (fvar y)) (fvar x') := by
+        rw [hLHS, hIH, hRHS]
+      exact open_injective x' _ _ hLfv hRfv heq
+  | fix L t _ ih =>
+      simp only [closeRec, openRec, subst]
+      congr 1
+      have ⟨x', hx'⟩ := HasFresh.fresh_exists (L ∪ t.fv ∪ {x, y})
+      have hx'L : x' ∉ L := fun h => hx' (Finset.mem_union_left _ (Finset.mem_union_left _ h))
+      have hx'fv : x' ∉ t.fv := fun h => hx'
+        (Finset.mem_union_left _ (Finset.mem_union_right _ h))
+      have hx'x : x' ≠ x := fun h => hx' (by
+        rw [h]; exact Finset.mem_union_right _ (by simp))
+      have hx'y : x' ≠ y := fun h => hx' (by
+        rw [h]; exact Finset.mem_union_right _ (by simp))
+      have hLfv : x' ∉ (openRec (k+1) (fvar y) (closeRec (k+1) x t)).fv :=
+        open_fresh_preserve_not_fvar _ (close_preserve_not_fvar _ hx'fv) hx'y
+      have hRfv : x' ∉ (subst t x (fvar y)).fv := by
+        apply subst_preserve_not_fvar
+        simp only [Finset.mem_union, fv, not_or]
+        refine ⟨hx'fv, ?_⟩
+        intro h; rw [Finset.mem_singleton] at h; exact hx'y h
+      have hLHS :
+          open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
+            = openRec (k+1) (fvar y) (closeRec (k+1) x (open' t (fvar x'))) := by
+        simp only [open']
+        rw [swap_open_fvars 0 (k+1) x' y _ (by omega)]
+        rw [swap_open_fvar_close (k+1) 0 x x' t (by omega) hx'x.symm]
+      have hIH := ih x' hx'L (k+1)
+      have hRHS :
+          open' (subst t x (fvar y)) (fvar x')
+            = subst (open' t (fvar x')) x (fvar y) := by
+        rw [subst_open_var x' x (fvar y) t hx'x.symm (.fvar y)]
+      have heq : open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
+            = open' (subst t x (fvar y)) (fvar x') := by
+        rw [hLHS, hIH, hRHS]
+      exact open_injective x' _ _ hLfv hRfv heq
+  | _ => grind
+
+/-- Specialised: outermost open ∘ close equals substitution. -/
+theorem open_close_subst_lc (x y : Var) (e : Exp) (he : IsLocallyClosed e) :
+    open' (close e x) (fvar y) = subst e x (fvar y) :=
+  open_close_to_subst e x y 0 he
+
 end Exp
 end ProbLang

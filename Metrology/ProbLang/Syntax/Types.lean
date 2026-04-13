@@ -389,4 +389,144 @@ inductive Typed : Tctx → Exp → Ty → Prop
 
 @[inherit_doc] scoped notation Γ " ⊢ₜ " e " : " τ => Typed Γ e τ
 
+/-! ## `Typed → IsLocallyClosed`
+
+Every typed expression is locally closed. Proved by induction on the
+`Typed` derivation. Cofinite cases (`lam`, `fix`, `tunpack`) lift the
+cofinite-typing hypothesis to a cofinite-LC witness directly. The `tlam`
+and `tunpack` cases use that an LC term is unchanged by opening
+(`Exp.open_lc`). -/
+
+theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp} {τ : Ty}
+    (h : Typed Γ e τ) : Exp.IsLocallyClosed e := by
+  induction h with
+  | fvar _ => exact .fvar _
+  | lit_int | lit_bool | lit_unit => exact .lit _
+  | binop_int _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
+  | binop_bool _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
+  | unop_int _ _ ih => exact .unop _ ih
+  | unop_bool _ _ ih => exact .unop _ ih
+  | unboxed_eq _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
+  | pair _ _ ih1 ih2 => exact .pair ih1 ih2
+  | fst _ ih => exact .fst ih
+  | snd _ ih => exact .snd ih
+  | inl _ ih => exact .inl ih
+  | inr _ ih => exact .inr ih
+  | case _ _ _ ih0 ih1 ih2 => exact .case ih0 ih1 ih2
+  | cond _ _ _ ih0 ih1 ih2 => exact .cond ih0 ih1 ih2
+  | @lam L Γ e τ1 τ2 _ ih =>
+      exact .lam L e (fun x hx => ih x hx)
+  | @fix L Γ e τ1 τ2 _ ih =>
+      exact .fix L e (fun x hx => ih x hx)
+  | app _ _ ih1 ih2 => exact .app ih1 ih2
+  | @tlam Γ e τ _ ih =>
+      -- ih : IsLocallyClosed e (without opening). We need cofinite witness.
+      -- Open at any fresh x: open' e (fvar x) = e (by open_lc).
+      refine .lam ∅ e (fun x _ => ?_)
+      have := Exp.open_lc 0 (Exp.fvar x) e ih
+      rw [Exp.open']; rw [← this]; exact ih
+  | tapp _ ih => exact .app ih (.lit _)
+  | tfold _ ih => exact ih
+  | tunfold _ ih =>
+      -- recUnfold = .lam (.bvar 0). LC since opening gives `fvar x`.
+      refine .app ?_ ih
+      refine .lam ∅ (.bvar 0) (fun x _ => ?_)
+      simp [Exp.open', Exp.openRec]; exact .fvar x
+  | tpack _ ih => exact ih
+  | @tunpack L Γ e1 e2 τ τ2 _ _ ih1 ih2 =>
+      refine .app ?_ ih1
+      exact .lam L e2 (fun x hx => ih2 x hx)
+  | alloc _ ih => exact .alloc ih
+  | load _ ih => exact .load ih
+  | store _ _ ih1 ih2 => exact .store ih1 ih2
+  | alloc_tape _ ih => exact .tape ih
+  | rand _ _ ih1 ih2 => exact .rand ih1 ih2
+  | rand_unit _ _ ih1 ih2 => exact .rand ih1 ih2
+  | scrut _ _ ih => exact .scrut _ ih
+  | fail => exact .fail
+
+/-! ## Tctx renaming utility -/
+
+/-- Rename one variable in a typing context: if `Γ x = some τ_x` and `y` is
+    fresh, then `Γ.insert y τ_x = (Γ.insert x τ_x) ∘ rename` … but cleaner
+    just to inline the structural manipulation case-by-case. -/
+def Tctx.swapInsert (Γ : Tctx) (x y : Var) (τ : Ty) : Tctx :=
+  Γ.insert y τ
+
+/-! ## `Typed.rename`: single-atom α-renaming preservation
+
+If `Typed (Γ.insert x τ_x) e τ` and `y` is fresh for both `Γ` (in the
+sense that we won't lose anything) and `e.fv`, then renaming `x` to `y`
+preserves typing.
+
+The proof is induction on `Typed`. Cofinite cases use `subst_open_var` to
+push `subst` through `open'`, mirroring `Properties.open_close_to_subst`. -/
+
+theorem Typed.rename {Γ : Tctx} {e : Exp} {τ τ_x : Ty}
+    (x y : Var) (h : Typed (Γ.insert x τ_x) e τ) (hy : y ∉ e.fv ∪ {x}) :
+    Typed (Γ.insert y τ_x) (Exp.subst e x (Exp.fvar y)) τ := by
+  sorry
+
+/-! ## Standard LN renaming/substitution lemmas (proofs deferred)
+
+The following are "metatheory plumbing" lemmas every cofinite-LN typing
+theory needs. We state them and use them in `ContextualRefinement` to
+discharge the cofinite premises of `Typed.lam` / `Typed.fix` / `Typed.tunpack`
+when only a single-atom typing is in hand. Proofs are non-trivial standard
+LN renaming theory; deferred. -/
+
+/-- Cofinite α-rename: a typing at one fresh atom can be lifted to all fresh atoms. -/
+theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp} {τ τ' : Ty}
+    (hx : x ∉ e.fv) (he : Typed (Γ.insert x τ) e τ') :
+    ∀ y ∉ insert x e.fv,
+      Typed (Γ.insert y τ) (Exp.open' (Exp.close e x) (Exp.fvar y)) τ' := by
+  intro y hy
+  have hyx : y ≠ x := fun h => hy (h ▸ Finset.mem_insert_self _ _)
+  have hyfv : y ∉ e.fv := fun h => hy (Finset.mem_insert_of_mem h)
+  -- Rewrite open' (close e x) (fvar y) = subst e x (fvar y) using LC.
+  have hLC : Exp.IsLocallyClosed e := he.isLocallyClosed
+  rw [Exp.open_close_subst_lc x y e hLC]
+  -- Apply Typed.rename
+  have hyu : y ∉ e.fv ∪ {x} := by
+    intro h
+    rcases Finset.mem_union.mp h with h | h
+    · exact hyfv h
+    · exact hyx (Finset.mem_singleton.mp h)
+  exact Typed.rename x y he hyu
+
+theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp} {τ τ' : Ty}
+    (hf : f ∉ e.fv) (he : Typed (Γ.insert f (.arrow τ τ')) e (.arrow τ τ')) :
+    ∀ g ∉ insert f e.fv,
+      Typed (Γ.insert g (.arrow τ τ'))
+        (Exp.open' (Exp.close e f) (Exp.fvar g)) (.arrow τ τ') := by
+  intro g hg
+  have hgf : g ≠ f := fun h => hg (h ▸ Finset.mem_insert_self _ _)
+  have hgfv : g ∉ e.fv := fun h => hg (Finset.mem_insert_of_mem h)
+  have hLC : Exp.IsLocallyClosed e := he.isLocallyClosed
+  rw [Exp.open_close_subst_lc f g e hLC]
+  have hgu : g ∉ e.fv ∪ {f} := by
+    intro h
+    rcases Finset.mem_union.mp h with h | h
+    · exact hgfv h
+    · exact hgf (Finset.mem_singleton.mp h)
+  exact Typed.rename f g he hgu
+
+theorem Typed.rename_unpack {Γ : Tctx} {x : Var} {e2 : Exp} {τ τ2 : Ty}
+    (hx : x ∉ e2.fv)
+    (he2 : Typed ((Γ.shift).insert x τ) e2 τ2.shift) :
+    ∀ y ∉ insert x e2.fv,
+      Typed ((Γ.shift).insert y τ)
+        (Exp.open' (Exp.close e2 x) (Exp.fvar y)) τ2.shift := by
+  intro y hy
+  have hyx : y ≠ x := fun h => hy (h ▸ Finset.mem_insert_self _ _)
+  have hyfv : y ∉ e2.fv := fun h => hy (Finset.mem_insert_of_mem h)
+  have hLC : Exp.IsLocallyClosed e2 := he2.isLocallyClosed
+  rw [Exp.open_close_subst_lc x y e2 hLC]
+  have hyu : y ∉ e2.fv ∪ {x} := by
+    intro h
+    rcases Finset.mem_union.mp h with h | h
+    · exact hyfv h
+    · exact hyx (Finset.mem_singleton.mp h)
+  exact Typed.rename x y he2 hyu
+
 end ProbLang

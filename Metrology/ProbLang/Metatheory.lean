@@ -151,6 +151,88 @@ theorem Exp.subst_subst_ne {e v v' : Exp} {x y : Var}
   rw [Exp.subst_subst hne hxv' hv'_lc]
   rw [Exp.subst_fresh y v v' hyv]
 
+/-! ### Substitution-map-level closedness lemmas
+
+Ports of `SubstMap.deleteB_preserves_closed`, `Exp.substMap_isClosed`,
+`Exp.substMap_isClosed_empty`. The original (Binder/String) versions had
+to thread the binder-shadowing dance through `deleteB`; under LN there is
+no shadowing and the proofs simplify to fold-style induction over the list.
+
+The key invariant is "every value in `vs` is locally-closed and has empty
+free-variable set" — i.e., the substitution range consists of fully-closed
+values. Under that invariant, `substMap` reduces to repeated `subst`. -/
+
+/-- Predicate: every value bound in the substitution map is fully closed. -/
+def SubstMap.AllClosed (vs : SubstMap) : Prop :=
+  ∀ p ∈ vs, p.2.isClosed .empty
+
+theorem SubstMap.AllClosed_nil : SubstMap.AllClosed ([] : SubstMap) := by
+  intro p hp; cases hp
+
+theorem SubstMap.AllClosed_cons {x v vs} :
+    SubstMap.AllClosed ((x, v) :: vs) ↔ v.isClosed .empty ∧ SubstMap.AllClosed vs := by
+  constructor
+  · intro h
+    refine ⟨h (x, v) (List.mem_cons_self), fun p hp => h p (List.mem_cons_of_mem _ hp)⟩
+  · rintro ⟨hv, hvs⟩ p hp
+    rcases List.mem_cons.mp hp with rfl | hpm
+    · exact hv
+    · exact hvs p hpm
+
+theorem SubstMap.AllClosed_delete {vs : SubstMap} (x : Var)
+    (h : SubstMap.AllClosed vs) : SubstMap.AllClosed (vs.delete x) := by
+  intro p hp
+  have hmem : p ∈ vs := by
+    have := List.mem_filter.mp hp; exact this.1
+  exact h p hmem
+
+/-- `substMap` through a closed expression is a no-op (Clutch's
+`Exp.substMap_isClosed` for the empty `X = ∅` case). -/
+theorem Exp.substMap_isClosed_empty {e : Exp} (vs : SubstMap)
+    (he : e.isClosed .empty) : e.substMap vs = e := by
+  -- Closed expression has fv ⊆ ∅, so no `subst` step changes it.
+  induction vs with
+  | nil => rfl
+  | cons p vs ih =>
+      simp only [substMap, List.foldr_cons]
+      -- After IH: e.substMap vs = e. Then subst at p.1 with p.2 is identity
+      -- since p.1 ∉ e.fv (e has no free vars at all).
+      rw [show vs.foldr (fun q acc => Exp.subst acc q.1 q.2) e = e from ih]
+      apply Exp.subst_fresh
+      intro hcontra
+      have := he.2 hcontra
+      simp [ClosedCtx.empty] at this
+
+/-- General version: if `e` is closed in `X` and `vs` only assigns variables
+NOT in `X`, then `substMap vs e = e`. (Clutch's `substMap_isClosed`.) -/
+theorem Exp.substMap_isClosed {X : ClosedCtx} {e : Exp} (vs : SubstMap)
+    (he : e.isClosed X)
+    (hvs : ∀ p ∈ vs, p.1 ∉ X) :
+    e.substMap vs = e := by
+  induction vs with
+  | nil => rfl
+  | cons p vs ih =>
+      simp only [substMap, List.foldr_cons]
+      have hvs' : ∀ q ∈ vs, q.1 ∉ X :=
+        fun q hq => hvs q (List.mem_cons_of_mem _ hq)
+      rw [show vs.foldr (fun q acc => Exp.subst acc q.1 q.2) e = e from ih hvs']
+      -- Now subst e p.1 p.2 = e since p.1 ∉ e.fv (because p.1 ∉ X ⊇ e.fv).
+      apply Exp.subst_fresh
+      have hp1_notin : p.1 ∉ X := hvs p List.mem_cons_self
+      intro hcontra
+      exact hp1_notin (he.2 hcontra)
+
+/-! ### Substitution-map insertion (closed-range version)
+
+Port of Clutch's `substMap_insert`: extending a substitution map with a
+single binding decomposes into a `subst'` followed by a `substMap` on the
+deleted environment. The proof is much simpler under LN — `insert` is just
+`cons`, so `substMap (cons p vs) e = subst (substMap vs e) p.1 p.2`
+holds definitionally. -/
+
+@[simp] theorem Exp.substMap_cons (p : Var × Exp) (vs : SubstMap) (e : Exp) :
+    e.substMap (p :: vs) = Exp.subst (e.substMap vs) p.1 p.2 := rfl
+
 /-! ## Group D — Deterministic / probabilistic head-step characterization
 
 Predicate-based step classification (Clutch's `metatheory.v` ~1448–1713,

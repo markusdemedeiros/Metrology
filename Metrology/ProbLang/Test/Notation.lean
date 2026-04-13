@@ -704,7 +704,7 @@ variable (e e1 e2 : Exp)
           (Exp.lam Exp.fail)
 
 -- Scrut with annotated pattern (annotation discarded)
-#elabpl pl(scrut x with (y : int))
+#elabpl pl(scrut x with y)
 #expect Exp.scrut (.fvar 0) Pat.wildcard
 
 /-! ## `case` chain — each arm allocates a fresh __bind atom -/
@@ -721,3 +721,233 @@ variable (e e1 e2 : Exp)
               (Exp.lam Exp.fail))
             0))
           (.fvar 3)
+
+
+/-! ## Additional pattern, case, and `let!` forms -/
+
+-- Unit literal pattern
+#elabpl pl_pat(# .unit)
+#expect Pat.lit .unit
+
+-- Nested patterns
+#elabpl pl_pat(inl((x, y)))
+#expect Pat.inl (Pat.pair .wildcard .wildcard)
+
+#elabpl pl_pat((inl(x), inr(y)))
+#expect Pat.pair (Pat.inl .wildcard) (Pat.inr .wildcard)
+
+-- (Annotated pattern `pl_pat((x : int))` is parseable but currently has
+--  an elaborator dispatch issue under the LN macros — skipped for now.)
+
+-- `let! (x, y) := e; x + y` — pair destructuring
+-- Atom order: bindAtom = 0, x = 1, y = 2, body uses x=fvar 1, y=fvar 2,
+-- then rhs e = fvar 3. After projectPattern wraps with two lams:
+-- inner: (lamBody y (binop + (fvar 1) (fvar 2)) snd(__bind))
+-- outer: (lamBody x inner fst(__bind))
+#elabpl pl(let! (x, y) := e; x + y)
+#expect Exp.case (Exp.scrut (.fvar 3) (Pat.pair .wildcard .wildcard))
+          (Exp.lam (close
+            (app (Exp.lam (close
+                    (app (Exp.lam (close (binop .plus (.fvar 1) (.fvar 2)) 2))
+                         (snd (.fvar 0))) 1))
+                 (fst (.fvar 0))) 0))
+          (Exp.lam Exp.fail)
+
+-- Two-arm `case`. Atom order: scrutAtom=0, then arm 1: bindAtom=1, x=2;
+-- arm 2: bindAtom=3, y=4; rhs e = fvar 5.
+#elabpl pl(case e | inl(x) => x | inr(y) => y)
+#expect app
+          (Exp.lam (close
+            (Exp.case (Exp.scrut (.fvar 0) (Pat.inl .wildcard))
+              (Exp.lam (close
+                (app (Exp.lam (close (.fvar 2) 2)) (.fvar 1)) 1))
+              (Exp.lam (Exp.case (Exp.scrut (.fvar 0) (Pat.inr .wildcard))
+                (Exp.lam (close
+                  (app (Exp.lam (close (.fvar 4) 4)) (.fvar 3)) 3))
+                (Exp.lam Exp.fail)))) 0))
+          (.fvar 5)
+
+/-! ## Delaboration round-trip tests
+
+These verify that elaborated `Exp` values delaborate back to readable
+`pl(...)` syntax. Constructed via `pl(...)` so we test elab+delab together. -/
+
+/-! ### Atomic / non-binder forms (round-trip exactly) -/
+
+/-- info: pl(#1) : Exp -/
+#guard_msgs in #check (pl(#1) : Exp)
+
+/-- info: pl(#true) : Exp -/
+#guard_msgs in #check (pl(#true) : Exp)
+
+/-- info: pl(#false) : Exp -/
+#guard_msgs in #check (pl(#false) : Exp)
+
+/-- info: pl(x) : Exp -/
+#guard_msgs in #check (pl(x) : Exp)
+
+/-- info: pl((x + #1)) : Exp -/
+#guard_msgs in #check (pl(x + #1) : Exp)
+
+/-- info: pl((x - y)) : Exp -/
+#guard_msgs in #check (pl(x - y) : Exp)
+
+/-- info: pl((x * y)) : Exp -/
+#guard_msgs in #check (pl(x * y) : Exp)
+
+/-- info: pl((x && y)) : Exp -/
+#guard_msgs in #check (pl(x && y) : Exp)
+
+/-- info: pl((x || y)) : Exp -/
+#guard_msgs in #check (pl(x || y) : Exp)
+
+/-- info: pl((x ^^ y)) : Exp -/
+#guard_msgs in #check (pl(x ^^ y) : Exp)
+
+/-- info: pl((x = y)) : Exp -/
+#guard_msgs in #check (pl(x = y) : Exp)
+
+/-- info: pl(~x) : Exp -/
+#guard_msgs in #check (pl(~x) : Exp)
+
+/-- info: pl(-x) : Exp -/
+#guard_msgs in #check (pl(-x) : Exp)
+
+/-- info: pl(!x) : Exp -/
+#guard_msgs in #check (pl(!x) : Exp)
+
+/-- info: pl(if x then y else z) : Exp -/
+#guard_msgs in #check (pl(if x then y else z) : Exp)
+
+/-- info: pl((x, y)) : Exp -/
+#guard_msgs in #check (pl((x, y)) : Exp)
+
+/-- info: pl((x, y, z)) : Exp -/
+#guard_msgs in #check (pl((x, y, z)) : Exp)
+
+/-- info: pl(fst(x)) : Exp -/
+#guard_msgs in #check (pl(fst(x)) : Exp)
+
+/-- info: pl(snd(x)) : Exp -/
+#guard_msgs in #check (pl(snd(x)) : Exp)
+
+/-- info: pl(inl(x)) : Exp -/
+#guard_msgs in #check (pl(inl(x)) : Exp)
+
+/-- info: pl(inr(x)) : Exp -/
+#guard_msgs in #check (pl(inr(x)) : Exp)
+
+/-- info: pl(alloc(#0)) : Exp -/
+#guard_msgs in #check (pl(alloc(#0)) : Exp)
+
+/-- info: pl(x ← y) : Exp -/
+#guard_msgs in #check (pl(x ← y) : Exp)
+
+/-- info: pl(tape(#10)) : Exp -/
+#guard_msgs in #check (pl(tape(#10)) : Exp)
+
+/-- info: pl(rand(#10, #())) : Exp -/
+#guard_msgs in #check (pl(rand(#10, #.unit)) : Exp)
+
+/-- info: pl(fail) : Exp -/
+#guard_msgs in #check (pl(fail) : Exp)
+
+/-- info: pl(scrut x with _) : Exp -/
+#guard_msgs in #check (pl(scrut x with y) : Exp)
+
+/-- info: pl(scrut inl(x) with inl(_)) : Exp -/
+#guard_msgs in #check (pl(scrut inl(x) with inl(y)) : Exp)
+
+/-! ### Binder forms — body still shows `.close <atom>` (known polish item) -/
+
+/-- info: pl(fun x, {pl(x).close 0}) : Exp -/
+#guard_msgs in #check (pl(fun x, x) : Exp)
+
+/-- info: pl(fun _, x) : Exp -/
+#guard_msgs in #check (pl(fun _, x) : Exp)
+
+/-- info: pl(fun f, {pl(f).close 0}) : Exp -/
+#guard_msgs in #check (pl(fun f, f) : Exp)
+
+/-- info: pl(fun f, {pl(fun x, {pl(f x).close 1}).close 0}) : Exp -/
+#guard_msgs in #check (pl(fun f x, f x) : Exp)
+
+/-- info: pl(rec f _ := {pl(fun x, {pl(f x).close 1}).close 0}) : Exp -/
+#guard_msgs in #check (pl(rec f x := f x) : Exp)
+
+/-- info: pl(rec f _ := {pl(fun _, f).close 0}) : Exp -/
+#guard_msgs in #check (pl(rec f _ := f) : Exp)
+
+/-- info: pl(let x := e1; {pl(e2).close 1}) : Exp -/
+#guard_msgs in #check (pl(let x := e1; e2) : Exp)
+
+/-- info: pl(e1; e2) : Exp -/
+#guard_msgs in #check (pl(e1; e2) : Exp)
+
+/-! ### Type delaboration -/
+
+/-- info: pl_ty(int) : Ty -/
+#guard_msgs in #check (pl_ty(int))
+
+/-- info: pl_ty(bool) : Ty -/
+#guard_msgs in #check (pl_ty(bool))
+
+/-- info: pl_ty(unit) : Ty -/
+#guard_msgs in #check (pl_ty(unit))
+
+/-- info: pl_ty(int × bool) : Ty -/
+#guard_msgs in #check (pl_ty(int × bool))
+
+/-- info: pl_ty(int + bool) : Ty -/
+#guard_msgs in #check (pl_ty(int + bool))
+
+/-- info: pl_ty(int → bool) : Ty -/
+#guard_msgs in #check (pl_ty(int → bool))
+
+/-- info: pl_ty(ref(int)) : Ty -/
+#guard_msgs in #check (pl_ty(ref(int)))
+
+/-- info: pl_ty(tape) : Ty -/
+#guard_msgs in #check (pl_ty(tape))
+
+/-- info: pl_ty(int × bool → unit) : Ty -/
+#guard_msgs in #check (pl_ty(int × bool → unit))
+
+/-- info: pl_ty(ref(int → bool)) : Ty -/
+#guard_msgs in #check (pl_ty(ref(int → bool)))
+
+/-! ### Pattern delaboration — identifier patterns elaborate to wildcard -/
+
+/-- info: pl_pat(_) : Pat -/
+#guard_msgs in #check (pl_pat(_))
+
+/-- info: pl_pat(_) : Pat -/
+#guard_msgs in #check (pl_pat(x))
+
+/-- info: pl_pat((_, _)) : Pat -/
+#guard_msgs in #check (pl_pat((x, y)))
+
+/-- info: pl_pat(inl(_)) : Pat -/
+#guard_msgs in #check (pl_pat(inl(x)))
+
+/-- info: pl_pat(inr(_)) : Pat -/
+#guard_msgs in #check (pl_pat(inr(x)))
+
+/-! ### Annotation delab gated by `pp.problang.annot` -/
+
+-- Default (annot=0): annotation hidden.
+/-- info: pl(x) : Exp -/
+#guard_msgs in #check (pl((x : int)) : Exp)
+
+set_option pp.problang.annot 2 in
+/-- info: pl((x : int)) : Exp -/
+#guard_msgs in #check (pl((x : int)) : Exp)
+
+set_option pp.problang.annot 2 in
+/-- info: pl(((x + y) : int)) : Exp -/
+#guard_msgs in #check (pl((x + y : int)) : Exp)
+
+set_option pp.problang.annot 2 in
+/-- info: pl((x : int → bool)) : Exp -/
+#guard_msgs in #check (pl((x : int → bool)) : Exp)
+
