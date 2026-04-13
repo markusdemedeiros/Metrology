@@ -137,18 +137,37 @@ macro_rules
   | `(pl_pat(inr($p)))            => `(Pat.inr pl_pat($p))
   | `(pl_pat(($p : $_τ)))         => `(pl_pat($p))
 
-/-! ## Expression elaboration (with name-env threading) -/
+/-! ## Expression elaboration (with name-env threading)
+
+Atoms are allocated from a monotonic counter, fresh per `pl(…)` invocation.
+Each binder grabs the next free `Nat`; each unbound top-level identifier
+also grabs one, deduped within the invocation via `topEnv`. -/
 
 /-- Map from Lean identifier names to the `Nat` atom assigned at binding time. -/
 abbrev NameEnv := Lean.NameMap Nat
 
-/-- Deterministic mapping from Lean name → `Nat` atom. Uses `hash` so the
-    same identifier always maps to the same atom. **Note:** shadowed bindings
-    of the same identifier produce identical atoms, which currently means the
-    *innermost* binder captures all occurrences. This is a known limitation;
-    shadowed names should be unique for correctness. -/
-private def atomOf (n : Lean.Name) (_scope : Nat) : Nat :=
-  (hash n).toNat
+/-- Allocator state held in an `IO.Ref` for the duration of one `pl(…)` call:
+    the next free atom and the top-level name→atom environment (shared across
+    free identifiers within the invocation). -/
+structure AtomState where
+  next   : Nat := 0
+  topEnv : NameEnv := {}
+
+/-- Allocate a fresh atom. -/
+private def freshAtom (st : IO.Ref AtomState) : TermElabM Nat := do
+  let s ← st.get
+  st.set { s with next := s.next + 1 }
+  return s.next
+
+/-- Look up (or allocate) the atom for a top-level free identifier. -/
+private def freshTopAtom (st : IO.Ref AtomState) (n : Lean.Name) : TermElabM Nat := do
+  let s ← st.get
+  match s.topEnv.find? n with
+  | some v => return v
+  | none =>
+      let a := s.next
+      st.set { next := s.next + 1, topEnv := s.topEnv.insert n a }
+      return a
 
 /-- Extract the `ident` (or hole) and optional type from a `pl_arg`. -/
 private def unpackArg (a : TSyntax `pl_arg) :
@@ -161,14 +180,14 @@ private def unpackArg (a : TSyntax `pl_arg) :
 
 mutual
 
-/-- Elaborate a `pl_exp` into an `Expr : Exp` under the given name environment
-    and fresh-atom counter. Returns the elaborated term. -/
-partial def elabPL (env : NameEnv) (scope : Nat) :
+/-- Elaborate a `pl_exp` into an `Expr : Exp` under the given name env and
+    atom-allocator `st`. -/
+partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
     TSyntax `pl_exp → TermElabM Term
   | `(pl_exp|($e : $τ)) => do
-      let e' ← elabPL env scope e
+      let e' ← elabPL env st e
       `(Exp.annotated pl_ty($τ) $e')
-  | `(pl_exp|($e))         => elabPL env scope e
+  | `(pl_exp|($e))         => elabPL env st e
   | `(pl_exp|{$t})         => `(($t : Exp))
   | `(pl_exp|# $n:num)     => `(Exp.lit (.int (Int.ofNat $n)))
   | `(pl_exp|#true)        => `(Exp.lit (.bool true))
@@ -179,94 +198,79 @@ partial def elabPL (env : NameEnv) (scope : Nat) :
       match env.find? i.getId with
       | some v => `(Exp.fvar $(Syntax.mkNatLit v))
       | none   =>
-          -- Free (top-level) identifier: map via its name hash.
-          let v := (hash i.getId).toNat
+          let v ← freshTopAtom st i.getId
           `(Exp.fvar $(Syntax.mkNatLit v))
   -- Binary / unary ops
-  | `(pl_exp|$e1 + $e2)    => do `(Exp.binop .plus  $(← elabPL env scope e1) $(← elabPL env scope e2))
-  | `(pl_exp|$e1 - $e2)    => do `(Exp.binop .minus $(← elabPL env scope e1) $(← elabPL env scope e2))
-  | `(pl_exp|$e1 * $e2)    => do `(Exp.binop .mult  $(← elabPL env scope e1) $(← elabPL env scope e2))
-  | `(pl_exp|$e1 && $e2)   => do `(Exp.binop .and   $(← elabPL env scope e1) $(← elabPL env scope e2))
-  | `(pl_exp|$e1 || $e2)   => do `(Exp.binop .or    $(← elabPL env scope e1) $(← elabPL env scope e2))
-  | `(pl_exp|$e1 ^^ $e2)   => do `(Exp.binop .xor   $(← elabPL env scope e1) $(← elabPL env scope e2))
-  | `(pl_exp|$e1 = $e2)    => do `(Exp.binop .eq    $(← elabPL env scope e1) $(← elabPL env scope e2))
-  | `(pl_exp|~$e)          => do `(Exp.unop  .neg   $(← elabPL env scope e))
-  | `(pl_exp|-$e)          => do `(Exp.unop  .minus $(← elabPL env scope e))
+  | `(pl_exp|$e1 + $e2)    => do `(Exp.binop .plus  $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 - $e2)    => do `(Exp.binop .minus $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 * $e2)    => do `(Exp.binop .mult  $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 && $e2)   => do `(Exp.binop .and   $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 || $e2)   => do `(Exp.binop .or    $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 ^^ $e2)   => do `(Exp.binop .xor   $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 = $e2)    => do `(Exp.binop .eq    $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|~$e)          => do `(Exp.unop  .neg   $(← elabPL env st e))
+  | `(pl_exp|-$e)          => do `(Exp.unop  .minus $(← elabPL env st e))
   | `(pl_exp|if $ec then $et else $ef) => do
-      `(Exp.cond $(← elabPL env scope ec) $(← elabPL env scope et) $(← elabPL env scope ef))
-  | `(pl_exp|$e1 $e2)      => do `(Exp.app $(← elabPL env scope e1) $(← elabPL env scope e2))
-  -- `fun x, body` = `rec _ x := body` (no self-reference)
+      `(Exp.cond $(← elabPL env st ec) $(← elabPL env st et) $(← elabPL env st ef))
+  | `(pl_exp|$e1 $e2)      => do `(Exp.app $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|fun $x:pl_arg $xs:pl_arg* , $body) => do
       if xs.size = 0 then
-        elabLam env scope x body
+        elabLam env st x body
       else
-        elabLam env scope x (← `(pl_exp|fun $xs*, $body))
-  -- `rec f x [...xs] := body`
+        elabLam env st x (← `(pl_exp|fun $xs*, $body))
   | `(pl_exp|rec $f:pl_arg $x:pl_arg $xs:pl_arg* := $body) => do
       let inner ← if xs.size = 0 then
                     pure body
                   else
                     `(pl_exp|fun $xs*, $body)
-      elabRec env scope f x inner
-  -- Pairs
-  | `(pl_exp|($e1, $e2))         => do `(Exp.pair $(← elabPL env scope e1) $(← elabPL env scope e2))
+      elabRec env st f x inner
+  | `(pl_exp|($e1, $e2))         => do `(Exp.pair $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|($e1, $e2, $es,*))  => do
       let rest ← `(pl_exp|($e2, $es,*))
-      `(Exp.pair $(← elabPL env scope e1) $(← elabPL env scope rest))
-  | `(pl_exp|fst($e))            => do `(Exp.fst $(← elabPL env scope e))
-  | `(pl_exp|snd($e))            => do `(Exp.snd $(← elabPL env scope e))
-  | `(pl_exp|inl($e))            => do `(Exp.inl $(← elabPL env scope e))
-  | `(pl_exp|inr($e))            => do `(Exp.inr $(← elabPL env scope e))
-  -- Heap
-  | `(pl_exp|alloc($e))          => do `(Exp.alloc $(← elabPL env scope e))
-  | `(pl_exp|! $e)               => do `(Exp.load $(← elabPL env scope e))
-  | `(pl_exp|$e1 ← $e2)         => do `(Exp.store $(← elabPL env scope e1) $(← elabPL env scope e2))
-  -- Random
-  | `(pl_exp|tape($e))           => do `(Exp.tape $(← elabPL env scope e))
-  | `(pl_exp|rand($e1, $e2))     => do `(Exp.rand $(← elabPL env scope e1) $(← elabPL env scope e2))
-  -- Let = app of lam
+      `(Exp.pair $(← elabPL env st e1) $(← elabPL env st rest))
+  | `(pl_exp|fst($e))            => do `(Exp.fst $(← elabPL env st e))
+  | `(pl_exp|snd($e))            => do `(Exp.snd $(← elabPL env st e))
+  | `(pl_exp|inl($e))            => do `(Exp.inl $(← elabPL env st e))
+  | `(pl_exp|inr($e))            => do `(Exp.inr $(← elabPL env st e))
+  | `(pl_exp|alloc($e))          => do `(Exp.alloc $(← elabPL env st e))
+  | `(pl_exp|! $e)               => do `(Exp.load $(← elabPL env st e))
+  | `(pl_exp|$e1 ← $e2)         => do `(Exp.store $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|tape($e))           => do `(Exp.tape $(← elabPL env st e))
+  | `(pl_exp|rand($e1, $e2))     => do `(Exp.rand $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|let $a:pl_arg := $e1; $e2) => do
       let (iOpt, τOpt) ← unpackArg a
-      let v1 ← elabPL env scope e1
-      let body ← elabLamArg env scope iOpt τOpt e2
+      let v1 ← elabPL env st e1
+      let body ← elabLamArg env st iOpt τOpt e2
       `(Exp.app $body $v1)
   | `(pl_exp|$e1; $e2) => do
-      -- sequencing: λ_. e2 applied to e1
-      let v1 ← elabPL env scope e1
-      let v2 ← elabPL env scope e2
+      let v1 ← elabPL env st e1
+      let v2 ← elabPL env st e2
       `(Exp.app (Exp.lamN "_" Option.none $v2) $v1)
-  -- Scrutinize
-  | `(pl_exp|scrut $e with $p)   => do `(Exp.scrut $(← elabPL env scope e) pl_pat($p))
-  -- `let! pat := e; body` — destructure a scrutiny value
+  | `(pl_exp|scrut $e with $p)   => do `(Exp.scrut $(← elabPL env st e) pl_pat($p))
   | `(pl_exp|let! $p:pl_pat := $e; $body) => do
       let (patBindings, bindIdents) ← gatherPatIdents p
-      -- Fresh atom for the anonymous bind temp
       let bindName := Lean.Name.mkSimple "__bind"
-      let bindAtom := atomOf bindName scope
+      let bindAtom ← freshAtom st
       let envBind := env.insert bindName bindAtom
-      -- Project each pattern-bound ident out of `__bind` using fst/snd/inl/inr
-      let projected ← projectPattern envBind (scope + 1) p (← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit bindAtom)})) body patBindings bindIdents
+      let projected ← projectPattern envBind st p (← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit bindAtom)})) body patBindings bindIdents
       let bodyClose ← closeMaybe projected bindAtom (some "__bind") none
       `(Exp.case
-         (Exp.scrut $(← elabPL env scope e) pl_pat($p))
+         (Exp.scrut $(← elabPL env st e) pl_pat($p))
          $bodyClose
          (Exp.lamN "_" Option.none Exp.fail))
-  -- Pattern-match `case`
   | `(pl_exp|case $e | $p:pl_pat => $b $[| $ps:pl_pat => $bs]*) => do
       let allPats := #[p] ++ ps
       let allBodies := #[b] ++ bs
-      let chain ← buildCaseChain env scope allPats allBodies
       let scrutName := Lean.Name.mkSimple "__scrut"
-      let scrutAtom := atomOf scrutName scope
+      let scrutAtom ← freshAtom st
       let envScrut := env.insert scrutName scrutAtom
       let scrutVar ← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit scrutAtom)})
-      -- rebuild chain with __scrut in scope
-      let chain2 ← buildCaseChainWith envScrut (scope + 1) scrutVar allPats allBodies
+      let chain2 ← buildCaseChainWith envScrut st scrutVar allPats allBodies
       let closed ← closeMaybe chain2 scrutAtom (some "__scrut") none
-      `(Exp.app $closed $(← elabPL env scope e))
+      `(Exp.app $closed $(← elabPL env st e))
   | `(pl_exp|fail)               => `(Exp.fail)
   | `(pl_exp|assert($e))         => do
-      elabPL env scope (← `(pl_exp|if $e then #.unit else fail))
+      elabPL env st (← `(pl_exp|if $e then #.unit else fail))
   | e => throwErrorAt e s!"unrecognised pl expression: {e}"
 
 /-- Emit `Exp.close body atom` (or `body` if `atom = none`), wrapped in a name hint. -/
@@ -288,65 +292,60 @@ partial def closeMaybeFix (body : Term) (atom : Nat) (name : Option String) (τ 
     | none    => `((none : Option Ty))
   `(Exp.fixN $(Syntax.mkStrLit nm) $τExpr $closed)
 
-/-- Elaborate `lam x. body` given a `pl_arg` and body. -/
-partial def elabLam (env : NameEnv) (scope : Nat) (arg : TSyntax `pl_arg)
+partial def elabLam (env : NameEnv) (st : IO.Ref AtomState) (arg : TSyntax `pl_arg)
     (body : TSyntax `pl_exp) : TermElabM Term := do
   let (iOpt, τOpt) ← unpackArg arg
-  elabLamArg env scope iOpt τOpt body
+  elabLamArg env st iOpt τOpt body
 
-partial def elabLamArg (env : NameEnv) (scope : Nat)
+partial def elabLamArg (env : NameEnv) (st : IO.Ref AtomState)
     (iOpt : Option Lean.Ident) (τOpt : Option (TSyntax `pl_ty))
     (body : TSyntax `pl_exp) : TermElabM Term := do
   match iOpt with
   | some i =>
       checkNotReserved i
       let nm := i.getId
-      let atom := atomOf nm scope
+      let atom ← freshAtom st
       let env' := env.insert nm atom
-      let body' ← elabPL env' (scope + 1) body
+      let body' ← elabPL env' st body
       closeMaybe body' atom (some nm.toString) τOpt
   | none =>
-      let body' ← elabPL env (scope + 1) body
+      let body' ← elabPL env st body
       `(Exp.lamN "_" Option.none $body')
 
-/-- Elaborate `rec f x := body` with `body` the already-reduced inner expr. -/
-partial def elabRec (env : NameEnv) (scope : Nat) (f : TSyntax `pl_arg) (x : TSyntax `pl_arg)
+partial def elabRec (env : NameEnv) (st : IO.Ref AtomState) (f : TSyntax `pl_arg) (x : TSyntax `pl_arg)
     (body : TSyntax `pl_exp) : TermElabM Term := do
   let (fOpt, fτ) ← unpackArg f
   let (xOpt, xτ) ← unpackArg x
-  -- Emit `fix (λf. lam (λx. body))` i.e. `Exp.fixN f (Exp.lamN x body)`
   match fOpt with
   | some fi =>
       checkNotReserved fi
       let fnm := fi.getId
-      let fatom := atomOf fnm scope
+      let fatom ← freshAtom st
       let env' := env.insert fnm fatom
       let lamBody ← match xOpt with
         | some xi =>
             checkNotReserved xi
             let xnm := xi.getId
-            let xatom := atomOf xnm (scope + 1)
+            let xatom ← freshAtom st
             let env'' := env'.insert xnm xatom
-            let b ← elabPL env'' (scope + 2) body
+            let b ← elabPL env'' st body
             closeMaybe b xatom (some xnm.toString) xτ
         | none =>
-            let b ← elabPL env' (scope + 1) body
+            let b ← elabPL env' st body
             `(Exp.lamN "_" Option.none $b)
       closeMaybeFix lamBody fatom (some fnm.toString) fτ
   | none =>
-      -- Anonymous self: `fun x, body` via a no-close fix over lam
       let lamBody ← match xOpt with
         | some xi =>
             checkNotReserved xi
             let xnm := xi.getId
-            let xatom := atomOf xnm scope
+            let xatom ← freshAtom st
             let env' := env.insert xnm xatom
-            let b ← elabPL env' (scope + 1) body
+            let b ← elabPL env' st body
             closeMaybe b xatom (some xnm.toString) xτ
         | none =>
-            let b ← elabPL env (scope + 1) body
+            let b ← elabPL env st body
             `(Exp.lamN "_" Option.none $b)
-      -- Technically `fun x, body` is just lam — no fix at all.
       pure lamBody
 
 /-- Collect the identifiers a pattern binds (in left-to-right order). -/
@@ -374,49 +373,40 @@ Two-pass: first extend the env with every identifier the pattern will bind
 (allocating fresh atoms), then produce nested `let`s that project each atom
 from the bindings expression. This way the body sees **all** pattern-bound
 variables, not just the innermost one. -/
-partial def projectPattern (env : NameEnv) (scope : Nat)
+partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
     (pat : TSyntax `pl_pat) (bindings : TSyntax `pl_exp)
     (body : TSyntax `pl_exp) (_ : Array Lean.Ident) (_ : Array Lean.Ident)
     : TermElabM Term := do
-  -- Pass 1: walk the pattern, collect (atom, ident) pairs in bind order,
-  -- and build the full env upfront.
-  let rec collect (env : NameEnv) (scope : Nat) (pat : TSyntax `pl_pat) :
+  -- Pass 1: collect pattern-bound idents in order, allocating atoms.
+  let rec collect (env : NameEnv) (pat : TSyntax `pl_pat) :
       TermElabM (NameEnv × Array (Lean.Ident × Nat)) := do
     match pat with
     | `(pl_pat|$i:ident) => do
         checkNotReserved i
         let nm := i.getId
-        let atom := atomOf nm scope
+        let atom ← freshAtom st
         return (env.insert nm atom, #[(i, atom)])
     | `(pl_pat|_) | `(pl_pat|# $_) => return (env, #[])
-    | `(pl_pat|($p)) | `(pl_pat|($p : $_)) => collect env scope p
+    | `(pl_pat|($p)) | `(pl_pat|($p : $_)) => collect env p
     | `(pl_pat|($p1, $p2)) => do
-        let (env1, a1) ← collect env scope p1
-        let (env2, a2) ← collect env1 (scope + a1.size) p2
+        let (env1, a1) ← collect env p1
+        let (env2, a2) ← collect env1 p2
         return (env2, a1 ++ a2)
-    | `(pl_pat|inl($p)) | `(pl_pat|inr($p)) => collect env scope p
+    | `(pl_pat|inl($p)) | `(pl_pat|inr($p)) => collect env p
     | _ => return (env, #[])
-  let (envFull, atoms) ← collect env scope pat
-  let scopeAfter := scope + atoms.size
-  -- Pass 2: elaborate body in the full env.
-  let bodyTerm ← elabPL envFull scopeAfter body
-  -- Pass 3: for each pattern-bound ident, wrap bodyTerm in a `let`/`app-lam`
-  -- that projects the right sub-expression out of `bindings`. We walk the
-  -- pattern again tracking the accumulated projector expression.
+  let (envFull, atoms) ← collect env pat
+  -- Pass 2: elaborate body with full env.
+  let bodyTerm ← elabPL envFull st body
+  -- Pass 3: wrap bodyTerm in projection apps.
   let rec emit (pat : TSyntax `pl_pat) (bindings : TSyntax `pl_exp)
       (inner : Term) : TermElabM Term := do
     match pat with
     | `(pl_pat|$i:ident) => do
         let nm := i.getId
-        let atom := atomOf nm scope  -- same atom as in `collect`
-        -- Need atom that matches — redo hash.
-        let atom := (hash nm).toNat ^^^ (scope + (atomIndexOf atoms nm).getD 0)
-        let _ := atom
-        -- Simpler: look it up in atoms.
         let some a := atoms.findSome? (fun (j, n) => if j.getId = nm then some n else none)
-          | throwError "projectPattern: internal: atom not found for {nm}"
+          | throwError "projectPattern: atom not found for {nm}"
         let closed ← closeMaybe inner a (some nm.toString) none
-        `(Exp.app $closed $(← elabPL env scope bindings))
+        `(Exp.app $closed $(← elabPL env st bindings))
     | `(pl_pat|_) | `(pl_pat|# $_) => return inner
     | `(pl_pat|($p)) | `(pl_pat|($p : $_)) => emit p bindings inner
     | `(pl_pat|($p1, $p2)) => do
@@ -425,36 +415,23 @@ partial def projectPattern (env : NameEnv) (scope : Nat)
     | `(pl_pat|inl($p)) | `(pl_pat|inr($p)) => emit p bindings inner
     | _ => return inner
   emit pat bindings bodyTerm
-where
-  atomIndexOf (atoms : Array (Lean.Ident × Nat)) (nm : Lean.Name) : Option Nat :=
-    atoms.findIdx? (fun (j, _) => j.getId = nm)
 
-/-- Build a chain of `case` arms, each trying a pattern and falling through. -/
-partial def buildCaseChain (env : NameEnv) (scope : Nat)
-    (pats : Array (TSyntax `pl_pat)) (bodies : Array (TSyntax `pl_exp)) : TermElabM Term := do
-  let scrutVar ← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit (atomOf (Name.mkSimple "__scrut") scope))})
-  buildCaseChainWith env scope scrutVar pats bodies
-
-partial def buildCaseChainWith (env : NameEnv) (scope : Nat)
+partial def buildCaseChainWith (env : NameEnv) (st : IO.Ref AtomState)
     (scrutVar : TSyntax `pl_exp)
     (pats : Array (TSyntax `pl_pat)) (bodies : Array (TSyntax `pl_exp)) : TermElabM Term := do
   let mut result : Term ← `(Exp.fail)
   for i in List.range pats.size |>.reverse do
     let pat := pats[i]!
     let body := bodies[i]!
-    -- projected body: destructure __bind
     let bindName := Lean.Name.mkSimple "__bind"
-    let bindAtom := atomOf bindName (scope + i)
+    let bindAtom ← freshAtom st
     let envBind := env.insert bindName bindAtom
     let bindVar ← `(pl_exp|{Exp.fvar $(Syntax.mkNatLit bindAtom)})
-    let projected ← projectPattern envBind (scope + i + 1) pat bindVar body #[] #[]
-    let projectedPL : TSyntax `pl_exp ← `(pl_exp|{$projected})
-    -- Re-elaborate the projected body; it already references __bind via fvar.
-    let projectedTerm ← elabPL envBind (scope + i + 1) projectedPL
-    let bodyClose ← closeMaybe projectedTerm bindAtom (some "__bind") none
+    let projected ← projectPattern envBind st pat bindVar body #[] #[]
+    let bodyClose ← closeMaybe projected bindAtom (some "__bind") none
     let fallback ← `(Exp.lamN "_" Option.none $result)
     result ← `(Exp.case
-                (Exp.scrut $(← elabPL env scope scrutVar) pl_pat($pat))
+                (Exp.scrut $(← elabPL env st scrutVar) pl_pat($pat))
                 $bodyClose
                 $fallback)
   return result
@@ -489,9 +466,9 @@ partial def registerSyntaxIdents (stx : Syntax) : TermElabM Unit := do
 
 elab_rules : term
   | `(pl($e)) => do
-      -- Register any identifiers so the delaborator can recover names.
       registerSyntaxIdents e.raw
-      let t ← elabPL {} 0 e
+      let st ← IO.mkRef ({} : AtomState)
+      let t ← elabPL {} st e
       Lean.Elab.Term.elabTerm t none
 
 end ProbLang
