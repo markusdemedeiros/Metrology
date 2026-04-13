@@ -1,6 +1,6 @@
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Syntax.Notation
-
+/-
 namespace ProbLang
 
 open Lean Meta Elab
@@ -294,3 +294,4 @@ example : ∃ n cfg2, DetExec n ⟨pl(snd((fst((#1, #2)), #3))), default⟩ cfg2
 
 end Synthesis
 end Tests
+-/

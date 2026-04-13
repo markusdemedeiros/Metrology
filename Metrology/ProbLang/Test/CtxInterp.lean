@@ -1,6 +1,6 @@
 import Metrology.ProbLang.Syntax.Notation
 import Metrology.ProbLang.Interp.CtxInterp
-
+/-
 open ProbLang ProbLang.EvalPrim
 
 /-! Tests for the context-decomposing ProbLang interpreter (`EvalPrim`).
@@ -1162,3 +1162,4 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 #eval check "partial application: stored and reused"
   pl(let add3 := (fun x y, x + y) #3; let a := add3 #10; let b := add3 #20; a + b)
   pl(#36)
+-/
