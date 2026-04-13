@@ -76,49 +76,47 @@ inductive Pat
   | inr (p : Pat)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
-/-- Locally-nameless expressions.
-  * `bvar` : de-Bruijn-indexed bound variables.
-  * `fvar` : free variables named by `Var = Nat`.
-  * `lam`  : lambda abstraction, binds one variable (`bvar 0` in body).
-  * `fix`  : recursive fixpoint, binds one variable (`bvar 0` in body = the recursive self).
-    The usual surface form `letrec f x. e` desugars to `fix (lam e')`.
--/
 inductive Exp
+  /-- Bound variable -/
   | bvar (n : Nat)
+  /-- Free variable -/
   | fvar (x : Var)
+  /-- Literal value -/
   | lit (b : BaseLit)
+  /-- Lambda: binds its argument -/
   | lam (e : Exp)
+  /-- Fixpoint: binds the entire expression -/
   | fix (e : Exp)
+  /-- Application -/
   | app (e1 e2 : Exp)
+  /-- Base operations -/
   | unop (u : UnOp) (e : Exp)
   | binop (b : BinOp) (e1 e2 : Exp)
   | cond (ec et tf : Exp)
+  /-- Pairs -/
   | pair (e1 e2 : Exp)
   | fst (e : Exp)
   | snd (e : Exp)
+  /-- Sums -/
   | inl (e : Exp)
   | inr (e : Exp)
   | case (ec el er : Exp)
+  /-- Heap -/
   | alloc (e : Exp)
   | load (e : Exp)
   | store (el ev : Exp)
+  /-- Allocate random tape, sized as its argument -/
   | tape (e : Exp)
+  /-- Unform random sample [0, en), with tape et -/
   | rand (en et : Exp)
+  /-- Halt and fail -/
   | fail
+  /-- Pattern matching primitive -/
   | scrut (e : Exp) (pat : Pat)
   deriving Inhabited, Countable, Repr, BEq
 
-/-- Phantom type annotation: carries a `Ty` alongside an `Exp` for display
-    purposes but is definitionally equal to the expression. -/
+/-- Phantom constructor: annotate an expression with a type. -/
 @[reducible] def Exp.annotated (_τ : Ty) (e : Exp) : Exp := e
-
-/-- Phantom name-hint wrapper for `lam`: carries the Lean identifier the user
-    wrote for the bound variable so delaborators can restore it. Reducibly
-    equal to `Exp.lam e`. -/
-@[reducible] def Exp.lamN (_name : String) (_τ : Option Ty) (e : Exp) : Exp := Exp.lam e
-
-/-- Phantom name-hint wrapper for `fix`. -/
-@[reducible] def Exp.fixN (_name : String) (_τ : Option Ty) (e : Exp) : Exp := Exp.fix e
 
 namespace Exp
 
@@ -232,34 +230,98 @@ instance : HasSubstitution Exp Var Exp where
   | fail => {}
   | scrut e _ => fv e
 
-/-- Locally-closed terms: no dangling de-Bruijn indices. Binder cases use
-    cofinite quantification. -/
-inductive LC : Exp → Prop
-  | fvar (x : Var) : LC (fvar x)
-  | lit (b : BaseLit) : LC (lit b)
-  | lam (L : Finset Var) (e : Exp) : (∀ x ∉ L, LC (open' e (fvar x))) → LC (lam e)
-  | fix (L : Finset Var) (e : Exp) : (∀ x ∉ L, LC (open' e (fvar x))) → LC (fix e)
-  | app {e1 e2} : LC e1 → LC e2 → LC (app e1 e2)
-  | unop (op : UnOp) {e} : LC e → LC (unop op e)
-  | binop (op : BinOp) {e1 e2} : LC e1 → LC e2 → LC (binop op e1 e2)
-  | cond {ec et ef} : LC ec → LC et → LC ef → LC (cond ec et ef)
-  | pair {e1 e2} : LC e1 → LC e2 → LC (pair e1 e2)
-  | fst {e} : LC e → LC (fst e)
-  | snd {e} : LC e → LC (snd e)
-  | inl {e} : LC e → LC (inl e)
-  | inr {e} : LC e → LC (inr e)
-  | case {ec el er} : LC ec → LC el → LC er → LC (case ec el er)
-  | alloc {e} : LC e → LC (alloc e)
-  | load {e} : LC e → LC (load e)
-  | store {e1 e2} : LC e1 → LC e2 → LC (store e1 e2)
-  | tape {e} : LC e → LC (tape e)
-  | rand {e1 e2} : LC e1 → LC e2 → LC (rand e1 e2)
-  | fail : LC fail
-  | scrut {e} (p : Pat) : LC e → LC (scrut e p)
+/-- An expression is locally closed. -/
+inductive IsLocallyClosed : Exp → Prop
+  | fvar (x : Var) :
+    IsLocallyClosed (fvar x)
+  | lit (b : BaseLit) :
+    IsLocallyClosed (lit b)
+  | lam (L : Finset Var) (e : Exp) :
+    (∀ x ∉ L, IsLocallyClosed (open' e (fvar x))) →
+    IsLocallyClosed (lam e)
+  | fix (L : Finset Var) (e : Exp) :
+    (∀ x ∉ L, IsLocallyClosed (open' e (fvar x))) →
+    IsLocallyClosed (fix e)
+  | app {e1 e2} :
+    IsLocallyClosed e1 →
+    IsLocallyClosed e2 →
+    IsLocallyClosed (app e1 e2)
+  | unop (op : UnOp) {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (unop op e)
+  | binop (op : BinOp) {e1 e2} :
+    IsLocallyClosed e1 →
+    IsLocallyClosed e2 →
+    IsLocallyClosed (binop op e1 e2)
+  | cond {ec et ef} :
+    IsLocallyClosed ec →
+    IsLocallyClosed et →
+    IsLocallyClosed ef →
+    IsLocallyClosed (cond ec et ef)
+  | pair {e1 e2} :
+    IsLocallyClosed e1 →
+    IsLocallyClosed e2 →
+    IsLocallyClosed (pair e1 e2)
+  | fst {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (fst e)
+  | snd {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (snd e)
+  | inl {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (inl e)
+  | inr {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (inr e)
+  | case {ec el er} :
+    IsLocallyClosed ec →
+    IsLocallyClosed el →
+    IsLocallyClosed er →
+    IsLocallyClosed (case ec el er)
+  | alloc {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (alloc e)
+  | load {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (load e)
+  | store {e1 e2} :
+    IsLocallyClosed e1 →
+    IsLocallyClosed e2 →
+    IsLocallyClosed (store e1 e2)
+  | tape {e} :
+    IsLocallyClosed e →
+    IsLocallyClosed (tape e)
+  | rand {e1 e2} :
+    IsLocallyClosed e1 →
+    IsLocallyClosed e2 →
+    IsLocallyClosed (rand e1 e2)
+  | fail :
+    IsLocallyClosed fail
+  | scrut {e} (p : Pat) :
+    IsLocallyClosed e →
+    IsLocallyClosed (scrut e p)
 
-attribute [scoped grind .] LC.fvar LC.lit LC.app LC.unop LC.binop LC.cond
-  LC.pair LC.fst LC.snd LC.inl LC.inr LC.case LC.alloc LC.load LC.store
-  LC.tape LC.rand LC.fail LC.scrut
+attribute [scoped grind .]
+  IsLocallyClosed.fvar
+  IsLocallyClosed.lit
+  IsLocallyClosed.app
+  IsLocallyClosed.unop
+  IsLocallyClosed.binop
+  IsLocallyClosed.cond
+  IsLocallyClosed.pair
+  IsLocallyClosed.fst
+  IsLocallyClosed.snd
+  IsLocallyClosed.inl
+  IsLocallyClosed.inr
+  IsLocallyClosed.case
+  IsLocallyClosed.alloc
+  IsLocallyClosed.load
+  IsLocallyClosed.store
+  IsLocallyClosed.tape
+  IsLocallyClosed.rand
+  IsLocallyClosed.fail
+  IsLocallyClosed.scrut
 
 end Exp
 
@@ -275,9 +337,7 @@ def Pat.tryMatch : Pat → Exp → Option Exp
   | .inr p, .inr e => p.tryMatch e
   | _, _ => none
 
--------------------------------------------------------------------------------
--- Fragment abstraction
--------------------------------------------------------------------------------
+/- ## Sublanguages -/
 
 abbrev Fragment := Exp → Type
 
@@ -308,9 +368,7 @@ def FragExp.mk? [Checkable F] (e : Exp) : Option (FragExp F) :=
 instance [Checkable F] [Checkable G] : Checkable (Both F G) where
   check? e := do return (← Checkable.check? e, ← Checkable.check? e)
 
--------------------------------------------------------------------------------
--- IsVal / Val
--------------------------------------------------------------------------------
+/- ## Values -/
 
 /-- Type-valued witness that an expression is a value. Values are:
     literals, lambda abstractions (which are closed-over functions), fixpoints
@@ -476,6 +534,8 @@ theorem Exp.ofVal_of_toVal_some {e : Exp} {v : Val} (h : e.toVal? = some v) : Ex
 theorem Exp.ofVal_injective : Function.Injective Exp.ofVal :=
   fun _ _ h => Val.ext h
 
+/- ## Evaluation contexts -/
+
 inductive EctxItem
   | appL (v2 : Val)
   | appR (e1 : Exp)
@@ -563,6 +623,8 @@ def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
   | scrut e1 p =>
     e1.toVal?.casesOn (some (.scrut p, e1)) fun _ => none
   | _ => none
+
+/- ## Deterministic evaluation helpers -/
 
 def UnOp.eval (op : UnOp) (v : Exp) : Option Exp :=
   match op, v with

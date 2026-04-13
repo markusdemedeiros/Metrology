@@ -36,7 +36,7 @@ theorem subset.insert {X Y : ClosedCtx} (h : X.subset Y) (x : Var) :
 end ClosedCtx
 
 /-- `Exp.isClosed X e` : `e` is locally closed and every free variable of `e` is in `X`. -/
-def Exp.isClosed (X : ClosedCtx) (e : Exp) : Prop := e.LC ∧ e.fv ⊆ X
+def Exp.isClosed (X : ClosedCtx) (e : Exp) : Prop := e.IsLocallyClosed ∧ e.fv ⊆ X
 
 theorem Exp.isClosed_weaken {X Y : ClosedCtx} (hXY : X.subset Y)
     {e : Exp} (h : e.isClosed X) : e.isClosed Y :=
@@ -118,7 +118,7 @@ theorem Exp.subst_is_closed_empty {e : Exp} {x : Var} {v : Exp}
 
 /-- Substitutions at different variables commute when `v'` has no `x` free. -/
 theorem Exp.subst_subst {e v v' : Exp} {x : Var} {y : Var}
-    (hne : x ≠ y) (hv' : x ∉ v'.fv) (_hv'_lc : v'.LC) :
+    (hne : x ≠ y) (hv' : x ∉ v'.fv) (_hv'_lc : v'.IsLocallyClosed) :
     Exp.subst (Exp.subst e x v) y v'
       = Exp.subst (Exp.subst e y v') x (Exp.subst v y v') := by
   induction e with
@@ -146,7 +146,7 @@ theorem Exp.subst_subst {e v v' : Exp} {x : Var} {y : Var}
 /-- Independence of substitutions at distinct, mutually-fresh variables. -/
 theorem Exp.subst_subst_ne {e v v' : Exp} {x y : Var}
     (hne : x ≠ y) (hxv' : x ∉ v'.fv) (hyv : y ∉ v.fv)
-    (hv_lc : v.LC) (hv'_lc : v'.LC) :
+    (hv_lc : v.IsLocallyClosed) (hv'_lc : v'.IsLocallyClosed) :
     Exp.subst (Exp.subst e x v) y v' = Exp.subst (Exp.subst e y v') x v := by
   rw [Exp.subst_subst hne hxv' hv'_lc]
   rw [Exp.subst_fresh y v v' hyv]
