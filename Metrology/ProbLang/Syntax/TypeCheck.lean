@@ -48,14 +48,14 @@ mutual
 partial def synth (Γ e : Expr) : TermElabM (Expr × Expr) := do
   let e ← Meta.whnf e
   match e.getAppFn.constName? with
-  | some ``Exp.var =>
+  | some ``Exp.fvar =>
       -- We don't know τ a priori; leave it as a metavariable and let the
       -- `rfl` for `Γ x = some τ` pin it down.
       let τ ← mkFreshExprMVar (mkConst ``Ty)
       let lookupTy ← mkAppM ``Eq #[← mkAppM' Γ #[e.getArg! 0], ← mkAppM ``Option.some #[τ]]
       let lookup ← mkFreshExprMVar lookupTy
       lookup.mvarId!.refl
-      let proof ← mkAppM ``Typed.var #[lookup]
+      let proof ← mkAppM ``Typed.fvar #[lookup]
       return (← instantiateMVars τ, proof)
   | some ``Exp.lit =>
       let arg := (e.getArg! 0).consumeMData
@@ -117,7 +117,7 @@ partial def checkMVar (mvar : MVarId) : TermElabM Unit := mvar.withContext do
   | some ``Exp.fail =>
       mvar.assign (← mkAppOptM ``Typed.fail #[Γ, τ])
   -- Synth-mode heads: call synth and unify.
-  | some ``Exp.var | some ``Exp.lit | some ``Exp.fst | some ``Exp.snd =>
+  | some ``Exp.fvar | some ``Exp.lit | some ``Exp.fst | some ``Exp.snd =>
       let (τ', proof) ← synth Γ e
       unless ← isDefEq τ τ' do
         throwError "typecheck/switch: inferred type{indentExpr τ'}\n\
@@ -144,7 +144,7 @@ example : Typed Tctx.empty (.lit (.int 42)) .int := typecheck
 example : Typed Tctx.empty .fail .bool := typecheck
 example : Typed Tctx.empty (.pair (.lit (.int 1)) (.lit .unit)) (.prod .int .unit) :=
   typecheck
-example : Typed (Tctx.empty.insert "x" .bool) (.var "x") .bool := typecheck
+example : Typed (Tctx.empty.insert "x" .bool) (.fvar "x") .bool := typecheck
 example : Typed Tctx.empty (.inl (.lit (.bool true))) (.sum .bool .int) := typecheck
 
 -- Synth-driven: `fst` pulls the product type through.

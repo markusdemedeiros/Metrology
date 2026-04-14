@@ -295,9 +295,8 @@ there's no dedicated `Typed.letrec` rule — derive it from `fix` + `lam`.
 
 /-- `Typed Γ e τ` — expression `e` has type `τ` under typing context `Γ`. -/
 inductive Typed : Tctx → Exp → Ty → Prop
-  | fvar {Γ x τ} :
-      Γ x = some τ →
-      Typed Γ (.fvar x) τ
+  | fvar {Γ x τ} : Γ x = some τ → Typed Γ (.fvar x) τ
+  | bvar {Γ x τ} : Γ x = some τ → Typed Γ (.bvar x) τ
   | lit_int  {Γ z} : Typed Γ (.lit (.int z)) .int
   | lit_bool {Γ b} : Typed Γ (.lit (.bool b)) .bool
   | lit_unit {Γ}   : Typed Γ (.lit .unit)     .unit
@@ -402,6 +401,7 @@ theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp} {τ : Ty}
     (h : Typed Γ e τ) : Exp.IsLocallyClosed e := by
   induction h with
   | fvar _ => exact .fvar _
+  | bvar _ => sorry -- exact .bvar _
   | lit_int | lit_bool | lit_unit => exact .lit _
   | binop_int _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
   | binop_bool _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
@@ -519,6 +519,7 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
         simp only [Tctx.insert]
         rw [if_neg (fun h : z = y => hyz' h.symm)]
         exact hz
+  | bvar => sorry
   | lit_int =>
       intros; subst_vars; simp only [Exp.subst]; exact .lit_int
   | lit_bool =>
