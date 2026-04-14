@@ -22,8 +22,6 @@ instance : COFE Val := COFE.ofDiscrete _ Eq_Equivalence
 instance : OFE.Discrete Val := ⟨id⟩
 instance (x : Val) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-instance : LawfulPartialMap LocHeap Loc := sorry
-
 abbrev SpecProg := Option (Excl Exp)
 abbrev SpecHeap := HeapView ℕ+ Loc (Agree Val) LocHeap
 abbrev SpecTapes := HeapView ℕ+ Loc (Agree Tape) LocHeap

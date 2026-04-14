@@ -527,17 +527,15 @@ def Tape.empty (z : Int) : Tape := ⟨z, []⟩
 
 /-- Loc → V heaps. This data structure encapsulates the underlying representation,
   and allows for better typeclass inference. -/
-structure LocHeap (V : Type _) : Type _ where
-  heap : ExtTreeMap Loc V compare
-  deriving Inhabited
-attribute [grind =] LocHeap.heap
+@[reducible] def LocHeap (V : Type _) : Type _ := ExtTreeMap Loc V compare
+
+instance : Inhabited (LocHeap V) := inferInstanceAs (Inhabited (ExtTreeMap _ _ _))
 
 instance [Countable V] : Countable (LocHeap V) :=
-  Function.Injective.countable (f := LocHeap.heap)
-    (fun ⟨_⟩ ⟨_⟩ h => by cases h; rfl)
+  inferInstanceAs (Countable (ExtTreeMap _ _ _))
 
-instance : Coe (LocHeap V) (ExtTreeMap Loc V compare) := ⟨(·.heap)⟩
-instance : Coe (ExtTreeMap Loc V compare) (LocHeap V)  := ⟨.mk⟩
+instance : GetElem? (LocHeap V) Loc V (fun (m : ExtTreeMap Loc V compare) k => k ∈ m) :=
+  inferInstanceAs (GetElem? (ExtTreeMap Loc V compare) _ _ _)
 
 structure State where
   heap  : LocHeap Val
@@ -678,16 +676,16 @@ def State.update_tapes (σ : State) (f : ExtTreeMap Loc Tape → ExtTreeMap Loc 
 theorem State.update_tapes_twice (σ : State) (l : Loc) (ys xs : Tape) :
     (σ.update_tapes (·.insert l xs)).update_tapes (·.insert l ys) =
     σ.update_tapes (·.insert l ys) := by
-  unfold State.update_tapes; congr 2; grind
+  unfold State.update_tapes; simp; grind
 
 theorem State.update_tapes_same {σ σ' : State}
     (h : σ.update_tapes (·.insert l xs) = σ'.update_tapes (·.insert l ys)) :
     xs = ys := by
-  have key := congrArg (·.tapes.1[l]?) h
-  simp [State.update_tapes] at key
+  have key := congrArg (·.tapes[l]?) h
+  simp [State.update_tapes, LocHeap] at key
   exact key
 
-theorem State.update_tapes_no_change {σ : State} (h : σ.tapes.1[l]? = some ys) :
+theorem State.update_tapes_no_change {σ : State} (h : σ.tapes[l]? = some ys) :
     σ.update_tapes (·.insert l ys) = σ := by
   unfold State.update_tapes; congr 2; grind
 

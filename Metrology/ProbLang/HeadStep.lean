@@ -74,19 +74,19 @@ def headStep : Cfg → Measure Cfg
 | ⟨.case (.inr e) _ er, σ⟩ => e.isValM <| (dirac ⟨er.app e, σ⟩)
 | ⟨.alloc ed, σ⟩ =>
   ed.asValM fun vd =>
-  let ℓ := σ.heap.1.fresh
+  let ℓ := σ.heap.fresh
   dirac ⟨.lit <| .loc ℓ, σ.update_heap fun t => t.insert ℓ vd⟩
 | ⟨.load (.lit (.loc ℓ)), σ⟩ =>
-  match σ.heap.1[ℓ]? with | none => 0 | some v => (dirac ⟨.ofVal v, σ⟩)
+  match σ.heap[ℓ]? with | none => 0 | some v => (dirac ⟨.ofVal v, σ⟩)
 | ⟨.store (.lit (.loc ℓ)) e, σ⟩ =>
   e.asValM fun v =>
-  match σ.heap.1[ℓ]? with | none => 0 | some _ => dirac ⟨.lit .unit, σ.update_heap fun t => t.insert ℓ v⟩
+  match σ.heap[ℓ]? with | none => 0 | some _ => dirac ⟨.lit .unit, σ.update_heap fun t => t.insert ℓ v⟩
 | ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ => Cfg.uniform z σ
 | ⟨.tape (.lit (.int z)), σ⟩ =>
-  let α := σ.tapes.1.fresh
+  let α := σ.tapes.fresh
   dirac ⟨.lit <| .lbl α, σ.update_tapes fun t => t.insert α (.empty z)⟩
 | ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ =>
-  match σ.tapes.1[α]? with
+  match σ.tapes[α]? with
   | none => 0
   | some ⟨M, ns⟩ =>
     if M = z
@@ -278,16 +278,16 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   HeadStepSupport ⟨.case (.inr e) el er, σ⟩ ⟨er.app e, σ⟩
 | AllocS :
   ed.toVal? = some vd →
-  ℓ = σ.heap.1.fresh →
+  ℓ = σ.heap.fresh →
   σ' = σ.update_heap (·.insert ℓ vd) →
   HeadStepSupport ⟨.alloc ed, σ⟩ ⟨.lit (.loc ℓ), σ'⟩
 | LoadS :
-  σ.heap.1[ℓ]? = some v →
+  σ.heap[ℓ]? = some v →
   e' = Exp.ofVal v →
   HeadStepSupport ⟨.load (.lit (.loc ℓ)), σ⟩ ⟨e', σ⟩
 | StoreS :
   e.toVal? = some v →
-  σ.heap.1[ℓ]?.isSome →
+  σ.heap[ℓ]?.isSome →
   σ' = σ.update_heap (·.insert ℓ v) →
   HeadStepSupport ⟨.store (.lit (.loc ℓ)) e, σ⟩ ⟨.lit .unit, σ'⟩
 | RandNoTapeS :
@@ -296,19 +296,19 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   v < z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ ⟨.lit (.int v), σ⟩
 | TapeS :
-  ℓ = σ.tapes.1.fresh →
+  ℓ = σ.tapes.fresh →
   σ' = σ.update_tapes (·.insert ℓ (.empty z)) →
   HeadStepSupport ⟨.tape (.lit (.int z)), σ⟩ ⟨.lit (.lbl ℓ), σ'⟩
 | RandTapeS :
   0 < z →
-  σ.tapes.1[α]? = some ⟨N, nn :: ns⟩ →
+  σ.tapes[α]? = some ⟨N, nn :: ns⟩ →
   z = N →
   v = nn.1 →
   σ' = σ.update_tapes (·.insert α ⟨N, ns⟩) →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 | RandTapeEmptyS :
   0 < z →
-  σ.tapes.1[α]? = some ⟨N, []⟩ →
+  σ.tapes[α]? = some ⟨N, []⟩ →
   z = N →
   0 ≤ v →
   v < z →
@@ -316,7 +316,7 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
 | RandTapeOtherS :
   0 < z →
-  σ.tapes.1[α]? = some ⟨N, L⟩ →
+  σ.tapes[α]? = some ⟨N, L⟩ →
   z ≠ N →
   0 ≤ v →
   v < z →

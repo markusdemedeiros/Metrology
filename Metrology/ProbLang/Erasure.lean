@@ -63,7 +63,7 @@ and appending `n` to the tape. This is the analogue of Clutch's
 `state_step σ α`, localized to this file so as not to pollute the
 language-level semantics. If the tape `α` is absent, we return `0`. -/
 noncomputable def tapePresample (σ : State) (α : Loc) : Measure State :=
-  match σ.tapes.1[α]? with
+  match σ.tapes[α]? with
   | none => 0
   | some ⟨N, bs⟩ =>
       (tapeIndexUniform N).bind (fun n =>
@@ -85,7 +85,7 @@ theorem tapeIndexUniform_univ_eq_one {N : Int} (hN : 0 < N) :
 /-- `tapePresample σ α` is a probability measure when `α` is an existing
 tape with positive bound. -/
 theorem tapePresample_univ_eq_one {σ : State} {α : Loc} {t : Tape}
-    (h : σ.tapes.1[α]? = some t) (hN : 0 < t.bound) :
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     (tapePresample σ α) Set.univ = 1 := by
   obtain ⟨N, bs⟩ := t
   simp only [tapePresample, h]
@@ -131,9 +131,9 @@ This is a case analysis on `headStep`, but cleaner than the full commutation
 because we only track the bound, not the full tape content. -/
 theorem primStep_tape_persists_support
     {σ : State} {α : Loc} {e : Exp} {t : Tape} {ρ : Cfg}
-    (h : σ.tapes.1[α]? = some t)
+    (h : σ.tapes[α]? = some t)
     (hρ : 0 < primStep ⟨e, σ⟩ {ρ}) :
-    ∃ t' : Tape, ρ.state.tapes.1[α]? = some t' ∧ t'.bound = t.bound := by
+    ∃ t' : Tape, ρ.state.tapes[α]? = some t' ∧ t'.bound = t.bound := by
   obtain ⟨e₂, σ₂⟩ := ρ
   -- Destructure primStep via `prim_step_iff` to get head-step support witness.
   obtain ⟨K, e₁', e₂', _hfill1, _hfill2, hhs⟩ := prim_step_iff.mp hρ
@@ -176,7 +176,7 @@ theorem primStep_tape_persists_support
     -- Tape allocation at fresh location ℓ. We need ℓ ≠ α so α survives.
     -- By `State.fresh_loc_upd_some` / `upd_diff_tape_tot`.
     subst hσ' hℓ
-    have hne : σ.tapes.1.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
+    have hne : σ.tapes.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
     refine ⟨t, ?_, rfl⟩
     exact State.upd_diff_tape_tot (hne.symm) |>.trans h
   | RandTapeS _hz hα' _hN _hv hσ' =>
@@ -194,7 +194,7 @@ theorem primStep_tape_persists_support
       refine ⟨_, State.upd_tape_some _ _ _, rfl⟩
     · refine ⟨t, ?_, rfl⟩
       have hne : α ≠ β := hαβ
-      rw [show (σ.update_tapes fun x => x.insert β _).tapes.1[α]? = σ.tapes.1[α]?
+      rw [show (σ.update_tapes fun x => x.insert β _).tapes[α]? = σ.tapes[α]?
           from State.upd_diff_tape_tot hne]
       exact h
   | RandTapeEmptyS _ _ _ _ _ hσ' =>
@@ -214,13 +214,13 @@ Derived from the support form via the fact that singletons outside the
 support have measure 0 (every discrete measure). -/
 theorem primStep_tape_persists
     {σ : State} {α : Loc} {e : Exp} {t : Tape}
-    (h : σ.tapes.1[α]? = some t) :
+    (h : σ.tapes[α]? = some t) :
     ∀ᵐ ρ ∂(primStep ⟨e, σ⟩),
-      ∃ t' : Tape, ρ.state.tapes.1[α]? = some t' ∧ t'.bound = t.bound := by
+      ∃ t' : Tape, ρ.state.tapes[α]? = some t' ∧ t'.bound = t.bound := by
   -- Use `MeasureTheory.ae_iff` (the filter-level form).
   refine (MeasureTheory.ae_iff).mpr ?_
-  rw [show {ρ : Cfg | ¬ ∃ t' : Tape, ρ.state.tapes.1[α]? = some t' ∧ t'.bound = t.bound}
-        = ⋃ ρ ∈ {ρ : Cfg | ¬ ∃ t' : Tape, ρ.state.tapes.1[α]? = some t' ∧ t'.bound = t.bound},
+  rw [show {ρ : Cfg | ¬ ∃ t' : Tape, ρ.state.tapes[α]? = some t' ∧ t'.bound = t.bound}
+        = ⋃ ρ ∈ {ρ : Cfg | ¬ ∃ t' : Tape, ρ.state.tapes[α]? = some t' ∧ t'.bound = t.bound},
             ({ρ} : Set Cfg) from by ext; simp]
   refine (measure_biUnion_null_iff (Set.to_countable _)).mpr ?_
   intro ρ hρ
@@ -240,7 +240,7 @@ theorem tapePresample_heap_eq {σ : State} {α : Loc} :
     ∀ᵐ σ' ∂(tapePresample σ α), σ'.heap = σ.heap := by
   refine MeasureTheory.ae_iff.mpr ?_
   unfold tapePresample
-  cases hsome : σ.tapes.1[α]? with
+  cases hsome : σ.tapes[α]? with
   | none => rfl
   | some t =>
     obtain ⟨N, bs⟩ := t
@@ -257,8 +257,8 @@ theorem tapePresample_heap_eq {σ : State} {α : Loc} :
 /-- `tapePresample σ α` only touches tape `α`: for any other location
 `α_lbl ≠ α`, the lookup at `α_lbl` is a.e. unchanged. -/
 theorem tapePresample_tape_ne_ae {σ : State} {α α_lbl : Loc} {t : Tape}
-    (h : σ.tapes.1[α]? = some t) (hne : α_lbl ≠ α) :
-    ∀ᵐ σ' ∂(tapePresample σ α), σ'.tapes.1[α_lbl]? = σ.tapes.1[α_lbl]? := by
+    (h : σ.tapes[α]? = some t) (hne : α_lbl ≠ α) :
+    ∀ᵐ σ' ∂(tapePresample σ α), σ'.tapes[α_lbl]? = σ.tapes[α_lbl]? := by
   refine MeasureTheory.ae_iff.mpr ?_
   obtain ⟨N, bs⟩ := t
   simp only [tapePresample, h]
@@ -267,7 +267,7 @@ theorem tapePresample_tape_ne_ae {σ : State} {α α_lbl : Loc} {t : Tape}
   refine (lintegral_eq_zero_iff Measurable.of_discrete).mpr ?_
   refine MeasureTheory.ae_of_all _ fun n => ?_
   show (Measure.dirac (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)))
-        {a | ¬a.tapes.1[α_lbl]? = σ.tapes.1[α_lbl]?} = 0
+        {a | ¬a.tapes[α_lbl]? = σ.tapes[α_lbl]?} = 0
   rw [Measure.dirac_apply' _ MeasurableSet.of_discrete,
       Set.indicator_of_notMem]
   simp only [Set.mem_setOf_eq, not_not]
@@ -293,7 +293,7 @@ theorem tapePresample_bind_pull_heap
   -- Both sides equal each other a.e. on tapePresample because every state
   -- in its support has heap = σ.heap.
   unfold tapePresample
-  cases hsome : σ.tapes.1[α]? with
+  cases hsome : σ.tapes[α]? with
   | none =>
     show ((0 : Measure State).bind _) = _
     rw [Measure.bind_zero_left, Measure.bind_zero_left]
@@ -324,10 +324,10 @@ theorem tapePresample_update_heap_comm
       (tapePresample σ α).map (·.update_heap f) := by
   unfold tapePresample
   -- (σ.update_heap f).tapes[α]? = σ.tapes[α]?
-  have htapes : (σ.update_heap f).tapes.1[α]? = σ.tapes.1[α]? := by
+  have htapes : (σ.update_heap f).tapes[α]? = σ.tapes[α]? := by
     simp [State.update_heap]
   rw [htapes]
-  cases hsome : σ.tapes.1[α]? with
+  cases hsome : σ.tapes[α]? with
   | none =>
     show (0 : Measure State) = _
     rw [Measure.map_zero]
@@ -352,10 +352,10 @@ theorem tapePresample_update_tapes_ne_comm
     tapePresample (σ.update_tapes (·.insert β v)) α =
       (tapePresample σ α).map (·.update_tapes (·.insert β v)) := by
   unfold tapePresample
-  have htapes : (σ.update_tapes (·.insert β v)).tapes.1[α]? = σ.tapes.1[α]? :=
+  have htapes : (σ.update_tapes (·.insert β v)).tapes[α]? = σ.tapes[α]? :=
     State.upd_diff_tape_tot (Ne.symm hne)
   rw [htapes]
-  cases hsome : σ.tapes.1[α]? with
+  cases hsome : σ.tapes[α]? with
   | none =>
     show (0 : Measure State) = _
     rw [Measure.map_zero]
@@ -390,7 +390,7 @@ then-`Cfg.uniform` composition. This is the only non-trivial headStep
 case where the head-step result is a `Cfg.uniform` measure. -/
 theorem tapePresample_bind_cfgUniform_comm
     {σ : State} {α : Loc} {t : Tape}
-    (hmem : σ.tapes.1[α]? = some t) (hN : 0 < t.bound) (z : Int) :
+    (hmem : σ.tapes[α]? = some t) (hN : 0 < t.bound) (z : Int) :
     (tapePresample σ α).bind (fun σ' => Cfg.uniform z σ') =
       (Cfg.uniform z σ).bind (fun ρ' =>
         (tapePresample ρ'.state α).bind
@@ -472,7 +472,7 @@ the same thing. -/
 
 /-- Inserting the same tape value at an existing key is the identity on `State`. -/
 theorem State.update_tapes_insert_id {σ : State} {α : Loc} {t : Tape}
-    (h : σ.tapes.1[α]? = some t) :
+    (h : σ.tapes[α]? = some t) :
     σ.update_tapes (·.insert α t) = σ :=
   State.update_tapes_no_change h
 
@@ -535,7 +535,7 @@ is the zero measure when the tape bound is nonpositive, so without it
 the LHS would collapse to `0` while the RHS may be nonzero. -/
 theorem execN_tape_presample_expr_eq
     {σ : State} {α : Loc} {e : Exp} {m : Nat} {t : Tape}
-    (h : σ.tapes.1[α]? = some t) (hN : 0 < t.bound) :
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     ((tapePresample σ α).bind (fun σ' => execN m ⟨e, σ'⟩)).map (·.expr) =
       (execN m ⟨e, σ⟩).map (·.expr) := by
   -- Induction on `m`, generalized over `e`, `σ`, `t` so the IH applies at
@@ -594,7 +594,7 @@ theorem execN_tape_presample_expr_eq
       -- Reshape the IH (`.map (·.expr)` form) into the pointwise integral
       -- form used by the case helpers below.
       have ih_pointwise : ∀ (e' : Exp) (σ' : State) (t' : Tape),
-          σ'.tapes.1[α]? = some t' → 0 < t'.bound →
+          σ'.tapes[α]? = some t' → 0 < t'.bound →
           ∫⁻ σ'', (execN m ⟨e', σ''⟩) ((fun x => x.expr) ⁻¹' S) ∂tapePresample σ' α
             = (execN m ⟨e', σ'⟩) ((fun x => x.expr) ⁻¹' S) := by
         intro e' σ' t' ht' hN'
@@ -609,7 +609,7 @@ theorem execN_tape_presample_expr_eq
       -- Specialization composing `ih_pointwise` with `K.fill`, matching the
       -- shape of the post-`K.fillCfg` integrand.
       have ih_fill : ∀ (e' : Exp) (σ' : State) (t' : Tape),
-          σ'.tapes.1[α]? = some t' → 0 < t'.bound →
+          σ'.tapes[α]? = some t' → 0 < t'.bound →
           ∫⁻ σ'', ((execN m ∘ K.fillCfg) ⟨e', σ''⟩) ((fun x => x.expr) ⁻¹' S)
               ∂tapePresample σ' α
             = ((execN m ∘ K.fillCfg) ⟨e', σ'⟩) ((fun x => x.expr) ⁻¹' S) := by
@@ -735,7 +735,7 @@ theorem execN_tape_presample_expr_eq
           have hload : ∀ (σ₀ : State), σ₀.heap = σ.heap →
               headStep (⟨.load (.lit (.loc ℓ)), σ₀⟩ : Cfg) = Measure.dirac ⟨.ofVal v, σ₀⟩ := by
             intro σ₀ hh
-            change (match σ₀.heap.1[ℓ]? with | none => (0 : Measure Cfg) | some v => Measure.dirac ⟨.ofVal v, σ₀⟩) = _
+            change (match σ₀.heap[ℓ]? with | none => (0 : Measure Cfg) | some v => Measure.dirac ⟨.ofVal v, σ₀⟩) = _
             rw [hh, hlook]
           -- Rewrite both sides using hload.
           -- LHS: a.e. rewrite the integrand.
@@ -760,15 +760,15 @@ theorem execN_tape_presample_expr_eq
           have halloc : ∀ (σ₀ : State), σ₀.heap = σ.heap →
               headStep (⟨.alloc ed, σ₀⟩ : Cfg) =
                 ed.asValM fun vd =>
-                  let ℓ := σ.heap.1.fresh
+                  let ℓ := σ.heap.fresh
                   Measure.dirac ⟨.lit (.loc ℓ), σ₀.update_heap fun hp => hp.insert ℓ vd⟩ := by
             intro σ₀ hh
-            show Exp.asValM ed (fun vd => let ℓ := σ₀.heap.1.fresh; _) = _
+            show Exp.asValM ed (fun vd => let ℓ := σ₀.heap.fresh; _) = _
             rw [hh]
           calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
                         ∂headStep ⟨.alloc ed, σ'⟩ ∂tapePresample σ α
               = ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
-                        ∂(ed.asValM fun vd => let ℓ := σ.heap.1.fresh;
+                        ∂(ed.asValM fun vd => let ℓ := σ.heap.fresh;
                             Measure.dirac ⟨.lit (.loc ℓ), σ'.update_heap fun hp => hp.insert ℓ vd⟩)
                         ∂tapePresample σ α := by
                 refine lintegral_congr_ae ?_
@@ -787,14 +787,14 @@ theorem execN_tape_presample_expr_eq
                   -- Commute the heap update with `tapePresample`, then close
                   -- via the IH at the heap-updated state.
                   set f_heap : Std.ExtTreeMap Loc Val compare → Std.ExtTreeMap Loc Val compare :=
-                    (fun hp => hp.insert σ.heap.1.fresh vd)
-                  have htape_upd : (σ.update_heap f_heap).tapes.1[α]? = some t := by
+                    (fun hp => hp.insert σ.heap.fresh vd)
+                  have htape_upd : (σ.update_heap f_heap).tapes[α]? = some t := by
                     simp [State.update_heap, h]
                   have key : ∫⁻ σ',
-                      ((execN m ∘ K.fillCfg) ⟨Exp.lit (BaseLit.loc σ.heap.1.fresh), σ'.update_heap f_heap⟩)
+                      ((execN m ∘ K.fillCfg) ⟨Exp.lit (BaseLit.loc σ.heap.fresh), σ'.update_heap f_heap⟩)
                         ((fun x => x.expr) ⁻¹' S) ∂tapePresample σ α
                     = ∫⁻ τ,
-                      ((execN m ∘ K.fillCfg) ⟨Exp.lit (BaseLit.loc σ.heap.1.fresh), τ⟩)
+                      ((execN m ∘ K.fillCfg) ⟨Exp.lit (BaseLit.loc σ.heap.fresh), τ⟩)
                         ((fun x => x.expr) ⁻¹' S) ∂(tapePresample σ α).map (·.update_heap f_heap) := by
                     rw [lintegral_map Measurable.of_discrete Measurable.of_discrete]
                   rw [key, ← tapePresample_update_heap_comm,
@@ -808,11 +808,11 @@ theorem execN_tape_presample_expr_eq
           have hstore : ∀ (σ₀ : State), σ₀.heap = σ.heap →
               headStep (⟨.store (.lit (.loc ℓ)) ev, σ₀⟩ : Cfg) =
                 ev.asValM fun v =>
-                  match σ.heap.1[ℓ]? with
+                  match σ.heap[ℓ]? with
                   | none => (0 : Measure Cfg)
                   | some _ => Measure.dirac ⟨.lit .unit, σ₀.update_heap fun hp => hp.insert ℓ v⟩ := by
             intro σ₀ hh
-            show Exp.asValM ev (fun v => match σ₀.heap.1[ℓ]? with | none => _ | some _ => _) = _
+            show Exp.asValM ev (fun v => match σ₀.heap[ℓ]? with | none => _ | some _ => _) = _
             rw [hh]
           cases hcheck : ev.toVal? with
           | none =>
@@ -829,7 +829,7 @@ theorem execN_tape_presample_expr_eq
                   rw [hstore σ rfl]; simp [Exp.asValM, hcheck, lintegral_zero_measure]
           | some v =>
             -- ev is a value. Check heap lookup.
-            cases hlook : σ.heap.1[ℓ]? with
+            cases hlook : σ.heap[ℓ]? with
             | none =>
               -- Segfault: headStep = 0
               calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
@@ -858,7 +858,7 @@ theorem execN_tape_presample_expr_eq
                     simp only [f_heap]
                 _ = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
                       ∂headStep ⟨.store (.lit (.loc ℓ)) ev, σ⟩ := by
-                    have htape_upd : (σ.update_heap f_heap).tapes.1[α]? = some t := by
+                    have htape_upd : (σ.update_heap f_heap).tapes[α]? = some t := by
                       simp [State.update_heap, h]
                     have key : ∫⁻ σ',
                         ((execN m ∘ K.fillCfg) ⟨Exp.lit BaseLit.unit, σ'.update_heap f_heap⟩)
@@ -873,13 +873,13 @@ theorem execN_tape_presample_expr_eq
                     simp [Exp.asValM, hcheck, hlook, lintegral_dirac' _ Measurable.of_discrete, f_heap]
         | tape =>
           -- `tape` allocates at `σ₀.tapes.fresh`. For `σ'` in the support of
-          -- `tapePresample σ α`, `σ'.tapes.1.fresh = σ.tapes.1.fresh` (presample
+          -- `tapePresample σ α`, `σ'.tapes.fresh = σ.tapes.fresh` (presample
           -- only re-inserts at the existing key `α`). Then commute the
           -- fresh-tape insert through `tapePresample` and apply the IH.
           rename_i z
-          have hne : σ.tapes.1.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
+          have hne : σ.tapes.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
           have hfresh_eq : ∀ᵐ σ' ∂(tapePresample σ α),
-              σ'.tapes.1.fresh = σ.tapes.1.fresh := by
+              σ'.tapes.fresh = σ.tapes.fresh := by
             obtain ⟨N, bs⟩ := t
             rw [MeasureTheory.ae_iff]
             simp only [tapePresample, h]
@@ -888,21 +888,21 @@ theorem execN_tape_presample_expr_eq
             refine (lintegral_eq_zero_iff Measurable.of_discrete).mpr ?_
             refine MeasureTheory.ae_of_all _ fun n => ?_
             show (Measure.dirac (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)))
-                  {a | ¬a.tapes.1.fresh = σ.tapes.1.fresh} = 0
+                  {a | ¬a.tapes.fresh = σ.tapes.fresh} = 0
             rw [Measure.dirac_apply' _ MeasurableSet.of_discrete,
                 Set.indicator_of_notMem]
             simp only [Set.mem_setOf_eq, not_not]
             exact State.fresh_loc_upd_some h
-          have htape_rw : ∀ (σ₀ : State), σ₀.tapes.1.fresh = σ.tapes.1.fresh →
+          have htape_rw : ∀ (σ₀ : State), σ₀.tapes.fresh = σ.tapes.fresh →
               headStep (⟨.tape (.lit (.int z)), σ₀⟩ : Cfg) =
-                Measure.dirac ⟨.lit (.lbl σ.tapes.1.fresh),
-                  σ₀.update_tapes (·.insert σ.tapes.1.fresh (Tape.empty z))⟩ := by
+                Measure.dirac ⟨.lit (.lbl σ.tapes.fresh),
+                  σ₀.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ := by
             intro σ₀ hfr; simp only [headStep, hfr]
           calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
                         ∂headStep ⟨.tape (.lit (.int z)), σ'⟩ ∂tapePresample σ α
               = ∫⁻ σ', ((execN m ∘ K.fillCfg)
-                    ⟨.lit (.lbl σ.tapes.1.fresh),
-                     σ'.update_tapes (·.insert σ.tapes.1.fresh (Tape.empty z))⟩)
+                    ⟨.lit (.lbl σ.tapes.fresh),
+                     σ'.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩)
                           ((fun x => x.expr) ⁻¹' S) ∂tapePresample σ α := by
                 refine lintegral_congr_ae ?_
                 filter_upwards [hfresh_eq] with σ' hfr
@@ -911,21 +911,21 @@ theorem execN_tape_presample_expr_eq
                   ∂headStep ⟨.tape (.lit (.int z)), σ⟩ := by
                 have key : ∫⁻ σ',
                     ((execN m ∘ K.fillCfg)
-                      ⟨Exp.lit (BaseLit.lbl σ.tapes.1.fresh),
-                       σ'.update_tapes (·.insert σ.tapes.1.fresh (Tape.empty z))⟩)
+                      ⟨Exp.lit (BaseLit.lbl σ.tapes.fresh),
+                       σ'.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩)
                       ((fun x => x.expr) ⁻¹' S) ∂tapePresample σ α
                   = ∫⁻ τ,
-                    ((execN m ∘ K.fillCfg) ⟨Exp.lit (BaseLit.lbl σ.tapes.1.fresh), τ⟩)
+                    ((execN m ∘ K.fillCfg) ⟨Exp.lit (BaseLit.lbl σ.tapes.fresh), τ⟩)
                       ((fun x => x.expr) ⁻¹' S)
                       ∂(tapePresample σ α).map
-                        (·.update_tapes (·.insert σ.tapes.1.fresh (Tape.empty z))) := by
+                        (·.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))) := by
                   rw [lintegral_map Measurable.of_discrete Measurable.of_discrete]
                 rw [key, ← tapePresample_update_tapes_ne_comm hne]
                 have htape_upd :
-                    (σ.update_tapes (·.insert σ.tapes.1.fresh (Tape.empty z))).tapes.1[α]?
+                    (σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))).tapes[α]?
                       = some t := by
                   rw [State.upd_diff_tape_tot (Ne.symm hne)]; exact h
-                rw [ih_fill _ (σ.update_tapes (·.insert σ.tapes.1.fresh (Tape.empty z))) t htape_upd hN]
+                rw [ih_fill _ (σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))) t htape_upd hN]
                 rw [htape_rw σ rfl, lintegral_dirac' _ Measurable.of_discrete]
       · -- Probabilistic case: `headStep` is either `Cfg.uniform` (non-tape
         -- or "other-tape" rand) or a tape-popping dirac (same-tape rand).
@@ -966,7 +966,7 @@ theorem execN_tape_presample_expr_eq
               rw [State.update_tapes_twice]
             simp_rw [hstep_upd, lintegral_dirac' _ Measurable.of_discrete]
             -- Fold the residual integral back into `tapePresample σ_popped α`.
-            have htape_popped : (σ.update_tapes (·.insert α ⟨z_r, ns⟩)).tapes.1[α]? =
+            have htape_popped : (σ.update_tapes (·.insert α ⟨z_r, ns⟩)).tapes[α]? =
                 some ⟨z_r, ns⟩ := State.upd_tape_some _ _ _
             convert
               ih_fill (.lit (.int ↑nn)) (σ.update_tapes (·.insert α ⟨z_r, ns⟩))
@@ -976,13 +976,13 @@ theorem execN_tape_presample_expr_eq
             rw [lintegral_bind Measurable.of_discrete.aemeasurable Measurable.of_discrete.aemeasurable]
             simp_rw [lintegral_dirac' _ Measurable.of_discrete]
           · -- α_lbl ≠ α: tapePresample doesn't affect tape α_lbl.
-            have hstep_rw : ∀ (σ₀ : State), σ₀.tapes.1[α_lbl]? = some ⟨z_r, nn :: ns⟩ →
+            have hstep_rw : ∀ (σ₀ : State), σ₀.tapes[α_lbl]? = some ⟨z_r, nn :: ns⟩ →
                 headStep (⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ₀⟩ : Cfg) =
                   Measure.dirac ⟨.lit (.int nn),
                     σ₀.update_tapes (·.insert α_lbl ⟨z_r, ns⟩)⟩ := by
               intro σ₀ ht'; simp [headStep, ht']
             have htapes_pres : ∀ᵐ σ' ∂(tapePresample σ α),
-                σ'.tapes.1[α_lbl]? = some ⟨z_r, nn :: ns⟩ := by
+                σ'.tapes[α_lbl]? = some ⟨z_r, nn :: ns⟩ := by
               obtain ⟨N, bs⟩ := t
               rw [MeasureTheory.ae_iff]
               simp only [tapePresample, h]
@@ -991,7 +991,7 @@ theorem execN_tape_presample_expr_eq
               refine (lintegral_eq_zero_iff Measurable.of_discrete).mpr ?_
               refine MeasureTheory.ae_of_all _ fun n => ?_
               show (Measure.dirac (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)))
-                    {a | ¬a.tapes.1[α_lbl]? = some ⟨z_r, nn :: ns⟩} = 0
+                    {a | ¬a.tapes[α_lbl]? = some ⟨z_r, nn :: ns⟩} = 0
               rw [Measure.dirac_apply' _ MeasurableSet.of_discrete,
                   Set.indicator_of_notMem]
               simp only [Set.mem_setOf_eq, not_not]
@@ -1021,7 +1021,7 @@ theorem execN_tape_presample_expr_eq
                     rw [lintegral_map Measurable.of_discrete Measurable.of_discrete]
                   rw [key, ← tapePresample_update_tapes_ne_comm (Ne.symm hαeq)]
                   have htape_upd :
-                      (σ.update_tapes (·.insert α_lbl ⟨z_r, ns⟩)).tapes.1[α]?
+                      (σ.update_tapes (·.insert α_lbl ⟨z_r, ns⟩)).tapes[α]?
                         = some t := by
                     rw [State.upd_diff_tape_tot hαeq]; exact h
                   rw [ih_fill _ (σ.update_tapes (·.insert α_lbl ⟨z_r, ns⟩)) t htape_upd hN]
@@ -1073,11 +1073,11 @@ theorem execN_tape_presample_expr_eq
           -- `N_b`; for `α_lbl ≠ α`, the lookup is unchanged.
           -- Helper: when tape at `α_lbl` has bound `≠ z_r`, headStep is uniform.
           have hrand_uniform : ∀ (σ₀ : State) {M : Int} {ns : List _},
-              σ₀.tapes.1[α_lbl]? = some ⟨M, ns⟩ → M ≠ z_r →
+              σ₀.tapes[α_lbl]? = some ⟨M, ns⟩ → M ≠ z_r →
               headStep (⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ₀⟩ : Cfg)
                 = Cfg.uniform z_r σ₀ := by
             intro σ₀ M ns ht hne
-            show (match σ₀.tapes.1[α_lbl]? with | none => _ | some ⟨M, _⟩ => _) = _
+            show (match σ₀.tapes[α_lbl]? with | none => _ | some ⟨M, _⟩ => _) = _
             rw [ht]; simp only; rw [if_neg hne]
           refine uniform_close _ z_r hz ?_ (hrand_uniform σ htapes (Ne.symm hzN))
           obtain ⟨N, bs⟩ := t
@@ -1097,7 +1097,7 @@ theorem execN_tape_presample_expr_eq
             rw [Measure.dirac_apply' _ MeasurableSet.of_discrete,
                 Set.indicator_of_notMem]
             simp only [Set.mem_setOf_eq, not_not]
-            have hlook : (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)).tapes.1[α]?
+            have hlook : (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)).tapes[α]?
                 = some ⟨N, bs ++ [n]⟩ := by simp [State.update_tapes]
             exact hrand_uniform _ hlook (fun h => hzN (hNN ▸ h.symm))
           · -- Different tape: lookup preserved.
@@ -1143,9 +1143,9 @@ noncomputable def tapePresampleIter (α : Loc) (σ : State) : Nat → Measure St
 /-- Tape-bound persistence under `tapePresampleIter`: every state in the
 support retains tape `α` with the same bound as the initial `σ`. -/
 theorem tapePresampleIter_tape_bound_ae {σ : State} {α : Loc} {t : Tape}
-    (h : σ.tapes.1[α]? = some t) (n : Nat) :
+    (h : σ.tapes[α]? = some t) (n : Nat) :
     ∀ᵐ σ' ∂(tapePresampleIter α σ n),
-      ∃ t' : Tape, σ'.tapes.1[α]? = some t' ∧ t'.bound = t.bound := by
+      ∃ t' : Tape, σ'.tapes[α]? = some t' ∧ t'.bound = t.bound := by
   induction n with
   | zero =>
     -- `tapePresampleIter α σ 0 = dirac σ`; the a.e. statement on a dirac
@@ -1182,7 +1182,7 @@ theorem tapePresampleIter_tape_bound_ae {σ : State} {α : Loc} {t : Tape}
 expression level, provided the initial tape exists and has positive bound. -/
 theorem execN_tapePresampleIter_expr_eq
     {σ : State} {α : Loc} {e : Exp} {m : Nat} {t : Tape} (n : Nat)
-    (h : σ.tapes.1[α]? = some t) (hN : 0 < t.bound) :
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     ((tapePresampleIter α σ n).bind (fun σ' => execN m ⟨e, σ'⟩)).map (·.expr) =
       (execN m ⟨e, σ⟩).map (·.expr) := by
   induction n generalizing σ with
@@ -1220,7 +1220,7 @@ theorem execN_tapePresampleIter_expr_eq
 
 theorem execN_iterM_tape_presample_expr_eq
     {σ : State} {α : Loc} {e : Exp} {m : Nat} {t : Tape} (n : Nat)
-    (h : σ.tapes.1[α]? = some t) (hN : 0 < t.bound) :
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     (((Nat.rec (motive := fun _ => Measure State)
                 (Measure.dirac σ)
                 (fun _ μ => μ.bind (fun σ' => tapePresample σ' α))) n).bind
@@ -1243,7 +1243,7 @@ at the expression level. Derived from `execN_tape_presample_expr_eq` by
 monotone convergence via `lintegral_limExec`. -/
 theorem limExec_tape_presample_expr_eq
     {σ : State} {α : Loc} {t : Tape} {e : Exp}
-    (h : σ.tapes.1[α]? = some t) (hN : 0 < t.bound) :
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)).map (·.expr) =
       (limExec ⟨e, σ⟩).map (·.expr) := by
   -- We replay the `ErasableExpr.lim_exec` proof inline with
@@ -1313,7 +1313,7 @@ theorem dret (σ : State) : ErasableExpr (Measure.dirac σ) σ :=
 /-- `tapePresample σ α` is `ErasableExpr`. This is the main theorem
 `execN_tape_presample_expr_eq`, repackaged as an `ErasableExpr` witness. -/
 theorem tapePresample {σ : State} {α : Loc} {t : Tape}
-    (h : σ.tapes.1[α]? = some t) (hN : 0 < t.bound) :
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     ErasableExpr (tapePresample σ α) σ := by
   intro e m
   exact execN_tape_presample_expr_eq h hN
