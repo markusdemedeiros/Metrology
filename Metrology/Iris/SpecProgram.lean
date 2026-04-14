@@ -22,9 +22,15 @@ instance : COFE Val := COFE.ofDiscrete _ Eq_Equivalence
 instance : OFE.Discrete Val := ⟨id⟩
 instance (x : Val) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-abbrev SpecProg := Option (Excl Exp)
+abbrev SpecProg := Auth ℕ+ (Option (Excl Exp))
 abbrev SpecHeap := HeapView ℕ+ Loc (Agree Val) LocHeap
 abbrev SpecTapes := HeapView ℕ+ Loc (Agree Tape) LocHeap
+
+def SpecProg.auth (e : Exp) : SpecProg := ● (some <| .excl e)
+def SpecProg.frag (e : Exp) : SpecProg := ◯ (some <| .excl e)
+
+def LocHeap.asAgree [OFE V] (h : LocHeap V) : LocHeap (Agree V) :=
+  PartialMap.map LocHeap toAgree h
 
 class SpecPreGS (GF : BundledGFunctors) where
   prog : ElemG GF (constOF SpecProg)
@@ -42,6 +48,213 @@ section Resources
 
 variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
 
+def specProgAuth (e : Exp) : IProp GF := iOwn (E := ISpec.prog) ISpec.γprog (.auth e)
+def specProgFrag (e : Exp) : IProp GF := iOwn (E := ISpec.prog) ISpec.γprog (.frag e)
+
+def specHeapAuth (σ : LocHeap Val) : IProp GF :=
+  iOwn (E := ISpec.heap) ISpec.γheap (HeapView.Auth (.own 1) (LocHeap.asAgree σ))
+def specHeapFrag (ℓ : Loc) (v : Val) : IProp GF :=
+  iOwn (E := ISpec.heap) ISpec.γheap (HeapView.Frag ℓ (.own 1) (toAgree v))
+
+def specTapesAuth (σ : LocHeap Tape) : IProp GF :=
+  iOwn (E := ISpec.tapes) ISpec.γtapes (HeapView.Auth (.own 1) (LocHeap.asAgree σ))
+def specTapesFrag (ℓ : Loc) (t : Tape) : IProp GF :=
+  iOwn (E := ISpec.tapes) ISpec.γtapes (HeapView.Frag ℓ (.own 1) (toAgree t))
+
+def ProbLang.Cfg.specAuth (c : Cfg) : IProp GF :=
+  let ⟨e, ⟨σ, τ⟩⟩ := c
+  iprop(specProgAuth e ∗ specHeapAuth σ ∗ specTapesAuth τ)
+
+-- TODO: Add ⤇ to my Lean4 emacs mode (lol)
+-- TODO: Make ↪ less annoying to type too
+notation "⤇ " t:50 => specProgFrag t
+notation l:50 " ↦ₛ " v:50 => specHeapFrag l v
+notation l:50 " ↪ₛ " τ:50 => specTapesFrag l τ
+
 end Resources
 
+section Algebra
+
+variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
+
+open ProbLang Cfg
+
+theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp} (H : some (Excl.excl e1) ≼ some (Excl.excl e2)) :
+    e1 = e2 := by
+  have H' := Option.inc_iff.mp H
+  simp at H'
+  rcases H' with (H'|H')
+  · exact H'
+  · have H'' := excl_included.mp H'
+    simp at H''
+
+theorem specAuth_specFrag_agree {e1 e2 : Exp} {σ : State} :
+    ⊢@{IProp GF} specAuth ⟨e1, σ⟩ -∗ ⤇ e2 -∗ ⌜e1 = e2⌝ := by
+  unfold specAuth specProgAuth specProgFrag
+  iintro ⟨He, -, -⟩ Hf
+  ihave Hv := iOwn_cmraValid_op (E := ISpec.prog) $$ [He Hf]
+  · isplitl [He] <;> iassumption
+  ihave %hv := internalCmraValid_discrete (A := SpecProg) (PROP := IProp GF) $$ Hv
+  ipure_intro
+  obtain ⟨hinc, _⟩ := Auth.auth_both_valid_discrete.mp hv
+  exact some_excl_inc_excl_exp_eq hinc |>.symm
+
+theorem specProg_update {e1 e2 e3 : Exp} {σ : State} :
+    ⊢@{IProp GF} specAuth ⟨e1, σ⟩ -∗ ⤇ e2 ==∗ specAuth ⟨e3, σ⟩ ∗ ⤇ e3 := by
+  iintro Ha Hf
+  ihave %he := specAuth_specFrag_agree (GF := GF) $$ Ha Hf
+  subst he
+  unfold specAuth specProgAuth specProgFrag; simp only []
+  ihave ⟨He, Hh, Ht⟩ := Ha
+  have Hupd : SpecProg.frag e1 • SpecProg.auth e1 ~~> SpecProg.frag e3 • SpecProg.auth e3 :=
+    Auth.auth_update (.option (.exclusive trivial))
+  ihave Hu := iOwn_update_op (E := ISpec.prog) $$ [Hf He]
+  · exact Hupd
+  · isplitl [Hf] <;> iassumption
+  imod Hu
+  imodintro
+  ihave ⟨Hf, Ha⟩ := iOwn_op (E := ISpec.prog) $$ Hu
+  isplitr [Hf] <;> try iassumption
+  isplitl [Ha] <;> try iassumption
+  isplitl [Hh] <;> try iassumption
+
+
+/-
+  Lemma spec_auth_lookup_heap e1 σ1 l v dq:
+    spec_auth (e1, σ1) -∗ l ↦ₛ{dq} v -∗ ⌜σ1.(heap) !! l = Some v⌝.
+  Proof. iIntros "(_&H&_) H'/=". iApply (ghost_map_lookup with "H H'"). Qed.
+
+  Lemma spec_auth_heap_alloc e σ v :
+    spec_auth (e, σ) ==∗
+    spec_auth (e, state_upd_heap <[ fresh_loc σ.(heap) := v ]> σ) ∗ fresh_loc σ.(heap) ↦ₛ v.
+  Proof.
+    iIntros "(? & Hheap & ?) /=".
+    iMod (ghost_map_insert (fresh_loc σ.(heap)) with "Hheap") as "[Hheap Hl]".
+    { apply not_elem_of_dom, fresh_loc_is_fresh. }
+    by iFrame.
+  Qed.
+
+  Lemma spec_auth_update_heap w e1 σ1 l v :
+    spec_auth (e1, σ1) -∗ l ↦ₛ{#1} v ==∗
+    spec_auth (e1, state_upd_heap <[l:=w]> σ1) ∗ l ↦ₛ{#1} w.
+  Proof.
+    iIntros "(?&H&?) H' /=".
+    iMod (ghost_map_update with "H H'") as "?".
+    iModIntro. by iFrame.
+  Qed.
+
+  (** Tapes *)
+
+  Lemma spec_auth_lookup_tape e1 σ1 l v dq :
+    spec_auth (e1, σ1) -∗ l ↪ₛ{dq} v -∗ ⌜σ1.(tapes) !! l = Some v⌝.
+  Proof. iIntros "(_&_&H&_) H'/=". iApply (ghost_map_lookup with "H H'"). Qed.
+
+  Lemma spec_auth_update_tape w e1 σ1 l v :
+    spec_auth (e1, σ1) -∗ l ↪ₛ{#1} v ==∗
+    spec_auth (e1, state_upd_tapes <[l:=w]> σ1) ∗ l ↪ₛ{#1} w.
+  Proof.
+    iIntros "(?&?&H&?) H'/=".
+    iMod (ghost_map_update with "H H'") as "?".
+    iModIntro. by iFrame.
+  Qed.
+
+  Lemma spec_auth_tape_alloc e σ N :
+    spec_auth (e, σ) ==∗
+    spec_auth (e, state_upd_tapes <[fresh_loc σ.(tapes) := (N; [])]> σ) ∗ fresh_loc σ.(tapes) ↪ₛ (N; []).
+  Proof.
+    iIntros "(? & ? & Htapes & ?) /=".
+    iMod (ghost_map_insert (fresh_loc σ.(tapes)) with "Htapes") as "[H Hl]".
+    { apply not_elem_of_dom, fresh_loc_is_fresh. }
+    by iFrame.
+  Qed.
+
+  (** Laplace Tapes *)
+
+  Lemma spec_auth_lookup_tape_laplace e1 σ1 l v dq :
+    spec_auth (e1, σ1) -∗ l ↪Lₛ{dq} v -∗ ⌜σ1.(tapes_laplace) !! l = Some v⌝.
+  Proof. iIntros "(_&_&_&H) H'/=". iApply (ghost_map_lookup with "H H'"). Qed.
+
+  Lemma spec_auth_update_tape_laplace w e1 σ1 l v :
+    spec_auth (e1, σ1) -∗ l ↪Lₛ{#1} v ==∗
+    spec_auth (e1, state_upd_tapes_laplace <[l:=w]> σ1) ∗ l ↪Lₛ{#1} w.
+  Proof.
+    iIntros "(?&?&?&H) H'/=".
+    iMod (ghost_map_update with "H H'") as "?".
+    iModIntro. by iFrame.
+  Qed.
+
+  Lemma spec_auth_tape_laplace_alloc e σ num den mean :
+    spec_auth (e, σ) ==∗
+    spec_auth (e, state_upd_tapes_laplace <[fresh_loc σ.(tapes_laplace) := (Tape_Laplace num den mean [])]> σ) ∗ fresh_loc σ.(tapes_laplace) ↪Lₛ (num, den, mean; []).
+  Proof.
+    iIntros "(? & ? & ?&Htapes) /=".
+    iMod (ghost_map_insert (fresh_loc σ.(tapes_laplace)) with "Htapes") as "[H Hl]".
+    { apply not_elem_of_dom, fresh_loc_is_fresh. }
+    by iFrame.
+  Qed.
+
+End theory.
+
+Lemma spec_ra_init e σ `{specGpreS Σ} :
+  ⊢ |==> ∃ _ : specG_prob_lang Σ,
+      spec_auth (e, σ) ∗ ⤇ e ∗ ([∗ map] l ↦ v ∈ σ.(heap), l ↦ₛ v) ∗ ([∗ map] α ↦ t ∈ σ.(tapes), α ↪ₛ t) ∗ ([∗ map] α ↦ t ∈ σ.(tapes_laplace), α ↪Lₛ t).
+Proof.
+  iMod (own_alloc ((● (Excl' e)) ⋅ (◯ (Excl' e)))) as "(%γp & Hprog_auth & Hprog_frag)".
+  { by apply auth_both_valid_discrete. }
+  iMod (ghost_map_alloc σ.(heap)) as "[%γH [Hh Hls]]".
+  iMod (ghost_map_alloc σ.(tapes)) as "[%γT [Ht Hαs]]".
+  iMod (ghost_map_alloc σ.(tapes_laplace)) as "[%γTL [Htl Hαs']]".
+  iExists (SpecGS _ _ γp _ _ _ γH γT γTL).
+  by iFrame.
+Qed.
+
+(** Tapes containing natural numbers defined as a wrapper over backend tapes *)
+Definition nat_spec_tape `{specG_prob_lang Σ} l (N : nat) (ns : list nat) : iProp Σ :=
+  ∃ (fs : list (fin (S N))), ⌜fin_to_nat <$> fs = ns⌝ ∗ l ↪ₛ (N; fs).
+
+Notation "l ↪ₛN ( M ; ns )" := (nat_spec_tape l M ns)%I
+       (at level 20, format "l ↪ₛN ( M ; ns )") : bi_scope.
+
+Section spec_tape_interface.
+  Context `{!specG_prob_lang Σ}.
+
+  (** Helper lemmas to go back and forth between the user-level representation
+      of tapes (using nat) and the backend (using fin) *)
+
+  Lemma spec_tapeN_to_empty l M :
+    (l ↪ₛN ( M ; [] ) -∗ l ↪ₛ ( M ; [] )).
+  Proof.
+    iIntros "Hl".
+    iDestruct "Hl" as (?) "(%Hmap & Hl')".
+    by destruct (fmap_nil_inv _ _ Hmap).
+  Qed.
+
+
+  Lemma empty_to_spec_tapeN l M :
+    (l ↪ₛ ( M ; [] ) -∗ l ↪ₛN ( M ; [] )).
+  Proof.
+    iIntros "Hl".
+    iExists []. auto.
+  Qed.
+
+  Lemma read_spec_tape_head l M n ns :
+    (l ↪ₛN ( M ; n :: ns ) -∗
+      ∃ x xs, l ↪ₛ ( M ; x :: xs ) ∗ ⌜ fin_to_nat x = n ⌝ ∗
+              ( l ↪ₛ ( M ; xs ) -∗l ↪ₛN ( M ; ns ) )).
+  Proof.
+    iIntros "Hl".
+    iDestruct "Hl" as (xss) "(%Hmap & Hl')".
+    destruct (fmap_cons_inv _ _ _ _ Hmap) as (x&xs&->&Hxs&->).
+    iExists x, xs.
+    iFrame.
+    iSplit; auto.
+    iIntros.
+    iExists xs; auto.
+  Qed.
+
+End spec_tape_interface.
+
+-/
+
+end Algebra
 end SpecRA
