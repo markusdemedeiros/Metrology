@@ -224,9 +224,7 @@ theorem open_close_to_subst (e : Exp) (x y : Var) (k : Nat) (he : IsLocallyClose
         rw [h]; exact Finset.mem_union_right _ (by simp))
       have hx'y : x' ≠ y := fun h => hx' (by
         rw [h]; exact Finset.mem_union_right _ (by simp))
-      -- IH at fresh x', depth k+1, on open' t (fvar x')
       have hih := ih x' hx'L (k+1)
-      -- Reshape both sides to use open_injective.
       have hLfv : x' ∉ (openRec (k+1) (fvar y) (closeRec (k+1) x t)).fv :=
         open_fresh_preserve_not_fvar _ (close_preserve_not_fvar _ hx'fv) hx'y
       have hRfv : x' ∉ (subst t x (fvar y)).fv := by
@@ -236,8 +234,6 @@ theorem open_close_to_subst (e : Exp) (x y : Var) (k : Nat) (he : IsLocallyClose
         intro h
         rw [Finset.mem_singleton] at h
         exact hx'y h
-      -- Goal: openRec (k+1) (fvar y) (closeRec (k+1) x t) = subst t x (fvar y)
-      -- Prove the open'-applied equality and then use open_injective.
       have hLHS :
           open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
             = openRec (k+1) (fvar y) (closeRec (k+1) x (open' t (fvar x'))) := by
@@ -305,22 +301,9 @@ theorem open_close_subst_lc_gen (x : Var) (e v : Exp)
   have hzx : z ≠ x := fun h => hz (h ▸ Finset.mem_insert_self _ _)
   have hze : z ∉ e.fv := fun h => hz (Finset.mem_insert_of_mem (Finset.mem_union_left _ h))
   have hzv : z ∉ v.fv := fun h => hz (Finset.mem_insert_of_mem (Finset.mem_union_right _ h))
-  -- close e x has z ∉ fv (since z ∉ e.fv and close only removes fvars).
   have hzcl : z ∉ (close e x).fv := close_preserve_not_fvar e hze
-  -- subst_intro: open' (close e x) v = subst (open' (close e x) (fvar z)) z v.
   rw [subst_intro z v (close e x) hzcl hv]
-  -- open' (close e x) (fvar z) = subst e x (fvar z) by open_close_subst_lc.
   rw [open_close_subst_lc x z e he]
-  -- Now the goal is: subst (subst e x (fvar z)) z v = subst e x v.
-  -- Use subst_subst to commute, exploiting hzv (z ∉ v.fv) and hze (z ∉ e.fv).
-  -- subst_subst: subst (subst e x v_inner) y v_outer
-  --                = subst (subst e y v_outer) x (subst v_inner y v_outer)
-  -- with x → x, y → z, v_inner → fvar z, v_outer → v, side cond: x ≠ z, x ∉ v.fv? No.
-  -- Easier: directly induct on e, but better — use that z ∉ subst e x (fvar z).fv
-  -- is false (we just put z in!). Instead, use subst_subst_ne style:
-  -- Substitute z by v in subst e x (fvar z): the only z is the one we just put in,
-  -- so it becomes v, giving subst e x v.
-  -- This is provable by induction on e. Let me use a direct lemma:
   have aux : ∀ (e : Exp), z ∉ e.fv →
       subst (subst e x (fvar z)) z v = subst e x v := by
     intro e hze

@@ -1,5 +1,5 @@
 import Metrology.ProbLang.Syntax.Syntax
-import Metrology.ProbLang.Syntax.Properties
+import Metrology.ProbLang.Syntax.LocallyClosed
 import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Exec

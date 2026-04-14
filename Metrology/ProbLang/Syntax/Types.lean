@@ -1,5 +1,5 @@
 import Metrology.ProbLang.Syntax.Syntax
-import Metrology.ProbLang.Syntax.Properties
+import Metrology.ProbLang.Syntax.LocallyClosed
 
 /-!
 # Syntactic typing for ProbLang (System F_μ_ref with tapes) — LN edition
