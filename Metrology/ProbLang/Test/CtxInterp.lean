@@ -938,9 +938,9 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 
 -- The notation `case e | ...` desugars through scrut, but raw .case only
 -- handles inl/inr.  Build a raw .case with a literal scrutinee directly.
+-- Under LN: each branch is a `lam` whose body uses `bvar 0`.
 #eval checkErrorMsg "raw case on int"
-  (Exp.case (.lit (.int 5)) (.letrec .anon (.named "x") (.var "x"))
-                             (.letrec .anon (.named "y") (.var "y")))
+  (Exp.case (.lit (.int 5)) (.lam (.bvar 0)) (.lam (.bvar 0)))
   "stuck"
 
 -- ---------------------------------------------------------------------------
@@ -948,7 +948,7 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 -- ---------------------------------------------------------------------------
 
 #eval checkErrorMsg "free variable"
-  (.binop .plus (.var "x") (.lit (.int 1)))
+  (.binop .plus (.fvar "unbound_x") (.lit (.int 1)))
   "stuck"
 
 -- ---------------------------------------------------------------------------
@@ -970,13 +970,15 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 -- Letrec: self-reference vs parameter name collision
 -- ---------------------------------------------------------------------------
 
--- `rec f f := f` — headStep does `subst f #42 (subst f (rec f f := f) (var "f"))`.
--- Inner subst: replaces `f` in body with the letrec itself → `rec f f := f`.
--- Outer subst: tries to replace `f` in the letrec, but both binders (`f` as
--- rec name and `f` as param) block substitution.  Result: the letrec unchanged.
+-- `rec f f := f` — under LN with counter-based atoms, the two `f` binders
+-- get distinct atoms (no shadowing pathology). Inner `f` (the parameter)
+-- shadows the outer (recursive self) lexically: body `f` refers to the
+-- innermost `f`, which is the parameter. So `(rec f f := f) #42` reduces:
+-- app (fix (lam body)) #42 → app (open body fix-self) #42 →
+-- (lam body') #42 → open body' #42 = #42.
 #eval check "rec f f name collision"
   pl((rec f f := f) #42)
-  pl(rec f f := f)
+  pl(#42)
 
 -- ---------------------------------------------------------------------------
 -- Typed binders

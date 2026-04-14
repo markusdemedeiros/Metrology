@@ -1,4 +1,5 @@
 import Metrology.ProbLang.Syntax.Syntax
+import Metrology.ProbLang.Syntax.Properties
 import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Exec
@@ -7,7 +8,6 @@ import Mathlib.MeasureTheory.MeasurableSpace.Defs
 import Mathlib.Probability.ProbabilityMassFunction.Basic
 import Mathlib.Probability.Kernel.Defs
 import Mathlib.Probability.Distributions.Uniform
-
 
 noncomputable section
 
@@ -22,7 +22,8 @@ class abbrev SLangType (T : Type) := Countable T, MeasurableSpace T, MeasurableS
 class ProbLangEmbeddable (T : Type _) where
   as_expr : T → Exp
   as_expr_isVal : ∀ t, IsVal (as_expr t)
-export ProbLangEmbeddable (as_expr as_expr_isVal)
+  as_expr_lc : ∀ t, Exp.IsLocallyClosed (as_expr t)
+export ProbLangEmbeddable (as_expr as_expr_isVal as_expr_lc)
 
 /-! ## Discrete measure theory helpers -/
 
@@ -152,14 +153,14 @@ theorem limExec_app {ef e : Exp} {σ : State} :
     limExec ⟨.app ef e, σ⟩ = (limExec ⟨e, σ⟩).bind (fun c => limExec ⟨.app ef c.expr, c.state⟩) :=
   limExec_fill_item (.appR ef)
 
-theorem limExec_beta {x : Binder} {body v : Exp} {σ : State} (hv : IsVal v) :
-    limExec ⟨.app (.letrec .anon x body) v, σ⟩ = limExec ⟨Exp.subst x v body, σ⟩ := by
-  have hnv : ¬ (Exp.app (.letrec .anon x body) v).isValue := by intro ⟨h⟩; cases h
+theorem limExec_beta {body v : Exp} {σ : State} (hv : IsVal v) :
+    limExec ⟨.app (.lam body) v, σ⟩ = limExec ⟨Exp.open' body v, σ⟩ := by
+  have hnv : ¬ (Exp.app (.lam body) v).isValue := by intro ⟨h⟩; cases h
   rw [limExec_not_final hnv]
-  have hred : ∃ ρ, 0 < headStep ⟨.app (.letrec .anon x body) v, σ⟩ {ρ} := by
-    refine ⟨⟨Exp.subst x v body, σ⟩, ?_⟩; simp [headStep, Exp.isValM_some' hv, Exp.subst]
+  have hred : ∃ ρ, 0 < headStep ⟨.app (.lam body) v, σ⟩ {ρ} := by
+    refine ⟨⟨Exp.open' body v, σ⟩, ?_⟩; simp [headStep, Exp.isValM_some' hv]
   rw [primStep_eq_headStep hred]
-  simp [headStep, Exp.isValM_some' hv, Exp.subst, Measure.dirac_bind Measurable.of_discrete]
+  simp [headStep, Exp.isValM_some' hv, Measure.dirac_bind Measurable.of_discrete]
 
 /-! ## ProbLang combinators -/
 
@@ -193,7 +194,9 @@ def probLangAnd (e1 e2 : Exp) : Exp := .binop .and e1 e2
 -- Control flow
 def probLangCond (ec et ef : Exp) : Exp := .cond ec et ef
 def probLangApp (ef ea : Exp) : Exp := .app ef ea
-def probLangLam (x : String) (body : Exp) : Exp := .letrec .anon (.named x) body
+/-- Build a lambda from an atom-indexed body: user passes `body` using `fvar x`,
+    we close over the atom to produce `lam (close body x)`. -/
+def probLangLam (x : Var) (body : Exp) : Exp := .lam (Exp.close body x)
 
 theorem probLangPure_isEmbedding [SLangType T] [ProbLangEmbeddable T] {t : T} :
     IsEmbedding (probPure t) (probLangPure t) := by
@@ -223,32 +226,39 @@ theorem probLangPure_isEmbedding [SLangType T] [ProbLangEmbeddable T] {t : T} :
       intro a; split_ifs <;> simp_all
   · simp [hσ]
 
-def probLangBind (x : Binder) (e1 e2 : Exp) : Exp :=
-  .app (.letrec .anon x e2) e1
+/-- LN bind: `let x := e1; body` desugars to `app (lam (close body x)) e1`.
+    Caller passes the body open at atom `x`; we close it. -/
+def probLangBind (x : Var) (e1 body : Exp) : Exp :=
+  .app (.lam (Exp.close body x)) e1
 
 theorem probLangBind_isEmbedding [SLangType T] [ProbLangEmbeddable T] [SLangType U]
-    [ProbLangEmbeddable U] {s1 : SLang T} {s2 : T → SLang U} {e1 body : Exp} {x : String}
-    (h1 : IsEmbedding s1 e1) (h2 : ∀ t, IsEmbedding (s2 t) (Exp.subst (.named x) (as_expr t) body))
-    -- TODO: Does freshness matter? I mean it must, right?
-    (_hfresh : Fresh x e1) :
-    IsEmbedding (probBind s1 s2) (probLangBind (.named x) e1 body) := by
+    [ProbLangEmbeddable U] {s1 : SLang T} {s2 : T → SLang U} {e1 body : Exp} {x : Var}
+    (hbody : Exp.IsLocallyClosed body)
+    (h1 : IsEmbedding s1 e1)
+    (h2 : ∀ t, IsEmbedding (s2 t) (Exp.subst body x (as_expr t))) :
+    IsEmbedding (probBind s1 s2) (probLangBind x e1 body) := by
   intro σ
   rw [probLangBind, limExec_app, h1 σ]
   unfold SLang.spec
   rw [Measure.bind_map .of_discrete .of_discrete, Measure.bind_map .of_discrete .of_discrete]
-  -- Rewrite the kernel: limExec_beta + h2
+  -- Rewrite the kernel: limExec_beta puts us at `open' (close body x) (as_expr t)`,
+  -- which equals `subst body x (as_expr t)` by `open_close_subst_lc_gen`.
   conv_lhs =>
     arg 2; ext t; simp only [Function.comp]
-    rw [limExec_beta (as_expr_isVal t), h2 t σ]
+    rw [limExec_beta (as_expr_isVal t),
+        Exp.open_close_subst_lc_gen x body (as_expr t) hbody (as_expr_lc t),
+        h2 t σ]
   unfold SLang.spec
   have fuse : ∀ (μ : Measure U),
       (μ.map as_expr).map (fun e => (⟨e, σ⟩ : Cfg)) =
       (fun u => dirac (⟨as_expr u, σ⟩ : Cfg)) ∘ₘ μ := by
     intro μ
-    rw [← Measure.bind_dirac_eq_map _ Measurable.of_discrete, Measure.bind_map .of_discrete .of_discrete]; rfl
+    rw [← Measure.bind_dirac_eq_map _ Measurable.of_discrete,
+        Measure.bind_map .of_discrete .of_discrete]; rfl
   simp_rw [fuse]
   rw [← SLang.count_bind_probBind,
-      Measure.bind_bind Measurable.of_discrete.aemeasurable Measurable.of_discrete.aemeasurable]
+      Measure.bind_bind Measurable.of_discrete.aemeasurable
+        Measurable.of_discrete.aemeasurable]
 
 /-! ## Uniform byte embedding -/
 
@@ -259,6 +269,7 @@ instance : MeasurableSingletonClass UInt8 := ⟨fun _ => trivial⟩
 instance : ProbLangEmbeddable UInt8 where
   as_expr u := .lit (.int u.toNat)
   as_expr_isVal _ := .lit
+  as_expr_lc _ := .lit _
 
 -- ProbLang expression: rand 255 ()
 -- Cfg.uniform 256 σ samples uniformly from Finset.Ico 0 256 = {0,...,255}
@@ -357,35 +368,25 @@ theorem probLangUniformByte_isEmbedding :
 /-! ## While loop embedding -/
 
 /--
-  Translation of `probWhile cond body init`:
-    (letrec f x = if (condE x) then (let v := bodyE x; f v) else x) initE
+  LN translation of `probWhile cond body init`:
+    `(rec f x = if condE x then let v := bodyE x; f v else x) initE`
 
-  where `condE`, `bodyE`, `initE` are ProbLang embeddings of `cond`, `body`, `init`.
--/
-def probLangWhile (f x v : String) (condE bodyE initE : Exp) : Exp :=
-  .app
-    (.letrec (.named f) (.named x)
-      (.cond condE  -- condition on x
-        (probLangBind (.named v) (.app bodyE (.var x)) (.app (.var f) (.var v)))
-        (.var x)))
-    initE
-
--- probWhile cond body init : SLang T
--- cond : T → Bool, body : T → SLang T, init : T
--- We need:
---   condE : Exp such that ∀ t, limExec ⟨app condE (as_expr t), σ⟩ = dirac ⟨.lit (.bool (cond t)), σ⟩
---   bodyE : Exp such that ∀ t, IsEmbedding (body t) (app bodyE (as_expr t))
---   initE : Exp such that IsEmbedding (probPure init) initE
---
--- Then: IsEmbedding (probWhile cond body init) (probLangWhile f x v condE bodyE initE)
--- under appropriate freshness conditions on f, x, v.
+  Atoms `f`, `x`, `v` are passed in as `Var`s; the body is built in terms of
+  `fvar f / fvar x / fvar v` and then closed at the appropriate boundaries. -/
+def probLangWhile (f x v : Var) (condE bodyE initE : Exp) : Exp :=
+  -- Inner body: if condE x then let v := bodyE x; f v else x
+  let body : Exp :=
+    .cond condE
+      (probLangBind v (.app bodyE (.fvar x)) (.app (.fvar f) (.fvar v)))
+      (.fvar x)
+  -- Wrap in `fix f. lam x. body`: close body over x then over f.
+  .app (.fix (Exp.close (.lam (Exp.close body x)) f)) initE
 
 theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
     {cond : T → Bool} {body : T → SLang T} {init : T}
-    {condE bodyE : Exp} {f x v : String}
+    {condE bodyE : Exp} {f x v : Var}
     (hcond : ∀ t σ, limExec ⟨.app condE (as_expr t), σ⟩ = dirac ⟨.lit (.bool (cond t)), σ⟩)
     (hbody : ∀ t, IsEmbedding (body t) (.app bodyE (as_expr t)))
-    (_hfresh : True)  -- TODO: freshness conditions on f, x, v
     :
     IsEmbedding (probWhile cond body init) (probLangWhile f x v condE bodyE (as_expr init)) := by
   sorry
@@ -406,12 +407,13 @@ instance : MeasurableSingletonClass Bool := ⟨fun _ => trivial⟩
 instance : ProbLangEmbeddable Bool where
   as_expr b := .lit (.bool b)
   as_expr_isVal _ := .lit
+  as_expr_lc _ := .lit _
 
-/-- ProbLang translation: let a := rand 255 (); let b := rand 255 (); a = b -/
+/-- ProbLang translation: `let a := rand 255 (); let b := rand 255 (); a = b`. -/
 def plTwoByteEq : Exp :=
-  probLangBind (.named "a") probLangUniformByte $
-    probLangBind (.named "b") probLangUniformByte $
-      probLangEq (.var "a") (.var "b")
+  probLangBind "a" probLangUniformByte $
+    probLangBind "b" probLangUniformByte $
+      probLangEq (.fvar "a") (.fvar "b")
 
 -- The ProbLang equality operator on embedded UInt8 values computes the same Bool.
 -- After substitution, probLangEq (as_expr a) (as_expr b) = .binop .eq (.lit (.int a.toNat)) (.lit (.int b.toNat))
@@ -443,33 +445,45 @@ theorem probLangEq_uint8_isEmbedding (a b : UInt8) :
 
 /-- Main theorem: plTwoByteEq is an embedding of twoByteEq. -/
 theorem twoByteEq_isEmbedding : IsEmbedding twoByteEq plTwoByteEq := by
-  -- twoByteEq = probBind probUniformByte (fun a => probBind probUniformByte (fun b => probPure (a == b)))
-  -- plTwoByteEq = probLangBind "a" probLangUniformByte (probLangBind "b" probLangUniformByte (probLangEq (var "a") (var "b")))
-  -- Step 1: outer bind — probLangBind_isEmbedding with s1 = probUniformByte, e1 = probLangUniformByte
   unfold twoByteEq plTwoByteEq
   show IsEmbedding (probBind probUniformByte fun a => probBind probUniformByte fun b => probPure (a == b)) _
+  -- Outer bind: `let a := byte; <body>`
   apply probLangBind_isEmbedding
-  -- h1: IsEmbedding probUniformByte probLangUniformByte
-  · exact probLangUniformByte_isEmbedding
-  -- h2: ∀ a, IsEmbedding (fun b => probBind probUniformByte (fun b' => probPure (a == b')))
-  --                       (subst "a" (as_expr a) (probLangBind "b" probLangUniformByte (probLangEq (var "a") (var "b"))))
-  · intro a
-    -- After substituting as_expr a for "a":
-    --   probLangBind "b" probLangUniformByte (probLangEq (as_expr a) (var "b"))
-    -- (since "a" doesn't appear in probLangUniformByte, and substitution in the eq replaces var "a")
-    simp [probLangBind, probLangEq, probLangUniformByte, Exp.subst, Exp.subst', Binder.binds]
-    -- Goal: IsEmbedding (probBind probUniformByte (fun b => probPure (a == b)))
-    --         (.app (.letrec .anon (.named "b") (.binop .eq (as_expr a) (.var "b"))) (.rand (.lit (.int 255)) (.lit .unit)))
-    -- This is probLangBind "b" probLangUniformByte (probLangEq (as_expr a) (.var "b"))
+  · -- hbody : LC of the outer body = `probLangBind 1 byte (eq (fvar 0) (fvar 1))`
+    -- This is `app (lam (close (eq (fvar 0) (fvar 1)) 1)) byte`. All literals + binops + lam → LC.
+    unfold probLangBind probLangUniformByte probLangEq
+    refine .app (.lam ∅ _ (fun _ _ => ?_)) (.rand (.lit _) (.lit _))
+    -- After opening the lam at fresh y: open' (close (eq (fvar 0) (fvar 1)) 1) (fvar y)
+    -- = subst (eq (fvar 0) (fvar 1)) 1 (fvar y) by open_close_subst_lc.
+    -- = eq (fvar 0) (fvar y). Both args are fvar → LC.
+    rw [Exp.open_close_subst_lc]
+    · exact .binop _ (.fvar _) (.fvar _)
+    · exact .binop _ (.fvar _) (.fvar _)
+  · -- h1 : IsEmbedding probUniformByte probLangUniformByte
+    exact probLangUniformByte_isEmbedding
+  · -- h2 : ∀ a, IsEmbedding (...) (subst <body> "a" (as_expr a))
+    intro a
+    have hgoal : Exp.subst (probLangBind "b" probLangUniformByte
+                              (probLangEq (.fvar "a") (.fvar "b"))) "a" (as_expr a)
+        = probLangBind "b" probLangUniformByte (probLangEq (as_expr a) (.fvar "b")) := by
+      unfold probLangBind probLangUniformByte probLangEq
+      simp only [Exp.subst, Exp.close, Exp.closeRec]
+      rfl
+    rw [hgoal]
     apply probLangBind_isEmbedding
+    · exact .binop _ (as_expr_lc a) (.fvar _)
     · exact probLangUniformByte_isEmbedding
     · intro b
-      simp [Exp.subst, Exp.subst']
+      have ha_subst : Exp.subst (as_expr a) "b" (as_expr b) = as_expr a := by
+        apply Exp.subst_fresh
+        intro h; simp [Exp.fv] at h
+      have hgoal2 : Exp.subst (probLangEq (as_expr a) (.fvar "b")) "b" (as_expr b)
+          = probLangEq (as_expr a) (as_expr b) := by
+        unfold probLangEq
+        simp only [Exp.subst]
+        rfl
+      rw [hgoal2]
       exact probLangEq_uint8_isEmbedding a b
-    · unfold Fresh; exact ⟨trivial, trivial⟩
-  -- hfresh: Fresh "a" probLangUniformByte
-  · unfold probLangUniformByte Fresh
-    exact ⟨trivial, trivial⟩
 
 end EmbedSLang
 end

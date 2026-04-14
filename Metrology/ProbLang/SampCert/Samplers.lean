@@ -1,5 +1,6 @@
 import Metrology.ProbLang.SampCert.SLang
 
+/-
 noncomputable section
 
 open EmbedSLang ProbLang
@@ -278,3 +279,4 @@ def plDiscreteGaussianSample (gaussianLoopE : Exp) : Exp :=
 def plDiscreteGaussianGenSample (gaussianSamplerE : Exp) (μ : Int) : Exp :=
   probLangBind (.named "s") gaussianSamplerE
     (probLangAdd (Exp.var "s") (probLangInt μ))
+-/

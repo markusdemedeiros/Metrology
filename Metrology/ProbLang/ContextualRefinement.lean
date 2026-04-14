@@ -32,10 +32,19 @@ open MeasureTheory
 /-! ## Single-frame context items -/
 
 /-- A single-frame evaluation-context hole. Every constructor corresponds
-to a position in an `Exp` where a sub-expression could sit. -/
+to a position in an `Exp` where a sub-expression could sit.
+
+Under locally-nameless, binder frames carry the atoms to close over. For
+`lam x` the hole is the body (open at `x`); `fill` closes: `.lam (close hole x)`.
+`fix f` is similar. The Clutch `letrec f x body` corresponds to `fix f .
+lam x . body`, i.e. two nested `CtxItem` frames: `fix f :: lam x :: K`. -/
 inductive CtxItem
-  -- Base lambda calculus
-  | letrec (f x : Binder)
+  -- Base lambda calculus: `lam x` frame takes body open at atom `x`.
+  | lam (x : Var)
+  -- `fix f` frame: body is a `.lam …` open at recursive atom `f`.
+  | fix (f : Var)
+  -- `Λ` frame (anonymous lam for type abstraction).
+  | tlam
   | appL (e2 : Exp)
   | appR (e1 : Exp)
   -- Base types and their operations
@@ -64,13 +73,14 @@ inductive CtxItem
   -- Recursive types (Fold is subsumption, Unfold wraps in `recUnfold`)
   | fold
   | unfold
-  -- Polymorphic types (Λ: = letrec anon anon; TApp = app · unit)
-  | tlam
+  -- TApp = app · unit
   | tapp
-  -- Existential types: unpack x := e in e' = app (λ x, e') e
-  -- (we have no explicit PACK frame, matching Clutch)
-  | unpackL (x : String) (e2 : Exp)
-  | unpackR (x : String) (e1 : Exp)
+  -- Existential types: unpack x := e in e2 = app (lam e2_closed_over_x) e.
+  -- `unpackL x e2`: hole fills in for the `e` scrutinee; `x` atom says how
+  -- to close `e2` into a lam. `unpackR x e1`: hole fills in for the body
+  -- `e2` (which is open at `x`); `e1` is the scrutinee.
+  | unpackL (x : Var) (e2 : Exp)
+  | unpackR (x : Var) (e1 : Exp)
   -- Tapes
   | allocTape
   | randL (e2 : Exp)
@@ -80,7 +90,11 @@ namespace CtxItem
 
 /-- Fill the hole in a single context frame. -/
 def fill : CtxItem → Exp → Exp
-  | .letrec f x,     e => .letrec f x e
+  -- LN binders: close the hole over the stored atom.
+  | .lam x,          e => .lam (Exp.close e x)
+  | .fix f,          e => .fix (Exp.close e f)
+  -- tlam is an anonymous `lam`: the hole body doesn't reference the binder.
+  | .tlam,           e => .lam e
   | .appL e2,        e => .app e e2
   | .appR e1,        e => .app e1 e
   | .unop op,        e => .unop op e
@@ -106,13 +120,13 @@ def fill : CtxItem → Exp → Exp
   | .fold,           e => e
   -- Unfold wraps in `recUnfold` (Clutch: `| CTX_Unfold => rec_unfold e`)
   | .unfold,         e => .app _root_.ProbLang.recUnfold e
-  -- Λ: e = letrec anon anon e
-  | .tlam,           e => .letrec .anon .anon e
   -- TApp e = app e ()
   | .tapp,           e => .app e (.lit .unit)
-  -- unpack: x := e in e2 = app (λ x, e2) e
-  | .unpackL x e2,   e => .app (.letrec .anon (.named x) e2) e
-  | .unpackR x e1,   e => .app (.letrec .anon (.named x) e) e1
+  -- unpack: x := e in e2 = app (lam (close e2 x)) e
+  -- unpackL: hole is the scrutinee `e`; `e2` already stored.
+  | .unpackL x e2,   e => .app (.lam (Exp.close e2 x)) e
+  -- unpackR: hole is the body `e2` (open at `x`); `e1` is the scrutinee.
+  | .unpackR x e1,   e => .app (.lam (Exp.close e x)) e1
   | .allocTape,      e => .tape e
   | .randL e2,       e => .rand e e2
   | .randR e1,       e => .rand e1 e
@@ -151,10 +165,14 @@ end Ctx
 in context `Γ` into the frame `k` produces an expression of type `τ'`
 in context `Γ'`. Direct 1:1 port of Clutch's `typed_ctx_item`. -/
 inductive TypedCtxItem : CtxItem → Tctx → Ty → Tctx → Ty → Prop
-  -- Base lambda calculus
-  | letrec {Γ τ τ' f x} :
-      TypedCtxItem (.letrec f x)
-        ((Γ.insertB f (.arrow τ τ')).insertB x τ) τ'
+  -- Base lambda calculus: `lam x` (open at `x : τ1`) producing `τ1 → τ2`.
+  -- The atom `x` must not appear free in the hole (a freshness invariant
+  -- that callers must establish; trivially true for elaborator-built holes).
+  | lam {Γ x τ τ'} :
+      TypedCtxItem (.lam x) (Γ.insert x τ) τ' Γ (.arrow τ τ')
+  -- `fix f`: body has type `τ → τ'` open at `f : τ → τ'`.
+  | fix {Γ f τ τ'} :
+      TypedCtxItem (.fix f) (Γ.insert f (.arrow τ τ')) (.arrow τ τ')
         Γ (.arrow τ τ')
   | appL {Γ e2 τ τ'} :
       Typed Γ e2 τ →
@@ -239,11 +257,14 @@ inductive TypedCtxItem : CtxItem → Tctx → Ty → Tctx → Ty → Prop
       TypedCtxItem .tlam Γ.shift τ Γ (.forall' τ)
   | tapp {Γ τ τ'} :
       TypedCtxItem .tapp Γ (.forall' τ) Γ (τ.single τ')
-  -- No explicit PACK frame, matching Clutch.
-  | unpackL {x e2 Γ τ τ2} :
+  -- No explicit PACK frame, matching Clutch. The freshness premise
+  -- `x ∉ e2.fv` is required to discharge the cofinite premise of
+  -- `Typed.tunpack` when `fill_typed` plugs an expression in.
+  | unpackL {x : Var} {e2 Γ τ τ2} :
+      x ∉ e2.fv →
       Typed ((Γ.shift).insert x τ) e2 τ2.shift →
       TypedCtxItem (.unpackL x e2) Γ (.exists' τ) Γ τ2
-  | unpackR {x e1 Γ τ τ2} :
+  | unpackR {x : Var} {e1 Γ τ τ2} :
       Typed Γ e1 (.exists' τ) →
       TypedCtxItem (.unpackR x e1)
         ((Γ.shift).insert x τ) τ2.shift Γ τ2
@@ -272,13 +293,109 @@ inductive TypedCtx : Ctx → Tctx → Ty → Tctx → Ty → Prop
 
 /-! ## Basic metatheory -/
 
+/-- Atoms appearing as binder positions in a context frame. Used to state
+    freshness preconditions on the hole expression. -/
+def CtxItem.binderAtoms : CtxItem → Finset Var
+  | .lam x => {x}
+  | .fix f => {f}
+  | .unpackL x _ => {x}
+  | .unpackR x _ => {x}
+  | _ => ∅
+
+/-- Free variables of any expressions stored in the frame's payload. -/
+def CtxItem.payloadFv : CtxItem → Finset Var
+  | .appL e2 => e2.fv
+  | .appR e1 => e1.fv
+  | .binopL _ e2 => e2.fv
+  | .binopR _ e1 => e1.fv
+  | .ifL e1 e2 => e1.fv ∪ e2.fv
+  | .ifM e0 e2 => e0.fv ∪ e2.fv
+  | .ifR e0 e1 => e0.fv ∪ e1.fv
+  | .pairL e2 => e2.fv
+  | .pairR e1 => e1.fv
+  | .caseL e1 e2 => e1.fv ∪ e2.fv
+  | .caseM e0 e2 => e0.fv ∪ e2.fv
+  | .caseR e0 e1 => e0.fv ∪ e1.fv
+  | .storeL e2 => e2.fv
+  | .storeR e1 => e1.fv
+  | .unpackL _ e2 => e2.fv
+  | .unpackR _ e1 => e1.fv
+  | .randL e2 => e2.fv
+  | .randR e1 => e1.fv
+  | _ => ∅
+
+/-- Closing a free variable can only remove atoms from the fv set. -/
+theorem Exp.closeRec_fv_subset (e : Exp) (x : Var) (k : Nat) (y : Var)
+    (hy : y ∈ (Exp.closeRec k x e).fv) : y ∈ e.fv := by
+  induction e generalizing k with
+  | bvar _ => simp [Exp.closeRec, Exp.fv] at hy
+  | fvar z =>
+      simp [Exp.closeRec] at hy
+      by_cases hxz : x = z
+      · rw [if_pos hxz] at hy; simp [Exp.fv] at hy
+      · rw [if_neg hxz] at hy; exact hy
+  | lit _ | fail => simp [Exp.closeRec, Exp.fv] at hy
+  | lam e ih | fix e ih =>
+      simp only [Exp.closeRec, Exp.fv] at hy ⊢
+      exact ih (k+1) hy
+  | unop _ e ih | fst e ih | snd e ih
+  | inl e ih | inr e ih | alloc e ih | load e ih | tape e ih | scrut e _ ih =>
+      simp only [Exp.closeRec, Exp.fv] at hy ⊢
+      exact ih k hy
+  | app e1 e2 ih1 ih2 | binop _ e1 e2 ih1 ih2 | pair e1 e2 ih1 ih2
+  | store e1 e2 ih1 ih2 | rand e1 e2 ih1 ih2 =>
+      simp only [Exp.closeRec, Exp.fv, Finset.mem_union] at hy ⊢
+      rcases hy with h | h
+      · exact .inl (ih1 k h)
+      · exact .inr (ih2 k h)
+  | cond e0 e1 e2 ih0 ih1 ih2 | case e0 e1 e2 ih0 ih1 ih2 =>
+      simp only [Exp.closeRec, Exp.fv, Finset.mem_union] at hy ⊢
+      rcases hy with (h | h) | h
+      · exact .inl (.inl (ih0 k h))
+      · exact .inl (.inr (ih1 k h))
+      · exact .inr (ih2 k h)
+
+theorem Exp.close_fv_subset (e : Exp) (x : Var) :
+    (Exp.close e x).fv ⊆ e.fv :=
+  fun y hy => Exp.closeRec_fv_subset e x 0 y hy
+
+/-- The free variables of `k.fill body` are contained in the union of
+    `k`'s payload fvs and the body's fvs (binder-induced removals only
+    decrease the set). -/
+theorem CtxItem.fv_fill_subset (k : CtxItem) (body : Exp) :
+    (k.fill body).fv ⊆ k.payloadFv ∪ body.fv := by
+  intro y hy
+  cases k <;>
+    simp only [CtxItem.fill, CtxItem.payloadFv, Exp.fv,
+      Finset.mem_union, Finset.empty_union, ProbLang.recUnfold] at hy ⊢
+  all_goals first
+    | tauto
+    | (rename_i x; exact Exp.close_fv_subset _ x hy)
+    | (rename_i x e2; rcases hy with h | h
+       · exact Or.inl (Exp.close_fv_subset _ x h)
+       · exact Or.inr h)
+    | (rename_i x e1; rcases hy with h | h
+       · exact Or.inr (Exp.close_fv_subset _ x h)
+       · exact Or.inl h)
+
 /-- Plugging a well-typed term into a well-typed single frame produces a
-well-typed term. (Clutch `typed_ctx_item_typed`.) -/
+well-typed term. (Clutch `typed_ctx_item_typed`.)
+
+For the binder frames (`lam`/`fix`/`unpackL`/`unpackR`), this requires the
+frame's binder atom to be fresh in the hole. Elaborator-built frames
+satisfy this automatically since binder atoms come from the `freshAtom`
+counter and never appear in user expressions. -/
 theorem TypedCtxItem.fill_typed {k : CtxItem} {Γ τ Γ' τ' e}
-    (he : Typed Γ e τ) (hk : TypedCtxItem k Γ τ Γ' τ') :
+    (he : Typed Γ e τ) (hk : TypedCtxItem k Γ τ Γ' τ')
+    (hfresh : ∀ x ∈ k.binderAtoms, x ∉ e.fv) :
     Typed Γ' (k.fill e) τ' := by
   induction hk with
-  | letrec      => exact .letrec he
+  | @lam Γ x τ τ' =>
+      have hxfv : x ∉ e.fv := hfresh x (by simp [CtxItem.binderAtoms])
+      exact Typed.lam (insert x e.fv) (Typed.rename_lam hxfv he)
+  | @fix Γ f τ τ' =>
+      have hffv : f ∉ e.fv := hfresh f (by simp [CtxItem.binderAtoms])
+      exact Typed.fix (insert f e.fv) (Typed.rename_fix hffv he)
   | appL h2     => exact .app he h2
   | appR h1     => exact .app h1 he
   | unop_int hop       => exact .unop_int he hop
@@ -309,22 +426,78 @@ theorem TypedCtxItem.fill_typed {k : CtxItem} {Γ τ Γ' τ' e}
   | unfold      => exact (.tunfold he : Typed _ (.app _root_.ProbLang.recUnfold _) _)
   | tlam        => exact .tlam he
   | tapp        => exact .tapp he
-  | unpackL h2  => exact .tunpack he h2
-  | unpackR h1  => exact .tunpack h1 he
+  | @unpackL x e2 Γ τ τ2 hxfv h2 =>
+      -- The constructor now carries `hxfv : x ∉ e2.fv` directly.
+      exact Typed.tunpack (insert x e2.fv) he (Typed.rename_unpack hxfv h2)
+  | @unpackR x e1 Γ τ τ2 h1 =>
+      have hxfv : x ∉ e.fv := hfresh x (by simp [CtxItem.binderAtoms])
+      exact Typed.tunpack (insert x e.fv) h1 (Typed.rename_unpack hxfv he)
   | allocTape   => exact .alloc_tape he
   | randL_unit h2 => exact .rand_unit he h2
   | randL_tape h2 => exact .rand he h2
   | randR_unit h1 => exact .rand_unit h1 he
   | randR_tape h1 => exact .rand h1 he
 
+/-- Atoms appearing as binders in any frame of a multi-frame context. -/
+def Ctx.binderAtoms (K : Ctx) : Finset Var :=
+  K.foldr (fun k acc => k.binderAtoms ∪ acc) ∅
+
+/-- Free variables of payloads across all frames in a multi-frame context. -/
+def Ctx.payloadFv (K : Ctx) : Finset Var :=
+  K.foldr (fun k acc => k.payloadFv ∪ acc) ∅
+
+/-- Multi-frame fv bound: fvs of `K.fill e` are bounded by payload fvs + fvs of `e`. -/
+theorem Ctx.fv_fill_subset (K : Ctx) (e : Exp) :
+    (K.fill e).fv ⊆ Ctx.payloadFv K ∪ e.fv := by
+  induction K with
+  | nil => intro y hy; exact Finset.mem_union_right _ hy
+  | cons k K ih =>
+      intro y hy
+      simp only [Ctx.fill, List.foldr_cons] at hy
+      have hk := CtxItem.fv_fill_subset k (K.foldr CtxItem.fill e) hy
+      simp only [Ctx.payloadFv, List.foldr_cons, Finset.mem_union] at hk ⊢
+      rcases hk with h | h
+      · exact Or.inl (Or.inl h)
+      · have := ih h
+        simp only [Finset.mem_union] at this
+        rcases this with h | h
+        · exact Or.inl (Or.inr h)
+        · exact Or.inr h
+
 /-- Plugging a well-typed term into a well-typed multi-frame context
-produces a well-typed term. (Clutch `typed_ctx_typed`.) -/
+produces a well-typed term. (Clutch `typed_ctx_typed`.)
+
+Requires every binder atom in the context to be fresh in both the hole
+and the surrounding frame payloads. -/
 theorem TypedCtx.fill_typed {K : Ctx} {Γ τ Γ' τ' e}
-    (he : Typed Γ e τ) (hK : TypedCtx K Γ τ Γ' τ') :
+    (he : Typed Γ e τ) (hK : TypedCtx K Γ τ Γ' τ')
+    (hfresh : ∀ x ∈ Ctx.binderAtoms K, x ∉ e.fv ∧ x ∉ Ctx.payloadFv K) :
     Typed Γ' (K.fill e) τ' := by
   induction hK with
   | nil => exact he
-  | cons hk _ ih => exact hk.fill_typed (ih he)
+  | @cons K k Γ1 τ1 Γ2 τ2 Γ3 τ3 hk hKrest ih =>
+      have hfreshK : ∀ x ∈ Ctx.binderAtoms K, x ∉ e.fv ∧ x ∉ Ctx.payloadFv K := by
+        intro x hx
+        have hxmem : x ∈ Ctx.binderAtoms (k :: K) := by
+          simp [Ctx.binderAtoms, List.foldr_cons, Finset.mem_union]; exact Or.inr hx
+        obtain ⟨hxe, hxpay⟩ := hfresh x hxmem
+        refine ⟨hxe, ?_⟩
+        intro h
+        apply hxpay
+        simp [Ctx.payloadFv, List.foldr_cons, Finset.mem_union]; exact Or.inr h
+      have hIH : Typed Γ2 (K.fill e) τ2 := ih he hfreshK
+      have hfreshk : ∀ x ∈ k.binderAtoms, x ∉ (K.fill e).fv := by
+        intro x hx
+        have hxmem : x ∈ Ctx.binderAtoms (k :: K) := by
+          simp [Ctx.binderAtoms, List.foldr_cons, Finset.mem_union]; exact Or.inl hx
+        obtain ⟨hxe, hxpay⟩ := hfresh x hxmem
+        intro hfv
+        rcases Finset.mem_union.mp (Ctx.fv_fill_subset K e hfv) with h | h
+        · apply hxpay
+          simp [Ctx.payloadFv, List.foldr_cons, Finset.mem_union]; exact Or.inr h
+        · exact hxe h
+      show Typed Γ3 (k.fill (K.fill e)) τ3
+      exact TypedCtxItem.fill_typed hIH hk hfreshk
 
 /-- Composing well-typed contexts. (Clutch `typed_ctx_compose`.) -/
 theorem TypedCtx.compose {K K' : Ctx} {Γ1 Γ2 Γ3 τ1 τ2 τ3}
