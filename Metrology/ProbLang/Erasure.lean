@@ -550,7 +550,7 @@ theorem execN_tape_presample_expr_eq
     rw [Measure.map_apply Measurable.of_discrete hS,
         Measure.map_apply Measurable.of_discrete hS,
         Measure.bind_apply (by exact .of_discrete) Measurable.of_discrete.aemeasurable]
-    simp
+    simp only [Measure.coe_zero, Pi.zero_apply, lintegral_zero]
   | succ m ih =>
     by_cases hv : e.isValue
     · -- Value case. `execN (m+1) ⟨e, σ'⟩ = dirac ⟨e, σ'⟩`, so after projecting
@@ -569,8 +569,7 @@ theorem execN_tape_presample_expr_eq
       rw [hker, Measure.map_dirac (f := fun c : Cfg => c.expr) (⟨e, σ⟩ : Cfg)]
       refine Measure.ext fun S hS => ?_
       rw [Measure.bind_apply hS Measurable.of_discrete.aemeasurable,
-          lintegral_const, tapePresample_univ_eq_one h hN]
-      simp
+          lintegral_const, tapePresample_univ_eq_one h hN, mul_one]
     · -- Non-value case. Unfold `execN (m+1)` to `primStep ≫= execN m`,
       -- decompose `primStep` into `headStep` at the redex, and dispatch by
       -- `det_or_prob_or_zero`. The K.fillCfg, map-bind shuffling, and
@@ -674,19 +673,21 @@ theorem execN_tape_presample_expr_eq
         | betaLam hv2 =>
           rename_i e1 e2
           refine det_close_state_pres _ (Exp.open' e1 e2) fun σ' => ?_
-          show Exp.isValM e2 (Measure.dirac _) = _; simp [Exp.isValM, hv2]
+          exact Exp.isValM_some hv2
         | betaFix hv2 =>
           rename_i e1 e2
           refine det_close_state_pres _ (Exp.app (Exp.open' e1 (.fix e1)) e2) fun σ' => ?_
-          show Exp.isValM e2 (Measure.dirac _) = _; simp [Exp.isValM, hv2]
+          exact Exp.isValM_some hv2
         | unop hv heval =>
           rename_i op e_u e'
-          exact det_close_state_pres _ e' fun σ' => by
-            simp [headStep, Exp.isValM, hv, Option.unwrapM, heval]
+          refine det_close_state_pres _ e' fun σ' => ?_
+          show Exp.isValM e_u (ProbLang.Option.unwrapM _ (op.eval e_u)) = _
+          rw [Exp.isValM_some hv, heval]; rfl
         | binop hv1 hv2 heval =>
           rename_i op e1 e2 e'
-          exact det_close_state_pres _ e' fun σ' => by
-            simp [headStep, Exp.isValM, hv1, hv2, Option.unwrapM, heval]
+          refine det_close_state_pres _ e' fun σ' => ?_
+          show Exp.isValM e1 (Exp.isValM e2 (ProbLang.Option.unwrapM _ (op.eval e1 e2))) = _
+          rw [Exp.isValM_some hv2, Exp.isValM_some hv1, heval]; rfl
         | ifTrue =>
           rename_i et ef
           exact det_close_state_pres _ et fun _ => rfl
@@ -697,30 +698,30 @@ theorem execN_tape_presample_expr_eq
           rename_i e1 e2
           refine det_close_state_pres _ e1 fun σ' => ?_
           show Exp.isValM e1 (Exp.isValM e2 (Measure.dirac _)) = _
-          simp [Exp.isValM, hv1, hv2]
+          rw [Exp.isValM_some hv2, Exp.isValM_some hv1]
         | snd hv1 hv2 =>
           rename_i e1 e2
           refine det_close_state_pres _ e2 fun σ' => ?_
           show Exp.isValM e1 (Exp.isValM e2 (Measure.dirac _)) = _
-          simp [Exp.isValM, hv1, hv2]
+          rw [Exp.isValM_some hv2, Exp.isValM_some hv1]
         | caseL hv =>
           rename_i e_c el er
           refine det_close_state_pres _ (el.app e_c) fun σ' => ?_
-          show Exp.isValM e_c (Measure.dirac _) = _; simp [Exp.isValM, hv]
+          exact Exp.isValM_some hv
         | caseR hv =>
           rename_i e_c el er
           refine det_close_state_pres _ (er.app e_c) fun σ' => ?_
-          show Exp.isValM e_c (Measure.dirac _) = _; simp [Exp.isValM, hv]
+          exact Exp.isValM_some hv
         | scrutSuccess hv hmatch =>
           rename_i e_s p bindings
           refine det_close_state_pres _ (.inl bindings) fun σ' => ?_
           show Exp.isValM e_s (match Pat.tryMatch p e_s with | some b => _ | none => _) = _
-          simp [Exp.isValM, hv, hmatch]
+          rw [Exp.isValM_some hv, hmatch]
         | scrutFailure hv hmatch =>
           rename_i e_s p
           refine det_close_state_pres _ (.inr (.lit .unit)) fun σ' => ?_
           show Exp.isValM e_s (match Pat.tryMatch p e_s with | some b => _ | none => _) = _
-          simp [Exp.isValM, hv, hmatch]
+          rw [Exp.isValM_some hv, hmatch]
         | load hlook =>
           -- headStep depends on σ'.heap[ℓ]?, but tapePresample preserves heap.
           rename_i ℓ v
@@ -1070,11 +1071,15 @@ theorem execN_tape_presample_expr_eq
           -- `z_r ≠ N_b`, so headStep falls through to `Cfg.uniform z_r σ'`.
           -- For `α_lbl = α`, tapePresample appends to α but preserves bound
           -- `N_b`; for `α_lbl ≠ α`, the lookup is unchanged.
-          have hstep_σ : headStep (⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ⟩ : Cfg)
-              = Cfg.uniform z_r σ := by
-            show (match σ.tapes.1[α_lbl]? with | none => _ | some ⟨M, _⟩ => _) = _
-            rw [htapes]; simp only; rw [if_neg (Ne.symm hzN)]
-          refine uniform_close _ z_r hz ?_ hstep_σ
+          -- Helper: when tape at `α_lbl` has bound `≠ z_r`, headStep is uniform.
+          have hrand_uniform : ∀ (σ₀ : State) {M : Int} {ns : List _},
+              σ₀.tapes.1[α_lbl]? = some ⟨M, ns⟩ → M ≠ z_r →
+              headStep (⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ₀⟩ : Cfg)
+                = Cfg.uniform z_r σ₀ := by
+            intro σ₀ M ns ht hne
+            show (match σ₀.tapes.1[α_lbl]? with | none => _ | some ⟨M, _⟩ => _) = _
+            rw [ht]; simp only; rw [if_neg hne]
+          refine uniform_close _ z_r hz ?_ (hrand_uniform σ htapes (Ne.symm hzN))
           obtain ⟨N, bs⟩ := t
           by_cases hαeq : α = α_lbl
           · -- Same tape: presample appends, bound stays `N = N_b`.
@@ -1094,14 +1099,10 @@ theorem execN_tape_presample_expr_eq
             simp only [Set.mem_setOf_eq, not_not]
             have hlook : (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)).tapes.1[α]?
                 = some ⟨N, bs ++ [n]⟩ := by simp [State.update_tapes]
-            show (match (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)).tapes.1[α]? with
-                  | none => _ | some ⟨M, _⟩ => _) = _
-            rw [hlook]; simp only
-            rw [if_neg (fun h => hzN (hNN ▸ h.symm))]
+            exact hrand_uniform _ hlook (fun h => hzN (hNN ▸ h.symm))
           · -- Different tape: lookup preserved.
             filter_upwards [tapePresample_tape_ne_ae h (Ne.symm hαeq)] with σ' htape_eq
-            show (match σ'.tapes.1[α_lbl]? with | none => _ | some ⟨M, _⟩ => _) = _
-            rw [htape_eq, htapes]; simp only; rw [if_neg (Ne.symm hzN)]
+            exact hrand_uniform _ (htape_eq.trans htapes) (Ne.symm hzN)
       · -- Zero case: `headStep ⟨e_red, σ⟩ = 0`, and by
         -- `State.head_step_dzero_upd_tapes` this propagates a.e. to
         -- `tapePresample σ α`, so both sides collapse to `0`.
