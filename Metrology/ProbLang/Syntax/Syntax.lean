@@ -39,18 +39,30 @@ instance instCountableString : Countable String where
 
 namespace ProbLang
 
-/-- Free-variable atoms are strings. Each surface identifier `x` elaborates to
-    `Exp.fvar "x"`. Bound variables use de-Bruijn `Nat` indices via `Exp.bvar`. -/
-abbrev Var : Type := String
+/-- Free-variable atoms. Strings, when provided by the user, or auto-generated internal
+free variables. -/
+inductive Var : Type where
+  | named (s : String)
+  | internal (n : Nat)
+  deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
-/-- `HasFresh String`: produce a string longer than every string in the set.
-    The `fresh_notMem` proof is a routine string/list-length inequality;
-    deferred (a small `String.length` lemma needed). -/
-instance : Cslib.HasFresh String where
-  fresh s :=
-    let maxLen : Nat := s.sup (fun str => str.length)
-    String.ofList (List.replicate (maxLen + 1) 'x')
-  fresh_notMem _ := by sorry
+instance : Coe String Var := ⟨.named⟩
+
+instance : Coe Nat Var := ⟨.internal⟩
+
+def Var.genId : Var → Nat | .named _ => 0 | .internal n => n
+
+/-- Generate a fresh (internal) free variable. -/
+instance : Cslib.HasFresh Var where
+  fresh s := .internal <| s.sup (·.genId) + 1
+  fresh_notMem L := by
+    rw [← Finset.forall_mem_not_eq]
+    intro b Hb
+    rcases b with (_|n); (· simp)
+    simp only [Var.internal.injEq]
+    refine Nat.ne_of_gt (Order.lt_add_one_iff.mpr ?_)
+    apply Finset.le_sup_of_le Hb
+    simp [Var.genId]
 
 abbrev Loc : Type := Int
 

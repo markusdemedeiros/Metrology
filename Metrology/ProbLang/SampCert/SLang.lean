@@ -16,7 +16,6 @@ namespace EmbedSLang
 
 open SLang ProbLang Classical MeasureTheory ProbabilityTheory Measure PMF Measurable
 
-
 class abbrev SLangType (T : Type) := Countable T, MeasurableSpace T, MeasurableSingletonClass T
 
 class ProbLangEmbeddable (T : Type _) where
