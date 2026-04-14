@@ -492,9 +492,10 @@ theorem Val.ext {v1 v2 : Val} (h : v1.1 = v2.1) : v1 = v2 := by
 instance : Countable Val := by
   unfold Val; exact instCountableSigma
 
-instance instCountableTreeMapLocVal : Countable (ExtTreeMap Loc Val compare) := by
-  obtain ⟨f_v, Hf_v⟩ : Countable (List (Loc × Val)) := by infer_instance
-  let f_items : ExtTreeMap Loc Val compare → List (Loc × Val) := ExtTreeMap.toList
+instance instCountableExtTreeMapLoc {V : Type _} [Countable V] :
+    Countable (ExtTreeMap Loc V compare) := by
+  obtain ⟨f_v, Hf_v⟩ : Countable (List (Loc × V)) := by infer_instance
+  let f_items : ExtTreeMap Loc V compare → List (Loc × V) := ExtTreeMap.toList
   have Hf_items : Function.Injective f_items := by
     simp [f_items]
     intro H1 H2 He
@@ -522,22 +523,25 @@ structure Tape where
   presamples : List { z : Int // 0 ≤ z ∧ z < bound}
   deriving Inhabited, Countable
 
-instance instCountableTreeMapLocTape : Countable (ExtTreeMap Loc Tape compare) := by
-  obtain ⟨f_v, Hf_v⟩ : Countable (List (Loc × Tape)) := by infer_instance
-  let f_items : ExtTreeMap Loc Tape compare → List (Loc × Tape) := ExtTreeMap.toList
-  have Hf_items : Function.Injective f_items := by
-    simp [f_items]
-    intro H1 H2 He
-    exact ExtTreeMap.toList_inj.mp (Hf_v (congrArg f_v (Hf_v (congrArg f_v He))))
-  exists (fun t => f_v <| f_items t)
-  intro H1 H2 He
-  exact ExtTreeMap.ext_getElem? (congrFun (congrArg getElem? (Hf_items (Hf_v He))))
-
 def Tape.empty (z : Int) : Tape := ⟨z, []⟩
 
+/-- Loc → V heaps. This data structure encapsulates the underlying representation,
+  and allows for better typeclass inference. -/
+structure LocHeap (V : Type _) : Type _ where
+  heap : ExtTreeMap Loc V compare
+  deriving Inhabited
+attribute [grind =] LocHeap.heap
+
+instance [Countable V] : Countable (LocHeap V) :=
+  Function.Injective.countable (f := LocHeap.heap)
+    (fun ⟨_⟩ ⟨_⟩ h => by cases h; rfl)
+
+instance : Coe (LocHeap V) (ExtTreeMap Loc V compare) := ⟨(·.heap)⟩
+instance : Coe (ExtTreeMap Loc V compare) (LocHeap V)  := ⟨.mk⟩
+
 structure State where
-  heap  : ExtTreeMap Loc Val
-  tapes : ExtTreeMap Loc Tape
+  heap  : LocHeap Val
+  tapes : LocHeap Tape
   deriving Inhabited, Countable
 
 theorem Exp.toVal?_ofVal (v : Val) : (Exp.ofVal v).toVal? = some v := by
@@ -674,18 +678,18 @@ def State.update_tapes (σ : State) (f : ExtTreeMap Loc Tape → ExtTreeMap Loc 
 theorem State.update_tapes_twice (σ : State) (l : Loc) (ys xs : Tape) :
     (σ.update_tapes (·.insert l xs)).update_tapes (·.insert l ys) =
     σ.update_tapes (·.insert l ys) := by
-  unfold State.update_tapes; congr 1; grind
+  unfold State.update_tapes; congr 2; grind
 
 theorem State.update_tapes_same {σ σ' : State}
     (h : σ.update_tapes (·.insert l xs) = σ'.update_tapes (·.insert l ys)) :
     xs = ys := by
-  have key := congrArg (·.tapes[l]?) h
+  have key := congrArg (·.tapes.1[l]?) h
   simp [State.update_tapes] at key
   exact key
 
-theorem State.update_tapes_no_change {σ : State} (h : σ.tapes[l]? = some ys) :
+theorem State.update_tapes_no_change {σ : State} (h : σ.tapes.1[l]? = some ys) :
     σ.update_tapes (·.insert l ys) = σ := by
-  unfold State.update_tapes; congr 1; grind
+  unfold State.update_tapes; congr 2; grind
 
 theorem State.update_tapes_same' {σ σ' : State} {xs : List { z : Int // 0 ≤ z ∧ z < n }}
     {x y : { z : Int // 0 ≤ z ∧ z < n }}

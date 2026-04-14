@@ -258,9 +258,9 @@ inductive DetHeadStepPred : Exp → State → Prop
   | caseR {e el er σ} : e.isValue →
       DetHeadStepPred (.case (.inr e) el er) σ
   | alloc {ed σ} : ed.isValue → DetHeadStepPred (.alloc ed) σ
-  | load {ℓ v σ} : σ.heap[ℓ]? = some v →
+  | load {ℓ v σ} : σ.heap.1[ℓ]? = some v →
       DetHeadStepPred (.load (.lit (.loc ℓ))) σ
-  | store {ℓ e σ} : e.isValue → σ.heap[ℓ]?.isSome →
+  | store {ℓ e σ} : e.isValue → σ.heap.1[ℓ]?.isSome →
       DetHeadStepPred (.store (.lit (.loc ℓ)) e) σ
   | tape {z σ} : DetHeadStepPred (.tape (.lit (.int z))) σ
   | scrutSuccess {e p σ bindings} : e.isValue → Pat.tryMatch p e = some bindings →
@@ -272,11 +272,11 @@ inductive DetHeadStepPred : Exp → State → Prop
 inductive ProbHeadStepPred : Exp → State → Prop
   | randNoTape {z σ} : 0 < z →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit .unit)) σ
-  | randTape {z α σ N nn ns} : 0 < z → σ.tapes[α]? = some ⟨N, nn :: ns⟩ → z = N →
+  | randTape {z α σ N nn ns} : 0 < z → σ.tapes.1[α]? = some ⟨N, nn :: ns⟩ → z = N →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
-  | randTapeEmpty {z α σ N} : 0 < z → σ.tapes[α]? = some ⟨N, []⟩ → z = N →
+  | randTapeEmpty {z α σ N} : 0 < z → σ.tapes.1[α]? = some ⟨N, []⟩ → z = N →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
-  | randTapeOther {z α σ N L} : 0 < z → σ.tapes[α]? = some ⟨N, L⟩ → z ≠ N →
+  | randTapeOther {z α σ N L} : 0 < z → σ.tapes.1[α]? = some ⟨N, L⟩ → z ≠ N →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
 
 /-- Either a deterministic or a probabilistic head step is taken. -/
@@ -298,8 +298,8 @@ def isDetHeadStep (e : Exp) (σ : State) : Bool :=
   | .case (.inl e) _ _ => decide e.isValue
   | .case (.inr e) _ _ => decide e.isValue
   | .alloc ed => decide ed.isValue
-  | .load (.lit (.loc ℓ)) => σ.heap[ℓ]?.isSome
-  | .store (.lit (.loc ℓ)) e => decide e.isValue && σ.heap[ℓ]?.isSome
+  | .load (.lit (.loc ℓ)) => σ.heap.1[ℓ]?.isSome
+  | .store (.lit (.loc ℓ)) e => decide e.isValue && σ.heap.1[ℓ]?.isSome
   | .tape (.lit (.int _)) => true
   | .scrut e _ => decide e.isValue
   | _ => false
@@ -475,7 +475,7 @@ theorem det_or_prob_or_zero (e : Exp) (σ : State) :
 /-! ## Group E — Tape and fresh-location update lemmas -/
 
 theorem State.upd_tape_some (σ : State) (α : Loc) (t : Tape) :
-    (σ.update_tapes (·.insert α t)).tapes[α]? = some t := by
+    (σ.update_tapes (·.insert α t)).tapes.1[α]? = some t := by
   simp [State.update_tapes]
 
 theorem State.upd_diff_tape_comm {σ : State} {α β : Loc} {bs bs' : Tape}
@@ -483,7 +483,7 @@ theorem State.upd_diff_tape_comm {σ : State} {α β : Loc} {bs bs' : Tape}
     ((σ.update_tapes (·.insert β bs)).update_tapes (·.insert α bs'))
       = ((σ.update_tapes (·.insert α bs')).update_tapes (·.insert β bs)) := by
   unfold State.update_tapes
-  congr 1
+  congr 2
   apply Std.ExtTreeMap.ext_getElem?
   intro k
   simp [Std.ExtTreeMap.getElem?_insert]
@@ -498,7 +498,7 @@ theorem State.upd_diff_tape_comm {σ : State} {α β : Loc} {bs bs' : Tape}
 
 theorem State.upd_diff_tape_tot {σ : State} {α β : Loc} {bs : Tape}
     (hne : α ≠ β) :
-    (σ.update_tapes (·.insert β bs)).tapes[α]? = σ.tapes[α]? := by
+    (σ.update_tapes (·.insert β bs)).tapes.1[α]? = σ.tapes.1[α]? := by
   simp [State.update_tapes, Std.ExtTreeMap.getElem?_insert, Ne.symm hne]
 
 theorem Std.ExtTreeMap.fresh_insert_of_mem
@@ -539,9 +539,9 @@ theorem Std.ExtTreeMap.fresh_insert_of_mem
   rw [hkeys]
 
 theorem State.fresh_loc_upd_some {σ : State} {α : Loc} {bs bs' : Tape}
-    (h : σ.tapes[α]? = some bs) :
-    (σ.tapes.insert α bs').fresh = σ.tapes.fresh :=
-  Std.ExtTreeMap.fresh_insert_of_mem σ.tapes h
+    (h : σ.tapes.1[α]? = some bs) :
+    (σ.tapes.1.insert α bs').fresh = σ.tapes.1.fresh :=
+  Std.ExtTreeMap.fresh_insert_of_mem σ.tapes.1 h
 
 theorem Std.ExtTreeMap.elem_fresh_ne
     {V : Type*} {t : Std.ExtTreeMap Int V compare} {k : Int} {v : V}
@@ -553,29 +553,29 @@ theorem Std.ExtTreeMap.elem_fresh_ne
   simp at h
 
 theorem State.fresh_loc_upd_swap {σ : State} {α : Loc} {bs bs' : Tape} {t : Tape}
-    (h : σ.tapes[α]? = some bs) :
-    ((σ.tapes.insert α bs').insert (σ.tapes.insert α bs').fresh t)
-      = ((σ.tapes.insert σ.tapes.fresh t).insert α bs') := by
+    (h : σ.tapes.1[α]? = some bs) :
+    ((σ.tapes.1.insert α bs').insert (σ.tapes.1.insert α bs').fresh t)
+      = ((σ.tapes.1.insert σ.tapes.1.fresh t).insert α bs') := by
   rw [State.fresh_loc_upd_some h]
-  have hne : σ.tapes.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
+  have hne : σ.tapes.1.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
   apply Std.ExtTreeMap.ext_getElem?
   intro k
   simp [Std.ExtTreeMap.getElem?_insert]
   by_cases hαk : α = k
   · subst hαk
-    have : ¬ (σ.tapes.fresh = α) := hne
+    have : ¬ (σ.tapes.1.fresh = α) := hne
     simp [this]
-  · by_cases hfk : σ.tapes.fresh = k
+  · by_cases hfk : σ.tapes.1.fresh = k
     · subst hfk
       simp [hαk]
     · simp [hαk, hfk]
 
 theorem State.fresh_loc_lookup {σ : State} {α : Loc} {bs : Tape} {t : Tape}
-    (h : σ.tapes[α]? = some bs) :
-    (σ.tapes.insert σ.tapes.fresh t)[α]? = some bs := by
-  have hne : σ.tapes.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
+    (h : σ.tapes.1[α]? = some bs) :
+    (σ.tapes.1.insert σ.tapes.1.fresh t)[α]? = some bs := by
+  have hne : σ.tapes.1.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
   rw [Std.ExtTreeMap.getElem?_insert]
-  have hcmp : compare σ.tapes.fresh α ≠ .eq := by
+  have hcmp : compare σ.tapes.1.fresh α ≠ .eq := by
     simp [compare, compareOfLessAndEq]
     split <;> simp_all
   simp [hcmp, h]
@@ -677,7 +677,7 @@ theorem Cfg.uniform_singleton_ne_one {z : Int} {σ : State} {ρ : Cfg}
 set_option linter.unnecessarySimpa false in
 theorem State.head_step_dzero_upd_tapes
     {e : Exp} {σ : State} {α : Loc} {bs bs' : Tape}
-    (hmem : σ.tapes[α]? = some bs)
+    (hmem : σ.tapes.1[α]? = some bs)
     (h0 : ProbLang.headStep ⟨e, σ⟩ = 0) :
     ProbLang.headStep ⟨e, σ.update_tapes (·.insert α bs')⟩ = 0 := by
   revert h0
@@ -699,14 +699,14 @@ theorem State.head_step_dzero_upd_tapes
   case alloc.no_redex hned =>
     simp [Exp.toVal?_eq_none.mpr hned]
   case load.segfault hheap =>
-    have hnotmem : ‹Loc› ∉ (σ.update_tapes (·.insert α bs')).heap := hheap
+    have hnotmem : ‹Loc› ∉ (σ.update_tapes (·.insert α bs')).1.heap := hheap
     have hnone := Option.not_isSome_iff_eq_none.mp
       (fun hsome => hnotmem (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
     rw [hnone]
   case store.no_redex hned =>
     simp [Exp.toVal?_eq_none.mpr hned]
   case store.segfault hv hheap =>
-    have hnotmem : ‹Loc› ∉ (σ.update_tapes (·.insert α bs')).heap := hheap
+    have hnotmem : ‹Loc› ∉ (σ.update_tapes (·.insert α bs')).1.heap := hheap
     have hnone := Option.not_isSome_iff_eq_none.mp
       (fun hsome => hnotmem (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
     rw [hnone]
@@ -716,7 +716,7 @@ theorem State.head_step_dzero_upd_tapes
     have hne : α ≠ ‹Lbl› := by
       intro he
       exact hnotin (he ▸ Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr (by rw [hmem]; rfl))
-    have hnone : σ.tapes[‹Lbl›]? = none :=
+    have hnone : σ.tapes.1[‹Lbl›]? = none :=
       Option.not_isSome_iff_eq_none.mp
         (fun hsome => hnotin (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
     rw [State.upd_diff_tape_tot (Ne.symm hne), hnone]
@@ -725,7 +725,7 @@ theorem State.head_step_dzero_upd_tapes
     rw [Cfg.uniform_eq_zero_iff] at h0
     by_cases hαeq : α = α'
     · subst hαeq
-      have hupd : (σ.update_tapes (·.insert α bs')).tapes[α]? = some bs' :=
+      have hupd : (σ.update_tapes (·.insert α bs')).tapes.1[α]? = some bs' :=
         State.upd_tape_some σ α bs'
       rw [hupd]
       obtain ⟨bbnd, bps⟩ := bs'
@@ -741,7 +741,7 @@ theorem State.head_step_dzero_upd_tapes
           omega
       · simp only [if_neg hbnd]
         rw [Cfg.uniform_eq_zero_iff]; exact h0
-    · have hupd : (σ.update_tapes (·.insert α bs')).tapes[α']? = σ.tapes[α']? :=
+    · have hupd : (σ.update_tapes (·.insert α bs')).tapes.1[α']? = σ.tapes.1[α']? :=
         State.upd_diff_tape_tot (Ne.symm hαeq)
       rw [hupd, heq]
       simp only [if_neg hMne]
@@ -751,7 +751,7 @@ theorem State.head_step_dzero_upd_tapes
     rw [Cfg.uniform_eq_zero_iff] at h0
     by_cases hαeq : α = α'
     · subst hαeq
-      have hupd : (σ.update_tapes (·.insert α bs')).tapes[α]? = some bs' :=
+      have hupd : (σ.update_tapes (·.insert α bs')).tapes.1[α]? = some bs' :=
         State.upd_tape_some σ α bs'
       rw [hupd]
       obtain ⟨bbnd, bps⟩ := bs'
@@ -767,7 +767,7 @@ theorem State.head_step_dzero_upd_tapes
           omega
       · simp only [if_neg hbnd]
         rw [Cfg.uniform_eq_zero_iff]; exact h0
-    · have hupd : (σ.update_tapes (·.insert α bs')).tapes[α']? = σ.tapes[α']? :=
+    · have hupd : (σ.update_tapes (·.insert α bs')).tapes.1[α']? = σ.tapes.1[α']? :=
         State.upd_diff_tape_tot (Ne.symm hαeq)
       rw [hupd, heq]
       simp only [if_true]
@@ -797,7 +797,7 @@ theorem State.det_head_step_upd_tapes
 
 theorem State.prim_step_empty_tape
     {K : ProbLang.Ectx} {σ : State} {α : Loc} {z : Int} {N : Int}
-    (_hmem : σ.tapes[α]? = some ⟨N, []⟩) :
+    (_hmem : σ.tapes.1[α]? = some ⟨N, []⟩) :
     ProbLang.primStep ⟨K.fill (.rand (.lit (.int z)) (.lit (.lbl α))), σ⟩
       = ProbLang.primStep ⟨K.fill (.rand (.lit (.int z)) (.lit .unit)), σ⟩ := by
   have hv_lbl : ¬ (Exp.rand (.lit (.int z)) (.lit (.lbl α))).isValue := by

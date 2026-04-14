@@ -172,17 +172,17 @@ theorem DetHeadStep.case_inr {v el er : Exp} (hv : IsVal v) (σ : State) :
   .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
 
 theorem DetHeadStep.alloc {v : Exp} (hv : IsVal v) (σ : State) :
-    DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, hv⟩)⟩ := by
+    DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.1.fresh), σ.update_heap (·.insert σ.heap.1.fresh ⟨v, hv⟩)⟩ := by
   obtain ⟨w, hw⟩ := hv.check?_some
   exact .of_det _ _ (by simp [headStep, Exp.asValM, Exp.toVal?, hw, IsVal.subsingleton hv w])
 
-theorem DetHeadStep.load {ℓ : Loc} {v : Val} (σ : State) (hlookup : σ.heap[ℓ]? = some v) :
+theorem DetHeadStep.load {ℓ : Loc} {v : Val} (σ : State) (hlookup : σ.heap.1[ℓ]? = some v) :
     DetHeadStep ⟨.load (.lit (.loc ℓ)), σ⟩ ⟨.ofVal v, σ⟩ :=
   .of_det _ _ (by simp [headStep, hlookup])
 
 theorem DetHeadStep.store {ℓ : Loc} {e : Exp} {v_old v_new : Val}
     (_hv : IsVal e) (σ : State)
-    (hlookup : σ.heap[ℓ]? = some v_old)
+    (hlookup : σ.heap.1[ℓ]? = some v_old)
     (hnew : e.toVal? = some v_new) :
     DetHeadStep ⟨.store (.lit (.loc ℓ)) e, σ⟩ ⟨.lit .unit, σ.update_heap (·.insert ℓ v_new)⟩ :=
   .of_det _ _ (by simp [headStep, Exp.asValM, hnew, hlookup])
