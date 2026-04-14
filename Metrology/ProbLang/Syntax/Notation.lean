@@ -26,8 +26,10 @@ syntax:max "pl_pat(" pl_pat ")" : term
 
 /-! ## `plBinderHint!`: attach display metadata to a binder expression.
 `plBinderHint! name τ? e` elaborates `e` and wraps it in an `Expr.mdata`
-carrying the binder's display name. The `τ?` slot is parsed but currently
-unused — reserved for future type-annotation rendering. -/
+carrying the binder's display name.
+
+The `τ?` slot is parsed but currently unused — reserved for future type-annotation
+rendering. -/
 
 /-- Opaque syntax for the binder-hint wrapper; only the elaborator consumes it. -/
 syntax (name := plBinderHint) "plBinderHint!" str term:max term:max : term
@@ -48,64 +50,63 @@ syntax binderIdent : pl_arg
 syntax "(" ident " : " pl_ty ")" : pl_arg
 
 -- Types
-syntax:max "int"      : pl_ty
-syntax:max "bool"     : pl_ty
-syntax:max "unit"     : pl_ty
-syntax:max "(" pl_ty ")" : pl_ty
-syntax:35 pl_ty:36 " × " pl_ty:35 : pl_ty
-syntax:30 pl_ty:31 " + " pl_ty:30 : pl_ty
-syntax:25 pl_ty:26 " → " pl_ty:25 : pl_ty
-syntax:max "ref(" pl_ty ")" : pl_ty
-syntax:max "tape"     : pl_ty
+syntax:max "int"                                                : pl_ty
+syntax:max "bool"                                               : pl_ty
+syntax:max "unit"                                               : pl_ty
+syntax:max "(" pl_ty ")"                                        : pl_ty
+syntax:35 pl_ty:36 " × " pl_ty:35                               : pl_ty
+syntax:30 pl_ty:31 " + " pl_ty:30                               : pl_ty
+syntax:25 pl_ty:26 " → " pl_ty:25                              : pl_ty
+syntax:max "ref(" pl_ty ")"                                     : pl_ty
+syntax:max "tape"                                               : pl_ty
 
 -- Patterns
-syntax:max "_"                       : pl_pat
-syntax:max ident                     : pl_pat
-syntax:max "#" term:max              : pl_pat
-syntax:max "(" pl_pat ")"            : pl_pat
-syntax:max "(" pl_pat ", " pl_pat ")" : pl_pat
-syntax:max "inl(" pl_pat ")"         : pl_pat
-syntax:max "inr(" pl_pat ")"         : pl_pat
-syntax:max "(" pl_pat " : " pl_ty ")" : pl_pat
+syntax:max "_"                                                  : pl_pat
+syntax:max ident                                                : pl_pat
+syntax:max "#" term:max                                         : pl_pat
+syntax:max "(" pl_pat ")"                                       : pl_pat
+syntax:max "(" pl_pat ", " pl_pat ")"                           : pl_pat
+syntax:max "inl(" pl_pat ")"                                    : pl_pat
+syntax:max "inr(" pl_pat ")"                                    : pl_pat
+syntax:max "(" pl_pat " : " pl_ty ")"                           : pl_pat
 
 -- Expressions
-syntax:max "{" term "}"              : pl_exp
-syntax:max "#" term:max              : pl_exp
-syntax:max ident                     : pl_exp
-syntax:max "(" pl_exp ")"            : pl_exp
-syntax:max "(" pl_exp " : " pl_ty ")" : pl_exp
-
-syntax:65 pl_exp:65 " + " pl_exp:66  : pl_exp
-syntax:65 pl_exp:65 " - " pl_exp:66  : pl_exp
-syntax:70 pl_exp:70 " * " pl_exp:71  : pl_exp
-syntax:60 pl_exp:60 " && " pl_exp:61 : pl_exp
-syntax:55 pl_exp:55 " || " pl_exp:56 : pl_exp
-syntax:58 pl_exp:58 " ^^ " pl_exp:59 : pl_exp
-syntax:50 pl_exp:50 " = " pl_exp:50  : pl_exp
-syntax:10 "if " pl_exp " then " pl_exp " else " pl_exp : pl_exp
-syntax:75 "~" pl_exp:75              : pl_exp
-syntax:75 "-" pl_exp:75              : pl_exp
-syntax:100 pl_exp:100 ppSpace pl_exp:101 : pl_exp
-syntax:10 "let " pl_arg " := " pl_exp:10 "; " pl_exp:1 : pl_exp
-syntax:5 pl_exp:6 "; " pl_exp:5      : pl_exp
-syntax:10 "fun" pl_arg+ ", " pl_exp:10 : pl_exp
-syntax:10 "rec " pl_arg ppSpace pl_arg+ " := " pl_exp:10 : pl_exp
-syntax:max "(" pl_exp ", " pl_exp,+ ")" : pl_exp
-syntax:100 "fst(" pl_exp ")"         : pl_exp
-syntax:100 "snd(" pl_exp ")"         : pl_exp
-syntax:100 "inl(" pl_exp ")"         : pl_exp
-syntax:100 "inr(" pl_exp ")"         : pl_exp
+syntax:max "{" term "}"                                         : pl_exp
+syntax:max "#" term:max                                         : pl_exp
+syntax:max ident                                                : pl_exp
+syntax:max "(" pl_exp ")"                                       : pl_exp
+syntax:max "(" pl_exp " : " pl_ty ")"                           : pl_exp
+syntax:65 pl_exp:65 " + " pl_exp:66                             : pl_exp
+syntax:65 pl_exp:65 " - " pl_exp:66                             : pl_exp
+syntax:70 pl_exp:70 " * " pl_exp:71                             : pl_exp
+syntax:60 pl_exp:60 " && " pl_exp:61                            : pl_exp
+syntax:55 pl_exp:55 " || " pl_exp:56                            : pl_exp
+syntax:58 pl_exp:58 " ^^ " pl_exp:59                            : pl_exp
+syntax:50 pl_exp:50 " = " pl_exp:50                             : pl_exp
+syntax:10 "if " pl_exp " then " pl_exp " else " pl_exp          : pl_exp
+syntax:75 "~" pl_exp:75                                         : pl_exp
+syntax:75 "-" pl_exp:75                                         : pl_exp
+syntax:100 pl_exp:100 ppSpace pl_exp:101                        : pl_exp
+syntax:10 "let " pl_arg " := " pl_exp:10 "; " pl_exp:1          : pl_exp
+syntax:5 pl_exp:6 "; " pl_exp:5                                 : pl_exp
+syntax:10 "fun" pl_arg+ ", " pl_exp:10                          : pl_exp
+syntax:10 "rec " pl_arg ppSpace pl_arg+ " := " pl_exp:10        : pl_exp
+syntax:max "(" pl_exp ", " pl_exp,+ ")"                         : pl_exp
+syntax:100 "fst(" pl_exp ")"                                    : pl_exp
+syntax:100 "snd(" pl_exp ")"                                    : pl_exp
+syntax:100 "inl(" pl_exp ")"                                    : pl_exp
+syntax:100 "inr(" pl_exp ")"                                    : pl_exp
 syntax:10 "case " pl_exp " | " pl_pat " => " pl_exp:10
-          (" | " pl_pat " => " pl_exp:10)* : pl_exp
-syntax:100 "alloc(" pl_exp ")"       : pl_exp
-syntax:80 "!" pl_exp:80              : pl_exp
-syntax:80 pl_exp:80 " ← " pl_exp:80  : pl_exp
-syntax:100 "tape(" pl_exp ")"        : pl_exp
-syntax:100 "rand(" pl_exp ", " pl_exp ")" : pl_exp
-syntax:10 "scrut " pl_exp " with " pl_pat : pl_exp
-syntax:max "fail"                    : pl_exp
-syntax:10 "let! " pl_pat " := " pl_exp:10 "; " pl_exp:1 : pl_exp
-syntax:100 "assert(" pl_exp ")"      : pl_exp
+          (" | " pl_pat " => " pl_exp:10)*                      : pl_exp
+syntax:100 "alloc(" pl_exp ")"                                  : pl_exp
+syntax:80 "!" pl_exp:80                                         : pl_exp
+syntax:80 pl_exp:80 " ← " pl_exp:80                            : pl_exp
+syntax:100 "tape(" pl_exp ")"                                   : pl_exp
+syntax:100 "rand(" pl_exp ", " pl_exp ")"                       : pl_exp
+syntax:10 "scrut " pl_exp " with " pl_pat                       : pl_exp
+syntax:max "fail"                                               : pl_exp
+syntax:10 "let! " pl_pat " := " pl_exp:10 "; " pl_exp:1         : pl_exp
+syntax:100 "assert(" pl_exp ")"                                 : pl_exp
 
 def reservedKeywords : List String :=
   ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "scrut",
@@ -116,7 +117,7 @@ def checkNotReserved (i : Lean.Ident) : TermElabM Unit := do
   if reservedKeywords.contains s then
     throwErrorAt i "'{s}' is a reserved keyword in ProbLang and cannot be used as an identifier"
 
-/-! ## Type elaboration (pure macro) -/
+/-! ## Type elaboration -/
 
 macro_rules
   | `(pl_ty(int))          => `(Ty.int)
@@ -129,62 +130,53 @@ macro_rules
   | `(pl_ty(ref($τ)))      => `(Ty.ref pl_ty($τ))
   | `(pl_ty(tape))         => `(Ty.tape)
 
-/-! ## Pattern elaboration (pure macro) -/
+/-! ## Pattern elaboration -/
 
 macro_rules
   | `(pl_pat(_))                  => `(Pat.wildcard)
-  | `(pl_pat($_:ident))           => `(Pat.wildcard)  -- identifier patterns bind; handled in `let!` / `case`
+  | `(pl_pat($_:ident))           => `(Pat.wildcard)
   | `(pl_pat(# $e))               => `(Pat.lit $e)
   | `(pl_pat(($p)))               => `(pl_pat($p))
   | `(pl_pat(($p1, $p2)))         => `(Pat.pair pl_pat($p1) pl_pat($p2))
   | `(pl_pat(inl($p)))            => `(Pat.inl pl_pat($p))
   | `(pl_pat(inr($p)))            => `(Pat.inr pl_pat($p))
 
-/-! ## Expression elaboration
+/-! ## Expression elaboration -/
 
-Now that `Var = String`, free identifiers map directly to their string atoms:
-`pl(x)` elaborates to `Exp.fvar "x"`. Different identifiers always have
-different atoms by string equality.
-
-For binders, we still need to gensym to avoid shadowing pathologies. The
-allocator threads a counter and prepends `"_"` to the identifier name to
-generate `"_x_0"`, `"_x_1"`, etc. (The leading `_` ensures binder atoms
-can't collide with surface free identifiers.) -/
-
-/-- Map from Lean identifier names to the `String` atom assigned at binding time. -/
-abbrev NameEnv := Lean.NameMap String
+/-- Map from Lean identifier names to the intenral atom assigned at binding time. -/
+abbrev NameEnv := Lean.NameMap Var
 
 /-- Allocator state held in an `IO.Ref` for the duration of one `pl(…)` call:
     just a fresh-atom counter for binder gensyms. -/
 structure AtomState where
   next : Nat := 0
 
-/-- Allocate a fresh string atom for a binder. The leading `_` ensures binder
-    atoms never collide with surface free identifiers. -/
-def freshAtom (st : IO.Ref AtomState) (base : String := "x") : TermElabM String := do
+/-- Generate a fresh atom -/
+def genAtom (st : IO.Ref AtomState) : TermElabM Var := do
   let s ← st.get
   st.set { next := s.next + 1 }
-  return "_" ++ base ++ "_" ++ toString s.next
+  return .internal s.next
 
-/-- A named binder: its Lean identifier, the gensym'd atom, and optional type annot. -/
+/-- A named binder: its Lean identifier, its fvar atom, and optional type annot. -/
 structure NamedBinder where
   ident : Lean.Ident
-  atom  : String
+  atom  : Var
   ty    : Option (TSyntax `pl_ty)
 
 /-- Allocate a fresh atom for a named binder, check it isn't reserved, and
     return the `NamedBinder` together with an env extended with its binding. -/
-def bindNamed (st : IO.Ref AtomState) (env : NameEnv)
-    (i : Lean.Ident) (ty : Option (TSyntax `pl_ty)) :
+def bindNamed (st : IO.Ref AtomState) (env : NameEnv) (i : Lean.Ident) (ty : Option (TSyntax `pl_ty)) :
     TermElabM (NamedBinder × NameEnv) := do
   checkNotReserved i
-  let atom ← freshAtom st i.getId.toString
+  let atom ← genAtom st
   return ({ ident := i, atom, ty }, env.insert i.getId atom)
 
-/-! ### Builders for binder-hint wrapped AST nodes
+def quoteVar : Var → TermElabM Term
+  | .named s    => `(Var.named $(Syntax.mkStrLit s))
+  | .internal n => `(Var.internal $(Syntax.mkNatLit n))
 
-These helpers encapsulate the `plBinderHint!` display-metadata wrapper so
-call sites don't have to repeat the boilerplate. -/
+/-! ### Smart term constructors
+These constructors bind any additional metadata to the term via `plBinderHint!`-/
 
 /-- Render an `Option Ty` syntax term from an optional `pl_ty`. -/
 def tyOptTerm (τ : Option (TSyntax `pl_ty)) : TermElabM Term := do
@@ -204,14 +196,14 @@ def mkAnonLam (body : Term) : TermElabM Term := do
 
 /-- Anonymous `λ. close body atom` — used for the case/let! scrutinee binder
     where the name is synthetic (no user ident to display). -/
-def closeAnonLam (body : Term) (atom : String) : TermElabM Term := do
-  let closed ← `(Exp.close $body $(Syntax.mkStrLit atom))
+def closeAnonLam (body : Term) (atom : Var) : TermElabM Term := do
+  let closed ← ``(Exp.close $body $(← quoteVar atom))
   wrapHint (← `(Exp.lam)) none none closed
 
 /-- Named-binder helper: close `body` over `b.atom`, wrap in `head` (`Exp.lam`
     or `Exp.fix`) with display name/type taken from `b`. -/
 def closeNamedHead (head : Term) (b : NamedBinder) (body : Term) : TermElabM Term := do
-  let closed ← `(Exp.close $body $(Syntax.mkStrLit b.atom))
+  let closed ← ``(Exp.close $body $(← quoteVar b.atom))
   wrapHint head (some b.ident.getId.toString) b.ty closed
 
 def mkNamedLam (b : NamedBinder) (body : Term) : TermElabM Term := do
@@ -237,7 +229,7 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
   | `(pl_exp|$i:ident)     => do
       checkNotReserved i
       let atomStr := env.find? i.getId |>.getD i.getId.toString
-      `(Exp.fvar $(Syntax.mkStrLit atomStr))
+      `(Exp.fvar $(← quoteVar atomStr))
   -- Binary / unary ops
   | `(pl_exp|$e1 + $e2)    => do `(Exp.binop .plus  $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|$e1 - $e2)    => do `(Exp.binop .minus $(← elabPL env st e1) $(← elabPL env st e2))
@@ -288,7 +280,7 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
   | `(pl_exp|case $e | $p:pl_pat => $b $[| $ps:pl_pat => $bs]*) => do
       -- Build `(λ scrut. <chain>) e`, where `<chain>` matches `scrut` against
       -- each pattern right-to-left, falling through to `fail`.
-      let scrutAtom ← freshAtom st
+      let scrutAtom ← genAtom st
       let chain ← buildCaseChain env st scrutAtom (#[p] ++ ps) (#[b] ++ bs)
       let lam ← closeAnonLam chain scrutAtom
       `(Exp.app $lam $(← elabPL env st e))
@@ -317,7 +309,7 @@ partial def elabBindArg (env : NameEnv) (st : IO.Ref AtomState)
     pattern variables out of it, and wrap in `λ atom. <projected>`. -/
 partial def mkCaseBranch (env : NameEnv) (st : IO.Ref AtomState)
     (pat : TSyntax `pl_pat) (body : TSyntax `pl_exp) : TermElabM Term := do
-  let atom ← freshAtom st
+  let atom ← genAtom st
   let projected ← projectPattern env st pat atom body
   closeAnonLam projected atom
 
@@ -331,7 +323,7 @@ Two passes over `pat`:
      projections of `scrutAtom` and wrapping `body` in one `(λ v. …) proj`
      application per ident binder. -/
 partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
-    (pat : TSyntax `pl_pat) (scrutAtom : String)
+    (pat : TSyntax `pl_pat) (scrutAtom : Var)
     (body : TSyntax `pl_exp) : TermElabM Term := do
   let rec collect (env : NameEnv) (acc : Lean.NameMap NamedBinder)
       (pat : TSyntax `pl_pat) : TermElabM (NameEnv × Lean.NameMap NamedBinder) := do
@@ -347,7 +339,7 @@ partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
     | _ => return (env, acc)
   let (envFull, binders) ← collect env ∅ pat
   let bodyTerm ← elabPL envFull st body
-  let scrutExp : TSyntax `pl_exp ← `(pl_exp|{Exp.fvar $(Syntax.mkStrLit scrutAtom)})
+  let scrutExp : TSyntax `pl_exp ← `(pl_exp|{Exp.fvar $(← quoteVar scrutAtom)})
   let rec emit (pat : TSyntax `pl_pat) (proj : TSyntax `pl_exp)
       (inner : Term) : TermElabM Term := do
     match pat with
@@ -367,9 +359,9 @@ partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
     into nested `Exp.case` nodes, with `Exp.fail` as the innermost fallback.
     The scrutinee is an `Exp.fvar scrutAtom` shared across all branches. -/
 partial def buildCaseChain (env : NameEnv) (st : IO.Ref AtomState)
-    (scrutAtom : String)
+    (scrutAtom : Var)
     (pats : Array (TSyntax `pl_pat)) (bodies : Array (TSyntax `pl_exp)) : TermElabM Term := do
-  let scrutExp : Term ← `(Exp.fvar $(Syntax.mkStrLit scrutAtom))
+  let scrutExp : Term ← `(Exp.fvar $(← quoteVar scrutAtom))
   let mut result : Term ← `(Exp.fail)
   for i in List.range pats.size |>.reverse do
     let branch ← mkCaseBranch env st pats[i]! bodies[i]!
@@ -682,7 +674,8 @@ open Lean.PrettyPrinter.Delaborator in
 def delabExpFvar : Delab := do
   let e ← SubExpr.getExpr
   unless e.getAppNumArgs == 1 do failure
-  let .lit (.strVal s) := e.appArg! | failure
+  let_expr Var.named sLit := e.appArg! | failure
+  let .lit (.strVal s) := sLit | failure
   `(pl($(Lean.mkIdent (Name.mkSimple s)):ident))
 
 end ProbLang

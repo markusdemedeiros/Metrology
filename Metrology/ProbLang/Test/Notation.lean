@@ -3,18 +3,7 @@ import Metrology.ProbLang.Syntax.Notation
 
 open ProbLang Exp Ty
 
-/-! # Tests for the LN surface-syntax elaborator (Var = String).
-
-Under the String-atom representation:
-* Free identifiers map directly to their name: `pl(x)` = `Exp.fvar "x"`.
-* Binder atoms are gensym'd: `fun x, ...` allocates `"_x_N"` where N is
-  the per-`pl(...)` counter.
-
-This file covers core surface-form elaboration + round-trip delab. It is
-less exhaustive than the pre-Var-switch version (see
-`Notation.lean.natatom.bak`); those assertions used numeric atom literals
-that are no longer valid.
--/
+/-! # Tests for the LN surface-syntax elaborator -/
 
 /-- Check that a ProbLang expression elaborates to the expected AST. -/
 macro "#elabpl " lhs:term:max ppLine "#expect " rhs:term : command =>
@@ -76,7 +65,8 @@ variable (e e1 e2 : Exp)
 example : pl(x) ≠ pl(y) := by
   intro h
   injection h with h'
-  exact (by decide : "x" ≠ "y") h'
+  injection h' with h''
+  exact (by decide : "x" ≠ "y") h''
 
 example : pl(x) = Exp.fvar "x" := by rfl
 

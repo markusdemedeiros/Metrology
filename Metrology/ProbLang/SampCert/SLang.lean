@@ -1,5 +1,5 @@
 import Metrology.ProbLang.Syntax.Syntax
-import Metrology.ProbLang.Syntax.Properties
+import Metrology.ProbLang.Syntax.LocallyClosed
 import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Exec
@@ -15,7 +15,6 @@ noncomputable section
 namespace EmbedSLang
 
 open SLang ProbLang Classical MeasureTheory ProbabilityTheory Measure PMF Measurable
-
 
 class abbrev SLangType (T : Type) := Countable T, MeasurableSpace T, MeasurableSingletonClass T
 

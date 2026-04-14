@@ -1,6 +1,6 @@
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Exec
-import Metrology.ProbLang.Syntax.Properties
+import Metrology.ProbLang.Syntax.LocallyClosed
 
 namespace ProbLang
 open Cslib Exp
