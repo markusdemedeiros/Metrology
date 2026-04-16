@@ -153,8 +153,21 @@ theorem supply_decrease {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗
 theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
     ●↯ ε₁ ⊢@{IProp GF} |==> (●↯ (ε₁ + ε₂) ∗ ↯ε₂) := by
   unfold ec ecAuth
-  -- FIXME: Rocq avoids this by `iMod (own_update with "H") as "[$ $]"; [|done].`.
-  -- Not sure if we support this yet?
+  have Hupd : (● ε₁) ~~> (● ε₁ + ε₂) • (◯ ε₂ : Auth ℕ+ ℝ≥0∞) := by
+    refine Auth.auth_update_alloc <| (local_update_unital_discrete ..).mpr ?_
+    simp only [CMRA.Valid, OFE.Equiv, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
+    exact fun _ => ⟨h, add_comm _ _⟩
+  iintro Hε
+  -- FIXME: Is this fixed by the last update to master?
+  -- imod (iOwn_update Hupd) with H'
+  -- Application type mismatch: The argument
+  --   Hupd
+  -- has type
+  --   (● ε₁) ~~> (● ε₁ + ε₂) • ◯ ε₂
+  -- but is expected to have type
+  --   ?m.102 ~~> ?m.103
+  -- in the application
+  --   iOwn_update Hupd
   suffices Hup :
       iOwn (E := IEC.ec) (ECGS.γec GF) (● ε₁)
       ⊢ |==> iOwn (E := IEC.ec) (ECGS.γec GF) ((● ε₁ + ε₂) • (◯ ε₂)) by
@@ -164,10 +177,7 @@ theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
     imodintro
     iapply iOwn_op
     iexact H
-  iintro Hε
-  refine iOwn_update <| Auth.auth_update_alloc <| (local_update_unital_discrete ..).mpr ?_
-  simp only [CMRA.Valid, OFE.Equiv, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
-  exact fun _ => ⟨h, add_comm _ _⟩
+  refine iOwn_update Hupd
 
 theorem weaken {ε₁ ε₂ : ℝ≥0∞} (h : ε₂ ≤ ε₁) : ↯ε₁ ⊢@{IProp GF} ↯ε₂ := by
   iintro Hε
@@ -323,18 +333,10 @@ theorem ec_alloc {GF : BundledGFunctors} [IEC : ECPreGS GF] (ε : ℝ≥0∞) (h
       ecAuth (IEC := { toECPreGS := IEC, γec := γ }) ε ∗
       ec (IEC := { toECPreGS := IEC, γec := γ }) ε := by
   unfold ec ecAuth
-  -- FIXME: Rocq: `iMod (own_alloc (● n ⋅ ◯ n)) as (γEC) "[H● H◯]".`
-  suffices Hup : ⊢ |==> ∃ γ, iOwn (E := IEC.ec) γ ((● ε) • (◯ ε)) by
-    ihave Hup := Hup
-    imod Hup with ⟨%γ, Hγ⟩
-    imodintro
-    iexists γ
-    iapply iOwn_op
-    iexact Hγ
-  ihave Halloc := iOwn_alloc (E := IEC.ec) ((● ε) • (◯ ε)) (Auth.auth_both_valid_2 h .rfl)
-  imod Halloc with ⟨%γ, Hγ⟩
+  imod (iOwn_alloc (E := IEC.ec) ((● ε) • (◯ ε)) (Auth.auth_both_valid_2 h .rfl)) with ⟨%γ, Hγ⟩
   imodintro
   iexists γ
+  iapply iOwn_op
   iexact Hγ
 
 end

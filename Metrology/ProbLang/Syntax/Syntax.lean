@@ -195,10 +195,10 @@ namespace Exp
   | fail => fail
   | scrut e p => scrut (closeRec i x e) p
 
-/-- Close the outermost binder. -/
+/-- Close the x using the outermost binder (bvar 0). -/
 @[simp, scoped grind =] def close (e : Exp) (x : Var) : Exp := closeRec 0 x e
 
-/-- Free-variable substitution (capture-avoiding by construction, because LN has no named binders). -/
+/-- Free-variable substitution. -/
 @[simp, scoped grind =] def subst (e : Exp) (x : Var) (sub : Exp) : Exp :=
   match e with
   | bvar j => bvar j
