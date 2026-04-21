@@ -270,6 +270,7 @@ variable [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace α'] [Measur
 
 /-! #### Tier 1 — core plumbing (blocks `app_weakestpre`, `adequacy`). -/
 
+omit [MeasurableSpace α] [MeasurableSpace β] in
 /-- Pointed `dret`/`dirac` variant: if `R (f a) (g b)` then the pushforward Diracs are
 coupled. Specialization of `AddCoupl.dirac`. -/
 theorem dret {ε : ENNReal} {R : α' → β' → Prop} {a : α} {b : β}
@@ -480,11 +481,11 @@ theorem swap {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : M
   have HFint : ∫⁻ a, (1 - g a) ∂μₗ = μₗ .univ - ∫⁻ a, g a ∂μₗ := by
     rw [MeasureTheory.lintegral_sub Hgm (ne_of_lt (lt_of_le_of_lt Hgint_le HμL_ne.lt_top))
       (ae_of_all _ Hgb)]
-    simp [lintegral_one]
+    simp
   have HGint : ∫⁻ b, (1 - f b) ∂μᵣ = μᵣ .univ - ∫⁻ b, f b ∂μᵣ := by
     rw [MeasureTheory.lintegral_sub Hfm (ne_of_lt (lt_of_le_of_lt Hfint_le HμR_ne.lt_top))
       (ae_of_all _ Hfb)]
-    simp [lintegral_one]
+    simp
   rw [HFint, HGint] at Hcpl
   -- Hcpl : μₗ.univ - ∫g ≤ (μᵣ.univ - ∫f) + ε
   -- Goal: ∫f dμᵣ ≤ ∫g dμₗ + ε

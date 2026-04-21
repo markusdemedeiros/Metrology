@@ -192,7 +192,7 @@ theorem spec_auth_update_heap {e : Exp} {σ : State} {l : Loc} {v w : Val} :
   ihave ⟨Hh, Hf⟩ := iOwn_op (E := ISpec.heap) $$ Hu
   -- Goal: specAuth ⟨e, σ.update_heap(insert l w)⟩ ∗ l ↦ₛ w
   -- After unfold: specProgAuth e ∗ specHeapAuth (insert l w σ.heap) ∗ specTapesAuth _ ∗ Frag
-  simp only [specAuth, specHeapAuth, specHeapFrag, State.update_heap, LocHeap.asAgree_insert]
+  simp only [State.update_heap, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [He] <;> try iassumption
   isplitl [Hh] <;> try iassumption
@@ -222,7 +222,7 @@ theorem spec_auth_heap_alloc {e : Exp} {σ : State} (v : Val) :
   imod Hu
   imodintro
   ihave ⟨Hh, Hf⟩ := iOwn_op (E := ISpec.heap) $$ Hu
-  simp only [specAuth, specHeapAuth, specHeapFrag, State.update_heap, LocHeap.asAgree_insert]
+  simp only [State.update_heap, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [He] <;> try iassumption
   isplitl [Hh] <;> try iassumption
@@ -270,7 +270,7 @@ theorem spec_auth_update_tape {e : Exp} {σ : State} {l : Loc} {t s : Tape} :
   imod Hu
   imodintro
   ihave ⟨Ht, Hf⟩ := iOwn_op (E := ISpec.tapes) $$ Hu
-  simp only [specAuth, specTapesAuth, specTapesFrag, State.update_tapes, LocHeap.asAgree_insert]
+  simp only [State.update_tapes, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [He] <;> try iassumption
   isplitl [Hh] <;> try iassumption
@@ -300,7 +300,7 @@ theorem spec_auth_tape_alloc {e : Exp} {σ : State} (t : Tape) :
   imod Hu
   imodintro
   ihave ⟨Ht, Hf⟩ := iOwn_op (E := ISpec.tapes) $$ Hu
-  simp only [specAuth, specTapesAuth, specTapesFrag, State.update_tapes, LocHeap.asAgree_insert]
+  simp only [State.update_tapes, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [He] <;> try iassumption
   isplitl [Hh] <;> try iassumption

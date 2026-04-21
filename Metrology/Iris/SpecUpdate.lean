@@ -43,8 +43,12 @@ def specUpdateN (n : Nat) (E : CoPset) (P : IProp GF) : IProp GF :=
   iprop(∀ ρ, SpecUpdateGS.specInterp ρ -∗ |={E}=> (∃ ρ', ⌜pexecN n ρ = MeasureTheory.Measure.dirac ρ'⌝ ∗ SpecUpdateGS.specInterp ρ' ∗ P))
 
 /-- Spec-side update: advance by some (existentially quantified) number of
-deterministic steps. This is the main modality used by spec rules. -/
-def specUpdate (E : CoPset) (P : IProp GF) : IProp GF :=
+deterministic steps. This is the main modality used by spec rules.
+
+⚠️ **Must be `abbrev`, not `def`** — per iris-lean gotcha #1, iprop tactics
+(`ispecialize`, `iapply`, `iexact`) need to see through this when the
+argument `P` varies (e.g. under `specUpdate E (fun v => ...)`). -/
+abbrev specUpdate (E : CoPset) (P : IProp GF) : IProp GF :=
   iprop(∀ ρ, SpecUpdateGS.specInterp ρ -∗ |={E}=> (∃ ρ' n, ⌜pexecN n ρ = MeasureTheory.Measure.dirac ρ'⌝ ∗ SpecUpdateGS.specInterp ρ' ∗ P))
 
 /-- `specUpdateN n` is stronger than the unindexed `specUpdate`. -/
