@@ -395,4 +395,65 @@ End spec_tape_interface.
 -/
 
 end Algebra
+
+/-! ## `natSpecTape` — user-level spec-side tape wrapper
+
+Spec-side analogue of `appNatTape`. Hides the backend subtype-list tape
+behind an existential, presenting `ns : List Int` to callers. Mirrors
+Rocq's `nat_spec_tape` (commented in `primitive_laws.v:82–86` and
+SpecProgram.lean:350–354 above). -/
+
+section NatSpecTape
+
+variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
+
+/-- Spec-side user-level tape: `l` points to a tape of bound `z` whose
+contents, as plain integers, match `ns`. -/
+noncomputable def specNatTape (l : Loc) (z : Int) (ns : List Int) : IProp GF :=
+  iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+    (⌜fs.map (fun x => x.val) = ns⌝) ∗ l ↪ₛ ⟨z, fs⟩)
+
+/-- `l ↪ₛN⟨z; ns⟩` — spec-side user-level tape points-to. -/
+notation:51 l:51 " ↪ₛN⟨" z:51 "; " ns:51 "⟩" => specNatTape l z ns
+
+/-- Empty user-level spec tape collapses to the backend empty tape. -/
+theorem spec_natTape_to_empty {l : Loc} {z : Int} :
+    specNatTape (GF := GF) l z [] ⊢ l ↪ₛ ⟨z, []⟩ := by
+  unfold specNatTape
+  iintro ⟨%fs, %Hmap, Hl⟩
+  have : fs = [] := List.map_eq_nil_iff.mp Hmap
+  subst this
+  iexact Hl
+
+/-- Backend empty spec tape embeds into user-level empty spec tape. -/
+theorem spec_empty_to_natTape {l : Loc} {z : Int} :
+    (l ↪ₛ ⟨z, ([] : List { z' : Int // 0 ≤ z' ∧ z' < z })⟩) ⊢@{IProp GF}
+      specNatTape l z [] := by
+  iintro Hl
+  unfold specNatTape
+  iexists []
+  isplitr; · ipure_intro; rfl
+  iexact Hl
+
+/-- Read the head of a user-level spec tape. -/
+theorem spec_read_natTape_head {l : Loc} {z : Int} {n : Int} {ns : List Int} :
+    specNatTape (GF := GF) l z (n :: ns) ⊢
+      iprop(∃ (x : { z' : Int // 0 ≤ z' ∧ z' < z })
+              (xs : List { z' : Int // 0 ≤ z' ∧ z' < z }),
+        l ↪ₛ ⟨z, x :: xs⟩ ∗ (⌜x.val = n⌝) ∗
+        (l ↪ₛ ⟨z, xs⟩ -∗ specNatTape l z ns)) := by
+  unfold specNatTape
+  iintro ⟨%fs, %Hmap, Hl⟩
+  have ⟨x, xs, hfs, hx, hxs⟩ := List.map_eq_cons_iff.mp Hmap
+  subst hfs
+  iexists x, xs
+  isplitl [Hl]; · iexact Hl
+  isplitr; · ipure_intro; exact hx
+  iintro Hl'
+  iexists xs
+  isplitr; · ipure_intro; exact hxs
+  iexact Hl'
+
+end NatSpecTape
+
 end SpecRA
