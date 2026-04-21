@@ -1,6 +1,7 @@
 import Metrology.Iris.SpecUpdate
 import Metrology.Iris.ErrorCredits
 import Metrology.Couplings.AdditiveCouplings
+import Metrology.Couplings.Couplings
 import Metrology.ProbLang.Exec
 import Metrology.ProbLang.Erasable
 import Iris.BI.Lib.Fixpoint
@@ -105,11 +106,25 @@ non-expansiveness/monotonicity helpers, and basic introduction lemmas.
   induction on `n` + structural walk through `wpPre` + IH under `▷`.
   Separated from the `NonExpansive` instance to keep elaboration fast.
 
-**File is sorry-free.**
+**`specCoupl` coupling-intro family (this batch):**
+* `specCoupl_erasables_exp` — full erasable-coupling intro with expectation
+  bound. Foundational; uses `AddCoupl.map` + `lintegral_map` to push
+  the LHS-state coupling through the `pexecN 0` collapse on the RHS.
+* `specCoupl_erasables` — specialization with constant per-config cost.
+* `specCoupl_erasable_steps` — erasable LHS, `pexecN n` on RHS. Includes
+  inline proof of `pexecN_univ_le_one`.
+* `specCoupl_steps` — pure `pexecN` on both sides (LHS is dirac σ).
+* `specCoupl_step` — single-step intro from `Reducible`. Uses
+  `RelCoupl.trivial` + `AddCoupl.pos_R` + `prim_step_mass`.
+* `specCoupl_ind` — induction principle via `least_fixpoint_ind`, lifting
+  `Ψ : State → Cfg → ENNReal → IProp` to `SpecCouplState → IProp` and
+  using `OFE.Discrete` to discharge the `NonExpansive` side condition.
+
+The full `specCoupl` API from Rocq is now ported.
 
 **Deferred:** `wp_atomic` (needs explicit atomic predicate, not Atomic class),
-`wp_contractive`, `spec_coupl_ind`/`erasables_*`/`steps_*`/`step` (need more
-measure-theory infra), the `proofmode_classes` section.
+`wp_contractive`, `progCoupl_steps_*`, `progCoupl_step_l_*`, the
+`proofmode_classes` section.
 -/
 
 open Std Iris Iris.Std Iris.BI OFE COFE ProbLang
@@ -861,18 +876,182 @@ theorem fupd_specCoupl {E : CoPset} {σ : State} {e' : Exp} {σ' : State}
       specCoupl E σ e' σ' ε Z :=
   fupd_specCoupl_of_le (_root_.le_refl _)
 
-/-! ### `specCoupl` — deferred: coupling-intro lemmas needing more measure infra
+/-! ### `specCoupl` — coupling-intro lemmas
 
-These require measure-theoretic lemmas (bind identity, `pexecN`-variants,
-`AddCoupl` bind/dret composition at `ENNReal`) that haven't been ported yet.
+General-purpose "construct a `specCoupl` from a raw `AddCoupl`-coupling"
+lemmas, used by program-logic proofs when discharging concrete primitive
+steps.
 
-* `specCoupl_ind` — induction principle, specialization of `least_fixpoint_ind`
-  past the `prodO`-tuple-matching; direct port is possible, deferred.
-* `specCoupl_erasables_exp` — erasable-coupling intro with expectation bound.
-* `specCoupl_erasables` — specialization with constant cost `ε₂`.
-* `specCoupl_erasable_steps` — erasable on LHS, `pexecN n` on RHS.
-* `specCoupl_steps` — pure `pexecN` steps on both sides (LHS is `dret σ`).
-* `specCoupl_step` — single-step specialization. -/
+* `specCoupl_erasables_exp` — full form with expectation bound.
+* `specCoupl_erasables` — specialization with constant cost.
+* `specCoupl_erasable_steps` — erasable LHS, `pexecN n` on RHS.
+* `specCoupl_steps` — pure `pexecN` on both sides (LHS is dirac σ).
+* `specCoupl_steps_det` — deterministic specialization.
+
+All `specCoupl` coupling-intro lemmas are now ported. -/
+
+/-- Induction principle for `specCoupl`. Mirrors Rocq's `spec_coupl_ind`.
+
+To prove `Ψ` of `specCoupl ε`, it suffices to show that `specCouplPre`
+applied to `(Ψ ∧ specCoupl)` implies `Ψ` (an "intuitionistic step
+hypothesis"). -/
+theorem specCoupl_ind {E : CoPset} {Ψ Z : State → Cfg → ENNReal → IProp GF} :
+    iprop(□ (∀ (σ : State) (c : Cfg) (ε : ENNReal),
+        specCouplPre E Z (fun s => iprop(Ψ s.1 s.2.1 s.2.2 ∧
+            specCoupl E s.1 s.2.1.expr s.2.1.state s.2.2 Z))
+          ((σ, c, ε) : SpecCouplState) -∗ Ψ σ c ε)) ⊢@{IProp GF}
+      ∀ (σ : State) (e' : Exp) (σ' : State) (ε : ENNReal),
+        specCoupl E σ e' σ' ε Z -∗ Ψ σ ⟨e', σ'⟩ ε := by
+  iintro #IH %σ %e' %σ' %ε HC
+  -- Lift Ψ to SpecCouplState.
+  let Ψ' : SpecCouplState → IProp GF := fun s => Ψ s.1 s.2.1 s.2.2
+  have HΨne : NonExpansive Ψ' := by
+    constructor
+    intro _ s s' hd
+    have heq : s = s' := OFE.Leibniz.eq_of_eqv (OFE.Discrete.discrete_0 hd)
+    subst heq; exact .of_eq rfl
+  -- Apply least_fixpoint_ind.
+  iapply (least_fixpoint_ind (F := specCouplPre (GF := GF) E Z) (Φ := Ψ'))
+    $$ [] %((σ, (⟨e', σ'⟩ : Cfg), ε) : SpecCouplState) HC
+  iintro !> %s HF
+  obtain ⟨σ'', c, ε'⟩ := s
+  iapply IH $$ %σ'' %c %ε'
+  iexact HF
+
+/-- General erasable-coupling intro for `specCoupl` with expectation bound on
+the per-configuration error. Mirrors Rocq's `spec_coupl_erasables_exp`. -/
+theorem specCoupl_erasables_exp {E : CoPset} {σ₁ : State} {e₁' : Exp} {σ₁' : State}
+    {ε₁ ε : ENNReal} {Z : State → Cfg → ENNReal → IProp GF}
+    {R : State → State → Prop}
+    {μ₁ : MeasureTheory.Measure State} {μ₁' : MeasureTheory.Measure State}
+    {X₂ : State → ENNReal} {r : ENNReal}
+    (Hcpl : AddCoupl ε₁ {p : State × State | R p.1 p.2} μ₁ μ₁')
+    (Heras₁ : Erasable μ₁ σ₁) (Heras₁' : Erasable μ₁' σ₁')
+    (Hbnd : ∀ σ', X₂ σ' ≤ r)
+    (Hexp : ε₁ + ∫⁻ σ', X₂ σ' ∂μ₁' ≤ ε) :
+    iprop(∀ (σ₂ σ₂' : State), (⌜R σ₂ σ₂'⌝) -∗ |={E}=>
+        specCoupl E σ₂ e₁' σ₂' (X₂ σ₂') Z) ⊢@{IProp GF}
+      specCoupl E σ₁ e₁' σ₁' ε Z := by
+  iintro H
+  iapply specCoupl_rec
+  iexists (fun σ₂ c => R σ₂ c.state ∧ c.expr = e₁'), 0, μ₁, μ₁',
+    ε₁, (fun ρ => X₂ ρ.state), r
+  isplitr
+  · ipure_intro
+    show AddCoupl ε₁ _ μ₁ ((μ₁').bind (fun σ => pexecN 0 ⟨e₁', σ⟩))
+    simp only [pexecN_zero]
+    rw [MeasureTheory.Measure.bind_dirac_eq_map _ Measurable.of_discrete,
+        ← MeasureTheory.Measure.map_id (μ := μ₁)]
+    exact AddCoupl.map (f := id) (g := fun σ => (⟨e₁', σ⟩ : Cfg))
+      Measurable.of_discrete Measurable.of_discrete
+      (fun {σ σ'} HR => ⟨HR, rfl⟩) Hcpl
+  isplitr
+  · ipure_intro; exact fun _ => Hbnd _
+  isplitr
+  · ipure_intro
+    refine _root_.le_trans ?_ Hexp
+    gcongr
+    have heq : (μ₁' : MeasureTheory.Measure State).bind (fun σ => pexecN 0 ⟨e₁', σ⟩) =
+        μ₁'.map (fun σ => (⟨e₁', σ⟩ : Cfg)) := by
+      simp only [pexecN_zero]
+      exact MeasureTheory.Measure.bind_dirac_eq_map _ Measurable.of_discrete
+    rw [heq, MeasureTheory.lintegral_map Measurable.of_discrete Measurable.of_discrete]
+  isplitr; · ipure_intro; exact Heras₁
+  isplitr; · ipure_intro; exact Heras₁'
+  iintro %σ₂ %e₂' %σ₂' %HS
+  obtain ⟨HR, rfl⟩ := HS
+  iapply H $$ %σ₂ %σ₂' %HR
+
+/-- Specialization of `specCoupl_erasables_exp` with a constant per-config cost
+`ε₂`. The error bound becomes `ε₁ + ε₂ ≤ ε`. -/
+theorem specCoupl_erasables {E : CoPset} {σ₁ : State} {e₁' : Exp} {σ₁' : State}
+    {ε₁ ε₂ ε : ENNReal} {Z : State → Cfg → ENNReal → IProp GF}
+    {R : State → State → Prop}
+    {μ₁ : MeasureTheory.Measure State} {μ₁' : MeasureTheory.Measure State}
+    (Hε : ε₁ + ε₂ ≤ ε)
+    (Hcpl : AddCoupl ε₁ {p : State × State | R p.1 p.2} μ₁ μ₁')
+    (Heras₁ : Erasable μ₁ σ₁) (Heras₁' : Erasable μ₁' σ₁') :
+    iprop(∀ (σ₂ σ₂' : State), (⌜R σ₂ σ₂'⌝) -∗ |={E}=>
+        specCoupl E σ₂ e₁' σ₂' ε₂ Z) ⊢@{IProp GF}
+      specCoupl E σ₁ e₁' σ₁' ε Z := by
+  iintro H
+  have Hexp_bnd : ε₁ + ∫⁻ _, ε₂ ∂μ₁' ≤ ε := by
+    refine _root_.le_trans ?_ Hε
+    rw [MeasureTheory.lintegral_const, Erasable.mass Heras₁', mul_one]
+  iapply (specCoupl_erasables_exp (X₂ := fun _ => ε₂) (r := ε₂) Hcpl Heras₁ Heras₁'
+    (fun _ => _root_.le_refl _) Hexp_bnd)
+  iintro %σ₂ %σ₂' %HR
+  iapply H $$ %σ₂ %σ₂' %HR
+
+/-- LHS-erasable + spec-side `pexecN n`-coupling intro for `specCoupl`.
+
+The relation `R` connects the LHS-state (sampled from `μ₁`) to a spec config
+(sampled from `pexecN n ⟨e₁', σ₁'⟩`). Mirrors Rocq's `spec_coupl_erasable_steps`. -/
+theorem specCoupl_erasable_steps {E : CoPset} {σ₁ : State} {e₁' : Exp} {σ₁' : State}
+    {n : Nat} {ε₁ ε₂ ε : ENNReal} {Z : State → Cfg → ENNReal → IProp GF}
+    {R : State → Cfg → Prop} {μ₁ : MeasureTheory.Measure State}
+    (Hε : ε₁ + ε₂ ≤ ε)
+    (Hcpl : AddCoupl ε₁ {p : State × Cfg | R p.1 p.2} μ₁ (pexecN n ⟨e₁', σ₁'⟩))
+    (Heras₁ : Erasable μ₁ σ₁) :
+    iprop(∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+        (⌜R σ₂ ⟨e₂', σ₂'⟩⌝) -∗ |={E}=>
+          specCoupl E σ₂ e₂' σ₂' ε₂ Z) ⊢@{IProp GF}
+      specCoupl E σ₁ e₁' σ₁' ε Z := by
+  iintro H
+  iapply specCoupl_rec
+  iexists R, n, μ₁, MeasureTheory.Measure.dirac σ₁', ε₁, (fun _ => ε₂), ε₂
+  isplitr
+  · ipure_intro
+    show AddCoupl ε₁ _ μ₁ ((MeasureTheory.Measure.dirac σ₁').bind (fun s => pexecN n ⟨e₁', s⟩))
+    rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete]
+    exact Hcpl
+  isplitr; · ipure_intro; intro _; exact _root_.le_refl _
+  isplitr
+  · ipure_intro
+    refine _root_.le_trans ?_ Hε
+    rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete,
+        MeasureTheory.lintegral_const]
+    gcongr
+    -- pexecN is a sub-probability: total mass ≤ 1. Prove by induction on n.
+    have hmass : ∀ m ρ, (pexecN m ρ) Set.univ ≤ 1 := by
+      intro m
+      induction m with
+      | zero => intro ρ; simp [pexecN_zero]
+      | succ k ih =>
+        intro ρ
+        rw [pexecN_succ]
+        rw [MeasureTheory.Measure.bind_apply MeasurableSet.of_discrete
+              Measurable.of_discrete.aemeasurable]
+        calc ∫⁻ a, (pexecN k a) Set.univ ∂(stepOrFinal ρ)
+            ≤ ∫⁻ _, 1 ∂(stepOrFinal ρ) := MeasureTheory.lintegral_mono fun a => ih a
+          _ = (stepOrFinal ρ) Set.univ := by simp
+          _ ≤ 1 := by
+              by_cases hv : ρ.expr.isValue
+              · rw [stepOrFinal_isValue hv]; simp
+              · rw [stepOrFinal_not_isValue hv]; exact primStep_univ_le_one ρ
+    calc ε₂ * (pexecN n ⟨e₁', σ₁'⟩) .univ
+        ≤ ε₂ * 1 := by gcongr; exact hmass n _
+      _ = ε₂ := mul_one _
+  isplitr; · ipure_intro; exact Heras₁
+  isplitr; · ipure_intro; exact Erasable.dret σ₁'
+  iintro %σ₂ %e₂' %σ₂' %HR
+  iapply H $$ %σ₂ %e₂' %σ₂' %HR
+
+/-- Pure-step specialization: LHS is the singleton `dirac σ₁`, RHS is `pexecN n`.
+Mirrors Rocq's `spec_coupl_steps`. -/
+theorem specCoupl_steps {E : CoPset} {σ₁ : State} {e₁' : Exp} {σ₁' : State}
+    {n : Nat} {ε₁ ε₂ ε : ENNReal} {Z : State → Cfg → ENNReal → IProp GF}
+    {R : State → Cfg → Prop}
+    (Hε : ε₁ + ε₂ ≤ ε)
+    (Hcpl : AddCoupl ε₁ {p : State × Cfg | R p.1 p.2}
+              (MeasureTheory.Measure.dirac σ₁) (pexecN n ⟨e₁', σ₁'⟩)) :
+    iprop(∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+        (⌜R σ₂ ⟨e₂', σ₂'⟩⌝) -∗ |={E}=>
+          specCoupl E σ₂ e₂' σ₂' ε₂ Z) ⊢@{IProp GF}
+      specCoupl E σ₁ e₁' σ₁' ε Z := by
+  iintro H
+  iapply (specCoupl_erasable_steps Hε Hcpl (Erasable.dret σ₁))
+  iexact H
 
 /-- Deterministic-step specialization: if `pexecN n ⟨e₁', σ₁'⟩ = dirac ⟨e₂', σ₂'⟩`
 (the spec side takes `n` steps and lands deterministically on `⟨e₂', σ₂'⟩`),
@@ -913,6 +1092,49 @@ theorem specCoupl_steps_det {E : CoPset} {σ : State} {e₁' : Exp} {σ₁' : St
   obtain ⟨rfl, HS'⟩ := HS'
   cases HS'
   iexact HS
+
+/-- Single-step specialization: when `(e₁', σ₁')` is reducible, every
+positive-measure spec successor lets us land on a `specCoupl` at the
+post-step config. Mirrors Rocq's `spec_coupl_step`. -/
+theorem specCoupl_step {E : CoPset} {σ₁ : State} {e₁' : Exp} {σ₁' : State}
+    {ε : ENNReal} {Z : State → Cfg → ENNReal → IProp GF}
+    (Hred : Reducible e₁' σ₁') :
+    iprop(∀ (e₂' : Exp) (σ₂' : State),
+        (⌜0 < primStep ⟨e₁', σ₁'⟩ {⟨e₂', σ₂'⟩}⌝) -∗ |={E}=>
+          specCoupl E σ₁ e₂' σ₂' ε Z) ⊢@{IProp GF}
+      specCoupl E σ₁ e₁' σ₁' ε Z := by
+  iintro H
+  have Hε : (0 : ENNReal) + ε ≤ ε := by rw [zero_add]
+  have hprob_lhs : (MeasureTheory.Measure.dirac σ₁ : MeasureTheory.Measure State) .univ = 1 := by
+    simp
+  have hprob_rhs : (primStep ⟨e₁', σ₁'⟩) .univ = 1 := by
+    haveI := prim_step_mass ⟨e₁', σ₁'⟩ Hred
+    exact MeasureTheory.IsProbabilityMeasure.measure_univ
+  have Htrivial : AddCoupl 0 Set.univ (MeasureTheory.Measure.dirac σ₁) (primStep ⟨e₁', σ₁'⟩) :=
+    RelCoupl.exact (RelCoupl.trivial hprob_lhs hprob_rhs)
+  have Hpos := AddCoupl.pos_R Htrivial
+  have hnotval : ¬ e₁'.isValue := fun hv => by
+    obtain ⟨ρ, hρ⟩ := Hred
+    exact val_stuck hρ hv
+  have hpexec1 : pexecN 1 ⟨e₁', σ₁'⟩ = primStep ⟨e₁', σ₁'⟩ := by
+    rw [pexecN_one, stepOrFinal_not_isValue hnotval]
+  have HcplR : AddCoupl 0 {p : State × Cfg | (fun σ c => σ = σ₁ ∧
+        0 < primStep ⟨e₁', σ₁'⟩ {c}) p.1 p.2}
+        (MeasureTheory.Measure.dirac σ₁) (pexecN 1 ⟨e₁', σ₁'⟩) := by
+    rw [hpexec1]
+    refine AddCoupl.mono_rel ?_ Hpos
+    rintro ⟨σ, c⟩ ⟨_, hσ, hc⟩
+    refine ⟨?_, ?_⟩
+    · by_contra hne
+      apply hσ
+      rw [MeasureTheory.Measure.dirac_apply' _ MeasurableSet.of_discrete]
+      simp [Ne.symm hne]
+    · exact pos_iff_ne_zero.mpr hc
+  iapply (specCoupl_steps (n := 1) (R := fun σ c => σ = σ₁ ∧
+    0 < primStep ⟨e₁', σ₁'⟩ {c}) (ε₁ := 0) (ε₂ := ε) (Hε := Hε) HcplR)
+  iintro %σ₂ %e₂' %σ₂' %HR
+  obtain ⟨rfl, Hpos'⟩ := HR
+  iapply H $$ %e₂' %σ₂' %Hpos'
 
 /-! ## `progCoupl` — derived lemmas -/
 
