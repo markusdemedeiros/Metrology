@@ -2337,6 +2337,641 @@ instance elimModal_specUpdateN_wp {n : Nat} {E : CoPset} {e : Exp} {P : IProp GF
     isplitl [Hρ']; · iassumption
     iapply Hcnt $$ HPv
 
+/-! ## Lifting lemmas (ports `clutch/theories/approxis/lifting.v`)
+
+Translate the operational semantics rules into WP rules. These sit directly
+on top of `wp_unfold` + the `specCoupl` / `progCoupl` modalities. -/
+
+/-- `wp_lift_step_couple` — the most general lifting lemma.
+Directly restates `wp_unfold` so callers don't have to unfold `wpPre`. -/
+theorem wp_lift_step_couple {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF} :
+    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε₁ : ENNReal),
+      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε₁) -∗
+        |={E, ∅}=> specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
+          match e₁.toVal? with
+          | some v => iprop(|={∅, E}=>
+              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗ errInterp ε₂ ∗ Φ v)
+          | none => progCoupl e₁ σ₂ ρ'.expr ρ'.state ε₂ (fun e₃ σ₃ e₃' σ₃' ε₃ =>
+              iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
+                iprop(|={∅, E}=>
+                  stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+                    wp E e₃ Φ)))))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_unfold
+  unfold wpPre
+  iexact H
+
+/-- `wp_lift_step_spec_couple` — only spec-side coupling, no LHS step.
+After the spec-coupling we must re-establish `wp E e₁ Φ`. -/
+theorem wp_lift_step_spec_couple {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF} :
+    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε₁ : ENNReal),
+      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε₁) -∗
+        |={E, ∅}=> specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
+          iprop(|={∅, E}=>
+            stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗ errInterp ε₂ ∗
+              wp E e₁ Φ))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_couple
+  iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ %e₁' %σ₁' %ε₁ [Hσ Hs Hε]
+  · isplitl [Hσ]; · iassumption
+    isplitl [Hs] <;> iassumption
+  imod H
+  imodintro
+  iapply specCoupl_bind (E1 := ∅) (E2 := ∅) Std.LawfulSet.subset_refl
+  isplitr [H]
+  swap
+  · iexact H
+  iintro %σ₂ %ρ₂ %ε₂ HInner
+  iapply fupd_specCoupl
+  imod HInner with ⟨Hσ', Hs', Hε', HW⟩
+  ihave HW' := (BI.equiv_iff.mp wp_unfold).1 $$ HW
+  ispecialize HW' $$ %σ₂ %ρ₂.expr %ρ₂.state %ε₂ [Hσ' Hs' Hε']
+  · isplitl [Hσ']; · iassumption
+    isplitl [Hs'] <;> iassumption
+  imod HW'
+  imodintro
+  iexact HW'
+
+/-- `wp_lift_step_prog_couple` — one program step against any `progCoupl`,
+no spec-only coupling prefix. Requires `e₁` is not a value. -/
+theorem wp_lift_step_prog_couple {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε₁ : ENNReal),
+      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε₁) -∗
+        |={E, ∅}=> progCoupl e₁ σ₁ e₁' σ₁' ε₁ (fun e₂ σ₂ e₂' σ₂' ε₂ =>
+          iprop(▷ |={∅, E}=>
+            stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₂', σ₂'⟩ ∗ errInterp ε₂ ∗
+              wp E e₂ Φ))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_couple
+  iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ %e₁' %σ₁' %ε₁ [Hσ Hs Hε]
+  · isplitl [Hσ]; · iassumption
+    isplitl [Hs] <;> iassumption
+  imod H
+  imodintro
+  iapply specCoupl_ret
+  simp only [Hv]
+  iapply (progCoupl_mono (Z₁ := fun e₂ σ₂ e₂' σ₂' ε₂ =>
+    iprop(▷ |={∅, E}=>
+      stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₂', σ₂'⟩ ∗ errInterp ε₂ ∗
+        wp E e₂ Φ)))
+  isplitr [H]
+  swap
+  · iexact H
+  iintro %e₂ %σ₂ %e₂' %σ₂' %ε₂ HL
+  iintro !>
+  iapply specCoupl_ret
+  iexact HL
+
+/-- `wp_lift_step_later` — single LHS step, no spec-side coupling, results
+under a later. Uses `progCoupl_step_l` through `wp_lift_step_couple`. -/
+theorem wp_lift_step_later {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E, ∅}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ∀ (e₂ : Exp) (σ₂ : State),
+        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
+          stateInterp σ₂ ∗ wp E e₂ Φ)) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_couple
+  iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imodintro
+  iapply specCoupl_ret
+  simp only [Hv]
+  iapply (progCoupl_step_l (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
+    iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
+      iprop(|={∅, E}=>
+        stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+          wp E e₃ Φ)))) Hred)
+  isplitr
+  · iintro !> %e₃ %σ₃ %e₃' %σ₃'
+    iintro !>
+    iapply (specCoupl_err_ge_1 (_root_.le_refl _))
+  iintro %e₂ %σ₂ %Hstep
+  ispecialize H $$ %e₂ %σ₂ %Hstep
+  imod H
+  imodintro
+  iintro !>
+  iapply specCoupl_ret
+  imod H with ⟨Hσ', HwpNew⟩
+  imodintro
+  isplitl [Hσ']; · iassumption
+  isplitl [Hs]; · iassumption
+  isplitl [Hε]; · iassumption
+  iassumption
+
+/-- `wp_lift_step` — like `wp_lift_step_later` but with the `▷` flipped inside. -/
+theorem wp_lift_step {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E, ∅}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ▷ ∀ (e₂ : Exp) (σ₂ : State),
+        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅, E}=>
+          stateInterp σ₂ ∗ wp E e₂ Φ) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_later Hv
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imodintro
+  isplitr; · ipure_intro; exact Hred
+  iintro %e₂ %σ₂ %Hstep
+  imodintro
+  iintro !>
+  iapply H $$ %e₂ %σ₂ %Hstep
+
+/-- `wp_lift_prim_steps_coupl` — coupling between LHS and RHS primStep. -/
+theorem wp_lift_prim_steps_coupl {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
+      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε) -∗
+        |={E, ∅}=>
+        ∃ (R : Cfg → Cfg → Prop) (ε₁ ε₂ : ENNReal),
+          (⌜ε₁ + ε₂ ≤ ε⌝) ∗
+          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜Reducible e₁' σ₁'⌝) ∗
+          (⌜AddCoupl ε₁ {p : Cfg × Cfg | R p.1 p.2}
+              (primStep ⟨e₁, σ₁⟩) (primStep ⟨e₁', σ₁'⟩)⌝) ∗
+          (∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+            (⌜R ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
+              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₂', σ₂'⟩ ∗
+                errInterp ε₂ ∗ wp E e₂ Φ))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_couple
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ %e₁' %σ₁' %ε [Hσ Hs Hε]
+  · isplitl [Hσ]; · iassumption
+    isplitl [Hs] <;> iassumption
+  imod H with ⟨%R, %ε₁, %ε₂, %Hεsum, %Hred, %Hred', %Hcpl, H⟩
+  imodintro
+  iapply specCoupl_ret
+  simp only [Hv]
+  iapply (progCoupl_steps (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
+    iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
+      iprop(|={∅, E}=>
+        stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+          wp E e₃ Φ)))) Hεsum Hred Hred' Hcpl)
+  isplitr
+  · iintro !> %e₃ %σ₃ %e₃' %σ₃'
+    iintro !>
+    iapply (specCoupl_err_ge_1 (_root_.le_refl _))
+  iintro %e₂ %σ₂ %e₂' %σ₂' %HR
+  ispecialize H $$ %e₂ %σ₂ %e₂' %σ₂' %HR
+  imod H
+  imodintro
+  iintro !>
+  iapply specCoupl_ret
+  imod H with ⟨Hσ', Hs', Hε', Hwp'⟩
+  imodintro
+  isplitl [Hσ']; · iassumption
+  isplitl [Hs']; · iassumption
+  isplitl [Hε']; · iassumption
+  iassumption
+
+/-- `wp_lift_prim_step_l_dret` — LHS step, RHS dirac (no spec step). -/
+theorem wp_lift_prim_step_l_dret {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
+      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε) -∗
+        |={E, ∅}=>
+        ∃ (R : Cfg → State → Prop) (ε₁ ε₂ : ENNReal),
+          (⌜ε₁ + ε₂ ≤ ε⌝) ∗
+          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜AddCoupl ε₁ {p : Cfg × State | R p.1 p.2}
+              (primStep ⟨e₁, σ₁⟩) (MeasureTheory.Measure.dirac σ₁')⌝) ∗
+          (∀ (e₂ : Exp) (σ₂ : State),
+            (⌜R ⟨e₂, σ₂⟩ σ₁'⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
+              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗
+                errInterp ε₂ ∗ wp E e₂ Φ))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_couple
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ %e₁' %σ₁' %ε [Hσ Hs Hε]
+  · isplitl [Hσ]; · iassumption
+    isplitl [Hs] <;> iassumption
+  imod H with ⟨%R, %ε₁, %ε₂, %Hεsum, %Hred, %Hcpl, H⟩
+  imodintro
+  iapply specCoupl_ret
+  simp only [Hv]
+  iapply (progCoupl_step_l_dret (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
+    iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
+      iprop(|={∅, E}=>
+        stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+          wp E e₃ Φ)))) Hεsum Hred Hcpl)
+  isplitr
+  · iintro !> %e₃ %σ₃ %e₃' %σ₃'
+    iintro !>
+    iapply (specCoupl_err_ge_1 (_root_.le_refl _))
+  iintro %e₂ %σ₂ %HR
+  ispecialize H $$ %e₂ %σ₂ %HR
+  imod H
+  imodintro
+  iintro !>
+  iapply specCoupl_ret
+  imod H with ⟨Hσ', Hs', Hε', Hwp'⟩
+  imodintro
+  isplitl [Hσ']; · iassumption
+  isplitl [Hs']; · iassumption
+  isplitl [Hε']; · iassumption
+  iassumption
+
+/-- `wp_lift_prim_step_l_erasable` — LHS step, RHS erasable distribution. -/
+theorem wp_lift_prim_step_l_erasable {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
+      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε) -∗
+        |={E, ∅}=>
+        ∃ (R : Cfg → State → Prop) (μ₁' : MeasureTheory.Measure State)
+          (ε₁ ε₂ : ENNReal),
+          (⌜ε₁ + ε₂ ≤ ε⌝) ∗
+          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜Erasable μ₁' σ₁'⌝) ∗
+          (⌜AddCoupl ε₁ {p : Cfg × State | R p.1 p.2}
+              (primStep ⟨e₁, σ₁⟩) μ₁'⌝) ∗
+          (∀ (e₂ : Exp) (σ₂ : State) (σ₂' : State),
+            (⌜R ⟨e₂, σ₂⟩ σ₂'⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
+              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₂'⟩ ∗
+                errInterp ε₂ ∗ wp E e₂ Φ))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_couple
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ %e₁' %σ₁' %ε [Hσ Hs Hε]
+  · isplitl [Hσ]; · iassumption
+    isplitl [Hs] <;> iassumption
+  imod H with ⟨%R, %μ₁', %ε₁, %ε₂, %Hεsum, %Hred, %Heras, %Hcpl, H⟩
+  imodintro
+  iapply specCoupl_ret
+  simp only [Hv]
+  iapply (progCoupl_step_l_erasable (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
+    iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
+      iprop(|={∅, E}=>
+        stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+          wp E e₃ Φ)))) Hεsum Hred Hcpl Heras)
+  isplitr
+  · iintro !> %e₃ %σ₃ %e₃' %σ₃'
+    iintro !>
+    iapply (specCoupl_err_ge_1 (_root_.le_refl _))
+  iintro %e₂ %σ₂ %σ₂' %HR
+  ispecialize H $$ %e₂ %σ₂ %σ₂' %HR
+  imod H
+  imodintro
+  iintro !>
+  iapply specCoupl_ret
+  imod H with ⟨Hσ', Hs', Hε', Hwp'⟩
+  imodintro
+  isplitl [Hσ']; · iassumption
+  isplitl [Hs']; · iassumption
+  isplitl [Hε']; · iassumption
+  iassumption
+
+/-- `wp_lift_pure_step` — pure LHS step (deterministic state, always reducible). -/
+theorem wp_lift_pure_step {E E' : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (Hstep : ∀ σ₁ e₂ σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} → σ₂ = σ₁) :
+    iprop(|={E}[E']▷=> ∀ (e₂ : Exp) (σ : State),
+      (⌜0 < primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩}⌝) -∗ wp E e₂ Φ) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  have Hv : e₁.toVal? = none := by
+    rcases htv : e₁.toVal? with _ | v
+    · rfl
+    · exfalso
+      have : e₁.isValue := Exp.toVal?_isValue htv
+      obtain ⟨ρ, hρ⟩ := Hsafe default
+      exact val_stuck hρ this
+  iapply wp_lift_step Hv
+  iintro %σ₁ Hσ
+  -- H : |={E,E'}=> ▷ |={E',E}=> ∀ e₂ σ, ⌜...⌝ -∗ wp E e₂ Φ
+  -- Goal : |={E,∅}=> ⌜Reducible⌝ ∗ ▷ ∀ e₂ σ₂, ⌜...⌝ -∗ |={∅,E}=> stateInterp σ₂ ∗ wp E e₂ Φ
+  imod H
+  -- Now H at mask E'; goal at mask E'
+  imod (BIFUpdate.subset (E1 := E') (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  isplitr; · ipure_intro; exact Hsafe σ₁
+  iintro !>
+  iintro %e₂ %σ₂ %Hpstep
+  have hσ : σ₂ = σ₁ := Hstep σ₁ e₂ σ₂ Hpstep
+  imod Hclose
+  imod H
+  imodintro
+  isplitl [Hσ]; · rw [← hσ]; iassumption
+  have Hpstep' : 0 < primStep ⟨e₁, σ₂⟩ {⟨e₂, σ₂⟩} := hσ ▸ Hpstep
+  iapply H $$ %e₂ %σ₂ %Hpstep'
+
+/-- `wp_lift_atomic_step_fupd` — atomic step with mask-shifting fupd. -/
+theorem wp_lift_atomic_step_fupd {E1 E2 : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E1}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ∀ (e₂ : Exp) (σ₂ : State),
+        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E1}[E2]▷=>
+          stateInterp σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E1 e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_later Hv
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imod (BIFUpdate.subset (E1 := E1) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  isplitr; · ipure_intro; exact Hred
+  iintro %e₂ %σ₂ %Hpstep
+  imod Hclose
+  ispecialize H $$ %e₂ %σ₂ %Hpstep
+  -- H : |={E1,E2}=> ▷ |={E2,E1}=> stateInterp σ₂ ∗ (match ...)
+  imod H
+  -- H at E2; goal at E1
+  imod (BIFUpdate.subset (E1 := E2) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  iintro !>
+  imod Hclose
+  cases htv : e₂.toVal? with
+  | some v =>
+    imod H with ⟨Hσ', HΦ⟩
+    imodintro
+    isplitl [Hσ']; · iassumption
+    iapply wp_value_of_toVal htv
+    iexact HΦ
+  | none =>
+    imod H with ⟨Hσ', HΦ⟩
+    iexfalso
+    iexact HΦ
+
+/-- `wp_lift_atomic_step` — atomic step without mask shift on the inner step. -/
+theorem wp_lift_atomic_step {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ▷ ∀ (e₂ : Exp) (σ₂ : State),
+        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E}=>
+          stateInterp σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_atomic_step_fupd (E2 := E) Hv
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imodintro
+  isplitr; · ipure_intro; exact Hred
+  iintro %e₂ %σ₂ %Hpstep
+  imodintro
+  iintro !>
+  iapply H $$ %e₂ %σ₂ %Hpstep
+
+/-- `wp_lift_pure_det_step` — pure deterministic step. -/
+theorem wp_lift_pure_det_step {E E' : CoPset} {e₁ e₂ : Exp} {Φ : Val → IProp GF}
+    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (Hdet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
+    iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_pure_step (Hsafe := Hsafe)
+    (Hstep := fun σ₁ e₂' σ₂ hp => (Hdet σ₁ e₂' σ₂ hp).1)
+  imod H
+  imodintro
+  iintro !>
+  imod H
+  imodintro
+  iintro %e₂' %σ %Hpstep
+  obtain ⟨_, heq⟩ := Hdet σ e₂' σ Hpstep
+  subst heq
+  iexact H
+
+end ApproxisWpGS
+
+/-- Helper: if `PureStep e₁ e₂` and `0 < primStep ⟨e₁,σ⟩ {⟨e₂',σ₂⟩}`, then
+`σ₂ = σ ∧ e₂' = e₂`. -/
+theorem PureStep.prim_step_det {e₁ e₂ : Exp} (h : PureStep e₁ e₂)
+    {σ : State} {e₂' : Exp} {σ₂ : State}
+    (hp : 0 < primStep ⟨e₁, σ⟩ {⟨e₂', σ₂⟩}) :
+    σ₂ = σ ∧ e₂' = e₂ := by
+  classical
+  haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e₁, σ⟩) :=
+    prim_step_mass _ ⟨⟨e₂, σ⟩, h.det σ ▸ zero_lt_one⟩
+  have hmass := h.det σ
+  -- {⟨e₂,σ⟩} has full mass 1, so its complement has mass 0.
+  have h0 : (primStep ⟨e₁, σ⟩) ({⟨e₂, σ⟩}ᶜ : Set Cfg) = 0 := by
+    have := MeasureTheory.prob_compl_eq_one_sub MeasurableSet.of_discrete
+      (μ := primStep ⟨e₁, σ⟩) (s := {⟨e₂, σ⟩})
+    rw [this, hmass, tsub_self]
+  by_contra hne
+  have hne' : (⟨e₂', σ₂⟩ : Cfg) ≠ ⟨e₂, σ⟩ := by
+    rintro ⟨⟩; exact hne ⟨rfl, rfl⟩
+  have hzero : (primStep ⟨e₁, σ⟩) {⟨e₂', σ₂⟩} = 0 := by
+    apply _root_.le_antisymm _ (zero_le _)
+    rw [← h0]
+    exact MeasureTheory.measure_mono (fun x hx => by
+      simp only [Set.mem_singleton_iff] at hx
+      subst hx; exact hne')
+  exact absurd hp (by rw [hzero]; exact _root_.lt_irrefl _)
+
+namespace ApproxisWpGS
+variable {GF : BundledGFunctors} [ApproxisWpGS GF]
+
+/-- `wp_pure_step_one` — single `PureStep` lifting. Single-step specialization of
+Rocq's `wp_pure_step_later` (with n = 1), directly consumable downstream. -/
+theorem wp_pure_step_one {E : CoPset} {e₁ e₂ : Exp} {Φ : Val → IProp GF}
+    (Hstep : PureStep e₁ e₂) :
+    iprop(▷ wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  iintro H
+  have Hdet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂ :=
+    fun σ e₂' σ₂ hp => Hstep.prim_step_det hp
+  iapply (wp_lift_pure_det_step (E' := E) (e₂ := e₂) Hstep.safe Hdet)
+  imodintro; iintro !>; imodintro; iexact H
+
+/-- `wp_pure_step_fupd` — `PureExec` step lifting (n-step `step_fupd` form).
+
+The `Nat.repeat` is left as-is in the statement; callers unfold via
+`simp only [Nat.repeat]` after `iapply`. -/
+theorem wp_pure_step_fupd {E E' : CoPset} {e₁ e₂ : Exp} {φ : Prop} {n : Nat}
+    {Φ : Val → IProp GF}
+    [Hex : PureExec φ n e₁ e₂] (Hφ : φ) :
+    iprop(|={E}[E']▷=>^[n] wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  have Hsteps := Hex.pure_exec Hφ
+  clear Hex
+  induction n generalizing e₁ with
+  | zero =>
+    simp only [nsteps] at Hsteps
+    subst Hsteps
+    simp only [Nat.repeat]
+    iintro H; iexact H
+  | succ n IH =>
+    obtain ⟨c, Hstep, Hrest⟩ := Hsteps
+    simp only [Nat.repeat]
+    iintro H
+    have Hdet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = c :=
+      fun σ e₂' σ₂ hp => Hstep.prim_step_det hp
+    iapply (wp_lift_pure_det_step (e₂ := c) Hstep.safe Hdet)
+    imod H; imodintro; iintro !>; imod H; imodintro
+    iapply (IH Hrest)
+    iexact H
+
+/-- `wp_pure_step_later` — `PureExec` step lifting (n-step `▷` form).
+
+Proven via `wp_pure_step_fupd` by converting `▷^n` to `(|={E}[E]▷=>)^n` with
+a trivial mask-preserving step-fupd per layer. -/
+theorem wp_pure_step_later {E : CoPset} {e₁ e₂ : Exp} {φ : Prop} {n : Nat}
+    {Φ : Val → IProp GF}
+    [Hex : PureExec φ n e₁ e₂] (Hφ : φ) :
+    Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (wp E e₂ Φ) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  refine BI.Entails.trans ?_ (wp_pure_step_fupd (E := E) (E' := E)
+    (e₁ := e₁) (e₂ := e₂) (n := n) (Hex := Hex) Hφ)
+  -- Pointwise: `▷ Q ⊢ |={E}[E]▷=> Q`.
+  induction n with
+  | zero =>
+    simp only [Nat.repeat]
+    exact BI.BIBase.Entails.rfl
+  | succ n ih =>
+    simp only [Nat.repeat]
+    refine (BI.later_mono ih).trans ?_
+    -- `▷ |={E}[E]▷=>^[n] wp ⊢ |={E}[E]▷=> |={E}[E]▷=>^[n] wp`
+    -- using `fupd_intro_mask` on both outer masks (mask E = E, trivial).
+    iintro H
+    imodintro; iintro !>; imodintro; iexact H
+
+/-! ## Ectx-lifting lemmas (ports `clutch/theories/approxis/ectx_lifting.v`)
+
+Specialize `Lifting` to head-step semantics using `headStep`/`Reducible.of_head`.
+-/
+
+/-- `wp_lift_head_step_prog_couple` — head-step specialization. -/
+theorem wp_lift_head_step_prog_couple {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε₁ : ENNReal),
+      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε₁) -∗
+        |={E, ∅}=> (⌜∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
+        progCoupl e₁ σ₁ e₁' σ₁' ε₁ (fun e₂ σ₂ e₂' σ₂' ε₂ =>
+          iprop(▷ |={∅, E}=>
+            stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₂', σ₂'⟩ ∗ errInterp ε₂ ∗
+              wp E e₂ Φ))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step_prog_couple Hv
+  iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ %e₁' %σ₁' %ε₁ [Hσ Hs Hε]
+  · isplitl [Hσ]; · iassumption
+    isplitl [Hs] <;> iassumption
+  imod H with ⟨%_Hhred, H⟩
+  imodintro
+  iexact H
+
+/-- `wp_lift_head_step` — head-step lifting (no spec coupling). -/
+theorem wp_lift_head_step {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E, ∅}=>
+      (⌜∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
+      ▷ ∀ (e₂ : Exp) (σ₂ : State),
+        (⌜0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅, E}=>
+          stateInterp σ₂ ∗ wp E e₂ Φ) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_step Hv
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hhred, H⟩
+  imodintro
+  isplitr; · ipure_intro; exact Reducible.of_head Hhred
+  iintro !>
+  iintro %e₂ %σ₂ %Hpstep
+  -- primStep positive + head-reducible ⇒ headStep positive at same successor
+  have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
+    exact heq ▸ Hpstep
+  iapply H $$ %e₂ %σ₂ %hpos
+
+/-- `wp_lift_atomic_head_step_fupd` — atomic head-step with mask shift. -/
+theorem wp_lift_atomic_head_step_fupd {E1 E2 : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E1}=>
+      (⌜∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
+      ∀ (e₂ : Exp) (σ₂ : State),
+        (⌜0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E1}[E2]▷=>
+          stateInterp σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E1 e₁ Φ := by
+  iintro H
+  iapply wp_lift_atomic_step_fupd Hv
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hhred, H⟩
+  imodintro
+  isplitr; · ipure_intro; exact Reducible.of_head Hhred
+  iintro %e₂ %σ₂ %Hpstep
+  have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
+    exact heq ▸ Hpstep
+  iapply H $$ %e₂ %σ₂ %hpos
+
+/-- `wp_lift_atomic_head_step` — atomic head-step without mask shift. -/
+theorem wp_lift_atomic_head_step {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E}=>
+      (⌜∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
+      ▷ ∀ (e₂ : Exp) (σ₂ : State),
+        (⌜0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E}=>
+          stateInterp σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply wp_lift_atomic_step Hv
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hhred, H⟩
+  imodintro
+  isplitr; · ipure_intro; exact Reducible.of_head Hhred
+  iintro !>
+  iintro %e₂ %σ₂ %Hpstep
+  have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
+    exact heq ▸ Hpstep
+  iapply H $$ %e₂ %σ₂ %hpos
+
+/-- `wp_lift_pure_det_head_step` — pure deterministic head step. -/
+theorem wp_lift_pure_det_head_step {E E' : CoPset} {e₁ e₂ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none)
+    (Hsafe : ∀ σ₁, ∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
+    (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
+    iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  iapply wp_lift_pure_det_step (Hsafe := fun σ => Reducible.of_head (Hsafe σ))
+  intros σ e₂' σ₂ hp
+  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep (Hsafe σ)
+  exact Hdet σ e₂' σ₂ (heq ▸ hp)
+
+/-- `wp_lift_pure_det_head_step'` — `▷`-form of `wp_lift_pure_det_head_step`. -/
+theorem wp_lift_pure_det_head_step' {E : CoPset} {e₁ e₂ : Exp} {Φ : Val → IProp GF}
+    (Hv : e₁.toVal? = none)
+    (Hsafe : ∀ σ₁, ∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
+    (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
+    iprop(▷ wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  iintro H
+  iapply (wp_lift_pure_det_head_step (E' := E) Hv Hsafe Hdet)
+  imodintro; iintro !>; imodintro
+  iexact H
+
 end ApproxisWpGS
 
 end ProbLang
