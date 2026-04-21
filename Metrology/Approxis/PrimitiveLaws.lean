@@ -448,6 +448,188 @@ theorem wp_rand_r {E : CoPset} (K : Ectx) {z : Int} {e : Exp}
     · ipure_intro; exact ⟨Hv0, Hvz⟩
     · iexact Hj'
 
+/-- `wp_alloc_tape_r` — the spec side allocates a fresh empty tape. -/
+theorem wp_alloc_tape_r {E : CoPset} (K : Ectx) {z : Int} {e : Exp}
+    {Φ : Val → IProp GF} :
+    iprop((⤇ K.fill (.tape (.lit (.int z)))) ∗
+        (∀ (l : Loc), (⤇ K.fill (.lit (.lbl l))) -∗
+          specNatTape l z [] -∗ wp E e Φ))
+      ⊢@{IProp GF} wp E e Φ := by
+  iintro ⟨Hj, Hwp⟩
+  ihave Hstep := step_alloctape (GF := GF) (E := E) K z $$ Hj
+  imod Hstep with ⟨%l, Hj', Hl⟩
+  -- `Tape.empty z = ⟨z, []⟩` definitionally; coerce via `show` at the entails level.
+  ihave Hl' := show (l ↪ₛ Tape.empty z) ⊢@{IProp GF}
+      (l ↪ₛ ⟨z, ([] : List { z' : Int // 0 ≤ z' ∧ z' < z })⟩) from
+    BI.BIBase.Entails.rfl $$ Hl
+  ihave HlNat := spec_empty_to_natTape (GF := GF) (l := l) (z := z) $$ Hl'
+  iapply Hwp $$ %l Hj' HlNat
+
+/-- `wp_rand_tape_r` — the spec side reads the head of a non-empty tape. -/
+theorem wp_rand_tape_r {E : CoPset} (K : Ectx) {z : Int} {l : Loc}
+    {n : Int} {ns : List Int} {e : Exp} {Φ : Val → IProp GF} :
+    iprop((⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) ∗
+        specNatTape l z (n :: ns) ∗
+        ((⤇ K.fill (.lit (.int n))) -∗ specNatTape l z ns -∗
+            (⌜0 ≤ n ∧ n < z⌝) -∗ wp E e Φ))
+      ⊢@{IProp GF} wp E e Φ := by
+  iintro ⟨Hj, Hl, Hwp⟩
+  -- Read the head: get backend frag + handback wand.
+  ihave Hread := spec_read_natTape_head (GF := GF) (l := l) (z := z)
+    (n := n) (ns := ns) $$ Hl
+  icases Hread with ⟨%x, %xs, Hback, %hxv, HHandback⟩
+  -- Fire the backend spec step.
+  ihave Hstep := step_rand (GF := GF) (E := E) K l x xs $$ [Hj Hback]
+  · isplitl [Hj] <;> iassumption
+  imod Hstep with ⟨Hj', Hback'⟩
+  subst hxv
+  -- Repack the new (backend) tape state into `specNatTape l z ns`.
+  ihave HlNew := HHandback $$ Hback'
+  iapply Hwp $$ Hj' HlNew
+  ipure_intro; exact x.2
+
+/-- `wp_rand_empty_r` — the spec side reads from an empty tape, falling back
+to a uniform sample (tape stays empty). -/
+theorem wp_rand_empty_r {E : CoPset} (K : Ectx) {z : Int} {l : Loc}
+    {e : Exp} {Φ : Val → IProp GF} (Hz : 0 < z) :
+    iprop((⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) ∗
+        specNatTape l z [] ∗
+        (∀ (n : Int), (specNatTape l z [] ∗ ⤇ K.fill (.lit (.int n))) -∗
+          (⌜0 ≤ n ∧ n < z⌝) -∗ wp E e Φ))
+      ⊢@{IProp GF} wp E e Φ := by
+  iintro ⟨Hj, Hα, Hwp⟩
+  ihave Hαb := spec_natTape_to_empty (GF := GF) (l := l) (z := z) $$ Hα
+  iapply wp_lift_step_spec_couple
+  iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
+  ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
+  subst Heq
+  ihave %Hlk := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hαb
+  -- Reducibility: `rand(lbl l) z` at σ₁' (empty tape → uniform sample).
+  have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩
+        {⟨.lit (.int 0), σ₁'⟩} :=
+    (headStep_support_iff _ _ _ _).mpr
+      (.RandTapeEmptyS Hz Hlk rfl (_root_.le_refl _) Hz rfl)
+  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
+    Reducible.of_head ⟨_, Hhead⟩
+  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
+    Hred_rand.fill K
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  iapply (specCoupl_step (Hred := Hred))
+  iintro %e₂' %σ₂' %Hstep
+  have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l))).isValue := by
+    intro ⟨w⟩; nomatch w
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  subst heq_e2'
+  have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
+      headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
+    primStep_eq_headStep ⟨_, Hhead⟩
+  rw [Hheq, headStep_support_iff] at Hstep'
+  cases Hstep' with
+  | RandTapeS _ Hlk' _ _ _ =>
+    rw [Hlk] at Hlk'; cases Hlk'
+  | RandTapeEmptyS _ _ _ Hv0 Hvz hσ =>
+    subst hσ
+    imodintro
+    iapply specCoupl_ret
+    ihave HUpd := specProg_update (GF := GF)
+      (e3 := K.fill (.lit (.int _))) $$ Hs Hj
+    imod HUpd with ⟨Hs', Hj'⟩
+    imod Hclose
+    imodintro
+    isplitl [Hσ]; · iexact Hσ
+    isplitl [Hs']; · iexact Hs'
+    isplitl [Hε]; · iexact Hε
+    -- Repack `Hαb` as `specNatTape l z []` and bundle with `Hj'` to feed `Hwp`.
+    ihave HαNat := spec_empty_to_natTape (GF := GF) (l := l) (z := z) $$ Hαb
+    -- Build the ∗-bundle argument in one `ihave` via a constant-wand entailment.
+    ihave HwpArg := show
+        (specNatTape l z [] ∗ ⤇ K.fill (.lit (.int _))) ⊢@{IProp GF}
+        (specNatTape l z [] ∗ ⤇ K.fill (.lit (.int _))) from
+      BI.BIBase.Entails.rfl $$ [HαNat Hj']
+    · isplitl [HαNat] <;> iassumption
+    iapply Hwp $$ HwpArg
+    ipure_intro; exact ⟨Hv0, Hvz⟩
+  | RandTapeOtherS _ Hlk' hne _ _ _ =>
+    rw [Hlk] at Hlk'; cases Hlk'; exact absurd rfl hne
+
+/-- `wp_rand_wrong_tape_r` — the spec side reads from a tape whose bound
+differs from the `rand` argument (uniform fallback, tape unchanged). -/
+theorem wp_rand_wrong_tape_r {E : CoPset} (K : Ectx) {z M : Int} {l : Loc}
+    {ns : List Int} {e : Exp} {Φ : Val → IProp GF}
+    (Hz : 0 < z) (HneM : z ≠ M) :
+    iprop((⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) ∗
+        specNatTape l M ns ∗
+        (∀ (n : Int), (specNatTape l M ns ∗ ⤇ K.fill (.lit (.int n))) -∗
+          (⌜0 ≤ n ∧ n < z⌝) -∗ wp E e Φ))
+      ⊢@{IProp GF} wp E e Φ := by
+  iintro ⟨Hj, Hα, Hwp⟩
+  -- Unfold `specNatTape` to get the backend frag.
+  ihave HαEx := show specNatTape l M ns ⊢@{IProp GF}
+      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
+        (⌜fs.map (fun x => x.val) = ns⌝) ∗ l ↪ₛ ⟨M, fs⟩) from
+    BI.BIBase.Entails.rfl $$ Hα
+  icases HαEx with ⟨%fs, %hmap, Hαb⟩
+  iapply wp_lift_step_spec_couple
+  iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
+  ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
+  subst Heq
+  ihave %Hlk := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hαb
+  have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩
+        {⟨.lit (.int 0), σ₁'⟩} :=
+    (headStep_support_iff _ _ _ _).mpr
+      (.RandTapeOtherS Hz Hlk HneM (_root_.le_refl _) Hz rfl)
+  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
+    Reducible.of_head ⟨_, Hhead⟩
+  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
+    Hred_rand.fill K
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  iapply (specCoupl_step (Hred := Hred))
+  iintro %e₂' %σ₂' %Hstep
+  have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l))).isValue := by
+    intro ⟨w⟩; nomatch w
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  subst heq_e2'
+  have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
+      headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
+    primStep_eq_headStep ⟨_, Hhead⟩
+  rw [Hheq, headStep_support_iff] at Hstep'
+  cases Hstep' with
+  | RandTapeS _ Hlk' heq _ _ =>
+    rw [Hlk] at Hlk'; cases Hlk'; exact absurd heq HneM
+  | RandTapeEmptyS _ Hlk' heq _ _ _ =>
+    rw [Hlk] at Hlk'; cases Hlk'; exact absurd heq HneM
+  | RandTapeOtherS _ _ _ Hv0 Hvz hσ =>
+    subst hσ
+    imodintro
+    iapply specCoupl_ret
+    ihave HUpd := specProg_update (GF := GF)
+      (e3 := K.fill (.lit (.int _))) $$ Hs Hj
+    imod HUpd with ⟨Hs', Hj'⟩
+    imod Hclose
+    imodintro
+    isplitl [Hσ]; · iexact Hσ
+    isplitl [Hs']; · iexact Hs'
+    isplitl [Hε]; · iexact Hε
+    -- Repack `Hαb` back into `specNatTape l M ns`.
+    ihave HαNat := show (l ↪ₛ ⟨M, fs⟩) ⊢@{IProp GF} specNatTape l M ns by
+      iintro Hb
+      unfold specNatTape
+      iexists fs
+      isplitr; · ipure_intro; exact hmap
+      iexact Hb
+    ihave HαNat' := HαNat $$ Hαb
+    ihave HwpArg := show
+        (specNatTape l M ns ∗ ⤇ K.fill (.lit (.int _))) ⊢@{IProp GF}
+        (specNatTape l M ns ∗ ⤇ K.fill (.lit (.int _))) from
+      BI.BIBase.Entails.rfl $$ [HαNat' Hj']
+    · isplitl [HαNat'] <;> iassumption
+    iapply Hwp $$ HwpArg
+    ipure_intro; exact ⟨Hv0, Hvz⟩
+
 end Lifting
 
 end ProbLang
