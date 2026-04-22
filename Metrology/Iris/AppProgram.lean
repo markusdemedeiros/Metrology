@@ -336,4 +336,29 @@ theorem app_read_natTape_head {l : Loc} {z : Int} {n : Int} {ns : List Int} :
 
 end NatTapeInterface
 
+/-! ## Allocation
+
+Allocates a fresh `AppGS GF` instance, producing the authoritative program
+state `appStateAuth σ`. Analogue of `spec_ra_init` restricted to the
+program-side (no prog-exclusive component — the program heap/tape γ-names
+live separately from the spec ones). -/
+theorem app_ra_init {GF : BundledGFunctors} [IAPre : AppPreGS GF]
+    (σ : State) :
+    ⊢@{IProp GF} |==> ∃ IA : AppGS GF,
+      @appStateAuth _ IA σ := by
+  imod (iOwn_alloc (E := IAPre.heap)
+    (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap))
+    HeapView.auth_one_valid) with ⟨%γH, HH⟩
+  imod (iOwn_alloc (E := IAPre.tapes)
+    (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.tapes))
+    HeapView.auth_one_valid) with ⟨%γT, HT⟩
+  imodintro
+  let IA : AppGS GF := {
+    toAppPreGS := IAPre
+    γheap := γH
+    γtapes := γT }
+  iexists IA
+  unfold appStateAuth appHeapAuth appTapesAuth
+  isplitl [HH] <;> iassumption
+
 end AppProgramRA

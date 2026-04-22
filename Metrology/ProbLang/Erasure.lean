@@ -1598,36 +1598,65 @@ theorem AddCoupl_erasure_erasable_exp_lhs
 
 /-- **Clutch `ARcoupl_erasure_erasable_exp_lhs_kanto`, reformulated (projected form).**
 
-Kantorovich-style LHS variant. In Clutch, the slack `E₂ : Cfg → Cfg → ℝ`
-depends on both the LHS and RHS samples, and the wrapper takes a
-higher-order Hε2 hypothesis (`∀ h1 h2, ... → Expval ... ≤ Expval ... + ε`)
-that generalizes a `prim_step / pexecN m`-coupling on test functions
-satisfying a specific pointwise constraint. Porting that faithfully would
-require a `kanto_plain`-style ~100-line proof in `AdditiveCouplings.lean`.
+Kantorovich-style LHS variant. The slack `E₂ : Cfg → Cfg → ENNReal` depends
+on both the LHS and RHS samples, and the wrapper takes a higher-order
+test-function expectation-bound hypothesis (`hExp`): for every pair of
+`[0,1]`-bounded measurable `h₁, h₂` with `h₁ ρ ≤ h₂ ρ' + E₂ ρ ρ'`,
+`∫⁻ h₁ ∂(primStep ⟨e₁,σ₁⟩) ≤ ∫⁻ h₂ ∂(μ₁'.bind (pexecN m ⟨e₁', ·⟩)) + ε`.
 
-We take a **simpler shape**: require an explicit pointwise bound `E₂ ρ ρ' ≤ ε`
-for the specific pair `ρ = ⟨e₁, σ₁⟩, ρ' = ⟨e₁', σ₁'⟩` (which is the only
-instance we actually need). The proof is then a one-line application of
-`mono_grading` to the continuation hypothesis at the specific pair.
-
-This is enough to validate the wrapper shape; downstream callers may need
-to switch to a more general kanto variant if they require slacks that
-genuinely depend on adversarial `(ρ, ρ')` pairs from a probabilistic
-distribution rather than a fixed pair. -/
+The conclusion operates on the LHS *after* one `primStep` bind — i.e. on
+`(primStep ⟨e₁,σ₁⟩ >>= execN n).map (·.expr)` — matching `execN (n+1)` for
+non-value `e₁` via `execN_succ_not_isValue`. -/
 theorem AddCoupl_erasure_erasable_exp_lhs_kanto
     {e₁ e₁' : Exp} {σ₁ σ₁' : State}
     {μ₁' : Measure State} {Φexp : Set (Exp × Exp)}
     {ε : ENNReal} {E₂ : Cfg → Cfg → ENNReal}
-    {n : Nat}
-    (_hErase₁' : ErasableExpr μ₁' σ₁')
-    (hBound : E₂ ⟨e₁, σ₁⟩ ⟨e₁', σ₁'⟩ ≤ ε)
+    {n m : Nat}
+    (hErase₁' : ErasableExpr μ₁' σ₁')
+    (hExp : ∀ (h₁ h₂ : Cfg → ENNReal),
+        (∀ ρ, h₁ ρ ≤ 1) → (∀ ρ, h₂ ρ ≤ 1) →
+        (∀ ρ ρ', h₁ ρ ≤ h₂ ρ' + E₂ ρ ρ') →
+        ∫⁻ ρ, h₁ ρ ∂(primStep ⟨e₁, σ₁⟩) ≤
+          ∫⁻ ρ', h₂ ρ' ∂(μ₁'.bind (fun σ => pexecN m ⟨e₁', σ⟩)) + ε)
     (hCont : ∀ ρ ρ',
         AddCoupl (E₂ ρ ρ') Φexp
           ((execN n ρ).map (·.expr))
           ((limExec ρ').map (·.expr))) :
     AddCoupl ε Φexp
-      ((execN n ⟨e₁, σ₁⟩).map (·.expr))
-      ((limExec ⟨e₁', σ₁'⟩).map (·.expr)) :=
-  AddCoupl.mono_grading hBound (hCont ⟨e₁, σ₁⟩ ⟨e₁', σ₁'⟩)
+      (((primStep ⟨e₁, σ₁⟩).bind (execN n)).map (·.expr))
+      ((limExec ⟨e₁', σ₁'⟩).map (·.expr)) := by
+  -- Rewrite RHS via `hErase₁'` (erasability) and `limExec_pexecN` (pexec-limExec).
+  --   (limExec ⟨e₁', σ₁'⟩).map (·.expr)
+  --   = (μ₁'.bind (limExec ⟨e₁', ·⟩)).map (·.expr)                (hErase)
+  --   = (μ₁'.bind (fun σ => (pexecN m ⟨e₁',σ⟩).bind limExec)).map (·.expr)  (limExec_pexecN)
+  --   = ((μ₁'.bind (pexecN m ⟨e₁', ·⟩)).bind limExec).map (·.expr)           (bind_bind)
+  rw [← hErase₁'.lim_exec e₁']
+  have hrw : (μ₁'.bind (fun σ => limExec ⟨e₁', σ⟩))
+           = (μ₁'.bind (fun σ => pexecN m ⟨e₁', σ⟩)).bind limExec := by
+    rw [Measure.bind_bind
+          Measurable.of_discrete.aemeasurable
+          Measurable.of_discrete.aemeasurable]
+    congr 1
+    funext σ
+    exact limExec_pexecN m ⟨e₁', σ⟩
+  rw [hrw]
+  -- Push `.map (·.expr)` through both outer binds.
+  rw [Measure.bind_map_comm, Measure.bind_map_comm]
+  -- Subprobability of inner kernels.
+  have hmassk_L : ∀ ρ : Cfg, (execN n ρ).map (·.expr) Set.univ ≤ 1 := by
+    intro ρ
+    rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+    simpa using execN_univ_le_one n ρ
+  have hmassk_R : ∀ ρ' : Cfg, (limExec ρ').map (·.expr) Set.univ ≤ 1 := by
+    intro ρ'
+    rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+    simpa using limExec_leq_mass (r := 1) (fun n => execN_univ_le_one n ρ')
+  -- Apply `bind_adv_kanto`. Test-function measurability is automatic on Cfg
+  -- (discrete space) via `Measurable.of_discrete`.
+  exact AddCoupl.bind_adv_kanto
+    (Hfm := Measurable.of_discrete) (Hgm := Measurable.of_discrete)
+    (Hfsprob := hmassk_L) (Hgsprob := hmassk_R)
+    (Hexp := fun h₁ h₂ _ _ => hExp h₁ h₂)
+    (Hcont := hCont)
 
 end ProbLang

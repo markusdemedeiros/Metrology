@@ -48,8 +48,25 @@ namespace ProbLang
 Mirrors Rocq's `approxisGS` record. Extending all four components in one
 class ensures joint allocation of γ-names and prevents accidental aliasing
 of program and spec heaps. -/
-class ApproxisGS (hlc : outParam Bool) (GF : BundledGFunctors)
-    extends AppGS GF, SpecGS GF, ECGS GF, InvGS_gen hlc GF
+/-- **Structural port note.** We `extends AppGS, ECGS, InvGS_gen` but embed
+`SpecGS` as a **non-extends** field `specGS`. Rocq's `approxisGS` uses
+`approxisGS_spec :: specG_prob_lang Σ` (a nested instance field), giving the
+spec-side heap/tape CMRAs and γ-names their own identities separate from the
+program-side. If we instead used `extends SpecGS`, Lean's diamond-inheritance
+field collapse would merge `AppPreGS.heap : ElemG GF (constOF SpecHeap)` with
+`SpecPreGS.heap : ElemG GF (constOF SpecHeap)` (same type!), forcing program
+and spec heaps to share γ-names — semantically wrong. -/
+class ApproxisGS (hlc : outParam Bool) (GF : BundledGFunctors) where
+  appGS    : AppGS GF
+  specGS   : SpecGS GF
+  ecGS     : ECGS GF
+  invGS    : InvGS_gen hlc GF
+
+-- Expose all nested component classes as instances so resources like `⤇ e`,
+-- `appStateAuth`, `ecAuth`, etc. (which want `[SpecGS GF]` / `[AppGS GF]` /
+-- `[ECGS GF]` / `[InvGS_gen hlc GF]`) resolve transparently under `[ApproxisGS hlc GF]`.
+attribute [reducible, instance] ApproxisGS.appGS ApproxisGS.specGS
+  ApproxisGS.ecGS ApproxisGS.invGS
 
 /-! ## `ApproxisWpGS` instance synthesis
 
@@ -79,6 +96,9 @@ hypotheses. Marked `@[simp]` so `simp only` strips them automatically. -/
 
 @[simp] theorem approxisWpGS_errInterp_eq :
     (ApproxisWpGS.errInterp : ENNReal → IProp GF) = ecAuth := rfl
+
+@[simp] theorem approxisWpGS_specInterp_eq :
+    (SpecUpdateGS.specInterp : Cfg → IProp GF) = Cfg.specAuth := rfl
 
 end ApproxisInstance
 

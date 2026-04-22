@@ -217,6 +217,50 @@ theorem bind_adv_lhs {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β
       _ = ∫⁻ b, ∫⁻ x, g' x ∂(g b) ∂μᵣ + (ε + ε') := by
             rw [add_assoc]
 
+/-- **Kantorovich-style bind, plain variant**: advanced composition with
+bilateral variable slack `E₂ : α → β → ENNReal`. Mirrors Rocq
+`ARcoupl_dbind_adv_kanto_plain` (couplings_app.v:114–221).
+
+The outer distributions are coupled by a *test-function expectation bound*
+rather than by a separate `AddCoupl`: for every pair of `[0,1]`-bounded
+measurable `h₁, h₂` satisfying `h₁ a ≤ h₂ b + E₂ a b` pointwise, the
+expectations satisfy `∫⁻ h₁ ∂μ₁ ≤ ∫⁻ h₂ ∂μ₂ + ε`. Together with inner
+couplings `AddCoupl (E₂ a b) S (f a) (g b)` at every pair, this yields
+`AddCoupl ε S (μ₁.bind f) (μ₂.bind g)`. -/
+theorem bind_adv_kanto {ε : ENNReal} {S : Set (α' × β')}
+    {μ₁ : Measure α} {μ₂ : Measure β}
+    {f : α → Measure α'} {g : β → Measure β'} {E₂ : α → β → ENNReal}
+    (Hfm : Measurable f) (Hgm : Measurable g)
+    (Hfsprob : ∀ a, (f a) .univ ≤ 1) (Hgsprob : ∀ b, (g b) .univ ≤ 1)
+    (Hexp : ∀ (h₁ : α → ENNReal) (h₂ : β → ENNReal),
+        Measurable h₁ → Measurable h₂ →
+        (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
+        (∀ a b, h₁ a ≤ h₂ b + E₂ a b) →
+        ∫⁻ a, h₁ a ∂μ₁ ≤ ∫⁻ b, h₂ b ∂μ₂ + ε)
+    (Hcont : ∀ a b, AddCoupl (E₂ a b) S (f a) (g b)) :
+    AddCoupl ε S (μ₁.bind f) (μ₂.bind g) := by
+  rintro ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
+  -- Define the inner-integral functions X a := ∫ f' ∂f a, Y b := ∫ g' ∂g b.
+  -- Both are `[0,1]`-bounded thanks to subprobability of f a / g b.
+  let X : α → ENNReal := fun a => ∫⁻ x, f' x ∂(f a)
+  let Y : β → ENNReal := fun b => ∫⁻ y, g' y ∂(g b)
+  have HXm : Measurable X := (measurable_lintegral Hf'm).comp Hfm
+  have HYm : Measurable Y := (measurable_lintegral Hg'm).comp Hgm
+  have HXb : ∀ a, X a ≤ 1 := fun a =>
+    (lintegral_le_meas Hf'b (by simp)).trans (Hfsprob a)
+  have HYb : ∀ b, Y b ≤ 1 := fun b =>
+    (lintegral_le_meas Hg'b (by simp)).trans (Hgsprob b)
+  -- Pointwise: X a ≤ Y b + E₂ a b, from the inner couplings at (a, b).
+  have HXY : ∀ a b, X a ≤ Y b + E₂ a b := fun a b =>
+    Hcont a b ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
+  -- Apply the expectation hypothesis to X, Y — this closes the outer integral.
+  have Hmain : ∫⁻ a, X a ∂μ₁ ≤ ∫⁻ b, Y b ∂μ₂ + ε :=
+    Hexp X Y HXm HYm HXb HYb HXY
+  -- Push the bind through the outer integrals.
+  rw [lintegral_bind Hfm.aemeasurable Hf'm.aemeasurable,
+      lintegral_bind Hgm.aemeasurable Hg'm.aemeasurable]
+  exact Hmain
+
 /-- Mass comparison: `ARcoupl ε` bounds the total mass of `μₗ` by that of `μᵣ` plus `ε`.
 Obtained by testing against the constant-`1` coupling function. -/
 theorem mass_leq {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
@@ -522,5 +566,18 @@ theorem swap {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : M
     _ = IG + ε := by ring_nf
 
 end Stubs
+
+/-- Trivial coupling: if the LHS has mass at most 1 and `1 ≤ ε`, then any
+`AddCoupl` claim holds — the LHS mass is absorbed by the slack alone.
+Rocq analogue: `ARcoupl_1`. -/
+theorem trivial_of_one_le {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α}
+    {μᵣ : Measure β} (Hε : 1 ≤ ε) (Hmass : μₗ Set.univ ≤ 1) :
+    AddCoupl ε S μₗ μᵣ := by
+  rintro ⟨f, Hfm, Hfb⟩ ⟨g, Hgm, Hgb⟩ _Hle
+  calc ∫⁻ x, f x ∂μₗ
+      _ ≤ μₗ Set.univ := lintegral_le_meas Hfb (by simp)
+      _ ≤ 1 := Hmass
+      _ ≤ ε := Hε
+      _ ≤ ∫⁻ y, g y ∂μᵣ + ε := le_add_self
 
 end AddCoupl

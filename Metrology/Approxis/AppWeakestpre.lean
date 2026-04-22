@@ -2704,6 +2704,42 @@ theorem wp_pure_step_later {E : CoPset} {e₁ e₂ : Exp} {φ : Prop} {n : Nat}
     iintro H
     imodintro; iintro !>; imodintro; iexact H
 
+/-! ## Step-fupdN helpers (`|={E}[E']▷=>^[n] _`)
+
+Utility lemmas for navigating `Nat.repeat`-encoded stacked step-fupds. Used by
+adequacy. -/
+
+/-- Introduce `n` layers of step-fupd trivially. -/
+theorem stepFupdN_intro {E E' : CoPset} (HE : E' ⊆ E) (n : Nat) {P : IProp GF} :
+    P ⊢@{IProp GF} iprop(|={E}[E']▷=>^[n] P) := by
+  induction n with
+  | zero => simp only [Nat.repeat]; exact BI.BIBase.Entails.rfl
+  | succ n ih =>
+    simp only [Nat.repeat]
+    iintro H
+    imod (BIFUpdate.subset (E1 := E) (E2 := E') HE) with Hclose
+    imodintro
+    iintro !>
+    imod Hclose
+    imodintro
+    iapply ih
+    iexact H
+
+/-- Monotonicity of step-fupdN in its body. -/
+theorem stepFupdN_mono {E E' : CoPset} {n : Nat} {P Q : IProp GF}
+    (HPQ : P ⊢@{IProp GF} Q) :
+    iprop(|={E}[E']▷=>^[n] P) ⊢@{IProp GF} iprop(|={E}[E']▷=>^[n] Q) := by
+  induction n with
+  | zero => simp only [Nat.repeat]; exact HPQ
+  | succ n ih =>
+    simp only [Nat.repeat]
+    iintro H
+    imod H; imodintro
+    iintro !>
+    imod H; imodintro
+    iapply ih
+    iexact H
+
 /-! ## Ectx-lifting lemmas (ports `clutch/theories/approxis/ectx_lifting.v`)
 
 Specialize `Lifting` to head-step semantics using `headStep`/`Reducible.of_head`.

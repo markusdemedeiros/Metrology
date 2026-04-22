@@ -332,7 +332,41 @@ theorem spec_auth_tape_alloc {e : Exp} {σ : State} (t : Tape) :
   Qed.
 
 End theory.
+-/
 
+/-! ## Allocation
+
+Mirrors Rocq `spec_ra_init` (commented below). Allocates a fresh `SpecGS GF`
+instance, producing the authoritative spec state `specAuth ⟨e, σ⟩` paired
+with the program fragment `⤇ e`. Heap/tape fragments are *not* produced by
+this version (the adequacy use-site discards them via `_`). -/
+theorem spec_ra_init {GF : BundledGFunctors} [ISPre : SpecPreGS GF]
+    (e : Exp) (σ : State) :
+    ⊢@{IProp GF} |==> ∃ IS : SpecGS GF,
+      @ProbLang.Cfg.specAuth _ IS ⟨e, σ⟩ ∗ @specProgFrag _ IS e := by
+  imod (iOwn_alloc (E := ISPre.prog) (SpecProg.auth e • SpecProg.frag e)
+    (Auth.auth_both_valid_2 trivial .rfl)) with ⟨%γp, Hp⟩
+  imod (iOwn_alloc (E := ISPre.heap)
+    (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap))
+    HeapView.auth_one_valid) with ⟨%γH, HH⟩
+  imod (iOwn_alloc (E := ISPre.tapes)
+    (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.tapes))
+    HeapView.auth_one_valid) with ⟨%γT, HT⟩
+  imodintro
+  let IS : SpecGS GF := {
+    toSpecPreGS := ISPre
+    γprog := γp
+    γheap := γH
+    γtapes := γT }
+  iexists IS
+  unfold ProbLang.Cfg.specAuth specProgAuth specHeapAuth specTapesAuth specProgFrag
+  ihave ⟨Hpa, Hpf⟩ := iOwn_op (E := ISPre.prog) $$ Hp
+  isplitl [Hpa HH HT]
+  · isplitl [Hpa] <;> try iassumption
+    isplitl [HH] <;> iassumption
+  · iexact Hpf
+
+/-
 Lemma spec_ra_init e σ `{specGpreS Σ} :
   ⊢ |==> ∃ _ : specG_prob_lang Σ,
       spec_auth (e, σ) ∗ ⤇ e ∗ ([∗ map] l ↦ v ∈ σ.(heap), l ↦ₛ v) ∗ ([∗ map] α ↦ t ∈ σ.(tapes), α ↪ₛ t) ∗ ([∗ map] α ↦ t ∈ σ.(tapes_laplace), α ↪Lₛ t).
