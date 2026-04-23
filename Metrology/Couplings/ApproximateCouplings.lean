@@ -47,9 +47,8 @@ variable {F : ENNReal → ENNReal}
 
 open Measure
 
-theorem refl (μ : Measure α) (HF : ∀ {x}, x ≤ F x) :
-    ARCoupling F (fun v => v.1 = v.2) μ μ :=
-  fun _ _ Hle => (lintegral_mono fun _ ↦ Hle rfl).trans HF
+theorem refl (μ : Measure α) (HF : ∀ {x}, x ≤ F x) : ARCoupling F (fun v => v.1 = v.2) μ μ :=
+  fun _ _ Hle => (lintegral_mono fun _ => Hle rfl).trans HF
 
 theorem dirac {a : α} {b : β} (HF : ∀ {x}, x ≤ F x) (Φ : Set (α × β)) (H : Φ (a, b)) :
     ARCoupling F Φ (.dirac a) (.dirac b) := by
