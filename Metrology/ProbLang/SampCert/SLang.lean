@@ -181,11 +181,9 @@ def probLangMul (e1 e2 : Exp) : Exp := .binop .mult e1 e2
 def probLangNegInt (e : Exp) : Exp := .unop .minus e
 
 -- Comparisons and booleans
--- NOTE: ProbLang lacks native < and div. We postulate encodings.
--- TODO: Add BinOp.lt and BinOp.div to ProbLang, or encode them.
-def probLangLt (e1 e2 : Exp) : Exp := sorry
-def probLangDiv (e1 e2 : Exp) : Exp := sorry
-def probLangMod (e1 e2 : Exp) : Exp := sorry
+def probLangLt (e1 e2 : Exp) : Exp := .binop .lt e1 e2
+def probLangDiv (e1 e2 : Exp) : Exp := .binop .div e1 e2
+def probLangMod (e1 e2 : Exp) : Exp := .binop .mod e1 e2
 def probLangEq (e1 e2 : Exp) : Exp := .binop .eq e1 e2
 def probLangNot (e : Exp) : Exp := .unop .neg e
 def probLangAnd (e1 e2 : Exp) : Exp := .binop .and e1 e2

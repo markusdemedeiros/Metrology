@@ -79,6 +79,10 @@ syntax:max "(" pl_exp " : " pl_ty ")"                           : pl_exp
 syntax:65 pl_exp:65 " + " pl_exp:66                             : pl_exp
 syntax:65 pl_exp:65 " - " pl_exp:66                             : pl_exp
 syntax:70 pl_exp:70 " * " pl_exp:71                             : pl_exp
+syntax:70 pl_exp:70 " / " pl_exp:71                             : pl_exp
+syntax:70 pl_exp:70 " % " pl_exp:71                             : pl_exp
+syntax:50 pl_exp:50 " < " pl_exp:50                             : pl_exp
+syntax:50 pl_exp:50 " <= " pl_exp:50                            : pl_exp
 syntax:60 pl_exp:60 " && " pl_exp:61                            : pl_exp
 syntax:55 pl_exp:55 " || " pl_exp:56                            : pl_exp
 syntax:58 pl_exp:58 " ^^ " pl_exp:59                            : pl_exp
@@ -234,6 +238,10 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
   | `(pl_exp|$e1 + $e2)    => do `(Exp.binop .plus  $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|$e1 - $e2)    => do `(Exp.binop .minus $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|$e1 * $e2)    => do `(Exp.binop .mult  $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 / $e2)    => do `(Exp.binop .div   $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 % $e2)    => do `(Exp.binop .mod   $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 < $e2)    => do `(Exp.binop .lt    $(← elabPL env st e1) $(← elabPL env st e2))
+  | `(pl_exp|$e1 <= $e2)   => do `(Exp.binop .le    $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|$e1 && $e2)   => do `(Exp.binop .and   $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|$e1 || $e2)   => do `(Exp.binop .or    $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|$e1 ^^ $e2)   => do `(Exp.binop .xor   $(← elabPL env st e1) $(← elabPL env st e2))
@@ -504,6 +512,10 @@ def unexpBinop : Unexpander
   | `($_ BinOp.plus  $e1 $e2) => do `(pl(($(← unpackPLExp e1) + $(← unpackPLExp e2))))
   | `($_ BinOp.minus $e1 $e2) => do `(pl(($(← unpackPLExp e1) - $(← unpackPLExp e2))))
   | `($_ BinOp.mult  $e1 $e2) => do `(pl(($(← unpackPLExp e1) * $(← unpackPLExp e2))))
+  | `($_ BinOp.div   $e1 $e2) => do `(pl(($(← unpackPLExp e1) / $(← unpackPLExp e2))))
+  | `($_ BinOp.mod   $e1 $e2) => do `(pl(($(← unpackPLExp e1) % $(← unpackPLExp e2))))
+  | `($_ BinOp.lt    $e1 $e2) => do `(pl(($(← unpackPLExp e1) < $(← unpackPLExp e2))))
+  | `($_ BinOp.le    $e1 $e2) => do `(pl(($(← unpackPLExp e1) <= $(← unpackPLExp e2))))
   | `($_ BinOp.and   $e1 $e2) => do `(pl(($(← unpackPLExp e1) && $(← unpackPLExp e2))))
   | `($_ BinOp.or    $e1 $e2) => do `(pl(($(← unpackPLExp e1) || $(← unpackPLExp e2))))
   | `($_ BinOp.xor   $e1 $e2) => do `(pl(($(← unpackPLExp e1) ^^ $(← unpackPLExp e2))))

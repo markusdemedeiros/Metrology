@@ -74,7 +74,7 @@ inductive BaseLit | int (z : Int) | bool (b : Bool) | unit | loc (loc : Loc) | l
 inductive UnOp | neg | minus
   deriving Inhabited, Countable, Repr, BEq
 
-inductive BinOp | plus | minus | mult | and | or | xor | eq
+inductive BinOp | plus | minus | mult | div | mod | and | or | xor | eq | lt | le
   deriving Inhabited, Countable, Repr, BEq
 
 inductive Ty
@@ -661,10 +661,17 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp) : Option Exp :=
   | plus,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 + z2)
   | minus, .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 - z2)
   | mult,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 * z2)
+  -- Division and modulus are stuck on a zero divisor (returns `none`).
+  | div,   .lit (.int _),   .lit (.int 0)   => none
+  | div,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 / z2)
+  | mod,   .lit (.int _),   .lit (.int 0)   => none
+  | mod,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 % z2)
   | and,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 && b2)
   | or,    .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 || b2)
   | xor,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 ^^ b2)
   | eq,    .lit l1,         .lit l2         => some <| .lit <| .bool (decide (l1 = l2))
+  | lt,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 < z2))
+  | le,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 ≤ z2))
   |_,      _,        _        => none
 
 def State.update_heap (σ : State) (f : ExtTreeMap Loc Val → ExtTreeMap Loc Val) : State :=
