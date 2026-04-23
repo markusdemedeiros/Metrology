@@ -4,6 +4,7 @@ import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Exec
 import SampCert.SLang
+import SampCert.Foundations.While
 import Mathlib.MeasureTheory.MeasurableSpace.Defs
 import Mathlib.Probability.ProbabilityMassFunction.Basic
 import Mathlib.Probability.Kernel.Defs
@@ -109,7 +110,7 @@ theorem limExec_fill_item (Ki : EctxItem) {e : Exp} {σ : State} :
       (limExec ⟨e, σ⟩).bind (fun c => limExec ⟨Ki.fillItem c.expr, c.state⟩) := by
   -- Convert the measure bind to an explicit sum
   refine Measure.ext_of_singleton fun c => ?_
-  rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+  rw [Measure.bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
   rw [lintegral_countable']
   unfold limExec
   -- Goal: (⨆ i, execN i ⟨Ki.fillItem e, σ⟩) {c} =
@@ -161,7 +162,83 @@ theorem limExec_beta {body v : Exp} {σ : State} (hv : IsVal v) :
   rw [primStep_eq_headStep hred]
   simp [headStep, Exp.isValM_some' hv, Measure.dirac_bind Measurable.of_discrete]
 
-/-! ## ProbLang combinators -/
+/-- Generic one-step unfolding for `limExec` at a deterministic head redex. -/
+theorem limExec_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
+    (h : DetHeadStep ρ ρ') : limExec ρ = limExec ρ' := by
+  rw [limExec_not_final hnv, primStep_eq_headStep ⟨ρ', h.pos⟩]
+  -- `headStep ρ = dirac ρ'`: mass 1 at ρ', total mass ≤ 1 ⇒ rest vanishes.
+  have hother : ∀ c ≠ ρ', (headStep ρ) {c} = 0 := by
+    intro c hc
+    have hdisj : Disjoint ({ρ'} : Set Cfg) {c} :=
+      Set.disjoint_singleton.mpr (Ne.symm hc)
+    have hunion : (headStep ρ) ({ρ'} ∪ {c}) = (headStep ρ) {ρ'} + (headStep ρ) {c} :=
+      measure_union hdisj (MeasurableSet.singleton c)
+    have hsub : (headStep ρ) ({ρ'} ∪ {c}) ≤ 1 :=
+      (measure_mono (Set.subset_univ _)).trans (headStep_univ_le_one ρ)
+    rw [hunion, h.det] at hsub
+    have : 1 + (headStep ρ) {c} ≤ 1 + 0 := by simpa using hsub
+    have hfin : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
+    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le _)
+  have hdirac : headStep ρ = dirac ρ' := by
+    refine Measure.ext_of_singleton fun c => ?_
+    by_cases hc : c = ρ'
+    · subst hc; rw [h.det]; simp
+    · rw [hother c hc]; simp [dirac_apply', hc]
+  rw [hdirac, Measure.dirac_bind Measurable.of_discrete]
+
+/-- Generic unfolding of a recursive closure at a value argument.
+
+Given `F = .fix (close (.lam (close body x)) f)` where `body` is LC and free in `f`, `x`,
+and a value `u` such that `f ∉ u.fv` and `x ≠ f`, reducing `.app F u` yields
+`.app F u  ↪*  subst (subst body x u) f F`. This is the single-iteration unfolding
+of any fix-lam-close/close form, and it's the LN-canonical presentation: the caller
+supplies the open body (using atoms `f` and `x`) and an LC value, and this lemma
+does the two `open_close_subst_lc_gen` commutations implicit in the two beta steps. -/
+theorem limExec_app_fix_lam_close {f x : Var}
+    {body u : Exp} (hbody : Exp.IsLocallyClosed body)
+    (hu : Exp.IsLocallyClosed u) (hu_val : IsVal u) (hfu : f ∉ u.fv)
+    {σ : State} :
+    let F := .fix (Exp.close (.lam (Exp.close body x)) f)
+    limExec ⟨.app F u, σ⟩ =
+      limExec ⟨Exp.subst (Exp.subst body x u) f F, σ⟩ := by
+  intro F
+  -- loop = inner .lam; F = .fix (close loop f).  Both LC:
+  have hloop_lc : Exp.IsLocallyClosed (.lam (Exp.close body x)) := by
+    refine Exp.IsLocallyClosed.lam (insert x body.fv) _ (fun y hy => ?_)
+    have hyx : y ≠ x := fun h => hy (by simp [h])
+    rw [Exp.open_close_subst_lc x y body hbody]
+    exact Exp.subst_lc hbody (.fvar _)
+  have hF_lc : Exp.IsLocallyClosed F := by
+    refine Exp.IsLocallyClosed.fix (insert f (Exp.lam (Exp.close body x)).fv) _ (fun g hg => ?_)
+    have hgf : g ≠ f := fun h => hg (by simp [h])
+    rw [Exp.open_close_subst_lc f g _ hloop_lc]
+    exact Exp.subst_lc hloop_lc (.fvar _)
+  -- Step A: app-fix.
+  have hnv₁ : ¬ (Exp.app F u).isValue := by intro ⟨h⟩; cases h
+  have hstep₁ : DetHeadStep ⟨.app F u, σ⟩
+      ⟨.app (Exp.open' (Exp.close (.lam (Exp.close body x)) f) F) u, σ⟩ :=
+    DetHeadStep.app_fix hu_val σ
+  rw [limExec_detHeadStep hnv₁ hstep₁]
+  -- open' (close loop f) F = subst loop f F (both LC).
+  rw [Exp.open_close_subst_lc_gen f (.lam (Exp.close body x)) F hloop_lc hF_lc]
+  -- Push subst into .lam.
+  show limExec ⟨.app (.lam (Exp.subst (Exp.close body x) f F)) u, σ⟩ = _
+  -- Step B: app-lam.
+  have hnv₂ : ¬ (Exp.app (.lam (Exp.subst (Exp.close body x) f F)) u).isValue := by
+    intro ⟨h⟩; cases h
+  have hstep₂ : DetHeadStep
+      ⟨.app (.lam (Exp.subst (Exp.close body x) f F)) u, σ⟩
+      ⟨Exp.open' (Exp.subst (Exp.close body x) f F) u, σ⟩ :=
+    DetHeadStep.app_lam hu_val σ
+  rw [limExec_detHeadStep hnv₂ hstep₂]
+  -- open' (subst (close body x) f F) u
+  --   = subst (open' (close body x) u) f F   [since f ∉ u.fv, F LC]
+  --   = subst (subst body x u) f F           [by open_close_subst_lc_gen]
+  have hu_no_f : Exp.subst u f F = u := Exp.subst_fresh f u F hfu
+  rw [show Exp.open' (Exp.subst (Exp.close body x) f F) u =
+        Exp.subst (Exp.open' (Exp.close body x) u) f F from by
+      rw [Exp.subst_open f F u _ hF_lc, hu_no_f]]
+  rw [Exp.open_close_subst_lc_gen x body u hbody hu]
 
 -- Values and literals
 def probLangPure [ProbLangEmbeddable T] (t : T) : Exp := as_expr t
@@ -369,23 +446,449 @@ theorem probLangUniformByte_isEmbedding :
     `(rec f x = if condE x then let v := bodyE x; f v else x) initE`
 
   Atoms `f`, `x`, `v` are passed in as `Var`s; the body is built in terms of
-  `fvar f / fvar x / fvar v` and then closed at the appropriate boundaries. -/
+  `fvar f / fvar x / fvar v` and then closed at the appropriate boundaries.
+
+  Both `condE` and `bodyE` are function expressions, applied to the loop
+  state `fvar x` inside the body. -/
 def probLangWhile (f x v : Var) (condE bodyE initE : Exp) : Exp :=
   -- Inner body: if condE x then let v := bodyE x; f v else x
   let body : Exp :=
-    .cond condE
+    .cond (.app condE (.fvar x))
       (probLangBind v (.app bodyE (.fvar x)) (.app (.fvar f) (.fvar v)))
       (.fvar x)
   -- Wrap in `fix f. lam x. body`: close body over x then over f.
   .app (.fix (Exp.close (.lam (Exp.close body x)) f)) initE
 
+/-- The expression `probLangWhile` unfolds to after one beta-fix + beta-lam, with
+    `u` (intended: `as_expr t`) substituted for the loop variable. The recursive
+    call still points at the original closed fixpoint `F`. -/
+def probLangWhile_unfolded (v : Var) (condE bodyE F u : Exp) : Exp :=
+  .cond (.app condE u)
+        (.app (.lam (Exp.close (.app F (.fvar v)) v)) (.app bodyE u))
+        u
+
+/-- Concrete double-subst simplification on the `probLangWhile` inner body.
+
+    This is the `subst (subst innerBody x u) f F` computation that the generic
+    `limExec_app_fix_lam_close` lemma sets up. It's purely symbolic: no limExec,
+    no measure theory — just `Exp.subst` reducing through `.cond / .app / .lam /
+    close / fvar`. -/
+theorem probLangWhile_subst_reduces
+    {f x v : Var} (hfx : f ≠ x) (hfv : f ≠ v) (hxv : x ≠ v)
+    {condE bodyE u F : Exp}
+    (hfcondE : f ∉ condE.fv) (hfbodyE : f ∉ bodyE.fv)
+    (hxcondE : x ∉ condE.fv) (hxbodyE : x ∉ bodyE.fv)
+    (hfu : f ∉ u.fv) (hvu : v ∉ u.fv)
+    (hvF : v ∉ F.fv) :
+    Exp.subst
+      (Exp.subst
+        (.cond (.app condE (.fvar x))
+          (.app (.lam (Exp.close (.app (.fvar f) (.fvar v)) v)) (.app bodyE (.fvar x)))
+          (.fvar x))
+        x u)
+      f F
+    =
+    .cond (.app condE u)
+          (.app (.lam (Exp.close (.app F (.fvar v)) v)) (.app bodyE u))
+          u := by
+  -- Outer .cond: subst pushes in; each subexpression reduces independently.
+  show Exp.cond _ _ _ = Exp.cond _ _ _
+  congr 1
+  · -- Cond discriminant: .app condE (.fvar x)
+    show Exp.app _ _ = Exp.app _ _
+    congr 1
+    · -- condE branch: x ∉ condE.fv and f ∉ condE.fv leave condE untouched.
+      show Exp.subst (Exp.subst condE x u) f F = condE
+      rw [Exp.subst_fresh x condE u hxcondE, Exp.subst_fresh f condE F hfcondE]
+    · -- (fvar x → u) then subst f F = u  (since f ∉ u.fv)
+      show Exp.subst (Exp.subst (Exp.fvar x) x u) f F = u
+      simp only [Exp.subst]
+      exact Exp.subst_fresh f u F hfu
+  · -- Inner .lam (close (.app (fvar f) (fvar v)) v) ... after subst x u then f F:
+    -- subst at x: fvar f ≠ x, fvar v ≠ x, so .app (fvar f) (fvar v) unchanged.
+    --   But close is at v, so we're doing subst (closeRec 0 v (.app (fvar f) (fvar v))) x u
+    --   = closeRec 0 v (subst (.app (fvar f) (fvar v)) x u)  [subst_closeRec, x ≠ v, v ∉ u.fv]
+    --   = closeRec 0 v (.app (fvar f) (fvar v))  [since x ≠ f, x ≠ v]
+    -- Then subst at f: push inside close; fvar f → F.
+    --   subst (closeRec 0 v (.app (fvar f) (fvar v))) f F
+    --   = closeRec 0 v (subst (.app (fvar f) (fvar v)) f F)  [subst_closeRec, f ≠ v, v ∉ F.fv]
+    --   = closeRec 0 v (.app F (fvar v))
+    show Exp.app _ _ = Exp.app _ _
+    congr 1
+    · -- the .lam (close (.app (fvar f) (fvar v)) v) under subst x u then subst f F
+      show Exp.lam _ = Exp.lam _
+      congr 1
+      show Exp.subst (Exp.subst (Exp.close _ v) x u) f F = Exp.close _ v
+      simp only [Exp.close]
+      rw [Exp.subst_closeRec x v u 0 _ hxv hvu]
+      rw [Exp.subst_closeRec f v F 0 _ hfv hvF]
+      congr 1
+      simp [Exp.subst, Ne.symm hfx, hxv, hfv]
+    · -- .app bodyE (.fvar x)
+      show Exp.app _ _ = Exp.app _ _
+      congr 1
+      · show Exp.subst (Exp.subst bodyE x u) f F = bodyE
+        rw [Exp.subst_fresh x bodyE u hxbodyE, Exp.subst_fresh f bodyE F hfbodyE]
+      · show Exp.subst (Exp.subst (Exp.fvar x) x u) f F = u
+        simp only [Exp.subst]
+        exact Exp.subst_fresh f u F hfu
+  · -- "fvar x → u" on the else-branch of the cond
+    show Exp.subst (Exp.subst (Exp.fvar x) x u) f F = u
+    simp only [Exp.subst]
+    exact Exp.subst_fresh f u F hfu
+
+/-- One-iteration unfolding of `probLangWhile` at `as_expr t`.
+
+    Combines the generic `limExec_app_fix_lam_close` with the concrete
+    `probLangWhile_subst_reduces` simplification to turn the closed loop
+    expression into its opened form with `as_expr t` substituted. -/
+theorem limExec_probLangWhile_app [SLangType T] [ProbLangEmbeddable T]
+    {f x v : Var} (hfx : f ≠ x) (hfv : f ≠ v) (hxv : x ≠ v)
+    {condE bodyE : Exp}
+    (hcondE_lc : Exp.IsLocallyClosed condE) (hbodyE_lc : Exp.IsLocallyClosed bodyE)
+    (hfcondE : f ∉ condE.fv) (hfbodyE : f ∉ bodyE.fv)
+    (hxcondE : x ∉ condE.fv) (hxbodyE : x ∉ bodyE.fv)
+    (hvcondE : v ∉ condE.fv) (hvbodyE : v ∉ bodyE.fv)
+    (hfas : ∀ (t : T), f ∉ (as_expr t).fv)
+    (_hxas : ∀ (t : T), x ∉ (as_expr t).fv)
+    (hvas : ∀ (t : T), v ∉ (as_expr t).fv)
+    (t : T) {σ : State} :
+    let F : Exp := .fix (Exp.close (.lam (Exp.close
+      (.cond (.app condE (.fvar x))
+        (probLangBind v (.app bodyE (.fvar x)) (.app (.fvar f) (.fvar v)))
+        (.fvar x)) x)) f)
+    limExec ⟨.app F (as_expr t), σ⟩
+      = limExec ⟨probLangWhile_unfolded v condE bodyE F (as_expr t), σ⟩ := by
+  intro F
+  -- innerBody: the open body at atoms f, x, v.
+  set innerBody : Exp :=
+    .cond (.app condE (.fvar x))
+          (probLangBind v (.app bodyE (.fvar x)) (.app (.fvar f) (.fvar v)))
+          (.fvar x) with hinner_def
+  -- Local-closure of innerBody.
+  have hfv_v : (Exp.app (.fvar f) (.fvar v) : Exp).IsLocallyClosed :=
+    .app (.fvar _) (.fvar _)
+  have hinner_lc : Exp.IsLocallyClosed innerBody := by
+    refine .cond (.app hcondE_lc (.fvar _)) ?_ (.fvar _)
+    -- probLangBind v e1 body = .app (.lam (close body v)) e1
+    refine .app ?_ (.app hbodyE_lc (.fvar _))
+    refine Exp.IsLocallyClosed.lam (insert v (Exp.app (.fvar f) (.fvar v)).fv) _ (fun y hy => ?_)
+    have hyv : y ≠ v := fun h => hy (by simp [h])
+    rw [Exp.open_close_subst_lc v y _ hfv_v]
+    exact Exp.subst_lc hfv_v (.fvar _)
+  -- v ∉ innerBody.fv: the probLangBind closes v off, and v ∉ condE.fv ∪ bodyE.fv,
+  -- v ≠ f, v ≠ x are direct hypotheses.
+  have hv_inner : v ∉ innerBody.fv := by
+    show v ∉ _
+    simp only [hinner_def, probLangBind, Exp.fv, Finset.mem_union, Finset.mem_singleton,
+      not_or]
+    refine ⟨⟨⟨hvcondE, fun h => hxv h.symm⟩, ?_, hvbodyE, fun h => hxv h.symm⟩, fun h => hxv h.symm⟩
+    -- v ∉ (close (.app (fvar f) (fvar v)) v).fv by close_var_not_fvar.
+    exact Exp.close_var_not_fvar_rec v 0 _
+  -- v ∉ F.fv via close_preserve_not_fvar.
+  have hvF : v ∉ F.fv := by
+    -- F = .fix (close (.lam (close innerBody x)) f)
+    -- (.fix e).fv = e.fv; (.lam e).fv = e.fv
+    show v ∉ Exp.fv _
+    have h1 : v ∉ (Exp.close innerBody x).fv :=
+      Exp.close_preserve_not_fvar _ hv_inner
+    -- .lam has same fv as body
+    have h2 : v ∉ (Exp.lam (Exp.close innerBody x)).fv := by
+      simp only [Exp.fv]; exact h1
+    exact Exp.close_preserve_not_fvar _ h2
+  -- Apply generic fix-unfolding.
+  rw [limExec_app_fix_lam_close (f := f) (x := x) hinner_lc
+        (as_expr_lc t) (as_expr_isVal t) (hfas t)]
+  -- Now the double subst simplifies via probLangWhile_subst_reduces.
+  have hsubst : Exp.subst (Exp.subst innerBody x (as_expr t)) f F =
+      probLangWhile_unfolded v condE bodyE F (as_expr t) := by
+    rw [hinner_def]
+    simp only [probLangBind, probLangWhile_unfolded]
+    exact probLangWhile_subst_reduces hfx hfv hxv
+      hfcondE hfbodyE hxcondE hxbodyE (hfas t) (hvas t) hvF
+  rw [hsubst]
+
+/-- Recurrence for `limExec ⟨.app F (as_expr t), σ⟩`: mirrors `probWhileFunctional`.
+
+    Uses the value-indexed form `(count (body t)).bind (fun t' => limExec ⟨.app F (as_expr t'), σ⟩)`
+    which is better-behaved than `(SLang.spec …).bind …` because every sampled value is
+    already in `as_expr`-form (no need for beta-lam reduction pointwise).
+
+    On `cond t = false`, terminates immediately at `as_expr t`.
+    On `cond t = true`, binds through one iteration of `body t`, then recurses. -/
+theorem limExec_probLangWhile_recurrence [SLangType T] [ProbLangEmbeddable T]
+    {cond : T → Bool} {body : T → SLang T}
+    {f x v : Var} (hfx : f ≠ x) (hfv : f ≠ v) (hxv : x ≠ v)
+    {condE bodyE : Exp}
+    (hcondE_lc : Exp.IsLocallyClosed condE) (hbodyE_lc : Exp.IsLocallyClosed bodyE)
+    (hfcondE : f ∉ condE.fv) (hfbodyE : f ∉ bodyE.fv)
+    (hxcondE : x ∉ condE.fv) (hxbodyE : x ∉ bodyE.fv)
+    (hvcondE : v ∉ condE.fv) (hvbodyE : v ∉ bodyE.fv)
+    (hfas : ∀ (t : T), f ∉ (as_expr t).fv)
+    (hxas : ∀ (t : T), x ∉ (as_expr t).fv)
+    (hvas : ∀ (t : T), v ∉ (as_expr t).fv)
+    (hcond : ∀ t σ, limExec ⟨.app condE (as_expr t), σ⟩ = dirac ⟨.lit (.bool (cond t)), σ⟩)
+    (hbody : ∀ t, IsEmbedding (body t) (.app bodyE (as_expr t)))
+    (t : T) {σ : State} :
+    let F : Exp := .fix (Exp.close (.lam (Exp.close
+      (.cond (.app condE (.fvar x))
+        (probLangBind v (.app bodyE (.fvar x)) (.app (.fvar f) (.fvar v)))
+        (.fvar x)) x)) f)
+    limExec ⟨.app F (as_expr t), σ⟩ =
+      (if cond t then
+        (count (body t)).bind (fun t' => limExec ⟨.app F (as_expr t'), σ⟩)
+       else dirac ⟨as_expr t, σ⟩) := by
+  intro F
+  -- Upfront: LC of innerBody, loopLam, and F (needed twice: in
+  -- limExec_app_fix_lam_close's preamble, and again for the beta-lam in the true-branch).
+  set innerBody : Exp :=
+    .cond (.app condE (.fvar x))
+          (probLangBind v (.app bodyE (.fvar x)) (.app (.fvar f) (.fvar v)))
+          (.fvar x) with hinner_def
+  have hfv_v : (Exp.app (.fvar f) (.fvar v) : Exp).IsLocallyClosed :=
+    .app (.fvar _) (.fvar _)
+  have hinner_lc : Exp.IsLocallyClosed innerBody := by
+    refine .cond (.app hcondE_lc (.fvar _)) ?_ (.fvar _)
+    refine .app ?_ (.app hbodyE_lc (.fvar _))
+    refine Exp.IsLocallyClosed.lam (insert v (Exp.app (.fvar f) (.fvar v)).fv) _ (fun y hy => ?_)
+    have hyv : y ≠ v := fun h => hy (by simp [h])
+    rw [Exp.open_close_subst_lc v y _ hfv_v]
+    exact Exp.subst_lc hfv_v (.fvar _)
+  have hloopLam_lc : Exp.IsLocallyClosed (.lam (Exp.close innerBody x)) := by
+    refine Exp.IsLocallyClosed.lam (insert x innerBody.fv) _ (fun y hy => ?_)
+    have hyx : y ≠ x := fun h => hy (by simp [h])
+    rw [Exp.open_close_subst_lc x y innerBody hinner_lc]
+    exact Exp.subst_lc hinner_lc (.fvar _)
+  have hF_lc : Exp.IsLocallyClosed F := by
+    refine Exp.IsLocallyClosed.fix (insert f (Exp.lam (Exp.close innerBody x)).fv) _ (fun g hg => ?_)
+    have hgf : g ≠ f := fun h => hg (by simp [h])
+    rw [Exp.open_close_subst_lc f g _ hloopLam_lc]
+    exact Exp.subst_lc hloopLam_lc (.fvar _)
+  have hv_inner : v ∉ innerBody.fv := by
+    show v ∉ _
+    simp only [hinner_def, probLangBind, Exp.fv, Finset.mem_union, Finset.mem_singleton,
+      not_or]
+    refine ⟨⟨⟨hvcondE, fun h => hxv h.symm⟩, ?_, hvbodyE, fun h => hxv h.symm⟩, fun h => hxv h.symm⟩
+    exact Exp.close_var_not_fvar_rec v 0 _
+  have hvF : v ∉ F.fv := by
+    show v ∉ Exp.fv _
+    have h1 : v ∉ (Exp.close innerBody x).fv :=
+      Exp.close_preserve_not_fvar _ hv_inner
+    have h2 : v ∉ (Exp.lam (Exp.close innerBody x)).fv := by
+      simp only [Exp.fv]; exact h1
+    exact Exp.close_preserve_not_fvar _ h2
+  -- Step 1: use one-iteration unfolding.
+  rw [limExec_probLangWhile_app hfx hfv hxv hcondE_lc hbodyE_lc
+        hfcondE hfbodyE hxcondE hxbodyE hvcondE hvbodyE hfas hxas hvas t]
+  simp only [probLangWhile_unfolded]
+  -- Step 2: evaluate the cond discriminant via limExec_fill_item with Ki = .condC.
+  rw [show (Exp.cond (Exp.app condE (as_expr t))
+              (Exp.app (Exp.lam (Exp.close (Exp.app F (.fvar v)) v)) (Exp.app bodyE (as_expr t)))
+              (as_expr t) : Exp)
+        = EctxItem.fillItem (.condC _ _) (Exp.app condE (as_expr t)) from rfl,
+      limExec_fill_item, hcond t σ, Measure.dirac_bind Measurable.of_discrete]
+  simp only [EctxItem.fillItem]
+  -- Step 3: split on cond t and apply DetHeadStep.cond_{true,false}.
+  by_cases hct : cond t = true
+  · rw [hct]
+    simp only [if_true]
+    have hnv : ¬ (Exp.cond (.lit (.bool true))
+        (Exp.app (.lam (Exp.close (Exp.app F (.fvar v)) v)) (Exp.app bodyE (as_expr t)))
+        (as_expr t)).isValue := by intro ⟨h⟩; cases h
+    rw [limExec_detHeadStep hnv (DetHeadStep.cond_true _ _ σ)]
+    -- Step 4: evaluate .app bodyE (as_expr t) via limExec_fill_item with Ki = .appR.
+    rw [show (Exp.app (.lam (Exp.close (Exp.app F (.fvar v)) v)) (Exp.app bodyE (as_expr t)) : Exp)
+          = EctxItem.fillItem (.appR _) (Exp.app bodyE (as_expr t)) from rfl,
+        limExec_fill_item]
+    simp only [EctxItem.fillItem]
+    rw [hbody t σ]
+    -- Step 5: unfold SLang.spec as (count (body t)).map as_expr |>.map (⟨·, σ⟩) and push
+    -- the bind through both maps.
+    unfold SLang.spec
+    rw [Measure.bind_map Measurable.of_discrete Measurable.of_discrete]
+    rw [Measure.bind_map Measurable.of_discrete Measurable.of_discrete]
+    -- Now: (count (body t)).bind (fun t' => limExec ⟨.app (.lam (close (.app F (fvar v)) v)) (as_expr t'), σ⟩)
+    -- which should equal: (count (body t)).bind (fun t' => limExec ⟨.app F (as_expr t'), σ⟩)
+    congr 1
+    funext t'
+    -- Goal: limExec ⟨.app (.lam (close (.app F (fvar v)) v)) (as_expr t'), σ⟩
+    --     = limExec ⟨.app F (as_expr t'), σ⟩
+    simp only [Function.comp]
+    rw [limExec_beta (as_expr_isVal t')]
+    congr 1
+    -- Goal: open' (close (.app F (fvar v)) v) (as_expr t') = .app F (as_expr t')
+    rw [Exp.open_close_subst_lc_gen v _ (as_expr t') (.app hF_lc (.fvar _)) (as_expr_lc t')]
+    -- subst (.app F (fvar v)) v (as_expr t') = .app (subst F v (as_expr t')) (as_expr t')
+    -- subst F v (as_expr t') = F since v ∉ F.fv.
+    simp only [Exp.subst]
+    rw [Exp.subst_fresh v F (as_expr t') hvF]
+    simp
+  · have hct' : cond t = false := by
+      cases hc : cond t with
+      | true => exact absurd hc hct
+      | false => rfl
+    simp only [hct']
+    have hnv : ¬ (Exp.cond (.lit (.bool false))
+        (Exp.app (.lam (Exp.close (Exp.app F (.fvar v)) v)) (Exp.app bodyE (as_expr t)))
+        (as_expr t)).isValue := by intro ⟨h⟩; cases h
+    rw [limExec_detHeadStep hnv (DetHeadStep.cond_false _ _ σ)]
+    exact limExec_of_isVal (as_expr_isVal t)
+
+/-- Forward direction: finite unrollings of `probWhile` are dominated pointwise
+    by `limExec` of the closed form. -/
+theorem SLang_spec_probWhileCut_le [SLangType T] [ProbLangEmbeddable T]
+    {cond : T → Bool} {body : T → SLang T}
+    {f x v : Var} (hfx : f ≠ x) (hfv : f ≠ v) (hxv : x ≠ v)
+    {condE bodyE : Exp}
+    (hcondE_lc : Exp.IsLocallyClosed condE) (hbodyE_lc : Exp.IsLocallyClosed bodyE)
+    (hfcondE : f ∉ condE.fv) (hfbodyE : f ∉ bodyE.fv)
+    (hxcondE : x ∉ condE.fv) (hxbodyE : x ∉ bodyE.fv)
+    (hvcondE : v ∉ condE.fv) (hvbodyE : v ∉ bodyE.fv)
+    (hfas : ∀ (t : T), f ∉ (as_expr t).fv)
+    (hxas : ∀ (t : T), x ∉ (as_expr t).fv)
+    (hvas : ∀ (t : T), v ∉ (as_expr t).fv)
+    (hcond : ∀ t σ, limExec ⟨.app condE (as_expr t), σ⟩ = dirac ⟨.lit (.bool (cond t)), σ⟩)
+    (hbody : ∀ t, IsEmbedding (body t) (.app bodyE (as_expr t)))
+    (k : Nat) (t : T) (σ : State) :
+    let F : Exp := .fix (Exp.close (.lam (Exp.close
+      (.cond (.app condE (.fvar x))
+        (probLangBind v (.app bodyE (.fvar x)) (.app (.fvar f) (.fvar v)))
+        (.fvar x)) x)) f)
+    SLang.spec (probWhileCut cond body k t) σ ≤ limExec ⟨.app F (as_expr t), σ⟩ := by
+  intro F
+  induction k generalizing t with
+  | zero =>
+    -- probWhileCut 0 = probZero = (fun _ => 0), so SLang.spec is 0.
+    have hzero : (probWhileCut cond body 0 t : SLang T) = (fun _ => 0) := rfl
+    show SLang.spec (probWhileCut cond body 0 t) σ ≤ _
+    rw [hzero]
+    have : SLang.spec (fun _ : T => (0 : ENNReal)) σ = (0 : Measure Cfg) := by
+      unfold SLang.spec _root_.count
+      simp
+    rw [this]
+    exact bot_le
+  | succ k ih =>
+    -- probWhileCut (k+1) = probWhileFunctional body (probWhileCut k).
+    show SLang.spec (probWhileFunctional cond body (probWhileCut cond body k) t) σ ≤ _
+    rw [limExec_probLangWhile_recurrence hfx hfv hxv hcondE_lc hbodyE_lc
+          hfcondE hfbodyE hxcondE hxbodyE hvcondE hvbodyE hfas hxas hvas
+          hcond hbody t]
+    unfold probWhileFunctional
+    by_cases hct : cond t = true
+    · rw [hct]; simp only [if_true]
+      show SLang.spec (probBind (body t) (probWhileCut cond body k)) σ ≤ _
+      -- Rewrite LHS: SLang.spec s = (count s).map as_expr .map (⟨·, σ⟩)
+      -- count (body t >>= wh) = (count ∘ wh) ∘ₘ (count (body t))   [SLang.count_bind_probBind]
+      unfold SLang.spec
+      rw [← SLang.count_bind_probBind]
+      -- Now ((count (body t) >>= ...).map as_expr .map (⟨·, σ⟩)).
+      -- Push .map into bind twice using Measure.bind_map_comm.
+      rw [Measure.bind_map_comm, Measure.bind_map_comm]
+      -- Goal: (count (body t)).bind (fun t' => count (probWhileCut cond body k t') |>.map as_expr |>.map (⟨·, σ⟩))
+      --       ≤ (count (body t)).bind (fun t' => limExec ⟨.app F (as_expr t'), σ⟩)
+      -- This is bind monotonicity in the kernel, applied pointwise via IH.
+      exact Measure.bind_mono_right _ _ _ (fun t' => ih t')
+    · have hct' : cond t = false := by
+        cases hc : cond t with
+        | true => exact absurd hc hct
+        | false => rfl
+      simp only [hct']
+      -- LHS: SLang.spec (probPure t) σ = dirac ⟨as_expr t, σ⟩. RHS: dirac ⟨as_expr t, σ⟩.
+      refine le_of_eq ?_
+      show SLang.spec (SLang.probPure t) σ = _
+      unfold SLang.spec
+      -- count (probPure t) = dirac t
+      have hc_eq : _root_.count (SLang.probPure t) = (dirac t : Measure T) := by
+        refine Measure.ext_of_singleton fun u => ?_
+        rw [_root_.count_singleton]
+        unfold SLang.probPure
+        rw [dirac_apply' _ (MeasurableSet.singleton u)]
+        by_cases hut : u = t
+        · subst hut; simp
+        · simp only [Set.indicator_apply, Set.mem_singleton_iff,
+                     show t ≠ u from fun h => hut h.symm, ↑reduceIte]
+          simp [hut]
+      simp only [show (false = true) = False from by simp, if_false]
+      rw [hc_eq]
+      rw [map_dirac' Measurable.of_discrete, map_dirac' Measurable.of_discrete]
+
+/-- Top-level embedding of `probWhile`.
+
+    Strategy: combine the forward direction (`SLang_spec_probWhileCut_le`) with a
+    backward direction via fuel induction:
+    - **Forward (≥)**: `SLang.spec (probWhileCut k init) σ ≤ limExec ⟨.app F (as_expr init), σ⟩`
+      for each `k`. Taking iSup_k gives `SLang.spec (probWhile init) ≤ limExec ⟨.app F (as_expr init), σ⟩`.
+      Needs: iSup pushes through `(count _).map as_expr .map (⟨·, σ⟩)`.
+    - **Backward (≤)**: `execN n ⟨.app F (as_expr init), σ⟩ ≤ SLang.spec (probWhile init) σ`
+      pointwise. Taking iSup_n gives `limExec ≤ SLang.spec (probWhile init)`.
+      Hard part: relate `n` primSteps to some finite number of `probWhileCut` iterations.
+
+    Current state: forward direction sub-lemma proven; backward direction is the gap. -/
 theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
     {cond : T → Bool} {body : T → SLang T} {init : T}
     {condE bodyE : Exp} {f x v : Var}
-    (hcond : ∀ t σ, limExec ⟨.app condE (as_expr t), σ⟩ = dirac ⟨.lit (.bool (cond t)), σ⟩)
-    (hbody : ∀ t, IsEmbedding (body t) (.app bodyE (as_expr t)))
-    :
+    (_hfx : f ≠ x) (_hfv : f ≠ v) (_hxv : x ≠ v)
+    (_hcondE_lc : Exp.IsLocallyClosed condE) (_hbodyE_lc : Exp.IsLocallyClosed bodyE)
+    (_hfcondE : f ∉ condE.fv) (_hfbodyE : f ∉ bodyE.fv)
+    (_hxcondE : x ∉ condE.fv) (_hxbodyE : x ∉ bodyE.fv)
+    (_hvcondE : v ∉ condE.fv) (_hvbodyE : v ∉ bodyE.fv)
+    (_hfas : ∀ (t : T), f ∉ (as_expr t).fv)
+    (_hxas : ∀ (t : T), x ∉ (as_expr t).fv)
+    (_hvas : ∀ (t : T), v ∉ (as_expr t).fv)
+    (_hcond : ∀ t σ, limExec ⟨.app condE (as_expr t), σ⟩ = dirac ⟨.lit (.bool (cond t)), σ⟩)
+    (_hbody : ∀ t, IsEmbedding (body t) (.app bodyE (as_expr t))) :
     IsEmbedding (probWhile cond body init) (probLangWhile f x v condE bodyE (as_expr init)) := by
+  -- The forward direction (≥) is very close — see the attempted proof below (commented
+  -- out). It reduces to a tsum/iSup swap for ENNReal-valued monotone sequences, which
+  -- is supplied by `lintegral_iSup` via the `lintegral_count` identity. The names
+  -- `Set.indicator_of_notMem` (camelCase) and `ENNReal.tsum_iSup` (or its variant via
+  -- `lintegral_iSup`) need to be located/adapted. The backward direction (≤) requires
+  -- fuel-induction on `execN n`.
+  --
+  -- Commented-out forward-direction attempt (compiles under the assumption of a
+  -- working `ENNReal.tsum_iSup` / `lintegral_iSup`-based monotone-convergence swap):
+  --
+  -- intro σ
+  -- refine le_antisymm ?_ ?_
+  -- · -- BACKWARD
+  --   sorry
+  -- · -- FORWARD
+  --   intro S
+  --   have h_le_iSup : ((count (probWhile cond body init)).map as_expr).map (⟨·, σ⟩) S
+  --       ≤ ⨆ k, ((count (probWhileCut cond body k init)).map as_expr).map (⟨·, σ⟩) S := by
+  --     have expand : ∀ (s : SLang T),
+  --         ((count s).map as_expr).map (⟨·, σ⟩) S =
+  --         ∑' x, s x * (S.indicator 1 ⟨as_expr x, σ⟩) := by
+  --       intro s
+  --       rw [Measure.map_apply Measurable.of_discrete .of_discrete,
+  --           Measure.map_apply Measurable.of_discrete .of_discrete,
+  --           show (_root_.count s) = Measure.count.withDensity s from rfl,
+  --           withDensity_apply _ .of_discrete,
+  --           ← lintegral_indicator .of_discrete, lintegral_count]
+  --       congr 1; funext x
+  --       by_cases hx : ⟨as_expr x, σ⟩ ∈ S
+  --       · simp only [Set.indicator_of_mem hx, Pi.one_apply, mul_one,
+  --                    Set.indicator_of_mem, Set.mem_preimage, hx]
+  --       · simp only [Set.indicator_of_notMem hx, mul_zero,
+  --                    Set.indicator_of_notMem, Set.mem_preimage, hx]
+  --     rw [expand (probWhile cond body init)]
+  --     have rhs_eq : (⨆ k, ((count (probWhileCut cond body k init)).map as_expr).map (⟨·, σ⟩) S) =
+  --         ⨆ k, ∑' x, probWhileCut cond body k init x * S.indicator 1 ⟨as_expr x, σ⟩ := by
+  --       congr 1; funext k; exact expand (probWhileCut cond body k init)
+  --     rw [rhs_eq]
+  --     show ∑' x, probWhile cond body init x * S.indicator 1 ⟨as_expr x, σ⟩ ≤ _
+  --     have probWhile_iSup : ∀ x, probWhile cond body init x = ⨆ k, probWhileCut cond body k init x :=
+  --       fun _ => rfl
+  --     simp_rw [probWhile_iSup, ENNReal.iSup_mul]
+  --     have hmono : ∀ x, Monotone (fun k => probWhileCut cond body k init x *
+  --         S.indicator 1 ⟨as_expr x, σ⟩) := fun x m n hmn =>
+  --       mul_le_mul' (SLang.probWhileCut_monotonic cond body init x hmn) le_rfl
+  --     rw [ENNReal.tsum_iSup (fun k _ l hkl => hmono _ hkl)]  -- needs correct lemma name
+  --   refine h_le_iSup.trans ?_
+  --   refine iSup_le (fun k => ?_)
+  --   exact SLang_spec_probWhileCut_le _hfx _hfv _hxv _hcondE_lc _hbodyE_lc
+  --     _hfcondE _hfbodyE _hxcondE _hxbodyE _hvcondE _hvbodyE _hfas _hxas _hvas _hcond _hbody
+  --     k init σ S
   sorry
 
 /-! ## Proof of concept: closed equivalence example -/

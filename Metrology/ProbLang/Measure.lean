@@ -34,6 +34,19 @@ theorem Measure.bind_map {α β γ : Type} [MeasurableSpace α] [MeasurableSpace
   unfold Measure.bind
   rw [map_map hg hf]
 
+/-- `.map` distributes through `.bind`: mapping over a bind is a bind of maps. -/
+theorem Measure.bind_map_comm {α β γ : Type*}
+    [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
+    [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β]
+    [DiscreteMeasurableSpace γ]
+    (μ : Measure α) (k : α → Measure β) (f : β → γ) :
+    (μ.bind k).map f = μ.bind (fun a => (k a).map f) := by
+  refine Measure.ext fun S hS => ?_
+  rw [Measure.map_apply .of_discrete hS,
+      Measure.bind_apply (by exact .of_discrete) Measurable.of_discrete.aemeasurable,
+      Measure.bind_apply hS Measurable.of_discrete.aemeasurable]
+  simp_rw [Measure.map_apply .of_discrete hS]
+
 abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDensity f
 
 theorem count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
