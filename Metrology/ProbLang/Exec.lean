@@ -152,7 +152,7 @@ theorem iSup_measure_apply {f : ℕ → Measure Cfg} {c : Cfg} :
   · exact iSup_le (fun i => by gcongr; exact le_iSup f i)
 
 /-- `Measure.bind` is monotone in its kernel argument (discrete case). -/
-private theorem Measure.bind_mono_right {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+theorem Measure.bind_mono_right {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
     [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β]
     (μ : Measure α) (f g : α → Measure β)
     (h : ∀ a, f a ≤ g a) :

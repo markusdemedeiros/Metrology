@@ -158,6 +158,24 @@ theorem subst_openRec (x : Var) (t : Exp) (k : Nat) (u e : Exp) (hu : IsLocallyC
     subst (openRec k u e) x t = openRec k (subst u x t) (subst e x t) := by
   induction e generalizing k with grind
 
+/-- `closeRec` at a fresh atom is the identity. -/
+theorem closeRec_fresh (x : Var) (e : Exp) (k : Nat) (h : x ∉ e.fv) :
+    closeRec k x e = e := by
+  induction e generalizing k <;> grind
+
+/-- Substitution commutes with closing at a different atom, provided the substitute
+    doesn't contain that atom. Used to push `subst` through `close`-introduced binders. -/
+@[scoped grind =]
+theorem subst_closeRec (x y : Var) (t : Exp) (k : Nat) (e : Exp) (hxy : x ≠ y)
+    (ht : y ∉ t.fv) :
+    subst (closeRec k y e) x t = closeRec k y (subst e x t) := by
+  induction e generalizing k with grind [closeRec_fresh]
+
+/-- Specialised to the outermost binder. -/
+theorem subst_close (x y : Var) (t : Exp) (e : Exp) (hxy : x ≠ y) (ht : y ∉ t.fv) :
+    subst (close e y) x t = close (subst e x t) y :=
+  subst_closeRec x y t 0 e hxy ht
+
 /-- Substitution commutes with opening the outermost binder. -/
 theorem subst_open (x : Var) (t : Exp) (u e : Exp) (hu : IsLocallyClosed t) :
     subst (open' e u) x t = open' (subst e x t) (subst u x t) := by grind
