@@ -13,10 +13,8 @@ require mathlib from git
 require cslib from git 
    "https://github.com/leanprover/cslib" @ "v4.29.0"
 
--- Using https://github.com/leanprover-community/iris-lean/pull/314 (Kaptch/inv)
--- for fancy-update modality support needed by Metrology.Iris.SpecUpdate.
 require iris from git
-  "https://github.com/Kaptch/iris-lean.git" @ "0ffa92f67397619fafe7b4adb75e6514bf494fb8"
+  "https://github.com/leanprover-community/iris-lean.git" / "Iris"
 
 require sampcert from git
   "https://github.com/leanprover/SampCert.git" @ "v4.29.0"

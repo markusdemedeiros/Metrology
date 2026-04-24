@@ -490,4 +490,43 @@ theorem spec_read_natTape_head {l : Loc} {z : Int} {n : Int} {ns : List Int} :
 
 end NatSpecTape
 
+/-! ## Validity helpers for two spec-side heap/tape fragments at the same location
+
+Two full-fraction `↦ₛ` fragments at the same spec location are inconsistent.
+Needed by `lrel_ref`/`lrel_tape` functionality/injectivity proofs in
+`Metrology/Approxis/Model.lean`. -/
+
+section ValidHelpers
+variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
+
+theorem specHeapFrag_valid_2 {l : Loc} {v1 v2 : Val} :
+    ⊢@{IProp GF} specHeapFrag l v1 -∗ specHeapFrag l v2 -∗ False := by
+  iintro H1 H2
+  unfold specHeapFrag
+  ihave Hv := iOwn_cmraValid_op (E := ISpec.heap) $$ [H1 H2]
+  · isplitl [H1] <;> iassumption
+  ihave %hv := internalCmraValid_discrete $$ Hv
+  exfalso
+  rw [HeapView.frag_op_valid_iff] at hv
+  obtain ⟨hdq, _⟩ := hv
+  have : ¬ ((1 : Iris.PNat) + 1).1 ≤ (1 : Iris.PNat).1 := by
+    show ¬ (1 + 1 : Nat) ≤ 1; omega
+  exact this hdq
+
+theorem specTapesFrag_valid_2 {l : Loc} {t1 t2 : Tape} :
+    ⊢@{IProp GF} specTapesFrag l t1 -∗ specTapesFrag l t2 -∗ False := by
+  iintro H1 H2
+  unfold specTapesFrag
+  ihave Hv := iOwn_cmraValid_op (E := ISpec.tapes) $$ [H1 H2]
+  · isplitl [H1] <;> iassumption
+  ihave %hv := internalCmraValid_discrete $$ Hv
+  exfalso
+  rw [HeapView.frag_op_valid_iff] at hv
+  obtain ⟨hdq, _⟩ := hv
+  have : ¬ ((1 : Iris.PNat) + 1).1 ≤ (1 : Iris.PNat).1 := by
+    show ¬ (1 + 1 : Nat) ≤ 1; omega
+  exact this hdq
+
+end ValidHelpers
+
 end SpecRA

@@ -361,4 +361,49 @@ theorem app_ra_init {GF : BundledGFunctors} [IAPre : AppPreGS GF]
   unfold appStateAuth appHeapAuth appTapesAuth
   isplitl [HH] <;> iassumption
 
+/-! ## Validity helpers for two heap/tape fragments at the same location
+
+Two full-fraction `↦` fragments at the same location are inconsistent
+(combined fraction `1 + 1 = 2 > 1`). Needed by `lrel_ref`/`lrel_tape`
+functionality/injectivity proofs in `Metrology/Approxis/Model.lean`. -/
+
+section ValidHelpers
+variable {GF : BundledGFunctors} [IApp : AppGS GF]
+
+theorem appHeapFrag_valid_2 {l : Loc} {v1 v2 : Val} :
+    ⊢@{IProp GF} appHeapFrag l v1 -∗ appHeapFrag l v2 -∗ False := by
+  iintro H1 H2
+  unfold appHeapFrag
+  ihave Hv := iOwn_cmraValid_op (E := IApp.heap) $$ [H1 H2]
+  · isplitl [H1] <;> iassumption
+  ihave %hv := internalCmraValid_discrete $$ Hv
+  exfalso
+  rw [HeapView.frag_op_valid_iff] at hv
+  obtain ⟨hdq, _⟩ := hv
+  -- `hdq : ✓ (DFrac.own 1 • DFrac.own 1 : DFrac ℕ+)` unfolds to `(1 + 1 : ℕ+) ≤ 1`.
+  -- PNat: `(1 + 1).1 = 2`, `2 ≤ 1` is false.
+  show False
+  have : ¬ ((1 : Iris.PNat) + 1).1 ≤ (1 : Iris.PNat).1 := by
+    show ¬ (1 + 1 : Nat) ≤ 1; omega
+  exact this hdq
+
+theorem appTapesFrag_valid_2 {l : Loc} {t1 t2 : Tape} :
+    ⊢@{IProp GF} appTapesFrag l t1 -∗ appTapesFrag l t2 -∗ False := by
+  iintro H1 H2
+  unfold appTapesFrag
+  ihave Hv := iOwn_cmraValid_op (E := IApp.tapes) $$ [H1 H2]
+  · isplitl [H1] <;> iassumption
+  ihave %hv := internalCmraValid_discrete $$ Hv
+  exfalso
+  rw [HeapView.frag_op_valid_iff] at hv
+  obtain ⟨hdq, _⟩ := hv
+  -- `hdq : ✓ (DFrac.own 1 • DFrac.own 1 : DFrac ℕ+)` unfolds to `(1 + 1 : ℕ+) ≤ 1`.
+  -- PNat: `(1 + 1).1 = 2`, `2 ≤ 1` is false.
+  show False
+  have : ¬ ((1 : Iris.PNat) + 1).1 ≤ (1 : Iris.PNat).1 := by
+    show ¬ (1 + 1 : Nat) ≤ 1; omega
+  exact this hdq
+
+end ValidHelpers
+
 end AppProgramRA
