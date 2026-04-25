@@ -130,12 +130,11 @@ We package this as an a.e. statement for use in the induction step. -/
 This is a case analysis on `headStep`, but cleaner than the full commutation
 because we only track the bound, not the full tape content. -/
 theorem primStep_tape_persists_support
-    {σ : State} {α : Loc} {e : Exp} {t : Tape} {ρ : Cfg}
-    (h : σ.tapes[α]? = some t)
+    {σ : State} {αloc : Loc} {e : Exp} {t : Tape} {ρ : Cfg}
+    (h : σ.tapes[αloc]? = some t)
     (hρ : 0 < primStep ⟨e, σ⟩ {ρ}) :
-    ∃ t' : Tape, ρ.state.tapes[α]? = some t' ∧ t'.bound = t.bound := by
+    ∃ t' : Tape, ρ.state.tapes[αloc]? = some t' ∧ t'.bound = t.bound := by
   obtain ⟨e₂, σ₂⟩ := ρ
-  -- Destructure primStep via `prim_step_iff` to get head-step support witness.
   obtain ⟨K, e₁', e₂', _hfill1, _hfill2, hhs⟩ := prim_step_iff.mp hρ
   rw [headStep_support_iff] at hhs
   -- Case-split on the `HeadStepSupport` constructor; in each case,
@@ -176,34 +175,32 @@ theorem primStep_tape_persists_support
     -- Tape allocation at fresh location ℓ. We need ℓ ≠ α so α survives.
     -- By `State.fresh_loc_upd_some` / `upd_diff_tape_tot`.
     subst hσ' hℓ
-    have hne : σ.tapes.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
+    have hne : σ.tapes.fresh ≠ αloc := Std.ExtTreeMap.elem_fresh_ne h
     refine ⟨t, ?_, rfl⟩
     exact State.upd_diff_tape_tot (hne.symm) |>.trans h
-  | RandTapeS _hz hα' _hN _hv hσ' =>
-    -- Rand read from a tape (call it β). Case-split on whether β = α.
-    -- `RandTapeS` introduces six auto-implicits (in order): β, N, nn, ns, v, z.
-    -- Bind all six by name so reordering/adding an implicit to the
-    -- constructor signature produces a loud error here instead of a silent
-    -- shift in meaning.
+  | @RandTapeS β _ _ _ _ _ _ _ hα' _hN _hv hσ' =>
     subst hσ'
-    rename_i β N _ns _v _z
-    by_cases hαβ : α = β
-    · -- Same tape: consumes head, leaves tail `ns✝`. Bound = N, unchanged.
-      subst hαβ
+    by_cases hαβ : αloc = β
+    · subst hαβ
       rw [hα'] at h
       have ht := Option.some.inj h
       subst ht
       refine ⟨_, State.upd_tape_some _ _ _, rfl⟩
     · refine ⟨t, ?_, rfl⟩
-      have hne : α ≠ β := hαβ
-      rw [show (σ.update_tapes fun x => x.insert β _).tapes[α]? = σ.tapes[α]?
-          from State.upd_diff_tape_tot hne]
+      rw [show (σ.update_tapes fun x => x.insert β _).tapes[αloc]? = σ.tapes[αloc]?
+          from State.upd_diff_tape_tot hαβ]
       exact h
   | RandTapeEmptyS _ _ _ _ _ hσ' =>
     subst hσ'
     exact ⟨t, h, rfl⟩
   | RandTapeOtherS _ _ _ _ _ hσ' =>
     subst hσ'
+    exact ⟨t, h, rfl⟩
+  | RandNonposS _ =>
+    exact ⟨t, h, rfl⟩
+  | RandTapeNonposEmptyS _ _ _ =>
+    exact ⟨t, h, rfl⟩
+  | RandTapeNonposOtherS _ _ _ =>
     exact ⟨t, h, rfl⟩
   | ScrutSuccessS =>
     exact ⟨t, h, rfl⟩
@@ -423,7 +420,7 @@ theorem Cfg.uniform_eq_bind {z : Int} {σ : State} (hz : 0 < z) :
       ((PMF.uniformOfFinset (Finset.Ico 0 z)
             (Finset.nonempty_Ico.mpr hz)).toMeasure).bind
         (fun n => Measure.dirac (⟨.lit (.int n), σ⟩ : Cfg)) := by
-  unfold Cfg.uniform Int.isPos Option.unwrapM
+  unfold Cfg.uniform Int.isPos
   rw [dif_pos hz]
   rw [Measure.bind_dirac_eq_map _ Measurable.of_discrete]
 
@@ -494,10 +491,15 @@ theorem tapePresample_bind_cfgUniform_comm
               (Finset.nonempty_Ico.mpr hz)).toMeasure))
       (f := fun σ' n => (Measure.dirac (⟨.lit (.int n), σ'⟩ : Cfg)) S)
       Measurable.of_discrete.aemeasurable
-  · -- Both sides reduce to 0.
-    have hCfg0' : ∀ σ' : State, Cfg.uniform z σ' = 0 :=
-      fun σ' => Cfg.uniform_eq_zero_iff.mpr hz
-    simp_rw [hCfg0', Measure.bind_zero_left, Measure.bind_zero_right']
+  · -- Both sides: Cfg.uniform z σ' = dirac ⟨lit -1, σ'⟩ for nonpos z.
+    have hCfg' : ∀ σ' : State,
+        Cfg.uniform z σ' = Measure.dirac (⟨.lit (.int (-1)), σ'⟩ : Cfg) :=
+      fun σ' => Cfg.uniform_nonpos_eq hz
+    simp_rw [hCfg']
+    rw [Measure.dirac_bind
+          (f := fun ρ' : Cfg => (tapePresample ρ'.state α).bind
+            (fun σ'' => Measure.dirac (⟨ρ'.expr, σ''⟩ : Cfg)))
+          Measurable.of_discrete]
 
 /-! ## Core: presampling is invisible to `execN` at the expression level
 
@@ -529,7 +531,7 @@ theorem tapeIndexUniform_lintegral_eq_cfg_uniform
         f ⟨.lit (.int ↑a), σ⟩ ∂tapeIndexUniform N
       = ∫⁻ (ρ : Cfg), f ρ ∂Cfg.uniform N σ := by
   -- Unfold both definitions to PMF.uniformOfFinset level
-  unfold tapeIndexUniform Cfg.uniform Int.isPos Option.unwrapM
+  unfold tapeIndexUniform Cfg.uniform Int.isPos
   have hNonempty : (Finset.Ico 0 N).Nonempty := ⟨0, Finset.mem_Ico.mpr ⟨le_refl _, hN⟩⟩
   rw [dif_pos hNonempty, dif_pos hN]
   simp only
@@ -596,6 +598,39 @@ theorem erasure_det_close
   simp_rw [hs, lintegral_dirac' _ Measurable.of_discrete]
   exact ih_fill _ σ t h hN
 
+/-- Helper for state-preserving dirac head-step cases that hold ONLY a.e.
+on `tapePresample σ α` (rather than for all `σ'`). Used by the new
+nonpos-rand cases where headStep depends on tape state, which presample
+preserves only on the support. -/
+theorem erasure_det_close_ae
+    {m : Nat} {K : Ectx} {S : Set Exp} {σ : State} {α : Loc} {t : Tape}
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
+    (ih_fill : ∀ (e' : Exp) (σ' : State) (t' : Tape),
+      σ'.tapes[α]? = some t' → 0 < t'.bound →
+      ∫⁻ σ'', ((execN m ∘ K.fillCfg) ⟨e', σ''⟩) ((fun x => x.expr) ⁻¹' S)
+          ∂tapePresample σ' α
+        = ((execN m ∘ K.fillCfg) ⟨e', σ'⟩) ((fun x => x.expr) ⁻¹' S))
+    (e_h e' : Exp)
+    (hs_ae : ∀ᵐ σ' ∂(tapePresample σ α),
+        headStep (⟨e_h, σ'⟩ : Cfg) = Measure.dirac ⟨e', σ'⟩)
+    (hs_σ : headStep (⟨e_h, σ⟩ : Cfg) = Measure.dirac ⟨e', σ⟩) :
+    ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+              ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
+      = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+          ∂headStep ⟨e_h, σ⟩ := by
+  haveI : IsProbabilityMeasure (tapePresample σ α) :=
+    ⟨tapePresample_univ_eq_one h hN⟩
+  rw [hs_σ, lintegral_dirac' _ Measurable.of_discrete]
+  calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+                ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
+      = ∫⁻ σ', ((execN m ∘ K.fillCfg) ⟨e', σ'⟩) ((fun x => x.expr) ⁻¹' S)
+          ∂tapePresample σ α := by
+        refine lintegral_congr_ae ?_
+        filter_upwards [hs_ae] with σ' hs
+        rw [hs, lintegral_dirac' _ Measurable.of_discrete]
+    _ = ((execN m ∘ K.fillCfg) ⟨e', σ⟩) ((fun x => x.expr) ⁻¹' S) :=
+          ih_fill _ σ t h hN
+
 /-- Helper for `Cfg.uniform` head-step cases. Given that
 `headStep ⟨e_h, σ'⟩ = Cfg.uniform z_r σ'` a.e. on `tapePresample σ α` and at
 `σ` itself, the goal collapses via Fubini + `ih_fill` at each sampled
@@ -622,7 +657,7 @@ theorem erasure_uniform_close
   set pmf := PMF.uniformOfFinset (Finset.Ico (0 : Int) z_r) hNonempty
   have hunif : ∀ σ₀ : State, Cfg.uniform z_r σ₀ =
       pmf.toMeasure.map (fun n : Int => (⟨.lit (.int n), σ₀⟩ : Cfg)) := fun σ₀ => by
-    unfold Cfg.uniform Int.isPos Option.unwrapM; rw [dif_pos hz]
+    unfold Cfg.uniform Int.isPos; rw [dif_pos hz]
   calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
                 ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
       = ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
@@ -1043,7 +1078,7 @@ theorem execN_tape_presample_expr_eq
           rename_i z_r
           exact uniform_close _ z_r hz
             (MeasureTheory.ae_of_all _ fun _ => rfl) rfl
-        | @randTape z_r α_lbl _ N_b nn ns hz htapes hzN =>
+        | @randTape z_r α_lbl _ N_b nn ns htapes hzN =>
           subst hzN
           by_cases hαeq : α = α_lbl
           · -- Same tape: `headStep` pops `nn`. After unfolding both sides,
@@ -1173,6 +1208,56 @@ theorem execN_tape_presample_expr_eq
           · -- Different tape: lookup preserved.
             filter_upwards [tapePresample_tape_ne_ae h (Ne.symm hαeq)] with σ' htape_eq
             exact hrand_uniform _ (htape_eq.trans htapes) (Ne.symm hzN)
+        | randNonpos hz =>
+          -- New nonpos case: headStep = dirac ⟨lit -1, σ'⟩, state-preserving.
+          rename_i z_r
+          refine det_close_state_pres _ (.lit (.int (-1))) fun σ' => ?_
+          show Cfg.uniform z_r σ' = _
+          exact Cfg.uniform_nonpos_eq hz
+        | @randTapeNonposEmpty z_r α_lbl _ N_b hz htapes hzN =>
+          have hαne : α ≠ α_lbl := by
+            intro heq; subst heq
+            have ht_eq : t = ⟨N_b, []⟩ := by
+              rw [htapes] at h; exact (Option.some.inj h).symm
+            apply hz; rw [hzN]
+            have : t.bound = N_b := by rw [ht_eq]
+            exact this ▸ hN
+          subst hzN
+          have hstep : ∀ {σ' : State}, σ'.tapes[α_lbl]? = some ⟨z_r, []⟩ →
+              headStep (⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ'⟩ : Cfg) =
+                Measure.dirac ⟨.lit (.int (-1)), σ'⟩ := by
+            intro σ' hσ'
+            simp only [headStep, hσ', ↓reduceIte]
+            exact Cfg.uniform_nonpos_eq hz
+          refine erasure_det_close_ae h hN ih_fill _ (.lit (.int (-1))) ?_ ?_
+          · filter_upwards [tapePresample_tape_ne_ae h (Ne.symm hαne)] with σ' htape_eq
+            exact hstep (htape_eq.trans htapes)
+          · exact hstep htapes
+        | @randTapeNonposOther z_r α_lbl _ N_b L hz htapes hzN =>
+          have hstep : ∀ {σ' : State}, σ'.tapes[α_lbl]? = some ⟨N_b, L⟩ →
+              headStep (⟨.rand (.lit (.int z_r)) (.lit (.lbl α_lbl)), σ'⟩ : Cfg) =
+                Measure.dirac ⟨.lit (.int (-1)), σ'⟩ := by
+            intro σ' hσ'
+            simp only [headStep, hσ']
+            rw [if_neg (Ne.symm hzN)]
+            exact Cfg.uniform_nonpos_eq hz
+          refine erasure_det_close_ae h hN ih_fill _ (.lit (.int (-1))) ?_ (hstep htapes)
+          by_cases hαeq : α = α_lbl
+          · subst hαeq
+            -- Original tape at α is t = ⟨N_b, L⟩ (from htapes = h).
+            have ht_eq : t = ⟨N_b, L⟩ := by
+              rw [htapes] at h; exact (Option.some.inj h).symm
+            subst ht_eq
+            refine tapePresample_ae h fun n => ?_
+            -- After appending n, tape α has bound N_b, presamples L ++ [n].
+            -- Since N_b ≠ z_r, headStep takes the if-neg branch → uniform = dirac -1.
+            have hlook : (σ.update_tapes (·.insert α ⟨N_b, L ++ [n]⟩)).tapes[α]? =
+                some ⟨N_b, L ++ [n]⟩ := by simp [State.update_tapes]
+            simp only [headStep, hlook]
+            rw [if_neg (Ne.symm hzN)]
+            exact Cfg.uniform_nonpos_eq hz
+          · filter_upwards [tapePresample_tape_ne_ae h (Ne.symm hαeq)] with σ' htape_eq
+            exact hstep (htape_eq.trans htapes)
       · -- Zero case handled by `erasure_zero_close`.
         exact erasure_zero_close (e_red := e_red) h hN hzero
 

@@ -155,6 +155,91 @@ instance pureExec_app_lam {body v : Exp} :
     PureExec (v.isValue) 1 (.app (.lam body) v) (Exp.open' body v) where
   pure_exec hv := ⟨_, (PureHeadStep.app_lam hv.some).toPureStep, rfl⟩
 
+/-- `PureHeadStep` for `if true then et else ef → et`. -/
+theorem PureHeadStep.cond_true (et ef : Exp) :
+    PureHeadStep (.cond (.lit (.bool true)) et ef) et :=
+  .of_det _ _ fun σ => by simp [headStep]
+
+/-- `PureHeadStep` for `if false then et else ef → ef`. -/
+theorem PureHeadStep.cond_false (et ef : Exp) :
+    PureHeadStep (.cond (.lit (.bool false)) et ef) ef :=
+  .of_det _ _ fun σ => by simp [headStep]
+
+instance pureExec_cond_true {et ef : Exp} :
+    PureExec True 1 (.cond (.lit (.bool true)) et ef) et where
+  pure_exec _ := ⟨_, (PureHeadStep.cond_true et ef).toPureStep, rfl⟩
+
+instance pureExec_cond_false {et ef : Exp} :
+    PureExec True 1 (.cond (.lit (.bool false)) et ef) ef where
+  pure_exec _ := ⟨_, (PureHeadStep.cond_false et ef).toPureStep, rfl⟩
+
+/-- `PureHeadStep` for `fst (v1, v2) → v1` when both are values. -/
+theorem PureHeadStep.fst_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) :
+    PureHeadStep (.fst (.pair e1 e2)) e1 :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2]
+
+/-- `PureHeadStep` for `snd (v1, v2) → v2`. -/
+theorem PureHeadStep.snd_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) :
+    PureHeadStep (.snd (.pair e1 e2)) e2 :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2]
+
+instance pureExec_fst_pair {e1 e2 : Exp} :
+    PureExec (e1.isValue ∧ e2.isValue) 1 (.fst (.pair e1 e2)) e1 where
+  pure_exec h := ⟨_, (PureHeadStep.fst_pair h.1.some h.2.some).toPureStep, rfl⟩
+
+instance pureExec_snd_pair {e1 e2 : Exp} :
+    PureExec (e1.isValue ∧ e2.isValue) 1 (.snd (.pair e1 e2)) e2 where
+  pure_exec h := ⟨_, (PureHeadStep.snd_pair h.1.some h.2.some).toPureStep, rfl⟩
+
+/-- `PureHeadStep` for `case (inl v) el er → el v`. -/
+theorem PureHeadStep.case_inl {v el er : Exp} (hv : IsVal v) :
+    PureHeadStep (.case (.inl v) el er) (el.app v) :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' hv]
+
+theorem PureHeadStep.case_inr {v el er : Exp} (hv : IsVal v) :
+    PureHeadStep (.case (.inr v) el er) (er.app v) :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' hv]
+
+instance pureExec_case_inl {v el er : Exp} :
+    PureExec v.isValue 1 (.case (.inl v) el er) (el.app v) where
+  pure_exec hv := ⟨_, (PureHeadStep.case_inl hv.some).toPureStep, rfl⟩
+
+instance pureExec_case_inr {v el er : Exp} :
+    PureExec v.isValue 1 (.case (.inr v) el er) (er.app v) where
+  pure_exec hv := ⟨_, (PureHeadStep.case_inr hv.some).toPureStep, rfl⟩
+
+/-- `PureHeadStep` for `binop op v1 v2 → r` when both are values and eval succeeds. -/
+theorem PureHeadStep.binop {op : BinOp} {e1 e2 r : Exp}
+    (h1 : IsVal e1) (h2 : IsVal e2) (heval : op.eval e1 e2 = some r) :
+    PureHeadStep (.binop op e1 e2) r :=
+  .of_det _ _ fun σ => by
+    simp [headStep, Option.unwrapM, Exp.isValM_some' h1, Exp.isValM_some' h2, heval]
+
+instance pureExec_binop {op : BinOp} {e1 e2 r : Exp} :
+    PureExec (e1.isValue ∧ e2.isValue ∧ op.eval e1 e2 = some r) 1
+      (.binop op e1 e2) r where
+  pure_exec h := ⟨_, (PureHeadStep.binop h.1.some h.2.1.some h.2.2).toPureStep, rfl⟩
+
+/-- `PureHeadStep` for `unop op v → r`. -/
+theorem PureHeadStep.unop {op : UnOp} {e r : Exp}
+    (hv : IsVal e) (heval : op.eval e = some r) :
+    PureHeadStep (.unop op e) r :=
+  .of_det _ _ fun σ => by
+    simp [headStep, Option.unwrapM, Exp.isValM_some' hv, heval]
+
+instance pureExec_unop {op : UnOp} {e r : Exp} :
+    PureExec (e.isValue ∧ op.eval e = some r) 1 (.unop op e) r where
+  pure_exec h := ⟨_, (PureHeadStep.unop h.1.some h.2).toPureStep, rfl⟩
+
+/-- `PureHeadStep` for `(fix body) v → (open' body (fix body)) v`. -/
+theorem PureHeadStep.app_fix {body v : Exp} (hv : IsVal v) :
+    PureHeadStep (.app (.fix body) v) (Exp.app (Exp.open' body (.fix body)) v) :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' hv]
+
+instance pureExec_app_fix {body v : Exp} :
+    PureExec v.isValue 1 (.app (.fix body) v) (Exp.app (Exp.open' body (.fix body)) v) where
+  pure_exec hv := ⟨_, (PureHeadStep.app_fix hv.some).toPureStep, rfl⟩
+
 theorem DetHeadStep.app_fix {body v : Exp}
     (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.app (.fix body) v, σ⟩

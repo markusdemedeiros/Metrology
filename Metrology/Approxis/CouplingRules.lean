@@ -117,7 +117,7 @@ theorem Cfg.lintegral_uniform {z : Int} (Hz : 0 < z) (σ : State) (φ : Cfg → 
       ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z)
           (Finset.nonempty_Ico.mpr Hz)).toMeasure).map
         (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg)) := by
-    unfold Cfg.uniform Int.isPos Option.unwrapM
+    unfold Cfg.uniform Int.isPos
     simp only [Hz, dite_true]
   rw [Huniform,
       MeasureTheory.lintegral_map (Measurable.of_discrete) Measurable.of_discrete]

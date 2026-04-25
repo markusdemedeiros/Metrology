@@ -69,6 +69,17 @@ def insert (vs : SubstMap) (x : Var) (v : Exp) : SubstMap := (x, v) :: vs
 def delete (vs : SubstMap) (x : Var) : SubstMap :=
   vs.filter (fun p => p.1 ≠ x)
 
+/-- Lookup: **rightmost binding wins**, mirroring `Exp.substMap`'s foldr
+semantics (the rightmost binding's `subst` is applied first, so its value
+becomes the innermost intermediate; under closedness assumptions, outer
+substs are no-ops). -/
+def lookup : SubstMap → Var → Option Exp
+  | [], _ => none
+  | (y, v) :: rest, x =>
+    match lookup rest x with
+    | some w => some w
+    | none => if x = y then some v else none
+
 end SubstMap
 
 /-- Apply a substitution map: fold `subst` left-to-right.
@@ -232,6 +243,243 @@ holds definitionally. -/
 @[simp] theorem Exp.substMap_cons (p : Var × Exp) (vs : SubstMap) (e : Exp) :
     e.substMap (p :: vs) = Exp.subst (e.substMap vs) p.1 p.2 := rfl
 
+/-! ### `substMap` distributivity over expression constructors
+
+These let `simp` push `Exp.substMap vs` through every constructor of `Exp`,
+mirroring the recursive structure of `Exp.subst`. Each lemma is one
+`induction vs` on the substitution list. They are critical for the
+`Fundamental.lean` lemmas, which need to commute `substMap vs` with the
+relational expression constructors before invoking the corresponding
+`refines_*` compatibility rule. -/
+
+@[simp] theorem Exp.substMap_lit (vs : SubstMap) (b : BaseLit) :
+    (Exp.lit b).substMap vs = .lit b := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_bvar (vs : SubstMap) (j : Nat) :
+    (Exp.bvar j).substMap vs = .bvar j := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_fail (vs : SubstMap) :
+    Exp.fail.substMap vs = .fail := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_pair (vs : SubstMap) (e1 e2 : Exp) :
+    (Exp.pair e1 e2).substMap vs = .pair (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_fst (vs : SubstMap) (e : Exp) :
+    (Exp.fst e).substMap vs = .fst (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_snd (vs : SubstMap) (e : Exp) :
+    (Exp.snd e).substMap vs = .snd (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_inl (vs : SubstMap) (e : Exp) :
+    (Exp.inl e).substMap vs = .inl (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_inr (vs : SubstMap) (e : Exp) :
+    (Exp.inr e).substMap vs = .inr (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_case (vs : SubstMap) (e0 e1 e2 : Exp) :
+    (Exp.case e0 e1 e2).substMap vs =
+      .case (e0.substMap vs) (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_cond (vs : SubstMap) (e0 e1 e2 : Exp) :
+    (Exp.cond e0 e1 e2).substMap vs =
+      .cond (e0.substMap vs) (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_app (vs : SubstMap) (e1 e2 : Exp) :
+    (Exp.app e1 e2).substMap vs = .app (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_lam (vs : SubstMap) (e : Exp) :
+    (Exp.lam e).substMap vs = .lam (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_fix (vs : SubstMap) (e : Exp) :
+    (Exp.fix e).substMap vs = .fix (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_unop (vs : SubstMap) (op : UnOp) (e : Exp) :
+    (Exp.unop op e).substMap vs = .unop op (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_binop (vs : SubstMap) (op : BinOp) (e1 e2 : Exp) :
+    (Exp.binop op e1 e2).substMap vs =
+      .binop op (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_alloc (vs : SubstMap) (e : Exp) :
+    (Exp.alloc e).substMap vs = .alloc (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_load (vs : SubstMap) (e : Exp) :
+    (Exp.load e).substMap vs = .load (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_store (vs : SubstMap) (e1 e2 : Exp) :
+    (Exp.store e1 e2).substMap vs = .store (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_tape (vs : SubstMap) (e : Exp) :
+    (Exp.tape e).substMap vs = .tape (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_rand (vs : SubstMap) (e1 e2 : Exp) :
+    (Exp.rand e1 e2).substMap vs = .rand (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_scrut (vs : SubstMap) (e : Exp) (p : Pat) :
+    (Exp.scrut e p).substMap vs = .scrut (e.substMap vs) p := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+/-- `substMap` distributes over `openRec` when all bindings are LC. The key
+binder-substitution lemma: `substMap vs (openRec k u e) = openRec k (substMap vs u) (substMap vs e)`. -/
+theorem Exp.substMap_openRec (vs : SubstMap) (k : Nat) (u e : Exp)
+    (hClosed : SubstMap.AllClosed vs) :
+    Exp.substMap vs (Exp.openRec k u e) =
+      Exp.openRec k (Exp.substMap vs u) (Exp.substMap vs e) := by
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨y, w⟩ := p
+    rw [SubstMap.AllClosed_cons] at hClosed
+    obtain ⟨hwClosed, hRestClosed⟩ := hClosed
+    rw [Exp.substMap_cons, ih hRestClosed, Exp.substMap_cons, Exp.substMap_cons]
+    -- subst (openRec k (substMap rest u) (substMap rest e)) y w
+    --  = openRec k (subst (substMap rest u) y w) (subst (substMap rest e) y w)
+    exact Exp.subst_openRec y w k _ _ hwClosed.1
+
+/-- `substMap` distributes over `open'`. -/
+theorem Exp.substMap_open (vs : SubstMap) (u e : Exp)
+    (hClosed : SubstMap.AllClosed vs) :
+    Exp.substMap vs (Exp.open' e u) =
+      Exp.open' (Exp.substMap vs e) (Exp.substMap vs u) :=
+  Exp.substMap_openRec vs 0 u e hClosed
+
+/-- Helper: when `x` is unbound in `vs`, `substMap` is a no-op on `.fvar x`. -/
+theorem Exp.substMap_fvar_lookup_none {vs : SubstMap} {x : Var}
+    (hv : SubstMap.lookup vs x = none) :
+    Exp.substMap vs (.fvar x) = .fvar x := by
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨y, w⟩ := p
+    simp only [SubstMap.lookup] at hv
+    cases hr : SubstMap.lookup rest x with
+    | some w' => rw [hr] at hv; cases hv
+    | none =>
+      rw [hr] at hv
+      simp only at hv
+      split_ifs at hv with hxy
+      rw [Exp.substMap_cons, ih hr]
+      show (Exp.fvar x).subst y w = .fvar x
+      simp only [Exp.subst]
+      have : ¬ y = x := fun h => hxy h.symm
+      rw [if_neg this]
+
+/-- Closedness of looked-up values in an `AllClosed` SubstMap. -/
+theorem SubstMap.lookup_closed {vs : SubstMap} {x : Var} {v : Exp}
+    (hv : SubstMap.lookup vs x = some v) (hClosed : SubstMap.AllClosed vs) :
+    v.isClosed .empty := by
+  induction vs with
+  | nil => simp [SubstMap.lookup] at hv
+  | cons p rest ih =>
+    obtain ⟨y, w⟩ := p
+    rw [SubstMap.AllClosed_cons] at hClosed
+    simp only [SubstMap.lookup] at hv
+    cases hr : SubstMap.lookup rest x with
+    | some w' =>
+      rw [hr] at hv; injection hv with hw'v; subst hw'v
+      exact ih hr hClosed.2
+    | none =>
+      rw [hr] at hv
+      simp only at hv
+      split_ifs at hv with hxy
+      injection hv with hwv; subst hwv
+      exact hClosed.1
+
+/-- `substMap` on `fvar x` looks up the rightmost binding for `x`, provided
+all bindings are closed expressions. -/
+theorem Exp.substMap_fvar_lookup_some (vs : SubstMap) (x : Var)
+    (hClosed : SubstMap.AllClosed vs) :
+    ∀ {v : Exp}, SubstMap.lookup vs x = some v → Exp.substMap vs (.fvar x) = v := by
+  induction vs with
+  | nil => intro v hv; simp [SubstMap.lookup] at hv
+  | cons p rest ih =>
+    intro v hv
+    obtain ⟨y, w⟩ := p
+    rw [SubstMap.AllClosed_cons] at hClosed
+    obtain ⟨hwClosed, hRestClosed⟩ := hClosed
+    rw [Exp.substMap_cons]
+    simp only [SubstMap.lookup] at hv
+    cases hr : SubstMap.lookup rest x with
+    | some w' =>
+      rw [hr] at hv; injection hv with hw'v; subst hw'v
+      rw [ih hRestClosed hr]
+      have hw'Closed := SubstMap.lookup_closed hr hRestClosed
+      show w'.subst y w = w'
+      apply Exp.subst_fresh
+      intro hmem
+      have := hw'Closed.2 hmem
+      simp [ClosedCtx.empty] at this
+    | none =>
+      rw [hr] at hv
+      simp only at hv
+      split_ifs at hv with hxy
+      injection hv with hwv; subst hwv; subst hxy
+      rw [Exp.substMap_fvar_lookup_none hr]
+      show (Exp.fvar x).subst x w = w
+      simp [Exp.subst]
+
 /-! ## Group D — Deterministic / probabilistic head-step characterization
 
 Predicate-based step classification (Clutch's `metatheory.v` ~1448–1713,
@@ -272,11 +520,17 @@ inductive DetHeadStepPred : Exp → State → Prop
 inductive ProbHeadStepPred : Exp → State → Prop
   | randNoTape {z σ} : 0 < z →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit .unit)) σ
-  | randTape {z α σ N nn ns} : 0 < z → σ.tapes[α]? = some ⟨N, nn :: ns⟩ → z = N →
+  | randTape {z α σ N nn ns} : σ.tapes[α]? = some ⟨N, nn :: ns⟩ → z = N →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
   | randTapeEmpty {z α σ N} : 0 < z → σ.tapes[α]? = some ⟨N, []⟩ → z = N →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
   | randTapeOther {z α σ N L} : 0 < z → σ.tapes[α]? = some ⟨N, L⟩ → z ≠ N →
+      ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
+  | randNonpos {z σ} : ¬ 0 < z →
+      ProbHeadStepPred (.rand (.lit (.int z)) (.lit .unit)) σ
+  | randTapeNonposEmpty {z α σ N} : ¬ 0 < z → σ.tapes[α]? = some ⟨N, []⟩ → z = N →
+      ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
+  | randTapeNonposOther {z α σ N L} : ¬ 0 < z → σ.tapes[α]? = some ⟨N, L⟩ → z ≠ N →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
 
 /-- Either a deterministic or a probabilistic head step is taken. -/
@@ -406,12 +660,17 @@ theorem HeadStepPred_iff_exists_support (e : Exp) (σ : State) :
       | scrutFailure hv hm => exact ⟨_, .ScrutFailureS hv hm⟩
     · cases hprob with
       | randNoTape hz => exact ⟨_, .RandNoTapeS hz (le_refl 0) hz⟩
-      | randTape hz htape hzN =>
-          exact ⟨_, .RandTapeS hz htape hzN rfl rfl⟩
+      | randTape htape hzN =>
+          exact ⟨_, .RandTapeS htape hzN rfl rfl⟩
       | randTapeEmpty hz htape hzN =>
           exact ⟨_, .RandTapeEmptyS hz htape hzN (le_refl 0) hz rfl⟩
       | randTapeOther hz htape hzN =>
           exact ⟨_, .RandTapeOtherS hz htape hzN (le_refl 0) hz rfl⟩
+      | randNonpos hz => exact ⟨_, .RandNonposS hz⟩
+      | randTapeNonposEmpty hz htape hzN =>
+          exact ⟨_, .RandTapeNonposEmptyS hz htape hzN⟩
+      | randTapeNonposOther hz htape hzN =>
+          exact ⟨_, .RandTapeNonposOtherS hz htape hzN⟩
   · rintro ⟨ρ', hsupp⟩
     cases hsupp with
     | BetaLamS hv _ => exact .inl (.betaLam hv)
@@ -433,9 +692,12 @@ theorem HeadStepPred_iff_exists_support (e : Exp) (σ : State) :
     | ScrutSuccessS hv hm => exact .inl (.scrutSuccess hv hm)
     | ScrutFailureS hv hm => exact .inl (.scrutFailure hv hm)
     | RandNoTapeS hz _ _ => exact .inr (.randNoTape hz)
-    | RandTapeS hz htape hzN _ _ => exact .inr (.randTape hz htape hzN)
+    | RandTapeS htape hzN _ _ => exact .inr (.randTape htape hzN)
     | RandTapeEmptyS hz htape hzN _ _ _ => exact .inr (.randTapeEmpty hz htape hzN)
     | RandTapeOtherS hz htape hzN _ _ _ => exact .inr (.randTapeOther hz htape hzN)
+    | RandNonposS hz => exact .inr (.randNonpos hz)
+    | RandTapeNonposEmptyS hz htape hzN => exact .inr (.randTapeNonposEmpty hz htape hzN)
+    | RandTapeNonposOtherS hz htape hzN => exact .inr (.randTapeNonposOther hz htape hzN)
 
 theorem not_HeadStepPred_iff_zero (e : Exp) (σ : State) :
     ¬ HeadStepPred e σ ↔ headStep ⟨e, σ⟩ = 0 := by
@@ -580,32 +842,21 @@ theorem State.fresh_loc_lookup {σ : State} {α : Loc} {bs : Tape} {t : Tape}
     split <;> simp_all
   simp [hcmp, h]
 
-theorem Cfg.uniform_eq_zero_iff {z : Int} {σ : State} :
-    Cfg.uniform z σ = 0 ↔ ¬ 0 < z := by
-  constructor
-  · intro h hz
-    have heq : Cfg.uniform z σ =
-        (PMF.uniformOfFinset (Finset.Ico 0 z)
-            (Finset.nonempty_Ico.mpr hz)).toMeasure.map
-            (fun x => (⟨.lit (.int x), σ⟩ : Cfg)) := by
-      unfold Cfg.uniform Int.isPos Option.unwrapM
-      rw [dif_pos hz]
-    have hprob : MeasureTheory.IsProbabilityMeasure
-        ((PMF.uniformOfFinset (Finset.Ico 0 z)
-            (Finset.nonempty_Ico.mpr hz)).toMeasure.map
-            (fun x => (⟨.lit (.int x), σ⟩ : Cfg))) :=
-      MeasureTheory.Measure.isProbabilityMeasure_map .of_discrete
-    have h1 := hprob.measure_univ
-    rw [← heq, h] at h1
-    simp at h1
-  · intro hnz
-    unfold Cfg.uniform Int.isPos Option.unwrapM
-    rw [dif_neg hnz]
+theorem Cfg.uniform_nonpos_eq {z : Int} {σ : State} (hz : ¬ 0 < z) :
+    Cfg.uniform z σ = MeasureTheory.Measure.dirac ⟨.lit (.int (-1)), σ⟩ := by
+  unfold Cfg.uniform Int.isPos
+  rw [dif_neg hz]
+
+theorem Cfg.uniform_ne_zero (z : Int) (σ : State) : Cfg.uniform z σ ≠ 0 := by
+  intro heq
+  have hp : MeasureTheory.IsProbabilityMeasure (Cfg.uniform z σ) :=
+    Cfg.uniform_isProbabilityMeasure
+  have := hp.measure_univ; rw [heq] at this; simp at this
 
 theorem Cfg.uniform_one_eq_dirac (σ : State) :
     Cfg.uniform 1 σ = MeasureTheory.Measure.dirac (⟨.lit (.int 0), σ⟩ : Cfg) := by
   classical
-  unfold Cfg.uniform Int.isPos Option.unwrapM
+  unfold Cfg.uniform Int.isPos
   simp only [show (0 : Int) < 1 from Int.one_pos, dite_true]
   have hico : Finset.Ico (0 : Int) 1 = {0} := by
     ext x; simp [Finset.mem_Ico]; omega
@@ -633,7 +884,7 @@ theorem Cfg.uniform_singleton_ne_one {z : Int} {σ : State} {ρ : Cfg}
   intro h1
   have Hz0 : 0 < z := by omega
   have hprob : MeasureTheory.IsProbabilityMeasure (Cfg.uniform z σ) :=
-    Cfg.uniform_isProbabilityMeasure Hz0
+    Cfg.uniform_isProbabilityMeasure
   have hpos0 : 0 < Cfg.uniform z σ {⟨.lit (.int 0), σ⟩} :=
     Cfg.uniform_singleton_pos_of_mem Hz0 (le_refl 0) Hz0
   have hpos1 : 0 < Cfg.uniform z σ {⟨.lit (.int 1), σ⟩} :=
@@ -711,7 +962,7 @@ theorem State.head_step_dzero_upd_tapes
       (fun hsome => hnotmem (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
     rw [hnone]
   case rand.plain h0 =>
-    rw [Cfg.uniform_eq_zero_iff] at h0 ⊢; exact h0
+    exact absurd h0 (Cfg.uniform_ne_zero _ _)
   case rand.tape.unalloc hnotin =>
     have hne : α ≠ ‹Lbl› := by
       intro he
@@ -721,57 +972,9 @@ theorem State.head_step_dzero_upd_tapes
         (fun hsome => hnotin (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr hsome))
     rw [State.upd_diff_tape_tot (Ne.symm hne), hnone]
   case rand.tape.mismatch =>
-    rename_i _ z' α' _ M' _ heq hMne
-    rw [Cfg.uniform_eq_zero_iff] at h0
-    by_cases hαeq : α = α'
-    · subst hαeq
-      have hupd : (σ.update_tapes (·.insert α bs')).tapes[α]? = some bs' :=
-        State.upd_tape_some σ α bs'
-      rw [hupd]
-      obtain ⟨bbnd, bps⟩ := bs'
-      simp only
-      by_cases hbnd : bbnd = z'
-      · subst hbnd
-        simp only [if_true]
-        cases bps with
-        | nil => rw [Cfg.uniform_eq_zero_iff]; exact h0
-        | cons n _ =>
-          exfalso; apply h0
-          have hn := n.2
-          omega
-      · simp only [if_neg hbnd]
-        rw [Cfg.uniform_eq_zero_iff]; exact h0
-    · have hupd : (σ.update_tapes (·.insert α bs')).tapes[α']? = σ.tapes[α']? :=
-        State.upd_diff_tape_tot (Ne.symm hαeq)
-      rw [hupd, heq]
-      simp only [if_neg hMne]
-      rw [Cfg.uniform_eq_zero_iff]; exact h0
+    exact absurd h0 (Cfg.uniform_ne_zero _ _)
   case rand.tape.empty =>
-    rename_i _ z' α' _ _ heq
-    rw [Cfg.uniform_eq_zero_iff] at h0
-    by_cases hαeq : α = α'
-    · subst hαeq
-      have hupd : (σ.update_tapes (·.insert α bs')).tapes[α]? = some bs' :=
-        State.upd_tape_some σ α bs'
-      rw [hupd]
-      obtain ⟨bbnd, bps⟩ := bs'
-      simp only
-      by_cases hbnd : bbnd = z'
-      · subst hbnd
-        simp only [if_true]
-        cases bps with
-        | nil => rw [Cfg.uniform_eq_zero_iff]; exact h0
-        | cons n _ =>
-          exfalso; apply h0
-          have hn := n.2
-          omega
-      · simp only [if_neg hbnd]
-        rw [Cfg.uniform_eq_zero_iff]; exact h0
-    · have hupd : (σ.update_tapes (·.insert α bs')).tapes[α']? = σ.tapes[α']? :=
-        State.upd_diff_tape_tot (Ne.symm hαeq)
-      rw [hupd, heq]
-      simp only [if_true]
-      rw [Cfg.uniform_eq_zero_iff]; exact h0
+    exact absurd h0 (Cfg.uniform_ne_zero _ _)
 
 theorem State.det_head_step_upd_tapes
     {e : Exp} {σ : State} {α : Loc} {bs' : Tape}

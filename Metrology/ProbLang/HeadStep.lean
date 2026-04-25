@@ -41,11 +41,15 @@ instance : MeasurableSpace Cfg := ⊤
 /-- `Cfg.uniform z σ` is the measure putting uniform mass on configs
 `⟨.lit (.int n), σ⟩` for `n ∈ {0, 1, …, z−1}` (i.e. `Finset.Ico 0 z`),
 matching the semantics of `rand z` sampling from `{0, …, z−1}`. The
-state fiber is constant at `σ`. If `z ≤ 0`, the measure is `0`. -/
+state fiber is constant at `σ`. If `z ≤ 0`, the measure is the dirac
+on `⟨.lit (.int (-1)), σ⟩` — `rand` on a non-positive bound is total
+and returns the sentinel value `-1`. -/
 def Cfg.uniform (z : Int) (σ : State) : Measure Cfg :=
-  z.isPos.unwrapM fun ⟨z, Hz⟩ =>
-  PMF.uniformOfFinset (.Ico 0 z) (Finset.nonempty_Ico.mpr Hz)
-    |>.toMeasure.map (⟨.lit <| .int ·, σ⟩)
+  match z.isPos with
+  | some ⟨z, Hz⟩ =>
+    PMF.uniformOfFinset (.Ico 0 z) (Finset.nonempty_Ico.mpr Hz)
+      |>.toMeasure.map (⟨.lit <| .int ·, σ⟩)
+  | none => dirac ⟨.lit (.int (-1)), σ⟩
 
 -- TODO: What if we change Cfg to Option (Exp × State)?
 -- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
@@ -295,12 +299,14 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   0 ≤ v →
   v < z →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ ⟨.lit (.int v), σ⟩
+| RandNonposS :
+  ¬ 0 < z →
+  HeadStepSupport ⟨.rand (.lit (.int z)) (.lit .unit), σ⟩ ⟨.lit (.int (-1)), σ⟩
 | TapeS :
   ℓ = σ.tapes.fresh →
   σ' = σ.update_tapes (·.insert ℓ (.empty z)) →
   HeadStepSupport ⟨.tape (.lit (.int z)), σ⟩ ⟨.lit (.lbl ℓ), σ'⟩
 | RandTapeS :
-  0 < z →
   σ.tapes[α]? = some ⟨N, nn :: ns⟩ →
   z = N →
   v = nn.1 →
@@ -322,6 +328,16 @@ inductive HeadStepSupport : Cfg → Cfg → Prop
   v < z →
   σ' = σ →
   HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int v), σ'⟩
+| RandTapeNonposEmptyS :
+  ¬ 0 < z →
+  σ.tapes[α]? = some ⟨N, []⟩ →
+  z = N →
+  HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int (-1)), σ⟩
+| RandTapeNonposOtherS :
+  ¬ 0 < z →
+  σ.tapes[α]? = some ⟨N, L⟩ →
+  z ≠ N →
+  HeadStepSupport ⟨.rand (.lit (.int z)) (.lit (.lbl α)), σ⟩ ⟨.lit (.int (-1)), σ⟩
 | ScrutSuccessS :
   e.isValue →
   Pat.tryMatch p e = some bindings →
@@ -360,20 +376,24 @@ theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp} {f : Val → Measure 
 
 theorem Cfg.uniform_singleton_pos_inv {z : Int} {σ : State} {ρ : Cfg}
     (h : 0 < Cfg.uniform z σ {ρ}) :
-    0 < z ∧ ρ.state = σ ∧
-    ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v < z := by
-  unfold Cfg.uniform Int.isPos Option.unwrapM at h
+    ρ.state = σ ∧
+    ((0 < z ∧ ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v < z) ∨
+     (¬ 0 < z ∧ ρ.expr = .lit (.int (-1)))) := by
+  unfold Cfg.uniform Int.isPos at h
   by_cases Hz : 0 < z
-  case neg => simp_all
-  case pos =>
-    simp [Hz, Measure.map_apply .of_discrete .of_discrete] at h
+  · simp only [Hz, dite_true] at h
+    simp [Measure.map_apply .of_discrete .of_discrete] at h
     obtain ⟨_, _, _, rfl⟩ := h
-    simp_all
+    refine ⟨rfl, .inl ⟨Hz, _, rfl, ?_, ?_⟩⟩ <;> simp_all
+  · simp only [Hz, dite_false] at h
+    rw [dirac_singleton_pos] at h
+    have ⟨h1, h2⟩ := (Cfg.mk.injEq ..).mp h
+    exact ⟨h2.symm, .inr ⟨Hz, h1.symm⟩⟩
 
 theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) :
     0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩} := by
-  unfold Cfg.uniform Int.isPos Option.unwrapM
+  unfold Cfg.uniform Int.isPos
   simp only [Hz, dite_true]
   rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg)) Measurable.of_discrete MeasurableSet.of_discrete]
   rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete]
@@ -382,6 +402,12 @@ theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State}
   · rw [ne_eq, Nat.cast_eq_zero]
     exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz, Set.mem_preimage]⟩
   · exact ENNReal.natCast_ne_top _
+
+theorem Cfg.uniform_singleton_nonpos {z : Int} {σ : State} (Hz : ¬ 0 < z) :
+    0 < Cfg.uniform z σ {⟨.lit (.int (-1)), σ⟩} := by
+  unfold Cfg.uniform Int.isPos
+  simp only [Hz, dite_false]
+  rw [dirac_singleton_pos]
 
 /-- Decompose `0 < (dirac a) {b}` into Cfg component equalities, then substitute. -/
 macro "cfg_dirac" h:ident : tactic =>
@@ -407,7 +433,7 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       intro h; cfg_dirac h
       exact .StoreS ‹_› (by rw [Option.isSome_iff_exists]; exact ⟨_, ‹_›⟩) rfl
     case rand.tape.deterministic =>
-      intro h; cfg_dirac h; exact .RandTapeS (by omega) ‹_› rfl rfl rfl
+      intro h; cfg_dirac h; exact .RandTapeS ‹_› rfl rfl rfl
     case unop.redex =>
       intro h; rw [unwrapM_singleton_pos] at h
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .UnOpS ‹_› hr.symm
@@ -416,19 +442,25 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .BinOpS ‹_› ‹_› hr.symm
     case rand.plain =>
       intro h
-      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
-      simp at hv hσ; subst hv; subst hσ
-      exact .RandNoTapeS Hz Hv0 Hvz
+      obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
+      simp at hσ; subst hσ
+      rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
+      · simp at hv; subst hv; exact .RandNoTapeS Hz Hv0 Hvz
+      · simp at hv; subst hv; exact .RandNonposS Hz
     case rand.tape =>
       intro h
-      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
-      simp at hv hσ; subst hv; subst hσ
-      exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
+      obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
+      simp at hσ; subst hσ
+      rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
+      · simp at hv; subst hv; exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
+      · simp at hv; subst hv; exact .RandTapeNonposEmptyS Hz ‹_› rfl
     case rand.tape.mismatch =>
       intro h
-      obtain ⟨Hz, hσ, v, hv, Hv0, Hvz⟩ := Cfg.uniform_singleton_pos_inv h
-      simp at hv hσ; subst hv; subst hσ
-      exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
+      obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
+      simp at hσ; subst hσ
+      rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
+      · simp at hv; subst hv; exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
+      · simp at hv; subst hv; exact .RandTapeNonposOtherS Hz ‹_› (Ne.symm ‹_›)
     case scrut_success => intro h; cfg_dirac h; exact .ScrutSuccessS ‹_› ‹_›
     case scrut_failure => intro h; cfg_dirac h; exact .ScrutFailureS ‹_› ‹_›
   · intro hsupp
@@ -448,6 +480,16 @@ theorem headStep_support_iff (e1 e2 : Exp) (σ1 σ2 : State) :
       split
       · next hM => rw [hM] at hzN; exact absurd rfl hzN
       · exact Cfg.uniform_singleton_pos_of_mem Hz Hv0 Hvz
+    | RandNonposS Hz =>
+      simp only [headStep]; exact Cfg.uniform_singleton_nonpos Hz
+    | RandTapeNonposEmptyS Hz htape hzN =>
+      subst hzN
+      simp only [headStep, htape, ↓reduceIte]
+      exact Cfg.uniform_singleton_nonpos Hz
+    | RandTapeNonposOtherS Hz htape hzN =>
+      simp only [headStep, htape]
+      rw [if_neg (Ne.symm hzN)]
+      exact Cfg.uniform_singleton_nonpos Hz
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
@@ -458,12 +500,14 @@ theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp} {f : Val → M
     IsProbabilityMeasure (e.asValM f) := by
   simp [Exp.asValM, hv]; infer_instance
 
-theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State} (Hz : 0 < z) :
+theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State} :
     IsProbabilityMeasure (Cfg.uniform z σ) := by
-  unfold Cfg.uniform Int.isPos Option.unwrapM
-  simp only [Hz, dite_true]
-  exact Measure.isProbabilityMeasure_map (μ := (PMF.uniformOfFinset _ _).toMeasure)
-    AEMeasurable.of_discrete
+  unfold Cfg.uniform Int.isPos
+  by_cases Hz : 0 < z
+  · simp only [Hz, dite_true]
+    exact Measure.isProbabilityMeasure_map (μ := (PMF.uniformOfFinset _ _).toMeasure)
+      AEMeasurable.of_discrete
+  · simp only [Hz, dite_false]; infer_instance
 
 theorem head_step_mass (e : Exp) (σ : State) :
     (∃ ρ : Cfg, 0 < headStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
@@ -478,8 +522,7 @@ theorem head_step_mass (e : Exp) (σ : State) :
     intro ⟨_, hρ⟩; rw [unwrapM_singleton_pos] at hρ
     obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
   case rand.plain | rand.tape | rand.tape.mismatch =>
-    intro ⟨_, hρ⟩
-    exact Cfg.uniform_isProbabilityMeasure (Cfg.uniform_singleton_pos_inv hρ).1
+    intro _; exact Cfg.uniform_isProbabilityMeasure
 
 /-- `headStep` is a sub-probability measure: total mass is at most 1.
 Case split on whether any singleton has positive mass: if so, `headStep ρ`

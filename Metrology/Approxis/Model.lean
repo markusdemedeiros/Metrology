@@ -280,9 +280,12 @@ noncomputable def lrel_nat : lrel GF where
 
 /-- `lrel_pos_nat`: both values are the same POSITIVE integer literal (`0 < n`).
 
-Used by `refines_rand_unit` and `refines_rand_tape` to rule out the `rand 0`
-stuck case. (Lean's `RandNoTapeS` requires `0 < z`, unlike Rocq's `rand n`
-which accepts `n = 0`.) -/
+Used by `refines_rand_unit` and `refines_rand_tape` to thread positivity
+into the underlying coupling rule (`refines_couple_rands_lr` /
+`wp_couple_rand_lbl_rand_lbl{,_wrong}` all take `0 < z`). With the
+current operational semantics `rand n ()` is total (returns `-1` on
+nonpos), so positivity is not needed for stuckness — only for the
+uniform-sample coupling. -/
 noncomputable def lrel_pos_nat : lrel GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ 0 < n ∧
     v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)

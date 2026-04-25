@@ -369,7 +369,7 @@ theorem probLangUniformByte_isEmbedding :
   have bind_dirac : limExec ∘ₘ Cfg.uniform 256 σ = Cfg.uniform 256 σ := by
     -- Cfg.uniform 256 σ = PMF.toMeasure(...).map (⟨.lit (.int ·), σ⟩)
     -- These are all value configs, so limExec = dirac on each.
-    unfold Cfg.uniform Int.isPos Option.unwrapM
+    unfold Cfg.uniform Int.isPos
     simp only [show (0 : Int) < 256 from by norm_num, dite_true]
     rw [Measure.bind_map .of_discrete .of_discrete]
     -- Goal: (limExec ∘ f) ∘ₘ μ = μ.map f where f v = ⟨.lit (.int v), σ⟩
@@ -389,7 +389,7 @@ theorem probLangUniformByte_isEmbedding :
   · subst hσ; simp only [and_true]
     -- LHS: Cfg.uniform 256 σ {⟨e', σ⟩}
     -- Unfold Cfg.uniform: PMF.uniformOfFinset(.Ico 0 256).toMeasure.map (⟨.lit (.int ·), σ⟩)
-    unfold Cfg.uniform Int.isPos Option.unwrapM
+    unfold Cfg.uniform Int.isPos
     simp only [show (0 : Int) < 256 from by norm_num, dite_true]
     rw [Measure.map_apply Measurable.of_discrete MeasurableSet.of_discrete]
     -- LHS: uniformOfFinset(.Ico 0 256).toMeasure {v | ⟨.lit (.int v), σ⟩ = ⟨e', σ⟩}
@@ -435,7 +435,7 @@ theorem probLangUniformByte_isEmbedding :
       · rfl
   · have : {x : UInt8 | as_expr x = e' ∧ σ = σ'} = ∅ := by ext; simp [hσ]
     simp only [this, Measure.restrict_empty, lintegral_zero_measure]
-    unfold Cfg.uniform Int.isPos Option.unwrapM
+    unfold Cfg.uniform Int.isPos
     simp [Measure.map_apply Measurable.of_discrete MeasurableSet.of_discrete,
           Set.preimage, Cfg.mk.injEq, hσ]
 

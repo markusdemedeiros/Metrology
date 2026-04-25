@@ -466,25 +466,60 @@ abbrev ValSubstMap := List (Var × (Val × Val))
 namespace RelCtx
 variable {GF : BundledGFunctors}
 
-/-- Lookup in a relational context. Leftmost binding wins (shadowing). -/
+/-- Lookup in a relational context. **Rightmost** binding wins (matching
+`Exp.substMap`'s foldr semantics: rightmost is applied first / wins). -/
 def lookup : RelCtx GF → Var → Option (lrel GF)
   | [], _ => none
-  | (y, A) :: rest, x => if x = y then some A else lookup rest x
+  | (y, A) :: rest, x =>
+    match lookup rest x with
+    | some B => some B
+    | none => if x = y then some A else none
 
 end RelCtx
 
 namespace ValSubstMap
 
-/-- Lookup in a value substitution. Leftmost binding wins. -/
+/-- Lookup in a value substitution. **Rightmost** binding wins. -/
 def lookup : ValSubstMap → Var → Option (Val × Val)
   | [], _ => none
-  | (y, p) :: rest, x => if x = y then some p else lookup rest x
+  | (y, p) :: rest, x =>
+    match lookup rest x with
+    | some q => some q
+    | none => if x = y then some p else none
 
 /-- Left projection as a `SubstMap`. -/
 def fst (vs : ValSubstMap) : SubstMap := vs.map (fun p => (p.1, p.2.1.1))
 
 /-- Right projection as a `SubstMap`. -/
 def snd (vs : ValSubstMap) : SubstMap := vs.map (fun p => (p.1, p.2.2.1))
+
+/-- Lookup commutes with `.fst` projection. -/
+theorem fst_lookup (vs : ValSubstMap) (x : Var) :
+    SubstMap.lookup vs.fst x = (vs.lookup x).map (fun p => p.1.1) := by
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨y, v1, v2⟩ := p
+    show SubstMap.lookup ((y, v1.1) :: ValSubstMap.fst rest) x =
+      (ValSubstMap.lookup ((y, v1, v2) :: rest) x).map (fun p => p.1.1)
+    simp only [SubstMap.lookup, ValSubstMap.lookup, ih]
+    cases ValSubstMap.lookup rest x with
+    | some q => simp
+    | none => simp
+
+/-- Lookup commutes with `.snd` projection. -/
+theorem snd_lookup (vs : ValSubstMap) (x : Var) :
+    SubstMap.lookup vs.snd x = (vs.lookup x).map (fun p => p.2.1) := by
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨y, v1, v2⟩ := p
+    show SubstMap.lookup ((y, v2.1) :: ValSubstMap.snd rest) x =
+      (ValSubstMap.lookup ((y, v1, v2) :: rest) x).map (fun p => p.2.1)
+    simp only [SubstMap.lookup, ValSubstMap.lookup, ih]
+    cases ValSubstMap.lookup rest x with
+    | some q => simp
+    | none => simp
 
 end ValSubstMap
 
@@ -499,6 +534,7 @@ relation assigned by `Γ x`. Matches the unfolded semantics of Rocq's
 `big_sepM2`. -/
 noncomputable def env_ltyped2 (Γ : RelCtx GF) (vs : ValSubstMap) : IProp GF :=
   iprop((⌜∀ x, (Γ.lookup x).isSome ↔ (vs.lookup x).isSome⌝) ∗
+    (⌜∀ p ∈ vs, p.2.1.1.isClosed .empty ∧ p.2.2.1.isClosed .empty⌝) ∗
     (∀ (x : Var) (A : lrel GF) (v1 v2 : Val),
       (⌜Γ.lookup x = some A⌝) -∗
       (⌜vs.lookup x = some (v1, v2)⌝) -∗
@@ -511,6 +547,14 @@ instance env_ltyped2_persistent (Γ : RelCtx GF) (vs : ValSubstMap) :
   unfold env_ltyped2
   infer_instance
 
+/-- Closedness: every binding in `vs` is closed. -/
+theorem env_ltyped2_allClosed (Γ : RelCtx GF) (vs : ValSubstMap) :
+    env_ltyped2 Γ vs ⊢@{IProp GF}
+      iprop(⌜∀ p ∈ vs, p.2.1.1.isClosed .empty ∧ p.2.2.1.isClosed .empty⌝) := by
+  unfold env_ltyped2
+  iintro ⟨_, %Hc, _⟩
+  ipure_intro; exact Hc
+
 /-- Lookup-by-Γ: if `Γ x = some A`, the substitution has a matching pair
 and the pair is in `A`. -/
 theorem env_ltyped2_lookup (Γ : RelCtx GF) (vs : ValSubstMap) (x : Var) (A : lrel GF)
@@ -518,7 +562,7 @@ theorem env_ltyped2_lookup (Γ : RelCtx GF) (vs : ValSubstMap) (x : Var) (A : lr
     env_ltyped2 Γ vs ⊢@{IProp GF}
       iprop(∃ (v1 v2 : Val), (⌜vs.lookup x = some (v1, v2)⌝) ∗ A v1 v2) := by
   unfold env_ltyped2
-  iintro ⟨%Hdom, Hall⟩
+  iintro ⟨%Hdom, %Hclosed, Hall⟩
   have hvs : (vs.lookup x).isSome := (Hdom x).mp (by rw [hΓ]; rfl)
   obtain ⟨⟨v1, v2⟩, hvs_eq⟩ := Option.isSome_iff_exists.mp hvs
   iexists v1, v2
@@ -532,6 +576,8 @@ theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx GF) [] := by
   unfold env_ltyped2
   isplitr
   · ipure_intro; intro x; simp [RelCtx.lookup, ValSubstMap.lookup]
+  isplitr
+  · ipure_intro; intro p hp; cases hp
   iintro %x %A %v1 %v2 %hΓ %hvs
   simp [RelCtx.lookup] at hΓ
 
@@ -539,53 +585,81 @@ theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx GF) [] := by
 theorem env_ltyped2_empty_inv (vs : ValSubstMap) :
     env_ltyped2 ([] : RelCtx GF) vs ⊢@{IProp GF} ⌜vs = []⌝ := by
   unfold env_ltyped2
-  iintro ⟨%Hdom, _⟩
+  iintro ⟨%Hdom, _, _⟩
   ipure_intro
-  -- From Hdom : ∀ x, (none).isSome ↔ (vs.lookup x).isSome, we get
-  -- vs.lookup x = none for all x, hence vs = [].
   cases vs with
   | nil => rfl
   | cons p rest =>
     exfalso
-    have := (Hdom p.1).mpr (by simp [ValSubstMap.lookup])
+    -- (Hdom p.1).mpr says: if vs.lookup p.1 has some, so does Γ.lookup. But Γ = [].
+    -- We need to show ValSubstMap.lookup (p :: rest) p.1 is some.
+    have hsome : (ValSubstMap.lookup (p :: rest) p.1).isSome := by
+      simp only [ValSubstMap.lookup]
+      cases ValSubstMap.lookup rest p.1 with
+      | some _ => simp
+      | none => simp
+    have := (Hdom p.1).mpr hsome
     simp [RelCtx.lookup] at this
 
-/-- Extending both contexts preserves `env_ltyped2`. -/
+/-- Extending both contexts preserves `env_ltyped2`. Requires the new values
+to be closed (since `env_ltyped2` now records closedness of all bindings). -/
 theorem env_ltyped2_insert (Γ : RelCtx GF) (vs : ValSubstMap)
-    (x : Var) (A : lrel GF) (v1 v2 : Val) :
+    (x : Var) (A : lrel GF) (v1 v2 : Val)
+    (hv1c : v1.1.isClosed .empty) (hv2c : v2.1.isClosed .empty) :
     iprop(A v1 v2 ∗ env_ltyped2 Γ vs) ⊢@{IProp GF}
       env_ltyped2 ((x, A) :: Γ) ((x, (v1, v2)) :: vs) := by
   iintro ⟨HA, HΓ⟩
   unfold env_ltyped2
-  icases HΓ with ⟨%Hdom, #Hall⟩
+  icases HΓ with ⟨%Hdom, %Hclosed, #Hall⟩
   isplitr
   · ipure_intro
     intro y
-    by_cases hxy : y = x
-    · subst hxy
-      simp [RelCtx.lookup, ValSubstMap.lookup]
-    · simp [RelCtx.lookup, ValSubstMap.lookup, hxy]
-      have := Hdom y
-      by_cases h1 : (Γ.lookup y).isSome
-      · have h2 : (vs.lookup y).isSome := this.mp h1
-        rw [h1, h2]
-      · have h2 : ¬(vs.lookup y).isSome := fun h => h1 (this.mpr h)
-        have h1' : (Γ.lookup y).isSome = false := Bool.eq_false_iff.mpr h1
-        have h2' : (vs.lookup y).isSome = false := Bool.eq_false_iff.mpr h2
-        rw [h1', h2']
+    simp only [RelCtx.lookup, ValSubstMap.lookup]
+    have hdom_y := Hdom y
+    cases hΓy : Γ.lookup y with
+    | some B =>
+      have : (vs.lookup y).isSome := hdom_y.mp (by rw [hΓy]; rfl)
+      obtain ⟨q, hvy⟩ := Option.isSome_iff_exists.mp this
+      rw [hvy]; simp
+    | none =>
+      have : ¬ (vs.lookup y).isSome := fun h => by
+        have := hdom_y.mpr h
+        rw [hΓy] at this; exact absurd this (by simp)
+      have hvy : vs.lookup y = none := Option.not_isSome_iff_eq_none.mp this
+      rw [hvy]; simp
+  isplitr
+  · ipure_intro
+    intro p hp
+    rcases List.mem_cons.mp hp with rfl | hpm
+    · exact ⟨hv1c, hv2c⟩
+    · exact Hclosed p hpm
   iintro %y %B %w1 %w2 %hΓ' %hvs'
-  by_cases hxy : y = x
-  · subst hxy
-    simp [RelCtx.lookup] at hΓ'
-    simp [ValSubstMap.lookup] at hvs'
-    subst hΓ'
-    obtain ⟨rfl, rfl⟩ := hvs'
-    iexact HA
-  · simp [RelCtx.lookup, hxy] at hΓ'
-    simp [ValSubstMap.lookup, hxy] at hvs'
-    iapply Hall $$ %y %B %w1 %w2
-    · ipure_intro; exact hΓ'
-    · ipure_intro; exact hvs'
+  simp only [RelCtx.lookup] at hΓ'
+  simp only [ValSubstMap.lookup] at hvs'
+  cases hΓy : Γ.lookup y with
+  | some Bold =>
+    rw [hΓy] at hΓ'; injection hΓ' with hBeq; subst hBeq
+    have hsome_vs : (vs.lookup y).isSome := (Hdom y).mp (by rw [hΓy]; rfl)
+    obtain ⟨⟨w1', w2'⟩, hvy⟩ := Option.isSome_iff_exists.mp hsome_vs
+    rw [hvy] at hvs'; injection hvs' with heq; obtain ⟨rfl, rfl⟩ := heq
+    iapply Hall $$ %y %Bold %w1 %w2
+    · ipure_intro; exact hΓy
+    · ipure_intro; exact hvy
+  | none =>
+    rw [hΓy] at hΓ'
+    simp only at hΓ'
+    split_ifs at hΓ' with hxy
+    injection hΓ' with hBeq; subst hBeq; subst hxy
+    cases hvy : vs.lookup y with
+    | some q =>
+      have := (Hdom y).mpr (by rw [hvy]; rfl)
+      rw [hΓy] at this; exact absurd this (by simp)
+    | none =>
+      rw [hvy] at hvs'
+      simp only [if_pos rfl] at hvs'
+      injection hvs' with heq
+      obtain ⟨rfl, rfl⟩ := heq
+      iexact HA
 
 end env_typed
 
