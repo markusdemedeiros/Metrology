@@ -145,6 +145,16 @@ theorem DetHeadStep.app_lam {body v : Exp}
     DetHeadStep ⟨.app (.lam body) v, σ⟩ ⟨Exp.open' body v, σ⟩ :=
   .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
 
+/-- `PureHeadStep` for `(λ. body) v` when `v` is a value. -/
+theorem PureHeadStep.app_lam {body v : Exp} (hv : IsVal v) :
+    PureHeadStep (.app (.lam body) v) (Exp.open' body v) :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' hv]
+
+/-- `PureExec` instance: `(λ. body) v` beta-reduces in 1 step when `v` is a value. -/
+instance pureExec_app_lam {body v : Exp} :
+    PureExec (v.isValue) 1 (.app (.lam body) v) (Exp.open' body v) where
+  pure_exec hv := ⟨_, (PureHeadStep.app_lam hv.some).toPureStep, rfl⟩
+
 theorem DetHeadStep.app_fix {body v : Exp}
     (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.app (.fix body) v, σ⟩

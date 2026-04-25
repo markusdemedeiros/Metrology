@@ -278,6 +278,16 @@ noncomputable def lrel_nat : lrel GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
   persistent _ _ := inferInstance
 
+/-- `lrel_pos_nat`: both values are the same POSITIVE integer literal (`0 < n`).
+
+Used by `refines_rand_unit` and `refines_rand_tape` to rule out the `rand 0`
+stuck case. (Lean's `RandNoTapeS` requires `0 < z`, unlike Rocq's `rand n`
+which accepts `n = 0`.) -/
+noncomputable def lrel_pos_nat : lrel GF where
+  car v1 v2 := iprop(∃ n : Nat, ⌜ 0 < n ∧
+    v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
+  persistent _ _ := inferInstance
+
 /-- `lrel_int`: both values are the same integer literal. -/
 noncomputable def lrel_int : lrel GF where
   car v1 v2 := iprop(∃ n : Int, ⌜ v1.1 = .lit (.int n) ∧ v2.1 = .lit (.int n) ⌝)

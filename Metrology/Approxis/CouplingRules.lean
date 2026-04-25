@@ -53,6 +53,24 @@ instance specTapesFrag_timeless [ISpec : SpecGS GF] (l : Loc) (t : Tape) :
   unfold specTapesFrag
   exact iOwn_timeless
 
+/-- DiscreteE for the backend heap-frag payload (parallel to tape variant). -/
+instance heapView_heap_frag_discreteE (l : Loc) (v : Val) :
+    OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree v)) := by
+  unfold HeapView.Frag
+  exact View.frag_discrete ⟨fun H => OFE.Discrete.discrete_0 H⟩
+
+/-- App-side heap fragment is Timeless. -/
+instance appHeapFrag_timeless [IApp : AppGS GF] (l : Loc) (v : Val) :
+    BI.Timeless (iprop(l ↦ v) : IProp GF) := by
+  unfold appHeapFrag
+  exact iOwn_timeless
+
+/-- Spec-side heap fragment is Timeless. -/
+instance specHeapFrag_timeless [ISpec : SpecGS GF] (l : Loc) (v : Val) :
+    BI.Timeless (iprop(l ↦ₛ v) : IProp GF) := by
+  unfold specHeapFrag
+  exact iOwn_timeless
+
 /-- App-side user-level nat-tape is Timeless. -/
 instance appNatTape_timeless [IApp : AppGS GF] (l : Loc) (z : Int) (ns : List Int) :
     BI.Timeless (appNatTape l z ns : IProp GF) := by

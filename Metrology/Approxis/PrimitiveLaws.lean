@@ -186,6 +186,7 @@ theorem wp_load {E : CoPset} {l : Loc} {v : Val} {Φ : Val → IProp GF} :
     isplitl [Hσ]; · iexact Hσ
     iapply HΦ; iexact Hl
 
+
 /-- `wp_store` — overwrite the value at location `l` with `v`. -/
 theorem wp_store {E : CoPset} {l : Loc} {v v' : Val} {Φ : Val → IProp GF} :
     iprop(appHeapFrag l v' ∗

@@ -4,6 +4,7 @@ import Metrology.Approxis.Model
 import Metrology.Approxis.Proofmode
 import Metrology.Approxis.PrimitiveLaws
 import Metrology.Approxis.CouplingRules
+import Metrology.Approxis.OpenInv
 
 /-!
 # Relational Rules
@@ -51,23 +52,60 @@ variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
 
 /-! ## Forward reductions on the LHS -/
 
+/-- Helper: `Nat.repeat (▷·) n P = laterN n P = ▷^[n] P` (defeq). -/
+theorem nat_repeat_later_eq_laterN (n : Nat) (P : IProp GF) :
+    Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n P = iprop(▷^[n] P) := by
+  induction n with
+  | zero => rfl
+  | succ m ih => simp only [Nat.repeat]; rw [ih]; rfl
+
 /-- `refines_pure_l` (app_rel_rules.v:27): if `e` pure-steps to `e'` in `n` steps,
-`▷^n (REL K[e'] << t : A) ⊢ REL K[e] << t : A`.
-
-**Port note**: Rocq's 3-line proof `wp_pures; iApply "IH" with "..."` relies on
-`wp_pures`'s implicit `▷^n` stripping. The Lean analogue is `wp_pure_step_later`,
-which gives us `Nat.repeat (▷·) n (wp ⊤ (K.fill e') Φ) ⊢ wp ⊤ (K.fill e) Φ`.
-
-The proof requires threading spatial hyps (HK, Hna, Herr, Hpos) under a `laterN n`
-layer. Inside iris proofmode, `iintro !>` strips ▷ from goal but only from
-hypotheses flagged as timeless; our spatial hyps aren't. A direct `laterN`-distribution
-proof (using `laterN_forall`, `laterN_wand`, `laterN_intro`) runs into the usual
-defeq issues between `Nat.repeat (▷·)` and `laterN`. Left as a sorry. -/
+`▷^n (REL K[e'] << t : A) ⊢ REL K[e] << t : A`. -/
 theorem refines_pure_l {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
     {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
     Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (refines E (K.fill e') t A)
       ⊢@{IProp GF} refines E (K.fill e) t A := by
-  sorry
+  have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
+  unfold refines
+  iintro H
+  iintro %K' %ε HK Hna Herr Hpos
+  iapply (wp_pure_step_later (Hex := HexK) Hφ)
+  -- Transform H from `Nat.repeat (▷·) n ...` to `▷^[n] ...` at the iprop level FIRST
+  -- (before touching the goal, to preserve iris context).
+  ihave H0 : iprop(▷^[n] (∀ (K₂ : Ectx) (ε₂ : ENNReal),
+      (⤇ K₂.fill t) -∗ (naOwnP E) -∗ (↯ ε₂) -∗ (⌜(0 : ENNReal) < ε₂⌝) -∗
+      wp ⊤ (K.fill e') (fun v => iprop(∃ v' ε',
+        (⤇ K₂.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v')))) $$ [H]
+  · rw [← nat_repeat_later_eq_laterN]; iexact H
+  -- Now rewrite the goal to match laterN form.
+  rw [nat_repeat_later_eq_laterN]
+  ihave H1 := (BI.laterN_forall n).mp $$ H0
+  -- H1 : ∀ K', ▷^[n] (∀ ε, ...).
+  ispecialize H1 $$ %K'
+  -- H1 : ▷^[n] (∀ ε, ...).
+  ihave H2 := (BI.laterN_forall n).mp $$ H1
+  ispecialize H2 $$ %ε
+  -- H2 : ▷^[n] (⤇ K'.fill t -∗ naOwnP E -∗ ↯ε -∗ ⌜0<ε⌝ -∗ wp ⊤ (K.fill e') Φ).
+  -- Apply laterN_wand 4 times to distribute through each -∗.
+  ihave H3 := BI.laterN_wand n $$ H2
+  -- H3 : ▷^[n] (⤇ K'.fill t) -∗ ▷^[n] (naOwnP E -∗ ↯ε -∗ ⌜0<ε⌝ -∗ wp).
+  ihave HKLater : iprop(▷^[n] (⤇ K'.fill t)) $$ [HK]
+  · iapply BI.laterN_intro n; iexact HK
+  ispecialize H3 $$ HKLater
+  ihave H4 := BI.laterN_wand n $$ H3
+  ihave HnaLater : iprop(▷^[n] naOwnP E) $$ [Hna]
+  · iapply BI.laterN_intro n; iexact Hna
+  ispecialize H4 $$ HnaLater
+  ihave H5 := BI.laterN_wand n $$ H4
+  ihave HerrLater : iprop(▷^[n] (↯ ε)) $$ [Herr]
+  · iapply BI.laterN_intro n; iexact Herr
+  ispecialize H5 $$ HerrLater
+  ihave H6 := BI.laterN_wand n $$ H5
+  ihave HposLater : iprop(▷^[n] ⌜(0 : ENNReal) < ε⌝) $$ [Hpos]
+  · iapply BI.laterN_intro n; iexact Hpos
+  ispecialize H6 $$ HposLater
+  -- H6 : ▷^[n] (wp ⊤ (K.fill e') Φ). Matches goal.
+  iexact H6
 
 /-- `refines_pure_r` (app_rel_rules.v:73): RHS pure step. -/
 theorem refines_pure_r {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
@@ -148,14 +186,73 @@ theorem refines_wp_l {E : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF} :
   iexact HFrame
 
 /-- `refines_atomic_l` (app_rel_rules.v:54): atomic step on the LHS, opening the
-continuation to allow spec-side steps + invariant opening. -/
-theorem refines_atomic_l {E : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF} :
+continuation to allow spec-side steps + invariant opening.
+
+Takes `OpenInv e1` (mirrors Rocq's `Atomic StronglyAtomic e1`) so that callers
+can open invariants (mask-shift `⊤ → E'`) for the duration of the single step. -/
+theorem refines_atomic_l {E E' : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF}
+    (Hopen : OpenInv e1) :
     iprop(∀ (K' : Ectx),
             (⤇ (K'.fill t)) -∗
-            wp ⊤ e1 (fun v => iprop(∃ (t' : Exp),
-              (⤇ (K'.fill t')) ∗ refines E (K.fill v.1) t' A)))
+            (|={⊤, E'}=> wp E' e1 (fun v => iprop(|={E', ⊤}=> ∃ (t' : Exp),
+              (⤇ (K'.fill t')) ∗ refines E (K.fill v.1) t' A))))
       ⊢@{IProp GF} refines E (K.fill e1) t A := by
-  sorry
+  show iprop(∀ (K' : Ectx),
+            (⤇ (K'.fill t)) -∗
+            (|={⊤, E'}=> wp E' e1 (fun v => iprop(|={E', ⊤}=> ∃ (t' : Exp),
+              (⤇ (K'.fill t')) ∗ refines E (K.fill v.1) t' A)))) ⊢@{IProp GF}
+    iprop(∀ (K' : Ectx) (ε : ENNReal),
+      (⤇ (K'.fill t)) -∗
+      (naOwnP E) -∗
+      (↯ ε) -∗
+      (⌜ (0 : ENNReal) < ε ⌝) -∗
+      wp ⊤ (K.fill e1) (fun v => iprop(∃ (v' : Val) (ε' : ENNReal),
+        (⤇ (K'.fill v'.1)) ∗ (naOwnP ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A v v')))
+  iintro Hlog %K' %ε HK Hna Herr Hpos
+  iapply wp_bind (K := K)
+  -- Goal: wp ⊤ e1 (fun v => wp ⊤ (K.fill v.1) Φ).
+  -- Apply wp_atomic Hopen: |={⊤,E'}=> wp E' e1 Ψ ⊢ wp ⊤ e1 Φ
+  -- where Ψ v = |={E',⊤}=> Φ v.
+  iapply (wp_atomic Hopen (E1 := ⊤) (E2 := E')
+    (Φ := fun v => wp ⊤ (K.fill (Exp.ofVal v)) (fun v₀ => iprop(∃ v' ε',
+      (⤇ K'.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v₀ v'))))
+  -- Goal: |={⊤,E'}=> wp E' e1 (fun v => |={E',⊤}=> wp ⊤ (K.fill v.1) Φ).
+  -- Specialize Hlog at K', feed HK to get the inner |={⊤,E'}=> wp E' e1 (...).
+  ispecialize Hlog $$ %K' HK
+  -- Hlog : |={⊤,E'}=> wp E' e1 (fun v => |={E',⊤}=> ∃ t', ⤇ K'.fill t' ∗ refines E (K.fill v.1) t' A)
+  imod Hlog with HW
+  imodintro
+  -- Now thread (Hna, Herr, Hpos) into Hlog's wp via wp_frame_l + wp_mono.
+  let R : IProp GF := iprop((naOwnP E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
+  ihave HR : R $$ [Hna Herr Hpos]
+  · isplitl [Hna]; · iassumption
+    isplitl [Herr]; · iassumption
+    iassumption
+  -- Note: v.1 = Exp.ofVal v definitionally; iris doesn't reduce so we work
+  -- with v.1 throughout this `have` and convert at wp_mono time.
+  ihave HFrame : iprop(wp E' e1 (fun v => iprop(R ∗
+      (|={E', ⊤}=> ∃ t', ⤇ K'.fill t' ∗ refines E (K.fill v.1) t' A))))
+      $$ [HR HW]
+  · iapply (wp_frame_l (R := R) (e := e1) (E := E')
+      (Φ := fun v => iprop(|={E',⊤}=> ∃ t', ⤇ K'.fill t' ∗ refines E (K.fill v.1) t' A)))
+    isplitl [HR]; · iexact HR
+    iexact HW
+  iapply (wp_mono
+    (Φ := fun v => iprop(R ∗
+      (|={E',⊤}=> ∃ t', ⤇ K'.fill t' ∗ refines E (K.fill v.1) t' A)))
+    (Ψ := fun v => iprop(|={E', ⊤}=> wp ⊤ (K.fill (Exp.ofVal v)) (fun v₀ => iprop(∃ v' ε',
+      (⤇ K'.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v₀ v')))))
+  case HΦ =>
+    intro v
+    have hfill : Exp.ofVal v = v.1 := rfl
+    rw [hfill]
+    iintro ⟨⟨Hna', Herr', %Hpos'⟩, HFup⟩
+    imod HFup with ⟨%t', HKt', HRef⟩
+    imodintro
+    ihave HRef' := refines_unfold $$ HRef
+    iapply HRef' $$ %K' %ε HKt' Hna' Herr'
+    ipure_intro; exact Hpos'
+  iexact HFrame
 
 /-! ## Stateful reductions on the LHS -/
 
