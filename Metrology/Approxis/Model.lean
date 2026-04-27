@@ -1,5 +1,6 @@
 import Metrology.Approxis.AppWeakestpre
 import Metrology.Approxis.PrimitiveLaws
+import Metrology.ProbLang.Syntax.LocallyClosed
 import Iris.Instances.Lib.NaInvariants
 import Iris.Instances.Lib.Invariants
 
@@ -196,6 +197,19 @@ instance lrel.car_ne {GF : BundledGFunctors} (v1 v2 : Val) :
     OFE.NonExpansive (fun A : lrel GF => A.car v1 v2) where
   ne {_ _ _} hAB := hAB v1 v2
 
+/-- `lrel` has Leibniz equality: pointwise OFE-equivalence at iprops (which is
+Leibniz via `UPred` Leibniz) lifts to `lrel`-level Leibniz via funext + the
+fact that persistence is propositional and so its proof-content is irrelevant. -/
+instance lrel.leibniz {GF : BundledGFunctors} : OFE.Leibniz (lrel GF) where
+  eq_of_eqv {A B} hequiv := by
+    obtain ⟨carA, persA⟩ := A
+    obtain ⟨carB, persB⟩ := B
+    have hcar : carA = carB := by
+      funext v1 v2
+      exact OFE.Leibniz.eq_of_eqv (hequiv v1 v2)
+    subst hcar
+    rfl
+
 /-! ## `na_own` / `na_inv` abbreviations keyed on the pool name -/
 
 section NaShorthand
@@ -300,8 +314,9 @@ noncomputable def lrel_int : lrel GF where
 results under the refinement judgement. Persistent thanks to the `□` box. -/
 noncomputable def lrel_arr (A1 A2 : lrel GF) : lrel GF where
   car v1 v2 :=
-    iprop(□ (∀ (w1 w2 : Val), A1 w1 w2 -∗
-      refines (⊤ : CoPset) (.app v1.1 w1.1) (.app v2.1 w2.1) A2))
+    iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
+      □ (∀ (w1 w2 : Val), A1 w1 w2 -∗
+        refines (⊤ : CoPset) (.app v1.1 w1.1) (.app v2.1 w2.1) A2))
   persistent _ _ := inferInstance
 
 /-- `lrel_prod A B`: pair values with component-wise relatedness. -/
@@ -323,13 +338,17 @@ noncomputable def lrel_sum (A B : lrel GF) : lrel GF where
       ((⌜ v1.1 = .inr w1.1 ⌝) ∗ (⌜ v2.1 = .inr w2.1 ⌝) ∗ B w1 w2))
   persistent _ _ := inferInstance
 
-/-- `lrel_exists C`: existential over semantic types. -/
+/-- `lrel_exists C`: existential over semantic types.
+Carries a closedness conjunct because the value form isn't constrained
+by the relation alone. -/
 noncomputable def lrel_exists (C : lrel GF → lrel GF) : lrel GF where
-  car v1 v2 := iprop(∃ A : lrel GF, C A v1 v2)
+  car v1 v2 := iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
+    ∃ A : lrel GF, C A v1 v2)
   persistent _ _ := inferInstance
 
 /-- `lrel_forall C`: universal over semantic types, uniform in them via
-`lrel_arr lrel_unit` — mirrors System F's value-restricted ∀ elimination. -/
+`lrel_arr lrel_unit` — mirrors System F's value-restricted ∀ elimination.
+The underlying `lrel_arr` already carries closedness. -/
 noncomputable def lrel_forall (C : lrel GF → lrel GF) : lrel GF where
   car v1 v2 :=
     iprop(∀ (A : lrel GF), (lrel_arr lrel_unit (C A)).car v1 v2)
@@ -348,18 +367,21 @@ Mirrors `lrel_rec1`, `lrel_rec1_contractive`, `lrel_rec`, `lrel_rec_unfold`
 one step later), so `fixpoint` gives a semantic recursive type. -/
 
 /-- One-step unfolding of a recursive semantic type (named `lrelRec1` to
-avoid colliding with Lean's `rec` keyword). -/
+avoid colliding with Lean's `rec` keyword). Carries a closedness conjunct
+(option C, uniform with `lrel_arr`/`lrel_exists`) so `interp_closed` can
+project it without `▷`-stripping. -/
 noncomputable def lrelRec1 (C : lrel GF -n> lrel GF) (r : lrel GF) : lrel GF where
-  car w1 w2 := iprop(▷ (C r).car w1 w2)
+  car w1 w2 := iprop((⌜w1.1.isClosedEmpty ∧ w2.1.isClosedEmpty⌝) ∗
+    ▷ (C r).car w1 w2)
   persistent _ _ := inferInstance
 
 instance lrelRec1_contractive (C : lrel GF -n> lrel GF) : OFE.Contractive (lrelRec1 C) where
   distLater_dist {n P Q} hPQ w1 w2 := by
-    show iprop(▷ _) ≡{n}≡ iprop(▷ _)
-    -- `▷` is contractive in IProp: `DistLater n X Y → ▷X ≡{n}≡ ▷Y`.
+    show iprop(_ ∗ ▷ _) ≡{n}≡ iprop(_ ∗ ▷ _)
+    -- The pure conjunct doesn't depend on `r`. The `▷ (C r).car` part is
+    -- contractive in `r`. Compose via `sep_ne`.
+    refine sep_ne.ne .rfl ?_
     refine Contractive.distLater_dist (f := (Iris.BI.later : IProp GF → IProp GF)) ?_
-    -- Goal: `DistLater n ((C P).car w1 w2) ((C Q).car w1 w2)`.
-    -- `C` is NonExpansive, so `DistLater n P Q → DistLater n (C P) (C Q)`.
     intro k hk
     have hk' : P ≡{k}≡ Q := hPQ k hk
     exact C.ne.ne hk' w1 w2
@@ -393,7 +415,9 @@ theorem lrel_rec_ne {n : Nat} {C1 C2 : lrel GF -n> lrel GF}
       (Equiv.dist (lrel_rec_unfold C2) w1 w2).symm
     have hmid : (lrelRec1 C1 (lrel_rec C1)).car w1 w2 ≡{0}≡
                 (lrelRec1 C2 (lrel_rec C2)).car w1 w2 := by
-      show iprop(▷ (C1 (lrel_rec C1)).car w1 w2) ≡{0}≡ iprop(▷ (C2 (lrel_rec C2)).car w1 w2)
+      show iprop(_ ∗ ▷ (C1 (lrel_rec C1)).car w1 w2) ≡{0}≡
+           iprop(_ ∗ ▷ (C2 (lrel_rec C2)).car w1 w2)
+      refine sep_ne.ne .rfl ?_
       exact Contractive.zero (f := (Iris.BI.later : IProp GF → IProp GF))
     exact h1.trans (hmid.trans h2)
   | succ m ih =>
@@ -404,7 +428,9 @@ theorem lrel_rec_ne {n : Nat} {C1 C2 : lrel GF -n> lrel GF}
       (Equiv.dist (lrel_rec_unfold C2) w1 w2).symm
     have hmid : (lrelRec1 C1 (lrel_rec C1)).car w1 w2 ≡{m+1}≡
                 (lrelRec1 C2 (lrel_rec C2)).car w1 w2 := by
-      show iprop(▷ (C1 (lrel_rec C1)).car w1 w2) ≡{m+1}≡ iprop(▷ (C2 (lrel_rec C2)).car w1 w2)
+      show iprop(_ ∗ ▷ (C1 (lrel_rec C1)).car w1 w2) ≡{m+1}≡
+           iprop(_ ∗ ▷ (C2 (lrel_rec C2)).car w1 w2)
+      refine sep_ne.ne .rfl ?_
       refine Contractive.succ (f := (Iris.BI.later : IProp GF → IProp GF)) ?_
       have ih' : lrel_rec C1 ≡{m}≡ lrel_rec C2 :=
         ih (fun A => (hC A).lt (Nat.lt_succ_self m))
@@ -461,6 +487,7 @@ theorem refines_ne {E : CoPset} {e e' : Exp} {n : Nat} {A B : lrel GF}
 
 instance lrel_arr_ne_2 : OFE.NonExpansive₂ (lrel_arr (GF := GF)) where
   ne {n A1 A2} hA {B1 B2} hB v1 v2 := by
+    refine sep_ne.ne .rfl ?_
     refine intuitionistically_ne.ne ?_
     refine forall_ne fun w1 => ?_
     refine forall_ne fun w2 => ?_
@@ -525,7 +552,8 @@ theorem lrel_exists_ne {n : Nat} {C1 C2 : lrel GF → lrel GF}
     (h : ∀ A, C1 A ≡{n}≡ C2 A) :
     (lrel_exists C1 : lrel GF) ≡{n}≡ lrel_exists C2 := by
   intro v1 v2
-  show iprop(∃ _, _) ≡{n}≡ iprop(∃ _, _)
+  show iprop(_ ∗ ∃ _, _) ≡{n}≡ iprop(_ ∗ ∃ _, _)
+  refine sep_ne.ne .rfl ?_
   refine exists_ne fun A => ?_
   exact h A v1 v2
 

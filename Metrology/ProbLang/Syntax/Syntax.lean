@@ -661,15 +661,21 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp) : Option Exp :=
   | plus,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 + z2)
   | minus, .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 - z2)
   | mult,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 * z2)
-  -- Division and modulus are stuck on a zero divisor (returns `none`).
-  | div,   .lit (.int _),   .lit (.int 0)   => none
+  -- Division and modulus on integers are total in Lean (n / 0 = 0, n % 0 = n)
+  -- and Rocq's `Z.quot`/`Z.rem` agree, so we follow the same convention rather
+  -- than getting stuck on a zero divisor.
   | div,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 / z2)
-  | mod,   .lit (.int _),   .lit (.int 0)   => none
   | mod,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 % z2)
   | and,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 && b2)
   | or,    .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 || b2)
   | xor,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 ^^ b2)
   | eq,    .lit l1,         .lit l2         => some <| .lit <| .bool (decide (l1 = l2))
+  -- Equality on tagged unboxed values (inl/inr of literals): tags differ → false;
+  -- tags match → recurse on payload literals.
+  | eq,    .inl (.lit l1),  .inl (.lit l2)  => some <| .lit <| .bool (decide (l1 = l2))
+  | eq,    .inr (.lit l1),  .inr (.lit l2)  => some <| .lit <| .bool (decide (l1 = l2))
+  | eq,    .inl (.lit _),   .inr (.lit _)   => some <| .lit <| .bool false
+  | eq,    .inr (.lit _),   .inl (.lit _)   => some <| .lit <| .bool false
   | lt,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 < z2))
   | le,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 ≤ z2))
   |_,      _,        _        => none

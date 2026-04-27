@@ -15,7 +15,7 @@
    "type": "git",
    "subDir": "Iris",
    "scope": "",
-   "rev": "ebbfb02cbbd646708a1a0834e5396978b1f16d84",
+   "rev": "5d6a9aa5d56f883022424f33bf118758e7205493",
    "name": "iris",
    "manifestFile": "lake-manifest.json",
    "inputRev": "invariant-functor-fix",

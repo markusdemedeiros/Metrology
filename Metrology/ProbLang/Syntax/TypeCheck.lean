@@ -114,8 +114,7 @@ partial def checkMVar (mvar : MVarId) : TermElabM Unit := mvar.withContext do
         | throwError "typecheck/check inr: expected a sum type, got{indentExpr τ}"
       let h ← checkSub (e.getArg! 0) τ2
       mvar.assign (← mkAppOptM ``Typed.inr #[Γ, e.getArg! 0, τ1, τ2, h])
-  | some ``Exp.fail =>
-      mvar.assign (← mkAppOptM ``Typed.fail #[Γ, τ])
+  -- `.fail` removed from the type system; would need a stuck-typing rule.
   -- Synth-mode heads: call synth and unify.
   | some ``Exp.fvar | some ``Exp.lit | some ``Exp.fst | some ``Exp.snd =>
       let (τ', proof) ← synth Γ e
@@ -141,7 +140,7 @@ elab "typecheck" : tactic => do
 section Examples
 
 example : Typed Tctx.empty (.lit (.int 42)) .int := typecheck
-example : Typed Tctx.empty .fail .bool := typecheck
+-- `Typed Tctx.empty .fail .bool` no longer holds: `Typed.fail` was removed.
 example : Typed Tctx.empty (.pair (.lit (.int 1)) (.lit .unit)) (.prod .int .unit) :=
   typecheck
 example : Typed (Tctx.empty.insert "x" .bool) (.fvar "x") .bool := typecheck

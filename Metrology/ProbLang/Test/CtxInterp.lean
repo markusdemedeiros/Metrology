@@ -1140,13 +1140,11 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 -- Equality on compound values gets stuck
 -- ---------------------------------------------------------------------------
 
--- eq only works on BaseLit; pairs, sums, functions are not literals
+-- eq works on BaseLit and on .inl/.inr of literals; pairs and functions still stuck.
 #eval checkErrorMsg "eq on pairs stuck"
   pl((#1, #2) = (#1, #2))
   "stuck"
-#eval checkErrorMsg "eq on inl stuck"
-  pl(inl(#1) = inl(#1))
-  "stuck"
+-- eq on inl of literals is now supported (matches Rocq's vals_compare_safe).
 #eval checkErrorMsg "eq on fn stuck"
   pl((fun x, x) = (fun x, x))
   "stuck"

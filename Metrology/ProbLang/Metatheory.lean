@@ -405,6 +405,38 @@ theorem Exp.substMap_open (vs : SubstMap) (u e : Exp)
       Exp.open' (Exp.substMap vs e) (Exp.substMap vs u) :=
   Exp.substMap_openRec vs 0 u e hClosed
 
+/-- If `x ∉ e.fv` and `vs` is closed, then `x ∉ (substMap vs e).fv`.
+A closed substMap can only remove free vars, not introduce new ones. -/
+theorem Exp.notFv_substMap {vs : SubstMap} {e : Exp} {x : Var}
+    (hClosed : SubstMap.AllClosed vs) (hx : x ∉ e.fv) :
+    x ∉ (Exp.substMap vs e).fv := by
+  induction vs with
+  | nil => exact hx
+  | cons p rest ih =>
+    obtain ⟨y, w⟩ := p
+    rw [SubstMap.AllClosed_cons] at hClosed
+    obtain ⟨hwClosed, hRestClosed⟩ := hClosed
+    rw [Exp.substMap_cons]
+    -- Goal: x ∉ (subst (substMap rest e) y w).fv
+    -- subst y w doesn't introduce new free vars beyond fv(prev) ∪ fv(w).
+    -- fv(w) = ∅ (since w is closed).
+    have hxRest : x ∉ (substMap rest e).fv := ih hRestClosed
+    intro hmem
+    -- (subst e' y w).fv ⊆ (e'.fv \ {y}) ∪ w.fv
+    have := fv_subst_subset (substMap rest e) y w hmem
+    rcases Finset.mem_union.mp this with h1 | h2
+    · exact hxRest (Finset.mem_sdiff.mp h1).1
+    · -- w is closed, so x ∉ w.fv
+      have : w.fv = ∅ := by
+        have := hwClosed.2
+        ext z
+        simp only [Finset.notMem_empty, iff_false]
+        intro hzw
+        have := this hzw
+        simp [ClosedCtx.empty] at this
+      rw [this] at h2
+      exact (Finset.notMem_empty _ h2)
+
 /-- Helper: when `x` is unbound in `vs`, `substMap` is a no-op on `.fvar x`. -/
 theorem Exp.substMap_fvar_lookup_none {vs : SubstMap} {x : Var}
     (hv : SubstMap.lookup vs x = none) :
@@ -446,6 +478,129 @@ theorem SubstMap.lookup_closed {vs : SubstMap} {x : Var} {v : Exp}
       split_ifs at hv with hxy
       injection hv with hwv; subst hwv
       exact hClosed.1
+
+/-- Bridge for binder-shifting in fundamental's `lam`/`fix`/`tlam`/`unpack`.
+After picking a fresh atom `x` and specializing the IH at vs' = (x, v) :: vs,
+the substMap of an opened body `open' e (.fvar x)` simplifies to `open' (substMap vs e) v`. -/
+theorem Exp.substMap_open_fresh {vs : SubstMap} {e v : Exp} {x : Var}
+    (hClosed : SubstMap.AllClosed vs) (hxFv : x ∉ e.fv)
+    (hxDom : SubstMap.lookup vs x = none) (hvLC : v.IsLocallyClosed) :
+    Exp.substMap ((x, v) :: vs) (Exp.open' e (.fvar x)) =
+      Exp.open' (Exp.substMap vs e) v := by
+  show Exp.subst (Exp.substMap vs (Exp.open' e (.fvar x))) x v =
+    Exp.open' (Exp.substMap vs e) v
+  rw [Exp.substMap_open _ _ _ hClosed]
+  rw [Exp.substMap_fvar_lookup_none hxDom]
+  have hxFv' : x ∉ (Exp.substMap vs e).fv := Exp.notFv_substMap hClosed hxFv
+  rw [Exp.subst_intro x v _ hxFv' hvLC]
+
+/-- `substMap` preserves local closedness when all bindings are LC. -/
+theorem Exp.substMap_lc {vs : SubstMap} {e : Exp}
+    (hClosed : SubstMap.AllClosed vs) (he : e.IsLocallyClosed) :
+    (Exp.substMap vs e).IsLocallyClosed := by
+  induction vs with
+  | nil => exact he
+  | cons p rest ih =>
+    obtain ⟨y, w⟩ := p
+    rw [SubstMap.AllClosed_cons] at hClosed
+    obtain ⟨hwClosed, hRestClosed⟩ := hClosed
+    rw [Exp.substMap_cons]
+    exact subst_lc (ih hRestClosed) hwClosed.1
+
+/-- A free variable of `(substMap vs e)` either was already free in `e` (and
+not substituted out), or comes from one of the substituted values. -/
+theorem Exp.fv_substMap_subset (vs : SubstMap) (e : Exp) :
+    (Exp.substMap vs e).fv ⊆
+      e.fv ∪ ((vs.map (·.2)).foldr (fun w acc => w.fv ∪ acc) ∅) := by
+  induction vs generalizing e with
+  | nil => simp [Exp.substMap]
+  | cons p rest ih =>
+    obtain ⟨z, w⟩ := p
+    rw [Exp.substMap_cons]
+    -- Goal: (subst (substMap rest e) z w).fv ⊆ e.fv ∪ ((w.fv ∪ rest_w_fv) ∪ acc).
+    intro y hy
+    have h1 := fv_subst_subset (substMap rest e) z w hy
+    rcases Finset.mem_union.mp h1 with hL | hR
+    · -- y ∈ (substMap rest e).fv \ {z} ⊆ (substMap rest e).fv ⊆ e.fv ∪ rest_w_fv.
+      have hyRest : y ∈ (substMap rest e).fv := (Finset.mem_sdiff.mp hL).1
+      have hih : y ∈ e.fv ∪ ((rest.map (·.2)).foldr (fun w acc => w.fv ∪ acc) ∅) := by
+        exact (ih (e := e)) hyRest
+      simp only [List.map_cons, List.foldr_cons, Finset.mem_union]
+      rcases Finset.mem_union.mp hih with h_e | h_rest
+      · exact .inl h_e
+      · exact .inr (.inr h_rest)
+    · -- y ∈ w.fv. Goal: in the rhs.
+      simp only [List.map_cons, List.foldr_cons, Finset.mem_union]
+      exact .inr (.inl hR)
+
+/-- Closed-bindings have no free variables (combined). -/
+theorem SubstMap.allClosed_values_fv_empty {vs : SubstMap}
+    (hClosed : SubstMap.AllClosed vs) :
+    ((vs.map (·.2)).foldr (fun w acc => w.fv ∪ acc) ∅) = ∅ := by
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨z, w⟩ := p
+    rw [SubstMap.AllClosed_cons] at hClosed
+    obtain ⟨hwClosed, hRestClosed⟩ := hClosed
+    simp only [List.map_cons, List.foldr_cons]
+    rw [ih hRestClosed]
+    have hwfv : w.fv = ∅ := by
+      ext z'
+      simp only [Finset.notMem_empty, iff_false]
+      intro hz'
+      have := hwClosed.2 hz'
+      simp [ClosedCtx.empty] at this
+    rw [hwfv]
+    simp
+
+/-- Stronger: `(substMap vs e).fv ⊆ e.fv \ vs.dom` when `vs` is closed.
+i.e., a closed substMap removes exactly the `vs.dom`-variables. -/
+theorem Exp.fv_substMap_sdiff_dom {vs : SubstMap} {e : Exp}
+    (hClosed : SubstMap.AllClosed vs) :
+    (Exp.substMap vs e).fv ⊆ e.fv \ (vs.map (·.1)).toFinset := by
+  induction vs generalizing e with
+  | nil =>
+    simp [Exp.substMap]
+  | cons p rest ih =>
+    obtain ⟨z, w⟩ := p
+    rw [SubstMap.AllClosed_cons] at hClosed
+    obtain ⟨hwClosed, hRestClosed⟩ := hClosed
+    rw [Exp.substMap_cons]
+    intro y hy
+    -- hy : y ∈ (subst (substMap rest e) z w).fv.
+    -- (subst e' z w).fv ⊆ (e'.fv \ {z}) ∪ w.fv. w.fv = ∅.
+    have h1 := fv_subst_subset (substMap rest e) z w hy
+    rcases Finset.mem_union.mp h1 with hL | hR
+    · -- y ∈ (substMap rest e).fv \ {z}.
+      have hyRest : y ∈ (substMap rest e).fv := (Finset.mem_sdiff.mp hL).1
+      have hyNeZ : y ∉ ({z} : Finset Var) := (Finset.mem_sdiff.mp hL).2
+      have hih : y ∈ e.fv \ (rest.map (·.1)).toFinset := (ih (e := e) hRestClosed) hyRest
+      simp only [Finset.mem_sdiff, List.map_cons, List.toFinset_cons, Finset.mem_insert,
+        not_or]
+      have hyDecomp := Finset.mem_sdiff.mp hih
+      refine ⟨hyDecomp.1, ?_, hyDecomp.2⟩
+      intro h; exact hyNeZ (by simp [h])
+    · -- y ∈ w.fv. But w is closed, so w.fv = ∅. Contradiction.
+      have hwfv : w.fv = ∅ := by
+        ext z'
+        simp only [Finset.notMem_empty, iff_false]
+        intro hz'
+        have := hwClosed.2 hz'
+        simp [ClosedCtx.empty] at this
+      rw [hwfv] at hR
+      exact (Finset.notMem_empty _ hR).elim
+
+/-- If `e.fv ⊆ dom(vs)` and `vs` is closed, then `(substMap vs e).fv = ∅`. -/
+theorem Exp.substMap_fv_eq_empty {vs : SubstMap} {e : Exp}
+    (hClosed : SubstMap.AllClosed vs)
+    (hsub : e.fv ⊆ (vs.map (·.1)).toFinset) :
+    (Exp.substMap vs e).fv = ∅ := by
+  rw [Finset.eq_empty_iff_forall_notMem]
+  intro y hy
+  have h := Exp.fv_substMap_sdiff_dom hClosed (e := e) hy
+  have h' := Finset.mem_sdiff.mp h
+  exact h'.2 (hsub h'.1)
 
 /-- `substMap` on `fvar x` looks up the rightmost binding for `x`, provided
 all bindings are closed expressions. -/

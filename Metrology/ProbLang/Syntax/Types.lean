@@ -54,7 +54,10 @@ def Ty.subst (σ : Nat → Ty) : Ty → Ty
   | .forall' τ  => .forall' (τ.subst (up σ))
   | .exists' τ  => .exists' (τ.subst (up σ))
 
-def Ty.single (τ' τ : Ty) : Ty :=
+/-- `τ.single τ'` substitutes `τ'` for var 0 in `τ`, i.e. `τ[τ'/0]`.
+The body `τ` is the receiver (first arg) so dot-notation reads naturally:
+`(forall' τ).single τ'` instantiates the bound variable in `τ` with `τ'`. -/
+def Ty.single (τ τ' : Ty) : Ty :=
   τ.subst (fun n => match n with | 0 => τ' | k + 1 => .var k)
 
 def Ty.shift (τ : Ty) : Ty := τ.rename (· + 1)
@@ -169,7 +172,7 @@ theorem Ty.subst_subst (σ₁ σ₂ : Nat → Ty) (τ : Ty) :
   | _ => simp only [Ty.subst, *]
 
 theorem Ty.single_shift (τ τ' : Ty) :
-    Ty.single τ' τ.shift = τ := by
+    Ty.single τ.shift τ' = τ := by
   simp only [Ty.single, Ty.shift, Ty.subst_rename]
   exact τ.subst_id
 
@@ -228,7 +231,8 @@ def BinOp.intResTy : BinOp → Option Ty
 def BinOp.boolResTy : BinOp → Option Ty
   | .plus | .minus | .mult | .div | .mod  => none
   | .and  | .or    | .xor                 => some .bool
-  | .eq   | .lt    | .le                  => some .bool
+  | .eq                                   => some .bool
+  | .lt   | .le                           => none
 
 def UnOp.intResTy : UnOp → Option Ty
   | .neg   => none
@@ -384,7 +388,6 @@ inductive Typed : Tctx → Exp → Ty → Prop
   | scrut {Γ e p τs τb} :
       Typed Γ e τs → PatTyped τs p τb →
       Typed Γ (.scrut e p) (.sum τb .unit)
-  | fail {Γ τ} : Typed Γ .fail τ
 
 @[inherit_doc] scoped notation Γ " ⊢ₜ " e " : " τ => Typed Γ e τ
 
@@ -442,7 +445,109 @@ theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp} {τ : Ty}
   | rand _ _ ih1 ih2 => exact .rand ih1 ih2
   | rand_unit _ _ ih1 ih2 => exact .rand ih1 ih2
   | scrut _ _ ih => exact .scrut _ ih
-  | fail => exact .fail
+
+/-- Every typed expression's free variables lie in the typing context's domain. -/
+theorem Typed.fvSubset {Γ : Tctx} {e : Exp} {τ : Ty}
+    (h : Typed Γ e τ) : ∀ x ∈ e.fv, (Γ x).isSome := by
+  induction h with
+  | fvar hx =>
+    intro x hx'
+    simp [Exp.fv, Finset.mem_singleton] at hx'
+    subst hx'; rw [hx]; rfl
+  | lit_int | lit_bool | lit_unit => intro x hx; simp [Exp.fv] at hx
+  | binop_int _ _ _ ih1 ih2 | binop_bool _ _ _ ih1 ih2 | unboxed_eq _ _ _ ih1 ih2 =>
+    intro x hx; simp only [Exp.fv] at hx
+    rcases Finset.mem_union.mp hx with hx | hx
+    · exact ih1 x hx
+    · exact ih2 x hx
+  | unop_int _ _ ih | unop_bool _ _ ih => intro x hx; simp [Exp.fv] at hx; exact ih x hx
+  | pair _ _ ih1 ih2 =>
+    intro x hx; simp only [Exp.fv] at hx
+    rcases Finset.mem_union.mp hx with hx | hx
+    · exact ih1 x hx
+    · exact ih2 x hx
+  | fst _ ih | snd _ ih | inl _ ih | inr _ ih =>
+    intro x hx; simp [Exp.fv] at hx; exact ih x hx
+  | case _ _ _ ih0 ih1 ih2 =>
+    intro x hx; simp only [Exp.fv] at hx
+    rcases Finset.mem_union.mp hx with hx | hx
+    · rcases Finset.mem_union.mp hx with hx | hx
+      · exact ih0 x hx
+      · exact ih1 x hx
+    · exact ih2 x hx
+  | cond _ _ _ ih0 ih1 ih2 =>
+    intro x hx; simp only [Exp.fv] at hx
+    rcases Finset.mem_union.mp hx with hx | hx
+    · rcases Finset.mem_union.mp hx with hx | hx
+      · exact ih0 x hx
+      · exact ih1 x hx
+    · exact ih2 x hx
+  | @lam L Γ e τ1 τ2 _ ih =>
+    intro x hx
+    simp only [Exp.fv] at hx
+    obtain ⟨y, hy⟩ := Cslib.HasFresh.fresh_exists (L ∪ {x})
+    have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
+    have hxy : x ≠ y :=
+      fun h => hy (Finset.mem_union_right _ (Finset.mem_singleton.mpr h.symm))
+    have hxopen : x ∈ (Exp.open' e (.fvar y)).fv := Exp.fv_subset_open e y hx
+    have hres := ih y hyL x hxopen
+    unfold Tctx.insert at hres
+    rw [if_neg hxy] at hres
+    exact hres
+  | @fix L Γ e τ1 τ2 _ ih =>
+    intro x hx
+    simp only [Exp.fv] at hx
+    obtain ⟨y, hy⟩ := Cslib.HasFresh.fresh_exists (L ∪ {x})
+    have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
+    have hxy : x ≠ y :=
+      fun h => hy (Finset.mem_union_right _ (Finset.mem_singleton.mpr h.symm))
+    have hxopen : x ∈ (Exp.open' e (.fvar y)).fv := Exp.fv_subset_open e y hx
+    have hres := ih y hyL x hxopen
+    unfold Tctx.insert at hres
+    rw [if_neg hxy] at hres
+    exact hres
+  | app _ _ ih1 ih2 =>
+    intro x hx; simp only [Exp.fv] at hx
+    rcases Finset.mem_union.mp hx with hx | hx
+    · exact ih1 x hx
+    · exact ih2 x hx
+  | tlam _ ih =>
+    intro x hx
+    simp only [Exp.fv] at hx
+    have hres := ih x hx
+    unfold Tctx.shift at hres
+    rw [Option.isSome_map] at hres
+    exact hres
+  | tapp _ ih => intro x hx; simp [Exp.fv] at hx; exact ih x hx
+  | tfold _ ih | tpack _ ih => exact ih
+  | tunfold _ ih =>
+    intro x hx
+    -- recUnfold = .lam (.bvar 0); fv recUnfold = ∅; so fv (recUnfold.app e) = fv e.
+    apply ih
+    simp [Exp.fv, recUnfold] at hx ⊢
+    exact hx
+  | @tunpack L Γ e1 e2 τ τ2 _ _ ih1 ih2 =>
+    intro x hx
+    simp only [Exp.fv] at hx
+    rcases Finset.mem_union.mp hx with hx | hx
+    · -- x ∈ e2.fv (via the lam wrapper, fv (lam e2) = fv e2)
+      obtain ⟨y, hy⟩ := Cslib.HasFresh.fresh_exists (L ∪ {x})
+      have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
+      have hxy : x ≠ y :=
+        fun h => hy (Finset.mem_union_right _ (Finset.mem_singleton.mpr h.symm))
+      have hxopen : x ∈ (Exp.open' e2 (.fvar y)).fv := Exp.fv_subset_open e2 y hx
+      have hres := ih2 y hyL x hxopen
+      unfold Tctx.insert Tctx.shift at hres
+      rw [if_neg hxy, Option.isSome_map] at hres
+      exact hres
+    · exact ih1 x hx
+  | alloc _ ih | load _ ih | alloc_tape _ ih | scrut _ _ ih =>
+    intro x hx; simp [Exp.fv] at hx; exact ih x hx
+  | store _ _ ih1 ih2 | rand _ _ ih1 ih2 | rand_unit _ _ ih1 ih2 =>
+    intro x hx; simp only [Exp.fv] at hx
+    rcases Finset.mem_union.mp hx with hx | hx
+    · exact ih1 x hx
+    · exact ih2 x hx
 
 /-! ## Tctx renaming utility -/
 
@@ -740,8 +845,6 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       intro x y τ_x Γ heq hy; subst heq; simp only [Exp.subst]
       simp only [Exp.fv] at hy
       exact .scrut (ih x y τ_x Γ rfl hy) hp
-  | fail =>
-      intros; subst_vars; simp only [Exp.subst]; exact .fail
 
 theorem Typed.rename {Γ : Tctx} {e : Exp} {τ τ_x : Ty}
     (x y : Var) (h : Typed (Γ.insert x τ_x) e τ) (hy : y ∉ e.fv ∪ {x}) :

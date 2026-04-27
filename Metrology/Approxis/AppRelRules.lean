@@ -649,8 +649,11 @@ theorem refines_wand {E : CoPset} {e1 e2 : Exp} {A A' : lrel GF} :
   iapply refines_ret (v1 := v) (v2 := v') (hv1 := rfl) (hv2 := rfl)
   iapply HAA' $$ HA
 
-/-- `refines_arrow_val` (app_rel_rules.v:228). -/
-theorem refines_arrow_val {v v' : Val} {A A' : lrel GF} :
+/-- `refines_arrow_val` (app_rel_rules.v:228). Requires the closedness
+witness for `v, v'` (port-specific: `lrel_arr` carries closedness as a
+conjunct because Lean's `Val` isn't intrinsically closed). -/
+theorem refines_arrow_val {v v' : Val} {A A' : lrel GF}
+    (hv : v.1.isClosedEmpty ∧ v'.1.isClosedEmpty) :
     iprop(□ (∀ (v1 v2 : Val), A v1 v2 -∗
             refines ⊤ (.app v.1 v1.1) (.app v'.1 v2.1) A'))
       ⊢@{IProp GF} refines (⊤ : CoPset) v.1 v'.1 (lrel_arr A A') := by
@@ -658,19 +661,23 @@ theorem refines_arrow_val {v v' : Val} {A A' : lrel GF} :
   iapply refines_ret (v1 := v) (v2 := v') (hv1 := rfl) (hv2 := rfl)
   imodintro
   unfold lrel_arr
+  isplitr
+  · ipure_intro; exact hv
   iintro !> %w1 %w2 HA
   iapply H $$ %w1 %w2 HA
 
 /-- `refines_arrow` (app_rel_rules.v:341): function refinement built from value
 refinement of argument. Reduces to `refines_arrow_val` via `refines_ret`
-injection of `A v1 v2` into `□ REL v1 << v2 : A`. -/
-theorem refines_arrow {v v' : Val} {A A' : lrel GF} :
+injection of `A v1 v2` into `□ REL v1 << v2 : A`. Requires closedness of
+`v, v'` (port-specific: lrel_arr carries a closedness conjunct). -/
+theorem refines_arrow {v v' : Val} {A A' : lrel GF}
+    (hv : v.1.isClosedEmpty ∧ v'.1.isClosedEmpty) :
     iprop(□ (∀ (v1 v2 : Val),
             □ refines (⊤ : CoPset) v1.1 v2.1 A -∗
             refines ⊤ (.app v.1 v1.1) (.app v'.1 v2.1) A'))
       ⊢@{IProp GF} refines (⊤ : CoPset) v.1 v'.1 (lrel_arr A A') := by
   iintro #H
-  iapply refines_arrow_val
+  iapply (refines_arrow_val (hv := hv))
   iintro !> %v1 %v2 #HA
   iapply H $$ %v1 %v2
   iintro !>

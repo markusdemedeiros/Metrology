@@ -346,5 +346,34 @@ theorem open_close_subst_lc_gen (x : Var) (e v : Exp)
         rw [ih0 hze.1.1, ih1 hze.1.2, ih2 hze.2]
   exact aux e hze
 
+/-- `e.isClosedEmpty` : `e` is locally closed and has no free variables.
+A minimal predicate (no `ClosedCtx`-parameterization) suitable for use upstream
+of `Metatheory.lean` where `ClosedCtx` is defined. -/
+def isClosedEmpty (e : Exp) : Prop := IsLocallyClosed e ∧ e.fv = ∅
+
+theorem isClosedEmpty.toFvSubsetEmpty {e : Exp} (h : e.isClosedEmpty) :
+    e.IsLocallyClosed ∧ e.fv ⊆ (∅ : Finset Var) := by
+  refine ⟨h.1, ?_⟩
+  rw [h.2]
+
+/-- Opening at a free variable preserves the original free variables. -/
+theorem fv_subset_openRec (k : Nat) (y : Var) (e : Exp) :
+    e.fv ⊆ (openRec k (fvar y) e).fv := by
+  induction e generalizing k <;> grind
+
+/-- Specialization to the outermost open. -/
+theorem fv_subset_open (e : Exp) (y : Var) :
+    e.fv ⊆ (open' e (fvar y)).fv :=
+  fv_subset_openRec 0 y e
+
+/-- After opening at a free variable `y`, the resulting fv is contained in `e.fv ∪ {y}`. -/
+theorem fv_openRec_subset (k : Nat) (y : Var) (e : Exp) :
+    (openRec k (fvar y) e).fv ⊆ e.fv ∪ {y} := by
+  induction e generalizing k with grind
+
+theorem fv_open_subset (e : Exp) (y : Var) :
+    (open' e (fvar y)).fv ⊆ e.fv ∪ {y} :=
+  fv_openRec_subset 0 y e
+
 end Exp
 end ProbLang

@@ -145,6 +145,177 @@ theorem interp_ne_env (τ : Ty) {n : Nat} {Δ Δ' : TyEnv GF}
 
 end interp
 
+/-! ## Closedness of related values
+
+Every value related by `interp τ Δ` is closed (no free variables, locally
+closed). This is a port-specific property — Rocq's intrinsic `val` carries
+closedness for free; we need to track it explicitly. The proof is by
+structural induction on `τ`, using each lrel's value-form constraint
+(literals are closed; arrow/forall/exists carry an explicit closedness
+conjunct; ref/tape values are locations/labels). -/
+
+section interp_closed
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+
+/-- `IsClosedRespecting Δ`: every lrel in `Δ` only relates closed values.
+A side condition for `interp_closed` to handle the type-variable case.
+Made a typeclass so it propagates implicitly to every `interp_closed` call. -/
+class TyEnv.IsClosedRespecting (Δ : TyEnv GF) : Prop where
+  closed : ∀ (n : Nat) (v v' : Val), (Δ n).car v v' ⊢@{IProp GF}
+    iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝)
+
+/-- Helper: a literal value is closed. -/
+theorem Exp.lit_isClosedEmpty (b : BaseLit) : (Exp.lit b).isClosedEmpty :=
+  ⟨IsLocallyClosed.lit b, by simp [Exp.fv]⟩
+
+/-- The constant-`lrel_unit` environment is closed-respecting: it relates only
+`(.lit .unit, .lit .unit)`, both closed. Useful as a base case. -/
+instance TyEnv.constUnit_IsClosedRespecting :
+    TyEnv.IsClosedRespecting ((fun _ => lrel_unit) : TyEnv GF) where
+  closed n v v' := by
+    show iprop(⌜v.1 = .lit .unit ∧ v'.1 = .lit .unit⌝) ⊢ _
+    iintro %h
+    ipure_intro
+    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
+
+/-- An lrel `X` is "closed-respecting" if it only relates closed values.
+Used as a side condition for extending closed-respecting environments. -/
+class lrel.IsClosedRespecting (X : lrel GF) : Prop where
+  closed : ∀ (v v' : Val), X.car v v' ⊢@{IProp GF}
+    iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝)
+
+/-- Extending a closed-respecting `Δ` with a closed-respecting `X` is closed-respecting. -/
+instance TyEnv.cons_IsClosedRespecting (X : lrel GF) (Δ : TyEnv GF)
+    [hX : X.IsClosedRespecting] [hΔ : Δ.IsClosedRespecting] :
+    (TyEnv.cons X Δ).IsClosedRespecting where
+  closed n v v' := by
+    cases n with
+    | zero => exact hX.closed v v'
+    | succ k => exact hΔ.closed k v v'
+
+/-- Every `interp τ Δ` value-relation only relates closed values, provided
+`Δ` is closed-respecting. Proof by structural induction on `τ`. The `rec'`
+case requires Löb induction; we wrap the whole statement in `loeb_wand`. -/
+theorem interp_closed {Δ : TyEnv GF} [hΔ : Δ.IsClosedRespecting]
+    (τ : Ty) (v v' : Val) :
+    (interp τ Δ).car v v' ⊢@{IProp GF}
+      iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) := by
+  induction τ generalizing Δ v v'
+  · -- int
+    show iprop(∃ n : Int, ⌜v.1 = .lit (.int n) ∧ v'.1 = .lit (.int n)⌝) ⊢
+      iprop(⌜_ ∧ _⌝ : IProp GF)
+    iintro ⟨%n, %h⟩
+    ipure_intro
+    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
+  · -- bool
+    show iprop(∃ b : Bool, ⌜v.1 = .lit (.bool b) ∧ v'.1 = .lit (.bool b)⌝) ⊢
+      iprop(⌜_ ∧ _⌝ : IProp GF)
+    iintro ⟨%b, %h⟩
+    ipure_intro
+    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
+  · -- unit
+    show iprop(⌜v.1 = .lit .unit ∧ v'.1 = .lit .unit⌝) ⊢
+      iprop(⌜_ ∧ _⌝ : IProp GF)
+    iintro %h
+    obtain ⟨h1, h2⟩ := h
+    ipure_intro
+    exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
+  · -- prod
+    rename_i τ1 τ2 ih1 ih2
+    show iprop(∃ (a1 a2 b1 b2 : Val),
+        (⌜v.1 = .pair a1.1 b1.1⌝) ∗ (⌜v'.1 = .pair a2.1 b2.1⌝) ∗
+        (interp τ1 Δ).car a1 a2 ∗ (interp τ2 Δ).car b1 b2) ⊢ _
+    iintro ⟨%a1, %a2, %b1, %b2, %hv1, %hv2, HA, HB⟩
+    ihave %hac := ih1 a1 a2 $$ HA
+    ihave %hbc := ih2 b1 b2 $$ HB
+    ipure_intro
+    refine ⟨hv1 ▸ ?_, hv2 ▸ ?_⟩
+    · refine ⟨Exp.IsLocallyClosed.pair hac.1.1 hbc.1.1, ?_⟩
+      simp [Exp.fv, hac.1.2, hbc.1.2]
+    · refine ⟨Exp.IsLocallyClosed.pair hac.2.1 hbc.2.1, ?_⟩
+      simp [Exp.fv, hac.2.2, hbc.2.2]
+  · -- sum
+    rename_i τ1 τ2 ih1 ih2
+    show iprop(∃ (w1 w2 : Val),
+        (⌜v.1 = .inl w1.1⌝ ∗ ⌜v'.1 = .inl w2.1⌝ ∗ (interp τ1 Δ).car w1 w2) ∨
+        (⌜v.1 = .inr w1.1⌝ ∗ ⌜v'.1 = .inr w2.1⌝ ∗ (interp τ2 Δ).car w1 w2)) ⊢ _
+    iintro ⟨%w1, %w2, Hor⟩
+    icases Hor with (⟨%hv1, %hv2, HA⟩ | ⟨%hv1, %hv2, HB⟩)
+    · ihave %hwc := ih1 w1 w2 $$ HA
+      ipure_intro
+      refine ⟨hv1 ▸ ?_, hv2 ▸ ?_⟩
+      · exact ⟨Exp.IsLocallyClosed.inl hwc.1.1, by simp [Exp.fv]; exact hwc.1.2⟩
+      · exact ⟨Exp.IsLocallyClosed.inl hwc.2.1, by simp [Exp.fv]; exact hwc.2.2⟩
+    · ihave %hwc := ih2 w1 w2 $$ HB
+      ipure_intro
+      refine ⟨hv1 ▸ ?_, hv2 ▸ ?_⟩
+      · exact ⟨Exp.IsLocallyClosed.inr hwc.1.1, by simp [Exp.fv]; exact hwc.1.2⟩
+      · exact ⟨Exp.IsLocallyClosed.inr hwc.2.1, by simp [Exp.fv]; exact hwc.2.2⟩
+  · -- arrow: lrel_arr's first conjunct is closedness
+    rename_i τ1 τ2 _ _
+    show iprop(_ ∗ □ _) ⊢ iprop(⌜_ ∧ _⌝ : IProp GF)
+    iintro ⟨%h, _⟩
+    ipure_intro; exact h
+  · -- ref
+    rename_i τ' _
+    show iprop(∃ (l1 l2 : Loc), (⌜v.1 = .lit (.loc l1)⌝) ∗
+        (⌜v'.1 = .lit (.loc l2)⌝) ∗ _) ⊢ _
+    iintro ⟨%l1, %l2, %hv1, %hv2, _⟩
+    ipure_intro
+    exact ⟨hv1 ▸ Exp.lit_isClosedEmpty _, hv2 ▸ Exp.lit_isClosedEmpty _⟩
+  · -- tape
+    show iprop(∃ (α1 α2 : Loc) (z : Int), (⌜v.1 = .lit (.lbl α1)⌝) ∗
+        (⌜v'.1 = .lit (.lbl α2)⌝) ∗ _) ⊢ _
+    iintro ⟨%α1, %α2, %z, %hv1, %hv2, _⟩
+    ipure_intro
+    exact ⟨hv1 ▸ Exp.lit_isClosedEmpty _, hv2 ▸ Exp.lit_isClosedEmpty _⟩
+  · -- var
+    rename_i n
+    show (Δ n).car v v' ⊢ _
+    exact hΔ.closed n v v'
+  · -- rec': (lrel_rec C).car v v' ≡ ⌜v.closed ∧ v'.closed⌝ ∗ ▷ (C ...).car v v'.
+    -- Closedness is the first conjunct (option C uniformly applied to lrel_rec).
+    rename_i τ' _
+    let CRec : lrel GF -n> lrel GF :=
+      { f := fun X => interp τ' (TyEnv.cons X Δ)
+        ne := ⟨fun {_ _ _} hXY => (interpNE τ').ne (TyEnv.cons_ne_head hXY)⟩ }
+    have hequiv : (interp (Ty.rec' τ') Δ : lrel GF) ≡ lrelRec1 CRec (interp (Ty.rec' τ') Δ) :=
+      lrel_rec_unfold CRec
+    have hunfold : (interp (Ty.rec' τ') Δ : lrel GF) = lrelRec1 CRec (interp (Ty.rec' τ') Δ) :=
+      OFE.Leibniz.eq_of_eqv (α := lrel GF) hequiv
+    rw [hunfold]
+    show iprop((⌜_⌝) ∗ _) ⊢ _
+    iintro ⟨%hcl, _⟩
+    ipure_intro
+    exact hcl
+  · -- forall'
+    rename_i τ' _
+    show iprop(∀ (A : lrel GF),
+        (lrel_arr lrel_unit (interp τ' (TyEnv.cons A Δ))).car v v') ⊢ _
+    iintro Hall
+    -- Instantiate at A := lrel_unit (any specific lrel will do).
+    ihave Hinst := Hall $$ %lrel_unit
+    -- Hinst : (lrel_arr lrel_unit (interp τ' (cons lrel_unit Δ))).car v v'.
+    -- The lrel_arr's first conjunct is closedness; project it.
+    ihave Hclosed : iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝ : IProp GF) $$ [Hinst]
+    · show iprop(_ ∗ □ _) ⊢ _
+      iintro ⟨%h, _⟩
+      ipure_intro; exact h
+    iexact Hclosed
+  · -- exists': lrel_exists's first conjunct is closedness
+    rename_i τ' _
+    show iprop(_ ∗ ∃ _, _) ⊢ iprop(⌜_ ∧ _⌝ : IProp GF)
+    iintro ⟨%h, _⟩
+    ipure_intro; exact h
+
+/-- For any `τ` and any closed-respecting `Δ`, the resulting lrel `interp τ Δ`
+is itself closed-respecting. -/
+instance interp_IsClosedRespecting {Δ : TyEnv GF} [Δ.IsClosedRespecting] (τ : Ty) :
+    (interp τ Δ).IsClosedRespecting where
+  closed v v' := interp_closed τ v v'
+
+end interp_closed
+
 /-! ## Unboxed-value predicate
 
 Ports `val_is_unboxed` (clutch/theories/prob_lang/lang.v). A value is
@@ -192,6 +363,36 @@ theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
     iintro ⟨%l1, %l2, %h1, %h2, _⟩
     ipure_intro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
+
+/-- At an unboxed type, both related values are bare literals (`.lit _`).
+Stronger than `unboxed_type_sound` (which allows `inl/inr` shapes too) because
+`UnboxedType` doesn't include sums. Used by `bin_log_related_unboxed_eq` to
+β-step `BinOp.eval .eq` on the underlying literals. -/
+theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
+    (H : UnboxedType τ) :
+    (interp τ Δ).car v v' ⊢@{IProp GF}
+      ⌜∃ l l' : BaseLit, v.1 = .lit l ∧ v'.1 = .lit l'⌝ := by
+  cases H
+  -- unit
+  · show iprop(⌜ _ ⌝) ⊢ _
+    iintro ⟨%h1, %h2⟩
+    ipure_intro
+    exact ⟨_, _, h1, h2⟩
+  -- int
+  · show iprop(∃ _, _) ⊢ _
+    iintro ⟨%n, %h1, %h2⟩
+    ipure_intro
+    exact ⟨_, _, h1, h2⟩
+  -- bool
+  · show iprop(∃ _, _) ⊢ _
+    iintro ⟨%b, %h1, %h2⟩
+    ipure_intro
+    exact ⟨_, _, h1, h2⟩
+  -- ref τ'
+  · show iprop(∃ _ _, _) ⊢ _
+    iintro ⟨%l1, %l2, %h1, %h2, _⟩
+    ipure_intro
+    exact ⟨_, _, h1, h2⟩
 
 /-- At equality-types, both related values are pointwise equal. Mirrors
 `eq_type_sound` (interp.v:60–77). -/
@@ -475,6 +676,24 @@ def lookup : RelCtx GF → Var → Option (lrel GF)
     | some B => some B
     | none => if x = y then some A else none
 
+/-- An entry's existence in `Γ` implies the lookup at its key is some. -/
+theorem lookup_isSome_of_mem {Γ : RelCtx GF} {p : Var × lrel GF}
+    (h : p ∈ Γ) : (Γ.lookup p.1).isSome := by
+  induction Γ with
+  | nil => cases h
+  | cons q rest ih =>
+    rcases List.mem_cons.mp h with rfl | hRest
+    · -- q = p.
+      simp only [RelCtx.lookup]
+      cases hr : RelCtx.lookup rest p.1 with
+      | some _ => simp
+      | none => simp
+    · simp only [RelCtx.lookup]
+      have := ih hRest
+      cases hr : RelCtx.lookup rest p.1 with
+      | some _ => simp
+      | none => rw [hr] at this; simp at this
+
 end RelCtx
 
 namespace ValSubstMap
@@ -521,6 +740,27 @@ theorem snd_lookup (vs : ValSubstMap) (x : Var) :
     | some q => simp
     | none => simp
 
+/-- A lookup that returns `some` implies the key appears in the list. -/
+theorem mem_of_lookup_isSome {vs : ValSubstMap} {x : Var}
+    (h : (vs.lookup x).isSome) : ∃ p ∈ vs, p.1 = x := by
+  induction vs with
+  | nil => simp [ValSubstMap.lookup] at h
+  | cons p rest ih =>
+    obtain ⟨z, w⟩ := p
+    simp only [ValSubstMap.lookup] at h
+    cases hr : ValSubstMap.lookup rest x with
+    | some w' =>
+      simp only [hr] at h
+      have hsome : (ValSubstMap.lookup rest x).isSome := by rw [hr]; rfl
+      obtain ⟨p', hp'mem, hp'eq⟩ := ih hsome
+      exact ⟨p', List.mem_cons.mpr (.inr hp'mem), hp'eq⟩
+    | none =>
+      simp only [hr] at h
+      split_ifs at h with hxz
+      · subst hxz
+        exact ⟨(x, w), List.mem_cons.mpr (.inl rfl), rfl⟩
+      · simp at h
+
 end ValSubstMap
 
 section env_typed
@@ -546,6 +786,14 @@ instance env_ltyped2_persistent (Γ : RelCtx GF) (vs : ValSubstMap) :
     Persistent (env_ltyped2 Γ vs) := by
   unfold env_ltyped2
   infer_instance
+
+/-- Domain agreement: `Γ.lookup x = some _ ↔ vs.lookup x = some _`. -/
+theorem env_ltyped2_domEq (Γ : RelCtx GF) (vs : ValSubstMap) :
+    env_ltyped2 Γ vs ⊢@{IProp GF}
+      iprop(⌜∀ x, (Γ.lookup x).isSome ↔ (vs.lookup x).isSome⌝) := by
+  unfold env_ltyped2
+  iintro ⟨%H, _, _⟩
+  ipure_intro; exact H
 
 /-- Closedness: every binding in `vs` is closed. -/
 theorem env_ltyped2_allClosed (Γ : RelCtx GF) (vs : ValSubstMap) :
@@ -591,8 +839,6 @@ theorem env_ltyped2_empty_inv (vs : ValSubstMap) :
   | nil => rfl
   | cons p rest =>
     exfalso
-    -- (Hdom p.1).mpr says: if vs.lookup p.1 has some, so does Γ.lookup. But Γ = [].
-    -- We need to show ValSubstMap.lookup (p :: rest) p.1 is some.
     have hsome : (ValSubstMap.lookup (p :: rest) p.1).isSome := by
       simp only [ValSubstMap.lookup]
       cases ValSubstMap.lookup rest p.1 with
@@ -602,7 +848,7 @@ theorem env_ltyped2_empty_inv (vs : ValSubstMap) :
     simp [RelCtx.lookup] at this
 
 /-- Extending both contexts preserves `env_ltyped2`. Requires the new values
-to be closed (since `env_ltyped2` now records closedness of all bindings). -/
+to be closed (since `env_ltyped2` records closedness of all bindings). -/
 theorem env_ltyped2_insert (Γ : RelCtx GF) (vs : ValSubstMap)
     (x : Var) (A : lrel GF) (v1 v2 : Val)
     (hv1c : v1.1.isClosed .empty) (hv2c : v2.1.isClosed .empty) :
@@ -891,9 +1137,11 @@ theorem interp_substG (τ : Ty) (σ : Nat → Ty) (Δ : TyEnv GF) :
     exact (hih.trans hne).dist
 
 /-- **`interp_subst`**: single substitution at the head. Mirrors
-`interp.v:210–212`. -/
+`interp.v:210–212`. With `Ty.single τ τ' = τ[τ'/0]`, this reads:
+interpreting `τ[τ'/0]` is the same as interpreting `τ` under an
+environment extended with the interpretation of `τ'`. -/
 theorem interp_subst (τ' τ : Ty) (Δ : TyEnv GF) :
-    interp (Ty.single τ' τ) Δ ≡ interp τ (TyEnv.cons (interp τ' Δ) Δ) := by
+    interp (Ty.single τ τ') Δ ≡ interp τ (TyEnv.cons (interp τ' Δ) Δ) := by
   unfold Ty.single
   have h := interp_substG τ (fun n => match n with | 0 => τ' | k + 1 => .var k) Δ
   -- semSubst of that σ is `cons (interp τ' Δ) Δ` up to pointwise equiv.

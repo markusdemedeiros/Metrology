@@ -49,15 +49,42 @@ namespace ProbLang
 section Compatibility
 variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
 
-/-- Helper: unfold `lrel_arr` application. Proves that `(lrel_arr A B).car v v'` is
-definitionally the `□ (∀ w w', A w w' -∗ REL (v w) << (v' w') : B)` form, bridging the
-`.car`/`lrel.mk` projection that iris tactics don't reduce. -/
+/-- Helper: unfold `lrel_arr` application. Proves that `(lrel_arr A B).car v v'`
+is definitionally `⌜v.closed ∧ v'.closed⌝ ∗ □ (∀ w w', A w w' -∗ REL (v w) << (v' w') : B)`,
+bridging the `.car`/`lrel.mk` projection that iris tactics don't reduce. The
+closedness conjunct is port-specific (Lean's `Val` isn't intrinsically closed). -/
 theorem lrel_arr_unfold (A B : lrel GF) (v v' : Val) :
     (lrel_arr A B).car v v' ⊢@{IProp GF}
+      iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
+        □ (∀ (w1 w2 : Val), A w1 w2 -∗
+          refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) :=
+  BIBase.Entails.rfl
+
+/-- Project the wand-only part of `(lrel_arr A B).car v v'`. -/
+theorem lrel_arr_unfold_wand (A B : lrel GF) (v v' : Val) :
+    (lrel_arr A B).car v v' ⊢@{IProp GF}
       iprop(□ (∀ (w1 w2 : Val), A w1 w2 -∗
-        refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) :=
-  -- The `.car` projection on `lrel_arr A B` is defeq to the body; this is `rfl` at
-  -- Lean level and `BIBase.Entails.rfl` at iprop level.
+        refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) := by
+  iintro H
+  ihave H' := lrel_arr_unfold A B v v' $$ H
+  icases H' with ⟨_, HW⟩
+  iexact HW
+
+/-- Project the closedness part of `(lrel_arr A B).car v v'`. -/
+theorem lrel_arr_unfold_closed (A B : lrel GF) (v v' : Val) :
+    (lrel_arr A B).car v v' ⊢@{IProp GF}
+      iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) := by
+  iintro H
+  ihave H' := lrel_arr_unfold A B v v' $$ H
+  icases H' with ⟨%hc, _⟩
+  ipure_intro; exact hc
+
+/-- Reverse direction: fold the unfolded `lrel_arr` form back. -/
+theorem lrel_arr_fold (A B : lrel GF) (v v' : Val) :
+    iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
+      □ (∀ (w1 w2 : Val), A w1 w2 -∗
+        refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) ⊢@{IProp GF}
+      (lrel_arr A B).car v v' :=
   BIBase.Entails.rfl
 
 /-- `refines_pair` (compatibility.v:19): pair compatibility.
@@ -168,8 +195,8 @@ theorem refines_app {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
   · iexact IH1
   iintro %v1 %v1' #Hff
   -- Goal: `REL [appL v2].fill v1.1 << [appL v2'].fill v1'.1 : B`, i.e. `.app v1.1 v2.1 << .app v1'.1 v2'.1`.
-  -- Hff : (lrel_arr A B).car v1 v1' — unfold via lrel_arr_unfold helper.
-  ihave Hff' := lrel_arr_unfold A B v1 v1' $$ Hff
+  -- Hff : (lrel_arr A B).car v1 v1' — extract just the wand part via lrel_arr_unfold_wand.
+  ihave Hff' := lrel_arr_unfold_wand A B v1 v1' $$ Hff
   have hgL : Ectx.fill [EctxItem.appL v2] v1.1 = Exp.app v1.1 v2.1 := rfl
   have hgR : Ectx.fill [EctxItem.appL v2'] v1'.1 = Exp.app v1'.1 v2'.1 := rfl
   rw [hgL, hgR]
@@ -233,9 +260,12 @@ theorem refines_seq (A : lrel GF) {e1 e2 e1' e2' : Exp} {B : lrel GF}
   rw [hfillRHS]
   iexact IH2
 
-/-- Helper: `(lrel_exists C).car v v' = ∃ A, (C A).car v v'` (defeq via `lrel.mk` projection). -/
+/-- Helper: build `(lrel_exists C).car v v'` from a closedness witness and the
+existential body. Defeq via `lrel.mk` projection. -/
 theorem lrel_exists_unfold (C : lrel GF → lrel GF) (v v' : Val) :
-    iprop(∃ A : lrel GF, (C A).car v v') ⊢@{IProp GF} (lrel_exists C).car v v' :=
+    iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
+      (∃ A : lrel GF, (C A).car v v'))
+      ⊢@{IProp GF} (lrel_exists C).car v v' :=
   BIBase.Entails.rfl
 
 /-- Helper: `(lrel_nat).car v v' ⊢ ∃ n : Nat, v = #n ∧ v' = #n`. -/
@@ -619,9 +649,12 @@ theorem lrel_tape_unfold (v v' : Val) :
   BIBase.Entails.rfl
 
 /-- `refines_pack` (compatibility.v:73): existential-packing compatibility.
-Given `REL e << e' : C A` for a specific `A`, conclude `REL e << e' : ∃ A, C A`. -/
+Given `REL e << e' : C A` for a specific `A`, conclude `REL e << e' : ∃ A, C A`.
+Requires a proof that `C A` only relates closed values (port-specific). -/
 theorem refines_pack (A : lrel GF) {e e' : Exp} {C : lrel GF → lrel GF}
-    (_hC : OFE.NonExpansive C) :
+    (_hC : OFE.NonExpansive C)
+    (hCclosed : ∀ v v' : Val, (C A).car v v' ⊢@{IProp GF}
+      iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝)) :
     refines (⊤ : CoPset) e e' (C A)
       ⊢@{IProp GF} refines ⊤ e e' (lrel_exists C) := by
   show _ ⊢@{IProp GF}
@@ -630,12 +663,15 @@ theorem refines_pack (A : lrel GF) {e e' : Exp} {C : lrel GF → lrel GF}
   iapply (refines_bind Ectx.empty Ectx.empty (A := C A)) $$ [IH]
   · iexact IH
   iintro %v %v' HCA
-  -- Goal: `refines ⊤ ([].fill v.1) ([].fill v'.1) (lrel_exists C)`.
   iapply refines_ret
     (e1 := Ectx.fill Ectx.empty v.1) (e2 := Ectx.fill Ectx.empty v'.1)
     (v1 := v) (v2 := v') (hv1 := rfl) (hv2 := rfl)
   imodintro
+  ihave %Hcl : iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝ : IProp GF) $$ [HCA]
+  · iapply (hCclosed v v'); iexact HCA
   iapply lrel_exists_unfold
+  isplitr
+  · ipure_intro; exact Hcl
   iexists A
   iexact HCA
 
@@ -648,19 +684,30 @@ semantic type `A`.
 
 **Port note**: same `IsLocallyClosed` requirement as `refines_seq`. -/
 theorem refines_forall {e e' : Exp} {C : lrel GF → lrel GF}
-    (he : e.IsLocallyClosed) (he' : e'.IsLocallyClosed) :
+    (he : e.IsLocallyClosed) (he' : e'.IsLocallyClosed)
+    (he_fv : e.fv = ∅) (he'_fv : e'.fv = ∅) :
     BI.intuitionistically (BI.forall (fun A : lrel GF => refines (⊤ : CoPset) e e' (C A)))
       ⊢@{IProp GF} refines ⊤ (.lam e) (.lam e') (lrel_forall C) := by
   iintro #H
   iapply (refines_ret (e1 := Exp.lam e) (e2 := Exp.lam e')
     (v1 := ⟨.lam e, IsVal.lam⟩) (v2 := ⟨.lam e', IsVal.lam⟩) (hv1 := rfl) (hv2 := rfl))
   imodintro
-  -- Goal: lrel_forall C ⟨.lam e, _⟩ ⟨.lam e', _⟩ = ∀ A, lrel_arr lrel_unit (C A) ...
   unfold lrel_forall
   iintro %A
-  -- Goal: (lrel_arr lrel_unit (C A)).car ⟨.lam e, _⟩ ⟨.lam e', _⟩
-  --     = □ ∀ u u', lrel_unit u u' -∗ refines ⊤ (.app (.lam e) u.1) (.app (.lam e') u'.1) (C A).
   unfold lrel_arr
+  isplitr
+  · ipure_intro
+    refine ⟨⟨?_, ?_⟩, ⟨?_, ?_⟩⟩
+    · exact Exp.IsLocallyClosed.lam ∅ e (fun y _ => by
+        show (e.open' (Exp.fvar y)).IsLocallyClosed
+        have : e.open' (Exp.fvar y) = e := (Exp.open_lc 0 (Exp.fvar y) e he).symm
+        rw [this]; exact he)
+    · simp [Exp.fv]; exact he_fv
+    · exact Exp.IsLocallyClosed.lam ∅ e' (fun y _ => by
+        show (e'.open' (Exp.fvar y)).IsLocallyClosed
+        have : e'.open' (Exp.fvar y) = e' := (Exp.open_lc 0 (Exp.fvar y) e' he').symm
+        rw [this]; exact he')
+    · simp [Exp.fv]; exact he'_fv
   iintro !> %u %u' Hunit
   -- Hunit : lrel_unit u u' = ⌜u.1 = .lit .unit ∧ u'.1 = .lit .unit⌝.
   -- Goal: refines ⊤ (.app (.lam e) u.1) (.app (.lam e') u'.1) (C A).
