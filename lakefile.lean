@@ -14,7 +14,7 @@ require cslib from git
    "https://github.com/leanprover/cslib" @ "v4.29.0"
 
 require iris from git
-  "https://github.com/leanprover-community/iris-lean.git" / "Iris"
+  "https://github.com/leanprover-community/iris-lean.git" @ "invariant-functor-fix" /  "Iris"
 
 require sampcert from git
   "https://github.com/leanprover/SampCert.git" @ "v4.29.0"

@@ -604,6 +604,220 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   isplitl [Hj']; · iexact Hj'
   ipure_intro; exact ⟨hn0, hnz⟩
 
+/-! ## Mixed tape-rand couplings
+
+`wp_couple_tape_rand` couples a LHS tape-rand on an empty tape with a RHS
+unit-rand. `wp_couple_rand_tape` is the symmetric version. Both compose
+`Cfg.uniform_addCoupl_bij` with `primStep_rand_lbl_empty` on one side and
+`primStep_rand_unit` on the other. -/
+
+/-- `wp_couple_tape_rand`: couple LHS rand on empty tape with RHS unit rand
+via bijection `f`. -/
+theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z) (K : Ectx) (E : CoPset) (α : Loc) (Φ : Val → IProp GF) :
+    iprop(▷ appNatTape α z [] ∗
+        (⤇ K.fill (.rand (.lit (.int z)) (.lit .unit))) ∗
+        (∀ (n : Int),
+          appNatTape α z [] ∗
+            (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
+          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)))
+      ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl α))) Φ := by
+  iintro ⟨Hα, Hj, Hcnt⟩
+  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α))).toVal? = none :=
+    Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
+  iapply (wp_lift_prim_steps_coupl Hv)
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  iapply (later_timeless_fupd (P := appNatTape α z []))
+  isplitl [Hα]; · iexact Hα
+  iintro Hα
+  ihave HαEx := show appNatTape α z [] ⊢@{IProp GF}
+      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+        (⌜fs.map (fun x => x.val) = []⌝) ∗ α ↪ₐ ⟨z, fs⟩) from
+    BI.BIBase.Entails.rfl $$ Hα
+  icases HαEx with ⟨%fs, %hmap_fs, Hα_b⟩
+  have hfs_nil : fs = [] := List.map_eq_nil_iff.mp hmap_fs
+  subst hfs_nil
+  ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
+  subst Heq
+  ihave %Hlk_α := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hα_b
+  have HheadL : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α)), σ₁⟩
+        {⟨.lit (.int 0), σ₁⟩} :=
+    (headStep_support_iff _ _ _ _).mpr
+      (.RandTapeEmptyS Hz Hlk_α rfl (_root_.le_refl _) Hz rfl)
+  have HredL : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α))) σ₁ :=
+    Reducible.of_head ⟨_, HheadL⟩
+  have HheadR : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩
+        {⟨.lit (.int 0), σ₁'⟩} :=
+    (headStep_support_iff _ _ _ _).mpr (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+  have HredR_rand : Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁' :=
+    Reducible.of_head ⟨_, HheadR⟩
+  have HredR : Reducible (K.fill (.rand (.lit (.int z)) (.lit .unit))) σ₁' :=
+    HredR_rand.fill K
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  let R : Cfg → Cfg → Prop := fun c₁ c₂ =>
+    ∃ n : Int, 0 ≤ n ∧ n < z ∧
+      c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
+  iexists R, 0, ε
+  isplitr; · ipure_intro; rw [zero_add]
+  isplitr; · ipure_intro; exact HredL
+  isplitr; · ipure_intro; exact HredR
+  isplitr
+  · ipure_intro
+    rw [primStep_rand_lbl_empty Hz σ₁ α Hlk_α]
+    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit)).isValue := by
+      intro ⟨w⟩; nomatch w
+    rw [primStep_fill Hv_rand, primStep_rand_unit Hz]
+    have Hbase := Cfg.uniform_addCoupl_bij Hz σ₁ σ₁' f hdom hbij
+    have : AddCoupl 0
+        {p : Cfg × Cfg | R p.1 p.2}
+        ((Cfg.uniform z σ₁).map id)
+        ((Cfg.uniform z σ₁').map (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))) := by
+      refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+        Measurable.of_discrete Measurable.of_discrete
+        (R := {p : Cfg × Cfg | R p.1 p.2})
+        ?_
+        Hbase
+      intro a b hab
+      obtain ⟨n, h0, hz, heqL, heqR⟩ := hab
+      refine ⟨n, h0, hz, heqL, ?_⟩
+      subst heqR
+      rfl
+    rw [MeasureTheory.Measure.map_id] at this
+    exact this
+  iintro %e₂ %σ₂ %e₂' %σ₂' %HR
+  obtain ⟨n, hn0, hnz, heq1, heq2⟩ := HR
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
+  imodintro
+  iintro !>
+  ihave HUpd := specProg_update (GF := GF)
+    (e3 := K.fill (.lit (.int (f n)))) $$ Hs Hj
+  imod HUpd with ⟨Hs', Hj'⟩
+  imod Hclose
+  imodintro
+  isplitl [Hσ]; · iexact Hσ
+  isplitl [Hs']; · iexact Hs'
+  isplitl [Hε]; · iexact Hε
+  iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+  ihave HαNat := show (α ↪ₐ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} appNatTape α z [] by
+    iintro Hb
+    unfold appNatTape
+    iexists ([] : List _)
+    isplitr; · ipure_intro; simp
+    iexact Hb
+  ihave HαNat' := HαNat $$ Hα_b
+  iapply Hcnt
+  isplitl [HαNat']; · iexact HαNat'
+  isplitl [Hj']; · iexact Hj'
+  ipure_intro; exact ⟨hn0, hnz⟩
+
+/-- `wp_couple_rand_tape`: symmetric — couple LHS unit rand with RHS rand on empty tape. -/
+theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z) (K : Ectx) (E : CoPset) (α' : Loc) (Φ : Val → IProp GF) :
+    iprop(▷ specNatTape α' z [] ∗
+        (⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) ∗
+        (∀ (n : Int),
+          specNatTape α' z [] ∗
+            (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
+          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)))
+      ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
+  iintro ⟨Hα', Hj, Hcnt⟩
+  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit)).toVal? = none :=
+    Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
+  iapply (wp_lift_prim_steps_coupl Hv)
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  iapply (later_timeless_fupd (P := specNatTape α' z []))
+  isplitl [Hα']; · iexact Hα'
+  iintro Hα'
+  ihave Hα'Ex := show specNatTape α' z [] ⊢@{IProp GF}
+      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+        (⌜fs.map (fun x => x.val) = []⌝) ∗ α' ↪ₛ ⟨z, fs⟩) from
+    BI.BIBase.Entails.rfl $$ Hα'
+  icases Hα'Ex with ⟨%fs', %hmap_fs', Hα'_b⟩
+  have hfs'_nil : fs' = [] := List.map_eq_nil_iff.mp hmap_fs'
+  subst hfs'_nil
+  ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
+  subst Heq
+  ihave %Hlk_α' := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hα'_b
+  have HheadL : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩
+        {⟨.lit (.int 0), σ₁⟩} :=
+    (headStep_support_iff _ _ _ _).mpr (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+  have HredL : Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
+    Reducible.of_head ⟨_, HheadL⟩
+  have HheadR : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α')), σ₁'⟩
+        {⟨.lit (.int 0), σ₁'⟩} :=
+    (headStep_support_iff _ _ _ _).mpr
+      (.RandTapeEmptyS Hz Hlk_α' rfl (_root_.le_refl _) Hz rfl)
+  have HredR_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) σ₁' :=
+    Reducible.of_head ⟨_, HheadR⟩
+  have HredR : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) σ₁' :=
+    HredR_rand.fill K
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  let R : Cfg → Cfg → Prop := fun c₁ c₂ =>
+    ∃ n : Int, 0 ≤ n ∧ n < z ∧
+      c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
+  iexists R, 0, ε
+  isplitr; · ipure_intro; rw [zero_add]
+  isplitr; · ipure_intro; exact HredL
+  isplitr; · ipure_intro; exact HredR
+  isplitr
+  · ipure_intro
+    rw [primStep_rand_unit Hz]
+    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α'))).isValue := by
+      intro ⟨w⟩; nomatch w
+    rw [primStep_fill Hv_rand, primStep_rand_lbl_empty Hz σ₁' α' Hlk_α']
+    have Hbase := Cfg.uniform_addCoupl_bij Hz σ₁ σ₁' f hdom hbij
+    have : AddCoupl 0
+        {p : Cfg × Cfg | R p.1 p.2}
+        ((Cfg.uniform z σ₁).map id)
+        ((Cfg.uniform z σ₁').map (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))) := by
+      refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+        Measurable.of_discrete Measurable.of_discrete
+        (R := {p : Cfg × Cfg | R p.1 p.2})
+        ?_
+        Hbase
+      intro a b hab
+      obtain ⟨n, h0, hz, heqL, heqR⟩ := hab
+      refine ⟨n, h0, hz, heqL, ?_⟩
+      subst heqR
+      rfl
+    rw [MeasureTheory.Measure.map_id] at this
+    exact this
+  iintro %e₂ %σ₂ %e₂' %σ₂' %HR
+  obtain ⟨n, hn0, hnz, heq1, heq2⟩ := HR
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
+  imodintro
+  iintro !>
+  ihave HUpd := specProg_update (GF := GF)
+    (e3 := K.fill (.lit (.int (f n)))) $$ Hs Hj
+  imod HUpd with ⟨Hs', Hj'⟩
+  imod Hclose
+  imodintro
+  isplitl [Hσ]; · iexact Hσ
+  isplitl [Hs']; · iexact Hs'
+  isplitl [Hε]; · iexact Hε
+  iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+  ihave Hα'Nat := show (α' ↪ₛ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} specNatTape α' z [] by
+    iintro Hb
+    unfold specNatTape
+    iexists ([] : List _)
+    isplitr; · ipure_intro; simp
+    iexact Hb
+  ihave Hα'Nat' := Hα'Nat $$ Hα'_b
+  iapply Hcnt
+  isplitl [Hα'Nat']; · iexact Hα'Nat'
+  isplitl [Hj']; · iexact Hj'
+  ipure_intro; exact ⟨hn0, hnz⟩
+
 end CouplingRules
 
 end ProbLang

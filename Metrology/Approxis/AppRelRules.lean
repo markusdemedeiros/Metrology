@@ -403,6 +403,231 @@ theorem refines_store_r {E : CoPset} {K : Ectx} {l : Loc} {v v' : Val} {e : Exp}
   ispecialize Hlog $$ Hl'
   iapply Hlog $$ %K' %ε HKRes' Hna Herr Hpos
 
+/-! ## Rand directional rules
+
+LHS-only and RHS-only stepping rules for `rand z ()` and `rand z (lbl α)`.
+These mirror Rocq's `refines_randT{,_empty}_l/r` and `refines_randU_l/r`.
+Pure-Iris compositions of `refines_wp_l`/spec-side `step_*` updates with
+the `wp_rand{,_lbl}*` lemmas from `PrimitiveLaws.lean`. -/
+
+/-- `refines_randU_l`: LHS unit-rand step. Concludes the LHS at any
+`n ∈ [0, z)` chosen by the continuation. -/
+theorem refines_randU_l {E : CoPset} {K : Ectx} {z : Int} {t : Exp} {A : lrel GF}
+    (Hz : 0 < z) :
+    iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
+            refines E (K.fill (.lit (.int n))) t A)
+      ⊢@{IProp GF} refines E (K.fill (.rand (.lit (.int z)) (.lit .unit))) t A := by
+  iintro Hlog
+  iapply (refines_wp_l (K := K) (e1 := .rand (.lit (.int z)) (.lit .unit)))
+  iapply (wp_rand Hz)
+  iintro %n %Hbnds
+  iapply Hlog $$ %n
+  ipure_intro; exact Hbnds
+
+/-- `refines_randT_l`: LHS tape-rand pop. Consumes the head `n` of tape `α`. -/
+theorem refines_randT_l {E : CoPset} {K : Ectx} {l : Loc} {z n : Int}
+    {ns : List Int} {t : Exp} {A : lrel GF} :
+    iprop(appNatTape l z (n :: ns) ∗
+            (appNatTape l z ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
+              refines E (K.fill (.lit (.int n))) t A))
+      ⊢@{IProp GF} refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) t A := by
+  iintro ⟨Hl, Hlog⟩
+  iapply (refines_wp_l (K := K) (e1 := .rand (.lit (.int z)) (.lit (.lbl l))))
+  iapply wp_rand_tape
+  isplitl [Hl]; · iexact Hl
+  iintro Hl' %Hbnds
+  iapply Hlog $$ Hl'
+  ipure_intro; exact Hbnds
+
+/-- `refines_randT_empty_l`: LHS rand on an empty tape — uniform sample, tape stays empty. -/
+theorem refines_randT_empty_l {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
+    {t : Exp} {A : lrel GF} (Hz : 0 < z) :
+    iprop(appNatTape l z [] ∗
+            (∀ (n : Int), appNatTape l z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
+              refines E (K.fill (.lit (.int n))) t A))
+      ⊢@{IProp GF} refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) t A := by
+  iintro ⟨Hl, Hlog⟩
+  iapply (refines_wp_l (K := K) (e1 := .rand (.lit (.int z)) (.lit (.lbl l))))
+  iapply (wp_rand_tape_empty Hz)
+  isplitl [Hl]; · iexact Hl
+  iintro %n Hl' %Hbnds
+  iapply Hlog $$ %n Hl'
+  ipure_intro; exact Hbnds
+
+/-- `refines_randU_r`: RHS unit-rand step. -/
+theorem refines_randU_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lrel GF}
+    (Hz : 0 < z) :
+    iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
+            refines E e (K.fill (.lit (.int n))) A)
+      ⊢@{IProp GF} refines E e (K.fill (.rand (.lit (.int z)) (.lit .unit))) A := by
+  -- Pattern: build via wp_rand_nonpos isn't applicable (Hz : 0 < z); use wp_rand_r.
+  -- In refines unfolded form we get `wp ⊤ e ...` as the goal; we need to step the
+  -- SPEC side, which `wp_rand_r` does (inside the wp).
+  iintro Hlog
+  unfold refines
+  iintro %K' %ε Hj Hna Herr Hpos
+  have hfc : K'.fill (K.fill (Exp.rand (.lit (.int z)) (.lit .unit))) =
+      (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit .unit)) := Ectx.fill_comp K' K _
+  ihave Hj' : iprop(⤇ (K'.comp K).fill (.rand (.lit (.int z)) (.lit .unit))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  iapply (wp_rand_r (K'.comp K) Hz)
+  isplitl [Hj']; · iexact Hj'
+  iintro %n %Hbnds HKRes
+  have hfcN : (K'.comp K).fill (Exp.lit (.int n)) = K'.fill (K.fill (.lit (.int n))) :=
+    (Ectx.fill_comp K' K _).symm
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
+  · rw [← hfcN]; iexact HKRes
+  -- Now goal is `wp ⊤ e Φ` where Φ is the original post.
+  -- We need to use Hlog to fold back into refines, then unfold to get the wp.
+  -- Specialize Hlog at n with the bounds proof.
+  ispecialize Hlog $$ %n
+  ihave Hpure : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
+  · ipure_intro; exact Hbnds
+  ispecialize Hlog $$ Hpure
+  -- Hlog : refines E e (K.fill #n) A. Apply at K', ε via refines's def body.
+  -- Since refines is defined as ∀ K ε, ... -∗ wp ..., we can directly specialize.
+  ispecialize Hlog $$ %K' %ε
+  ispecialize Hlog $$ HKRes'
+  ispecialize Hlog $$ Hna
+  ispecialize Hlog $$ Herr
+  iapply Hlog
+  iexact Hpos
+
+/-- `refines_randT_r`: RHS tape-rand pop. The continuation receives the popped
+value and the tail tape. -/
+theorem refines_randT_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
+    {n : Int} {ns : List Int} {e : Exp} {A : lrel GF} :
+    iprop(specNatTape l z (n :: ns) ∗
+            (specNatTape l z ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
+              refines E e (K.fill (.lit (.int n))) A))
+      ⊢@{IProp GF} refines E e (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) A := by
+  iintro ⟨Hα, Hlog⟩
+  unfold refines
+  iintro %K' %ε Hj Hna Herr Hpos
+  -- Reshape Hj to (K'.comp K)-form.
+  have hfc : K'.fill (K.fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) =
+      (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l))) := Ectx.fill_comp K' K _
+  ihave Hjc : iprop(⤇ (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  -- Convert specNatTape to backend frag form.
+  ihave HαEx := show specNatTape l z (n :: ns) ⊢@{IProp GF}
+      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+        (⌜fs.map (fun x => x.val) = (n :: ns)⌝) ∗ l ↪ₛ ⟨z, fs⟩) from
+    BI.BIBase.Entails.rfl $$ Hα
+  icases HαEx with ⟨%fs, %hmap, Hαb⟩
+  -- fs.map = n :: ns, so fs = (some witness for n) :: rest. Extract head.
+  cases fs with
+  | nil => simp at hmap
+  | cons w ws =>
+    simp at hmap
+    obtain ⟨hwn, hwsm⟩ := hmap
+    -- hwn : w.val = n, hwsm : ws.map (·.val) = ns.
+    -- Use step_rand to step the spec.
+    ihave HStep := step_rand (E := ⊤) (K'.comp K) l w ws $$ [Hjc Hαb]
+    · isplitl [Hjc]; · iexact Hjc
+      iexact Hαb
+    iapply specUpdate_wp
+    iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
+    isplitl [HStep]; · iexact HStep
+    iintro ⟨HKRes, HαResNew⟩
+    -- HKRes : ⤇ (K'.comp K).fill #w.val = ⤇ (K'.comp K).fill #n.
+    have hw_eq : w.val = n := hwn
+    -- Reshape HKRes back to K'.fill (K.fill #n).
+    have hfcN : (K'.comp K).fill (Exp.lit (.int w.val)) =
+        K'.fill (K.fill (.lit (.int w.val))) := (Ectx.fill_comp K' K _).symm
+    ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
+    · rw [← hw_eq, ← hfcN]; iexact HKRes
+    iapply specUpdate_ret
+    -- HαResNew : l ↪ₛ ⟨z, ws⟩. Convert to specNatTape.
+    ihave HαResNat : iprop(specNatTape l z ns) $$ [HαResNew]
+    · unfold specNatTape
+      iexists ws
+      isplitr; · ipure_intro; exact hwsm
+      iexact HαResNew
+    -- Apply Hlog at HαResNat with bounds proof and HKRes'.
+    ispecialize Hlog $$ HαResNat
+    ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
+    · ipure_intro; exact ⟨hw_eq ▸ w.2.1, hw_eq ▸ w.2.2⟩
+    ispecialize Hlog $$ Hbnds
+    ispecialize Hlog $$ %K' %ε
+    ispecialize Hlog $$ HKRes'
+    ispecialize Hlog $$ Hna
+    ispecialize Hlog $$ Herr
+    iapply Hlog
+    iexact Hpos
+
+/-- `refines_randT_empty_r`: RHS rand on an empty tape — uniform sample, tape empty. -/
+theorem refines_randT_empty_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
+    {e : Exp} {A : lrel GF} (Hz : 0 < z) :
+    iprop(specNatTape l z [] ∗
+            (∀ (n : Int), specNatTape l z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
+              refines E e (K.fill (.lit (.int n))) A))
+      ⊢@{IProp GF} refines E e (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) A := by
+  iintro ⟨Hα, Hlog⟩
+  unfold refines
+  iintro %K' %ε Hj Hna Herr Hpos
+  have hfc : K'.fill (K.fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) =
+      (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l))) := Ectx.fill_comp K' K _
+  ihave Hjc : iprop(⤇ (K'.comp K).fill (.rand (.lit (.int z)) (.lit (.lbl l)))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  iapply (wp_rand_tape_empty_r (K'.comp K) Hz)
+  isplitl [Hjc]; · iexact Hjc
+  isplitl [Hα]; · iexact Hα
+  iintro %n HαNew HKRes %Hbnds
+  have hfcN : (K'.comp K).fill (Exp.lit (.int n)) = K'.fill (K.fill (.lit (.int n))) :=
+    (Ectx.fill_comp K' K _).symm
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
+  · rw [← hfcN]; iexact HKRes
+  ispecialize Hlog $$ %n HαNew
+  ihave Hbpure : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
+  · ipure_intro; exact Hbnds
+  ispecialize Hlog $$ Hbpure
+  ispecialize Hlog $$ %K' %ε
+  ispecialize Hlog $$ HKRes'
+  ispecialize Hlog $$ Hna
+  ispecialize Hlog $$ Herr
+  iapply Hlog
+  iexact Hpos
+
+/-- `refines_alloctape_l`: LHS tape allocation. -/
+theorem refines_alloctape_l {E : CoPset} {K : Ectx} {z : Int} {t : Exp} {A : lrel GF} :
+    iprop(∀ (l : Loc), appTapesFrag l (Tape.empty z) -∗
+            refines E (K.fill (.lit (.lbl l))) t A)
+      ⊢@{IProp GF} refines E (K.fill (.tape (.lit (.int z)))) t A := by
+  iintro Hlog
+  iapply (refines_wp_l (K := K) (e1 := .tape (.lit (.int z))))
+  iapply wp_alloctape
+  iintro %l Hl
+  iapply Hlog $$ %l Hl
+
+/-- `refines_alloctape_r`: RHS tape allocation. The fresh location's spec tape
+fragment is delivered via the continuation. -/
+theorem refines_alloctape_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lrel GF} :
+    iprop(∀ (l : Loc), specNatTape l z [] -∗
+            refines E e (K.fill (.lit (.lbl l))) A)
+      ⊢@{IProp GF} refines E e (K.fill (.tape (.lit (.int z)))) A := by
+  iintro Hlog
+  unfold refines
+  iintro %K' %ε Hj Hna Herr Hpos
+  have hfc : K'.fill (K.fill (Exp.tape (.lit (.int z)))) =
+      (K'.comp K).fill (Exp.tape (.lit (.int z))) := Ectx.fill_comp K' K _
+  ihave Hjc : iprop(⤇ (K'.comp K).fill (Exp.tape (.lit (.int z)))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  iapply (wp_alloc_tape_r (K'.comp K))
+  isplitl [Hjc]; · iexact Hjc
+  iintro %l HKRes Hl
+  have hfcL : (K'.comp K).fill (Exp.lit (.lbl l)) = K'.fill (K.fill (.lit (.lbl l))) :=
+    (Ectx.fill_comp K' K _).symm
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.lbl l)))) $$ [HKRes]
+  · rw [← hfcL]; iexact HKRes
+  ispecialize Hlog $$ %l Hl
+  ispecialize Hlog $$ %K' %ε
+  ispecialize Hlog $$ HKRes'
+  ispecialize Hlog $$ Hna
+  ispecialize Hlog $$ Herr
+  iapply Hlog
+  iexact Hpos
+
 /-! ## Structural rules -/
 
 /-- `refines_wand` (app_rel_rules.v:330): weakening the result relation. -/
@@ -499,6 +724,130 @@ theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : In
   -- Hcnt : refines E (K.fill #n) (K'.fill #(f n)) A.
   -- Since ispecialize has already transformed Hcnt to its unfolded form, apply directly.
   -- Reshape K.fill (Exp.ofVal ⟨.lit (.int n), IsVal.lit⟩) = K.fill (.lit (.int n)).
+  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
+      Exp.lit (.int n) := rfl
+  rw [hfillN]
+  iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
+
+/-- `refines_couple_TU`: couple a LHS tape-rand (on empty tape α) with a RHS
+unit-rand via bijection `f`. -/
+theorem refines_couple_TU {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
+    (α : Loc) (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z) :
+    iprop(▷ appNatTape α z [] ∗
+        (∀ (n : Int), appNatTape α z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
+            refines E (K.fill (.lit (.int n))) (K'.fill (.lit (.int (f n)))) A))
+      ⊢@{IProp GF}
+        refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl α))))
+          (K'.fill (.rand (.lit (.int z)) (.lit .unit))) A := by
+  iintro ⟨Hα, Hcnt⟩
+  unfold refines
+  iintro %K2 %ε Hj Hna Herr Hpos
+  have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit .unit))) =
+      (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit)) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  iapply wp_bind (K := K)
+  iapply (wp_couple_tape_rand z f hdom hbij Hz (K2.comp K') ⊤ α
+    (fun n => wp ⊤ (K.fill (Exp.ofVal n))
+      (fun v => iprop(∃ v' ε',
+        (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
+  isplitl [Hα]; · iexact Hα
+  isplitl [Hj']; · iexact Hj'
+  iintro %n ⟨HαNew, HKres, %Hn⟩
+  have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
+      (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
+  · rw [hfcN]; iexact HKres
+  ispecialize Hcnt $$ %n HαNew
+  ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
+  · ipure_intro; exact Hn
+  ispecialize Hcnt $$ Hbnds
+  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
+      Exp.lit (.int n) := rfl
+  rw [hfillN]
+  iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
+
+/-- `refines_couple_UT`: symmetric — couple LHS unit-rand with RHS tape-rand on
+empty tape α' via bijection `f`. -/
+theorem refines_couple_UT {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
+    (α' : Loc) (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z) :
+    iprop(▷ specNatTape α' z [] ∗
+        (∀ (n : Int), specNatTape α' z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
+            refines E (K.fill (.lit (.int n))) (K'.fill (.lit (.int (f n)))) A))
+      ⊢@{IProp GF}
+        refines E (K.fill (.rand (.lit (.int z)) (.lit .unit)))
+          (K'.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) A := by
+  iintro ⟨Hα', Hcnt⟩
+  unfold refines
+  iintro %K2 %ε Hj Hna Herr Hpos
+  have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) =
+      (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  iapply wp_bind (K := K)
+  iapply (wp_couple_rand_tape z f hdom hbij Hz (K2.comp K') ⊤ α'
+    (fun n => wp ⊤ (K.fill (Exp.ofVal n))
+      (fun v => iprop(∃ v' ε',
+        (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
+  isplitl [Hα']; · iexact Hα'
+  isplitl [Hj']; · iexact Hj'
+  iintro %n ⟨Hα'New, HKres, %Hn⟩
+  have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
+      (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
+  · rw [hfcN]; iexact HKres
+  ispecialize Hcnt $$ %n Hα'New
+  ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
+  · ipure_intro; exact Hn
+  ispecialize Hcnt $$ Hbnds
+  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
+      Exp.lit (.int n) := rfl
+  rw [hfillN]
+  iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
+
+/-- `refines_couple_TT`: couple two empty tapes via a bijection. Uses the
+existing `wp_couple_rand_lbl_rand_lbl`. -/
+theorem refines_couple_TT {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
+    (α α' : Loc) (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z) :
+    iprop(▷ appNatTape α z [] ∗ ▷ specNatTape α' z [] ∗
+        (∀ (n : Int), appNatTape α z [] -∗ specNatTape α' z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
+            refines E (K.fill (.lit (.int n))) (K'.fill (.lit (.int (f n)))) A))
+      ⊢@{IProp GF}
+        refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl α))))
+          (K'.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) A := by
+  iintro ⟨Hα, Hα', Hcnt⟩
+  unfold refines
+  iintro %K2 %ε Hj Hna Herr Hpos
+  have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) =
+      (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  iapply wp_bind (K := K)
+  iapply (wp_couple_rand_lbl_rand_lbl z f hdom hbij Hz (K2.comp K') ⊤ α α'
+    (fun n => wp ⊤ (K.fill (Exp.ofVal n))
+      (fun v => iprop(∃ v' ε',
+        (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
+  isplitl [Hα]; · iexact Hα
+  isplitl [Hα']; · iexact Hα'
+  isplitl [Hj']; · iexact Hj'
+  iintro %n ⟨HαNew, Hα'New, HKres, %Hn⟩
+  have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
+      (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
+  · rw [hfcN]; iexact HKres
+  ispecialize Hcnt $$ %n HαNew Hα'New
+  ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
+  · ipure_intro; exact Hn
+  ispecialize Hcnt $$ Hbnds
   have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
       Exp.lit (.int n) := rfl
   rw [hfillN]

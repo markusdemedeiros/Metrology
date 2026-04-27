@@ -592,6 +592,68 @@ theorem wp_rand_nonpos_r {E : CoPset} (K : Ectx) {z : Int} {e : Exp}
     isplitl [Hε]; · iexact Hε
     iapply Hwp $$ Hj'
 
+/-- `wp_rand_tape_empty_r` — spec-side rand on an empty tape: samples a uniform
+`n ∈ [0, z)`, leaving the tape empty. Mirrors `wp_rand_r` but the spec resource
+is `specNatTape l z []` instead of `⤇ K.fill (rand z ())`. -/
+theorem wp_rand_tape_empty_r {E : CoPset} (K : Ectx) {l : Loc} {z : Int} {e : Exp}
+    {Φ : Val → IProp GF} (Hz : 0 < z) :
+    iprop((⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) ∗ specNatTape l z [] ∗
+        (∀ (n : Int), specNatTape l z [] -∗
+          (⤇ K.fill (.lit (.int n))) -∗ (⌜0 ≤ n ∧ n < z⌝) -∗ wp E e Φ))
+      ⊢@{IProp GF} wp E e Φ := by
+  iintro ⟨Hj, Hα, Hwp⟩
+  ihave HαB := spec_natTape_to_empty (GF := GF) (l := l) (z := z) $$ Hα
+  iapply wp_lift_step_spec_couple
+  iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
+  ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
+  subst Heq
+  ihave %hlook := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs HαB
+  -- Reducibility via RandTapeEmptyS.
+  have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩
+        {⟨.lit (.int 0), σ₁'⟩} :=
+    (headStep_support_iff _ _ _ _).mpr
+      (.RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl)
+  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
+    Reducible.of_head ⟨_, Hhead⟩
+  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
+    Hred_rand.fill K
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  iapply (specCoupl_step (Hred := Hred))
+  iintro %e₂' %σ₂' %Hstep
+  have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l))).isValue := by
+    intro ⟨w⟩; nomatch w
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  subst heq_e2'
+  have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
+      headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
+    primStep_eq_headStep ⟨_, Hhead⟩
+  rw [Hheq, headStep_support_iff] at Hstep'
+  cases Hstep' with
+  | RandTapeS hlook' _ _ _ =>
+    rw [hlook] at hlook'; cases hlook'
+  | RandTapeEmptyS _ _ _ Hv0 Hvz hσ =>
+    subst hσ
+    imodintro
+    iapply specCoupl_ret
+    ihave HUpd := specProg_update (GF := GF)
+      (e3 := K.fill (.lit (.int _))) $$ Hs Hj
+    imod HUpd with ⟨Hs', Hj'⟩
+    imod Hclose
+    imodintro
+    isplitl [Hσ]; · iexact Hσ
+    isplitl [Hs']; · iexact Hs'
+    isplitl [Hε]; · iexact Hε
+    -- Convert HαB back to specNatTape l z [].
+    ihave HαNat := spec_empty_to_natTape (GF := GF) (l := l) (z := z) $$ HαB
+    iapply Hwp $$ HαNat Hj'
+    ipure_intro; exact ⟨Hv0, Hvz⟩
+  | RandTapeOtherS _ hlook' hne _ _ _ =>
+    rw [hlook] at hlook'; cases hlook'; exact absurd rfl hne
+  | RandTapeNonposEmptyS hnz _ _ => exact absurd Hz hnz
+  | RandTapeNonposOtherS hnz _ _ => exact absurd Hz hnz
+
 /-- `wp_rand_lbl_nonpos_r` — spec-side: `rand z (lbl l)` for `z ≤ 0` with
 empty tape deterministically returns `-1`. -/
 theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : Ectx) {l : Loc} {z N : Int} {e : Exp}

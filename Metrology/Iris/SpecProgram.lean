@@ -108,7 +108,7 @@ theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp} (H : some (Excl.excl e1) ≼ som
   simp at H'
   rcases H' with (H'|H')
   · exact H'
-  · have H'' := excl_included.mp H'
+  · have H'' := Excl.inc_iff.mp H'
     simp at H''
 
 theorem specAuth_specFrag_agree {e1 e2 : Exp} {σ : State} :
