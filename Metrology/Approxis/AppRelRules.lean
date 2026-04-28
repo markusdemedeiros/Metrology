@@ -1,46 +1,12 @@
-import Metrology.Approxis.EctxLifting
 import Metrology.Approxis.AppWeakestpre
 import Metrology.Approxis.Model
-import Metrology.Approxis.Proofmode
 import Metrology.Approxis.PrimitiveLaws
 import Metrology.Approxis.CouplingRules
 import Metrology.Approxis.OpenInv
 
-/-!
-# Relational Rules
+/-! # Relational Rules
 
-Port of `clutch/theories/approxis/app_rel_rules.v`, narrowed to the lemmas
-used by `Compatibility.lean` and downstream (Fundamental, Soundness).
-
-## Scope (2026-04-24)
-
-The full Rocq file has ~30 lemmas. This port covers the ~10 directly used by
-`compatibility.v`:
-
-| Lemma | Used by | Rocq line |
-|---|---|---|
-| `refines_pure_l`, `refines_pure_r` | pure-step compatibility | 27, 73 |
-| `refines_wp_l` | LHS-step compatibility (load/store/rand) | 41 |
-| `refines_atomic_l` | heap-op compatibility (store/load under invariant) | 54 |
-| `refines_alloc_l`, `refines_load_l`, `refines_store_l` | heap ops | 244, 255, 266 |
-| `refines_alloc_r`, `refines_load_r`, `refines_store_r` | spec heap ops | 119, 132, 144 |
-| `refines_wand` | general weakening | 330 |
-| `refines_arrow_val`, `refines_arrow` | function-refinement compatibility | 228, 341 |
-| `refines_couple_rands_lr` (= `refines_couple_UU`) | rand-unit compatibility | 463 |
-
-All statements ported as `sorry`'d for now — establishes the API surface that
-`Compatibility.lean` can target. Proofs deferred: each requires careful
-threading of the `refines` spatial context through WP/specCoupl primitives.
-
-Omitted from port: adversarial-error variants (`refines_couple_TT_err`, …),
-`refines_couple_TT_{frag,adv}`, `refines_get_ec`, `refines_ind_amp`,
-`refines_arrow_val_err`, fragmented couplings (`refines_couple_exp*`),
-`refines_couple_UU_err`/`_rev`/`_avoid`, LHS tape rules
-(`refines_alloctape_l`, `refines_rand{T,U}_l`, `refines_rand_empty_l`),
-RHS tape rules (`refines_alloctape_r`, `refines_rand{T,U}_r`,
-`refines_rand_empty_r`), `refines_step_r`, `refines_steps_r`.
-These depend on coupling-rules variants also omitted in `CouplingRules.lean`.
--/
+Iris-level relational rules (refines_pure_l/r, refines_wp_l, refines_atomic_l, heap and rand directional rules, structural/coupling rules) used by Compatibility and downstream. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 open scoped AppGS
@@ -70,25 +36,17 @@ theorem refines_pure_l {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
   iintro H
   iintro %K' %ε HK Hna Herr Hpos
   iapply (wp_pure_step_later (Hex := HexK) Hφ)
-  -- Transform H from `Nat.repeat (▷·) n ...` to `▷^[n] ...` at the iprop level FIRST
-  -- (before touching the goal, to preserve iris context).
   ihave H0 : iprop(▷^[n] (∀ (K₂ : Ectx) (ε₂ : ENNReal),
       (⤇ K₂.fill t) -∗ (naOwnP E) -∗ (↯ ε₂) -∗ (⌜(0 : ENNReal) < ε₂⌝) -∗
       wp ⊤ (K.fill e') (fun v => iprop(∃ v' ε',
         (⤇ K₂.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v')))) $$ [H]
   · rw [← nat_repeat_later_eq_laterN]; iexact H
-  -- Now rewrite the goal to match laterN form.
   rw [nat_repeat_later_eq_laterN]
   ihave H1 := (BI.laterN_forall n).mp $$ H0
-  -- H1 : ∀ K', ▷^[n] (∀ ε, ...).
   ispecialize H1 $$ %K'
-  -- H1 : ▷^[n] (∀ ε, ...).
   ihave H2 := (BI.laterN_forall n).mp $$ H1
   ispecialize H2 $$ %ε
-  -- H2 : ▷^[n] (⤇ K'.fill t -∗ naOwnP E -∗ ↯ε -∗ ⌜0<ε⌝ -∗ wp ⊤ (K.fill e') Φ).
-  -- Apply laterN_wand 4 times to distribute through each -∗.
   ihave H3 := BI.laterN_wand n $$ H2
-  -- H3 : ▷^[n] (⤇ K'.fill t) -∗ ▷^[n] (naOwnP E -∗ ↯ε -∗ ⌜0<ε⌝ -∗ wp).
   ihave HKLater : iprop(▷^[n] (⤇ K'.fill t)) $$ [HK]
   · iapply BI.laterN_intro n; iexact HK
   ispecialize H3 $$ HKLater
@@ -104,7 +62,6 @@ theorem refines_pure_l {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
   ihave HposLater : iprop(▷^[n] ⌜(0 : ENNReal) < ε⌝) $$ [Hpos]
   · iapply BI.laterN_intro n; iexact Hpos
   ispecialize H6 $$ HposLater
-  -- H6 : ▷^[n] (wp ⊤ (K.fill e') Φ). Matches goal.
   iexact H6
 
 /-- `refines_pure_r` (app_rel_rules.v:73): RHS pure step. -/
@@ -116,9 +73,7 @@ theorem refines_pure_r {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
   iintro %K' %ε Hj Hna Herr Hpos
   have hfc : K'.fill (K.fill e) = (K'.comp K).fill e := Ectx.fill_comp K' K e
   have hfc' : K'.fill (K.fill e') = (K'.comp K).fill e' := Ectx.fill_comp K' K e'
-  -- Rewrite goal to use the composed context shape.
   rw [hfc]
-  -- Advance spec: ⤇ (K'.comp K).fill e → specUpdate ⊤ (⤇ (K'.comp K).fill e').
   ihave HStep := step_pure (E := ⊤) (K'.comp K) (Hex := Hex) Hφ $$ Hj
   iapply specUpdate_wp
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)

@@ -7,37 +7,13 @@ import Iris.Instances.Lib.WSat
 import Iris.Instances.Lib.LaterCredits
 import Iris.Instances.Lib.FUpd
 
-/-!
-# Relational Adequacy
-
-Relational adequacy theorem. Bridges from a parametric `refines` proof
-(in the Iris logic) to an `AddCoupl` between the limit-step semantics
-distributions of the two programs.
-
-Key result: `refines_coupling` — given a parametric `refines ⊤ e e' A` proof
-that holds under any `ApproxisRGS`, and a value-relation extraction
-`A v v' -∗ ⌜φ v v'⌝`, conclude `AddCoupl 0 (adequacyRel φ) (limExec e) (limExec e')`.
-
-## Rocq source
-`clutch/theories/approxis/adequacy_rel.v` — `approximates_coupling`,
-`refines_coupling`.
--/
+/-! # Relational adequacy: bridging parametric `refines` to an `AddCoupl` on `limExec`. -/
 
 namespace ProbLang
 
 open Iris Iris.BI Iris.ProofMode OFE COFE Iris.Std DisjointLeibnizSet Auth HeapView
 open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS
 
-/-! ## `refines_coupling`
-
-Zero-error relational adequacy: a parametric `refines ⊤ e e' A` proof under
-any `ApproxisRGS false GF`, together with `A v v' -∗ ⌜φ v v'⌝`, gives an
-unconditional coupling between the two programs' limit semantics.
-
-This is the corollary form (`refines_coupling`) of Rocq's
-`approximates_coupling`. It avoids the error-credit-splitting infrastructure
-since `ε = 0` and the `wp_adequacy_error_lim` iteration provides the small
-positive budget directly. -/
 theorem refines_coupling {GF : BundledGFunctors}
     [IPre : AppPreGS GF] [ISPre : SpecPreGS GF] [IECPre : ECPreGS GF]
     [IInvPre : InvGpreS GF] [INaPre : NaInvG GF]
@@ -84,26 +60,10 @@ theorem refines_coupling {GF : BundledGFunctors}
       iexact Hphi
   iexact Hwp
 
-/-! ## A concrete `BundledGFunctors` for the OTP example
+/-! ### Concrete `BundledGFunctors` for the OTP example -/
 
-Mirrors Rocq's `approxisRΣ := #[approxisΣ; na_invΣ]` where
-`approxisΣ := #[invΣ; ghost_mapΣ loc val; ghost_mapΣ loc tape; specΣ; ecΣ]`.
-
-Slots used:
-* 0: wsat invariant heap (uses `LaterOF IdOF` to refer abstractly to `IProp Σ`)
-* 1: wsat enabled set
-* 2: wsat disabled set
-* 3: later-credits authority
-* 4: program heap (`AppPreGS.heap`)
-* 5: program tapes (`AppPreGS.tapes`)
-* 6: spec program
-* 7: spec heap (different slot from program heap!)
-* 8: spec tapes (different slot from program tapes!)
-* 9: error credits
-* 10: NA invariant pool
--/
-
-/-- Concrete model `BundledGFunctors` for OTP/Approxis. -/
+/-- Concrete model `BundledGFunctors` for OTP/Approxis. Slot 7/8 (spec heap/tapes)
+are distinct from slot 4/5 (program heap/tapes) to prevent γ-aliasing. -/
 noncomputable def otpSigma : BundledGFunctors := fun n =>
   match n with
   | 0  => ⟨InvMapF, by infer_instance⟩
@@ -119,9 +79,7 @@ noncomputable def otpSigma : BundledGFunctors := fun n =>
   | 10 => ⟨NaInvF, by infer_instance⟩
   | _  => ⟨constOF Unit, by infer_instance⟩
 
-/-! ## PreGS instances for `otpSigma`
-
-Each `ElemG` instance points at a specific slot of `otpSigma`. -/
+/-! ### PreGS instances for `otpSigma` -/
 
 instance otpSigma_WsatGpreS : WsatGpreS otpSigma where
   inv := { τ := 0, transp := by unfold otpSigma; rfl }

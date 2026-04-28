@@ -1,29 +1,6 @@
 import Metrology.Approxis.AppWeakestpre
 
-/-!
-# Lifting Lemmas
-
-Lifting lemmas that translate operational semantics rules into program logic rules.
-
-## Port status (2026-04-24)
-
-Of the 17 lifting lemmas in `clutch/theories/approxis/lifting.v`, **14 are
-already ported directly into `Metrology/Approxis/AppWeakestpre.lean`** (they
-were written there alongside the WP definition rather than being split out):
-
-- `wp_lift_step_couple`, `wp_lift_step_spec_couple`, `wp_lift_step_prog_couple`
-- `wp_lift_step_later`, `wp_lift_step`
-- `wp_lift_prim_steps_coupl`, `wp_lift_prim_step_l_dret`, `wp_lift_prim_step_l_erasable`
-- `wp_lift_pure_step`, `wp_lift_atomic_step_fupd`, `wp_lift_atomic_step`
-- `wp_lift_pure_det_step`, `wp_pure_step_fupd`, `wp_pure_step_later`
-
-This file supplies the remaining 3 adversarial-error variants, which
-require `progCoupl_steps_adv` / `progCoupl_steps_adv'` and compute the
-per-configuration error `X` on the WP continuation.
-
-## Rocq source
-`clutch/theories/approxis/lifting.v`
--/
+/-! # Lifting lemmas translating operational semantics rules into program-logic rules. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
@@ -31,10 +8,6 @@ namespace ProbLang.ApproxisWpGS
 
 variable {GF : BundledGFunctors} [ApproxisWpGS GF]
 
-/-- `wp_lift_prim_steps_coupl_adv` — one-LHS-step against a coupled RHS
-primStep with an adversarial per-configuration error `X`, subject to
-`X ≤ 1` and an additive `ε₂` slack. Mirrors `wp_lift_prim_steps_coupl_adv`
-(lifting.v:231–262). -/
 theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
     (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
@@ -77,9 +50,6 @@ theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : Exp} {Φ : Val → IPr
   ispecialize H $$ %e₂ %σ₂ %e₂' %σ₂'
   iexact H
 
-/-- `wp_lift_prim_steps_coupl_adv'` — like `wp_lift_prim_steps_coupl_adv` but
-with the entire error budget `ε` absorbed into `X` (no additive slack).
-Mirrors `wp_lift_prim_steps_coupl_adv'` (lifting.v:265–295). -/
 theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
     (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
@@ -121,10 +91,7 @@ theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : Exp} {Φ : Val → IP
   ispecialize H $$ %e₂ %σ₂ %e₂' %σ₂'
   iexact H
 
-/-- `wp_lift_prim_steps_coupl_adv_err_le_1` — like `wp_lift_prim_steps_coupl_adv`
-but the continuation may *bail out* if `X(ρ₂) + ε₂ ≥ 1` (in which case the
-remaining error budget is saturated). Mirrors `wp_lift_prim_steps_coupl_adv_err_le_1`
-(lifting.v:298–340). -/
+/-- The continuation may bail out if `X(ρ₂) + ε₂ ≥ 1`, saturating the error budget. -/
 theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : Exp}
     {Φ : Val → IProp GF} (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
@@ -165,7 +132,6 @@ theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : Exp}
   imodintro
   iintro !>
   ispecialize H $$ %e₂ %σ₂ %e₂' %σ₂'
-  -- Case-split on the disjunction in the continuation.
   by_cases hle : (X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ + ε₂ : ENNReal) < 1
   · iapply specCoupl_ret
     imod H

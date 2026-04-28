@@ -1,15 +1,11 @@
 import Metrology.Approxis.AppWeakestpre
 import Metrology.Approxis.Lifting
-import Metrology.Approxis.EctxLifting
 import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.DerivedLaws
-import Metrology.Approxis.Proofmode
 import Metrology.Approxis.CouplingRules
 import Metrology.Approxis.Model
 import Metrology.Approxis.Interp
 import Metrology.Approxis.AppRelRules
 import Metrology.Approxis.RelTactics
-import Metrology.Approxis.Reltac2
 import Metrology.Approxis.Compatibility
 import Metrology.Approxis.Fundamental
 import Metrology.Approxis.Adequacy

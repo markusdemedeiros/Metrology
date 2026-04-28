@@ -3,41 +3,7 @@ import Metrology.Approxis.AppRelRules
 import Metrology.Approxis.RelTactics
 import Metrology.Approxis.AdequacyRel
 
-/-!
-# One-Time Pad — self-contained refinement example
-
-We use **modular addition** as our OTP combiner instead of XOR (since XOR
-on `[0, N)` requires bit-fiddling infrastructure we don't have yet, while
-modular addition gives the same bijection-based security argument with
-tools we already have).
-
-## The core OTP argument
-
-For any fixed message `m ∈ [0, N)`:
-
-  `(let k := rand N in (k + m) mod N) ≃ rand N`
-
-The two programs are observationally equivalent because the map `k ↦ (k+m) mod N`
-is a bijection on `[0, N)`, so uniformly sampling `k` and adding `m` mod N
-yields a value uniformly distributed in `[0, N)`.
-
-This is the heart of OTP's information-theoretic security: the ciphertext
-distribution is independent of the message.
-
-## What this example exercises
-
-* `refines_couple_rands_lr` — the UU coupling rule for two `rand z ()`s.
-* `rel_pure_l/r`, `rel_pures_l/r` — pure stepping.
-* `rel_vals` — closing with a value relation.
-* `lrel_int` and the various unfolds.
-
-## What we prove
-
-`OTP_uniform`: `REL (let k := rand #N in #m + k mod #N) << rand #N : lrel_int`
-
-via the bijection `f n := (n + m) mod N`. Concretely: every output value
-on the LHS is matched on the RHS via `f`, and `f` is bijective on `[0, N)`.
--/
+/-! # One-Time Pad refinement example, using modular addition as the combiner. -/
 
 namespace ProbLang
 open Iris Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
@@ -46,10 +12,7 @@ namespace OTP
 
 variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
 
-/-! ## The bijection
-
-We need: for `N > 0`, the function `f n := (n + m) mod N` (where `m` is fixed)
-is a bijection on `[0, N)`. -/
+/-! ### The bijection -/
 
 /-- Modular addition: `(n + m) mod N`. -/
 def addMod (m N : Int) (n : Int) : Int := (n + m) % N
@@ -70,15 +33,12 @@ theorem addMod_bij (m N : Int) (HN : 0 < N) :
   · refine ⟨⟨Int.emod_nonneg _ (Int.ne_of_gt HN),
             Int.emod_lt_of_pos _ HN⟩, ?_⟩
     unfold addMod
-    -- Goal: ((m' - m) % N + m) % N = m'.
-    -- Use (a % N + b) % N = (a + b) % N from Int.add_emod.
     have h1 : ((m' - m) % N + m) % N = (m' - m + m) % N := by
       rw [Int.add_emod, Int.emod_emod_of_dvd _ (dvd_refl N), ← Int.add_emod]
     rw [h1, show m' - m + m = m' from by ring, Int.emod_eq_of_lt hm'0 hm'N]
   · rintro n ⟨⟨hn0, hnN⟩, hadd⟩
     unfold addMod at hadd
     have hn_eq : n = n % N := (Int.emod_eq_of_lt hn0 hnN).symm
-    -- From hadd : (n + m) % N = m', derive n = (m' - m) % N.
     have h1 : (n - (m' - m)) % N = 0 := by
       have h2 : (n + m - m') % N = 0 := by
         have hsub : ((n + m) - m') % N = ((n + m) % N - m' % N) % N := Int.sub_emod _ _ _
@@ -87,10 +47,8 @@ theorem addMod_bij (m N : Int) (HN : 0 < N) :
       have heq : n + m - m' = n - (m' - m) := by ring
       rw [heq] at h2; exact h2
     rw [hn_eq]
-    -- Goal: n % N = (m' - m) % N. From h1 : (n - (m'-m)) % N = 0.
     have hsub2 := Int.sub_emod n (m' - m) N
     rw [h1] at hsub2
-    -- hsub2 : 0 = (n % N - (m' - m) % N) % N
     have hr1 : 0 ≤ (m' - m) % N := Int.emod_nonneg _ (Int.ne_of_gt HN)
     have hr2 : (m' - m) % N < N := Int.emod_lt_of_pos _ HN
     have hl1 : 0 ≤ n % N := Int.emod_nonneg _ (Int.ne_of_gt HN)
@@ -100,19 +58,13 @@ theorem addMod_bij (m N : Int) (HN : 0 < N) :
       have hdvd : (N : Int) ∣ ((n % N) - ((m' - m) % N)) :=
         Int.dvd_of_emod_eq_zero hmod_eq
       rcases hdvd with ⟨q, hq⟩
-      -- N * q = n%N - (m'-m)%N, with both in [0, N). So |N*q| < N. Hence q = 0.
       have hbound : N * q < N ∧ -N < N * q := by rw [← hq]; omega
       have : q = 0 := by nlinarith
       rw [this, mul_zero] at hq
       linarith
     omega
 
-/-! ## The OTP refinement
-
-Show that for any fixed message `m ∈ [0, N)`:
-  `(let k := rand #N in #m + k mod N) ≃ rand #N : lrel_int`
-
-at types `m : Int`, `N : Int` with `0 < N` and `0 ≤ m < N`. -/
+/-! ### The OTP refinement -/
 
 /-- The LHS program: sample a key, then output `(m + k) mod N`. -/
 def otp_enc (m N : Int) : Exp :=
@@ -123,22 +75,11 @@ def otp_ideal (N : Int) : Exp :=
   pl(rand(#(.int N), #(.unit)))
 
 /-- **OTP refinement**: for any fixed `m ∈ [0, N)`, encrypting `m` with a fresh
-random key is observationally equivalent to a fresh random sample.
-
-Strategy:
-* Reshape goal: LHS is `(λ k. (m + k) mod N) (rand N ())`, viewed as
-  `K[rand N ()]` for `K = [appR (λ k. (m + k) mod N)]`.
-* Apply `refines_couple_rands_lr` with bijection `f := addMod m N`.
-* After coupling at value `n ∈ [0, N)`: LHS has `(λ k. (m + k) mod N) (#n)`
-  and RHS has `#((n + m) mod N)`.
-* On LHS: beta-reduce, then the binop reduces deterministically.
-* The result `(m + n) mod N` equals `f n = (n + m) mod N` (by commutativity).
-* Close with `refines_ret` at `lrel_int`. -/
+random key is observationally equivalent to a fresh random sample. -/
 theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
     ⊢@{IProp GF} refines (⊤ : CoPset) (otp_enc m N) (otp_ideal N) lrel_int := by
   unfold otp_enc otp_ideal
   simp only [Exp.close, Exp.closeRec, ite_true, ↓reduceIte]
-  -- Reshape so that LHS = K_lam.fill (rand) and RHS = [].fill (rand).
   set body : Exp := Exp.binop .mod
       (Exp.binop .plus (Exp.lit (.int m)) (Exp.bvar 0))
       (Exp.lit (.int N)) with hbody
@@ -155,12 +96,10 @@ theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
     (hbij := addMod_bij m N HN)
     (Hz := HN))
   iintro %n ⟨%Hn0, %HnN⟩
-  -- Goal: refines ⊤ (K_lam.fill #n) ([].fill #(addMod m N n)) lrel_int.
   rw [show K_lam.fill (Exp.lit (.int n)) =
       Exp.app (Exp.lam body) (Exp.lit (.int n)) from rfl]
   rw [show Ectx.fill ([] : Ectx) (Exp.lit (.int (addMod m N n))) =
       Exp.lit (.int (addMod m N n)) from rfl]
-  -- Step 1: beta. (λ. body) #n → body[#n].
   rw [show Exp.app (Exp.lam body) (Exp.lit (.int n)) =
       Ectx.fill ([] : Ectx) (Exp.app (Exp.lam body) (Exp.lit (.int n))) from rfl]
   iapply (refines_pure_l (K := []) (e := Exp.app (Exp.lam body) (Exp.lit (.int n)))
@@ -170,12 +109,10 @@ theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
   iintro !>
   rw [show Ectx.fill ([] : Ectx) (Exp.open' body (Exp.lit (.int n))) =
       Exp.open' body (Exp.lit (.int n)) from rfl]
-  -- Open' body with #n: (m + #n) mod N.
   rw [show Exp.open' body (Exp.lit (.int n)) =
       Exp.binop .mod
         (Exp.binop .plus (Exp.lit (.int m)) (Exp.lit (.int n)))
         (Exp.lit (.int N)) from rfl]
-  -- Step 2: reduce inner plus. Context = [binopL .mod ⟨#N, lit⟩].
   rw [show Exp.binop .mod
         (Exp.binop .plus (Exp.lit (.int m)) (Exp.lit (.int n)))
         (Exp.lit (.int N)) =
@@ -191,7 +128,6 @@ theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
   rw [show Ectx.fill [EctxItem.binopL .mod ⟨.lit (.int N), IsVal.lit⟩]
         (Exp.lit (.int (m + n))) =
       Exp.binop .mod (Exp.lit (.int (m + n))) (Exp.lit (.int N)) from rfl]
-  -- Step 3: outer mod. Context = [].
   rw [show Exp.binop .mod (Exp.lit (.int (m + n))) (Exp.lit (.int N)) =
       Ectx.fill ([] : Ectx) (Exp.binop .mod (Exp.lit (.int (m + n))) (Exp.lit (.int N))) from rfl]
   have hmod_eval : BinOp.eval .mod (Exp.lit (.int (m + n))) (Exp.lit (.int N)) =
@@ -208,12 +144,9 @@ theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
   iintro !>
   rw [show Ectx.fill ([] : Ectx) (Exp.lit (.int ((m + n) % N))) =
       Exp.lit (.int ((m + n) % N)) from rfl]
-  -- Now: LHS = #((m+n) % N), RHS = #(addMod m N n) = #((n+m) % N).
-  -- They are equal by commutativity.
   have heq : (m + n) % N = addMod m N n := by
     unfold addMod; rw [show n + m = m + n from by ring]
   rw [heq]
-  -- Close at lrel_int.
   iapply (refines_ret (e1 := Exp.lit (.int (addMod m N n)))
     (e2 := Exp.lit (.int (addMod m N n)))
     (v1 := ⟨.lit (.int (addMod m N n)), IsVal.lit⟩)
@@ -225,13 +158,7 @@ theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
   ipure_intro
   exact ⟨rfl, rfl⟩
 
-/-! ## Reverse direction
-
-`rand N ≃ (let k := rand N in (m + k) mod N) : lrel_int`
-
-Same bijection-based argument, but with LHS/RHS swapped. The bijection
-witness on the LHS sample `n ∈ [0, N)` is `addMod (-m) N n = (n - m) mod N`,
-and after the RHS pure-steps reduce to `(m + (n - m) % N) % N = n`. -/
+/-! ### Reverse direction -/
 
 /-- For `0 ≤ n < N`: `(m + (n - m) mod N) mod N = n`. -/
 theorem addMod_neg_inv (m N : Int) (HN : 0 < N) :
@@ -248,7 +175,6 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
     ⊢@{IProp GF} refines (⊤ : CoPset) (otp_ideal N) (otp_enc m N) lrel_int := by
   unfold otp_enc otp_ideal
   simp only [Exp.close, Exp.closeRec, ite_true, ↓reduceIte]
-  -- Reshape so that LHS = [].fill (rand) and RHS = K_lam.fill (rand).
   set body : Exp := Exp.binop .mod
       (Exp.binop .plus (Exp.lit (.int m)) (Exp.bvar 0))
       (Exp.lit (.int N)) with hbody
@@ -269,8 +195,6 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
   rw [show Ectx.fill ([] : Ectx) (Exp.lit (.int n)) = Exp.lit (.int n) from rfl]
   rw [show K_lam.fill (Exp.lit (.int (addMod (-m) N n))) =
       Exp.app (Exp.lam body) (Exp.lit (.int (addMod (-m) N n))) from rfl]
-  -- Pure-step the RHS: beta, then inner plus, then outer mod.
-  -- Step 1 (beta).
   rw [show Exp.app (Exp.lam body) (Exp.lit (.int (addMod (-m) N n))) =
       Ectx.fill ([] : Ectx) (Exp.app (Exp.lam body) (Exp.lit (.int (addMod (-m) N n)))) from rfl]
   iapply (refines_pure_r (K := ([] : Ectx))

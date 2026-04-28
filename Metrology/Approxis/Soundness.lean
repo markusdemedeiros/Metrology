@@ -5,21 +5,9 @@ import Metrology.Approxis.Interp
 import Metrology.Approxis.Fundamental
 import Metrology.ProbLang.ContextualRefinement
 
-/-!
-# Soundness
+/-! # Soundness
 
-Soundness of the logical relation w.r.t. contextual refinement. Key theorems:
-
-* `bin_log_related_under_typed_ctx` — precongruence: plugging logically-related
-  expressions into a well-typed evaluation context yields logically-related
-  expressions.
-* `refines_sound` — for closed terms: logical relation implies contextual
-  refinement.
-* `refines_sound_open` — open variant.
-
-## Rocq source
-`clutch/theories/approxis/soundness.v`
--/
+Soundness of the logical relation w.r.t. contextual refinement (precongruence + closed/open soundness theorems). -/
 
 namespace ProbLang
 

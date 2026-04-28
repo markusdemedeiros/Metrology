@@ -1,5 +1,4 @@
 import Metrology.Approxis.Lifting
-import Metrology.Approxis.EctxLifting
 import Metrology.Approxis.PrimitiveLaws
 
 /-!

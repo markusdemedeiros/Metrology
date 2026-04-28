@@ -5,42 +5,9 @@ import Metrology.Approxis.AppRelRules
 import Metrology.Approxis.RelTactics
 import Metrology.Approxis.Interp
 
-/-!
-# Fundamental Theorem
+/-! # Fundamental Theorem
 
-Fundamental theorem of the logical relation: well-typed terms are related to themselves.
-
-```
-Theorem fundamental (Δ : TyEnv) (Γ : RelCtx) (e : Exp) (τ : Ty) :
-  Γ ⊢ₜ e : τ → ⊢ E; Δ; Γ ⊨ e ≤log≤ e : τ
-```
-
-## Rocq source
-`clutch/theories/approxis/fundamental.v` (33 `bin_log_related_*` lemmas + the
-fundamental theorem + `bin_log_related_under_typed_ctx` / `refines_typed`).
-
-## Port status (2026-04-25)
-
-**Statement-only stubs.** Every `bin_log_related_*` declaration is in place
-with a `sorry` body. The plumbing (`Tctx → RelCtx` lift, substMap-distributivity
-lemmas, free-variable bookkeeping) is what each proof needs and is mostly
-unimplemented. The `refines_*` building blocks all exist in `Compatibility.lean`,
-`AppRelRules.lean`, and the new `refines_rand_*_int` in this session — so each
-stub here is an exercise in typing-context bookkeeping plus a final `iapply`
-to the corresponding `refines_*` lemma.
-
-## What's blocking each proof
-
-- **`substMap` congruences** — `Exp.substMap_pair`, `_app`, `_lam`, `_alloc`,
-  `_load`, `_store`, `_rand`, etc. None are currently in `Metatheory.lean`.
-  Each is a one-line induction on the substitution list.
-- **`Tctx → RelCtx` lift** — `Typed`'s `Tctx := Var → Option Ty` doesn't directly
-  feed `bin_log_related`'s `RelCtx := List (Var × lrel GF)`. Need a lift
-  `Tctx.toRelCtx (Δ : TyEnv GF) : Tctx → RelCtx GF`.
-- **`env_ltyped2_lookup` for free-variable case** — already exists in `Interp.lean`.
-- **Recursive cases** (`rec`, `tlam`, `unpack`) — additionally need Löb induction
-  and binder-shifting reasoning.
--/
+Fundamental theorem of the logical relation: well-typed terms are related to themselves, plus per-constructor `bin_log_related_*` compatibility lemmas. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
@@ -51,27 +18,14 @@ open Cslib Exp
 section Fundamental
 variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
 
-/-! ## Tctx → RelCtx lifting
-
-The fundamental theorem operates on `Typed`'s `Tctx` (function-encoded), but
-`bin_log_related` consumes `RelCtx` (list-of-pairs). We bridge by keeping the
-typing premise on `Tctx` and the relational interpretation on `RelCtx`,
-related pointwise via `interp τ Δ` for each binding.
-
-Since `Tctx := Var → Option Ty` has no enumerable list of bindings, we instead
-operate on `RelCtx GF` directly throughout, requiring callers to provide the
-lifted form. The connection to `Typed`'s `Tctx` happens at the top-level
-`fundamental` theorem via a `TctxRelated` helper. -/
+/-! ## Tctx → RelCtx lifting -/
 
 /-- `TctxRelated Δ Γtc Γrc` asserts that the relational context `Γrc` is the
 pointwise lift of the syntactic context `Γtc` through `interp · Δ`. -/
 def TctxRelated (Δ : TyEnv GF) (Γtc : Tctx) (Γrc : RelCtx GF) : Prop :=
   ∀ x, (Γtc x).map (fun τ => interp τ Δ) = Γrc.lookup x
 
-/-! ## Compatibility lemmas (statement stubs)
-
-Each lemma mirrors `bin_log_related_*` from `fundamental.v`. All bodies are
-`sorry` pending the `substMap` infrastructure (see file header). -/
+/-! ## Compatibility lemmas -/
 
 theorem bin_log_related_var (Δ : TyEnv GF) (Γ : RelCtx GF) (x : Var) (τ : Ty)
     (hΓ : Γ.lookup x = some (interp τ Δ)) :
@@ -2160,7 +2114,7 @@ theorem TctxRelated.insert {Δ : TyEnv GF} {Γtc : Tctx} {Γrc : RelCtx GF}
       cases h : Γtc y with
       | none => rfl
       | some τ' => rw [h] at heq; simp at heq
-    simp [hΓy_none, hfresh, if_pos rfl]
+    simp [hfresh]
   · rw [if_neg hxy]
     cases hRc : Γrc.lookup y with
     | none =>

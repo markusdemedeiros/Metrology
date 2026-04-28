@@ -617,19 +617,6 @@ theorem wp_fupd {E : CoPset} {e : Exp} {Φ : Val → IProp GF} :
   isplitl [Hε]; · iassumption
   iassumption
 
-/-! ### TODO: structural WP lemmas requiring more infrastructure
-
-Still deferred:
-
-* `wp_atomic` — atomicity in ProbLang is trivial (any head step) but needs
-  the concrete `Atomic`-style predicate plumbed through.
-* `wp_step_fupd` — Löb induction.
-* `wp_bind` — uses concrete `Ectx` API from `ProbLang.CtxStep`.
-* `spec_update_wp`, `wp_spec_update` — bridge `specUpdate` modality with WP.
-
-The `proofmode_classes` section (`FromModal`, `ElimModal`, `Frame`, etc.)
-follows once the structural lemmas land. -/
-
 /-- Fancy-update absorbs into `wp` from outside. -/
 theorem fupd_wp {E : CoPset} {e : Exp} {Φ : Val → IProp GF} :
     iprop(|={E}=> wp E e Φ) ⊢@{IProp GF} wp E e Φ := by
@@ -2842,7 +2829,7 @@ theorem wp_lift_atomic_head_step {E : CoPset} {e₁ : Exp} {Φ : Val → IProp G
 
 /-- `wp_lift_pure_det_head_step` — pure deterministic head step. -/
 theorem wp_lift_pure_det_head_step {E E' : CoPset} {e₁ e₂ : Exp} {Φ : Val → IProp GF}
-    (Hv : e₁.toVal? = none)
+    (_Hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, ∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
     (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by

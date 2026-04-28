@@ -2,17 +2,7 @@ import Metrology.Approxis.AppWeakestpre
 import Metrology.Approxis.PrimitiveLaws
 import Metrology.ProbLang.Erasure
 
-/-!
-# Adequacy
-
-Adequacy of the WP. Proves that WP entailments imply `AddCoupl` between execution
-distributions. Key lemmas: `wp_adequacy_spec_coupl`, `wp_adequacy_prog_coupl`,
-`wp_adequacy_val_fupd`, `wp_adequacy_step_fupdN`, `wp_adequacy_exec_n`,
-`wp_adequacy`, `wp_adequacy_error_lim`, `wp_adequacy_mass`.
-
-## Rocq source
-`clutch/theories/approxis/adequacy.v`
--/
+/-! # Adequacy: WP entailments imply `AddCoupl` between execution distributions. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
   ProbLang.ApproxisWpGS ProbLang.Cfg

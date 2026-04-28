@@ -936,7 +936,7 @@ theorem env_ltyped2_insert (Γ : RelCtx GF) (vs : ValSubstMap)
       rw [hΓy] at this; exact absurd this (by simp)
     | none =>
       rw [hvy] at hvs'
-      simp only [if_pos rfl] at hvs'
+      simp only at hvs'
       injection hvs' with heq
       obtain ⟨rfl, rfl⟩ := heq
       iexact HA

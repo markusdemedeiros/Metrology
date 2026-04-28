@@ -1,39 +1,10 @@
 import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.Proofmode
 import Metrology.Approxis.Model
 import Metrology.Approxis.RelTactics
 import Metrology.Approxis.AppRelRules
 import Metrology.ProbLang.Syntax.LocallyClosed
 
-/-!
-# Compatibility Lemmas
-
-Port of `clutch/theories/approxis/compatibility.v` (192 lines, 10 lemmas).
-
-Structural compatibility lemmas for the logical relation — one rule per language
-construct. Used by `Fundamental.lean` to prove the fundamental theorem
-one typing-rule case at a time.
-
-## Lemmas ported
-
-| Lemma | Rocq line | Uses |
-|---|---|---|
-| `refines_pair` | 19 | `refines_bind` (twice) + `lrel_prod` unfold |
-| `refines_injl`, `refines_injr` | 31, 41 | `refines_bind` + `lrel_sum` unfold |
-| `refines_app` | 51 | `refines_bind` (twice) + `lrel_arr` elimination |
-| `refines_seq` | 62 | `refines_bind` + `refines_pure_{l,r}` |
-| `refines_pack` | 73 | `refines_bind` + `lrel_exists` unfold |
-| `refines_forall` | 83 | `refines_arrow_val` at `lrel_arr lrel_unit (C A)` |
-| `refines_store` | 95 | `refines_atomic_l` + `wp_store` + `tp_store` under `lrel_ref` invariant |
-| `refines_load` | 118 | `refines_atomic_l` + `wp_load` + `tp_load` under `lrel_ref` invariant |
-| `refines_rand_tape` | 139 | `wp_couple_rand_lbl_rand_lbl{,_wrong}` under `lrel_tape` invariant |
-| `refines_rand_unit` | 175 | `refines_couple_rands_lr` + `lrel_int` |
-
-All proofs sorried pending completion of AppRelRules (which has sorries for
-`refines_pure_l`, `refines_pure_r`, `refines_wp_l`, `refines_atomic_l`, and
-the LHS/RHS heap ops). Once those are proved, the Compatibility proofs
-should follow mechanically from their Rocq counterparts.
--/
+/-! # Compatibility Lemmas: structural compatibility of the logical relation, one rule per language construct. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 open scoped AppGS
@@ -60,7 +31,6 @@ theorem lrel_arr_unfold (A B : lrel GF) (v v' : Val) :
           refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) :=
   BIBase.Entails.rfl
 
-/-- Project the wand-only part of `(lrel_arr A B).car v v'`. -/
 theorem lrel_arr_unfold_wand (A B : lrel GF) (v v' : Val) :
     (lrel_arr A B).car v v' ⊢@{IProp GF}
       iprop(□ (∀ (w1 w2 : Val), A w1 w2 -∗
@@ -70,7 +40,6 @@ theorem lrel_arr_unfold_wand (A B : lrel GF) (v v' : Val) :
   icases H' with ⟨_, HW⟩
   iexact HW
 
-/-- Project the closedness part of `(lrel_arr A B).car v v'`. -/
 theorem lrel_arr_unfold_closed (A B : lrel GF) (v v' : Val) :
     (lrel_arr A B).car v v' ⊢@{IProp GF}
       iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) := by
@@ -79,7 +48,6 @@ theorem lrel_arr_unfold_closed (A B : lrel GF) (v v' : Val) :
   icases H' with ⟨%hc, _⟩
   ipure_intro; exact hc
 
-/-- Reverse direction: fold the unfolded `lrel_arr` form back. -/
 theorem lrel_arr_fold (A B : lrel GF) (v v' : Val) :
     iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
       □ (∀ (w1 w2 : Val), A w1 w2 -∗
@@ -87,16 +55,6 @@ theorem lrel_arr_fold (A B : lrel GF) (v v' : Val) :
       (lrel_arr A B).car v v' :=
   BIBase.Entails.rfl
 
-/-- `refines_pair` (compatibility.v:19): pair compatibility.
-`(REL e1 << e1' : A) ∗ (REL e2 << e2' : B) ⊢ REL (e1, e2) << (e1', e2') : A × B`.
-
-Mirrors Rocq `rel_bind_ap e2 e2' "IH2" ...; rel_bind_ap e1 e1' "IH1" ...; value_case`
-(compatibility.v:19–29). Right-to-left evaluation order on pairs.
-
-**Port note**: we build the continuation as a first-class `ihave`-hypothesis
-`Hcont` so that the inner `refines_bind` call has access to IH1 cleanly.
-The `$$ [HYPS]` split in Lean Iris doesn't automatically retain unlisted
-hypotheses past the tactic boundary when there are multiple wand args. -/
 theorem refines_pair {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
     iprop(refines ⊤ e1 e1' A) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' B -∗
@@ -108,8 +66,6 @@ theorem refines_pair {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
   iapply (refines_bind [EctxItem.pairR e1] [EctxItem.pairR e1'] (A := B)) $$ [IH2]
   · iexact IH2
   iintro %v2 %v2' HB
-  -- Goal shape: `refines ⊤ ([pairR e1].fill v2.1) ([pairR e1'].fill v2'.1) (A × B)`.
-  -- Bridge via `refines_bind` on `e1/e1'` under `[pairL v2]/[pairL v2']` — defeq form.
   have hbridge_L : Ectx.fill [EctxItem.pairR e1] v2.1 = Ectx.fill [EctxItem.pairL v2] e1 := rfl
   have hbridge_R : Ectx.fill [EctxItem.pairR e1'] v2'.1 = Ectx.fill [EctxItem.pairL v2'] e1' := rfl
   rw [hbridge_L, hbridge_R]
@@ -134,14 +90,12 @@ theorem refines_pair {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
 theorem refines_injl {e e' : Exp} {A B : lrel GF} :
     iprop(refines ⊤ e e' A)
       ⊢@{IProp GF} refines ⊤ (.inl e) (.inl e') (lrel_sum A B) := by
-  -- Reshape the goal from `.inl e` to `[inl].fill e` so `refines_bind` unifies.
   show _ ⊢@{IProp GF}
     refines ⊤ (Ectx.fill [EctxItem.inl] e) (Ectx.fill [EctxItem.inl] e') (lrel_sum A B)
   iintro IH
   iapply (refines_bind [EctxItem.inl] [EctxItem.inl] (A := A)) $$ [IH]
   · iexact IH
   iintro %v %v' HA
-  -- Continuation goal: `REL [inl].fill v.1 << [inl].fill v'.1 : lrel_sum A B`.
   iapply refines_ret
     (e1 := Ectx.fill [EctxItem.inl] v.1)
     (e2 := Ectx.fill [EctxItem.inl] v'.1)
@@ -194,8 +148,6 @@ theorem refines_app {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
   iapply (refines_bind [EctxItem.appL v2] [EctxItem.appL v2'] (A := lrel_arr A B)) $$ [IH1]
   · iexact IH1
   iintro %v1 %v1' #Hff
-  -- Goal: `REL [appL v2].fill v1.1 << [appL v2'].fill v1'.1 : B`, i.e. `.app v1.1 v2.1 << .app v1'.1 v2'.1`.
-  -- Hff : (lrel_arr A B).car v1 v1' — extract just the wand part via lrel_arr_unfold_wand.
   ihave Hff' := lrel_arr_unfold_wand A B v1 v1' $$ Hff
   have hgL : Ectx.fill [EctxItem.appL v2] v1.1 = Exp.app v1.1 v2.1 := rfl
   have hgR : Ectx.fill [EctxItem.appL v2'] v1'.1 = Exp.app v1'.1 v2'.1 := rfl
@@ -214,7 +166,6 @@ theorem refines_seq (A : lrel GF) {e1 e2 e1' e2' : Exp} {B : lrel GF}
     iprop(refines ⊤ e1 e1' A) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' B -∗
         refines ⊤ (.app (.lam e2) e1) (.app (.lam e2') e1') B) := by
-  -- Reshape goal upfront to expose the bind contexts.
   show iprop(refines ⊤ e1 e1' A) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' B -∗
         refines ⊤ (Ectx.fill [EctxItem.appR (.lam e2)] e1)
@@ -224,31 +175,22 @@ theorem refines_seq (A : lrel GF) {e1 e2 e1' e2' : Exp} {B : lrel GF}
     (A := A)) $$ [IH1]
   · iexact IH1
   iintro %v %v' _HA
-  -- Goal: refines ⊤ ([appR (λe2)].fill v.1) ([appR (λe2')].fill v'.1) B
-  --     = refines ⊤ (.app (λe2) v.1) (.app (λe2') v'.1) B.
-  -- Wrap LHS in Ectx.fill [] for refines_pure_l; keep RHS bare.
   have hfv : Ectx.fill [EctxItem.appR (.lam e2)] v.1 =
     Ectx.fill [] (Exp.app (.lam e2) v.1) := rfl
   have hfv' : Ectx.fill [EctxItem.appR (.lam e2')] v'.1 =
     Exp.app (.lam e2') v'.1 := rfl
   rw [hfv, hfv']
-  -- Now use refines_pure_l at [], with `pureExec_app_lam` (n = 1).
   have hv_iv : IsVal v.1 := v.2
   iapply (refines_pure_l (E := ⊤) (K := []) (t := .app (.lam e2') v'.1)
     (e := .app (.lam e2) v.1) (e' := Exp.open' e2 v.1) (A := B)
     (n := 1) (φ := v.1.isValue) (Hφ := ⟨hv_iv⟩))
-  -- Goal: Nat.repeat (▷·) 1 (refines ⊤ ([].fill (open' e2 v.1)) (.app (λe2') v'.1) B)
-  --     = ▷ refines ⊤ (open' e2 v.1) (.app (λe2') v'.1) B.
   simp only [Nat.repeat]
-  -- Apply open_lc: open' e2 v.1 = e2 (since e2 is LC).
   have hopen : Exp.open' e2 v.1 = e2 := (Exp.open_lc 0 v.1 e2 he2).symm
   have hfill_empty : Ectx.fill [] (Exp.open' e2 v.1) = e2 := by
     show Exp.open' e2 v.1 = e2
     exact hopen
   rw [hfill_empty]
-  -- Goal: ▷ refines ⊤ e2 (.app (λe2') v'.1) B.
   iintro !>
-  -- Beta-step RHS similarly.
   have hrhs : Exp.app (.lam e2') v'.1 = Ectx.fill [] (.app (.lam e2') v'.1) := rfl
   rw [hrhs]
   have hv'_iv : IsVal v'.1 := v'.2
@@ -331,12 +273,9 @@ theorem refines_fst {e e' : Exp} {A B : lrel GF} :
   iintro %v %v' Hprod
   ihave HprodEx := lrel_prod_unfold A B v v' $$ Hprod
   icases HprodEx with ⟨%a1, %a2, %b1, %b2, %hv, %hv', HA, HB⟩
-  -- Goal: refines ⊤ ([fst].fill v.1) ([fst].fill v'.1) A
   rw [show Ectx.fill [EctxItem.fst] v.1 = Exp.fst v.1 from rfl,
       show Ectx.fill [EctxItem.fst] v'.1 = Exp.fst v'.1 from rfl,
       hv, hv']
-  -- Goal: refines ⊤ (.fst (.pair a1.1 b1.1)) (.fst (.pair a2.1 b2.1)) A
-  -- Use refines_pure_l + refines_pure_r to step both sides via fst_pair.
   have hfill : (Exp.fst (.pair a1.1 b1.1)) = Ectx.fill [] (Exp.fst (.pair a1.1 b1.1)) := rfl
   have hfill' : (Exp.fst (.pair a2.1 b2.1)) = Ectx.fill [] (Exp.fst (.pair a2.1 b2.1)) := rfl
   rw [hfill, hfill']
@@ -374,7 +313,6 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp} {A B C : lrel GF} :
   icases HsumEx with ⟨%w1, %w2, HOr⟩
   rw [show Ectx.fill [EctxItem.case e1 e2] v.1 = Exp.case v.1 e1 e2 from rfl,
       show Ectx.fill [EctxItem.case e1' e2'] v'.1 = Exp.case v'.1 e1' e2' from rfl]
-  -- HOr is a disjunction. icases with `|` separator.
   icases HOr with (⟨%hv, %hv', HA⟩ | ⟨%hv, %hv', HB⟩)
   · rw [hv, hv']
     have hf1 : (Exp.case (.inl w1.1) e1 e2) = Ectx.fill [] (Exp.case (.inl w1.1) e1 e2) := rfl
@@ -386,8 +324,6 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp} {A B C : lrel GF} :
     iapply (refines_pure_r (K := []) (Hex := pureExec_case_inl) w2.2.toIsValue)
     rw [show Ectx.fill [] (Exp.app e1 w1.1) = Exp.app e1 w1.1 from rfl,
         show Ectx.fill [] (Exp.app e1' w2.1) = Exp.app e1' w2.1 from rfl]
-    -- Goal: refines ⊤ (.app e1 w1.1) (.app e1' w2.1) C.
-    -- Use refines_app with IH1 (lrel_arr A C) and refines_ret of HA.
     have hap1 : Exp.app e1 w1.1 = Ectx.fill [EctxItem.appR e1] w1.1 := rfl
     have hap2 : Exp.app e1' w2.1 = Ectx.fill [EctxItem.appR e1'] w2.1 := rfl
     rw [hap1, hap2]
@@ -457,18 +393,13 @@ theorem refines_alloctape {e e' : Exp} :
   rw [show Ectx.fill [EctxItem.tape] v.1 = Exp.tape v.1 from rfl,
       show Ectx.fill [EctxItem.tape] v'.1 = Exp.tape v'.1 from rfl,
       hv, hv']
-  -- Goal: refines ⊤ (.tape #n) (.tape #n) lrel_tape.
-  -- Allocate on RHS first (gives label l'), then LHS (gives l), then invariant.
   unfold refines
   iintro %K %ε Hj Hna Herr Hpos
-  -- RHS: step .tape #n via wp_alloc_tape_r — but that's wp-flavored.
-  -- Use specProg's step_alloctape directly.
   ihave HStep := step_alloctape (GF := GF) (E := ⊤) K n $$ Hj
   iapply specUpdate_wp
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro ⟨%l', HKRes, Hl'frag⟩
-  -- Hl'frag : l' ↪ₛ Tape.empty n. Now LHS: wp on `.tape #n`.
   iapply specUpdate_ret
   iapply (wp_lift_atomic_head_step (e₁ := .tape (.lit (.int n)))
     (Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w))
@@ -485,9 +416,7 @@ theorem refines_alloctape {e e' : Exp} :
     subst hl; subst hσ
     ihave HAlloc := app_state_tape_alloc (GF := GF) (σ := σ₁) (Tape.empty n) $$ Hσ
     imod HAlloc with ⟨Hσ', Hlfrag⟩
-    -- Now allocate the invariant.
     set lL := σ₁.tapes.fresh
-    -- Convert Tape.empty n = ⟨n, []⟩ via def-eq.
     have htape_eq : Tape.empty n = (⟨n, ([] : List { z' : Int // 0 ≤ z' ∧ z' < n })⟩ : Tape) := rfl
     ihave HlfragV : iprop(appTapesFrag lL ⟨n, ([] : List { z' : Int // 0 ≤ z' ∧ z' < n })⟩) $$ [Hlfrag]
     · rw [← htape_eq]; iexact Hlfrag
