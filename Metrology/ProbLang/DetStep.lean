@@ -240,6 +240,26 @@ instance pureExec_app_fix {body v : Exp} :
     PureExec v.isValue 1 (.app (.fix body) v) (Exp.app (Exp.open' body (.fix body)) v) where
   pure_exec hv := ⟨_, (PureHeadStep.app_fix hv.some).toPureStep, rfl⟩
 
+/-- `PureHeadStep` for `scrut v p` when match succeeds. -/
+theorem PureHeadStep.scrut_some {v : Exp} {p : Pat} {b : Exp}
+    (hv : IsVal v) (hmatch : Pat.tryMatch p v = some b) :
+    PureHeadStep (.scrut v p) (.inl b) :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' hv, hmatch]
+
+/-- `PureHeadStep` for `scrut v p` when match fails. -/
+theorem PureHeadStep.scrut_none {v : Exp} {p : Pat}
+    (hv : IsVal v) (hmatch : Pat.tryMatch p v = none) :
+    PureHeadStep (.scrut v p) (.inr (.lit .unit)) :=
+  .of_det _ _ fun σ => by simp [headStep, Exp.isValM_some' hv, hmatch]
+
+instance pureExec_scrut_some {v : Exp} {p : Pat} {b : Exp} :
+    PureExec (v.isValue ∧ Pat.tryMatch p v = some b) 1 (.scrut v p) (.inl b) where
+  pure_exec h := ⟨_, (PureHeadStep.scrut_some h.1.some h.2).toPureStep, rfl⟩
+
+instance pureExec_scrut_none {v : Exp} {p : Pat} :
+    PureExec (v.isValue ∧ Pat.tryMatch p v = none) 1 (.scrut v p) (.inr (.lit .unit)) where
+  pure_exec h := ⟨_, (PureHeadStep.scrut_none h.1.some h.2).toPureStep, rfl⟩
+
 theorem DetHeadStep.app_fix {body v : Exp}
     (hv : IsVal v) (σ : State) :
     DetHeadStep ⟨.app (.fix body) v, σ⟩

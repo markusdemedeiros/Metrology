@@ -356,6 +356,10 @@ theorem isClosedEmpty.toFvSubsetEmpty {e : Exp} (h : e.isClosedEmpty) :
   refine ⟨h.1, ?_⟩
   rw [h.2]
 
+/-- A literal value is closed. -/
+theorem lit_isClosedEmpty (b : BaseLit) : (Exp.lit b).isClosedEmpty :=
+  ⟨IsLocallyClosed.lit b, by simp [Exp.fv]⟩
+
 /-- Opening at a free variable preserves the original free variables. -/
 theorem fv_subset_openRec (k : Nat) (y : Var) (e : Exp) :
     e.fv ⊆ (openRec k (fvar y) e).fv := by

@@ -154,165 +154,21 @@ structural induction on `τ`, using each lrel's value-form constraint
 (literals are closed; arrow/forall/exists carry an explicit closedness
 conjunct; ref/tape values are locations/labels). -/
 
+/-! ### `interp_closed`: closedness of values at any `interp τ Δ`
+
+Now trivial: closedness is built into `lrel`'s structure (option D, 2026-04-27).
+This was previously a substantial inductive proof requiring `IsClosedRespecting`
+typeclass infrastructure. -/
+
 section interp_closed
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
-/-- `IsClosedRespecting Δ`: every lrel in `Δ` only relates closed values.
-A side condition for `interp_closed` to handle the type-variable case.
-Made a typeclass so it propagates implicitly to every `interp_closed` call. -/
-class TyEnv.IsClosedRespecting (Δ : TyEnv GF) : Prop where
-  closed : ∀ (n : Nat) (v v' : Val), (Δ n).car v v' ⊢@{IProp GF}
-    iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝)
-
-/-- Helper: a literal value is closed. -/
-theorem Exp.lit_isClosedEmpty (b : BaseLit) : (Exp.lit b).isClosedEmpty :=
-  ⟨IsLocallyClosed.lit b, by simp [Exp.fv]⟩
-
-/-- The constant-`lrel_unit` environment is closed-respecting: it relates only
-`(.lit .unit, .lit .unit)`, both closed. Useful as a base case. -/
-instance TyEnv.constUnit_IsClosedRespecting :
-    TyEnv.IsClosedRespecting ((fun _ => lrel_unit) : TyEnv GF) where
-  closed n v v' := by
-    show iprop(⌜v.1 = .lit .unit ∧ v'.1 = .lit .unit⌝) ⊢ _
-    iintro %h
-    ipure_intro
-    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
-
-/-- An lrel `X` is "closed-respecting" if it only relates closed values.
-Used as a side condition for extending closed-respecting environments. -/
-class lrel.IsClosedRespecting (X : lrel GF) : Prop where
-  closed : ∀ (v v' : Val), X.car v v' ⊢@{IProp GF}
-    iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝)
-
-/-- Extending a closed-respecting `Δ` with a closed-respecting `X` is closed-respecting. -/
-instance TyEnv.cons_IsClosedRespecting (X : lrel GF) (Δ : TyEnv GF)
-    [hX : X.IsClosedRespecting] [hΔ : Δ.IsClosedRespecting] :
-    (TyEnv.cons X Δ).IsClosedRespecting where
-  closed n v v' := by
-    cases n with
-    | zero => exact hX.closed v v'
-    | succ k => exact hΔ.closed k v v'
-
-/-- Every `interp τ Δ` value-relation only relates closed values, provided
-`Δ` is closed-respecting. Proof by structural induction on `τ`. The `rec'`
-case requires Löb induction; we wrap the whole statement in `loeb_wand`. -/
-theorem interp_closed {Δ : TyEnv GF} [hΔ : Δ.IsClosedRespecting]
-    (τ : Ty) (v v' : Val) :
+/-- Every `interp τ Δ` value-relation only relates closed values. Trivial via
+`lrel.closed` field. -/
+theorem interp_closed {Δ : TyEnv GF} (τ : Ty) (v v' : Val) :
     (interp τ Δ).car v v' ⊢@{IProp GF}
-      iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) := by
-  induction τ generalizing Δ v v'
-  · -- int
-    show iprop(∃ n : Int, ⌜v.1 = .lit (.int n) ∧ v'.1 = .lit (.int n)⌝) ⊢
-      iprop(⌜_ ∧ _⌝ : IProp GF)
-    iintro ⟨%n, %h⟩
-    ipure_intro
-    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
-  · -- bool
-    show iprop(∃ b : Bool, ⌜v.1 = .lit (.bool b) ∧ v'.1 = .lit (.bool b)⌝) ⊢
-      iprop(⌜_ ∧ _⌝ : IProp GF)
-    iintro ⟨%b, %h⟩
-    ipure_intro
-    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
-  · -- unit
-    show iprop(⌜v.1 = .lit .unit ∧ v'.1 = .lit .unit⌝) ⊢
-      iprop(⌜_ ∧ _⌝ : IProp GF)
-    iintro %h
-    obtain ⟨h1, h2⟩ := h
-    ipure_intro
-    exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
-  · -- prod
-    rename_i τ1 τ2 ih1 ih2
-    show iprop(∃ (a1 a2 b1 b2 : Val),
-        (⌜v.1 = .pair a1.1 b1.1⌝) ∗ (⌜v'.1 = .pair a2.1 b2.1⌝) ∗
-        (interp τ1 Δ).car a1 a2 ∗ (interp τ2 Δ).car b1 b2) ⊢ _
-    iintro ⟨%a1, %a2, %b1, %b2, %hv1, %hv2, HA, HB⟩
-    ihave %hac := ih1 a1 a2 $$ HA
-    ihave %hbc := ih2 b1 b2 $$ HB
-    ipure_intro
-    refine ⟨hv1 ▸ ?_, hv2 ▸ ?_⟩
-    · refine ⟨Exp.IsLocallyClosed.pair hac.1.1 hbc.1.1, ?_⟩
-      simp [Exp.fv, hac.1.2, hbc.1.2]
-    · refine ⟨Exp.IsLocallyClosed.pair hac.2.1 hbc.2.1, ?_⟩
-      simp [Exp.fv, hac.2.2, hbc.2.2]
-  · -- sum
-    rename_i τ1 τ2 ih1 ih2
-    show iprop(∃ (w1 w2 : Val),
-        (⌜v.1 = .inl w1.1⌝ ∗ ⌜v'.1 = .inl w2.1⌝ ∗ (interp τ1 Δ).car w1 w2) ∨
-        (⌜v.1 = .inr w1.1⌝ ∗ ⌜v'.1 = .inr w2.1⌝ ∗ (interp τ2 Δ).car w1 w2)) ⊢ _
-    iintro ⟨%w1, %w2, Hor⟩
-    icases Hor with (⟨%hv1, %hv2, HA⟩ | ⟨%hv1, %hv2, HB⟩)
-    · ihave %hwc := ih1 w1 w2 $$ HA
-      ipure_intro
-      refine ⟨hv1 ▸ ?_, hv2 ▸ ?_⟩
-      · exact ⟨Exp.IsLocallyClosed.inl hwc.1.1, by simp [Exp.fv]; exact hwc.1.2⟩
-      · exact ⟨Exp.IsLocallyClosed.inl hwc.2.1, by simp [Exp.fv]; exact hwc.2.2⟩
-    · ihave %hwc := ih2 w1 w2 $$ HB
-      ipure_intro
-      refine ⟨hv1 ▸ ?_, hv2 ▸ ?_⟩
-      · exact ⟨Exp.IsLocallyClosed.inr hwc.1.1, by simp [Exp.fv]; exact hwc.1.2⟩
-      · exact ⟨Exp.IsLocallyClosed.inr hwc.2.1, by simp [Exp.fv]; exact hwc.2.2⟩
-  · -- arrow: lrel_arr's first conjunct is closedness
-    rename_i τ1 τ2 _ _
-    show iprop(_ ∗ □ _) ⊢ iprop(⌜_ ∧ _⌝ : IProp GF)
-    iintro ⟨%h, _⟩
-    ipure_intro; exact h
-  · -- ref
-    rename_i τ' _
-    show iprop(∃ (l1 l2 : Loc), (⌜v.1 = .lit (.loc l1)⌝) ∗
-        (⌜v'.1 = .lit (.loc l2)⌝) ∗ _) ⊢ _
-    iintro ⟨%l1, %l2, %hv1, %hv2, _⟩
-    ipure_intro
-    exact ⟨hv1 ▸ Exp.lit_isClosedEmpty _, hv2 ▸ Exp.lit_isClosedEmpty _⟩
-  · -- tape
-    show iprop(∃ (α1 α2 : Loc) (z : Int), (⌜v.1 = .lit (.lbl α1)⌝) ∗
-        (⌜v'.1 = .lit (.lbl α2)⌝) ∗ _) ⊢ _
-    iintro ⟨%α1, %α2, %z, %hv1, %hv2, _⟩
-    ipure_intro
-    exact ⟨hv1 ▸ Exp.lit_isClosedEmpty _, hv2 ▸ Exp.lit_isClosedEmpty _⟩
-  · -- var
-    rename_i n
-    show (Δ n).car v v' ⊢ _
-    exact hΔ.closed n v v'
-  · -- rec': (lrel_rec C).car v v' ≡ ⌜v.closed ∧ v'.closed⌝ ∗ ▷ (C ...).car v v'.
-    -- Closedness is the first conjunct (option C uniformly applied to lrel_rec).
-    rename_i τ' _
-    let CRec : lrel GF -n> lrel GF :=
-      { f := fun X => interp τ' (TyEnv.cons X Δ)
-        ne := ⟨fun {_ _ _} hXY => (interpNE τ').ne (TyEnv.cons_ne_head hXY)⟩ }
-    have hequiv : (interp (Ty.rec' τ') Δ : lrel GF) ≡ lrelRec1 CRec (interp (Ty.rec' τ') Δ) :=
-      lrel_rec_unfold CRec
-    have hunfold : (interp (Ty.rec' τ') Δ : lrel GF) = lrelRec1 CRec (interp (Ty.rec' τ') Δ) :=
-      OFE.Leibniz.eq_of_eqv (α := lrel GF) hequiv
-    rw [hunfold]
-    show iprop((⌜_⌝) ∗ _) ⊢ _
-    iintro ⟨%hcl, _⟩
-    ipure_intro
-    exact hcl
-  · -- forall'
-    rename_i τ' _
-    show iprop(∀ (A : lrel GF),
-        (lrel_arr lrel_unit (interp τ' (TyEnv.cons A Δ))).car v v') ⊢ _
-    iintro Hall
-    -- Instantiate at A := lrel_unit (any specific lrel will do).
-    ihave Hinst := Hall $$ %lrel_unit
-    -- Hinst : (lrel_arr lrel_unit (interp τ' (cons lrel_unit Δ))).car v v'.
-    -- The lrel_arr's first conjunct is closedness; project it.
-    ihave Hclosed : iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝ : IProp GF) $$ [Hinst]
-    · show iprop(_ ∗ □ _) ⊢ _
-      iintro ⟨%h, _⟩
-      ipure_intro; exact h
-    iexact Hclosed
-  · -- exists': lrel_exists's first conjunct is closedness
-    rename_i τ' _
-    show iprop(_ ∗ ∃ _, _) ⊢ iprop(⌜_ ∧ _⌝ : IProp GF)
-    iintro ⟨%h, _⟩
-    ipure_intro; exact h
-
-/-- For any `τ` and any closed-respecting `Δ`, the resulting lrel `interp τ Δ`
-is itself closed-respecting. -/
-instance interp_IsClosedRespecting {Δ : TyEnv GF} [Δ.IsClosedRespecting] (τ : Ty) :
-    (interp τ Δ).IsClosedRespecting where
-  closed v v' := interp_closed τ v v'
+      iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) :=
+  (interp τ Δ).closed v v'
 
 end interp_closed
 
@@ -761,6 +617,184 @@ theorem mem_of_lookup_isSome {vs : ValSubstMap} {x : Var}
         exact ⟨(x, w), List.mem_cons.mpr (.inl rfl), rfl⟩
       · simp at h
 
+/-- If a key appears in vs, lookup is some. -/
+theorem lookup_isSome_of_mem {vs : ValSubstMap} {x : Var}
+    (hmem : ∃ w, (x, w) ∈ vs) : (vs.lookup x).isSome := by
+  obtain ⟨w, hmem⟩ := hmem
+  induction vs with
+  | nil => exact absurd hmem (by simp)
+  | cons q rest ih =>
+    obtain ⟨k, v⟩ := q
+    rcases List.mem_cons.mp hmem with hp_eq | hpm
+    · injection hp_eq with hkx _
+      subst hkx
+      simp only [ValSubstMap.lookup]
+      cases ValSubstMap.lookup rest x with
+      | some _ => simp
+      | none => simp
+    · simp only [ValSubstMap.lookup]
+      cases hrr : ValSubstMap.lookup rest x with
+      | some _ => simp
+      | none =>
+        have := ih hpm
+        rw [hrr] at this
+        cases this
+
+/-- Delete all entries with key `x` from a value substitution map. -/
+def delete (vs : ValSubstMap) (x : Var) : ValSubstMap :=
+  vs.filter (fun p => !decide (p.1 = x))
+
+/-- After deleting `x`, lookup at `x` returns `none`. -/
+theorem lookup_delete_self (vs : ValSubstMap) (x : Var) :
+    (vs.delete x).lookup x = none := by
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨z, w⟩ := p
+    show ValSubstMap.lookup
+        (List.filter (fun p => !decide (p.1 = x)) ((z, w) :: rest)) x = none
+    rw [List.filter_cons]
+    by_cases hzx : z = x
+    · simp [hzx]; show (delete rest x).lookup x = none; exact ih
+    · have hcond : (!decide ((z, w).1 = x)) = true := by simp [hzx]
+      rw [if_pos hcond]
+      show (match ValSubstMap.lookup (delete rest x) x with
+            | some q => some q
+            | none => if x = z then some w else none) = none
+      rw [ih]
+      simp [Ne.symm hzx]
+
+/-- After deleting `x`, lookup at any other key is unchanged. -/
+theorem lookup_delete_other (vs : ValSubstMap) (x z : Var) (hxz : z ≠ x) :
+    (vs.delete x).lookup z = vs.lookup z := by
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨w, v⟩ := p
+    show ValSubstMap.lookup
+        (List.filter (fun p => !decide (p.1 = x)) ((w, v) :: rest)) z
+      = ValSubstMap.lookup ((w, v) :: rest) z
+    rw [List.filter_cons]
+    by_cases hwx : w = x
+    · have hcond : (!decide ((w, v).1 = x)) = false := by simp [hwx]
+      rw [if_neg (by rw [hcond]; simp)]
+      -- LHS = lookup (delete rest x) z. Want = lookup ((w, v) :: rest) z.
+      -- Since w = x, the head doesn't match z (since z ≠ x), so RHS reduces to lookup rest z.
+      show ValSubstMap.lookup (delete rest x) z = ValSubstMap.lookup ((w, v) :: rest) z
+      rw [ih]
+      show ValSubstMap.lookup rest z = ValSubstMap.lookup ((w, v) :: rest) z
+      simp only [ValSubstMap.lookup]
+      have hzNeW : ¬ (z = w) := by intro h; subst h; exact hxz hwx
+      cases ValSubstMap.lookup rest z with
+      | some _ => rfl
+      | none => simp [hzNeW]
+    · have hcond : (!decide ((w, v).1 = x)) = true := by simp [hwx]
+      rw [if_pos hcond]
+      show (match ValSubstMap.lookup (delete rest x) z with
+            | some q => some q
+            | none => if z = w then some v else none)
+        = (match ValSubstMap.lookup rest z with
+            | some q => some q
+            | none => if z = w then some v else none)
+      rw [ih]
+
+/-- Membership in `vs.delete x` excludes any pair with key `x`. -/
+theorem mem_delete (vs : ValSubstMap) (x : Var) (p : Var × (Val × Val)) :
+    p ∈ vs.delete x ↔ p ∈ vs ∧ p.1 ≠ x := by
+  unfold delete
+  rw [List.mem_filter]
+  simp
+
+/-- The fst-projection of `vs.delete x` filters x out of vs.fst. -/
+theorem fst_delete (vs : ValSubstMap) (x : Var) :
+    (vs.delete x).fst = vs.fst.filter (fun p => !decide (p.1 = x)) := by
+  unfold delete fst
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨z, v1, v2⟩ := p
+    simp only [List.filter_cons, List.map_cons]
+    by_cases hzx : z = x
+    · simp [hzx]; exact ih
+    · have h1 : (!decide ((z, v1, v2).1 = x)) = true := by simp [hzx]
+      have h2 : (!decide ((z, v1.1).1 = x)) = true := by simp [hzx]
+      rw [if_pos h1]
+      simp only [List.map_cons]
+      rw [if_pos h2]
+      simp only [List.cons.injEq, true_and]
+      exact ih
+
+/-- Snd analog. -/
+theorem snd_delete (vs : ValSubstMap) (x : Var) :
+    (vs.delete x).snd = vs.snd.filter (fun p => !decide (p.1 = x)) := by
+  unfold delete snd
+  induction vs with
+  | nil => rfl
+  | cons p rest ih =>
+    obtain ⟨z, v1, v2⟩ := p
+    simp only [List.filter_cons, List.map_cons]
+    by_cases hzx : z = x
+    · simp [hzx]; exact ih
+    · have h1 : (!decide ((z, v1, v2).1 = x)) = true := by simp [hzx]
+      have h2 : (!decide ((z, v2.1).1 = x)) = true := by simp [hzx]
+      rw [if_pos h1]
+      simp only [List.map_cons]
+      rw [if_pos h2]
+      simp only [List.cons.injEq, true_and]
+      exact ih
+
+/-- Domain of `vs.delete x` excludes x. -/
+theorem map_fst_delete_notMem (vs : ValSubstMap) (x : Var) :
+    x ∉ ((vs.delete x).map (·.1)).toFinset := by
+  intro h
+  simp only [List.mem_toFinset, List.mem_map] at h
+  obtain ⟨p, hpmem, hpeq⟩ := h
+  rw [mem_delete] at hpmem
+  exact hpmem.2 hpeq
+
+/-- Domain of `vs.delete x` is contained in domain of vs. -/
+theorem map_fst_delete_subset (vs : ValSubstMap) (x : Var) :
+    ((vs.delete x).map (·.1)).toFinset ⊆ (vs.map (·.1)).toFinset := by
+  intro z hz
+  simp only [List.mem_toFinset, List.mem_map] at hz ⊢
+  obtain ⟨p, hpmem, hpeq⟩ := hz
+  rw [mem_delete] at hpmem
+  exact ⟨p, hpmem.1, hpeq⟩
+
+/-- The pair returned by `lookup` is the rightmost matching member. -/
+theorem mem_of_lookup_eq_some {vs : ValSubstMap} {y : Var} {w1 w2 : Val}
+    (h : vs.lookup y = some (w1, w2)) : (y, (w1, w2)) ∈ vs := by
+  induction vs with
+  | nil => simp [ValSubstMap.lookup] at h
+  | cons p rest ih =>
+    obtain ⟨z, ⟨v1, v2⟩⟩ := p
+    simp only [ValSubstMap.lookup] at h
+    cases hr : ValSubstMap.lookup rest y with
+    | some q =>
+      rw [hr] at h
+      -- h : some q = some (w1, w2)
+      have hqe : q = (w1, w2) := by injection h
+      have ihp := ih (by rw [hr, hqe])
+      exact List.mem_cons.mpr (.inr ihp)
+    | none =>
+      rw [hr] at h
+      split_ifs at h with hyz
+      · subst hyz
+        simp at h
+        obtain ⟨h1, h2⟩ := h
+        subst h1; subst h2
+        exact List.mem_cons.mpr (.inl rfl)
+
+/-- After delete + cons of new x-binding, fst-projection equals
+substituting via subst _ x w in front of the deleted vs.fst. Used in `bin_log_related_rename`. -/
+theorem fst_cons_delete (vs : ValSubstMap) (x : Var) (w1 w2 : Val) :
+    ValSubstMap.fst ((x, (w1, w2)) :: vs.delete x)
+      = (x, w1.1) :: (vs.delete x).fst := rfl
+
+theorem snd_cons_delete (vs : ValSubstMap) (x : Var) (w1 w2 : Val) :
+    ValSubstMap.snd ((x, (w1, w2)) :: vs.delete x)
+      = (x, w2.1) :: (vs.delete x).snd := rfl
+
 end ValSubstMap
 
 section env_typed
@@ -907,6 +941,87 @@ theorem env_ltyped2_insert (Γ : RelCtx GF) (vs : ValSubstMap)
       obtain ⟨rfl, rfl⟩ := heq
       iexact HA
 
+/-- Helper: a `RelCtx.lookup` that returns `some` implies the key appears in the list. -/
+theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx GF} {y : Var}
+    (h : (Γ.lookup y).isSome) : y ∈ (Γ.map (·.1)).toFinset := by
+  induction Γ with
+  | nil => simp [RelCtx.lookup] at h
+  | cons q rest ih =>
+    obtain ⟨k, B⟩ := q
+    simp only [RelCtx.lookup] at h
+    cases hr : RelCtx.lookup rest y with
+    | some _ =>
+      rw [hr] at h
+      have hsome : (RelCtx.lookup rest y).isSome := by rw [hr]; rfl
+      have ihm := ih hsome
+      simp at ihm ⊢
+      exact Or.inr ihm
+    | none =>
+      rw [hr] at h
+      split_ifs at h with hyk
+      · simp [hyk]
+      · simp at h
+
+/-- Drop a head binding for a fresh atom: if `y ∉ Γ.dom`, then
+`env_ltyped2 ((y, A) :: Γ) vs ⊢ env_ltyped2 Γ (vs.delete y)`. -/
+theorem env_ltyped2_drop_head (Γ : RelCtx GF) (vs : ValSubstMap)
+    (y : Var) (A : lrel GF)
+    (hyNotDom : y ∉ (Γ.map (·.1)).toFinset) :
+    env_ltyped2 ((y, A) :: Γ) vs ⊢@{IProp GF} env_ltyped2 Γ (vs.delete y) := by
+  unfold env_ltyped2
+  iintro ⟨%Hdom, %Hclosed, #Hall⟩
+  have hΓy : Γ.lookup y = none := by
+    cases hΓ : Γ.lookup y with
+    | none => rfl
+    | some _ =>
+      exfalso
+      have hsome : (Γ.lookup y).isSome := by rw [hΓ]; rfl
+      exact hyNotDom (RelCtx.mem_of_lookup_isSome hsome)
+  isplitr
+  · ipure_intro
+    intro z
+    by_cases hzy : z = y
+    · subst hzy
+      rw [hΓy, ValSubstMap.lookup_delete_self]
+      simp
+    · rw [ValSubstMap.lookup_delete_other vs y z hzy]
+      have hcons : RelCtx.lookup ((y, A) :: Γ) z =
+          match Γ.lookup z with
+          | some B => some B
+          | none => if z = y then some A else none := rfl
+      have heq := Hdom z
+      rw [hcons] at heq
+      cases hΓz : Γ.lookup z with
+      | some B =>
+        rw [hΓz] at heq
+        simp at heq ⊢
+        exact heq
+      | none =>
+        rw [hΓz] at heq
+        simp [hzy] at heq ⊢
+        exact heq
+  isplitr
+  · ipure_intro
+    intro p hp
+    rw [ValSubstMap.mem_delete] at hp
+    exact Hclosed p hp.1
+  iintro %z %B %v1 %v2 %hΓz %hvsz
+  -- z ≠ y because (vs.delete y).lookup y = none, so z lookup landing is at z ≠ y.
+  have hzy : z ≠ y := by
+    intro heq; subst heq
+    rw [ValSubstMap.lookup_delete_self] at hvsz
+    cases hvsz
+  rw [ValSubstMap.lookup_delete_other vs y z hzy] at hvsz
+  -- ((y, A) :: Γ).lookup z = some B since Γ.lookup z = some B and z ≠ y → head doesn't fire.
+  have hΓhead : RelCtx.lookup ((y, A) :: Γ) z = some B := by
+    show (match Γ.lookup z with
+          | some B' => some B'
+          | none => if z = y then some A else none) = some B
+    rw [hΓz]
+  iapply Hall $$ %z %B %v1 %v2
+  · ipure_intro; exact hΓhead
+  · ipure_intro; exact hvsz
+
 end env_typed
 
 /-! ## The semantic typing judgement
@@ -930,6 +1045,152 @@ and use `interp τ Δ` as the relation. -/
 noncomputable abbrev bin_log_related_ty (E : CoPset) (Δ : TyEnv GF)
     (Γ : RelCtx GF) (e e' : Exp) (τ : Ty) : IProp GF :=
   bin_log_related E Γ e e' (interp τ Δ)
+
+/-- **α-renaming for `bin_log_related`.** From related-at-`x` infer related-at-`y`
+for the appropriately-renamed expressions, when both atoms are outside `Γ.dom`,
+distinct, and `y` doesn't already appear in the bodies. -/
+theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx GF}
+    {x y : Var} {A : lrel GF} {τE τE' : Exp} {B : lrel GF}
+    (hxy : x ≠ y)
+    (hxNotDom : x ∉ (Γ.map (·.1)).toFinset)
+    (hyNotDom : y ∉ (Γ.map (·.1)).toFinset)
+    (hyFvE : y ∉ τE.fv) (hyFvE' : y ∉ τE'.fv) :
+    bin_log_related E ((x, A) :: Γ) τE τE' B ⊢@{IProp GF}
+      bin_log_related E ((y, A) :: Γ) (τE.subst x (.fvar y)) (τE'.subst x (.fvar y)) B := by
+  unfold bin_log_related
+  iintro Hold %vs #Hvs
+  -- Extract (w1, w2) at y from Hvs.
+  have hΓy_lookup : Γ.lookup y = none := by
+    cases hΓ : Γ.lookup y with
+    | none => rfl
+    | some _ =>
+      exfalso
+      have : (Γ.lookup y).isSome := by rw [hΓ]; rfl
+      exact hyNotDom (RelCtx.mem_of_lookup_isSome this)
+  have hyHeadLookup : RelCtx.lookup ((y, A) :: Γ) y = some A := by
+    show (match Γ.lookup y with
+          | some B => some B
+          | none => if y = y then some A else none) = some A
+    rw [hΓy_lookup]; simp
+  ihave HvsAtY := env_ltyped2_lookup ((y, A) :: Γ) vs y A hyHeadLookup $$ Hvs
+  icases HvsAtY with ⟨%w1, %w2, %hvsLookupY, HA_w⟩
+  -- Closedness of (w1, w2) extracted from env_ltyped2.
+  ihave %Hvs_clos := env_ltyped2_allClosed _ vs $$ Hvs
+  -- Build vs' := (x, (w1, w2)) :: vs.delete y. Need env_ltyped2 ((x, A) :: Γ) vs'.
+  -- Step 1: env_ltyped2 Γ (vs.delete y) via env_ltyped2_drop_head.
+  ihave HvsDrop := env_ltyped2_drop_head Γ vs y A hyNotDom $$ Hvs
+  -- Step 2: env_ltyped2 ((x, A) :: Γ) vs' via env_ltyped2_insert.
+  -- Need closedness of w1, w2.
+  have hw_closed : w1.1.isClosed .empty ∧ w2.1.isClosed .empty :=
+    Hvs_clos (y, (w1, w2)) (ValSubstMap.mem_of_lookup_eq_some hvsLookupY)
+  obtain ⟨hw1c, hw2c⟩ := hw_closed
+  ihave Hvs' : iprop(env_ltyped2 ((x, A) :: Γ) ((x, (w1, w2)) :: vs.delete y))
+      $$ [HA_w HvsDrop]
+  · iapply (env_ltyped2_insert Γ (vs.delete y) x A w1 w2 hw1c hw2c)
+    isplitr [HA_w]
+    · iexact HA_w
+    iexact HvsDrop
+  -- Apply Hold at vs' := (x, (w1, w2)) :: vs.delete y.
+  set vs' : ValSubstMap := (x, (w1, w2)) :: vs.delete y with hvs'_def
+  ihave Hrefines := Hold $$ %vs' Hvs'
+  -- Domain agreement: x ∉ vs.dom (since x ≠ y and x ∉ Γ.dom).
+  ihave %Hvs_dom := env_ltyped2_domEq _ vs $$ Hvs
+  have hvsLookupX : vs.lookup x = none := by
+    have hΓx : Γ.lookup x = none := by
+      cases hΓ : Γ.lookup x with
+      | none => rfl
+      | some _ =>
+        exfalso
+        have : (Γ.lookup x).isSome := by rw [hΓ]; rfl
+        exact hxNotDom (RelCtx.mem_of_lookup_isSome this)
+    have hΓheadX : RelCtx.lookup ((y, A) :: Γ) x = none := by
+      show (match Γ.lookup x with
+            | some B => some B
+            | none => if x = y then some A else none) = none
+      rw [hΓx]; simp [hxy]
+    cases hvs : vs.lookup x with
+    | none => rfl
+    | some _ =>
+      exfalso
+      have : (vs.lookup x).isSome := by rw [hvs]; rfl
+      have hΓsome : (RelCtx.lookup ((y, A) :: Γ) x).isSome := (Hvs_dom x).mpr this
+      rw [hΓheadX] at hΓsome
+      cases hΓsome
+  -- vs.fst is AllClosed (from Hvs_clos).
+  have hvs_fst_closed : SubstMap.AllClosed vs.fst := by
+    intro p hp
+    obtain ⟨⟨z, ⟨v1, v2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
+    rw [← hpeq]
+    exact (Hvs_clos (z, v1, v2) hmem).1
+  have hvs_snd_closed : SubstMap.AllClosed vs.snd := by
+    intro p hp
+    obtain ⟨⟨z, ⟨v1, v2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
+    rw [← hpeq]
+    exact (Hvs_clos (z, v1, v2) hmem).2
+  -- x ∉ vs.fst.dom (and vs.snd.dom): same set as vs.dom.
+  have hvsFst_dom : (vs.fst.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
+    show ((vs.map fun p => (p.1, p.2.1.1)).map (·.1)).toFinset = _
+    simp only [List.map_map]; rfl
+  have hvsSnd_dom : (vs.snd.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
+    show ((vs.map fun p => (p.1, p.2.2.1)).map (·.1)).toFinset = _
+    simp only [List.map_map]; rfl
+  have hxNotVsDom : x ∉ (vs.map (·.1)).toFinset := by
+    intro h
+    simp only [List.mem_toFinset, List.mem_map] at h
+    obtain ⟨p, hpmem, hpeq⟩ := h
+    have hsome : (vs.lookup x).isSome := by
+      apply ValSubstMap.lookup_isSome_of_mem
+      refine ⟨p.2, ?_⟩
+      rw [← hpeq]
+      exact hpmem
+    rw [hvsLookupX] at hsome
+    cases hsome
+  -- Use fst_lookup to get vs.fst.lookup y = some w1.1.
+  have hvsFstLookupY : vs.fst.lookup y = some w1.1 := by
+    rw [ValSubstMap.fst_lookup, hvsLookupY]; rfl
+  have hvsSndLookupY : vs.snd.lookup y = some w2.1 := by
+    rw [ValSubstMap.snd_lookup, hvsLookupY]; rfl
+  -- Apply the swap lemma.
+  have hxNotVsFst : x ∉ (vs.fst.map (·.1)).toFinset := by rw [hvsFst_dom]; exact hxNotVsDom
+  have hxNotVsSnd : x ∉ (vs.snd.map (·.1)).toFinset := by rw [hvsSnd_dom]; exact hxNotVsDom
+  have hswapFst :=
+    Exp.substMap_subst_fvar_lookup vs.fst τE x y w1.1 hxy hxNotVsFst hvs_fst_closed
+      hvsFstLookupY hyFvE
+  have hswapSnd :=
+    Exp.substMap_subst_fvar_lookup vs.snd τE' x y w2.1 hxy hxNotVsSnd hvs_snd_closed
+      hvsSndLookupY hyFvE'
+  -- Bridge: vs.fst.filter (·≠y) = (vs.delete y).fst.
+  have hfilter1 : vs.fst.filter (fun p => !decide (p.1 = y)) = (vs.delete y).fst := by
+    rw [ValSubstMap.fst_delete]
+  have hfilter2 : vs.snd.filter (fun p => !decide (p.1 = y)) = (vs.delete y).snd := by
+    rw [ValSubstMap.snd_delete]
+  rw [hfilter1] at hswapFst
+  rw [hfilter2] at hswapSnd
+  -- Now hswapFst : substMap vs.fst (subst τE x (.fvar y)) = subst (substMap (vs.delete y).fst τE) x w1.1.
+  -- And substMap vs'.fst τE = subst (substMap (vs.delete y).fst τE) x w1.1 (definitionally for cons).
+  -- So substMap vs.fst (subst τE x (.fvar y)) = substMap vs'.fst τE.
+  have heqFst : Exp.substMap vs.fst (Exp.subst τE x (.fvar y)) = Exp.substMap vs'.fst τE := by
+    rw [hswapFst]
+    show _ = Exp.subst (Exp.substMap (vs.delete y).fst τE) x w1.1
+    rfl
+  have heqSnd : Exp.substMap vs.snd (Exp.subst τE' x (.fvar y)) = Exp.substMap vs'.snd τE' := by
+    rw [hswapSnd]
+    show _ = Exp.subst (Exp.substMap (vs.delete y).snd τE') x w2.1
+    rfl
+  -- Now rewrite the goal to match Hrefines.
+  rw [heqFst, heqSnd]
+  iexact Hrefines
+
+/-- α-renaming for `bin_log_related_ty` (interp-typed wrapper). -/
+theorem bin_log_related_ty_rename {E : CoPset} {Δ : TyEnv GF} {Γ : RelCtx GF}
+    {x y : Var} {A : lrel GF} {τE τE' : Exp} {τ : Ty}
+    (hxy : x ≠ y)
+    (hxNotDom : x ∉ (Γ.map (·.1)).toFinset)
+    (hyNotDom : y ∉ (Γ.map (·.1)).toFinset)
+    (hyFvE : y ∉ τE.fv) (hyFvE' : y ∉ τE'.fv) :
+    bin_log_related_ty E Δ ((x, A) :: Γ) τE τE' τ ⊢@{IProp GF}
+      bin_log_related_ty E Δ ((y, A) :: Γ) (τE.subst x (.fvar y)) (τE'.subst x (.fvar y)) τ :=
+  bin_log_related_rename hxy hxNotDom hyNotDom hyFvE hyFvE'
 
 end bin_log_related
 

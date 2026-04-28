@@ -130,6 +130,7 @@ record rather than an `Arguments`-style coercion. -/
 structure lrel (GF : BundledGFunctors) where
   car : Val → Val → IProp GF
   persistent v1 v2 : Persistent (car v1 v2)
+  closed v1 v2 : car v1 v2 ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝)
 
 attribute [instance] lrel.persistent
 
@@ -185,12 +186,34 @@ noncomputable instance {GF : BundledGFunctors} : IsCOFE (lrel GF) where
           ⟨fun _ _ _ hfg => persistently_ne.ne (hfg v1 v2)⟩
         exact Iris.BI.LimitPreserving.entails (Φne := hne_Φ) (Ψne := hne_Ψ)
           (fun f => f v1 v2) (fun f => iprop(<pers> f v1 v2))
+          (lrel.toFunChain c) hk
+      closed := fun v1 v2 => by
+        -- Closedness limit: each chain element implies closedness, and
+        -- closedness is a pure (timeless) prop, so the limit also implies it.
+        have hk : ∀ k, (c.chain k).car v1 v2 ⊢
+            iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF) :=
+          fun k => (c.chain k).closed v1 v2
+        have hne_Φ : OFE.NonExpansive
+          (fun f : Val → Val → IProp GF => f v1 v2) :=
+          ⟨fun _ _ _ hfg => hfg v1 v2⟩
+        have hne_Ψ : OFE.NonExpansive
+          (fun _ : Val → Val → IProp GF =>
+            iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF)) :=
+          ⟨fun _ _ _ _ => OFE.Dist.rfl⟩
+        exact Iris.BI.LimitPreserving.entails (Φne := hne_Φ) (Ψne := hne_Ψ)
+          (fun f => f v1 v2)
+          (fun _ => iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF))
           (lrel.toFunChain c) hk }
   conv_compl {_ c} v1 v2 := IsCOFE.conv_compl (c := lrel.toFunChain c) v1 v2
 
-/-- Inhabited instance (required by `fixpoint`). -/
+/-- Inhabited instance (required by `fixpoint`). The default relation is
+`False` (relates nothing), which trivially implies any conclusion including
+closedness. -/
 instance {GF : BundledGFunctors} : Inhabited (lrel GF) where
-  default := { car := fun _ _ => iprop(True), persistent := fun _ _ => inferInstance }
+  default :=
+    { car := fun _ _ => iprop(False)
+      persistent := fun _ _ => inferInstance
+      closed := fun _ _ => Iris.BI.false_elim }
 
 /-- `lrel.car` is nonexpansive in the `lrel` argument (for fixed `v1, v2`). -/
 instance lrel.car_ne {GF : BundledGFunctors} (v1 v2 : Val) :
@@ -202,8 +225,8 @@ Leibniz via `UPred` Leibniz) lifts to `lrel`-level Leibniz via funext + the
 fact that persistence is propositional and so its proof-content is irrelevant. -/
 instance lrel.leibniz {GF : BundledGFunctors} : OFE.Leibniz (lrel GF) where
   eq_of_eqv {A B} hequiv := by
-    obtain ⟨carA, persA⟩ := A
-    obtain ⟨carB, persB⟩ := B
+    obtain ⟨carA, persA, closA⟩ := A
+    obtain ⟨carB, persB, closB⟩ := B
     have hcar : carA = carB := by
       funext v1 v2
       exact OFE.Leibniz.eq_of_eqv (hequiv v1 v2)
@@ -277,47 +300,67 @@ Value-level matching is on `v.1 : Exp`, since `Val := (e : Exp) × IsVal e`. -/
 section SimpleLRels
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
+/-- Helper: closedness for a value at a literal-shape relation. -/
+private theorem lrel_closed_lit_pair (v1 v2 : Val) :
+    iprop(⌜v1.1 = .lit .unit ∧ v2.1 = .lit .unit⌝ : IProp GF)
+      ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
+  iintro %h
+  ipure_intro
+  exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
+
 /-- `lrel_unit`: both values are the unit literal. -/
 noncomputable def lrel_unit : lrel GF where
   car v1 v2 := iprop(⌜ v1.1 = .lit .unit ∧ v2.1 = .lit .unit ⌝)
   persistent _ _ := inferInstance
+  closed v1 v2 := lrel_closed_lit_pair v1 v2
 
 /-- `lrel_bool`: both values are the same boolean literal. -/
 noncomputable def lrel_bool : lrel GF where
   car v1 v2 := iprop(∃ b : Bool, ⌜ v1.1 = .lit (.bool b) ∧ v2.1 = .lit (.bool b) ⌝)
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%b, %h⟩
+    ipure_intro
+    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_nat`: both values are the same integer literal with `0 ≤ n`. -/
 noncomputable def lrel_nat : lrel GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%n, %h⟩
+    ipure_intro
+    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
-/-- `lrel_pos_nat`: both values are the same POSITIVE integer literal (`0 < n`).
-
-Used by `refines_rand_unit` and `refines_rand_tape` to thread positivity
-into the underlying coupling rule (`refines_couple_rands_lr` /
-`wp_couple_rand_lbl_rand_lbl{,_wrong}` all take `0 < z`). With the
-current operational semantics `rand n ()` is total (returns `-1` on
-nonpos), so positivity is not needed for stuckness — only for the
-uniform-sample coupling. -/
+/-- `lrel_pos_nat`: both values are the same POSITIVE integer literal (`0 < n`). -/
 noncomputable def lrel_pos_nat : lrel GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ 0 < n ∧
     v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%n, %h⟩
+    ipure_intro
+    exact ⟨h.2.1 ▸ Exp.lit_isClosedEmpty _, h.2.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_int`: both values are the same integer literal. -/
 noncomputable def lrel_int : lrel GF where
   car v1 v2 := iprop(∃ n : Int, ⌜ v1.1 = .lit (.int n) ∧ v2.1 = .lit (.int n) ⌝)
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%n, %h⟩
+    ipure_intro
+    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_arr A1 A2`: functions sending `A1`-related arguments to `A2`-related
-results under the refinement judgement. Persistent thanks to the `□` box. -/
+results under the refinement judgement. Closedness is built into the relation
+via the structure field (no longer a separate conjunct). -/
 noncomputable def lrel_arr (A1 A2 : lrel GF) : lrel GF where
   car v1 v2 :=
     iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
       □ (∀ (w1 w2 : Val), A1 w1 w2 -∗
         refines (⊤ : CoPset) (.app v1.1 w1.1) (.app v2.1 w2.1) A2))
   persistent _ _ := inferInstance
+  closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
 
 /-- `lrel_prod A B`: pair values with component-wise relatedness. -/
 noncomputable def lrel_prod (A B : lrel GF) : lrel GF where
@@ -327,6 +370,20 @@ noncomputable def lrel_prod (A B : lrel GF) : lrel GF where
       (⌜ v2.1 = .pair a2.1 b2.1 ⌝) ∗
       A a1 a2 ∗ B b1 b2)
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%a1, %a2, %b1, %b2, %h1, %h2, HA, HB⟩
+    ihave %hAcl := A.closed a1 a2 $$ HA
+    ihave %hBcl := B.closed b1 b2 $$ HB
+    ipure_intro
+    refine ⟨?_, ?_⟩
+    · refine ⟨?_, ?_⟩
+      · rw [h1]
+        exact Exp.IsLocallyClosed.pair hAcl.1.1 hBcl.1.1
+      · rw [h1]; simp [Exp.fv]; exact ⟨hAcl.1.2, hBcl.1.2⟩
+    · refine ⟨?_, ?_⟩
+      · rw [h2]
+        exact Exp.IsLocallyClosed.pair hAcl.2.1 hBcl.2.1
+      · rw [h2]; simp [Exp.fv]; exact ⟨hAcl.2.2, hBcl.2.2⟩
 
 /-- `lrel_sum A B`: tagged-union values, both `inl` related by `A` or both
 `inr` related by `B`. -/
@@ -337,27 +394,53 @@ noncomputable def lrel_sum (A B : lrel GF) : lrel GF where
       ∨
       ((⌜ v1.1 = .inr w1.1 ⌝) ∗ (⌜ v2.1 = .inr w2.1 ⌝) ∗ B w1 w2))
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%w1, %w2, Hd⟩
+    icases Hd with (⟨%h1, %h2, HA⟩ | ⟨%h1, %h2, HB⟩)
+    · ihave %hAcl := A.closed w1 w2 $$ HA
+      ipure_intro
+      refine ⟨?_, ?_⟩
+      · refine ⟨?_, ?_⟩
+        · rw [h1]; exact Exp.IsLocallyClosed.inl hAcl.1.1
+        · rw [h1]; simp [Exp.fv]; exact hAcl.1.2
+      · refine ⟨?_, ?_⟩
+        · rw [h2]; exact Exp.IsLocallyClosed.inl hAcl.2.1
+        · rw [h2]; simp [Exp.fv]; exact hAcl.2.2
+    · ihave %hBcl := B.closed w1 w2 $$ HB
+      ipure_intro
+      refine ⟨?_, ?_⟩
+      · refine ⟨?_, ?_⟩
+        · rw [h1]; exact Exp.IsLocallyClosed.inr hBcl.1.1
+        · rw [h1]; simp [Exp.fv]; exact hBcl.1.2
+      · refine ⟨?_, ?_⟩
+        · rw [h2]; exact Exp.IsLocallyClosed.inr hBcl.2.1
+        · rw [h2]; simp [Exp.fv]; exact hBcl.2.2
 
-/-- `lrel_exists C`: existential over semantic types.
-Carries a closedness conjunct because the value form isn't constrained
-by the relation alone. -/
+/-- `lrel_exists C`: existential over semantic types. -/
 noncomputable def lrel_exists (C : lrel GF → lrel GF) : lrel GF where
   car v1 v2 := iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
     ∃ A : lrel GF, C A v1 v2)
   persistent _ _ := inferInstance
+  closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
 
 /-- `lrel_forall C`: universal over semantic types, uniform in them via
 `lrel_arr lrel_unit` — mirrors System F's value-restricted ∀ elimination.
-The underlying `lrel_arr` already carries closedness. -/
+Closedness derives from `lrel_arr lrel_unit (C A)` for any A. -/
 noncomputable def lrel_forall (C : lrel GF → lrel GF) : lrel GF where
   car v1 v2 :=
     iprop(∀ (A : lrel GF), (lrel_arr lrel_unit (C A)).car v1 v2)
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro Hall
+    ihave Hinst := Hall $$ %(default : lrel GF)
+    iapply ((lrel_arr lrel_unit (C default)).closed v1 v2)
+    iexact Hinst
 
-/-- `lrel_true`: trivial relation that relates everything. -/
+/-- `lrel_true`: trivial relation that relates everything that's closed. -/
 noncomputable def lrel_true : lrel GF where
-  car _ _ := iprop(True)
+  car v1 v2 := iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝)
   persistent _ _ := inferInstance
+  closed _ _ := BIBase.Entails.rfl
 
 /-! ### Recursive lrel via `fixpoint`
 
@@ -374,6 +457,7 @@ noncomputable def lrelRec1 (C : lrel GF -n> lrel GF) (r : lrel GF) : lrel GF whe
   car w1 w2 := iprop((⌜w1.1.isClosedEmpty ∧ w2.1.isClosedEmpty⌝) ∗
     ▷ (C r).car w1 w2)
   persistent _ _ := inferInstance
+  closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
 
 instance lrelRec1_contractive (C : lrel GF -n> lrel GF) : OFE.Contractive (lrelRec1 C) where
   distLater_dist {n P Q} hPQ w1 w2 := by
@@ -508,6 +592,10 @@ noncomputable def lrel_ref (A : lrel GF) : lrel GF where
       Iris.inv (logN.@ ((l1, l2) : Loc × Loc))
         (iprop(∃ (w1 w2 : Val), (appHeapFrag l1 w1) ∗ (specHeapFrag l2 w2) ∗ A w1 w2)))
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%l1, %l2, %h1, %h2, _⟩
+    ipure_intro
+    exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_tape`: tape values whose contents are empty and sampled from the
 same finite range. Mirrors `lrel_tape` (model.v:113–115). -/
@@ -518,6 +606,10 @@ noncomputable def lrel_tape : lrel GF where
       Iris.inv (logN.@ ((α1, α2) : Loc × Loc))
         (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩))))
   persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%α1, %α2, %z, %h1, %h2, _⟩
+    ipure_intro
+    exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_ref` is nonexpansive in its content type. -/
 instance lrel_ref_ne : OFE.NonExpansive (lrel_ref (GF := GF)) where

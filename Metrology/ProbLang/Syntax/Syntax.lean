@@ -71,6 +71,20 @@ abbrev Lbl : Type := Int
 inductive BaseLit | int (z : Int) | bool (b : Bool) | unit | loc (loc : Loc) | lbl (lbl : Lbl)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
+theorem BaseLit.beq_self_true (l : BaseLit) : (l == l) = true := by
+  cases l with
+  | int z =>
+    show (Int.decEq z z).decide = true
+    exact decide_eq_true rfl
+  | bool b => cases b <;> rfl
+  | unit => rfl
+  | loc l =>
+    show decide (l = l) = true
+    rw [decide_eq_true rfl]
+  | lbl l =>
+    show decide (l = l) = true
+    rw [decide_eq_true rfl]
+
 inductive UnOp | neg | minus
   deriving Inhabited, Countable, Repr, BEq
 
@@ -358,6 +372,18 @@ def Pat.tryMatch : Pat → Exp → Option Exp
   | .inl p, .inl e => p.tryMatch e
   | .inr p, .inr e => p.tryMatch e
   | _, _ => none
+
+/-- `tryMatch (.lit l) (.lit l) = some (.lit .unit)`. -/
+theorem Pat.tryMatch_lit_eq (l : BaseLit) :
+    Pat.tryMatch (.lit l) (.lit l) = some (.lit .unit) := by
+  show (if (l == l) = true then some (Exp.lit BaseLit.unit) else none) = _
+  rw [if_pos (BaseLit.beq_self_true l)]
+
+/-- `tryMatch (.lit l1) (.lit l2) = none` when `l1 ≠ l2`. -/
+theorem Pat.tryMatch_lit_ne {l1 l2 : BaseLit} (h : ¬ (l1 == l2) = true) :
+    Pat.tryMatch (.lit l1) (.lit l2) = none := by
+  show (if (l1 == l2) = true then some (Exp.lit BaseLit.unit) else none) = _
+  rw [if_neg h]
 
 /- ## Sublanguages -/
 
