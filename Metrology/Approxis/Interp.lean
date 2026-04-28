@@ -6,25 +6,8 @@ import Metrology.ProbLang.Syntax.Types
 /-!
 # Type Interpretation
 
-Interpretation of syntactic types as semantic types: a nonexpansive map
-`interp : Ty → TyEnv GF → lrel GF` sending each syntactic type to its
-logical relation under a type-variable environment.
-
-**Representation choice.** Rocq uses `listO (lrelC Σ)` for the
-type-variable environment. We instead use a function `Nat → lrel GF`
-(`TyEnv GF`) so the OFE comes for free via the pi instance on the
-function space.
-
-**Design note.** We define `interp` via `Ty.rec` on a **bundled motive**
-`fun τ => {f : TyEnv GF → lrel GF // NonExpansiveEnv f}` where
-`NonExpansiveEnv` is pointwise nonexpansiveness in the environment.
-Bundling the nonexpansiveness witness with the function lets the `.rec'`
-case of the recursion feed `lrel_rec`'s `Hom` constructor a genuine
-(non-`sorry`) ne-proof via the induction hypothesis. `interp` and
-`interp_ne_env` are then the two projections of this bundle. No sorries.
-
-## Rocq source
-`clutch/theories/approxis/interp.v`
+Nonexpansive map `interp : Ty → TyEnv GF → lrel GF` sending each syntactic
+type to its logical relation under a type-variable environment.
 -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
@@ -34,15 +17,12 @@ namespace ProbLang
 section TyEnvSetup
 variable {GF : BundledGFunctors}
 
-/-- Type-variable environment: `Nat → lrel GF`. -/
 abbrev TyEnv (GF : BundledGFunctors) := Nat → lrel GF
 
-/-- Prepend a semantic type to a type-variable environment. -/
 def TyEnv.cons (X : lrel GF) (Δ : TyEnv GF) : TyEnv GF
   | 0 => X
   | n + 1 => Δ n
 
-/-- `cons X` is nonexpansive in `X`. -/
 theorem TyEnv.cons_ne_head {n : Nat} {X Y : lrel GF} {Δ : TyEnv GF}
     (h : X ≡{n}≡ Y) : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons Y Δ) := by
   intro k
@@ -50,7 +30,6 @@ theorem TyEnv.cons_ne_head {n : Nat} {X Y : lrel GF} {Δ : TyEnv GF}
   | zero => exact h
   | succ m => exact Dist.rfl
 
-/-- `cons` is nonexpansive in the tail. -/
 theorem TyEnv.cons_ne_tail {n : Nat} {X : lrel GF} {Δ Δ' : TyEnv GF}
     (h : Δ ≡{n}≡ Δ') : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons X Δ') := by
   intro k
@@ -58,7 +37,6 @@ theorem TyEnv.cons_ne_tail {n : Nat} {X : lrel GF} {Δ Δ' : TyEnv GF}
   | zero => exact Dist.rfl
   | succ m => exact h m
 
-/-- Context lookup for type variables. Mirrors `ctx_lookup`. -/
 @[reducible] def ctxLookup (x : Nat) (Δ : TyEnv GF) : lrel GF := Δ x
 
 end TyEnvSetup
@@ -67,8 +45,7 @@ section interp
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
 /-- A function `TyEnv GF → lrel GF` paired with its pointwise
-nonexpansiveness witness. This is the motive we recurse on, so that the
-`.rec'` case can directly feed `lrel_rec`'s `Hom` using the IH. -/
+nonexpansiveness witness. -/
 structure NEFun (GF : BundledGFunctors) where
   fn  : TyEnv GF → lrel GF
   ne  : ∀ {n : Nat} {Δ Δ' : TyEnv GF}, Δ ≡{n}≡ Δ' → fn Δ ≡{n}≡ fn Δ'
@@ -76,50 +53,39 @@ structure NEFun (GF : BundledGFunctors) where
 namespace NEFun
 variable {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
-/-- The constant `NEFun`. -/
 @[reducible] noncomputable def const (L : lrel GF) : NEFun GF :=
   { fn := fun _ => L, ne := fun _ => Dist.rfl }
 
-/-- `NEFun` factory for `ctxLookup`. -/
 @[reducible] def ofCtx (x : Nat) : NEFun GF :=
   { fn := fun Δ => ctxLookup x Δ, ne := fun h => h x }
 
-/-- Lift a binary `NonExpansive₂` combinator to `NEFun`s. -/
 @[reducible] noncomputable def map2 (F : lrel GF → lrel GF → lrel GF)
     [OFE.NonExpansive₂ F] (A B : NEFun GF) : NEFun GF :=
   { fn := fun Δ => F (A.fn Δ) (B.fn Δ)
     ne := fun h => OFE.NonExpansive₂.ne (A.ne h) (B.ne h) }
 
-/-- Lift a unary `NonExpansive` combinator to `NEFun`s. -/
 @[reducible] noncomputable def map1 (F : lrel GF → lrel GF)
     [OFE.NonExpansive F] (A : NEFun GF) : NEFun GF :=
   { fn := fun Δ => F (A.fn Δ)
     ne := fun h => OFE.NonExpansive.ne (f := F) (A.ne h) }
 
-/-- The recursive-type combinator at the `NEFun` level. Given a `NEFun`
-on the extended environment, produce a `NEFun` on the current one. The
-ne-witness is a direct use of `lrel_rec_ne`. -/
 @[reducible] noncomputable def rec' (A : NEFun GF) : NEFun GF :=
   { fn := fun Δ => lrel_rec
       { f := fun X => A.fn (TyEnv.cons X Δ)
         ne := ⟨fun {_ _ _} hXY => A.ne (TyEnv.cons_ne_head hXY)⟩ }
     ne := fun h => lrel_rec_ne (fun _ => A.ne (TyEnv.cons_ne_tail h)) }
 
-/-- The `∀`-type combinator at the `NEFun` level. -/
 @[reducible] noncomputable def forall' (A : NEFun GF) : NEFun GF :=
   { fn := fun Δ => lrel_forall (fun X => A.fn (TyEnv.cons X Δ))
     ne := fun h => lrel_forall_ne (fun _ => A.ne (TyEnv.cons_ne_tail h)) }
 
-/-- The `∃`-type combinator at the `NEFun` level. -/
 @[reducible] noncomputable def exists' (A : NEFun GF) : NEFun GF :=
   { fn := fun Δ => lrel_exists (fun X => A.fn (TyEnv.cons X Δ))
     ne := fun h => lrel_exists_ne (fun _ => A.ne (TyEnv.cons_ne_tail h)) }
 
 end NEFun
 
-/-- Bundled interpretation: `interpNE τ` is a function `TyEnv → lrel`
-together with its pointwise ne-witness in the environment. Defined by
-structural recursion on `τ`. -/
+/-- Bundled interpretation paired with a pointwise ne-witness. -/
 noncomputable def interpNE : Ty → NEFun GF
   | .unit         => NEFun.const lrel_unit
   | .int          => NEFun.const lrel_int
@@ -134,37 +100,21 @@ noncomputable def interpNE : Ty → NEFun GF
   | .forall' τ'   => NEFun.forall' (interpNE τ')
   | .exists' τ'   => NEFun.exists' (interpNE τ')
 
-/-- Unbundled interpretation: the function component of `interpNE`. -/
 noncomputable def interp (τ : Ty) (Δ : TyEnv GF) : lrel GF :=
   (interpNE (GF := GF) τ).fn Δ
 
-/-- Public API: `interp τ` is nonexpansive in its environment. -/
 theorem interp_ne_env (τ : Ty) {n : Nat} {Δ Δ' : TyEnv GF}
     (h : Δ ≡{n}≡ Δ') : interp τ Δ ≡{n}≡ interp τ Δ' :=
   (interpNE (GF := GF) τ).ne h
 
 end interp
 
-/-! ## Closedness of related values
-
-Every value related by `interp τ Δ` is closed (no free variables, locally
-closed). This is a port-specific property — Rocq's intrinsic `val` carries
-closedness for free; we need to track it explicitly. The proof is by
-structural induction on `τ`, using each lrel's value-form constraint
-(literals are closed; arrow/forall/exists carry an explicit closedness
-conjunct; ref/tape values are locations/labels). -/
-
-/-! ### `interp_closed`: closedness of values at any `interp τ Δ`
-
-Now trivial: closedness is built into `lrel`'s structure (option D, 2026-04-27).
-This was previously a substantial inductive proof requiring `IsClosedRespecting`
-typeclass infrastructure. -/
+/-! ## Closedness of related values -/
 
 section interp_closed
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
-/-- Every `interp τ Δ` value-relation only relates closed values. Trivial via
-`lrel.closed` field. -/
+/-- Every `interp τ Δ` value-relation only relates closed values. -/
 theorem interp_closed {Δ : TyEnv GF} (τ : Ty) (v v' : Val) :
     (interp τ Δ).car v v' ⊢@{IProp GF}
       iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) :=
@@ -172,20 +122,14 @@ theorem interp_closed {Δ : TyEnv GF} (τ : Ty) (v v' : Val) :
 
 end interp_closed
 
-/-! ## Unboxed-value predicate
+/-! ## Unboxed-value predicate -/
 
-Ports `val_is_unboxed` (clutch/theories/prob_lang/lang.v). A value is
-"unboxed" if it's a literal (int/bool/unit/loc/lbl) or a tagged literal
-via `inl`/`inr`. -/
-
-/-- A value-level expression is unboxed. -/
 @[simp] def Exp.isUnboxedV : Exp → Prop
   | .lit _ => True
   | .inl (.lit _) => True
   | .inr (.lit _) => True
   | _ => False
 
-/-- `Val.isUnboxed v` holds iff `v.1` is unboxed. -/
 @[reducible] def Val.isUnboxed (v : Val) : Prop := v.1.isUnboxedV
 
 /-! ## Soundness of the semantic type interpretation -/
@@ -193,87 +137,71 @@ via `inl`/`inr`. -/
 section interp_sound
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
-/-- Unboxed-type values are unboxed. Mirrors `unboxed_type_sound`
-(interp.v:49–58). -/
+/-- Unboxed-type values are unboxed. -/
 theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
     (H : UnboxedType τ) :
     (interp τ Δ).car v v' ⊢@{IProp GF} ⌜ Val.isUnboxed v ∧ Val.isUnboxed v' ⌝ := by
   cases H
-  -- unit
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩
     ipure_intro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
-  -- int
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%n, %h1, %h2⟩
     ipure_intro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
-  -- bool
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%b, %h1, %h2⟩
     ipure_intro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
-  -- ref τ'
   · show iprop(∃ _ _, _) ⊢ _
     iintro ⟨%l1, %l2, %h1, %h2, _⟩
     ipure_intro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
 
-/-- At an unboxed type, both related values are bare literals (`.lit _`).
-Stronger than `unboxed_type_sound` (which allows `inl/inr` shapes too) because
-`UnboxedType` doesn't include sums. Used by `bin_log_related_unboxed_eq` to
-β-step `BinOp.eval .eq` on the underlying literals. -/
+/-- At an unboxed type, both related values are bare literals. Stronger than
+`unboxed_type_sound`: `UnboxedType` doesn't include sums. -/
 theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
     (H : UnboxedType τ) :
     (interp τ Δ).car v v' ⊢@{IProp GF}
       ⌜∃ l l' : BaseLit, v.1 = .lit l ∧ v'.1 = .lit l'⌝ := by
   cases H
-  -- unit
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩
     ipure_intro
     exact ⟨_, _, h1, h2⟩
-  -- int
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%n, %h1, %h2⟩
     ipure_intro
     exact ⟨_, _, h1, h2⟩
-  -- bool
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%b, %h1, %h2⟩
     ipure_intro
     exact ⟨_, _, h1, h2⟩
-  -- ref τ'
   · show iprop(∃ _ _, _) ⊢ _
     iintro ⟨%l1, %l2, %h1, %h2, _⟩
     ipure_intro
     exact ⟨_, _, h1, h2⟩
 
-/-- At equality-types, both related values are pointwise equal. Mirrors
-`eq_type_sound` (interp.v:60–77). -/
+/-- At equality-types, both related values are pointwise equal. -/
 theorem eq_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val} (H : EqType τ) :
     (interp τ Δ).car v v' ⊢@{IProp GF} ⌜ v = v' ⌝ := by
   induction H generalizing v v'
-  -- unit
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩
     ipure_intro
     apply Val.ext
     rw [h1, h2]
-  -- int
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%n, %h1, %h2⟩
     ipure_intro
     apply Val.ext
     rw [h1, h2]
-  -- bool
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%b, %h1, %h2⟩
     ipure_intro
     apply Val.ext
     rw [h1, h2]
-  -- prod
   · rename_i τ1 τ2 Hτ1 Hτ2 ih1 ih2
     show iprop(∃ _ _ _ _, _) ⊢ _
     iintro ⟨%a1, %a2, %b1, %b2, %h1, %h2, HA, HB⟩
@@ -283,7 +211,6 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val} (H : EqType τ) :
     ipure_intro
     apply Val.ext
     rw [h1, h2, heq1, heq2]
-  -- sum
   · rename_i τ1 τ2 Hτ1 Hτ2 ih1 ih2
     unfold interp at ih1 ih2
     show iprop(∃ _ _, _) ⊢ _
@@ -298,30 +225,13 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val} (H : EqType τ) :
       apply Val.ext
       rw [h1, h2, heq]
 
-/-- Decidable equality at unboxed types. Mirrors `unboxed_type_eq`
-(interp.v:79–118). Sketch:
-
-1. By `unboxed_type_ref_or_eqtype`, `τ` is `EqType` or `ref τ'` or `tape`.
-2. `EqType` case: `eq_type_sound` on both hyps gives `v1 = v2` and
-   `w1 = w2`, then the biconditional follows pure-logically.
-3. `ref τ'` case: destructure both `lrel_ref` hyps. Case-split on
-   `l1 = r1` and `l2 = r2`. Three of the four subcases are either
-   trivial (both equal → both sides equal) or pure-logic (one equal
-   and the other not → both sides false). The fourth subcase (`l1 = r1`
-   but `l2 ≠ r2`, or vice versa) opens two invariants to derive
-   `False` from two `appHeapFrag`/`specHeapFrag` at the same location.
-4. `tape` case: analogous using `appTapesFrag`/`specTapesFrag`.
-
-The invariant-opening pattern mirrors `interp_ref_funct`/`inj`,
-`interp_tape_funct`/`inj` from Model.lean. -/
+/-- Decidable equality at unboxed types. -/
 theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv GF} {v1 v2 w1 w2 : Val}
     (H : UnboxedType τ) :
     (interp τ Δ).car v1 v2 ⊢@{IProp GF}
       (interp τ Δ).car w1 w2 -∗ |={⊤}=> ⌜ v1 = w1 ↔ v2 = w2 ⌝ := by
-  -- Classify `τ` into EqType, TRef, or TTape.
   rcases unboxed_type_ref_or_eqtype H with Hτ | ⟨τ', rfl⟩ | rfl
-  · -- EqType case: v1 = v2 and w1 = w2 both equalities, so the biconditional is pure.
-    iintro H1 H2
+  · iintro H1 H2
     ihave %heq1 := eq_type_sound Hτ $$ H1
     ihave %heq2 := eq_type_sound Hτ $$ H2
     imodintro
@@ -329,28 +239,22 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv GF} {v1 v2 w1 w2 : Val}
     refine ⟨fun h => ?_, fun h => ?_⟩
     · rw [← heq1, ← heq2, h]
     · rw [heq1, heq2, h]
-  · -- TRef τ' case.
-    unfold interp
+  · unfold interp
     show (lrel_ref ((interpNE τ').fn Δ)).car _ _ ⊢
       (lrel_ref ((interpNE τ').fn Δ)).car _ _ -∗ _
     unfold lrel_ref
     iintro H1 H2
     icases H1 with ⟨%l1, %l2, %he1, %he1', Hinv1⟩
     icases H2 with ⟨%r1, %r2, %he2, %he2', Hinv2⟩
-    -- v1.1 = .lit (.loc l1), v2.1 = .lit (.loc l2), w1.1 = .lit (.loc r1), w2.1 = .lit (.loc r2).
     by_cases h_l1_r1 : l1 = r1
     · by_cases h_l2_r2 : l2 = r2
-      · -- l1 = r1 and l2 = r2: both `v = w` equalities hold.
-        imodintro
+      · imodintro
         ipure_intro
         subst h_l1_r1 h_l2_r2
         refine ⟨fun _ => ?_, fun _ => ?_⟩
         · apply Val.ext; rw [he1', he2']
         · apply Val.ext; rw [he1, he2]
-      · -- l1 = r1 but l2 ≠ r2: derive False from two specHeapFrag at l2 (= r2 would
-        -- be required for equality, but l2 ≠ r2 case... wait this is subtle).
-        subst h_l1_r1
-        -- After subst: r1 replaced by l1. Derive False.
+      · subst h_l1_r1
         have hN_disj : logN.@ ((l1, l2) : Loc × Loc) ## logN.@ ((l1, r2) : Loc × Loc) :=
           ndot_ne_disjoint _ (fun heq => h_l2_r2 (by injection heq))
         have h1 : (↑(logN.@ ((l1, l2) : Loc × Loc)) : CoPset) ⊆ ⊤ :=

@@ -7,30 +7,15 @@ import Iris.Instances.Lib.Invariants
 /-!
 # Semantic Model
 
-Defines the semantic model for the binary logical relation. Key definitions:
-`ApproxisRGS` typeclass, `lrel` (logical relation type = persistent iProp on value pairs),
-`refines`, and type constructors (`lrel_unit`, `lrel_nat`, `lrel_bool`, `lrel_prod`,
-`lrel_sum`, `lrel_arr`, `lrel_rec`, `lrel_forall`, `lrel_exists`, `lrel_ref`, `lrel_tape`).
-
-## Rocq source
-`clutch/theories/approxis/model.v`
-
--- ## External dependencies (not yet ported)
--- - `clutch.common` (language, ectxi_language, locations)
--- - `clutch.prelude` (properness)
--- - `clutch.prob_lang` (notation, lang)
--- - Iris (na_invariants, proofmode)
+Semantic model for the binary logical relation: `ApproxisRGS`, `lrel`,
+`refines`, and type constructors.
 -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 namespace ProbLang
 
-/-! ## `Pos.Countable` instances for namespace indexing
-
-`logN.@(l1, l2)` requires `Pos.Countable (Loc × Loc)`. Loc = Int, and iris
-ships only `Pos.Countable` for `Namespace`/`List`/`Pos`. Add Nat, Int, and
-product instances here. -/
+/-! ## `Pos.Countable` instances for namespace indexing -/
 
 theorem Pos.toNat_succ (p : Pos) : p.succ.toNat = p.toNat + 1 := by
   induction p with
@@ -109,10 +94,7 @@ instance {A B : Type} [Pos.Countable A] [Pos.Countable B] : Pos.Countable (A × 
 
 def logN : Namespace := nroot.@ (1 : Pos)
 
-/-! ## `ApproxisRGS` ghost-state bundle
-
-Mirrors Rocq's `approxisRGS` (model.v:11–15). On top of `ApproxisGS` we add
-the non-atomic invariant pool (`NaInvG`) and a pool name. -/
+/-! ## `ApproxisRGS` ghost-state bundle -/
 
 class ApproxisRGS (hlc : outParam Bool) (GF : BundledGFunctors) where
   approxisGS : ApproxisGS hlc GF
@@ -121,11 +103,7 @@ class ApproxisRGS (hlc : outParam Bool) (GF : BundledGFunctors) where
 
 attribute [reducible, instance] ApproxisRGS.approxisGS ApproxisRGS.naInvG
 
-/-! ## Logical relation type
-
-A semantic value-relation is a binary persistent iProp on `Val × Val`.
-Mirrors `lrel` (model.v:18–21). The persistence hypothesis is packed into the
-record rather than an `Arguments`-style coercion. -/
+/-! ## Logical relation type -/
 
 structure lrel (GF : BundledGFunctors) where
   car : Val → Val → IProp GF
@@ -134,16 +112,9 @@ structure lrel (GF : BundledGFunctors) where
 
 attribute [instance] lrel.persistent
 
-/-- Coerce an `lrel` to its underlying binary relation. -/
 instance {GF} : CoeFun (lrel GF) (fun _ => Val → Val → IProp GF) := ⟨lrel.car⟩
 
-/-! ## OFE/COFE structure on `lrel`
-
-Mirrors `lrel_ofe_mixin` and `lrel_cofe` (model.v:30–57). `lrel GF` is
-equivalent to `{f : Val → Val → IProp GF // ∀ v1 v2, Persistent (f v1 v2)}`
-as an OFE: equivalence/distance lift pointwise from the underlying binary
-function, and completion builds a chain limit then re-packages with the
-persistent witness. -/
+/-! ## OFE/COFE structure on `lrel` -/
 
 instance {GF : BundledGFunctors} : OFE (lrel GF) where
   Equiv A B := ∀ v1 v2, A.car v1 v2 ≡ B.car v1 v2
@@ -159,17 +130,12 @@ instance {GF : BundledGFunctors} : OFE (lrel GF) where
     exact OFE.equiv_dist.mpr fun n => h n v1 v2
   dist_lt hd hmn v1 v2 := OFE.dist_lt (hd v1 v2) hmn
 
-/-- Project an `lrel`-valued chain into the underlying function-space chain,
-which has `COFE` via the standard pi-instance. This lets us take completion
-in the function space and re-package with a persistence witness. -/
+/-- Project an `lrel`-valued chain into the underlying function-space chain. -/
 noncomputable def lrel.toFunChain {GF : BundledGFunctors}
     (c : Chain (lrel GF)) : Chain (Val → Val → IProp GF) where
   chain k := (c.chain k).car
   cauchy h := (c.cauchy h : _)
 
-/-- Chain completion for `lrel`: take pointwise completion in the function
-space and prove persistence of the limit via `LimitPreserving.entails`
-applied to `P ⊢ <pers> P` pointwise. -/
 noncomputable instance {GF : BundledGFunctors} : IsCOFE (lrel GF) where
   compl c :=
     let carC : Val → Val → IProp GF := IsCOFE.compl (lrel.toFunChain c)
@@ -188,8 +154,6 @@ noncomputable instance {GF : BundledGFunctors} : IsCOFE (lrel GF) where
           (fun f => f v1 v2) (fun f => iprop(<pers> f v1 v2))
           (lrel.toFunChain c) hk
       closed := fun v1 v2 => by
-        -- Closedness limit: each chain element implies closedness, and
-        -- closedness is a pure (timeless) prop, so the limit also implies it.
         have hk : ∀ k, (c.chain k).car v1 v2 ⊢
             iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF) :=
           fun k => (c.chain k).closed v1 v2
@@ -206,23 +170,16 @@ noncomputable instance {GF : BundledGFunctors} : IsCOFE (lrel GF) where
           (lrel.toFunChain c) hk }
   conv_compl {_ c} v1 v2 := IsCOFE.conv_compl (c := lrel.toFunChain c) v1 v2
 
-/-- Inhabited instance (required by `fixpoint`). The default relation is
-`False` (relates nothing), which trivially implies any conclusion including
-closedness. -/
 instance {GF : BundledGFunctors} : Inhabited (lrel GF) where
   default :=
     { car := fun _ _ => iprop(False)
       persistent := fun _ _ => inferInstance
       closed := fun _ _ => Iris.BI.false_elim }
 
-/-- `lrel.car` is nonexpansive in the `lrel` argument (for fixed `v1, v2`). -/
 instance lrel.car_ne {GF : BundledGFunctors} (v1 v2 : Val) :
     OFE.NonExpansive (fun A : lrel GF => A.car v1 v2) where
   ne {_ _ _} hAB := hAB v1 v2
 
-/-- `lrel` has Leibniz equality: pointwise OFE-equivalence at iprops (which is
-Leibniz via `UPred` Leibniz) lifts to `lrel`-level Leibniz via funext + the
-fact that persistence is propositional and so its proof-content is irrelevant. -/
 instance lrel.leibniz {GF : BundledGFunctors} : OFE.Leibniz (lrel GF) where
   eq_of_eqv {A B} hequiv := by
     obtain ⟨carA, persA, closA⟩ := A
@@ -249,13 +206,7 @@ variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
 end NaShorthand
 
-/-! ## Refinement judgement
-
-The core definition (model.v:76–86). Given `⤇ fill K e'`, `na_own E`, error
-budget `↯ ε` with `0 < ε`, prove `wp e {v, ∃ v' ε', ⤇ fill K v' ∗ na_own ⊤ ∗
-↯ ε' ∗ ⌜0 < ε'⌝ ∗ A v v'}`.
-
-Rocq seals this; we expose it plainly — callers can always `unfold refines`. -/
+/-! ## Refinement judgement -/
 
 section Refines
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
@@ -269,8 +220,7 @@ noncomputable def refines (E : CoPset) (e e' : Exp) (A : lrel GF) : IProp GF :=
     wp ⊤ e (fun v => iprop(∃ (v' : Val) (ε' : ENNReal),
       (⤇ (K.fill v'.1)) ∗ (naOwnP ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A v v')))
 
-/-- `refines` definitionally equals its body. Use this helper to bridge between
-folded and unfolded forms via `iapply`/`iexact` (which don't reduce `def` bodies). -/
+/-- Bridge between the folded and unfolded form of `refines` for `iapply`/`iexact`. -/
 theorem refines_unfold {E : CoPset} {e e' : Exp} {A : lrel GF} :
     refines E e e' A ⊢@{IProp GF}
       iprop(∀ (K : Ectx) (ε : ENNReal),
@@ -292,15 +242,11 @@ scoped notation:100 "REL " e1 " << " e2 " @ " E " : " A =>
 scoped notation:100 "REL " e1 " << " e2 " : " A =>
   refines (⊤ : CoPset) e1 e2 A
 
-/-! ## Simple lrel constructors
-
-Each mirrors a case of `lrel` in `clutch/theories/approxis/model.v:100–142`.
-Value-level matching is on `v.1 : Exp`, since `Val := (e : Exp) × IsVal e`. -/
+/-! ## Simple lrel constructors -/
 
 section SimpleLRels
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
-/-- Helper: closedness for a value at a literal-shape relation. -/
 private theorem lrel_closed_lit_pair (v1 v2 : Val) :
     iprop(⌜v1.1 = .lit .unit ∧ v2.1 = .lit .unit⌝ : IProp GF)
       ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
@@ -308,13 +254,11 @@ private theorem lrel_closed_lit_pair (v1 v2 : Val) :
   ipure_intro
   exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
-/-- `lrel_unit`: both values are the unit literal. -/
 noncomputable def lrel_unit : lrel GF where
   car v1 v2 := iprop(⌜ v1.1 = .lit .unit ∧ v2.1 = .lit .unit ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := lrel_closed_lit_pair v1 v2
 
-/-- `lrel_bool`: both values are the same boolean literal. -/
 noncomputable def lrel_bool : lrel GF where
   car v1 v2 := iprop(∃ b : Bool, ⌜ v1.1 = .lit (.bool b) ∧ v2.1 = .lit (.bool b) ⌝)
   persistent _ _ := inferInstance
@@ -323,7 +267,6 @@ noncomputable def lrel_bool : lrel GF where
     ipure_intro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
-/-- `lrel_nat`: both values are the same integer literal with `0 ≤ n`. -/
 noncomputable def lrel_nat : lrel GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
   persistent _ _ := inferInstance
@@ -332,7 +275,7 @@ noncomputable def lrel_nat : lrel GF where
     ipure_intro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
-/-- `lrel_pos_nat`: both values are the same POSITIVE integer literal (`0 < n`). -/
+/-- Both values are the same positive integer literal (`0 < n`). -/
 noncomputable def lrel_pos_nat : lrel GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ 0 < n ∧
     v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
@@ -342,7 +285,6 @@ noncomputable def lrel_pos_nat : lrel GF where
     ipure_intro
     exact ⟨h.2.1 ▸ Exp.lit_isClosedEmpty _, h.2.2 ▸ Exp.lit_isClosedEmpty _⟩
 
-/-- `lrel_int`: both values are the same integer literal. -/
 noncomputable def lrel_int : lrel GF where
   car v1 v2 := iprop(∃ n : Int, ⌜ v1.1 = .lit (.int n) ∧ v2.1 = .lit (.int n) ⌝)
   persistent _ _ := inferInstance
@@ -351,9 +293,6 @@ noncomputable def lrel_int : lrel GF where
     ipure_intro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
-/-- `lrel_arr A1 A2`: functions sending `A1`-related arguments to `A2`-related
-results under the refinement judgement. Closedness is built into the relation
-via the structure field (no longer a separate conjunct). -/
 noncomputable def lrel_arr (A1 A2 : lrel GF) : lrel GF where
   car v1 v2 :=
     iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
@@ -362,7 +301,6 @@ noncomputable def lrel_arr (A1 A2 : lrel GF) : lrel GF where
   persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
 
-/-- `lrel_prod A B`: pair values with component-wise relatedness. -/
 noncomputable def lrel_prod (A B : lrel GF) : lrel GF where
   car v1 v2 :=
     iprop(∃ (a1 a2 b1 b2 : Val),
@@ -385,8 +323,6 @@ noncomputable def lrel_prod (A B : lrel GF) : lrel GF where
         exact Exp.IsLocallyClosed.pair hAcl.2.1 hBcl.2.1
       · rw [h2]; simp [Exp.fv]; exact ⟨hAcl.2.2, hBcl.2.2⟩
 
-/-- `lrel_sum A B`: tagged-union values, both `inl` related by `A` or both
-`inr` related by `B`. -/
 noncomputable def lrel_sum (A B : lrel GF) : lrel GF where
   car v1 v2 :=
     iprop(∃ (w1 w2 : Val),
@@ -416,16 +352,13 @@ noncomputable def lrel_sum (A B : lrel GF) : lrel GF where
         · rw [h2]; exact Exp.IsLocallyClosed.inr hBcl.2.1
         · rw [h2]; simp [Exp.fv]; exact hBcl.2.2
 
-/-- `lrel_exists C`: existential over semantic types. -/
 noncomputable def lrel_exists (C : lrel GF → lrel GF) : lrel GF where
   car v1 v2 := iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
     ∃ A : lrel GF, C A v1 v2)
   persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
 
-/-- `lrel_forall C`: universal over semantic types, uniform in them via
-`lrel_arr lrel_unit` — mirrors System F's value-restricted ∀ elimination.
-Closedness derives from `lrel_arr lrel_unit (C A)` for any A. -/
+/-- Universal over semantic types, uniform via `lrel_arr lrel_unit`. -/
 noncomputable def lrel_forall (C : lrel GF → lrel GF) : lrel GF where
   car v1 v2 :=
     iprop(∀ (A : lrel GF), (lrel_arr lrel_unit (C A)).car v1 v2)
@@ -436,23 +369,16 @@ noncomputable def lrel_forall (C : lrel GF → lrel GF) : lrel GF where
     iapply ((lrel_arr lrel_unit (C default)).closed v1 v2)
     iexact Hinst
 
-/-- `lrel_true`: trivial relation that relates everything that's closed. -/
+/-- Trivial relation that relates everything that's closed. -/
 noncomputable def lrel_true : lrel GF where
   car v1 v2 := iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝)
   persistent _ _ := inferInstance
   closed _ _ := BIBase.Entails.rfl
 
-/-! ### Recursive lrel via `fixpoint`
+/-! ### Recursive lrel via `fixpoint` -/
 
-Mirrors `lrel_rec1`, `lrel_rec1_contractive`, `lrel_rec`, `lrel_rec_unfold`
-(model.v:125–166). The body `C` is a nonexpansive endofunction on `lrel GF`;
-`lrel_rec1 C rec := ▷ C rec` is contractive (because `▷` makes the dependency
-one step later), so `fixpoint` gives a semantic recursive type. -/
-
-/-- One-step unfolding of a recursive semantic type (named `lrelRec1` to
-avoid colliding with Lean's `rec` keyword). Carries a closedness conjunct
-(option C, uniform with `lrel_arr`/`lrel_exists`) so `interp_closed` can
-project it without `▷`-stripping. -/
+/-- One-step unfolding of a recursive semantic type. Carries a closedness
+conjunct so `interp_closed` can project it without `▷`-stripping. -/
 noncomputable def lrelRec1 (C : lrel GF -n> lrel GF) (r : lrel GF) : lrel GF where
   car w1 w2 := iprop((⌜w1.1.isClosedEmpty ∧ w2.1.isClosedEmpty⌝) ∗
     ▷ (C r).car w1 w2)
@@ -462,31 +388,24 @@ noncomputable def lrelRec1 (C : lrel GF -n> lrel GF) (r : lrel GF) : lrel GF whe
 instance lrelRec1_contractive (C : lrel GF -n> lrel GF) : OFE.Contractive (lrelRec1 C) where
   distLater_dist {n P Q} hPQ w1 w2 := by
     show iprop(_ ∗ ▷ _) ≡{n}≡ iprop(_ ∗ ▷ _)
-    -- The pure conjunct doesn't depend on `r`. The `▷ (C r).car` part is
-    -- contractive in `r`. Compose via `sep_ne`.
     refine sep_ne.ne .rfl ?_
     refine Contractive.distLater_dist (f := (Iris.BI.later : IProp GF → IProp GF)) ?_
     intro k hk
     have hk' : P ≡{k}≡ Q := hPQ k hk
     exact C.ne.ne hk' w1 w2
 
-/-- Contractive-hom wrapper so we can feed it to `fixpoint`. -/
 noncomputable def lrelRec1Hom (C : lrel GF -n> lrel GF) : lrel GF -c> lrel GF where
   f := lrelRec1 C
   ne := inferInstance
   contractive := inferInstance
 
-/-- Recursive semantic type as the fixed point of `lrelRec1 C`. -/
 noncomputable def lrel_rec (C : lrel GF -n> lrel GF) : lrel GF :=
   fixpoint (lrelRec1 C)
 
-/-- Fixed-point unfolding for `lrel_rec`. -/
 theorem lrel_rec_unfold (C : lrel GF -n> lrel GF) :
     lrel_rec C ≡ lrelRec1 C (lrel_rec C) :=
   fixpoint_unfold (lrelRec1Hom C)
 
-/-- `lrel_rec` is nonexpansive in `C`. Mirrors `lrel_rec_ne`
-(model.v:154–163). -/
 theorem lrel_rec_ne {n : Nat} {C1 C2 : lrel GF -n> lrel GF}
     (hC : ∀ A : lrel GF, C1 A ≡{n}≡ C2 A) :
     lrel_rec C1 ≡{n}≡ lrel_rec C2 := by
@@ -525,9 +444,7 @@ theorem lrel_rec_ne {n : Nat} {C1 C2 : lrel GF -n> lrel GF}
       exact step1.trans step2
     exact h1.trans (hmid.trans h2)
 
-/-! ### Nonexpansive instances on simple lrel constructors
-
-Mirrors `lrel_prod_ne`, `lrel_sum_ne`, `lrel_arr_ne` (model.v:145–152). -/
+/-! ### Nonexpansive instances on simple lrel constructors -/
 
 instance lrel_prod_ne_2 : OFE.NonExpansive₂ (lrel_prod (GF := GF)) where
   ne {n A1 A2} hA {B1 B2} hB v1 v2 := by
@@ -549,8 +466,7 @@ instance lrel_sum_ne_2 : OFE.NonExpansive₂ (lrel_sum (GF := GF)) where
     · refine sep_ne.ne .rfl ?_
       exact sep_ne.ne .rfl (hB w1 w2)
 
-/-- `refines` is nonexpansive in its relation argument (for fixed `E, e, e'`).
-Mirrors `refines_ne` (model.v:92–94). -/
+/-- `refines` is nonexpansive in its relation argument. -/
 theorem refines_ne {E : CoPset} {e e' : Exp} {n : Nat} {A B : lrel GF}
     (h : A ≡{n}≡ B) : refines E e e' A ≡{n}≡ refines E e e' B := by
   unfold refines
@@ -627,10 +543,7 @@ instance lrel_ref_ne : OFE.NonExpansive (lrel_ref (GF := GF)) where
     refine sep_ne.ne .rfl ?_
     exact hAB w1 w2
 
-/-- `lrel_forall` is nonexpansive in the body function
-(pointwise-`≡{n}≡`). We phrase this via a bespoke lemma rather than a
-generic `NonExpansive`, because the argument type `lrel GF → lrel GF`
-would need its own OFE. -/
+/-- `lrel_forall` is nonexpansive in the body function (pointwise-`≡{n}≡`). -/
 theorem lrel_forall_ne {n : Nat} {C1 C2 : lrel GF → lrel GF}
     (h : ∀ A, C1 A ≡{n}≡ C2 A) :
     (lrel_forall C1 : lrel GF) ≡{n}≡ lrel_forall C2 := by
@@ -639,7 +552,6 @@ theorem lrel_forall_ne {n : Nat} {C1 C2 : lrel GF → lrel GF}
   refine forall_ne fun A => ?_
   exact lrel_arr_ne_2.ne .rfl (h A) v1 v2
 
-/-- `lrel_exists` is nonexpansive in the body function. -/
 theorem lrel_exists_ne {n : Nat} {C1 C2 : lrel GF → lrel GF}
     (h : ∀ A, C1 A ≡{n}≡ C2 A) :
     (lrel_exists C1 : lrel GF) ≡{n}≡ lrel_exists C2 := by
@@ -651,10 +563,7 @@ theorem lrel_exists_ne {n : Nat} {C1 C2 : lrel GF → lrel GF}
 
 end SimpleLRels
 
-/-! ### Semantic property lemmas
-
-Mirrors `interp_ref_funct`, `interp_ref_inj`, `interp_tape_funct`,
-`interp_tape_inj` (model.v:187–249). -/
+/-! ### Semantic property lemmas -/
 
 section SemtypesProperties
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
@@ -662,8 +571,7 @@ variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 instance : Inhabited Val := ⟨⟨.lit .unit, .lit⟩⟩
 
 /-- Reference type is functional in the program-side location: if `#l` is
-related to both `#l1` and `#l2` at `ref A`, then `l1 = l2`. Mirrors
-`interp_ref_funct` (model.v:187–201). -/
+related to both `#l1` and `#l2` at `ref A`, then `l1 = l2`. -/
 theorem interp_ref_funct {E : CoPset} (A : lrel GF) (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
     ⊢@{IProp GF} (lrel_ref A).car ⟨.lit (.loc l), .lit⟩ ⟨.lit (.loc l1), .lit⟩ -∗
@@ -678,7 +586,6 @@ theorem interp_ref_funct {E : CoPset} (A : lrel GF) (l l1 l2 : Loc)
   have heq_l1 : l1 = l1' := by simp at Heq1'; exact Heq1'
   have heq_l2 : l2 = l2' := by simp at Heq2'; exact Heq2'
   subst heq_l' heq_l1 heq_l2
-  -- Now Hinv1 uses `(l', l1)`, Hinv2 uses `(l', l2)`. Goal is `l1 = l2`.
   subst heq_l
   by_cases h : l1 = l2
   · imodintro; ipure_intro; exact h
@@ -695,9 +602,6 @@ theorem interp_ref_funct {E : CoPset} (A : lrel GF) (l l1 l2 : Loc)
       exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
     imod Iris.inv_acc E _ _ h1 $$ Hinv1 with ⟨HP1, _⟩
     imod Iris.inv_acc _ _ _ h2' $$ Hinv2 with ⟨HP2, _⟩
-    -- Push `▷` inside each invariant body via `later_exists` + `later_sep`,
-    -- isolating `▷ appHeapFrag l _` on each side. Then derive `▷ False` by
-    -- applying `appHeapFrag_valid_2` pointwise under `▷`.
     ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
     · ihave HP1a := later_exists.mpr $$ HP1
       icases HP1a with ⟨%wa1, HP1b⟩
@@ -713,17 +617,13 @@ theorem interp_ref_funct {E : CoPset} (A : lrel GF) (l l1 l2 : Loc)
       icases HP2e with ⟨Hl2L, _⟩
       inext
       iapply appHeapFrag_valid_2 $$ Hl1L Hl2L
-    -- `▷ False ⊢ ◇ (fupd E1 E2 ⌜l1=l2⌝) ⊢ (fupd E1 E2 ⌜l1=l2⌝)`; the
-    -- latter is the `IsExcept0 (fupd E1 E2 P)` instance.
-    -- Build `◇ (fupd _ _ ⌜l1 = l2⌝)` from `▷ False` and close via `IsExcept0`.
     iapply IsExcept0.is_except0
     unfold BIBase.except0
     iapply BI.or_intro_l
     iexact HbotLater
 
 /-- Reference type is injective on the program-side location: if both `#l1`
-and `#l2` are related to `#l` at `ref A`, then `l1 = l2`. Mirrors
-`interp_ref_inj` (model.v:203–217). -/
+and `#l2` are related to `#l` at `ref A`, then `l1 = l2`. -/
 theorem interp_ref_inj {E : CoPset} (A : lrel GF) (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
     ⊢@{IProp GF} (lrel_ref A).car ⟨.lit (.loc l1), .lit⟩ ⟨.lit (.loc l), .lit⟩ -∗
@@ -779,8 +679,7 @@ theorem interp_ref_inj {E : CoPset} (A : lrel GF) (l l1 l2 : Loc)
     iapply BI.or_intro_l
     iexact HbotLater
 
-/-- Tape type is functional in the program-side location. Mirrors
-`interp_tape_funct` (model.v:219–233). -/
+/-- Tape type is functional in the program-side location. -/
 theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
     ⊢@{IProp GF} lrel_tape.car ⟨.lit (.lbl l), .lit⟩ ⟨.lit (.lbl l1), .lit⟩ -∗
@@ -822,8 +721,7 @@ theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
     iapply BI.or_intro_l
     iexact HbotLater
 
-/-- Tape type is injective on the program-side location. Mirrors
-`interp_tape_inj` (model.v:235–249). -/
+/-- Tape type is injective on the program-side location. -/
 theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
     ⊢@{IProp GF} lrel_tape.car ⟨.lit (.lbl l1), .lit⟩ ⟨.lit (.lbl l), .lit⟩ -∗
@@ -869,15 +767,11 @@ theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
 
 end SemtypesProperties
 
-/-! ## Monadic layer
-
-Structural laws and modal-elimination instances for the `refines` judgement.
-Mirrors `clutch/theories/approxis/model.v:264–405`. -/
+/-! ## Monadic layer -/
 
 section Monadic
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
-/-- `fupd` can be stripped off in front of a `refines`. -/
 theorem fupd_refines {E : CoPset} {e t : Exp} {A : lrel GF} :
     iprop(|={⊤}=> refines E e t A) ⊢@{IProp GF} refines E e t A := by
   unfold refines
@@ -885,13 +779,7 @@ theorem fupd_refines {E : CoPset} {e t : Exp} {A : lrel GF} :
   imod H
   iapply H $$ %K %ε HR Hna Herr Hpos
 
-/-- `refines_bind`: sequence two refinements via evaluation-context framing.
-Mirrors `refines_bind` (model.v:343–359).
-
-The continuation `Hf` is spatial. The standard `wp_wand` in `AppWeakestpre`
-uses a `□`-wrapped wand and so can't carry `Hf`; we instead use `wp_frame_l`
-to pack `Hf` into the inner WP's post-condition, then discharge pointwise
-via `wp_mono`. -/
+/-- Sequence two refinements via evaluation-context framing. -/
 theorem refines_bind (K K' : Ectx) {E : CoPset} {A A' : lrel GF} {e e' : Exp} :
     ⊢@{IProp GF} iprop((refines E e e' A) -∗
       (∀ (v v' : Val), A v v' -∗ refines (⊤ : CoPset) (K.fill v.1) (K'.fill v'.1) A')
@@ -899,25 +787,20 @@ theorem refines_bind (K K' : Ectx) {E : CoPset} {A A' : lrel GF} {e e' : Exp} :
   unfold refines
   iintro Hm Hf
   iintro %K'' %ε Hj Hna Herr Hpos
-  -- Compose the eval contexts: `K''.fill (K'.fill e') = (K''.comp K').fill e'`.
   have hfc : ∀ x : Exp, K''.fill (K'.fill x) = (K''.comp K').fill x :=
     fun x => Ectx.fill_comp K'' K' x
-  -- Feed `Hm` its arguments with the composed context.
   ispecialize Hm $$ %(K''.comp K') %ε
   ihave Hj2 : iprop(⤇ (K''.comp K').fill e') $$ [Hj]
   · rw [← hfc]; iassumption
   ispecialize Hm $$ Hj2 Hna Herr Hpos
-  -- Inner post-condition (from `Hm` after specialization).
   let ΦInner : Val → IProp GF := fun v => iprop(
     ∃ (v' : Val) (ε' : ENNReal),
       (⤇ (K''.comp K').fill v'.1) ∗ naOwnP ⊤ ∗ ↯ ε' ∗
       ⌜(0 : ENNReal) < ε'⌝ ∗ A.car v v')
-  -- Outer post-condition (goal shape after `wp_bind` + `wp_mono`).
   let ΦOuter : Val → IProp GF := fun v => iprop(
     ∃ (v' : Val) (ε' : ENNReal),
       (⤇ K''.fill v'.1) ∗ naOwnP ⊤ ∗ ↯ ε' ∗
       ⌜(0 : ENNReal) < ε'⌝ ∗ A'.car v v')
-  -- Type of `Hf`.
   let HfTy : IProp GF := iprop(
     ∀ (v v' : Val), A v v' -∗ ∀ (K_1 : Ectx) (ε : ENNReal),
       (⤇ K_1.fill (K'.fill v'.1)) -∗ (naOwnP ⊤) -∗ (↯ ε) -∗ (⌜(0 : ENNReal) < ε⌝) -∗
@@ -925,14 +808,11 @@ theorem refines_bind (K K' : Ectx) {E : CoPset} {A A' : lrel GF} {e e' : Exp} :
         ∃ (v'' : Val) (ε'' : ENNReal),
           (⤇ K_1.fill v''.1) ∗ naOwnP ⊤ ∗ ↯ ε'' ∗
           ⌜(0 : ENNReal) < ε''⌝ ∗ A'.car v₂ v'')))
-  -- Goal: `wp ⊤ (K.fill e) ΦOuter`. Use `wp_bind`.
   iapply wp_bind (K := K)
-  -- Frame `Hf` into `Hm`'s post via `wp_frame_l`.
   ihave Hstep : iprop(wp ⊤ e (fun v => iprop(HfTy ∗ ΦInner v))) $$ [Hf Hm]
   · iapply wp_frame_l (R := HfTy) (e := e) (E := ⊤) (Φ := ΦInner)
     isplitl [Hf]; · iexact Hf
     iexact Hm
-  -- Pointwise entailment: `HfTy ∗ ΦInner v ⊢ wp ⊤ (K.fill v.1) ΦOuter`.
   iapply wp_mono
     (Φ := fun v => iprop(HfTy ∗ ΦInner v))
     (Ψ := fun v => wp ⊤ (K.fill (Exp.ofVal v)) ΦOuter)
@@ -946,9 +826,8 @@ theorem refines_bind (K K' : Ectx) {E : CoPset} {A A' : lrel GF} {e e' : Exp} :
     iapply Hf'' $$ %K'' %ε' Hj3 Hna' Herr' Hpos'
   iexact Hstep
 
-/-- `refines_ret_na`: value introduction that consumes the local `na_own E`
-to produce `na_own ⊤` together with `A v1 v2`. Mirrors `refines_ret_na`
-(model.v:361–372). -/
+/-- Value introduction that consumes the local `na_own E` to produce
+`na_own ⊤` together with `A v1 v2`. -/
 theorem refines_ret_na {E : CoPset} {e1 e2 : Exp} {v1 v2 : Val} {A : lrel GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
     iprop((naOwnP E) ={⊤}=∗ (naOwnP ⊤) ∗ A v1 v2) ⊢@{IProp GF}
@@ -971,8 +850,7 @@ theorem refines_ret_na {E : CoPset} {e1 e2 : Exp} {v1 v2 : Val} {A : lrel GF}
   isplitl [Hpos]; · iassumption
   iassumption
 
-/-- `refines_ret_na'`: dual formulation of `refines_ret_na` that splits
-`⊤ = E ∪ (⊤ \ E)`. Mirrors `refines_ret_na'` (model.v:374–391). -/
+/-- Dual of `refines_ret_na` splitting `⊤ = E ∪ (⊤ \ E)`. -/
 theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp} {v1 v2 : Val} {A : lrel GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
     iprop(|={⊤}=> (naOwnP (SDiff.sdiff (⊤ : CoPset) E)) ∗ A v1 v2) ⊢@{IProp GF}
@@ -989,12 +867,9 @@ theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp} {v1 v2 : Val} {A : lrel GF}
   imodintro
   iexists v2, ε
   isplitl [Hj]; · iassumption
-  -- Combine `naOwnP E` (from Hnais) and `naOwnP (⊤ \ E)` (from HF) into
-  -- `naOwnP ⊤` via `na_own_union` on the disjoint decomposition.
   have hdisj : E ## (SDiff.sdiff (⊤ : CoPset) E) := LawfulSet.disjoint_diff_right
   have hunion : E ∪ (SDiff.sdiff (⊤ : CoPset) E) = (⊤ : CoPset) :=
     LawfulSet.subset_union_diff (fun _ _ => CoPset.mem_full)
-  -- `Hnais ∗ HF ⊢ naOwnP ⊤` via `own_union` applied to disjoint decomposition.
   ihave Hfull : iprop(naOwnP ⊤) $$ [Hnais HF]
   · have heq : (⊤ : CoPset) = E ∪ (SDiff.sdiff (⊤ : CoPset) E) := hunion.symm
     rw [show naOwnP (⊤ : CoPset) = naOwnP (E ∪ (SDiff.sdiff (⊤ : CoPset) E)) from
@@ -1008,8 +883,7 @@ theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp} {v1 v2 : Val} {A : lrel GF}
   isplitl [Hpos]; · iassumption
   iassumption
 
-/-- `refines_ret`: value introduction. From `|={⊤}=> A v1 v2`, conclude
-`REL v1 << v2 : A`. Mirrors `refines_ret` (model.v:393–402). -/
+/-- From `|={⊤}=> A v1 v2`, conclude `REL v1 << v2 : A`. -/
 theorem refines_ret {e1 e2 : Exp} {v1 v2 : Val} {A : lrel GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
     iprop(|={⊤}=> A v1 v2) ⊢@{IProp GF} refines (⊤ : CoPset) e1 e2 A := by
@@ -1030,8 +904,6 @@ theorem refines_ret {e1 e2 : Exp} {v1 v2 : Val} {A : lrel GF}
   isplitl [Hpos]; · iassumption
   iassumption
 
-/-- `fupd` can be eliminated in front of a `refines` goal. Mirrors
-`elim_fupd_refines` (model.v:277–285). -/
 instance elim_fupd_refines (E : CoPset) (e t : Exp) (P : IProp GF) (A : lrel GF) :
     ElimModal True false false (iprop(|={⊤}=> P)) P
       (refines E e t A) (refines E e t A) where
@@ -1042,8 +914,6 @@ instance elim_fupd_refines (E : CoPset) (e t : Exp) (P : IProp GF) (A : lrel GF)
     imod HP
     iapply HI $$ HP
 
-/-- `bupd` can be eliminated in front of a `refines` goal (via `bupd ⊢ fupd`).
-Mirrors `elim_bupd_logrel` (model.v:287–292). -/
 instance elim_bupd_refines (E : CoPset) (e t : Exp) (P : IProp GF) (A : lrel GF) :
     ElimModal True false false (iprop(|==> P)) P
       (refines E e t A) (refines E e t A) where
@@ -1054,8 +924,6 @@ instance elim_bupd_refines (E : CoPset) (e t : Exp) (P : IProp GF) (A : lrel GF)
     imod HP
     iapply HI $$ HP
 
-/-- `refines` is an except-0 modal: `◇ (refines ...) ⊢ refines ...`.
-Mirrors `is_except_0_logrel` (model.v:294–300). -/
 instance is_except_0_refines (E : CoPset) (e t : Exp) (A : lrel GF) :
     IsExcept0 (refines E e t A) where
   is_except0 := by
@@ -1065,7 +933,6 @@ instance is_except_0_refines (E : CoPset) (e t : Exp) (A : lrel GF) :
     imodintro
     iexact HL
 
-/-- Allocate a fresh non-atomic invariant for proving a refinement. -/
 theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Exp} {A : lrel GF} :
     iprop((▷ P) ∗ ((naInvP N P) -∗ refines E e1 e2 A)) ⊢@{IProp GF}
     refines E e1 e2 A := by
@@ -1076,7 +943,6 @@ theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Ex
   imodintro
   iapply Hcont $$ Hinv
 
-/-- Open a non-atomic invariant: use its content inside a refinement and close it. -/
 theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp} {A : lrel GF}
     (HNE : (↑N : CoPset) ⊆ E) :
     iprop((naInvP N P) ∗ ((▷ P) ∗ (naCloseP P N E) -∗
@@ -1096,7 +962,6 @@ theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp}
   imodintro
   iapply IH' $$ %K %ε Hj Hnais' Herr Hpos
 
-/-- Close a non-atomic invariant early, moving from mask `E` to `E ∖ ↑N`. -/
 theorem refines_na_close {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp} {A : lrel GF} :
     iprop((▷ P) ∗ (naCloseP P N E) ∗ refines E e1 e2 A) ⊢@{IProp GF}
     refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A := by

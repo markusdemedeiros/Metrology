@@ -50,18 +50,15 @@ theorem bin_log_related_lam_step
   have hInnerDom : (((x, interp τ_arg Δ) :: Γrc').map (·.1)).toFinset =
       (Γrc'.map (·.1)).toFinset ∪ {x} := by
     simp [List.map_cons, List.toFinset_cons, Finset.union_comm]
-  -- Cofinite L for bin_log_related_lam: cover Γrc'.dom, x, Ke.fv, Ke'.fv.
   let L : Finset Var :=
     (Γrc'.map (·.1)).toFinset ∪ {x} ∪ Ke.fv ∪ Ke'.fv
   apply bin_log_related_lam Δ Γrc' L
-  -- he_lc.
   · intro y _
     rw [Exp.open_close_subst_lc x y _ hKe_lc]
     exact Exp.subst_lc hKe_lc (Exp.IsLocallyClosed.fvar y)
   · intro y _
     rw [Exp.open_close_subst_lc x y _ hKe'_lc]
     exact Exp.subst_lc hKe'_lc (Exp.IsLocallyClosed.fvar y)
-  -- he_fv: (close Ke x).fv ⊆ Γrc'.dom.
   · intro z hz
     have hzKe : z ∈ Ke.fv := Exp.close_fv_subset _ x hz
     have hzKeDom := hKe_fv hzKe
@@ -82,7 +79,6 @@ theorem bin_log_related_lam_step
       have hzx : z = x := Finset.mem_singleton.mp hz_x
       rw [hzx] at hz
       exact Exp.close_var_not_fvar x Ke' hz
-  -- Hbody.
   intro y hyNotL
   have hyNotRc : y ∉ (Γrc'.map (·.1)).toFinset := fun h => hyNotL
     (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_left _ h)))
@@ -93,7 +89,6 @@ theorem bin_log_related_lam_step
     (Finset.mem_union_left _ (Finset.mem_union_right _ h))
   have hyNotFvKe' : y ∉ Ke'.fv := fun h => hyNotL
     (Finset.mem_union_right _ h)
-  -- Use bin_log_related_ty_rename to swap binder atom x → y.
   have hRename := bin_log_related_ty_rename (E := ⊤) (Δ := Δ) (Γ := Γrc')
     (x := x) (y := y) (A := interp τ_arg Δ)
     (τE := Ke) (τE' := Ke') (τ := τ_body)
@@ -198,7 +193,6 @@ theorem bin_log_related_under_typed_ctx
     cases HK with
     | @cons _ _ _ _ Γ2 τ2 _ _ HKitem HKtail =>
     obtain ⟨HfreshHead, HfreshTail⟩ := Hfresh
-    -- Restrict the global binder-freshness premise to K'.
     have HbindersK' : ∀ x ∈ Ctx.binderAtoms K',
         x ∉ e.fv ∧ x ∉ e'.fv ∧ x ∉ Ctx.payloadFv K' := by
       intro x hxK'
@@ -576,7 +570,6 @@ theorem bin_log_related_under_typed_ctx
       · iexact IH1'
       iexact IHk'
     | @fold Γ τα =>
-      -- CtxItem.fold is subsumption: k.fill e = e.
       simp only [CtxItem.fill]
       have IHk := IHinner Γrc' HCtx (by
         simp only [CtxItem.binderAtoms, Finset.union_empty] at HfreshTail
@@ -603,22 +596,11 @@ theorem bin_log_related_under_typed_ctx
       ihave IHk' := IHk
       iapply (bin_log_related_tapp Δ Γrc') $$ [IHk']
       iexact IHk'
-    -- Binder cases. The architecture for `lam` is documented in soundness_port_status.md:
-    -- - rename_i to bind atom and types from cases
-    -- - extract HfreshHead / HfreshTail from BindersFresh.cons
-    -- - apply IH at extended Γrc to get bin_log_related at the binder atom
-    -- - apply `bin_log_related_lam` with cofinite L, transporting each fresh-atom
-    --   instance via `bin_log_related_rename` (proven in Interp.lean).
-    -- The full proof additionally needs LC and fv-bounds on K'.fill e / e' as
-    -- preconditions to the precongruence (typically derived from typing).
     | @lam Γ x τ τ' =>
       simp only [CtxItem.fill]
-      -- After cases: x : Var (binder atom), τ : Ty (binder type),
-      -- τ2 : Ty (body type), Γtc' : Tctx (outer typing ctx).
       have hHeadAtom : x ∈ (CtxItem.lam x).binderAtoms := by
         simp [CtxItem.binderAtoms]
       have hxRc : x ∉ (Γrc'.map (·.1)).toFinset := HfreshHead x hHeadAtom
-      -- Inner Γrc := (x, interp τ Δ) :: Γrc'; well-formed since x ∉ Γrc'.dom.
       have hxRcLookup : Γrc'.lookup x = none := by
         cases hRc : Γrc'.lookup x with
         | none => rfl
@@ -631,7 +613,6 @@ theorem bin_log_related_under_typed_ctx
           exact ⟨p, hpmem, hpeq⟩
       have HCtxInner : TctxRelated Δ (Γtc'.insert x τ) ((x, interp τ Δ) :: Γrc') :=
         HCtx.insert x τ hxRcLookup
-      -- HfreshTail in extended dom: dom of (x,_)::Γrc' = Γrc'.dom ∪ {x}.
       have hInnerDom : (((x, interp τ Δ) :: Γrc').map (·.1)).toFinset =
           (Γrc'.map (·.1)).toFinset ∪ {x} := by
         simp [List.map_cons, List.toFinset_cons, Finset.union_comm]
@@ -641,7 +622,6 @@ theorem bin_log_related_under_typed_ctx
         simp only [CtxItem.binderAtoms] at HfreshTail
         exact HfreshTail
       have IHk_at_x := IHinner ((x, interp τ Δ) :: Γrc') HCtxInner HfreshK'Inner
-      -- Typing of K'.fill e / e' at (Γtc'.insert x τ, τ2).
       have HbindersK'_e : ∀ y ∈ Ctx.binderAtoms K',
           y ∉ e.fv ∧ y ∉ Ctx.payloadFv K' :=
         fun y hy => ⟨(HbindersK' y hy).1, (HbindersK' y hy).2.2⟩
@@ -663,9 +643,6 @@ theorem bin_log_related_under_typed_ctx
         hxRc hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv IHk_at_x
     | @fix Γ f τ τ' =>
       simp only [CtxItem.fill]
-      -- After cases, names exposed: f : Var (binder atom), τ τ' : Ty (the τ τ' of the
-      -- fix binder, which is .arrow τ τ' in the type). Γtc' is unified with Γ.
-      -- HfreshHead: f ∉ Γrc'.dom.
       have hHeadAtom : f ∈ (CtxItem.fix f).binderAtoms := by
         simp [CtxItem.binderAtoms]
       have hfRc : f ∉ (Γrc'.map (·.1)).toFinset := HfreshHead f hHeadAtom
@@ -679,7 +656,6 @@ theorem bin_log_related_under_typed_ctx
           apply hfRc
           simp only [List.mem_toFinset, List.mem_map]
           exact ⟨p, hpmem, hpeq⟩
-      -- Inner Γrc := (f, interp (.arrow τ τ') Δ) :: Γrc'.
       have HCtxInner : TctxRelated Δ (Γtc'.insert f (.arrow τ τ'))
           ((f, interp (.arrow τ τ') Δ) :: Γrc') :=
         HCtx.insert f (.arrow τ τ') hfRcLookup
@@ -716,8 +692,6 @@ theorem bin_log_related_under_typed_ctx
         hfRc hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv IHk_at_f
     | tlam =>
       simp only [CtxItem.fill]
-      -- After cases: τ2 : Ty (the body type), Γtc' : Tctx (outer = inner outer).
-      -- HfreshTail with empty binderAtoms.
       have HfreshK'Outer : Ctx.BindersFresh K' (Γrc'.map (·.1)).toFinset := by
         simp only [CtxItem.binderAtoms, Finset.union_empty] at HfreshTail
         exact HfreshTail
@@ -748,19 +722,11 @@ theorem bin_log_related_under_typed_ctx
     | unpackL =>
       simp only [CtxItem.fill]
       next e2 τ_pkg hxFvE2 Hty_e2 =>
-      rename_i x  -- the binder atom (inaccessible: from `.unpackL x e2`).
-      -- HfreshHead: x ∉ Γrc'.dom (binderAtoms = {x}).
+      rename_i x
       have hHeadAtom : x ∈ (CtxItem.unpackL x e2).binderAtoms := by
         simp [CtxItem.binderAtoms]
       have hxRc : x ∉ (Γrc'.map (·.1)).toFinset := HfreshHead x hHeadAtom
-      -- HIH1: related scrutinees at .exists' τ_pkg.
-      -- Inner application of IHinner needs BindersFresh K' Γrc'.dom (since
-      -- after unpackL, K's binder atoms shift to {x} ∪ inner). Looking at
-      -- HfreshTail: BindersFresh K' (Γrc'.dom ∪ {x}). To use the IH at Γrc'
-      -- (same outer dom), we need K' freshness against Γrc'.dom — strictly
-      -- weaker, so it just follows from HfreshTail by monotonicity.
       have HfreshK'Outer : Ctx.BindersFresh K' (Γrc'.map (·.1)).toFinset := by
-        -- Build a generic monotonicity lemma inline.
         have mono : ∀ {K0 : Ctx} {S T : Finset Var},
             S ⊆ T → Ctx.BindersFresh K0 T → Ctx.BindersFresh K0 S := by
           intro K0
@@ -773,7 +739,6 @@ theorem bin_log_related_under_typed_ctx
             exact ihK (Finset.union_subset_union hST Finset.Subset.rfl) h2
         exact mono Finset.subset_union_left HfreshTail
       have HIH1 := IHinner Γrc' HCtx HfreshK'Outer
-      -- HIH2: for any A, any fresh y, fundamental applied to rename_unpack typing.
       let L : Finset Var := insert x e2.fv ∪ (Γrc'.map (·.1)).toFinset
       apply bin_log_related_unpack Δ Γrc' L HIH1
       intro A y hyL
@@ -799,7 +764,7 @@ theorem bin_log_related_under_typed_ctx
     | unpackR =>
       simp only [CtxItem.fill]
       next e1 τ_pkg Hty_e1 =>
-      rename_i x  -- inaccessible binder atom from `.unpackR x e1`.
+      rename_i x
       have hHeadAtom : x ∈ (CtxItem.unpackR x e1).binderAtoms := by
         simp [CtxItem.binderAtoms]
       have hxRc : x ∉ (Γrc'.map (·.1)).toFinset := HfreshHead x hHeadAtom
@@ -813,17 +778,12 @@ theorem bin_log_related_under_typed_ctx
           apply hxRc
           simp only [List.mem_toFinset, List.mem_map]
           exact ⟨p, hpmem, hpeq⟩
-      -- HIH1: e1 ~ e1 at .exists' τ_pkg (via fundamental on the payload typing).
       have HIH1 := fundamental Hty_e1 Δ Γrc' HCtx
-      -- HfreshTail in extended dom: dom of (x,_)::Γrc' = Γrc'.dom ∪ {x}.
       have hInnerDom : ∀ (A' : lrel GF),
           (((x, interp τ_pkg (TyEnv.cons A' Δ)) :: Γrc').map (·.1)).toFinset =
           (Γrc'.map (·.1)).toFinset ∪ {x} := by
         intro A'
         simp [List.map_cons, List.toFinset_cons, Finset.union_comm]
-      -- Typing of K'.fill e and K'.fill e' at ((Γtc'.shift).insert x τ_pkg, τ_body).
-      -- τ_body unifies with the inner τ2 (body type of cons match). After cases,
-      -- the inner ctx is unified with `(Γ.shift).insert x τ` and inner τ2 with τ2.shift.
       have HbindersK'_e : ∀ y ∈ Ctx.binderAtoms K',
           y ∉ e.fv ∧ y ∉ Ctx.payloadFv K' :=
         fun y hy => ⟨(HbindersK' y hy).1, (HbindersK' y hy).2.2⟩
@@ -857,7 +817,6 @@ theorem bin_log_related_under_typed_ctx
           apply hyNotRc
           simp only [List.mem_toFinset, List.mem_map]
           exact ⟨p, hpmem, hpeq⟩
-      -- IH at (cons A Δ, ((x, interp τ_pkg (cons A Δ)) :: Γrc')).
       have HCtxShiftA := HCtx.shift A
       have HCtxIns : TctxRelated (TyEnv.cons A Δ) ((Γtc'.shift).insert x τ_pkg)
           ((x, interp τ_pkg (TyEnv.cons A Δ)) :: Γrc') :=
@@ -869,7 +828,6 @@ theorem bin_log_related_under_typed_ctx
         exact HfreshTail
       have IHk_at_x := ih HKtail HbindersK' (TyEnv.cons A Δ)
         ((x, interp τ_pkg (TyEnv.cons A Δ)) :: Γrc') HCtxIns HfreshK'Inner
-      -- α-rename binder atom from x to y.
       have hRename := bin_log_related_ty_rename
         (E := ⊤) (Δ := TyEnv.cons A Δ) (Γ := Γrc')
         (x := x) (y := y) (A := interp τ_pkg (TyEnv.cons A Δ))
@@ -960,7 +918,6 @@ theorem refines_sound_open_fresh
       limExec ⟨K.fill e,  σ₀⟩ (finalBool b) ≤
       limExec ⟨K.fill e', σ₀⟩ (finalBool b) := by
   intro K σ₀ b Htyped HfreshK Hbinders
-  -- Bridge limExec on `finalBool b ⊆ Cfg` to its `(·.expr)` projection at `{.lit (.bool b)}`.
   have hRewriteFb : ∀ (e0 : Exp),
       limExec ⟨e0, σ₀⟩ (finalBool b) =
       ((limExec ⟨e0, σ₀⟩).map (·.expr)) {.lit (.bool b)} := by
@@ -968,18 +925,15 @@ theorem refines_sound_open_fresh
     rw [Measure.map_apply (by fun_prop) (MeasurableSet.singleton _)]
     rfl
   rw [hRewriteFb (K.fill e), hRewriteFb (K.fill e')]
-  -- Apply refines_coupling to get an AddCoupl 0 between projected limExec.
   have hCpl :
       AddCoupl 0 (adequacyRel boolEqVal)
         ((limExec ⟨K.fill e,  σ₀⟩).map (·.expr))
         ((limExec ⟨K.fill e', σ₀⟩).map (·.expr)) := by
     apply refines_coupling (GF := GF) (A := fun _ => lrel_bool) (φ := boolEqVal)
     · intro IR v v'
-      have := IR  -- bring into scope for instance synthesis
+      have := IR
       exact lrel_bool_to_boolEqVal v v'
     · intro IR
-      -- bin_log_related_under_typed_ctx (with Γrc' = []) lifts Hlog through K.
-      -- Then specialize at vs = [] to land in `refines`.
       have HRel : TctxRelated (default : TyEnv GF) Tctx.empty ([] : RelCtx GF) := by
         intro x; simp [Tctx.empty, RelCtx.lookup]
       have HrelClosed :
@@ -990,7 +944,6 @@ theorem refines_sound_open_fresh
         · intro Δ Γrc HCtx; exact Hlog IR Δ Γrc HCtx
         · exact HRel
         · exact HfreshK
-      -- Specialize at vs := []; substMap [] e = e (def-eq via fst/snd of []).
       unfold bin_log_related_ty bin_log_related at HrelClosed
       have hgoal_eq : (refines (⊤ : CoPset) (K.fill e) (K.fill e')
             (lrel_bool (GF := GF)) : IProp GF) =
@@ -1002,32 +955,24 @@ theorem refines_sound_open_fresh
       ihave Hf := HrelClosed
       iapply Hf $$ %([] : ValSubstMap)
       iapply env_ltyped2_empty
-  -- Now apply set_leq_zero with T = T' = {.lit (.bool b)}.
   apply AddCoupl.set_leq_zero (MeasurableSet.singleton _) (MeasurableSet.singleton _) hCpl
   rintro a b' ⟨v, v', hv, hv', ⟨b'', hvb1, hvb2⟩⟩ ha
-  -- ha : a ∈ {.lit (.bool b)}, so a = .lit (.bool b).
   have haEq : a = .lit (.bool b) := ha
-  -- From e.toVal? = some v, derive e = v.1 (via the def of toVal?).
   have toVal?_to_eq : ∀ {e : Exp} {w : Val}, e.toVal? = some w → e = w.1 := by
     intro e w he
     unfold Exp.toVal? at he
     split at he
-    · -- IsVal.check? e = some k branch: he : some ⟨e, k⟩ = some w, so w.1 = e.
-      rename_i k _
+    · rename_i k _
       have := Option.some.inj he
       rw [← this]
-    · -- IsVal.check? e = none branch: he : none = some w, contradiction.
-      cases he
+    · cases he
   have hav : a = v.1 := toVal?_to_eq hv
   have hbv : b' = v'.1 := toVal?_to_eq hv'
-  -- v.1 = a = .lit (.bool b), and v.1 = .lit (.bool b''), so b = b''.
   have hvbeq : v.1 = .lit (.bool b) := hav ▸ haEq
   rw [hvbeq] at hvb1
-  -- hvb1 : .lit (.bool b) = .lit (.bool b''); subst the bool equality.
   injection hvb1 with hbool
   injection hbool with hbb
   subst hbb
-  -- v'.1 = .lit (.bool b), and b' = v'.1.
   show b' ∈ ({.lit (.bool b)} : Set Exp)
   show b' = .lit (.bool b)
   rw [hbv, hvb2]
@@ -1047,8 +992,6 @@ theorem refines_sound_fresh (e e' : Exp) (τ : Ty)
       limExec ⟨K.fill e', σ₀⟩ (finalBool b) := by
   apply refines_sound_open_fresh (GF := GF) Tctx.empty e e' τ Hty_e Hty_e'
   intro IR Δ Γrc HCtx
-  -- HCtx : TctxRelated Δ Tctx.empty Γrc, i.e. ∀ x, (Tctx.empty x).map _ = Γrc.lookup x.
-  -- Since Tctx.empty x = none, get Γrc.lookup x = none for all x; force Γrc = [].
   have hΓrcEmpty : Γrc = [] := by
     cases Γrc with
     | nil => rfl
@@ -1056,7 +999,6 @@ theorem refines_sound_fresh (e e' : Exp) (τ : Ty)
       exfalso
       have h := HCtx p.1
       simp [Tctx.empty] at h
-      -- h : Γrc.lookup p.1 = none, but for cons it's some _.
       simp only [RelCtx.lookup] at h
       cases hr : RelCtx.lookup rest p.1 with
       | some _ => rw [hr] at h; cases h
@@ -1065,11 +1007,8 @@ theorem refines_sound_fresh (e e' : Exp) (τ : Ty)
   unfold bin_log_related_ty bin_log_related
   iintro %vs Hvs
   ihave Hvs_eq := env_ltyped2_empty_inv vs $$ Hvs
-  -- Hvs_eq : ⌜vs = []⌝; rewrite vs to [] then substMap [] e = e.
   icases Hvs_eq with %hvs_nil
   rw [hvs_nil]
-  -- Goal: refines ⊤ (substMap [].fst e) (substMap [].snd e') (interp τ Δ).
-  -- This is def-eq to refines ⊤ e e' (interp τ Δ).
   have hgoal_eq : (refines (⊤ : CoPset) e e' (interp τ Δ) : IProp GF) =
       refines (⊤ : CoPset)
         (Exp.substMap (ValSubstMap.fst ([] : ValSubstMap)) e)

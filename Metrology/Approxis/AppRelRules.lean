@@ -4,9 +4,7 @@ import Metrology.Approxis.PrimitiveLaws
 import Metrology.Approxis.CouplingRules
 import Metrology.Approxis.OpenInv
 
-/-! # Relational Rules
-
-Iris-level relational rules (refines_pure_l/r, refines_wp_l, refines_atomic_l, heap and rand directional rules, structural/coupling rules) used by Compatibility and downstream. -/
+/-! # Relational Rules -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 open scoped AppGS
@@ -18,7 +16,6 @@ variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
 
 /-! ## Forward reductions on the LHS -/
 
-/-- Helper: `Nat.repeat (▷·) n P = laterN n P = ▷^[n] P` (defeq). -/
 theorem nat_repeat_later_eq_laterN (n : Nat) (P : IProp GF) :
     Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n P = iprop(▷^[n] P) := by
   induction n with
@@ -79,7 +76,6 @@ theorem refines_pure_r {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro HK'
-  -- HK' : ⤇ (K'.comp K).fill e'. Reshape via Ectx.fill_comp to ⤇ K'.fill (K.fill e').
   ihave HK'' : iprop(⤇ K'.fill (K.fill e')) $$ [HK']
   · rw [hfc']; iexact HK'
   iapply specUpdate_ret
@@ -104,7 +100,6 @@ theorem refines_step_r {E : CoPset} {K' : Ectx} {e1 e2 : Exp} {A : lrel GF} :
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro ⟨%v, HK'', Hrefines⟩
-  -- HK'' : ⤇ (K''.comp K').fill v.1; reshape to ⤇ K''.fill (K'.fill v.1).
   have hfcv : K''.fill (K'.fill v.1) = (K''.comp K').fill v.1 := Ectx.fill_comp K'' K' v.1
   ihave HK''' : iprop(⤇ K''.fill (K'.fill v.1)) $$ [HK'']
   · rw [hfcv]; iexact HK''
@@ -120,9 +115,6 @@ theorem refines_steps_r {E : CoPset} {K' : Ectx} {e1 e2 e2' : Exp} {A : lrel GF}
   unfold refines
   iintro Hupd Hlog
   iintro %K'' %ε Hj Hna Herr Hpos
-  -- imod Hlog before iapply fupd_wp (the latter clobbers iris context).
-  -- We need to reshape goal to absorb fupd. Strategy: use refines_unfold-style
-  -- explicit fupd absorption via Iris.fupd.
   imod Hlog
   have hfc : K''.fill (K'.fill e2) = (K''.comp K').fill e2 := Ectx.fill_comp K'' K' e2
   have hfc' : K''.fill (K'.fill e2') = (K''.comp K').fill e2' := Ectx.fill_comp K'' K' e2'
@@ -153,8 +145,6 @@ entailment reshape that works outside iris proofmode. -/
 theorem refines_wp_l {E : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF} :
     iprop(wp ⊤ e1 (fun v => refines E (K.fill v.1) t A))
       ⊢@{IProp GF} refines E (K.fill e1) t A := by
-  -- Reshape goal's RHS: refines E (K.fill e1) t A = <unfolded body>.
-  -- He's post stays as `refines E (K.fill v.1) t A` (folded).
   show iprop(wp ⊤ e1 (fun v => refines E (K.fill v.1) t A)) ⊢@{IProp GF}
     iprop(∀ (K' : Ectx) (ε : ENNReal),
       (⤇ (K'.fill t)) -∗
@@ -187,7 +177,6 @@ theorem refines_wp_l {E : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF} :
     have hfill : Exp.ofVal v = v.1 := rfl
     rw [hfill]
     iintro ⟨⟨HK', Hna', Herr', %Hpos'⟩, HRefv⟩
-    -- Unfold HRefv via the refines_unfold helper.
     ihave HRefv' := refines_unfold $$ HRefv
     iapply HRefv' $$ %K' %ε HK' Hna' Herr'
     ipure_intro; exact Hpos'
@@ -218,26 +207,17 @@ theorem refines_atomic_l {E E' : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF}
         (⤇ (K'.fill v'.1)) ∗ (naOwnP ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A v v')))
   iintro Hlog %K' %ε HK Hna Herr Hpos
   iapply wp_bind (K := K)
-  -- Goal: wp ⊤ e1 (fun v => wp ⊤ (K.fill v.1) Φ).
-  -- Apply wp_atomic Hopen: |={⊤,E'}=> wp E' e1 Ψ ⊢ wp ⊤ e1 Φ
-  -- where Ψ v = |={E',⊤}=> Φ v.
   iapply (wp_atomic Hopen (E1 := ⊤) (E2 := E')
     (Φ := fun v => wp ⊤ (K.fill (Exp.ofVal v)) (fun v₀ => iprop(∃ v' ε',
       (⤇ K'.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v₀ v'))))
-  -- Goal: |={⊤,E'}=> wp E' e1 (fun v => |={E',⊤}=> wp ⊤ (K.fill v.1) Φ).
-  -- Specialize Hlog at K', feed HK to get the inner |={⊤,E'}=> wp E' e1 (...).
   ispecialize Hlog $$ %K' HK
-  -- Hlog : |={⊤,E'}=> wp E' e1 (fun v => |={E',⊤}=> ∃ t', ⤇ K'.fill t' ∗ refines E (K.fill v.1) t' A)
   imod Hlog with HW
   imodintro
-  -- Now thread (Hna, Herr, Hpos) into Hlog's wp via wp_frame_l + wp_mono.
   let R : IProp GF := iprop((naOwnP E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
   ihave HR : R $$ [Hna Herr Hpos]
   · isplitl [Hna]; · iassumption
     isplitl [Herr]; · iassumption
     iassumption
-  -- Note: v.1 = Exp.ofVal v definitionally; iris doesn't reduce so we work
-  -- with v.1 throughout this `have` and convert at wp_mono time.
   ihave HFrame : iprop(wp E' e1 (fun v => iprop(R ∗
       (|={E', ⊤}=> ∃ t', ⤇ K'.fill t' ∗ refines E (K.fill v.1) t' A))))
       $$ [HR HW]
@@ -306,8 +286,7 @@ theorem refines_store_l {E : CoPset} {K : Ectx} {l : Loc} {v' : Val} {t : Exp}
   have hstore : Exp.store (.lit (.loc l)) v'.1 =
       Exp.store (.lit (.loc l)) (Exp.ofVal v') := rfl
   rw [hstore]
-  -- wp_store arg names are confusing: `v` is the NEW value (being stored),
-  -- `v'` is the OLD value (read via appHeapFrag l v'). Swap to match our spec.
+  -- `wp_store`'s `v` is the NEW value, `v'` is the OLD; swapped here.
   iapply (wp_store (v := v') (v' := v))
   isplitl [Hl]; · iexact Hl
   iintro Hl
@@ -327,19 +306,16 @@ theorem refines_alloc_r {E : CoPset} {K : Ectx} {v : Val} {t : Exp} {A : lrel GF
       (K'.comp K).fill (Exp.alloc v.1) := Ectx.fill_comp K' K _
   ihave Hj' : iprop(⤇ (K'.comp K).fill (Exp.alloc v.1)) $$ [Hj]
   · rw [← hfc]; iexact Hj
-  -- step_alloc: ⤇ K.fill (alloc v) → specUpdate (∃ l, ⤇ K.fill #l ∗ l ↦ₛ v).
   ihave HStep := step_alloc (E := ⊤) (K'.comp K) (v := v.1) v.2 $$ Hj'
   iapply specUpdate_wp
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro ⟨%l, HKRes, Hl⟩
-  -- HKRes : ⤇ (K'.comp K).fill (.lit (.loc l)). Reshape.
   have hfcL : K'.fill (K.fill (Exp.lit (.loc l))) =
       (K'.comp K).fill (Exp.lit (.loc l)) := Ectx.fill_comp K' K _
   ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.loc l)))) $$ [HKRes]
   · rw [hfcL]; iexact HKRes
   iapply specUpdate_ret
-  -- Hl has `l ↦ₛ ⟨v.1, v.2⟩`, Hlog wants `l ↦ₛ v`. Reshape at the iprop level.
   have hv_eq : (⟨v.1, v.2⟩ : Val) = v := rfl
   ihave Hl' : iprop(l ↦ₛ v) $$ [Hl]
   · rw [← hv_eq]; iexact Hl
@@ -357,13 +333,11 @@ theorem refines_load_r {E : CoPset} {K : Ectx} {l : Loc} {v : Val} {t : Exp}
   iintro ⟨Hl, Hlog⟩
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  -- Reshape Hj via iprop-level equality using Ectx.fill_comp.
   have hfc : K'.fill (K.fill (Exp.load (.lit (.loc l)))) =
       (K'.comp K).fill (Exp.load (.lit (.loc l))) := Ectx.fill_comp K' K _
   have hfcv : (K'.comp K).fill (Exp.ofVal v) = K'.fill (K.fill v.1) := (Ectx.fill_comp K' K _).symm
   ihave Hj' : iprop(⤇ (K'.comp K).fill (Exp.load (.lit (.loc l)))) $$ [Hj]
   · rw [← hfc]; iexact Hj
-  -- step_load: ⤇ (K'.comp K).fill (load #l) ∗ l ↦ₛ v → specUpdate(⤇ ...(ofVal v) ∗ l ↦ₛ v).
   ihave HStep := step_load (E := ⊤) (K'.comp K) (l := l) (v := v) $$ [Hj' Hl]
   · isplitl [Hj']; · iexact Hj'
     iexact Hl
@@ -371,13 +345,9 @@ theorem refines_load_r {E : CoPset} {K : Ectx} {l : Loc} {v : Val} {t : Exp}
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro ⟨HKRes, HlRes⟩
-  -- HKRes : ⤇ (K'.comp K).fill (Exp.ofVal v). Reshape to ⤇ K'.fill (K.fill v.1).
-  -- Note: `Exp.ofVal v = v.1` definitionally.
   ihave HKRes' : iprop(⤇ K'.fill (K.fill v.1)) $$ [HKRes]
   · rw [← hfcv]; iexact HKRes
   iapply specUpdate_ret
-  -- After ispecialize, Hlog is specialized via HlRes to refines E t (K.fill v.1) A.
-  -- Apply with all 5 preconditions.
   ispecialize Hlog $$ HlRes
   iapply Hlog $$ %K' %ε HKRes' Hna Herr Hpos
 
@@ -393,7 +363,6 @@ theorem refines_store_r {E : CoPset} {K : Ectx} {l : Loc} {v v' : Val} {e : Exp}
       (K'.comp K).fill (Exp.store (.lit (.loc l)) v'.1) := Ectx.fill_comp K' K _
   ihave Hj' : iprop(⤇ (K'.comp K).fill (Exp.store (.lit (.loc l)) v'.1)) $$ [Hj]
   · rw [← hfc]; iexact Hj
-  -- step_store : ⤇ ... (store #l e) ∗ l ↦ₛ v_old → specUpdate (⤇ ... () ∗ l ↦ₛ v_new).
   ihave HStep := step_store (E := ⊤) (K'.comp K) (l := l) (v_old := v) (v_new := v')
     (e := v'.1) v'.2 (Exp.toVal?_ofVal v') $$ [Hj' Hl]
   · isplitl [Hj']; · iexact Hj'
@@ -402,7 +371,6 @@ theorem refines_store_r {E : CoPset} {K : Ectx} {l : Loc} {v v' : Val} {e : Exp}
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro ⟨HKRes, Hl'⟩
-  -- HKRes : ⤇ (K'.comp K).fill (.lit .unit). Reshape.
   have hfcU : K'.fill (K.fill (Exp.lit .unit)) =
       (K'.comp K).fill (Exp.lit .unit) := Ectx.fill_comp K' K _
   ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit .unit))) $$ [HKRes]
@@ -468,9 +436,6 @@ theorem refines_randU_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lrel GF
     iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
             refines E e (K.fill (.lit (.int n))) A)
       ⊢@{IProp GF} refines E e (K.fill (.rand (.lit (.int z)) (.lit .unit))) A := by
-  -- Pattern: build via wp_rand_nonpos isn't applicable (Hz : 0 < z); use wp_rand_r.
-  -- In refines unfolded form we get `wp ⊤ e ...` as the goal; we need to step the
-  -- SPEC side, which `wp_rand_r` does (inside the wp).
   iintro Hlog
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
@@ -485,15 +450,10 @@ theorem refines_randU_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lrel GF
     (Ectx.fill_comp K' K _).symm
   ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
   · rw [← hfcN]; iexact HKRes
-  -- Now goal is `wp ⊤ e Φ` where Φ is the original post.
-  -- We need to use Hlog to fold back into refines, then unfold to get the wp.
-  -- Specialize Hlog at n with the bounds proof.
   ispecialize Hlog $$ %n
   ihave Hpure : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipure_intro; exact Hbnds
   ispecialize Hlog $$ Hpure
-  -- Hlog : refines E e (K.fill #n) A. Apply at K', ε via refines's def body.
-  -- Since refines is defined as ∀ K ε, ... -∗ wp ..., we can directly specialize.
   ispecialize Hlog $$ %K' %ε
   ispecialize Hlog $$ HKRes'
   ispecialize Hlog $$ Hna
@@ -512,25 +472,20 @@ theorem refines_randT_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
   iintro ⟨Hα, Hlog⟩
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  -- Reshape Hj to (K'.comp K)-form.
   have hfc : K'.fill (K.fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) =
       (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l))) := Ectx.fill_comp K' K _
   ihave Hjc : iprop(⤇ (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) $$ [Hj]
   · rw [← hfc]; iexact Hj
-  -- Convert specNatTape to backend frag form.
   ihave HαEx := show specNatTape l z (n :: ns) ⊢@{IProp GF}
       iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
         (⌜fs.map (fun x => x.val) = (n :: ns)⌝) ∗ l ↪ₛ ⟨z, fs⟩) from
     BI.BIBase.Entails.rfl $$ Hα
   icases HαEx with ⟨%fs, %hmap, Hαb⟩
-  -- fs.map = n :: ns, so fs = (some witness for n) :: rest. Extract head.
   cases fs with
   | nil => simp at hmap
   | cons w ws =>
     simp at hmap
     obtain ⟨hwn, hwsm⟩ := hmap
-    -- hwn : w.val = n, hwsm : ws.map (·.val) = ns.
-    -- Use step_rand to step the spec.
     ihave HStep := step_rand (E := ⊤) (K'.comp K) l w ws $$ [Hjc Hαb]
     · isplitl [Hjc]; · iexact Hjc
       iexact Hαb
@@ -538,21 +493,17 @@ theorem refines_randT_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
     iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
     isplitl [HStep]; · iexact HStep
     iintro ⟨HKRes, HαResNew⟩
-    -- HKRes : ⤇ (K'.comp K).fill #w.val = ⤇ (K'.comp K).fill #n.
     have hw_eq : w.val = n := hwn
-    -- Reshape HKRes back to K'.fill (K.fill #n).
     have hfcN : (K'.comp K).fill (Exp.lit (.int w.val)) =
         K'.fill (K.fill (.lit (.int w.val))) := (Ectx.fill_comp K' K _).symm
     ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
     · rw [← hw_eq, ← hfcN]; iexact HKRes
     iapply specUpdate_ret
-    -- HαResNew : l ↪ₛ ⟨z, ws⟩. Convert to specNatTape.
     ihave HαResNat : iprop(specNatTape l z ns) $$ [HαResNew]
     · unfold specNatTape
       iexists ws
       isplitr; · ipure_intro; exact hwsm
       iexact HαResNew
-    -- Apply Hlog at HαResNat with bounds proof and HKRes'.
     ispecialize Hlog $$ HαResNat
     ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
     · ipure_intro; exact ⟨hw_eq ▸ w.2.1, hw_eq ▸ w.2.2⟩
@@ -702,11 +653,6 @@ theorem refines_get_ec {E : CoPset} {e e' : Exp} {A : lrel GF} :
     iprop(∀ (ε : ENNReal), (↯ε) -∗ (⌜0 < ε⌝) -∗ refines E e e' A)
       ⊢@{IProp GF} refines E e e' A := by
   iintro Hcnt
-  -- Don't unfold refines — keep the goal as `refines E e e' A`.
-  -- We need to consume Hcnt somehow with an ε/2 split of error budget,
-  -- but doing so requires unfolding refines (to access Hj, Hna, Herr).
-  -- Alternative: wrap in `refines_get_ec` as an Iris lemma and consume both
-  -- copies of Hcnt at ε/2 via splitting at the unfolded level.
   unfold refines
   iintro %K %ε Hj Hna HerrTot %HposTot
   have hsplit : ε = ε / 2 + ε / 2 := (ENNReal.add_halves _).symm
@@ -721,8 +667,6 @@ theorem refines_get_ec {E : CoPset} {e e' : Exp} {A : lrel GF} :
   · ipure_intro; exact hpos2
   ihave Hpos2I' : iprop(⌜(0 : ENNReal) < ε / 2⌝) $$ []
   · ipure_intro; exact hpos2
-  -- Hcnt at ε/2 produces folded refines. The goal here is the unfolded body,
-  -- but they're def-eq, so iapply succeeds via def-eq matching.
   ihave HrefFolded := Hcnt $$ %(ε / 2) Herr1 Hpos2I
   iapply HrefFolded $$ %K %(ε / 2) Hj Hna Herr2 Hpos2I'
 
@@ -747,32 +691,23 @@ theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : In
   iintro Hcnt
   unfold refines
   iintro %K2 %ε Hj Hna Herr Hpos
-  -- Reshape spec frag: ⤇ K2.fill (K'.fill (rand #z ())) = ⤇ (K2.comp K').fill (rand ...).
   have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit .unit))) =
       (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit)) := Ectx.fill_comp K2 K' _
   ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit))) $$ [Hj]
   · rw [← hfc]; iexact Hj
-  -- Apply wp_bind to focus on the LHS rand inside K.
   iapply wp_bind (K := K)
-  -- Apply wp_couple_rand_rand at the inner rand. Post: Φ n for n ∈ [0,z).
-  -- The outer wp-bind then carries Φ through K.
   iapply (wp_couple_rand_rand z f hdom hbij Hz (K2.comp K') ⊤
     (fun n => wp ⊤ (K.fill (Exp.ofVal n))
       (fun v => iprop(∃ v' ε',
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
   isplitl [Hj']; · iexact Hj'
   iintro %n %Hn HKres
-  -- HKres : ⤇ (K2.comp K').fill (.lit (.int (f n))). Reshape.
   have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
       (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
   ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
   · rw [hfcN]; iexact HKres
-  -- Now specialize Hcnt at n; get refines E (K.fill #n) (K'.fill #(f n)) A.
   ispecialize Hcnt $$ %n
   ispecialize Hcnt $$ %Hn
-  -- Hcnt : refines E (K.fill #n) (K'.fill #(f n)) A.
-  -- Since ispecialize has already transformed Hcnt to its unfolded form, apply directly.
-  -- Reshape K.fill (Exp.ofVal ⟨.lit (.int n), IsVal.lit⟩) = K.fill (.lit (.int n)).
   have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
