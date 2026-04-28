@@ -200,8 +200,6 @@ theorem Cfg.uniform_addCoupl_bij {z : Int} (Hz : 0 < z) (σ σ' : State)
   simp only [Finset.mem_Ico] at hn
   exact Hle ⟨n, hn.1, hn.2, rfl, rfl⟩
 
-/-! ## `primStep` reductions for `rand` variants -/
-
 /-- `primStep` of `rand #z ()` (unlabeled) equals `Cfg.uniform z σ`. -/
 theorem primStep_rand_unit {z : Int} (Hz : 0 < z) (σ : State) :
     primStep (⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩ : Cfg) = Cfg.uniform z σ := by
@@ -253,6 +251,55 @@ theorem primStep_rand_lbl_empty {z : Int} (Hz : 0 < z) (σ : State) (l : Loc)
           else Cfg.uniform z σ) = Cfg.uniform z σ
   rw [Hlk]
   simp only [↓reduceIte]
+
+/-! ## Coupling-context helpers (`ARcoupl_steps_ctx_bind_r{,_no_state}`)
+
+Pure-distribution-level lemmas that lift a coupling between `μ` and `primStep ⟨e, σ⟩`
+to one between `μ` and `primStep ⟨K.fill e, σ⟩`. The codomain relation is
+weakened by quantifying over the inner reduct.
+
+These are direct ports of Rocq's `ARcoupl_steps_ctx_bind_r` and
+`ARcoupl_steps_ctx_bind_r_no_state` (coupling_rules.v:22-49). -/
+
+open MeasureTheory in
+/-- `ARcoupl_steps_ctx_bind_r` (coupling_rules.v:22): if `μ` is coupled to
+`primStep ⟨e, σ⟩` by `R`, then it is also coupled to `primStep ⟨K.fill e, σ⟩` by
+the lifted relation `λ a (e', σ'). ∃ e'', e' = K.fill e'' ∧ R a (e'', σ')`. -/
+theorem AddCoupl_steps_ctx_bind_r {α} [MeasurableSpace α] [DiscreteMeasurableSpace α]
+    {μ : Measure α} {e : Exp} {σ : State} {R : Set (α × Cfg)} {ε : ENNReal}
+    {K : Ectx} (hv : ¬ e.isValue)
+    (Hcpl : AddCoupl ε R μ (primStep ⟨e, σ⟩)) :
+    AddCoupl ε
+      {p : α × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R (p.1, ⟨e'', p.2.state⟩)}
+      μ (primStep ⟨K.fill e, σ⟩) := by
+  rw [primStep_fill (K := K) hv]
+  rw [show μ = μ.map id from (MeasureTheory.Measure.map_id).symm]
+  refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+    Measurable.of_discrete Measurable.of_discrete
+    (R := {p : α × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R (p.1, ⟨e'', p.2.state⟩)}) ?_ Hcpl
+  intro a ⟨e', σ'⟩ HR
+  refine ⟨e', rfl, ?_⟩
+  exact HR
+
+open MeasureTheory in
+/-- `ARcoupl_steps_ctx_bind_r_no_state` (coupling_rules.v:37): variant of
+`AddCoupl_steps_ctx_bind_r` where the relation only depends on the *expression*
+of the second component. -/
+theorem AddCoupl_steps_ctx_bind_r_no_state
+    {μ : Measure Cfg} {e : Exp} {σ : State} {R : Exp → Exp → Prop} {ε : ENNReal}
+    {K : Ectx} (hv : ¬ e.isValue)
+    (Hcpl : AddCoupl ε {p : Cfg × Cfg | R p.1.expr p.2.expr} μ (primStep ⟨e, σ⟩)) :
+    AddCoupl ε
+      {p : Cfg × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R p.1.expr e''}
+      μ (primStep ⟨K.fill e, σ⟩) := by
+  rw [primStep_fill (K := K) hv]
+  rw [show μ = μ.map id from (MeasureTheory.Measure.map_id).symm]
+  refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+    Measurable.of_discrete Measurable.of_discrete
+    (R := {p : Cfg × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R p.1.expr e''}) ?_ Hcpl
+  intro a b HR
+  refine ⟨b.expr, rfl, ?_⟩
+  exact HR
 
 section CouplingRules
 

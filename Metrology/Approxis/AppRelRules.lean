@@ -130,6 +130,59 @@ theorem refines_pure_r {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
   iapply specUpdate_ret
   iapply H $$ %K' %ε HK'' Hna Herr Hpos
 
+/-- `refines_step_r` (app_rel_rules.v): single-step RHS spec helper. The user
+provides, for any outer context `K''`, a `specUpdate` from `⤇ K''.fill e₂` to
+`∃ v, ⤇ K''.fill v ∗ refines E e₁ (K'.fill v) A`. -/
+theorem refines_step_r {E : CoPset} {K' : Ectx} {e1 e2 : Exp} {A : lrel GF} :
+    iprop(∀ (K : Ectx), (⤇ K.fill e2) -∗
+            specUpdate ⊤ (∃ (v : Val), iprop((⤇ K.fill v.1) ∗
+              refines E e1 (K'.fill v.1) A)))
+      ⊢@{IProp GF} refines E e1 (K'.fill e2) A := by
+  iintro He
+  unfold refines
+  iintro %K'' %ε Hj Hna Herr Hpos
+  have hfc : K''.fill (K'.fill e2) = (K''.comp K').fill e2 := Ectx.fill_comp K'' K' e2
+  ihave Hj' : iprop(⤇ (K''.comp K').fill e2) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  ihave HStep := He $$ %(K''.comp K') Hj'
+  iapply specUpdate_wp
+  iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
+  isplitl [HStep]; · iexact HStep
+  iintro ⟨%v, HK'', Hrefines⟩
+  -- HK'' : ⤇ (K''.comp K').fill v.1; reshape to ⤇ K''.fill (K'.fill v.1).
+  have hfcv : K''.fill (K'.fill v.1) = (K''.comp K').fill v.1 := Ectx.fill_comp K'' K' v.1
+  ihave HK''' : iprop(⤇ K''.fill (K'.fill v.1)) $$ [HK'']
+  · rw [hfcv]; iexact HK''
+  iapply specUpdate_ret
+  iapply Hrefines $$ %K'' %ε HK''' Hna Herr Hpos
+
+/-- `refines_steps_r` (app_rel_rules.v): variant of `refines_step_r` where the
+RHS reduct `e₂'` is known. Useful when the value isn't fresh. -/
+theorem refines_steps_r {E : CoPset} {K' : Ectx} {e1 e2 e2' : Exp} {A : lrel GF} :
+    iprop(∀ (K : Ectx), (⤇ K.fill e2) -∗ specUpdate ⊤ (⤇ K.fill e2'))
+      ⊢@{IProp GF} (|={⊤}=> refines E e1 (K'.fill e2') A) -∗
+        refines E e1 (K'.fill e2) A := by
+  unfold refines
+  iintro Hupd Hlog
+  iintro %K'' %ε Hj Hna Herr Hpos
+  -- imod Hlog before iapply fupd_wp (the latter clobbers iris context).
+  -- We need to reshape goal to absorb fupd. Strategy: use refines_unfold-style
+  -- explicit fupd absorption via Iris.fupd.
+  imod Hlog
+  have hfc : K''.fill (K'.fill e2) = (K''.comp K').fill e2 := Ectx.fill_comp K'' K' e2
+  have hfc' : K''.fill (K'.fill e2') = (K''.comp K').fill e2' := Ectx.fill_comp K'' K' e2'
+  ihave Hj' : iprop(⤇ (K''.comp K').fill e2) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  ihave HStep := Hupd $$ %(K''.comp K') Hj'
+  iapply specUpdate_wp
+  iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
+  isplitl [HStep]; · iexact HStep
+  iintro HKres
+  ihave HKres' : iprop(⤇ K''.fill (K'.fill e2')) $$ [HKres]
+  · rw [hfc']; iexact HKres
+  iapply specUpdate_ret
+  iapply Hlog $$ %K'' %ε HKres' Hna Herr Hpos
+
 /-- `refines_wp_l` (app_rel_rules.v:41): embed a `wp` into a `refines` on the LHS.
 
 Rocq: `iIntros "He" (K' ε) "Hs Hnais Herr Hpos"; wp_bind; iApply (wp_wand with "He")`.
@@ -684,6 +737,40 @@ theorem refines_arrow {v v' : Val} {A A' : lrel GF}
   iapply refines_ret (v1 := v1) (v2 := v2) (hv1 := rfl) (hv2 := rfl)
   imodintro
   iexact HA
+
+/-! ## Error-credit rules -/
+
+/-- `refines_get_ec` (app_rel_rules.v): introduces an error-credit `↯ε` into
+the precondition. The user provides a refinement parametric in any positive ε,
+having access to `↯ε`. -/
+theorem refines_get_ec {E : CoPset} {e e' : Exp} {A : lrel GF} :
+    iprop(∀ (ε : ENNReal), (↯ε) -∗ (⌜0 < ε⌝) -∗ refines E e e' A)
+      ⊢@{IProp GF} refines E e e' A := by
+  iintro Hcnt
+  -- Don't unfold refines — keep the goal as `refines E e e' A`.
+  -- We need to consume Hcnt somehow with an ε/2 split of error budget,
+  -- but doing so requires unfolding refines (to access Hj, Hna, Herr).
+  -- Alternative: wrap in `refines_get_ec` as an Iris lemma and consume both
+  -- copies of Hcnt at ε/2 via splitting at the unfolded level.
+  unfold refines
+  iintro %K %ε Hj Hna HerrTot %HposTot
+  have hsplit : ε = ε / 2 + ε / 2 := (ENNReal.add_halves _).symm
+  ihave HerrEq : iprop(↯ (ε / 2 + ε / 2)) $$ [HerrTot]
+  · rw [← hsplit]; iexact HerrTot
+  ihave HerrSp : iprop((↯ (ε / 2)) ∗ (↯ (ε / 2))) $$ [HerrEq]
+  · iapply ErrorCredit.split $$ HerrEq
+  icases HerrSp with ⟨Herr1, Herr2⟩
+  have hpos2 : (0 : ENNReal) < ε / 2 :=
+    ENNReal.div_pos_iff.mpr ⟨ne_of_gt HposTot, by simp⟩
+  ihave Hpos2I : iprop(⌜(0 : ENNReal) < ε / 2⌝) $$ []
+  · ipure_intro; exact hpos2
+  ihave Hpos2I' : iprop(⌜(0 : ENNReal) < ε / 2⌝) $$ []
+  · ipure_intro; exact hpos2
+  -- Hcnt at ε/2 produces folded refines. The goal here is the unfolded body,
+  -- but they're def-eq, so iapply succeeds via def-eq matching.
+  ihave HrefFolded := Hcnt $$ %(ε / 2) Herr1 Hpos2I
+  iapply HrefFolded $$ %K %(ε / 2) Hj Hna Herr2 Hpos2I'
+
 
 /-! ## Coupling-driven rule -/
 
