@@ -1,8 +1,12 @@
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.Model
-import Metrology.Approxis.RelTactics
-import Metrology.Approxis.AppRelRules
-import Metrology.ProbLang.Syntax.LocallyClosed
+module
+
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.Approxis.Model
+public import Metrology.Approxis.RelTactics
+public import Metrology.Approxis.AppRelRules
+public import Metrology.ProbLang.Syntax.LocallyClosed
+
+@[expose] public section
 
 /-! # Compatibility Lemmas: structural compatibility of the logical relation, one rule per language construct. -/
 
@@ -58,10 +62,12 @@ theorem lrel_arr_fold (A B : lrel GF) (v v' : Val) :
 theorem refines_pair {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
     iprop(refines ⊤ e1 e1' A) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' B -∗
-            refines ⊤ (Ectx.fill [EctxItem.pairR e1] e2)
-                      (Ectx.fill [EctxItem.pairR e1'] e2') (lrel_prod A B)) := by
-  -- Use an explicit rewrite to bridge [pairR e1].fill v2.1 = [pairL v2].fill e1.
-  -- This is `rfl`, but `iapply`/`iexact` don't reduce it during unification.
+            refines ⊤ (Exp.pair e1 e2) (Exp.pair e1' e2') (lrel_prod A B)) := by
+  -- Surface form is defeq to the Ectx.fill form below; the `show` consolidates the
+  -- one unavoidable bridge here so that callers can use surface syntax directly.
+  show _ ⊢@{IProp GF} iprop(refines ⊤ e2 e2' B -∗
+    refines ⊤ (Ectx.fill [EctxItem.pairR e1] e2)
+              (Ectx.fill [EctxItem.pairR e1'] e2') (lrel_prod A B))
   iintro IH1 IH2
   iapply (refines_bind [EctxItem.pairR e1] [EctxItem.pairR e1'] (A := B)) $$ [IH2]
   · iexact IH2
@@ -136,8 +142,10 @@ theorem refines_injr {e e' : Exp} {A B : lrel GF} :
 theorem refines_app {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
     iprop(refines ⊤ e1 e1' (lrel_arr A B)) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' A -∗
-            refines ⊤ (Ectx.fill [EctxItem.appR e1] e2)
-                      (Ectx.fill [EctxItem.appR e1'] e2') B) := by
+            refines ⊤ (Exp.app e1 e2) (Exp.app e1' e2') B) := by
+  show _ ⊢@{IProp GF} iprop(refines ⊤ e2 e2' A -∗
+    refines ⊤ (Ectx.fill [EctxItem.appR e1] e2)
+              (Ectx.fill [EctxItem.appR e1'] e2') B)
   iintro IH1 IH2
   iapply (refines_bind [EctxItem.appR e1] [EctxItem.appR e1'] (A := A)) $$ [IH2]
   · iexact IH2
@@ -324,9 +332,6 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp} {A B C : lrel GF} :
     iapply (refines_pure_r (K := []) (Hex := pureExec_case_inl) w2.2.toIsValue)
     rw [show Ectx.fill [] (Exp.app e1 w1.1) = Exp.app e1 w1.1 from rfl,
         show Ectx.fill [] (Exp.app e1' w2.1) = Exp.app e1' w2.1 from rfl]
-    have hap1 : Exp.app e1 w1.1 = Ectx.fill [EctxItem.appR e1] w1.1 := rfl
-    have hap2 : Exp.app e1' w2.1 = Ectx.fill [EctxItem.appR e1'] w2.1 := rfl
-    rw [hap1, hap2]
     iapply (refines_app (A := A) (B := C)) $$ [IH1]
     · iexact IH1
     iapply refines_ret (e1 := w1.1) (e2 := w2.1) (v1 := w1) (v2 := w2)
@@ -343,9 +348,6 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp} {A B C : lrel GF} :
     iapply (refines_pure_r (K := []) (Hex := pureExec_case_inr) w2.2.toIsValue)
     rw [show Ectx.fill [] (Exp.app e2 w1.1) = Exp.app e2 w1.1 from rfl,
         show Ectx.fill [] (Exp.app e2' w2.1) = Exp.app e2' w2.1 from rfl]
-    have hap1 : Exp.app e2 w1.1 = Ectx.fill [EctxItem.appR e2] w1.1 := rfl
-    have hap2 : Exp.app e2' w2.1 = Ectx.fill [EctxItem.appR e2'] w2.1 := rfl
-    rw [hap1, hap2]
     iapply (refines_app (A := B) (B := C)) $$ [IH2]
     · iexact IH2
     iapply refines_ret (e1 := w1.1) (e2 := w2.1) (v1 := w1) (v2 := w2)

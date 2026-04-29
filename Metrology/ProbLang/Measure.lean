@@ -1,7 +1,11 @@
-import Mathlib.MeasureTheory.MeasurableSpace.Defs
-import Mathlib.Probability.ProbabilityMassFunction.Basic
-import Mathlib.Probability.Kernel.Defs
-import Mathlib.Probability.Distributions.Uniform
+module
+
+public import Mathlib.MeasureTheory.MeasurableSpace.Defs
+public import Mathlib.Probability.ProbabilityMassFunction.Basic
+public import Mathlib.Probability.Kernel.Defs
+public import Mathlib.Probability.Distributions.Uniform
+
+@[expose] public section
 
 noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure

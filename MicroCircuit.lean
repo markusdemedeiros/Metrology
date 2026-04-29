@@ -1,8 +1,14 @@
-import MicroCircuit.Circuits
-import MicroCircuit.Lib
-import MicroCircuit.GarbleBasic
-import MicroCircuit.GarbleFreeNot
-import MicroCircuit.GarbleFreeXor
-import MicroCircuit.GarbleRowReduction
-import MicroCircuit.GarbleHalfGatesNaive
-import MicroCircuit.GarbleHalfGates
+module
+
+public import MicroCircuit.Circuits
+public import MicroCircuit.Lib
+public import MicroCircuit.GarbleBasic
+public import MicroCircuit.GarbleFreeNot
+public import MicroCircuit.GarbleFreeXor
+public import MicroCircuit.GarbleRowReduction
+public import MicroCircuit.GarbleHalfGatesNaive
+public import MicroCircuit.GarbleHalfGates
+
+@[expose] public section
+
+end

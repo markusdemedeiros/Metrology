@@ -1,12 +1,16 @@
-import Mathlib.Data.ENNReal.Basic
-import Iris
-import Iris.Algebra.HeapView
-import Iris.Instances.IProp.Instance
-import Iris.Std.HeapInstances
-import Metrology.Iris.Algebra
-import Metrology.Iris.SpecProgram
-import Metrology.ProbLang.Syntax.Syntax
-import Metrology.ProbLang.Syntax.Notation
+module
+
+public import Mathlib.Data.ENNReal.Basic
+public import Iris
+public import Iris.Algebra.HeapView
+public import Iris.Instances.IProp.Instance
+public import Iris.Std.HeapInstances
+public import Metrology.Iris.Algebra
+public import Metrology.Iris.SpecProgram
+public import Metrology.ProbLang.Syntax.Syntax
+public import Metrology.ProbLang.Syntax.Notation
+
+@[expose] public section
 
 /-!
 # Program-side ghost state

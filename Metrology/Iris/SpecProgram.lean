@@ -1,11 +1,15 @@
-import Mathlib.Data.ENNReal.Basic
-import Iris
-import Iris.Algebra.HeapView
-import Iris.Instances.IProp.Instance
-import Iris.Std.HeapInstances
-import Metrology.Iris.Algebra
-import Metrology.ProbLang.Syntax.Syntax
-import Metrology.ProbLang.Syntax.Notation
+module
+
+public import Mathlib.Data.ENNReal.Basic
+public import Iris
+public import Iris.Algebra.HeapView
+public import Iris.Instances.IProp.Instance
+public import Iris.Std.HeapInstances
+public import Metrology.Iris.Algebra
+public import Metrology.ProbLang.Syntax.Syntax
+public import Metrology.ProbLang.Syntax.Notation
+
+@[expose] public section
 
 section SpecRA
 open Std Iris Iris.Std COFE ProbLang

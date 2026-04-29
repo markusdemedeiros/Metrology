@@ -1,23 +1,27 @@
-import Mathlib.Data.Real.Basic
-import Mathlib.Data.EReal.Basic
-import Mathlib.MeasureTheory.Measure.MeasureSpace
-import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
-import Mathlib.MeasureTheory.Integral.Lebesgue.Basic
-import Mathlib.MeasureTheory.Measure.Dirac
-import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
-import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
-import Mathlib.MeasureTheory.Measure.GiryMonad
-import Mathlib.MeasureTheory.Integral.Lebesgue.Add
-import Mathlib.Topology.UnitInterval
-import Mathlib.MeasureTheory.Constructions.UnitInterval
-import Mathlib.Probability.ProbabilityMassFunction.Basic
-import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import Mathlib.Analysis.Real.OfDigits
+module
+
+public import Mathlib.Data.Real.Basic
+public import Mathlib.Data.EReal.Basic
+public import Mathlib.MeasureTheory.Measure.MeasureSpace
+public import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Basic
+public import Mathlib.MeasureTheory.Measure.Dirac
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
+public import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
+public import Mathlib.MeasureTheory.Measure.GiryMonad
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Add
+public import Mathlib.Topology.UnitInterval
+public import Mathlib.MeasureTheory.Constructions.UnitInterval
+public import Mathlib.Probability.ProbabilityMassFunction.Basic
+public import Mathlib.Probability.ProbabilityMassFunction.Constructions
+public import Mathlib.Analysis.Real.OfDigits
+
+@[expose] public section
 
 def BoundedFunction {α : Type _} (f : α → ENNReal) : Prop :=
   ∀ a, f a ≤ 1
 
-def CouplingFunction (α : Type _) [MeasurableSpace α] :=
+@[expose] def CouplingFunction (α : Type _) [MeasurableSpace α] :=
   { f : α → ENNReal // Measurable f ∧ BoundedFunction f}
 
 theorem CouplingFunction.measurable {α : Type} [MeasurableSpace α] (f : CouplingFunction α) :

@@ -1,6 +1,10 @@
-import Metrology.Iris.SpecProgram
-import Metrology.ProbLang.Exec
-import Iris.Instances.Lib.FUpd
+module
+
+public import Metrology.Iris.SpecProgram
+public import Metrology.ProbLang.Exec
+public import Iris.Instances.Lib.FUpd
+
+@[expose] public section
 
 /-!
 # Spec-side update modality

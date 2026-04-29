@@ -1,5 +1,9 @@
-import Metrology.ProbLang.HeadStep
-import Metrology.ProbLang.CtxStep
+module
+
+public import Metrology.ProbLang.HeadStep
+public import Metrology.ProbLang.CtxStep
+
+@[expose] public section
 
 /-!
 # Atomic Expressions

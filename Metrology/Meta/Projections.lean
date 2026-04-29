@@ -1,7 +1,11 @@
-import Lean
-import Metrology.Meta.Inspect
-import Lean.Meta.Constructions.CtorElim
-import Lean.AuxRecursor
+module
+
+public import Lean
+public import Metrology.Meta.Inspect
+public import Lean.Meta.Constructions.CtorElim
+public import Lean.AuxRecursor
+
+@[expose] public section
 
 open Lean Elab Command Term Meta
 

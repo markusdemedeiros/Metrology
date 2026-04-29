@@ -1,5 +1,10 @@
-import Metrology.ProbLang.DetStep
-import Metrology.ProbLang.Syntax.Notation
+module
+
+public import Metrology.ProbLang.DetStep
+public import Metrology.ProbLang.Syntax.Notation
+
+@[expose] public section
+
 /-
 namespace ProbLang
 

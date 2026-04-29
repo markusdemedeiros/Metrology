@@ -1,4 +1,8 @@
-import MicroCircuit.Circuits
+module
+
+public import MicroCircuit.Circuits
+
+@[expose] public section
 
 -- SHA-256 implementation based off of
 -- https://www.movable-type.co.uk/scripts/sha256.html

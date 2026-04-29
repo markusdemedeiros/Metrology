@@ -1,11 +1,15 @@
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.AppWeakestpre
-import Metrology.Approxis.Model
-import Metrology.Approxis.Adequacy
-import Iris.Algebra.Auth
-import Iris.Instances.Lib.WSat
-import Iris.Instances.Lib.LaterCredits
-import Iris.Instances.Lib.FUpd
+module
+
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.Approxis.AppWeakestpre
+public import Metrology.Approxis.Model
+public import Metrology.Approxis.Adequacy
+public import Iris.Algebra.Auth
+public import Iris.Instances.Lib.WSat
+public import Iris.Instances.Lib.LaterCredits
+public import Iris.Instances.Lib.FUpd
+
+@[expose] public section
 
 /-! # Relational adequacy: bridging parametric `refines` to an `AddCoupl` on `limExec`. -/
 

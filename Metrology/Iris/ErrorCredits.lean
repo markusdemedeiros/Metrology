@@ -1,10 +1,14 @@
-import Mathlib.Data.ENNReal.Basic
-import Iris
-import Iris.Algebra.View
-import Iris.Instances.IProp.Instance
-import Iris.Algebra.Auth
-import Iris.Algebra.Numbers
-import Metrology.Iris.Algebra
+module
+
+public import Mathlib.Data.ENNReal.Basic
+public import Iris
+public import Iris.Algebra.View
+public import Iris.Instances.IProp.Instance
+public import Iris.Algebra.Auth
+public import Iris.Algebra.Numbers
+public import Metrology.Iris.Algebra
+
+@[expose] public section
 
 noncomputable section
 

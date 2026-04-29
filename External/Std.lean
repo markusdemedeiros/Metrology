@@ -1,7 +1,11 @@
-import Std
-import Std.Data.ExtTreeMap.Lemmas
-import Mathlib.Data.Countable.Basic
-import Mathlib.Logic.Equiv.List
+module
+
+public import Std
+public import Std.Data.ExtTreeMap.Lemmas
+public import Mathlib.Data.Countable.Basic
+public import Mathlib.Logic.Equiv.List
+
+@[expose] public section
 
 /-# Dumping ground for lemmas that belong in Std, or Mathlib/Data. -/
 

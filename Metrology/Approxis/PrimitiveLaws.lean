@@ -1,9 +1,13 @@
-import Metrology.Approxis.AppWeakestpre
-import Metrology.Iris.AppProgram
-import Metrology.Iris.SpecProgram
-import Metrology.Iris.SpecUpdate
-import Metrology.Iris.SpecRules
-import Metrology.Iris.ErrorCredits
+module
+
+public import Metrology.Approxis.AppWeakestpre
+public import Metrology.Iris.AppProgram
+public import Metrology.Iris.SpecProgram
+public import Metrology.Iris.SpecUpdate
+public import Metrology.Iris.SpecRules
+public import Metrology.Iris.ErrorCredits
+
+@[expose] public section
 
 /-!
 # Primitive Laws

@@ -1,5 +1,9 @@
-import Metrology.Approxis.Lifting
-import Metrology.Approxis.PrimitiveLaws
+module
+
+public import Metrology.Approxis.Lifting
+public import Metrology.Approxis.PrimitiveLaws
+
+@[expose] public section
 
 /-!
 # Coupling Rules

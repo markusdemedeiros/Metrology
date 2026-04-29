@@ -1,5 +1,9 @@
-import Metrology.ProbLang.Measure
-import Metrology.ProbLang.HeadStep
+module
+
+public import Metrology.ProbLang.Measure
+public import Metrology.ProbLang.HeadStep
+
+@[expose] public section
 
 noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure ProbLang

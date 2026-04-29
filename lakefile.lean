@@ -29,6 +29,10 @@ lean_exe metrology where
 lean_exe ProbLangTest where
   root := `ProbLangTest
 
+lean_exe CtxInterpTest where
+  root := `CtxInterpTest
+  supportInterpreter := true
+
 target LibCryptoFFI (pkg : NPackage __name__) : FilePath := do
   let oFile := pkg.buildDir / "ffi" / "FFI.o"
   let aFile := pkg.buildDir / "ffi" / "libCryptoFFI.a"

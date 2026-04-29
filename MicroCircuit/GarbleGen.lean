@@ -1,4 +1,8 @@
-import MicroCircuit.Circuits
+module
+
+public import MicroCircuit.Circuits
+
+@[expose] public section
 
 /-! ## Generic garbling scheme interface
 

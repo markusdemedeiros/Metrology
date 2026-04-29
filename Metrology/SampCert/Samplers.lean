@@ -1,4 +1,4 @@
-import Metrology.ProbLang.SampCert.SLang
+import Metrology.SampCert.SLang
 
 /-
 noncomputable section

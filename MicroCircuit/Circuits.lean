@@ -1,4 +1,8 @@
-import Init.Data.Nat.Bitwise.Basic
+module
+
+public import Init.Data.Nat.Bitwise.Basic
+
+@[expose] public section
 
 /-! # Circuit representation and monadic builder
 

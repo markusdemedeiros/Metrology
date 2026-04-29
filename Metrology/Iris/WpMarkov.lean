@@ -1,12 +1,16 @@
-import Iris
-import Mathlib.Probability.Kernel.Basic
-import Mathlib.Data.ENNReal.Basic
-import Iris.Instances.IProp.Instance
-import Iris.Algebra.Auth
-import Iris.Algebra.Numbers
-import Mathlib.MeasureTheory.Measure.Sub
-import Mathlib.MeasureTheory.Measure.MeasureSpaceDef
-import Iris.Algebra.HeapView
+module
+
+public import Iris
+public import Mathlib.Probability.Kernel.Basic
+public import Mathlib.Data.ENNReal.Basic
+public import Iris.Instances.IProp.Instance
+public import Iris.Algebra.Auth
+public import Iris.Algebra.Numbers
+public import Mathlib.MeasureTheory.Measure.Sub
+public import Mathlib.MeasureTheory.Measure.MeasureSpaceDef
+public import Iris.Algebra.HeapView
+
+@[expose] public section
 
 -- -- FIXME: (Iris) Expose IProp
 -- -- FIXME: (Iris) Scope Iris.Set

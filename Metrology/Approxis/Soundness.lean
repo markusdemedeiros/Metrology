@@ -1,9 +1,13 @@
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.Model
-import Metrology.Approxis.AdequacyRel
-import Metrology.Approxis.Interp
-import Metrology.Approxis.Fundamental
-import Metrology.ProbLang.ContextualRefinement
+module
+
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.Approxis.Model
+public import Metrology.Approxis.AdequacyRel
+public import Metrology.Approxis.Interp
+public import Metrology.Approxis.Fundamental
+public import Metrology.ProbLang.ContextualRefinement
+
+@[expose] public section
 
 /-! # Soundness
 

@@ -1,8 +1,12 @@
-import Lean
+module
+
+public import Lean
+
+@[expose] public section
 
 open Lean Elab Command Term Meta
 
-def inspectFormat : Lean.Expr → Format
+meta def inspectFormat : Lean.Expr → Format
 | .bvar i => .text s!"(bvar {i})"
 | .fvar i => .text s!"(fvar {i.name})"
 | .mvar i => .text s!"(mvar {i.name})"
@@ -38,7 +42,7 @@ where
 syntax (name := inspect) "#inspect " term : command
 
 @[command_elab inspect]
-def inspectCore : CommandElab
+meta def inspectCore : CommandElab
   | `(#inspect $term) =>
         withoutModifyingEnv <| runTermElabM fun _ => Term.withDeclName `_inspect do
         let e ← Term.elabTerm term none

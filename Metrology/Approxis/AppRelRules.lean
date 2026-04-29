@@ -1,8 +1,12 @@
-import Metrology.Approxis.AppWeakestpre
-import Metrology.Approxis.Model
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.CouplingRules
-import Metrology.Approxis.OpenInv
+module
+
+public import Metrology.Approxis.AppWeakestpre
+public import Metrology.Approxis.Model
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.Approxis.CouplingRules
+public import Metrology.Approxis.OpenInv
+
+@[expose] public section
 
 /-! # Relational Rules -/
 

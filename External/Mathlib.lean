@@ -1,13 +1,17 @@
-import Mathlib.Data.Countable.Basic
-import Mathlib.Tactic.DeriveCountable
-import Mathlib.Logic.Equiv.List
-import Mathlib.MeasureTheory.MeasurableSpace.Defs
-import Mathlib.MeasureTheory.Measure.Dirac
-import Mathlib.MeasureTheory.Measure.GiryMonad
-import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
-import Mathlib.Probability.ProbabilityMassFunction.Basic
-import Mathlib.Probability.Kernel.Defs
-import Mathlib.Probability.Distributions.Uniform
+module
+
+public import Mathlib.Data.Countable.Basic
+public import Mathlib.Tactic.DeriveCountable
+public import Mathlib.Logic.Equiv.List
+public import Mathlib.MeasureTheory.MeasurableSpace.Defs
+public import Mathlib.MeasureTheory.Measure.Dirac
+public import Mathlib.MeasureTheory.Measure.GiryMonad
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
+public import Mathlib.Probability.ProbabilityMassFunction.Basic
+public import Mathlib.Probability.Kernel.Defs
+public import Mathlib.Probability.Distributions.Uniform
+
+@[expose] public section
 
 /-# Dumping ground for lemmas that belong in Std or Mathlib -/
 

@@ -1,11 +1,15 @@
-import Lean
+module
+
+public import Lean
+
+@[expose] public section
 
 open Lean Elab Command Term Meta
 
 syntax (name := checkdef) "#checkdef " ident : command
 
 @[command_elab checkdef]
-def checkDefCore : CommandElab
+meta def checkDefCore : CommandElab
   | `(#checkdef $decl) => do
     let env ← getEnv
     let some (.defnInfo info) := env.constants.find? (decl.getId) | throwError "bad constant"
@@ -20,3 +24,5 @@ def checkDefCore : CommandElab
                safe"
     return ()
   | _ => throwUnsupportedSyntax
+
+end

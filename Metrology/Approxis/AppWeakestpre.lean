@@ -1,12 +1,16 @@
-import Metrology.Iris.SpecUpdate
-import Metrology.Iris.ErrorCredits
-import Metrology.Couplings.AdditiveCouplings
-import Metrology.Couplings.Couplings
-import Metrology.ProbLang.Exec
-import Metrology.ProbLang.Erasable
-import Iris.BI.Lib.Fixpoint
-import Iris.ProofMode.Classes
-import Iris.ProofMode.InstancesUpdates
+module
+
+public import Metrology.Iris.SpecUpdate
+public import Metrology.Iris.ErrorCredits
+public import Metrology.Couplings.AdditiveCouplings
+public import Metrology.Couplings.Couplings
+public import Metrology.ProbLang.Exec
+public import Metrology.ProbLang.Erasable
+public import Iris.BI.Lib.Fixpoint
+public import Iris.ProofMode.Classes
+public import Iris.ProofMode.InstancesUpdates
+
+@[expose] public section
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 

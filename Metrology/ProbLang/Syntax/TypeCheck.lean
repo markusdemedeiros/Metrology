@@ -1,4 +1,8 @@
-import Metrology.ProbLang.Syntax.Types
+module
+
+public import Metrology.ProbLang.Syntax.Types
+
+@[expose] public section
 
 /-!
 # `typecheck` bidirectional elaborator for ProbLang

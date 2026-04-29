@@ -1,4 +1,8 @@
-import Metrology.Approxis.AppWeakestpre
+module
+
+public import Metrology.Approxis.AppWeakestpre
+
+@[expose] public section
 
 /-! # Lifting lemmas translating operational semantics rules into program-logic rules. -/
 

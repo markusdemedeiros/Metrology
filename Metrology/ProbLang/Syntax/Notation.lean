@@ -1,6 +1,11 @@
-import Lean.PrettyPrinter.Delaborator
-import Lean.Elab.Term
-import Metrology.ProbLang.Syntax.Syntax
+module
+
+public meta import Lean.PrettyPrinter.Delaborator
+public meta import Lean.Elab.Term
+public import Metrology.ProbLang.Syntax.Syntax
+public meta import Metrology.ProbLang.Syntax.Syntax
+
+@[expose] public section
 
 /-! # Surface syntax for ProbLang  -/
 
@@ -10,7 +15,7 @@ open Lean Lean.Elab Lean.Elab.Term Lean.PrettyPrinter Lean.Meta Lean.Parser
 
 /-- Controls rendering of ProbLang type annotations. `0` hide all, `1` show
     annotations on let/fun/rec binders only, `2` show every annotation. -/
-register_option pp.problang.annot : Nat := {
+meta register_option pp.problang.annot : Nat := {
   defValue := 0
   descr := "ProbLang: display type annotations (0=none | 1=binders | 2=all)"
 }
@@ -35,10 +40,10 @@ rendering. -/
 syntax (name := plBinderHint) "plBinderHint!" str term:max term:max : term
 
 /-- Metadata key used by `plBinderHint!`. -/
-def plBinderNameKey : Name := `ProbLang.plBinderName
+meta def plBinderNameKey : Name := `ProbLang.plBinderName
 
 @[term_elab plBinderHint]
-def elabPlBinderHint : Lean.Elab.Term.TermElab := fun stx expectedType? => do
+meta def elabPlBinderHint : Lean.Elab.Term.TermElab := fun stx expectedType? => do
   let `(plBinderHint! $nameStr:str $_τ $eTerm) := stx
     | throwError "plBinderHint!: unexpected syntax"
   let e ← Lean.Elab.Term.elabTerm eTerm expectedType?
@@ -112,11 +117,11 @@ syntax:max "fail"                                               : pl_exp
 syntax:10 "let! " pl_pat " := " pl_exp:10 "; " pl_exp:1         : pl_exp
 syntax:100 "assert(" pl_exp ")"                                 : pl_exp
 
-def reservedKeywords : List String :=
+meta def reservedKeywords : List String :=
   ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "scrut",
    "if", "then", "else", "let", "fun", "rec", "case"]
 
-def checkNotReserved (i : Lean.Ident) : TermElabM Unit := do
+meta def checkNotReserved (i : Lean.Ident) : TermElabM Unit := do
   let s := i.getId.toString
   if reservedKeywords.contains s then
     throwErrorAt i "'{s}' is a reserved keyword in ProbLang and cannot be used as an identifier"
@@ -156,7 +161,7 @@ structure AtomState where
   next : Nat := 0
 
 /-- Generate a fresh atom -/
-def genAtom (st : IO.Ref AtomState) : TermElabM Var := do
+meta def genAtom (st : IO.Ref AtomState) : TermElabM Var := do
   let s ← st.get
   st.set { next := s.next + 1 }
   return .internal s.next
@@ -169,13 +174,13 @@ structure NamedBinder where
 
 /-- Allocate a fresh atom for a named binder, check it isn't reserved, and
     return the `NamedBinder` together with an env extended with its binding. -/
-def bindNamed (st : IO.Ref AtomState) (env : NameEnv) (i : Lean.Ident) (ty : Option (TSyntax `pl_ty)) :
+meta def bindNamed (st : IO.Ref AtomState) (env : NameEnv) (i : Lean.Ident) (ty : Option (TSyntax `pl_ty)) :
     TermElabM (NamedBinder × NameEnv) := do
   checkNotReserved i
   let atom ← genAtom st
   return ({ ident := i, atom, ty }, env.insert i.getId atom)
 
-def quoteVar : Var → TermElabM Term
+meta def quoteVar : Var → TermElabM Term
   | .named s    => `(Var.named $(Syntax.mkStrLit s))
   | .internal n => `(Var.internal $(Syntax.mkNatLit n))
 
@@ -183,44 +188,44 @@ def quoteVar : Var → TermElabM Term
 These constructors bind any additional metadata to the term via `plBinderHint!`-/
 
 /-- Render an `Option Ty` syntax term from an optional `pl_ty`. -/
-def tyOptTerm (τ : Option (TSyntax `pl_ty)) : TermElabM Term := do
+meta def tyOptTerm (τ : Option (TSyntax `pl_ty)) : TermElabM Term := do
   match τ with
   | some τ' => `((some pl_ty($τ')))
   | none    => `((none : Option Ty))
 
 /-- Emit `plBinderHint! name τ (head body)` where `head` is `Exp.lam` or `Exp.fix`. -/
-def wrapHint (head : Term) (name : Option String) (τ : Option (TSyntax `pl_ty))
+meta def wrapHint (head : Term) (name : Option String) (τ : Option (TSyntax `pl_ty))
     (body : Term) : TermElabM Term := do
   let nm := name.getD "_"
   `(plBinderHint! $(Syntax.mkStrLit nm) $(← tyOptTerm τ) ($head $body))
 
 /-- Anonymous `Exp.lam` wrapping `body` (no `close`, no name). -/
-def mkAnonLam (body : Term) : TermElabM Term := do
+meta def mkAnonLam (body : Term) : TermElabM Term := do
   wrapHint (← `(Exp.lam)) none none body
 
 /-- Anonymous `λ. close body atom` — used for the case/let! scrutinee binder
     where the name is synthetic (no user ident to display). -/
-def closeAnonLam (body : Term) (atom : Var) : TermElabM Term := do
+meta def closeAnonLam (body : Term) (atom : Var) : TermElabM Term := do
   let closed ← ``(Exp.close $body $(← quoteVar atom))
   wrapHint (← `(Exp.lam)) none none closed
 
 /-- Named-binder helper: close `body` over `b.atom`, wrap in `head` (`Exp.lam`
     or `Exp.fix`) with display name/type taken from `b`. -/
-def closeNamedHead (head : Term) (b : NamedBinder) (body : Term) : TermElabM Term := do
+meta def closeNamedHead (head : Term) (b : NamedBinder) (body : Term) : TermElabM Term := do
   let closed ← ``(Exp.close $body $(← quoteVar b.atom))
   wrapHint head (some b.ident.getId.toString) b.ty closed
 
-def mkNamedLam (b : NamedBinder) (body : Term) : TermElabM Term := do
+meta def mkNamedLam (b : NamedBinder) (body : Term) : TermElabM Term := do
   closeNamedHead (← `(Exp.lam)) b body
 
-def mkNamedFix (b : NamedBinder) (body : Term) : TermElabM Term := do
+meta def mkNamedFix (b : NamedBinder) (body : Term) : TermElabM Term := do
   closeNamedHead (← `(Exp.fix)) b body
 
 mutual
 
 /-- Elaborate a `pl_exp` into an `Expr : Exp` under the given name env and
     atom-allocator `st`. -/
-partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
+meta partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
     TSyntax `pl_exp → TermElabM Term
   | `(pl_exp|($e : $τ)) => do
       `(Exp.annotated pl_ty($τ) $(← elabPL env st e))
@@ -300,7 +305,7 @@ partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
 /-- Elaborate `body` under a single `pl_arg` binder. Anonymous `_` wraps in
     `mkAnonLam`; a named binder allocates a fresh atom, extends `env`, and
     wraps via `named` (`mkNamedLam` or `mkNamedFix`). -/
-partial def elabBindArg (env : NameEnv) (st : IO.Ref AtomState)
+meta partial def elabBindArg (env : NameEnv) (st : IO.Ref AtomState)
     (arg : TSyntax `pl_arg) (body : TSyntax `pl_exp)
     (named : NamedBinder → Term → TermElabM Term) : TermElabM Term := do
   match arg with
@@ -315,7 +320,7 @@ partial def elabBindArg (env : NameEnv) (st : IO.Ref AtomState)
 
 /-- Build one branch of a `case`/`let!`: allocate a fresh atom, project
     pattern variables out of it, and wrap in `λ atom. <projected>`. -/
-partial def mkCaseBranch (env : NameEnv) (st : IO.Ref AtomState)
+meta partial def mkCaseBranch (env : NameEnv) (st : IO.Ref AtomState)
     (pat : TSyntax `pl_pat) (body : TSyntax `pl_exp) : TermElabM Term := do
   let atom ← genAtom st
   let projected ← projectPattern env st pat atom body
@@ -330,7 +335,7 @@ Two passes over `pat`:
   2. `emit` walks `pat` outside-in, building nested `fst`/`snd`/identity
      projections of `scrutAtom` and wrapping `body` in one `(λ v. …) proj`
      application per ident binder. -/
-partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
+meta partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
     (pat : TSyntax `pl_pat) (scrutAtom : Var)
     (body : TSyntax `pl_exp) : TermElabM Term := do
   let rec collect (env : NameEnv) (acc : Lean.NameMap NamedBinder)
@@ -366,7 +371,7 @@ partial def projectPattern (env : NameEnv) (st : IO.Ref AtomState)
 /-- Fold the branches of `case v | p₁ => b₁ | … | pₙ => bₙ` right-to-left
     into nested `Exp.case` nodes, with `Exp.fail` as the innermost fallback.
     The scrutinee is an `Exp.fvar scrutAtom` shared across all branches. -/
-partial def buildCaseChain (env : NameEnv) (st : IO.Ref AtomState)
+meta partial def buildCaseChain (env : NameEnv) (st : IO.Ref AtomState)
     (scrutAtom : Var)
     (pats : Array (TSyntax `pl_pat)) (bodies : Array (TSyntax `pl_exp)) : TermElabM Term := do
   let scrutExp : Term ← `(Exp.fvar $(← quoteVar scrutAtom))
@@ -400,17 +405,17 @@ namespace ProbLang
 open Lean Lean.PrettyPrinter
 
 /-- Strip the `pl(...)` wrapper to get a raw `pl_exp`, or fall back to `{t}` escape. -/
-def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
+meta def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
   | `(pl($e)) => `(pl_exp|$e)
   | `($t)     => `(pl_exp|{$t})
 
 /-- Strip the `pl_ty(...)` wrapper to get a raw `pl_ty`. -/
-def unpackPLTy [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
+meta def unpackPLTy [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
   | `(pl_ty($τ)) => pure τ
   | `($_)        => panic! "unknown type"
 
 /-- Strip the `pl_pat(...)` wrapper to get a raw `pl_pat`. -/
-def unpackPLPat [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_pat)
+meta def unpackPLPat [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_pat)
   | `(pl_pat($p)) => pure p
   | `($_)         => panic! "unknown pattern"
 
@@ -429,86 +434,86 @@ partial def unexpFun : Term → UnexpandM Term
 /-! ### Types -/
 
 @[app_unexpander Ty.int]
-def unexpTyInt : Unexpander | `($_) => `(pl_ty(int))
+meta def unexpTyInt : Unexpander | `($_) => `(pl_ty(int))
 @[app_unexpander Ty.bool]
-def unexpTyBool : Unexpander | `($_) => `(pl_ty(bool))
+meta def unexpTyBool : Unexpander | `($_) => `(pl_ty(bool))
 @[app_unexpander Ty.unit]
-def unexpTyUnit : Unexpander | `($_) => `(pl_ty(unit))
+meta def unexpTyUnit : Unexpander | `($_) => `(pl_ty(unit))
 @[app_unexpander Ty.prod]
-def unexpTyProd : Unexpander
+meta def unexpTyProd : Unexpander
   | `($_ $τ1 $τ2) => do `(pl_ty($(← unpackPLTy τ1) × $(← unpackPLTy τ2)))
   | _ => throw ()
 @[app_unexpander Ty.sum]
-def unexpTySum : Unexpander
+meta def unexpTySum : Unexpander
   | `($_ $τ1 $τ2) => do `(pl_ty($(← unpackPLTy τ1) + $(← unpackPLTy τ2)))
   | _ => throw ()
 @[app_unexpander Ty.arrow]
-def unexpTyArrow : Unexpander
+meta def unexpTyArrow : Unexpander
   | `($_ $τ1 $τ2) => do `(pl_ty($(← unpackPLTy τ1) → $(← unpackPLTy τ2)))
   | _ => throw ()
 @[app_unexpander Ty.ref]
-def unexpTyRef : Unexpander
+meta def unexpTyRef : Unexpander
   | `($_ $τ) => do `(pl_ty(ref($(← unpackPLTy τ))))
   | _ => throw ()
 @[app_unexpander Ty.tape]
-def unexpTyTape : Unexpander
+meta def unexpTyTape : Unexpander
   | `($_) => do `(pl_ty(tape))
 
 /-! ### Patterns -/
 
 @[app_unexpander Pat.wildcard]
-def unexpPatWildcard : Unexpander
+meta def unexpPatWildcard : Unexpander
   | `($_) => `(pl_pat(_))
 
 @[app_unexpander Pat.lit]
-def unexpPatLit : Unexpander
+meta def unexpPatLit : Unexpander
   | `($_ $b) => `(pl_pat(# $b))
   | _ => throw ()
 
 @[app_unexpander Pat.pair]
-def unexpPatPair : Unexpander
+meta def unexpPatPair : Unexpander
   | `($_ $p1 $p2) => do `(pl_pat(($(← unpackPLPat p1), $(← unpackPLPat p2))))
   | _ => throw ()
 
 @[app_unexpander Pat.inl]
-def unexpPatInl : Unexpander
+meta def unexpPatInl : Unexpander
   | `($_ $p) => do `(pl_pat(inl($(← unpackPLPat p))))
   | _ => throw ()
 
 @[app_unexpander Pat.inr]
-def unexpPatInr : Unexpander
+meta def unexpPatInr : Unexpander
   | `($_ $p) => do `(pl_pat(inr($(← unpackPLPat p))))
   | _ => throw ()
 
 /-! ### Literals / atomic expressions -/
 
 @[app_unexpander Exp.lit]
-def unexpLit : Unexpander
+meta def unexpLit : Unexpander
   | `($_ $arg) => `(pl(# $arg))
   | _ => throw ()
 
 @[app_unexpander BaseLit.int]
-def unexpBLInt : Unexpander
+meta def unexpBLInt : Unexpander
   | `($_ (Int.ofNat $n:num)) => `($n)
   | `($_ $z)                 => pure z
   | _                        => throw ()
 
 @[app_unexpander BaseLit.bool]
-def unexpBLBool : Unexpander
+meta def unexpBLBool : Unexpander
   | `($_ $b) => pure b
   | _ => throw ()
 
 @[app_unexpander BaseLit.unit]
-def unexpBLUnit : Unexpander := fun _ => `(())
+meta def unexpBLUnit : Unexpander := fun _ => `(())
 
 @[app_unexpander Exp.fail]
-def unexpFail : Unexpander
+meta def unexpFail : Unexpander
   | `($_) => do `(pl(fail))
 
 /-! ### Operators -/
 
 @[app_unexpander Exp.binop]
-def unexpBinop : Unexpander
+meta def unexpBinop : Unexpander
   | `($_ BinOp.plus  $e1 $e2) => do `(pl(($(← unpackPLExp e1) + $(← unpackPLExp e2))))
   | `($_ BinOp.minus $e1 $e2) => do `(pl(($(← unpackPLExp e1) - $(← unpackPLExp e2))))
   | `($_ BinOp.mult  $e1 $e2) => do `(pl(($(← unpackPLExp e1) * $(← unpackPLExp e2))))
@@ -523,78 +528,78 @@ def unexpBinop : Unexpander
   | _ => throw ()
 
 @[app_unexpander Exp.unop]
-def unexpUnop : Unexpander
+meta def unexpUnop : Unexpander
   | `($_ UnOp.neg   $e) => do `(pl(~$(← unpackPLExp e)))
   | `($_ UnOp.minus $e) => do `(pl(-$(← unpackPLExp e)))
   | _ => throw ()
 
 @[app_unexpander Exp.cond]
-def unexpCond : Unexpander
+meta def unexpCond : Unexpander
   | `($_ $ec $et $ef) => do
     `(pl(if $(← unpackPLExp ec) then $(← unpackPLExp et) else $(← unpackPLExp ef)))
   | _ => throw ()
 
 /-! ### Pairs / sums / projections -/
 
-partial def unexpPair' : Term → UnexpandM Term
+meta partial def unexpPair' : Term → UnexpandM Term
   | `(pl(($e1, ($e2, $e3,*)))) => do unexpPair' (← `(pl(($e1, $e2, $e3,*))))
   | x => return x
 
 @[app_unexpander Exp.pair]
-def unexpPair : Unexpander
+meta def unexpPair : Unexpander
   | `($_ $e1 $e2) => do
     unexpPair' (← `(pl(($(← unpackPLExp e1), $(← unpackPLExp e2)))))
   | _ => throw ()
 
 @[app_unexpander Exp.fst]
-def unexpFst : Unexpander
+meta def unexpFst : Unexpander
   | `($_ $e) => do `(pl(fst($(← unpackPLExp e))))
   | _ => throw ()
 
 @[app_unexpander Exp.snd]
-def unexpSnd : Unexpander
+meta def unexpSnd : Unexpander
   | `($_ $e) => do `(pl(snd($(← unpackPLExp e))))
   | _ => throw ()
 
 @[app_unexpander Exp.inl]
-def unexpInl : Unexpander
+meta def unexpInl : Unexpander
   | `($_ $e) => do `(pl(inl($(← unpackPLExp e))))
   | _ => throw ()
 
 @[app_unexpander Exp.inr]
-def unexpInr : Unexpander
+meta def unexpInr : Unexpander
   | `($_ $e) => do `(pl(inr($(← unpackPLExp e))))
   | _ => throw ()
 
 /-! ### State / random / scrut -/
 
 @[app_unexpander Exp.alloc]
-def unexpAlloc : Unexpander
+meta def unexpAlloc : Unexpander
   | `($_ $e) => do `(pl(alloc($(← unpackPLExp e))))
   | _ => throw ()
 
 @[app_unexpander Exp.load]
-def unexpLoad : Unexpander
+meta def unexpLoad : Unexpander
   | `($_ $e) => do `(pl(!$(← unpackPLExp e)))
   | _ => throw ()
 
 @[app_unexpander Exp.store]
-def unexpStore : Unexpander
+meta def unexpStore : Unexpander
   | `($_ $e1 $e2) => do `(pl($(← unpackPLExp e1) ← $(← unpackPLExp e2)))
   | _ => throw ()
 
 @[app_unexpander Exp.tape]
-def unexpTape : Unexpander
+meta def unexpTape : Unexpander
   | `($_ $e) => do `(pl(tape($(← unpackPLExp e))))
   | _ => throw ()
 
 @[app_unexpander Exp.rand]
-def unexpRand : Unexpander
+meta def unexpRand : Unexpander
   | `($_ $e1 $e2) => do `(pl(rand($(← unpackPLExp e1), $(← unpackPLExp e2))))
   | _ => throw ()
 
 @[app_unexpander Exp.scrut]
-def unexpScrut : Unexpander
+meta def unexpScrut : Unexpander
   | `($_ $e $p) => do `(pl(scrut $(← unpackPLExp e) with $(← unpackPLPat p)))
   | _ => throw ()
 
@@ -602,7 +607,7 @@ def unexpScrut : Unexpander
 
 /-- Construct a `pl_arg` from a name-hint string. Monad-polymorphic so it
     works in both `UnexpandM` and `DelabM`. -/
-def buildArgFromName [Monad m] [MonadRef m] [MonadQuotation m]
+meta def buildArgFromName [Monad m] [MonadRef m] [MonadQuotation m]
     (name : String) : m (TSyntax `pl_arg) := do
   if name = "_" then
     `(pl_arg|_)
@@ -612,7 +617,7 @@ def buildArgFromName [Monad m] [MonadRef m] [MonadQuotation m]
 
 /-- Strip a leading `Exp.close ... <atom>` so the lam body renders without
     explicit closing. -/
-def stripClose [Monad m] [MonadRef m] [MonadQuotation m]
+meta def stripClose [Monad m] [MonadRef m] [MonadQuotation m]
     (e : Term) : m Term := do
   match e with
   | `(Exp.close $body $_) => return body
@@ -622,7 +627,7 @@ open Lean.PrettyPrinter.Delaborator in
 /-- Delaborator dispatched when the `mdata` contains exactly our
     `ProbLang.plBinderName` key. Lean routes via `mdata.<singleKey>`. -/
 @[delab mdata.ProbLang.plBinderName]
-def delabPlBinderMeta : Delab := do
+meta def delabPlBinderMeta : Delab := do
   let e ← SubExpr.getExpr
   let .mdata kv inner := e | failure
   let name := kv.getString plBinderNameKey ""
@@ -647,7 +652,7 @@ A unary `λ` applied to an argument displays as either `let x := arg; body`
 plain application. -/
 
 @[app_unexpander Exp.app]
-def unexpApp : Unexpander
+meta def unexpApp : Unexpander
   | `($_ $fn $arg) => do
     let rhs ← unpackPLExp arg
     match fn with
@@ -663,7 +668,7 @@ def unexpApp : Unexpander
 
 open Lean.PrettyPrinter.Delaborator in
 @[delab app.ProbLang.Exp.annotated]
-def delabExpAnnotated : Delab := do
+meta def delabExpAnnotated : Delab := do
   let e ← SubExpr.getExpr
   unless e.getAppNumArgs == 2 do failure
   let mode := pp.problang.annot.get (← getOptions)
@@ -683,7 +688,7 @@ can recover the display name straight from the string literal. -/
 
 open Lean.PrettyPrinter.Delaborator in
 @[delab app.ProbLang.Exp.fvar]
-def delabExpFvar : Delab := do
+meta def delabExpFvar : Delab := do
   let e ← SubExpr.getExpr
   unless e.getAppNumArgs == 1 do failure
   let_expr Var.named sLit := e.appArg! | failure

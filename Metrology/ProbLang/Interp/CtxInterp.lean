@@ -1,5 +1,9 @@
-import Metrology.ProbLang.Syntax.Syntax
-import Std.Data.ExtTreeMap.Lemmas
+module
+
+public import Metrology.ProbLang.Syntax.Syntax
+public import Std.Data.ExtTreeMap.Lemmas
+
+@[expose] public section
 
 open Std
 
@@ -36,11 +40,11 @@ instance : ToString Error where
     | .segfault ℓ     => s!"segfault at location {ℓ}"
     | .unsupported msg => s!"unsupported: {msg}"
 
-private def throw' (err : Error) : IO α :=
+def throw' (err : Error) : IO α :=
   throw (IO.userError (toString err))
 
 /-- Sample uniformly from [0, z).  Returns an error if z ≤ 0. -/
-private def sampleUniform (z : Int) : IO Int := do
+def sampleUniform (z : Int) : IO Int := do
   if 0 < z then
     return ← IO.rand 0 z.toNat
   else
@@ -177,7 +181,7 @@ partial def eval (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Val := do
     eval σ e'
 
 /-- Run an expression from an empty initial heap. -/
-def run (e : Exp) : IO Val := do
+@[expose] def run (e : Exp) : IO Val := do
   let σ ← IO.mkRef (∅ : ExtTreeMap Loc Val)
   eval σ e
 

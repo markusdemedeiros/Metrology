@@ -1,5 +1,9 @@
-import Metrology.ProbLang.Syntax.Syntax
-import Metrology.ProbLang.Syntax.Notation
+module
+
+public import Metrology.ProbLang.Syntax.Syntax
+public import Metrology.ProbLang.Syntax.Notation
+
+@[expose] public section
 
 open ProbLang Exp Ty
 

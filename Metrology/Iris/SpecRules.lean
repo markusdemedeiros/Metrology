@@ -1,5 +1,9 @@
-import Metrology.Iris.SpecUpdate
-import Metrology.ProbLang.DetStep
+module
+
+public import Metrology.Iris.SpecUpdate
+public import Metrology.ProbLang.DetStep
+
+@[expose] public section
 
 /-!
 # Spec-side stepping rules

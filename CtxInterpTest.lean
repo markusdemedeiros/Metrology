@@ -1162,3 +1162,6 @@ private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Un
 #eval check "partial application: stored and reused"
   pl(let add3 := (fun x y, x + y) #3; let a := add3 #10; let b := add3 #20; a + b)
   pl(#36)
+
+def main : IO Unit :=
+  IO.println "All CtxInterp tests passed."

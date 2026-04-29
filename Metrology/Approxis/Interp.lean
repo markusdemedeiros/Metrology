@@ -1,7 +1,11 @@
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.Model
-import Metrology.ProbLang.Metatheory
-import Metrology.ProbLang.Syntax.Types
+module
+
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.Approxis.Model
+public import Metrology.ProbLang.Metatheory
+public import Metrology.ProbLang.Syntax.Types
+
+@[expose] public section
 
 /-!
 # Type Interpretation
@@ -106,6 +110,31 @@ noncomputable def interp (τ : Ty) (Δ : TyEnv GF) : lrel GF :=
 theorem interp_ne_env (τ : Ty) {n : Nat} {Δ Δ' : TyEnv GF}
     (h : Δ ≡{n}≡ Δ') : interp τ Δ ≡{n}≡ interp τ Δ' :=
   (interpNE (GF := GF) τ).ne h
+
+/-! ### `interp` head-shape equations
+
+These centralize the defeq bridges between `interp` at a constructor type and
+the corresponding `lrel_*` builder. Rewriting through these is preferable to
+inline `have h : interp ... = lrel_... := rfl; rw [h]` patterns: if the shape
+of `interp` ever changes (e.g. an extra wrapper), only these lemmas need
+updating. -/
+
+@[simp] theorem interp_unit (Δ : TyEnv GF) : interp Ty.unit Δ = lrel_unit := rfl
+@[simp] theorem interp_int  (Δ : TyEnv GF) : interp Ty.int  Δ = lrel_int  := rfl
+@[simp] theorem interp_bool (Δ : TyEnv GF) : interp Ty.bool Δ = lrel_bool := rfl
+@[simp] theorem interp_tape (Δ : TyEnv GF) : interp Ty.tape Δ = lrel_tape := rfl
+
+theorem interp_prod (Δ : TyEnv GF) (τ1 τ2 : Ty) :
+    interp (Ty.prod τ1 τ2) Δ = lrel_prod (interp τ1 Δ) (interp τ2 Δ) := rfl
+
+theorem interp_sum (Δ : TyEnv GF) (τ1 τ2 : Ty) :
+    interp (Ty.sum τ1 τ2) Δ = lrel_sum (interp τ1 Δ) (interp τ2 Δ) := rfl
+
+theorem interp_arrow (Δ : TyEnv GF) (τ1 τ2 : Ty) :
+    interp (Ty.arrow τ1 τ2) Δ = lrel_arr (interp τ1 Δ) (interp τ2 Δ) := rfl
+
+theorem interp_ref (Δ : TyEnv GF) (τ : Ty) :
+    interp (Ty.ref τ) Δ = lrel_ref (interp τ Δ) := rfl
 
 end interp
 

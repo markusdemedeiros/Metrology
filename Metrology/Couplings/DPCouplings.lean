@@ -1,20 +1,24 @@
-import Mathlib.Data.Real.Basic
-import Mathlib.Data.EReal.Basic
-import Mathlib.MeasureTheory.Measure.MeasureSpace
-import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
-import Mathlib.MeasureTheory.Integral.Lebesgue.Basic
-import Mathlib.MeasureTheory.Measure.Dirac
-import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
-import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
-import Mathlib.MeasureTheory.Measure.GiryMonad
-import Mathlib.MeasureTheory.Integral.Lebesgue.Add
-import Mathlib.Topology.UnitInterval
-import Mathlib.MeasureTheory.Constructions.UnitInterval
-import Mathlib.Probability.ProbabilityMassFunction.Basic
-import Mathlib.Probability.ProbabilityMassFunction.Constructions
-import Mathlib.Analysis.Real.OfDigits
+module
 
-import Metrology.Couplings.ApproximateCouplings
+public import Mathlib.Data.Real.Basic
+public import Mathlib.Data.EReal.Basic
+public import Mathlib.MeasureTheory.Measure.MeasureSpace
+public import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Basic
+public import Mathlib.MeasureTheory.Measure.Dirac
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
+public import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
+public import Mathlib.MeasureTheory.Measure.GiryMonad
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Add
+public import Mathlib.Topology.UnitInterval
+public import Mathlib.MeasureTheory.Constructions.UnitInterval
+public import Mathlib.Probability.ProbabilityMassFunction.Basic
+public import Mathlib.Probability.ProbabilityMassFunction.Constructions
+public import Mathlib.Analysis.Real.OfDigits
+
+public import Metrology.Couplings.ApproximateCouplings
+
+@[expose] public section
 
 noncomputable section DPCoupling
 

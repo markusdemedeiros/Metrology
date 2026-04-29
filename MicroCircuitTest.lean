@@ -1,4 +1,8 @@
-import MicroCircuit
+module
+
+public import MicroCircuit
+
+@[expose] public section
 
 /- ## Circuit eval tests -/
 

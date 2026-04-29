@@ -1,7 +1,12 @@
-import Mathlib.MeasureTheory.Constructions.Cylinders
-import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
-import Mathlib.Data.Real.Basic
-import Metrology.Meta.Projections
+module
+
+public import Mathlib.MeasureTheory.Constructions.Cylinders
+public import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
+public import Mathlib.Data.Real.Basic
+public import Metrology.Meta.Projections
+import all Metrology.Meta.Projections
+
+@[expose] public section
 
 -- Operational semantics of continuous PPL
 

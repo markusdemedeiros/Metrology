@@ -1,8 +1,12 @@
-import Metrology.Approxis.AppWeakestpre
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.ProbLang.Syntax.LocallyClosed
-import Iris.Instances.Lib.NaInvariants
-import Iris.Instances.Lib.Invariants
+module
+
+public import Metrology.Approxis.AppWeakestpre
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.ProbLang.Syntax.LocallyClosed
+public import Iris.Instances.Lib.NaInvariants
+public import Iris.Instances.Lib.Invariants
+
+@[expose] public section
 
 /-!
 # Semantic Model
@@ -247,7 +251,7 @@ scoped notation:100 "REL " e1 " << " e2 " : " A =>
 section SimpleLRels
 variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
-private theorem lrel_closed_lit_pair (v1 v2 : Val) :
+theorem lrel_closed_lit_pair (v1 v2 : Val) :
     iprop(⌜v1.1 = .lit .unit ∧ v2.1 = .lit .unit⌝ : IProp GF)
       ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
   iintro %h

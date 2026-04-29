@@ -1,4 +1,8 @@
-import MicroCircuit
+module
+
+public import MicroCircuit
+
+@[expose] public section
 
 /-- Emit a Graphviz DOT representation of a circuit to stdout. -/
 def Circuit.toDot (c : Circuit) (numInputs : Nat) (name : String := "circuit") : String := Id.run do

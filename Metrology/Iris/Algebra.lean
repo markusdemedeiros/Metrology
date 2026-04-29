@@ -1,12 +1,16 @@
-import Iris
-import Mathlib.Probability.Kernel.Basic
-import Mathlib.Data.ENNReal.Basic
-import Mathlib.MeasureTheory.Measure.Sub
-import Mathlib.MeasureTheory.Measure.MeasureSpaceDef
-import Iris.Algebra.View
-import Iris.Instances.IProp.Instance
-import Iris.Algebra.Auth
-import Iris.Algebra.Numbers
+module
+
+public import Iris
+public import Mathlib.Probability.Kernel.Basic
+public import Mathlib.Data.ENNReal.Basic
+public import Mathlib.MeasureTheory.Measure.Sub
+public import Mathlib.MeasureTheory.Measure.MeasureSpaceDef
+public import Iris.Algebra.View
+public import Iris.Instances.IProp.Instance
+public import Iris.Algebra.Auth
+public import Iris.Algebra.Numbers
+
+@[expose] public section
 
 open Std Iris COFE ProbabilityTheory MeasureTheory
 

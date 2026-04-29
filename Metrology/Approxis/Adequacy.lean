@@ -1,6 +1,10 @@
-import Metrology.Approxis.AppWeakestpre
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.ProbLang.Erasure
+module
+
+public import Metrology.Approxis.AppWeakestpre
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.ProbLang.Erasure
+
+@[expose] public section
 
 /-! # Adequacy: WP entailments imply `AddCoupl` between execution distributions. -/
 

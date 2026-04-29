@@ -1,6 +1,10 @@
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.Model
-import Metrology.Approxis.AppRelRules
+module
+
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.Approxis.Model
+public import Metrology.Approxis.AppRelRules
+
+@[expose] public section
 
 /-! # Relational tactics: macro wrappers around `refines_*` lemmas, mirroring Rocq's `rel_*`. -/
 

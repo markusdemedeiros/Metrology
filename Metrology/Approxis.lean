@@ -1,16 +1,20 @@
-import Metrology.Approxis.AppWeakestpre
-import Metrology.Approxis.Lifting
-import Metrology.Approxis.PrimitiveLaws
-import Metrology.Approxis.CouplingRules
-import Metrology.Approxis.Model
-import Metrology.Approxis.Interp
-import Metrology.Approxis.AppRelRules
-import Metrology.Approxis.RelTactics
-import Metrology.Approxis.Compatibility
-import Metrology.Approxis.Fundamental
-import Metrology.Approxis.Adequacy
-import Metrology.Approxis.AdequacyRel
-import Metrology.Approxis.Soundness
+module
+
+public import Metrology.Approxis.AppWeakestpre
+public import Metrology.Approxis.Lifting
+public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.Approxis.CouplingRules
+public import Metrology.Approxis.Model
+public import Metrology.Approxis.Interp
+public import Metrology.Approxis.AppRelRules
+public import Metrology.Approxis.RelTactics
+public import Metrology.Approxis.Compatibility
+public import Metrology.Approxis.Fundamental
+public import Metrology.Approxis.Adequacy
+public import Metrology.Approxis.AdequacyRel
+public import Metrology.Approxis.Soundness
+
+@[expose] public section
 
 /-!
 # Approxis

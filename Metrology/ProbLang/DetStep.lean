@@ -1,5 +1,9 @@
-import Metrology.ProbLang.CtxStep
-import Mathlib.Order.Defs.PartialOrder
+module
+
+public import Metrology.ProbLang.CtxStep
+public import Mathlib.Order.Defs.PartialOrder
+
+@[expose] public section
 
 noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure

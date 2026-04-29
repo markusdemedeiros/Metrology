@@ -1,5 +1,9 @@
-import Metrology.LibCrypto
-import MicroCircuit
+module
+
+public import Metrology.LibCrypto
+public import MicroCircuit
+
+@[expose] public section
 
 /-
 /- ## LibCrypto / garbling tests (commented out pending garbling rewrite) -/

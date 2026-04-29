@@ -1,4 +1,8 @@
-import Metrology.ProbLang.Test
+module
+
+public import Metrology.ProbLang.Test
+
+@[expose] public section
 
 /-- ProbLang test runner.
 

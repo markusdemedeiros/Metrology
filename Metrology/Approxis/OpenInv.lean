@@ -1,5 +1,9 @@
-import Metrology.Approxis.AppWeakestpre
-import Metrology.ProbLang.Atomic
+module
+
+public import Metrology.Approxis.AppWeakestpre
+public import Metrology.ProbLang.Atomic
+
+@[expose] public section
 
 /-! # `OpenInv e`: the logical-atomicity predicate enabling mask-shift around evaluating `e`. -/
 

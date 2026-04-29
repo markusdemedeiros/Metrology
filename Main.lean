@@ -1,5 +1,9 @@
-import Metrology
-import Mathlib.Data.Real.Basic
+module
+
+public import Metrology
+public import Mathlib.Data.Real.Basic
+
+@[expose] public section
 
 /-! # Some tests -/
 
@@ -128,3 +132,5 @@ def MyTree'.branch.ctor  : MyTree' L1 L2 × MyTree' L1 L2 × Nat  → MyTree' L1
 --     --           { leaf1 l | l ∈ Set.univ }
 
 def main : IO Unit := return
+
+end

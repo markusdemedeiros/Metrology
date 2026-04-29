@@ -1,3 +1,6 @@
-import Metrology.ProbLang.Test.CtxInterp
-import Metrology.ProbLang.Test.Notation
-import Metrology.ProbLang.Test.StepTactics
+module
+
+public import Metrology.ProbLang.Test.Notation
+public import Metrology.ProbLang.Test.StepTactics
+
+@[expose] public section

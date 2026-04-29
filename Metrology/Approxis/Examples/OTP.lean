@@ -1,7 +1,11 @@
-import Metrology.Approxis.Compatibility
-import Metrology.Approxis.AppRelRules
-import Metrology.Approxis.RelTactics
-import Metrology.Approxis.AdequacyRel
+module
+
+public import Metrology.Approxis.Compatibility
+public import Metrology.Approxis.AppRelRules
+public import Metrology.Approxis.RelTactics
+public import Metrology.Approxis.AdequacyRel
+
+@[expose] public section
 
 /-! # One-Time Pad refinement example, using modular addition as the combiner. -/
 

@@ -1,6 +1,10 @@
-import Metrology.ProbLang.DetStep
-import Metrology.ProbLang.Exec
-import Metrology.ProbLang.Syntax.LocallyClosed
+module
+
+public import Metrology.ProbLang.DetStep
+public import Metrology.ProbLang.Exec
+public import Metrology.ProbLang.Syntax.LocallyClosed
+
+@[expose] public section
 
 namespace ProbLang
 open Cslib Exp

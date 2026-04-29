@@ -1,1 +1,5 @@
-import Metrology.LibCrypto.LibCryptoLean
+module
+
+public import Metrology.LibCrypto.LibCryptoLean
+
+@[expose] public section

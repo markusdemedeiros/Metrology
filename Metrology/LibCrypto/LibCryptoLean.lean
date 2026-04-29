@@ -1,4 +1,8 @@
-import Std
+module
+
+public import Std
+
+@[expose] public section
 
 /-- Convert the number `val` into a numBytes-sized little-endian ByteArray.
 Return `none` if val does not fit. -/

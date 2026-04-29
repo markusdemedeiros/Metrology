@@ -1,5 +1,9 @@
-import Metrology.Couplings.ApproximateCouplings
+module
+
+public import Metrology.Couplings.ApproximateCouplings
 -- import Mathlib.Analysis.Real.OfDigits
+
+@[expose] public section
 
 -- abbrev BinarySequence := ℕ → Fin 2
 -- -- #synth MeasurableSpace BinarySequence

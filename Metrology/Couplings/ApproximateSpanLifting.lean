@@ -1,9 +1,13 @@
-import Mathlib.Data.Real.Basic
-import Mathlib.Data.EReal.Basic
-import Mathlib.MeasureTheory.Measure.MeasureSpace
-import Mathlib.MeasureTheory.Integral.Lebesgue.Basic
-import Mathlib.MeasureTheory.Measure.Dirac
-import Mathlib.MeasureTheory.Measure.GiryMonad
+module
+
+public import Mathlib.Data.Real.Basic
+public import Mathlib.Data.EReal.Basic
+public import Mathlib.MeasureTheory.Measure.MeasureSpace
+public import Mathlib.MeasureTheory.Integral.Lebesgue.Basic
+public import Mathlib.MeasureTheory.Measure.Dirac
+public import Mathlib.MeasureTheory.Measure.GiryMonad
+
+@[expose] public section
 
 section ApproximateSpanLifting
 

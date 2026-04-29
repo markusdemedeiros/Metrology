@@ -1,7 +1,11 @@
-import Metrology.ProbLang.Measure
-import Metrology.ProbLang.HeadStep
-import Metrology.ProbLang.DetStep
-import Metrology.Couplings.AdditiveCouplings
+module
+
+public import Metrology.ProbLang.Measure
+public import Metrology.ProbLang.HeadStep
+public import Metrology.ProbLang.DetStep
+public import Metrology.Couplings.AdditiveCouplings
+
+@[expose] public section
 
 noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure ProbLang

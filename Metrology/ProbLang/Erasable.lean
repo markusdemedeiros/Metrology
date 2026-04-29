@@ -1,4 +1,8 @@
-import Metrology.ProbLang.Exec
+module
+
+public import Metrology.ProbLang.Exec
+
+@[expose] public section
 
 /-!
 # Erasable and rewritable distributions

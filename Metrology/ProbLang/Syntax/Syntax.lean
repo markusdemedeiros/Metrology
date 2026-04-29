@@ -1,10 +1,15 @@
-import Std
-import Std.Data.ExtTreeMap.Lemmas
-import Mathlib.Data.Countable.Basic
-import Mathlib.Tactic.DeriveCountable
-import Mathlib.Logic.Equiv.List
-import Cslib.Foundations.Data.HasFresh
-import Cslib.Foundations.Syntax.HasSubstitution
+module
+
+public import Std
+public import Std.Data.ExtTreeMap.Lemmas
+public import Mathlib.Data.Countable.Basic
+public import Mathlib.Tactic.DeriveCountable
+import all Mathlib.Tactic.DeriveCountable
+public import Mathlib.Logic.Equiv.List
+public import Cslib.Foundations.Data.HasFresh
+public import Cslib.Foundations.Syntax.HasSubstitution
+
+@[expose] public section
 
 open Std
 open Cslib
@@ -430,7 +435,7 @@ inductive IsVal : Exp → Type
   | inr  : IsVal e → IsVal (.inr e)
 
 /-- A value is an expression paired with a Type-valued witness. -/
-def Val := (e : Exp) × IsVal e
+@[expose] def Val := (e : Exp) × IsVal e
 
 namespace IsVal
 

@@ -1,5 +1,9 @@
-import Std.Data.HashMap
-import Metrology.LibCrypto.LibCryptoLean
+module
+
+public import Std.Data.HashMap
+public import Metrology.LibCrypto.LibCryptoLean
+
+@[expose] public section
 
 /- ## Word-level SHA-256
 Reference: https://www.movable-type.co.uk/scripts/sha256.html

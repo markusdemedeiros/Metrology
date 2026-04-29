@@ -1,4 +1,8 @@
-import Metrology.ProbLang.Syntax.Syntax
+module
+
+public import Metrology.ProbLang.Syntax.Syntax
+
+@[expose] public section
 
 /-!
 # LN plumbing theorems for `Exp`
@@ -11,23 +15,20 @@ All theorems here concern `openRec` / `closeRec` / `subst` / `fv` / `LC`.
 -/
 
 namespace ProbLang
-open Cslib
-open Exp
+
+open Cslib Exp
 
 namespace Exp
 
 variable {x y : Var} {e e' u t : Exp}
 
-/-- An opening appearing on both sides of an equality can be removed. -/
-theorem open_lc_aux (e : Exp) (j v i u) (neq : i ≠ j)
-    (heq : openRec j v e = openRec i u (openRec j v e)) :
-    e = openRec i u e := by
+theorem openRec_aux (e : Exp) (j v i u) (neq : i ≠ j)
+    (heq : openRec j v e = openRec i u (openRec j v e)) : e = openRec i u e := by
   induction e generalizing i j <;> grind
 
 /-- Swap opens at non-clashing depths (both substituting free variables). -/
-theorem swap_open_fvars (k n : Nat) (x y : Var) (e : Exp) (neq : k ≠ n) :
-    openRec k (fvar x) (openRec n (fvar y) e)
-      = openRec n (fvar y) (openRec k (fvar x) e) := by
+theorem openRec_openRec_comm (k n : Nat) (x y : Var) (e : Exp) (neq : k ≠ n) :
+    openRec k (fvar x) (openRec n (fvar y) e) = openRec n (fvar y) (openRec k (fvar x) e) := by
   induction e generalizing k n <;> grind
 
 /-- Substitution of an absent free variable is the identity. -/
@@ -37,19 +38,19 @@ theorem subst_fresh (x : Var) (e sub : Exp) (h : x ∉ e.fv) :
   induction e <;> grind
 
 /-- Opening then closing at the same depth recovers the term, provided the atom is fresh. -/
-theorem open_close (x : Var) (e : Exp) (k : Nat) (h : x ∉ e.fv) :
+theorem closeRec_openRec (x : Var) (e : Exp) (k : Nat) (h : x ∉ e.fv) :
     e = closeRec k x (openRec k (fvar x) e) := by
   induction e generalizing k <;> grind
 
 /-- Specialisation of `open_close` to the outermost binder. -/
-theorem open_close_var (x : Var) (e : Exp) (h : x ∉ e.fv) :
+theorem close_open (x : Var) (e : Exp) (h : x ∉ e.fv) :
     e = close (open' e (fvar x)) x :=
-  open_close x e 0 h
+  closeRec_openRec x e 0 h
 
 /-- Opening at a free variable is injective on terms not containing that variable. -/
-theorem open_injective (x : Var) (e e' : Exp) (hx : x ∉ e.fv) (hx' : x ∉ e'.fv)
+theorem open_inj (x : Var) (e e' : Exp) (hx : x ∉ e.fv) (hx' : x ∉ e'.fv)
     (heq : open' e (fvar x) = open' e' (fvar x)) : e = e' := by
-  grind [open_close x e 0 hx, open_close x e' 0 hx']
+  grind [closeRec_openRec x e 0 hx, closeRec_openRec x e' 0 hx']
 
 /-- Opening and closing commute at non-clashing depths / variables. -/
 theorem swap_open_fvar_close (k n : Nat) (x y : Var) (e : Exp)
@@ -146,10 +147,10 @@ theorem open_lc (k : Nat) (t : Exp) (e : Exp) (he : e.IsLocallyClosed) :
   induction he generalizing k with
   | lam L e _ ih =>
       obtain ⟨x, hx⟩ := HasFresh.fresh_exists L
-      grind [open_lc_aux e 0 (fvar x) (k+1) t]
+      grind [openRec_aux e 0 (fvar x) (k+1) t]
   | fix L e _ ih =>
       obtain ⟨x, hx⟩ := HasFresh.fresh_exists L
-      grind [open_lc_aux e 0 (fvar x) (k+1) t]
+      grind [openRec_aux e 0 (fvar x) (k+1) t]
   | _ => grind
 
 /-- Substitution distributes through `openRec` when the substitute is LC. -/
@@ -256,7 +257,7 @@ theorem open_close_to_subst (e : Exp) (x y : Var) (k : Nat) (he : IsLocallyClose
           open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
             = openRec (k+1) (fvar y) (closeRec (k+1) x (open' t (fvar x'))) := by
         simp only [open']
-        rw [swap_open_fvars 0 (k+1) x' y _ (by omega)]
+        rw [openRec_openRec_comm 0 (k+1) x' y _ (by omega)]
         rw [swap_open_fvar_close (k+1) 0 x x' t (by omega) hx'x.symm]
       have hIH := ih x' hx'L (k+1)
       have hRHS :
@@ -266,7 +267,7 @@ theorem open_close_to_subst (e : Exp) (x y : Var) (k : Nat) (he : IsLocallyClose
       have heq : open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
             = open' (subst t x (fvar y)) (fvar x') := by
         rw [hLHS, hIH, hRHS]
-      exact open_injective x' _ _ hLfv hRfv heq
+      exact open_inj x' _ _ hLfv hRfv heq
   | fix L t _ ih =>
       simp only [closeRec, openRec, subst]
       congr 1
@@ -289,7 +290,7 @@ theorem open_close_to_subst (e : Exp) (x y : Var) (k : Nat) (he : IsLocallyClose
           open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
             = openRec (k+1) (fvar y) (closeRec (k+1) x (open' t (fvar x'))) := by
         simp only [open']
-        rw [swap_open_fvars 0 (k+1) x' y _ (by omega)]
+        rw [openRec_openRec_comm 0 (k+1) x' y _ (by omega)]
         rw [swap_open_fvar_close (k+1) 0 x x' t (by omega) hx'x.symm]
       have hIH := ih x' hx'L (k+1)
       have hRHS :
@@ -299,7 +300,7 @@ theorem open_close_to_subst (e : Exp) (x y : Var) (k : Nat) (he : IsLocallyClose
       have heq : open' (openRec (k+1) (fvar y) (closeRec (k+1) x t)) (fvar x')
             = open' (subst t x (fvar y)) (fvar x') := by
         rw [hLHS, hIH, hRHS]
-      exact open_injective x' _ _ hLfv hRfv heq
+      exact open_inj x' _ _ hLfv hRfv heq
   | _ => grind
 
 /-- Specialised: outermost open ∘ close equals substitution. -/

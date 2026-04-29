@@ -1,5 +1,9 @@
-import Metrology.ProbLang.Syntax.Types
-import Metrology.ProbLang.Exec
+module
+
+public import Metrology.ProbLang.Syntax.Types
+public import Metrology.ProbLang.Exec
+
+@[expose] public section
 
 /-!
 # Contextual refinement

@@ -1,5 +1,9 @@
-import Metrology.ProbLang.Erasable
-import Metrology.ProbLang.Metatheory
+module
+
+public import Metrology.ProbLang.Erasable
+public import Metrology.ProbLang.Metatheory
+
+@[expose] public section
 
 /-!
 # Erasure: presampling on tapes is invisible

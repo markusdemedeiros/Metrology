@@ -1,5 +1,9 @@
-import MicroCircuit.GarbleGen
-import MicroCircuit.Common
+module
+
+public import MicroCircuit.GarbleGen
+public import MicroCircuit.Common
+
+@[expose] public section
 
 namespace HalfGateGarbling
 
