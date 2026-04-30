@@ -845,14 +845,13 @@ end Soundness
 
 section RefinesSound
 open MeasureTheory
-variable {GF : BundledGFunctors}
-  [AppPreGS GF] [SpecPreGS GF] [ECPreGS GF] [InvGpreS GF] [NaInvG GF]
+variable {GF : BundledGFunctors} [RefinesPreGS GF]
 
 /-- The bool-equality value relation extracted from `lrel_bool`. -/
 def boolEqVal (v v' : Val) : Prop :=
   ∃ b : Bool, v.1 = .lit (.bool b) ∧ v'.1 = .lit (.bool b)
 
-omit [AppPreGS GF] [SpecPreGS GF] [ECPreGS GF] [InvGpreS GF] [NaInvG GF] in
+omit [RefinesPreGS GF] in
 /-- `lrel_bool` extracts purely to `boolEqVal`. -/
 theorem lrel_bool_to_boolEqVal [ApproxisRGS false GF] (v v' : Val) :
     ⊢@{IProp GF} iprop((lrel_bool (GF := GF)).car v v' -∗ ⌜boolEqVal v v'⌝) := by
@@ -924,15 +923,17 @@ theorem refines_sound_open_fresh
   intro K σ₀ b Htyped HfreshK Hbinders
   have hRewriteFb : ∀ (e0 : Exp),
       limExec ⟨e0, σ₀⟩ (finalBool b) =
-      ((limExec ⟨e0, σ₀⟩).map (·.expr)) {.lit (.bool b)} := by
+      (limExecV ⟨e0, σ₀⟩) {.lit (.bool b)} := by
     intro e0
+    unfold limExecV
+    unfold asExpr
     rw [Measure.map_apply (by fun_prop) (MeasurableSet.singleton _)]
     rfl
   rw [hRewriteFb (K.fill e), hRewriteFb (K.fill e')]
   have hCpl :
       AddCoupl 0 (adequacyRel boolEqVal)
-        ((limExec ⟨K.fill e,  σ₀⟩).map (·.expr))
-        ((limExec ⟨K.fill e', σ₀⟩).map (·.expr)) := by
+        (limExecV ⟨K.fill e,  σ₀⟩)
+        (limExecV ⟨K.fill e', σ₀⟩) := by
     apply refines_coupling (GF := GF) (A := fun _ => lrel_bool) (φ := boolEqVal)
     · intro IR v v'
       have := IR

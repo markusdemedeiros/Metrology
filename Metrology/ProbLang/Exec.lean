@@ -103,9 +103,14 @@ theorem execN_fill_item_eq (Ki : EctxItem) (n : Nat) {ρ ρ'' : Cfg} :
         show ∀ i, n + 1 - (i + 1) = n - i from fun i => by omega,
         Measure.coe_zero, Pi.zero_apply, zero_mul, tsum_zero, zero_add]
 
-
-
+/-- Limiting distribution of an execution, over configurations -/
 def limExec (ρ : Cfg) : Measure Cfg := ⨆ (i : ℕ), execN i ρ
+
+/-- Extract an expression measure from a Cfg measure -/
+def asExpr (μ : Measure Cfg) : Measure Exp := μ.map (·.expr)
+
+/-- Limiting distribution of an execution, over return values -/
+def limExecV (ρ : Cfg) : Measure Exp := asExpr <| limExec ρ
 
 /-! ## `execN` / `limExec` metatheory — ported from Rocq `theories/prob/markov.v`.
 

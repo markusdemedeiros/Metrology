@@ -18,17 +18,17 @@ namespace ProbLang
 open Iris Iris.BI Iris.ProofMode OFE COFE Iris.Std DisjointLeibnizSet Auth HeapView
 open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS
 
-theorem refines_coupling {GF : BundledGFunctors}
-    [IPre : AppPreGS GF] [ISPre : SpecPreGS GF] [IECPre : ECPreGS GF]
-    [IInvPre : InvGpreS GF] [INaPre : NaInvG GF]
+class abbrev RefinesPreGS (GF : BundledGFunctors) :=
+  AppPreGS GF, SpecPreGS GF, ECPreGS GF, InvGpreS GF, NaInvG GF
+
+theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS GF]
     (A : ∀ (_ : ApproxisRGS false GF), lrel GF)
     (φ : Val → Val → Prop) (e e' : Exp) (σ σ' : State)
     (HA : ∀ (IR : ApproxisRGS false GF) (v v' : Val),
       ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
     (Hlog : ∀ (IR : ApproxisRGS false GF),
       ⊢@{IProp GF} refines (hlc := false) (GF := GF) ⊤ e e' (A IR)) :
-    AddCoupl 0 (adequacyRel φ) ((limExec ⟨e, σ⟩).map (·.expr))
-        ((limExec ⟨e', σ'⟩).map (·.expr)) := by
+    AddCoupl 0 (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
   apply wp_adequacy_error_lim (GF := GF) e e' σ σ' 0 φ
   intro IGS ε' Hε'pos
   iintro He' Herr
@@ -36,7 +36,7 @@ theorem refines_coupling {GF : BundledGFunctors}
   icases HnaEx with ⟨%γ, Htok⟩
   set IR : ApproxisRGS false GF :=
     { approxisGS := IGS
-      naInvG := INaPre
+      naInvG := _
       nais := γ }
   have HlogIR : (⊢@{IProp GF} refines (hlc := false) (GF := GF) ⊤ e e' (A IR)) := Hlog IR
   ihave Hlog' := HlogIR
@@ -64,52 +64,49 @@ theorem refines_coupling {GF : BundledGFunctors}
       iexact Hphi
   iexact Hwp
 
-/-! ### Concrete `BundledGFunctors` for the OTP example -/
-
-/-- Concrete model `BundledGFunctors` for OTP/Approxis. Slot 7/8 (spec heap/tapes)
-are distinct from slot 4/5 (program heap/tapes) to prevent γ-aliasing. -/
-noncomputable def otpSigma : BundledGFunctors := fun n =>
+/-- Concrete model for Approxis -/
+noncomputable def ApproxisFunctor : BundledGFunctors := fun n =>
   match n with
-  | 0  => ⟨InvMapF, by infer_instance⟩
-  | 1  => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
-  | 2  => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
-  | 3  => ⟨AuthURF (F := ℕ+) (constOF Credit), by infer_instance⟩
-  | 4  => ⟨constOF SpecHeap, by infer_instance⟩
-  | 5  => ⟨constOF SpecTapes, by infer_instance⟩
-  | 6  => ⟨constOF SpecProg, by infer_instance⟩
-  | 7  => ⟨constOF SpecHeap, by infer_instance⟩
-  | 8  => ⟨constOF SpecTapes, by infer_instance⟩
-  | 9  => ⟨constOF (Auth ℕ+ ErrorCredit), by infer_instance⟩
-  | 10 => ⟨NaInvF, by infer_instance⟩
-  | _  => ⟨constOF Unit, by infer_instance⟩
+  | 0 => ⟨InvMapF, by infer_instance⟩
+  | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
+  | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
+  | 3 => ⟨AuthURF (F := ℕ+) (constOF Credit), by infer_instance⟩
+  | 4 => ⟨constOF SpecHeap, by infer_instance⟩
+  | 5 => ⟨constOF SpecTapes, by infer_instance⟩
+  | 6 => ⟨constOF SpecProg, by infer_instance⟩
+  | 7 => ⟨constOF (Auth ℕ+ ErrorCredit), by infer_instance⟩
+  | 8 => ⟨NaInvF, by infer_instance⟩
+  | _ => ⟨constOF Unit, by infer_instance⟩
 
 /-! ### PreGS instances for `otpSigma` -/
 
-instance otpSigma_WsatGpreS : WsatGpreS otpSigma where
-  inv := { τ := 0, transp := by unfold otpSigma; rfl }
-  enabled := { τ := 1, transp := by unfold otpSigma; rfl }
-  disabled := { τ := 2, transp := by unfold otpSigma; rfl }
+instance ApproxisFunctor_WsatGpreS : WsatGpreS ApproxisFunctor where
+  inv := ⟨0, rfl⟩
+  enabled := ⟨1, rfl⟩
+  disabled := ⟨2, rfl⟩
 
-instance otpSigma_LcGpreS : LcGpreS otpSigma where
-  lc_elem := { τ := 3, transp := by unfold otpSigma; rfl }
+instance ApproxisFunctor_LcGpreS : LcGpreS ApproxisFunctor where
+  lc_elem := ⟨3, rfl⟩
 
-instance otpSigma_InvGpreS : InvGpreS otpSigma where
-  toWsatGpreS := otpSigma_WsatGpreS
-  toLcGpreS := otpSigma_LcGpreS
+instance ApproxisFunctor_InvGpreS : InvGpreS ApproxisFunctor where
+  toWsatGpreS := ApproxisFunctor_WsatGpreS
+  toLcGpreS := ApproxisFunctor_LcGpreS
 
-instance otpSigma_AppPreGS : AppPreGS otpSigma where
-  heap := { τ := 4, transp := by unfold otpSigma; rfl }
-  tapes := { τ := 5, transp := by unfold otpSigma; rfl }
+instance ApproxisFunctor_AppPreGS : AppPreGS ApproxisFunctor where
+  heap := ⟨4, rfl⟩
+  tapes := ⟨5, rfl⟩
 
-instance otpSigma_SpecPreGS : SpecPreGS otpSigma where
-  prog := { τ := 6, transp := by unfold otpSigma; rfl }
-  heap := { τ := 7, transp := by unfold otpSigma; rfl }
-  tapes := { τ := 8, transp := by unfold otpSigma; rfl }
+instance ApproxisFunctor_SpecPreGS : SpecPreGS ApproxisFunctor where
+  prog := ⟨6, rfl⟩
+  heap := ⟨4, rfl⟩
+  tapes := ⟨5, rfl⟩
 
-instance otpSigma_ECPreGS : ECPreGS otpSigma where
-  ec := { τ := 9, transp := by unfold otpSigma; rfl }
+instance ApproxisFunctor_ECPreGS : ECPreGS ApproxisFunctor where
+  ec := ⟨7, rfl⟩
 
-instance otpSigma_NaInvG : NaInvG otpSigma where
-  inv := { τ := 10, transp := by unfold otpSigma; rfl }
+instance ApproxisFunctor_NaInvG : NaInvG ApproxisFunctor where
+  inv := ⟨8, rfl⟩
+
+instance ApproxisFunctor_RefinesPreGS : RefinesPreGS ApproxisFunctor where
 
 end ProbLang

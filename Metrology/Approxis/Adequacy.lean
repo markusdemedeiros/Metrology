@@ -240,23 +240,23 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
       (∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
         Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
           (⌜AddCoupl ε' (adequacyRel φ)
-            ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝)) -∗
+            (asExpr (execN m ⟨e₁, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝)) -∗
       |={∅}=> |={∅}[∅]▷=>^[n]
         (⌜AddCoupl ε (adequacyRel φ)
-          ((execN m ⟨e₁, σ₁⟩).map (·.expr))
-          ((limExec ⟨e₁', σ₁'⟩).map (·.expr))⌝) := by
+          (asExpr (execN m ⟨e₁, σ₁⟩))
+          (limExecV ⟨e₁', σ₁'⟩)⌝) := by
   set Ψ : State → Cfg → ENNReal → IProp GF :=
     fun σ₀ ⟨e₀', σ₀'⟩ ε₀ =>
       iprop((∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
         Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
           (⌜AddCoupl ε' (adequacyRel φ)
-            ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝)) -∗
+            (asExpr (execN m ⟨e₁, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝)) -∗
         |={∅}=> |={∅}[∅]▷=>^[n]
           (⌜AddCoupl ε₀ (adequacyRel φ)
-            ((execN m ⟨e₁, σ₀⟩).map (·.expr))
-            ((limExec ⟨e₀', σ₀'⟩).map (·.expr))⌝))
+            (asExpr (execN m ⟨e₁, σ₀⟩))
+            (limExecV ⟨e₀', σ₀'⟩)⌝))
   iintro Hspec HZ
   iapply (specCoupl_ind (Ψ := Ψ) (Z := Z) (E := ∅)) $$ [] %σ₁ %e₁' %σ₁' %ε Hspec HZ
   iintro !> %σ₀ %c₀ %ε₀ H
@@ -269,6 +269,7 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
     iapply ProbLang.ApproxisWpGS.stepFupdN_intro Std.LawfulSet.empty_subset n
     ipure_intro
     exact AddCoupl.trivial_of_one_le HVac (by
+      unfold asExpr
       rw [MeasureTheory.Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
       simpa using execN_univ_le_one m ⟨e₁, σ₀⟩)
   ·
@@ -279,11 +280,11 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
       %HAC, %HX₂bnd, %HεBnd, %Herase1, %Herase1', HCont⟩
     have Himpl : (∀ σ₂ e₂' σ₂', S σ₂ ⟨e₂', σ₂'⟩ →
       AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-        ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-        ((limExec ⟨e₂', σ₂'⟩).map (·.expr))) →
+        (asExpr (execN m ⟨e₁, σ₂⟩))
+        (limExecV ⟨e₂', σ₂'⟩)) →
       AddCoupl ε₀ (adequacyRel φ)
-        ((execN m ⟨e₁, σ₀⟩).map (·.expr))
-        ((limExec ⟨e₀', σ₀'⟩).map (·.expr)) := fun Hpure =>
+        (asExpr (execN m ⟨e₁, σ₀⟩))
+        (limExecV ⟨e₀', σ₀'⟩) := fun Hpure =>
       AddCoupl_erasure_erasable_exp_rhs
         (e₁ := e₁) (e₁' := e₀') (σ₁ := σ₀) (σ₁' := σ₀') (m := k) (n := m)
         (ε₂ := ∫⁻ ρ, X₂ ρ ∂(μ₁'.bind (fun σ => pexecN k ⟨e₀', σ⟩)))
@@ -300,8 +301,8 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
     · refine stepFupdN_mono (E := ∅) (E' := ∅) (n := n)
         (P := iprop(⌜∀ σ₂ e₂' σ₂', S σ₂ ⟨e₂', σ₂'⟩ →
           AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-            ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝ : IProp GF)) ?_
+            (asExpr (execN m ⟨e₁, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)) ?_
       iintro %Hpure
       ipure_intro
       exact Himpl Hpure
@@ -309,8 +310,8 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
     · refine stepFupdN_mono (E := ∅) (E' := ∅) (n := n)
         (P := iprop(∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State),
           ⌜S σ₂ ⟨e₂', σ₂'⟩⌝ -∗ ⌜AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-            ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝ : IProp GF)) ?_
+            (asExpr (execN m ⟨e₁, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)) ?_
       refine Entails.trans (forall_mono fun _ => forall_mono fun _ =>
         forall_mono fun _ => pure_wand.mp) ?_
       refine Entails.trans (forall_mono fun _ => forall_mono fun _ => pure_forall.mpr) ?_
@@ -319,31 +320,31 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
     iapply (fupd_stepFupdN_plain_forall_3 (GF := GF) (n := n)
       (Ψ := fun σ₂ e₂' σ₂' => iprop(
         ⌜S σ₂ ⟨e₂', σ₂'⟩⌝ -∗ ⌜AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-          ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-          ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝ : IProp GF)))
+          (asExpr (execN m ⟨e₁, σ₂⟩))
+          (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)))
     iintro %σ₂ %e₂' %σ₂'
     ispecialize HCont $$ %σ₂ %e₂' %σ₂'
     iapply BIFUpdate.mono
     · exact stepFupdN_pure_wand_intro (GF := GF) (E := ∅) (n := n)
         (p := S σ₂ ⟨e₂', σ₂'⟩)
         (q := AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-          ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-          ((limExec ⟨e₂', σ₂'⟩).map (·.expr)))
+          (asExpr (execN m ⟨e₁, σ₂⟩))
+          (limExecV ⟨e₂', σ₂'⟩))
     iapply (fupd_pure_wand_intro (GF := GF) (S σ₂ ⟨e₂', σ₂'⟩)
       iprop(|={∅}[∅]▷=>^[n] ⌜AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-        ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-        ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝ : IProp GF))
+        (asExpr (execN m ⟨e₁, σ₂⟩))
+        (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF))
     iintro %HS
     ispecialize HCont $$ %HS
     ihave HCont' : iprop(|={∅}=> (((∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
             Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
               (⌜AddCoupl ε' (adequacyRel φ)
-                ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-                ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝)) -∗
+                (asExpr (execN m ⟨e₁, σ₂⟩))
+                (limExecV ⟨e₂', σ₂'⟩)⌝)) -∗
             |={∅}=> |={∅}[∅]▷=>^[n]
               (⌜AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-                ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-                ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝)) ∧
+                (asExpr (execN m ⟨e₁, σ₂⟩))
+                (limExecV ⟨e₂', σ₂'⟩)⌝)) ∧
         specCoupl ∅ σ₂ e₂' σ₂' (X₂ ⟨e₂', σ₂'⟩) Z)) $$ [HCont]
     · iexact HCont
     imod HCont' with HCont''
@@ -360,12 +361,12 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
       (∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
         Z e₂ σ₂ e₂' σ₂' ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
           (⌜AddCoupl ε' (adequacyRel φ)
-            ((execN m ⟨e₂, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝)) -∗
+            (asExpr (execN m ⟨e₂, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝)) -∗
       |={∅}=> |={∅}[∅]▷=>^[n]
         (⌜AddCoupl ε (adequacyRel φ)
-          ((execN (m + 1) ⟨e₁, σ₁⟩).map (·.expr))
-          ((limExec ⟨e₁', σ₁'⟩).map (·.expr))⌝) := by
+          (asExpr (execN (m + 1) ⟨e₁, σ₁⟩))
+          (limExecV ⟨e₁', σ₁'⟩)⌝) := by
   have Hnv : ¬ e₁.isValue := Exp.toVal?_eq_none.mp Hnone
   rw [execN_succ_not_isValue (ρ := ⟨e₁, σ₁⟩) Hnv m]
   iintro HCpl Hcoupl
@@ -375,8 +376,8 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
     refine stepFupdN_mono (E := ∅) (E' := ∅) (n := n)
       (P := iprop(⌜∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
           AddCoupl (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-            ((execN m ⟨e₂, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝ : IProp GF)) ?_
+            (asExpr (execN m ⟨e₂, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)) ?_
     iintro %Hpure
     ipure_intro
     exact AddCoupl_erasure_erasable_exp_lhs_kanto
@@ -392,8 +393,8 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
   · refine stepFupdN_mono (E := ∅) (E' := ∅) (n := n)
       (P := iprop(∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
           ⌜AddCoupl (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩) (adequacyRel φ)
-            ((execN m ⟨e₂, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝ : IProp GF)) ?_
+            (asExpr (execN m ⟨e₂, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)) ?_
     refine Entails.trans (forall_mono fun _ => forall_mono fun _ =>
       forall_mono fun _ => pure_forall.mpr) ?_
     refine Entails.trans (forall_mono fun _ => forall_mono fun _ => pure_forall.mpr) ?_
@@ -414,12 +415,12 @@ theorem wp_adequacy_spec_coupl_zero (m : Nat) (e₁ : Exp) (σ₁ : State)
       (∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
         Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=>
           (⌜AddCoupl ε' (adequacyRel φ)
-            ((execN m ⟨e₁, σ₂⟩).map (·.expr))
-            ((limExec ⟨e₂', σ₂'⟩).map (·.expr))⌝)) -∗
+            (asExpr (execN m ⟨e₁, σ₂⟩))
+            (limExecV ⟨e₂', σ₂'⟩)⌝)) -∗
       |={∅}=>
         (⌜AddCoupl ε (adequacyRel φ)
-          ((execN m ⟨e₁, σ₁⟩).map (·.expr))
-          ((limExec ⟨e₁', σ₁'⟩).map (·.expr))⌝) :=
+          (asExpr (execN m ⟨e₁, σ₁⟩))
+          (limExecV ⟨e₁', σ₁'⟩)⌝) :=
   wp_adequacy_spec_coupl 0 m e₁ σ₁ e₁' σ₁' Z φ ε
 
 theorem wpPre_value_Z_eq {v : Val} {Φ : Val → IProp GF} (E : CoPset) :
@@ -474,8 +475,8 @@ theorem wp_adequacy_val_fupd (e e' : Exp) (σ σ' : State) (n : Nat)
         wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))
       ⊢@{IProp GF} |={⊤, ∅}=>
         (⌜AddCoupl ε (adequacyRel φ)
-          ((execN n ⟨e, σ⟩).map (·.expr))
-          ((limExec ⟨e', σ'⟩).map (·.expr))⌝) := by
+          (asExpr (execN n ⟨e, σ⟩))
+          (limExecV ⟨e', σ'⟩)⌝) := by
   have he_eq : e = Exp.ofVal v := (Exp.ofVal_of_toVal_some He).symm
   subst he_eq
   iintro ⟨Hσ, Hs, Hε, Hwp⟩
@@ -495,6 +496,7 @@ theorem wp_adequacy_val_fupd (e e' : Exp) (σ σ' : State) (n : Nat)
   imod (BIFUpdate.subset (E1 := ⊤) (E2 := ∅) Std.LawfulSet.empty_subset) with _
   imodintro
   ipure_intro
+  unfold asExpr limExecV asExpr
   cases n with
   | zero =>
     simp only [execN, MeasureTheory.Measure.map_zero]
@@ -517,8 +519,8 @@ theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp) (σ σ' : State)
         wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))
       ⊢@{IProp GF} |={⊤, ∅}=> |={∅}[∅]▷=>^[n]
         (⌜AddCoupl ε (adequacyRel φ)
-          ((execN n ⟨e, σ⟩).map (·.expr))
-          ((limExec ⟨e', σ'⟩).map (·.expr))⌝) := by
+          (asExpr (execN n ⟨e, σ⟩))
+          (limExecV ⟨e', σ'⟩)⌝) := by
   revert e σ e' σ' ε
   induction n with
   | zero =>
@@ -528,6 +530,7 @@ theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp) (σ σ' : State)
     imodintro
     simp only [Nat.repeat]
     ipure_intro
+    unfold asExpr
     simp only [execN_zero, MeasureTheory.Measure.map_zero]
     exact AddCoupl.zero_left _ _
   | succ n ih =>
@@ -588,11 +591,12 @@ theorem wp_adequacy_exec_n {GF : BundledGFunctors}
     (Hwp : ∀ (_ : ApproxisGS false GF),
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε -∗
         wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
-    AddCoupl ε (adequacyRel φ) ((execN n ⟨e, σ⟩).map (·.expr))
-        ((limExec ⟨e', σ'⟩).map (·.expr)) := by
+    AddCoupl ε (adequacyRel φ) (asExpr (execN n ⟨e, σ⟩))
+        (limExecV ⟨e', σ'⟩) := by
   by_cases hε1 : (1 : ENNReal) ≤ ε
   ·
     refine AddCoupl.trivial_of_one_le hε1 ?_
+    unfold asExpr
     rw [MeasureTheory.Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
     simpa using execN_univ_le_one n ⟨e, σ⟩
   have hε_lt : ε < 1 := lt_of_not_ge hε1
@@ -623,24 +627,24 @@ theorem wp_adequacy {GF : BundledGFunctors}
     (Hwp : ∀ (_ : ApproxisGS false GF),
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε -∗
         wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
-    AddCoupl ε (adequacyRel φ) ((limExec ⟨e, σ⟩).map (·.expr))
-        ((limExec ⟨e', σ'⟩).map (·.expr)) := by
+    AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩)
+        (limExecV ⟨e', σ'⟩) := by
   have Hlifted : AddCoupl ε (fun (p : Cfg × Exp) => adequacyRel φ (p.1.expr, p.2))
-      (limExec ⟨e, σ⟩) ((limExec ⟨e', σ'⟩).map (·.expr)) := by
+      (limExec ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
     apply limExec_AddCoupl
     intro n
     have H := wp_adequacy_exec_n (GF := GF) e e' σ σ' n φ ε Hwp
     have Hmap_id :
-        ((limExec (⟨e', σ'⟩ : Cfg)).map (·.expr)) =
-          ((limExec (⟨e', σ'⟩ : Cfg)).map (·.expr)).map id := by
+        (limExecV (⟨e', σ'⟩ : Cfg)) =
+          (limExecV (⟨e', σ'⟩ : Cfg)).map id := by
       rw [MeasureTheory.Measure.map_id]
     rw [Hmap_id] at H
     have := AddCoupl.map_inv (α' := Exp) (β' := Exp)
       (f := fun (c : Cfg) => c.expr) (g := id) Measurable.of_discrete measurable_id H
     exact this
   have Hmap_id :
-      ((limExec (⟨e', σ'⟩ : Cfg)).map (·.expr)) =
-        ((limExec (⟨e', σ'⟩ : Cfg)).map (·.expr)).map id := by
+      (limExecV (⟨e', σ'⟩ : Cfg)) =
+        (limExecV (⟨e', σ'⟩ : Cfg)).map id := by
     rw [MeasureTheory.Measure.map_id]
   rw [Hmap_id] at Hlifted
   have H_pushed := AddCoupl.map (α' := Exp) (β' := Exp)
@@ -658,11 +662,12 @@ theorem wp_adequacy_error_lim {GF : BundledGFunctors}
     (Hwp : ∀ (_ : ApproxisGS false GF) (ε' : ENNReal), ε < ε' →
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε' -∗
         wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
-    AddCoupl ε (adequacyRel φ) ((limExec ⟨e, σ⟩).map (·.expr))
-        ((limExec ⟨e', σ'⟩).map (·.expr)) := by
+    AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩)
+        (limExecV ⟨e', σ'⟩) := by
   by_cases hε_top : ε = (⊤ : ENNReal)
   · subst hε_top
     refine AddCoupl.trivial_of_one_le (by exact le_top (a := (1 : ENNReal))) ?_
+    unfold limExecV asExpr
     rw [MeasureTheory.Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
     simpa using limExec_leq_mass (r := 1) (fun n => execN_univ_le_one n ⟨e, σ⟩)
   apply AddCoupl.limit
@@ -680,8 +685,8 @@ theorem wp_adequacy_mass {GF : BundledGFunctors}
     (Hwp : ∀ (_ : ApproxisGS false GF),
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε -∗
         wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
-    (limExec ⟨e, σ⟩).map (·.expr) Set.univ ≤
-        (limExec ⟨e', σ'⟩).map (·.expr) Set.univ + ε := by
+    limExecV ⟨e, σ⟩ Set.univ ≤
+        limExecV ⟨e', σ'⟩ Set.univ + ε := by
   have := AddCoupl.mass_leq (wp_adequacy e e' σ σ' ε φ Hwp)
   simpa using this
 

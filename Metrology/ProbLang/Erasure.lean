@@ -915,8 +915,9 @@ the LHS would collapse to `0` while the RHS may be nonzero. -/
 theorem execN_tape_presample_expr_eq
     {σ : State} {α : Loc} {e : Exp} {m : Nat} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
-    ((tapePresample σ α).bind (fun σ' => execN m ⟨e, σ'⟩)).map (·.expr) =
-      (execN m ⟨e, σ⟩).map (·.expr) := by
+    asExpr ((tapePresample σ α).bind (fun σ' => execN m ⟨e, σ'⟩)) =
+      asExpr (execN m ⟨e, σ⟩) := by
+  unfold asExpr
   -- Induction on `m`, generalized over `e`, `σ`, `t` so the IH applies at
   -- the post-step state (which may hold different tape content but retains
   -- tape `α` with the same bound, via tape-bound persistence).
@@ -1309,8 +1310,9 @@ expression level, provided the initial tape exists and has positive bound. -/
 theorem execN_tapePresampleIter_expr_eq
     {σ : State} {α : Loc} {e : Exp} {m : Nat} {t : Tape} (n : Nat)
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
-    ((tapePresampleIter α σ n).bind (fun σ' => execN m ⟨e, σ'⟩)).map (·.expr) =
-      (execN m ⟨e, σ⟩).map (·.expr) := by
+    asExpr ((tapePresampleIter α σ n).bind (fun σ' => execN m ⟨e, σ'⟩)) =
+      asExpr (execN m ⟨e, σ⟩) := by
+  unfold asExpr
   induction n generalizing σ with
   | zero =>
     -- `tapePresampleIter α σ 0 = dirac σ`, so LHS collapses to `execN m ⟨e, σ⟩`.
@@ -1335,23 +1337,27 @@ theorem execN_tapePresampleIter_expr_eq
           refine lintegral_congr_ae ?_
           filter_upwards [tapePresampleIter_tape_bound_ae h k]
             with σ₁ ⟨t', ht', hbound⟩
-          rw [execN_tape_presample_expr_eq ht' (hbound ▸ hN)]
+          have h_eq := execN_tape_presample_expr_eq (e := e) (m := m) ht' (hbound ▸ hN)
+          unfold asExpr at h_eq
+          rw [h_eq]
       _ = ((tapePresampleIter α σ k).bind (fun σ' => execN m ⟨e, σ'⟩)).map (·.expr) S := by
           rw [Measure.map_apply Measurable.of_discrete hS,
               Measure.bind_apply (Measurable.of_discrete hS)
                 Measurable.of_discrete.aemeasurable]
           simp_rw [Measure.map_apply Measurable.of_discrete hS]
       _ = (execN m ⟨e, σ⟩).map (·.expr) S := by
-          rw [ih h, Measure.map_apply Measurable.of_discrete hS]
+          have h_ih := ih h
+          unfold asExpr at h_ih
+          rw [h_ih, Measure.map_apply Measurable.of_discrete hS]
 
 theorem execN_iterM_tape_presample_expr_eq
     {σ : State} {α : Loc} {e : Exp} {m : Nat} {t : Tape} (n : Nat)
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
-    (((Nat.rec (motive := fun _ => Measure State)
+    asExpr (((Nat.rec (motive := fun _ => Measure State)
                 (Measure.dirac σ)
                 (fun _ μ => μ.bind (fun σ' => tapePresample σ' α))) n).bind
-       (fun σ' => execN m ⟨e, σ'⟩)).map (·.expr) =
-      (execN m ⟨e, σ⟩).map (·.expr) := by
+       (fun σ' => execN m ⟨e, σ'⟩)) =
+      asExpr (execN m ⟨e, σ⟩) := by
   -- The anonymous `Nat.rec` is definitionally equal to `tapePresampleIter`.
   have hiter_eq : (Nat.rec (motive := fun _ => Measure State)
                     (Measure.dirac σ)
@@ -1370,8 +1376,9 @@ monotone convergence via `lintegral_limExec`. -/
 theorem limExec_tape_presample_expr_eq
     {σ : State} {α : Loc} {t : Tape} {e : Exp}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
-    ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)).map (·.expr) =
-      (limExec ⟨e, σ⟩).map (·.expr) := by
+    asExpr ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) =
+      limExecV ⟨e, σ⟩ := by
+  unfold asExpr limExecV asExpr
   -- We replay the `ErasableExpr.lim_exec` proof inline with
   -- `execN_tape_presample_expr_eq` as the per-n hypothesis.
   refine Measure.ext fun S hS => ?_
@@ -1391,6 +1398,7 @@ theorem limExec_tape_presample_expr_eq
           lintegral_mono' (execN_mono hij ⟨e, σ'⟩) (le_refl _))]
   refine iSup_congr fun n => ?_
   have hn := execN_tape_presample_expr_eq (e := e) (m := n) h hN
+  unfold asExpr at hn
   have hval : ((tapePresample σ α).bind (fun σ' => execN n ⟨e, σ'⟩)).map (·.expr) S
             = (execN n ⟨e, σ⟩).map (·.expr) S := by
     rw [hn]
@@ -1421,8 +1429,8 @@ analogue of Clutch's `erasable` for our `Cfg`-valued operational semantics.
 Both `dret`-style and `tapePresample`-style distributions satisfy it. -/
 def ErasableExpr (μ : Measure State) (σ : State) : Prop :=
   ∀ (e : Exp) (m : Nat),
-    (μ.bind (fun σ' => execN m ⟨e, σ'⟩)).map (·.expr) =
-      (execN m ⟨e, σ⟩).map (·.expr)
+    asExpr (μ.bind (fun σ' => execN m ⟨e, σ'⟩)) =
+      asExpr (execN m ⟨e, σ⟩)
 
 namespace ErasableExpr
 
@@ -1449,6 +1457,7 @@ theorem dbind {μ₁ : Measure State} {μ₂ : State → Measure State} {σ : St
     (h₁ : ErasableExpr μ₁ σ) (h₂ : ∀ σ', ErasableExpr (μ₂ σ') σ') :
     ErasableExpr (μ₁.bind μ₂) σ := by
   intro e m
+  unfold asExpr
   -- Flatten the outer `(μ₁.bind μ₂).bind (execN m ⟨e, ·⟩)` into a
   -- double bind; apply `h₂` pointwise to each σ' in the inner kernel
   -- (at the projected level); then use `h₁` to finish.
@@ -1464,13 +1473,17 @@ theorem dbind {μ₁ : Measure State} {μ₂ : State → Measure State} {σ : St
       = (fun σ' : State =>
           Measure.map (·.expr) (execN m ⟨e, σ'⟩)) := by
     funext σ'
-    exact h₂ σ' e m
+    have := h₂ σ' e m
+    unfold asExpr at this
+    exact this
   rw [hker]
   -- Now the goal is: μ₁.bind (fun σ' => (execN m ⟨e, σ'⟩).map (·.expr)) =
   --                  (execN m ⟨e, σ⟩).map (·.expr).
   -- Pull the `.map` back out, then apply `h₁ e m`.
   rw [← Measure.bind_map_comm]
-  exact h₁ e m
+  have := h₁ e m
+  unfold asExpr at this
+  exact this
 
 /-- `ErasableExpr` lifts through `limExec` at the expression-projection
 level. This is the load-bearing corollary for the adequacy wrappers.
@@ -1480,8 +1493,9 @@ Proof via `lintegral_limExec`: we test both sides against the indicator of
 and apply the `ErasableExpr` hypothesis pointwise at each `n`. -/
 theorem lim_exec {μ : Measure State} {σ : State} (h : ErasableExpr μ σ)
     (e : Exp) :
-    (μ.bind (fun σ' => limExec ⟨e, σ'⟩)).map (·.expr) =
-      (limExec ⟨e, σ⟩).map (·.expr) := by
+    asExpr (μ.bind (fun σ' => limExec ⟨e, σ'⟩)) =
+      limExecV ⟨e, σ⟩ := by
+  unfold asExpr limExecV asExpr
   refine Measure.ext fun S hS => ?_
   -- Rewrite both sides as `limExec ... (preimage S)`:
   rw [Measure.map_apply Measurable.of_discrete hS,
@@ -1512,6 +1526,7 @@ theorem lim_exec {μ : Measure State} {σ : State} (h : ErasableExpr μ σ)
   -- For each n, apply h e n and evaluate at the set S. The hypothesis is
   -- about the projected measure on `Exp`.
   have hn := h e n
+  unfold asExpr at hn
   have hval : (μ.bind (fun σ' => execN n ⟨e, σ'⟩)).map (·.expr) S
             = (execN n ⟨e, σ⟩).map (·.expr) S := by
     rw [hn]
@@ -1562,13 +1577,14 @@ theorem AddCoupl_erasure_erasable
     (hErase₂ : ErasableExpr μ₂ σ₁')
     (hCont : ∀ σ₂ σ₂', R (σ₂, σ₂') →
         AddCoupl ε₂ Φexp
-          ((execN n ⟨e₁, σ₂⟩).map (·.expr))
-          ((limExec ⟨e₁', σ₂'⟩).map (·.expr))) :
+          (asExpr (execN n ⟨e₁, σ₂⟩))
+          (limExecV ⟨e₁', σ₂'⟩)) :
     AddCoupl ε Φexp
-      ((execN n ⟨e₁, σ₁⟩).map (·.expr))
-      ((limExec ⟨e₁', σ₁'⟩).map (·.expr)) := by
+      (asExpr (execN n ⟨e₁, σ₁⟩))
+      (limExecV ⟨e₁', σ₁'⟩) := by
   -- Rewrite both projected targets via the `ErasableExpr` hypotheses.
   rw [← hErase₁ e₁ n, ← hErase₂.lim_exec e₁']
+  unfold asExpr
   -- Push `.map (·.expr)` through both outer binds.
   rw [Measure.bind_map_comm, Measure.bind_map_comm]
   -- Sub-probability of the inner kernels (projected `execN n`).
@@ -1582,7 +1598,10 @@ theorem AddCoupl_erasure_erasable
     (Hfm := Measurable.of_discrete) (Hgm := Measurable.of_discrete)
     (Hμₗ := hμ₁mass) (Hfsprob := hmassk)
     (Hcpl := hCoupl)
-    (Hbind := fun {σ₂ σ₂'} (hR : R (σ₂, σ₂')) => hCont σ₂ σ₂' hR)
+    (Hbind := fun {σ₂ σ₂'} (hR : R (σ₂, σ₂')) => by
+      have := hCont σ₂ σ₂' hR
+      unfold asExpr limExecV asExpr at this
+      exact this)
   exact AddCoupl.mono_grading hSum hBind
 
 /-- **Clutch `ARcoupl_erasure_erasable_exp_rhs`, reformulated (projected form).**
@@ -1602,11 +1621,11 @@ theorem AddCoupl_erasure_erasable_exp_rhs
     (hErase₁' : ErasableExpr μ₁' σ₁')
     (hCont : ∀ σ₂ ρ', R (σ₂, ρ') →
         AddCoupl (E₂ ρ') Φexp
-          ((execN n ⟨e₁, σ₂⟩).map (·.expr))
-          ((limExec ρ').map (·.expr))) :
+          (asExpr (execN n ⟨e₁, σ₂⟩))
+          (limExecV ρ')) :
     AddCoupl ε Φexp
-      ((execN n ⟨e₁, σ₁⟩).map (·.expr))
-      ((limExec ⟨e₁', σ₁'⟩).map (·.expr)) := by
+      (asExpr (execN n ⟨e₁, σ₁⟩))
+      (limExecV ⟨e₁', σ₁'⟩) := by
   -- Rewrite both projected targets via the erasability hypotheses.
   -- LHS: `(execN n ⟨e₁, σ₁⟩).map (·.expr)` ← `(μ₁.bind (execN n ⟨e₁, ·⟩)).map (·.expr)`
   rw [← hErase₁ e₁ n]
@@ -1629,6 +1648,7 @@ theorem AddCoupl_erasure_erasable_exp_rhs
     funext σ₂'
     exact limExec_pexecN m ⟨e₁', σ₂'⟩
   rw [hrw]
+  unfold asExpr
   -- Push `.map (·.expr)` through both outer binds.
   rw [Measure.bind_map_comm, Measure.bind_map_comm]
   -- Sub-probability of the inner kernels (projected `execN n ⟨e₁, ·⟩`).
@@ -1643,7 +1663,10 @@ theorem AddCoupl_erasure_erasable_exp_rhs
     (Hfsprob := hmassk)
     (HE₂sum := hBoundSum)
     (Hcpl := hCoupl)
-    (Hbind := fun {σ₂ ρ'} hR => hCont σ₂ ρ' hR)
+    (Hbind := fun {σ₂ ρ'} hR => by
+      have := hCont σ₂ ρ' hR
+      unfold asExpr limExecV asExpr at this
+      exact this)
   exact AddCoupl.mono_grading hEpsSum hBind
 
 /-- **Clutch `ARcoupl_erasure_erasable_exp_lhs`, reformulated (projected form).**
@@ -1660,14 +1683,15 @@ theorem AddCoupl_erasure_erasable_exp_lhs
     (hErase₁' : ErasableExpr μ₁' σ₁')
     (hCont : ∀ ρ σ₂', R (ρ, σ₂') →
         AddCoupl (E₂ ρ) Φexp
-          ((execN n ρ).map (·.expr))
-          ((limExec ⟨e₁', σ₂'⟩).map (·.expr))) :
+          (asExpr (execN n ρ))
+          (limExecV ⟨e₁', σ₂'⟩)) :
     AddCoupl ε Φexp
-      (((primStep ⟨e₁, σ₁⟩).bind (execN n)).map (·.expr))
-      ((limExec ⟨e₁', σ₁'⟩).map (·.expr)) := by
+      (asExpr ((primStep ⟨e₁, σ₁⟩).bind (execN n)))
+      (limExecV ⟨e₁', σ₁'⟩) := by
   -- Rewrite the RHS via `hErase₁'`:
   --   `(limExec ⟨e₁', σ₁'⟩).map (·.expr) = (μ₁'.bind (limExec ⟨e₁', ·⟩)).map (·.expr)`.
   rw [← hErase₁'.lim_exec e₁']
+  unfold asExpr
   -- Push `.map (·.expr)` through both outer binds.
   rw [Measure.bind_map_comm, Measure.bind_map_comm]
   -- Sub-probability of inner `execN n ρ` projected kernels.
@@ -1682,7 +1706,10 @@ theorem AddCoupl_erasure_erasable_exp_lhs
     (Hfsprob := hmassk)
     (HE₂sum := hBoundSum)
     (Hcpl := hCoupl)
-    (Hbind := fun {ρ σ₂'} hR => hCont ρ σ₂' hR)
+    (Hbind := fun {ρ σ₂'} hR => by
+      have := hCont ρ σ₂' hR
+      unfold asExpr limExecV asExpr at this
+      exact this)
   exact AddCoupl.mono_grading hEpsSum hBind
 
 /-- **Clutch `ARcoupl_erasure_erasable_exp_lhs_kanto`, reformulated (projected form).**
@@ -1709,11 +1736,11 @@ theorem AddCoupl_erasure_erasable_exp_lhs_kanto
           ∫⁻ ρ', h₂ ρ' ∂(μ₁'.bind (fun σ => pexecN m ⟨e₁', σ⟩)) + ε)
     (hCont : ∀ ρ ρ',
         AddCoupl (E₂ ρ ρ') Φexp
-          ((execN n ρ).map (·.expr))
-          ((limExec ρ').map (·.expr))) :
+          (asExpr (execN n ρ))
+          (limExecV ρ')) :
     AddCoupl ε Φexp
-      (((primStep ⟨e₁, σ₁⟩).bind (execN n)).map (·.expr))
-      ((limExec ⟨e₁', σ₁'⟩).map (·.expr)) := by
+      (asExpr ((primStep ⟨e₁, σ₁⟩).bind (execN n)))
+      (limExecV ⟨e₁', σ₁'⟩) := by
   -- Rewrite RHS via `hErase₁'` (erasability) and `limExec_pexecN` (pexec-limExec).
   --   (limExec ⟨e₁', σ₁'⟩).map (·.expr)
   --   = (μ₁'.bind (limExec ⟨e₁', ·⟩)).map (·.expr)                (hErase)
@@ -1729,6 +1756,7 @@ theorem AddCoupl_erasure_erasable_exp_lhs_kanto
     funext σ
     exact limExec_pexecN m ⟨e₁', σ⟩
   rw [hrw]
+  unfold asExpr
   -- Push `.map (·.expr)` through both outer binds.
   rw [Measure.bind_map_comm, Measure.bind_map_comm]
   -- Subprobability of inner kernels.
@@ -1746,6 +1774,9 @@ theorem AddCoupl_erasure_erasable_exp_lhs_kanto
     (Hfm := Measurable.of_discrete) (Hgm := Measurable.of_discrete)
     (Hfsprob := hmassk_L) (Hgsprob := hmassk_R)
     (Hexp := fun h₁ h₂ _ _ => hExp h₁ h₂)
-    (Hcont := hCont)
+    (Hcont := fun ρ ρ' => by
+      have := hCont ρ ρ'
+      unfold asExpr limExecV asExpr at this
+      exact this)
 
 end ProbLang

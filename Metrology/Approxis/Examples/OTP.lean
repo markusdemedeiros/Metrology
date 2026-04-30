@@ -80,10 +80,10 @@ def otp_ideal (N : Int) : Exp :=
 
 /-- **OTP refinement**: for any fixed `m ∈ [0, N)`, encrypting `m` with a fresh
 random key is observationally equivalent to a fresh random sample. -/
-theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
-    ⊢@{IProp GF} refines (⊤ : CoPset) (otp_enc m N) (otp_ideal N) lrel_int := by
+theorem otp_refines (m N : Int) (HN : 0 < N) :
+  ⊢@{IProp GF} refines (⊤ : CoPset) (otp_enc m N) (otp_ideal N) lrel_int := by
   unfold otp_enc otp_ideal
-  simp only [Exp.close, Exp.closeRec, ite_true, ↓reduceIte]
+  simp only [Exp.close, Exp.closeRec, ↓reduceIte]
   set body : Exp := Exp.binop .mod
       (Exp.binop .plus (Exp.lit (.int m)) (Exp.bvar 0))
       (Exp.lit (.int N)) with hbody
@@ -165,7 +165,7 @@ theorem otp_refines (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
 /-! ### Reverse direction -/
 
 /-- For `0 ≤ n < N`: `(m + (n - m) mod N) mod N = n`. -/
-theorem addMod_neg_inv (m N : Int) (HN : 0 < N) :
+theorem addMod_neg_inv (m N : Int) :
     ∀ n : Int, 0 ≤ n → n < N → (m + (n + (-m)) % N) % N = n := by
   intro n hn0 hnN
   have h1 : (m + (n + (-m)) % N) % N = (m + (n + (-m))) % N := by
@@ -175,10 +175,10 @@ theorem addMod_neg_inv (m N : Int) (HN : 0 < N) :
 
 /-- **Reverse OTP refinement**: a fresh random sample refines encrypting `m`
 with a fresh random key. -/
-theorem otp_refines_rev (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
+theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
     ⊢@{IProp GF} refines (⊤ : CoPset) (otp_ideal N) (otp_enc m N) lrel_int := by
   unfold otp_enc otp_ideal
-  simp only [Exp.close, Exp.closeRec, ite_true, ↓reduceIte]
+  simp only [Exp.close, Exp.closeRec, ↓reduceIte]
   set body : Exp := Exp.binop .mod
       (Exp.binop .plus (Exp.lit (.int m)) (Exp.bvar 0))
       (Exp.lit (.int N)) with hbody
@@ -241,7 +241,7 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N) :
       Exp.lit (.int ((m + addMod (-m) N n) % N)) from rfl]
   -- The RHS-reduced value is `(m + (n + (-m)) % N) % N = n` by addMod_neg_inv.
   have heq : (m + addMod (-m) N n) % N = n := by
-    unfold addMod; exact addMod_neg_inv m N HN n Hn0 HnN
+    unfold addMod; exact addMod_neg_inv m N n Hn0 HnN
   rw [heq]
   iapply (refines_ret (e1 := Exp.lit (.int n)) (e2 := Exp.lit (.int n))
     (v1 := ⟨.lit (.int n), IsVal.lit⟩) (v2 := ⟨.lit (.int n), IsVal.lit⟩)
@@ -382,36 +382,32 @@ and the uniform-sample distribution are coupled by value-equality with zero
 error. This is `otp_refines` exited from the Iris logic via `refines_coupling`. -/
 theorem otp_adequate
     (GF : BundledGFunctors.{0, 0, 0})
-    [AppPreGS GF] [SpecPreGS GF] [ECPreGS GF] [InvGpreS GF] [NaInvG GF]
-    (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N)
+    [RefinesPreGS GF]
+    (m N : Int) (HN : 0 < N)
     (σ σ' : State) :
-    AddCoupl 0 (adequacyRel otpφ)
-      ((limExec ⟨otp_enc m N, σ⟩).map (·.expr))
-      ((limExec ⟨otp_ideal N, σ'⟩).map (·.expr)) := by
+    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_enc m N, σ⟩) (limExecV ⟨otp_ideal N, σ'⟩) := by
   apply ProbLang.refines_coupling (GF := GF)
     (A := fun _ => lrel_int) (φ := otpφ)
   · intro IR v v'
     exact lrel_int_to_otpφ v v'
   · intro IR
-    exact otp_refines (hlc := false) (GF := GF) (IR := IR) m N HN Hm0 HmN
+    exact otp_refines (hlc := false) (GF := GF) (IR := IR) m N HN
 
 /-- **Semantic OTP guarantee (reverse)**: the uniform-sample distribution and
 the encrypted-message distribution are coupled by value-equality with zero
 error. This is `otp_refines_rev` exited from the Iris logic. -/
 theorem otp_adequate_rev
     (GF : BundledGFunctors.{0, 0, 0})
-    [AppPreGS GF] [SpecPreGS GF] [ECPreGS GF] [InvGpreS GF] [NaInvG GF]
-    (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N)
+    [RefinesPreGS GF]
+    (m N : Int) (HN : 0 < N)
     (σ σ' : State) :
-    AddCoupl 0 (adequacyRel otpφ)
-      ((limExec ⟨otp_ideal N, σ⟩).map (·.expr))
-      ((limExec ⟨otp_enc m N, σ'⟩).map (·.expr)) := by
+    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_ideal N, σ⟩) (limExecV ⟨otp_enc m N, σ'⟩) := by
   apply ProbLang.refines_coupling (GF := GF)
     (A := fun _ => lrel_int) (φ := otpφ)
   · intro IR v v'
     exact lrel_int_to_otpφ v v'
   · intro IR
-    exact otp_refines_rev (hlc := false) (GF := GF) (IR := IR) m N HN Hm0 HmN
+    exact otp_refines_rev (hlc := false) (GF := GF) (IR := IR) m N HN
 
 /-! ## Final closed statement: instantiated at the concrete model
 
@@ -422,20 +418,16 @@ type-class hypotheses or `GF` parameter. -/
 /-- **Final OTP guarantee (closed)**: at the concrete model `otpSigma`, the
 encrypted-message and uniform distributions are coupled with zero error. -/
 theorem otp_adequate_closed
-    (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N)
+    (m N : Int) (HN : 0 < N)
     (σ σ' : State) :
-    AddCoupl 0 (adequacyRel otpφ)
-      ((limExec ⟨otp_enc m N, σ⟩).map (·.expr))
-      ((limExec ⟨otp_ideal N, σ'⟩).map (·.expr)) :=
-  otp_adequate ProbLang.otpSigma m N HN Hm0 HmN σ σ'
+    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_enc m N, σ⟩) (limExecV ⟨otp_ideal N, σ'⟩) :=
+  otp_adequate ApproxisFunctor m N HN σ σ'
 
 theorem otp_adequate_rev_closed
-    (m N : Int) (HN : 0 < N) (Hm0 : 0 ≤ m) (HmN : m < N)
+    (m N : Int) (HN : 0 < N)
     (σ σ' : State) :
-    AddCoupl 0 (adequacyRel otpφ)
-      ((limExec ⟨otp_ideal N, σ⟩).map (·.expr))
-      ((limExec ⟨otp_enc m N, σ'⟩).map (·.expr)) :=
-  otp_adequate_rev ProbLang.otpSigma m N HN Hm0 HmN σ σ'
+    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_ideal N, σ⟩) (limExecV ⟨otp_enc m N, σ'⟩) :=
+  otp_adequate_rev ApproxisFunctor m N HN σ σ'
 
 end OTP
 
