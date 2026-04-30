@@ -1154,7 +1154,7 @@ variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
 
 /-- `cons X (Δ ∘ ξ) = cons X Δ ∘ upren ξ`. -/
 theorem TyEnv.comp_upren (X : lrel GF) (Δ : TyEnv GF) (ξ : Nat → Nat) :
-    TyEnv.cons X (TyEnv.comp Δ ξ) = TyEnv.comp (TyEnv.cons X Δ) (upren ξ) := by
+    TyEnv.cons X (TyEnv.comp Δ ξ) = TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ) := by
   funext n; cases n with
   | zero => rfl
   | succ m => rfl
@@ -1202,9 +1202,9 @@ theorem interp_rename (τ : Ty) (ξ : Nat → Nat) (Δ : TyEnv GF) :
     show (lrel_rec _).car v1 v2 ≡ (lrel_rec _).car v1 v2
     refine OFE.equiv_dist.mpr fun n => ?_
     refine lrel_rec_ne (fun X => ?_) v1 v2
-    have hih : interp (τ'.rename (upren ξ)) (TyEnv.cons X Δ) ≡
-               interp τ' (TyEnv.comp (TyEnv.cons X Δ) (upren ξ)) := ih (upren ξ) _
-    have hcomp : TyEnv.comp (TyEnv.cons X Δ) (upren ξ) = TyEnv.cons X (TyEnv.comp Δ ξ) :=
+    have hih : interp (τ'.rename (Renaming.under ξ)) (TyEnv.cons X Δ) ≡
+               interp τ' (TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ)) := ih (Renaming.under ξ) _
+    have hcomp : TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ) = TyEnv.cons X (TyEnv.comp Δ ξ) :=
       (TyEnv.comp_upren X Δ ξ).symm
     rw [hcomp] at hih
     exact OFE.Equiv.dist hih
@@ -1214,9 +1214,9 @@ theorem interp_rename (τ : Ty) (ξ : Nat → Nat) (Δ : TyEnv GF) :
     show (lrel_forall _).car v1 v2 ≡ (lrel_forall _).car v1 v2
     refine OFE.equiv_dist.mpr fun n => ?_
     refine lrel_forall_ne (fun X => ?_) v1 v2
-    have hih : interp (τ'.rename (upren ξ)) (TyEnv.cons X Δ) ≡
-               interp τ' (TyEnv.comp (TyEnv.cons X Δ) (upren ξ)) := ih (upren ξ) _
-    have hcomp : TyEnv.comp (TyEnv.cons X Δ) (upren ξ) = TyEnv.cons X (TyEnv.comp Δ ξ) :=
+    have hih : interp (τ'.rename (Renaming.under ξ)) (TyEnv.cons X Δ) ≡
+               interp τ' (TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ)) := ih (Renaming.under ξ) _
+    have hcomp : TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ) = TyEnv.cons X (TyEnv.comp Δ ξ) :=
       (TyEnv.comp_upren X Δ ξ).symm
     rw [hcomp] at hih
     exact OFE.Equiv.dist hih
@@ -1226,9 +1226,9 @@ theorem interp_rename (τ : Ty) (ξ : Nat → Nat) (Δ : TyEnv GF) :
     show (lrel_exists _).car v1 v2 ≡ (lrel_exists _).car v1 v2
     refine OFE.equiv_dist.mpr fun n => ?_
     refine lrel_exists_ne (fun X => ?_) v1 v2
-    have hih : interp (τ'.rename (upren ξ)) (TyEnv.cons X Δ) ≡
-               interp τ' (TyEnv.comp (TyEnv.cons X Δ) (upren ξ)) := ih (upren ξ) _
-    have hcomp : TyEnv.comp (TyEnv.cons X Δ) (upren ξ) = TyEnv.cons X (TyEnv.comp Δ ξ) :=
+    have hih : interp (τ'.rename (Renaming.under ξ)) (TyEnv.cons X Δ) ≡
+               interp τ' (TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ)) := ih (Renaming.under ξ) _
+    have hcomp : TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ) = TyEnv.cons X (TyEnv.comp Δ ξ) :=
       (TyEnv.comp_upren X Δ ξ).symm
     rw [hcomp] at hih
     exact OFE.Equiv.dist hih

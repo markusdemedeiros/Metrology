@@ -20,68 +20,61 @@ unchanged from Clutch — types were de-Bruijn already.
 namespace ProbLang
 open Cslib Exp
 
-/-! ## Ty renaming / substitution (de Bruijn) — unchanged from the old Types -/
+abbrev Renaming := Nat → Nat
+abbrev Substitution := Nat → Ty
 
-@[simp] def upren (ξ : Nat → Nat) : Nat → Nat
-  | 0     => 0
-  | n + 1 => ξ n + 1
+/-- Transform a renaming `ξ` into one that applies under a binder -/
+@[simp] def Renaming.under (ξ : Renaming) : Renaming | 0 => 0 | n + 1 => ξ n + 1
 
-def Ty.rename (ξ : Nat → Nat) : Ty → Ty
-  | .int        => .int
-  | .bool       => .bool
-  | .unit       => .unit
-  | .tape       => .tape
-  | .prod τ1 τ2 => .prod (τ1.rename ξ) (τ2.rename ξ)
-  | .sum  τ1 τ2 => .sum  (τ1.rename ξ) (τ2.rename ξ)
-  | .arrow τ1 τ2 => .arrow (τ1.rename ξ) (τ2.rename ξ)
-  | .ref τ      => .ref (τ.rename ξ)
-  | .var n      => .var (ξ n)
-  | .rec' τ     => .rec'    (τ.rename (upren ξ))
-  | .forall' τ  => .forall' (τ.rename (upren ξ))
-  | .exists' τ  => .exists' (τ.rename (upren ξ))
+def Ty.rename (ξ : Renaming) : Ty → Ty
+  | .int          => .int
+  | .bool         => .bool
+  | .unit         => .unit
+  | .tape         => .tape
+  | .prod τ1 τ2   => .prod (τ1.rename ξ) (τ2.rename ξ)
+  | .sum  τ1 τ2   => .sum  (τ1.rename ξ) (τ2.rename ξ)
+  | .arrow τ1 τ2  => .arrow (τ1.rename ξ) (τ2.rename ξ)
+  | .ref τ        => .ref (τ.rename ξ)
+  | .var n        => .var (ξ n)
+  | .rec' τ       => .rec' (τ.rename ξ.under)
+  | .forall' τ    => .forall' (τ.rename ξ.under)
+  | .exists' τ    => .exists' (τ.rename ξ.under)
 
-def up (σ : Nat → Ty) : Nat → Ty
-  | 0     => .var 0
-  | n + 1 => (σ n).rename (· + 1)
+/-- Transform a substitution `σ` into one that applies under a binder -/
+def up (σ : Substitution) : Substitution | 0  => .var 0 | n + 1 => (σ n).rename (· + 1)
 
-def Ty.subst (σ : Nat → Ty) : Ty → Ty
-  | .int        => .int
-  | .bool       => .bool
-  | .unit       => .unit
-  | .tape       => .tape
-  | .prod τ1 τ2 => .prod (τ1.subst σ) (τ2.subst σ)
-  | .sum  τ1 τ2 => .sum  (τ1.subst σ) (τ2.subst σ)
-  | .arrow τ1 τ2 => .arrow (τ1.subst σ) (τ2.subst σ)
-  | .ref τ      => .ref (τ.subst σ)
-  | .var n      => σ n
-  | .rec' τ     => .rec'    (τ.subst (up σ))
-  | .forall' τ  => .forall' (τ.subst (up σ))
-  | .exists' τ  => .exists' (τ.subst (up σ))
+def Ty.subst (σ : Substitution) : Ty → Ty
+  | .int          => .int
+  | .bool         => .bool
+  | .unit         => .unit
+  | .tape         => .tape
+  | .prod τ1 τ2   => .prod (τ1.subst σ) (τ2.subst σ)
+  | .sum  τ1 τ2   => .sum  (τ1.subst σ) (τ2.subst σ)
+  | .arrow τ1 τ2  => .arrow (τ1.subst σ) (τ2.subst σ)
+  | .ref τ        => .ref (τ.subst σ)
+  | .var n        => σ n
+  | .rec' τ       => .rec'    (τ.subst (up σ))
+  | .forall' τ    => .forall' (τ.subst (up σ))
+  | .exists' τ    => .exists' (τ.subst (up σ))
 
-/-- `τ.single τ'` substitutes `τ'` for var 0 in `τ`, i.e. `τ[τ'/0]`.
-The body `τ` is the receiver (first arg) so dot-notation reads naturally:
-`(forall' τ).single τ'` instantiates the bound variable in `τ` with `τ'`. -/
-def Ty.single (τ τ' : Ty) : Ty :=
-  τ.subst (fun n => match n with | 0 => τ' | k + 1 => .var k)
+/-- `τ.single τ'` substitutes `τ'` for var 0 in `τ`, i.e. `τ[τ'/0]`.-/
+def Ty.single (τ τ' : Ty) : Ty := τ.subst (fun n => match n with | 0 => τ' | k + 1 => .var k)
 
 def Ty.shift (τ : Ty) : Ty := τ.rename (· + 1)
 
-def Ty.renameSubst (ξ : Nat → Nat) (σ : Nat → Ty) : Nat → Ty :=
-  fun n => (σ n).rename ξ
+def Ty.renameSubst (ξ : Renaming) (σ : Substitution) : Substitution := (σ · |>.rename ξ)
 
-def Ty.substComp (σ₂ σ₁ : Nat → Ty) : Nat → Ty :=
-  fun n => (σ₁ n).subst σ₂
+def Ty.substComp (σ₂ σ₁ : Substitution) : Substitution := fun n => (σ₁ n).subst σ₂
 
-@[simp] def upN : Nat → (Nat → Ty) → (Nat → Ty)
+@[simp] def upN : Nat → Substitution → Substitution
   | 0,     σ => σ
   | k + 1, σ => up (upN k σ)
 
-theorem upren_id : ∀ n, upren id n = n
+theorem under_id : ∀ n, Renaming.under id n = n
   | 0     => rfl
   | _ + 1 => rfl
 
-theorem upren_comp (ξ₁ ξ₂ : Nat → Nat) : ∀ n,
-    upren ξ₁ (upren ξ₂ n) = upren (ξ₁ ∘ ξ₂) n
+theorem under_comp (ξ₁ ξ₂ : Renaming) : ∀ n, Renaming.under ξ₁ (Renaming.under ξ₂ n) = Renaming.under (ξ₁ ∘ ξ₂) n
   | 0     => rfl
   | _ + 1 => rfl
 
@@ -89,9 +82,8 @@ theorem Ty.rename_id (τ : Ty) : τ.rename id = τ := by
   induction τ with
   | var n => rfl
   | rec' τ ih | forall' τ ih | exists' τ ih =>
-    simp only [Ty.rename]
-    rw [show upren id = id from funext upren_id, ih]
-  | _ => simp only [Ty.rename, *]
+    simp only [rename, show Renaming.under id = id from funext under_id, ih]
+  | _ => simp only [rename, *]
 
 theorem Ty.rename_rename (ξ₁ ξ₂ : Nat → Nat) (τ : Ty) :
     (τ.rename ξ₂).rename ξ₁ = τ.rename (ξ₁ ∘ ξ₂) := by
@@ -99,11 +91,11 @@ theorem Ty.rename_rename (ξ₁ ξ₂ : Nat → Nat) (τ : Ty) :
   | var n => rfl
   | rec' τ ih | forall' τ ih | exists' τ ih =>
     simp only [Ty.rename, ih]
-    rw [show upren ξ₁ ∘ upren ξ₂ = upren (ξ₁ ∘ ξ₂) from funext (upren_comp _ _)]
+    rw [show Renaming.under ξ₁ ∘ Renaming.under ξ₂ = Renaming.under (ξ₁ ∘ ξ₂) from funext (under_comp _ _)]
   | _ => simp only [Ty.rename, *]
 
 theorem up_upren (ξ : Nat → Nat) : ∀ n,
-    up (fun k => .var (ξ k)) n = .var (upren ξ n)
+    up (fun k => .var (ξ k)) n = .var (Renaming.under ξ n)
   | 0     => rfl
   | _ + 1 => rfl
 
@@ -113,7 +105,7 @@ theorem Ty.rename_eq_subst (ξ : Nat → Nat) (τ : Ty) :
   | var n => rfl
   | rec' τ ih | forall' τ ih | exists' τ ih =>
     simp only [Ty.rename, Ty.subst, ih,
-      show (fun n => Ty.var (upren ξ n)) = up (fun k => .var (ξ k))
+      show (fun n => Ty.var (Renaming.under ξ n)) = up (fun k => .var (ξ k))
         from funext fun n => (up_upren ξ n).symm]
   | _ => simp only [Ty.rename, Ty.subst, *]
 
@@ -130,7 +122,7 @@ theorem Ty.subst_id (τ : Ty) : τ.subst .var = τ := by
   | _ => simp only [Ty.subst, *]
 
 theorem up_subst_upren (σ : Nat → Ty) (ξ : Nat → Nat) : ∀ n,
-    up (σ ∘ ξ) n = up σ (upren ξ n)
+    up (σ ∘ ξ) n = up σ (Renaming.under ξ n)
   | 0     => rfl
   | _ + 1 => rfl
 
@@ -140,11 +132,11 @@ theorem Ty.subst_rename (σ : Nat → Ty) (ξ : Nat → Nat) (τ : Ty) :
   | var n => rfl
   | rec' τ ih | forall' τ ih | exists' τ ih =>
     simp only [Ty.rename, Ty.subst, ih,
-      show up σ ∘ upren ξ = up (σ ∘ ξ) from funext fun n => (up_subst_upren σ ξ n).symm]
+      show up σ ∘ Renaming.under ξ = up (σ ∘ ξ) from funext fun n => (up_subst_upren σ ξ n).symm]
   | _ => simp only [Ty.rename, Ty.subst, *]
 
 theorem up_renameSubst (ξ : Nat → Nat) (σ : Nat → Ty) : ∀ n,
-    up (Ty.renameSubst ξ σ) n = Ty.renameSubst (upren ξ) (up σ) n
+    up (Ty.renameSubst ξ σ) n = Ty.renameSubst (Renaming.under ξ) (up σ) n
   | 0     => rfl
   | n + 1 => by
     simp only [up, Ty.renameSubst, Ty.rename_rename]; rfl
@@ -155,7 +147,7 @@ theorem Ty.rename_subst (ξ : Nat → Nat) (σ : Nat → Ty) (τ : Ty) :
   | var n => rfl
   | rec' τ ih | forall' τ ih | exists' τ ih =>
     simp only [Ty.subst, Ty.rename, ih,
-      show Ty.renameSubst (upren ξ) (up σ) = up (Ty.renameSubst ξ σ)
+      show Ty.renameSubst (Renaming.under ξ) (up σ) = up (Ty.renameSubst ξ σ)
         from funext fun n => (up_renameSubst ξ σ n).symm]
   | _ => simp only [Ty.subst, Ty.rename, *]
 
@@ -206,6 +198,7 @@ theorem upN_ge : ∀ {k n : Nat} (σ : Nat → Ty), k ≤ n →
 
 /-! ## Value classes -/
 
+-- ??
 inductive UnboxedType : Ty → Prop
   | unit                           : UnboxedType .unit
   | int                            : UnboxedType .int
@@ -220,12 +213,12 @@ inductive EqType : Ty → Prop
   | sum  {τ τ'}                    : EqType τ → EqType τ' → EqType (.sum τ τ')
 
 theorem unboxed_type_ref_or_eqtype {τ : Ty} (h : UnboxedType τ) :
-    EqType τ ∨ (∃ τ', τ = .ref τ') ∨ τ = .tape := by
-  cases h with
-  | unit  => exact .inl .unit
-  | int   => exact .inl .int
-  | bool  => exact .inl .bool
-  | ref τ => exact .inr (.inl ⟨τ, rfl⟩)
+    EqType τ ∨ (∃ τ', τ = .ref τ') ∨ τ = .tape :=
+  match h with
+  | .unit  => .inl .unit
+  | .int   => .inl .int
+  | .bool  => .inl .bool
+  | .ref τ => .inr (.inl ⟨τ, rfl⟩)
 
 def BinOp.intResTy : BinOp → Option Ty
   | .plus | .minus | .mult | .div | .mod  => some .int
