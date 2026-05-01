@@ -113,11 +113,6 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
   iintro %e₃ %σ₃ %e₃' %σ₃' %ε₃ ⟨%Hreach, HInner⟩
   rcases Hreach with ⟨σ, Hstep⟩ | Hε1
   · have he₃val : e₃.isValue := h σ e₃ σ₃ Hstep
-    have htv₃ : ∃ v, e₃.toVal? = some v := by
-      cases hev : e₃.toVal? with
-      | none => exact absurd ((Exp.toVal?_eq_none).mp hev) (fun nv => nv he₃val)
-      | some v => exact ⟨v, rfl⟩
-    obtain ⟨v, hv⟩ := htv₃
     iintro !>
     iapply (specCoupl_bind (E1 := ∅) (E2 := ∅) Std.LawfulSet.subset_refl)
     isplitr [HInner]
