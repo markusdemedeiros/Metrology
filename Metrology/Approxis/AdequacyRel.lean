@@ -21,6 +21,27 @@ open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS
 class abbrev RefinesPreGS (GF : BundledGFunctors) :=
   AppPreGS GF, SpecPreGS GF, ECPreGS GF, InvGpreS GF, NaInvG GF
 
+/-- `⤇ e` and `⤇ Ectx.fill [] e` are definitionally equal. Named for use in
+`rw` rewrites where Lean's defeq is not exposed (e.g. when adapting hypotheses
+to fit lemmas that universally quantify over an evaluation context). -/
+theorem spec_eq_fill_nil {GF : BundledGFunctors} [SpecGS GF] (e : Exp) :
+    (iprop(⤇ e) : IProp GF) = iprop(⤇ Ectx.fill ([] : Ectx) e) :=
+  rfl
+
+/-- `⤇ Ectx.fill [] v.1` and `⤇ Exp.ofVal v` are definitionally equal. -/
+theorem spec_fill_nil_eq_ofVal {GF : BundledGFunctors} [SpecGS GF] (v : Val) :
+    (iprop(⤇ Ectx.fill ([] : Ectx) v.1) : IProp GF) = iprop(⤇ Exp.ofVal v) :=
+  rfl
+
+/-- **Relational adequacy.** If a parametric `refines` judgement holds for
+every `ApproxisRGS` instance, and its relation `A IR` implies a pure
+relation `φ`, then the limit-step distributions of `e` and `e'` are coupled
+by `φ` with zero error.
+
+This is the bridge from the Iris-internal `refines` judgement to the
+external probabilistic semantics, obtained by combining the WP-level
+adequacy theorem `wp_adequacy_error_lim` with the parametric assumption
+to allocate a fresh non-atomic invariant pool. -/
 theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS GF]
     (A : ∀ (_ : ApproxisRGS false GF), lrel GF)
     (φ : Val → Val → Prop) (e e' : Exp) (σ σ' : State)
@@ -29,39 +50,35 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS GF]
     (Hlog : ∀ (IR : ApproxisRGS false GF),
       ⊢@{IProp GF} refines (hlc := false) (GF := GF) ⊤ e e' (A IR)) :
     AddCoupl 0 (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
+  -- Reduce relational adequacy to the WP-level adequacy theorem.
   apply wp_adequacy_error_lim (GF := GF) e e' σ σ' 0 φ
   intro IGS ε' Hε'pos
   iintro He' Herr
+  -- Allocate the non-atomic invariant pool needed to build an `ApproxisRGS`.
   imod (Iris.NonAtomicInvariant.alloc (GF := GF)) with HnaEx
   icases HnaEx with ⟨%γ, Htok⟩
   set IR : ApproxisRGS false GF :=
-    { approxisGS := IGS
-      naInvG := _
-      nais := γ }
-  have HlogIR : (⊢@{IProp GF} refines (hlc := false) (GF := GF) ⊤ e e' (A IR)) := Hlog IR
-  ihave Hlog' := HlogIR
-  ihave Hwp := refines_unfold (E := ⊤) (e := e) (e' := e') (A := A IR) $$ Hlog'
-  have hf : e' = Ectx.fill ([] : Ectx) e' := rfl
+    { approxisGS := IGS, naInvG := _, nais := γ }
+  -- Specialize the parametric `refines` to this instance and unfold to a WP.
+  ihave HlogR := Hlog IR
+  ihave Hwp := refines_unfold $$ HlogR
+  -- Adapt `He'` to the empty-context form expected by `Hwp`.
   ihave He'' : iprop(⤇ Ectx.fill ([] : Ectx) e') $$ [He']
-  · rw [← hf]; iexact He'
+  · rw [← spec_eq_fill_nil e']; iexact He'
   ispecialize Hwp $$ %([] : Ectx) %ε' He'' Htok Herr %Hε'pos
+  -- Weaken the WP post-condition from `(A IR).car v v'` to `φ v v'`.
   iapply (wp_mono
     (Φ := fun v => iprop(∃ (v' : Val) (ε'' : ENNReal),
       (⤇ Ectx.fill ([] : Ectx) v'.1) ∗ (naOwnP ⊤) ∗ (↯ ε'') ∗
-      (⌜(0 : ENNReal) < ε''⌝) ∗ (A IR).car v v'))
-    (Ψ := fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))
+      (⌜(0 : ENNReal) < ε''⌝) ∗ (A IR).car v v')))
   case HΦ =>
     intro v
     iintro Hpost
-    icases Hpost with ⟨%v', %ε'', Hspec, Hna, Herr', %Hpos, HA_v⟩
+    icases Hpost with ⟨%v', %_, Hspec, _, _, %_, HA_v⟩
     iexists v'
     isplitl [Hspec]
-    · have hf : (iprop(⤇ Ectx.fill ([] : Ectx) v'.1) : IProp GF) =
-                iprop(⤇ Exp.ofVal v') := rfl
-      rw [← hf]; iexact Hspec
-    · ihave Hbridge := HA IR v v'
-      ihave Hphi := Hbridge $$ HA_v
-      iexact Hphi
+    · rw [← spec_fill_nil_eq_ofVal v']; iexact Hspec
+    · iapply (HA IR v v') $$ HA_v
   iexact Hwp
 
 /-- Concrete model for Approxis -/
@@ -78,7 +95,7 @@ noncomputable def ApproxisFunctor : BundledGFunctors := fun n =>
   | 8 => ⟨NaInvF, by infer_instance⟩
   | _ => ⟨constOF Unit, by infer_instance⟩
 
-/-! ### PreGS instances for `otpSigma` -/
+/-! ### `RefinesPreGS` instances for `ApproxisFunctor` -/
 
 instance ApproxisFunctor_WsatGpreS : WsatGpreS ApproxisFunctor where
   inv := ⟨0, rfl⟩
