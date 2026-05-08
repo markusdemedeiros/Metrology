@@ -3,6 +3,7 @@ import Metrology.ProbLang.Syntax.LocallyClosed
 import Metrology.ProbLang.HeadStep
 import Metrology.ProbLang.DetStep
 import Metrology.ProbLang.Exec
+import Metrology.ProbLang.Metatheory
 import SampCert.SLang
 import SampCert.Foundations.While
 import Mathlib.MeasureTheory.MeasurableSpace.Defs
@@ -196,6 +197,30 @@ theorem execN_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
 /-- `execN n ρ ≤ limExec ρ`. -/
 theorem execN_le_limExec (n : Nat) (ρ : Cfg) : execN n ρ ≤ limExec ρ :=
   le_iSup (fun i => execN i ρ) n
+
+/-- A deterministic step (under any ectx) preserves `limExec`. -/
+theorem limExec_detStep {ρ ρ' : Cfg} (h : DetStep ρ ρ') : limExec ρ = limExec ρ' := by
+  have hnv : ¬ ρ.expr.isValue := val_stuck (h.det ▸ one_pos)
+  rw [limExec_not_final hnv]
+  -- primStep ρ = dirac ρ' since primStep ρ {ρ'} = 1 and total mass ≤ 1.
+  have hother : ∀ c ≠ ρ', (primStep ρ) {c} = 0 := by
+    intro c hc
+    have hdisj : Disjoint ({ρ'} : Set Cfg) {c} :=
+      Set.disjoint_singleton.mpr (Ne.symm hc)
+    have hunion : (primStep ρ) ({ρ'} ∪ {c}) = (primStep ρ) {ρ'} + (primStep ρ) {c} :=
+      measure_union hdisj (MeasurableSet.singleton c)
+    have hsub : (primStep ρ) ({ρ'} ∪ {c}) ≤ 1 :=
+      (measure_mono (Set.subset_univ _)).trans (primStep_univ_le_one ρ)
+    rw [hunion, h.det] at hsub
+    have : 1 + (primStep ρ) {c} ≤ 1 + 0 := by simpa using hsub
+    have hfin : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
+    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le _)
+  have hdirac : primStep ρ = dirac ρ' := by
+    refine Measure.ext_of_singleton fun c => ?_
+    by_cases hc : c = ρ'
+    · subst hc; rw [h.det]; simp
+    · rw [hother c hc]; simp [dirac_apply', hc]
+  rw [hdirac, Measure.dirac_bind Measurable.of_discrete]
 
 /-- Generic one-step unfolding for `limExec` at a deterministic head redex. -/
 theorem limExec_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
@@ -1482,6 +1507,906 @@ theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
       rfl
     rw [hPL]
     exact hk S
+
+/-! ## Generic combinator: meta-recursion-on-Nat ↔ probWhile-with-accumulator
+
+  Many SampCert primitives are defined by Lean meta-recursion on a `ℕ` parameter.
+  To embed them faithfully when the parameter is computed at *runtime* in ProbLang,
+  we need a closed ProbLang term that takes the counter as a runtime argument.
+  Building one bespoke `fix`-based ProbLang term per primitive is tedious; instead,
+  we re-express each meta-recursive primitive as a `probWhile` over an accumulator,
+  prove this is equivalent on the SLang side, then reuse the existing
+  `probLangWhile_isEmbedding` to embed it. -/
+
+/-- Meta-level structural recursion on `ℕ`: build the SLang term that runs
+    `step 0 base ; step 1 _ ; ... ; step (n-1) _`, threading the running accumulator. -/
+def probNatRec (base : T) (step : ℕ → T → SLang T) : ℕ → SLang T
+  | 0 => probPure base
+  | n+1 => probBind (probNatRec base step n) (step n)
+
+/-- The body of the accumulator loop (parameterized by the meta-level count `n`).
+    State `(rem, acc)` — `rem` counts down from `n` to `0`; the index passed to
+    `step` is `n - rem`, which counts up from `0` to `n - 1` over the loop. -/
+def probNatRec_body (n : ℕ) (step : ℕ → T → SLang T) : ℕ × T → SLang (ℕ × T) :=
+  fun s => probBind (step (n - s.1) s.2) (fun acc' => probPure (s.1 - 1, acc'))
+
+/-- `probWhile`-based formulation: state `(remaining, acc)`, decrement remaining,
+    apply `step (n - remaining)` to acc on each iteration. -/
+def probNatRec_loop (base : T) (step : ℕ → T → SLang T) (n : ℕ) : SLang T :=
+  probBind
+    (probWhile (fun s : ℕ × T => 0 < s.1) (probNatRec_body n step) (n, base))
+    (fun s : ℕ × T => probPure s.2)
+
+/-- Helper: starting from `acc`, run `len` step calls with consecutive indices
+    `start, start+1, ..., start+len-1`. Forward index order. -/
+def probNatRec_offset (acc : T) (step : ℕ → T → SLang T) (start : ℕ) : ℕ → SLang T
+  | 0 => probPure acc
+  | len+1 => probBind (step start acc) (fun acc' => probNatRec_offset acc' step (start + 1) len)
+
+/-! ### Helper: `probWhileCut` evaluation on the accumulator loop.
+
+    `probNatRec` is defined by *outer* recursion: `probNatRec _ _ (n+1) = bind (probNatRec _ _ n) (step n)`.
+    To match against `probNatRec_offset`, which is defined by *inner* recursion (head step first),
+    we'll need an equivalence lemma between them as well. -/
+
+/-- Generalized "append one step at the end" for `probNatRec_offset`. -/
+theorem probNatRec_offset_append [Countable T]
+    (acc : T) (step : ℕ → T → SLang T) (start n : ℕ) :
+    probBind (probNatRec_offset acc step start n) (step (start + n))
+    = probNatRec_offset acc step start (n + 1) := by
+  induction n generalizing start acc with
+  | zero =>
+    show probBind (probPure acc) (step (start + 0)) = probBind (step start acc) (fun acc' => probPure acc')
+    rw [SLang.pure_bind, Nat.add_zero, SLang.bind_pure]
+  | succ n ih =>
+    show probBind (probBind (step start acc) _) (step (start + (n+1)))
+       = probBind (step start acc) _
+    rw [SLang.bind_bind]
+    congr 1
+    funext acc'
+    have := ih acc' (start + 1)
+    show probBind (probNatRec_offset acc' step (start + 1) n) (step (start + (n+1)))
+       = probNatRec_offset acc' step (start + 1) (n + 1)
+    rw [show start + (n+1) = (start + 1) + n by omega]
+    exact this
+
+/-- `probNatRec` written in inner-recursion form: `probNatRec base step n = probNatRec_offset base step 0 n`. -/
+theorem probNatRec_eq_offset [Countable T] (base : T) (step : ℕ → T → SLang T) (n : ℕ) :
+    probNatRec base step n = probNatRec_offset base step 0 n := by
+  induction n with
+  | zero => rfl
+  | succ n ih =>
+    show probBind (probNatRec base step n) (step n) = probNatRec_offset base step 0 (n+1)
+    rw [ih]
+    have h := probNatRec_offset_append base step 0 n
+    rw [Nat.zero_add] at h
+    exact h
+
+/-- `probWhileCut` on the accumulator loop stabilizes at state `(0, ·)`: for any `k ≥ 1`,
+    `probWhileCut cond body k (0, acc) = pure (0, acc)`. -/
+theorem probWhileCut_natRec_zero_succ [Countable T] (step : ℕ → T → SLang T) (n : ℕ)
+    (k : ℕ) (acc : T) :
+    probWhileCut (fun s : ℕ × T => 0 < s.1) (probNatRec_body n step) (k + 1) (0, acc)
+    = probPure (0, acc) := by
+  show probWhileFunctional _ _ (probWhileCut _ _ k) (0, acc) = _
+  unfold probWhileFunctional
+  simp only [show ¬ (0 : ℕ) < 0 from Nat.lt_irrefl 0, decide_false, Bool.false_eq_true,
+    ↓reduceIte]
+  rfl
+
+/-- After `≥ m + 1` cuts (one extra to see `cond = false` and exit), with state `(m, acc)`:
+    the loop runs `m` body steps starting at index `n - m`, then returns `(0, acc_final)`.
+    Generalized over the cut-count `k` so it stabilizes for `k ≥ m+1`. -/
+theorem probWhileCut_natRec_loop_ge [Countable T] (step : ℕ → T → SLang T)
+    (n : ℕ) :
+    ∀ (m : ℕ) (acc : T) (k : ℕ), m ≤ n → m + 1 ≤ k →
+    probWhileCut (fun s : ℕ × T => 0 < s.1) (probNatRec_body n step) k (m, acc)
+    = probBind (probNatRec_offset acc step (n - m) m) (fun acc_final => probPure (0, acc_final)) := by
+  intro m
+  induction m with
+  | zero =>
+    -- m = 0: state (0, acc), cond is false, result is pure regardless of remaining cuts ≥ 1.
+    intro acc k _ hk
+    obtain ⟨k', rfl⟩ : ∃ k', k = k' + 1 := ⟨k - 1, by omega⟩
+    rw [probWhileCut_natRec_zero_succ step n k' acc]
+    show probPure (0, acc) = probBind (probNatRec_offset acc step (n - 0) 0) _
+    show probPure (0, acc) = probBind (probPure acc) (fun acc_final => probPure (0, acc_final))
+    rw [SLang.pure_bind]
+  | succ m ih =>
+    intro acc k hmn hk
+    have hmn' : m ≤ n := Nat.le_of_succ_le hmn
+    have hk' : m + 1 ≤ k - 1 := by omega
+    obtain ⟨k', rfl⟩ : ∃ k', k = k' + 1 := ⟨k - 1, by omega⟩
+    have hk'' : m + 1 ≤ k' := by omega
+    -- Helper: IH applied at any acc' with cut-count k'.
+    have inner_step' : ∀ acc' : T,
+        probWhileCut (fun s : ℕ × T => 0 < s.1) (probNatRec_body n step) k' (m, acc')
+        = probBind (probNatRec_offset acc' step (n - m) m) (fun a => probPure (0, a)) := by
+      intro acc'; exact ih acc' k' hmn' hk''
+    -- Now do the rewrite chain.
+    show probWhileCut _ _ (k' + 1) (m+1, acc) = _
+    show probWhileFunctional _ _ (probWhileCut _ _ k') (m+1, acc) = _
+    unfold probWhileFunctional
+    simp only [show 0 < m + 1 from Nat.succ_pos m, decide_true, ↓reduceIte]
+    -- Goal: bind (probNatRec_body n step (m+1, acc)) (probWhileCut _ _ k') = ...
+    have body_eval :
+        probNatRec_body n step (m+1, acc)
+        = probBind (step (n - (m+1)) acc) (fun acc' => probPure (m, acc')) := by
+      show probBind (step (n - (m+1, acc).1) (m+1, acc).2) (fun acc' => probPure ((m+1, acc).1 - 1, acc'))
+        = _
+      simp
+    show probBind (probNatRec_body n step (m+1, acc)) _ = _
+    rw [body_eval, SLang.bind_bind]
+    have rewrite_inner : (fun (a : T) =>
+        probBind (probPure (m, a))
+          (probWhileCut (fun s : ℕ × T => 0 < s.1) (probNatRec_body n step) k'))
+      = (fun (a : T) =>
+        probBind (probNatRec_offset a step (n - m) m) (fun b => probPure (0, b))) := by
+      funext a
+      rw [SLang.pure_bind]
+      exact inner_step' a
+    rw [rewrite_inner]
+    rw [← SLang.bind_bind]
+    congr 1
+    show probBind (step (n - (m+1)) acc) (fun a => probNatRec_offset a step (n - m) m)
+       = probNatRec_offset acc step (n - (m+1)) (m + 1)
+    rw [show (n - m) = (n - (m+1) + 1) by omega]
+    rfl
+
+/-- The two formulations are equal as SLang terms. -/
+theorem probNatRec_eq_loop [Countable T] (base : T) (step : ℕ → T → SLang T) (n : ℕ) :
+    probNatRec base step n = probNatRec_loop base step n := by
+  rw [probNatRec_eq_offset]
+  unfold probNatRec_loop
+  -- For each pointwise output x, take the sup of probWhileCut over k.
+  -- For all k ≥ n+1, probWhileCut k (n, base) is constant (by probWhileCut_natRec_loop_ge).
+  -- So the sequence is eventually constant, and probWhile = that constant value.
+  have hwhile :
+      probWhile (fun s : ℕ × T => 0 < s.1) (probNatRec_body n step) (n, base)
+      = probBind (probNatRec_offset base step 0 n) (fun a => probPure (0, a)) := by
+    funext x
+    refine probWhile_apply _ _ _ _ _ ?_
+    apply tendsto_atTop_of_eventually_const (i₀ := n + 1)
+    intro k hk
+    rw [probWhileCut_natRec_loop_ge step n n base k (le_refl n) hk]
+    rw [show n - n = 0 from Nat.sub_self n]
+  rw [hwhile, SLang.bind_bind]
+  -- Goal: probNatRec_offset base step 0 n
+  --     = bind (probNatRec_offset base step 0 n) (fun a => bind (pure (0, a)) (fun s => pure s.2))
+  -- Inner: bind (pure (0, a)) (fun s => pure s.2) = pure a
+  have hinner : (fun a : T => probBind (probPure ((0 : ℕ), a))
+                  (fun s : ℕ × T => probPure s.2))
+              = (fun a : T => probPure a) := by
+    funext a
+    rw [SLang.pure_bind]
+  rw [hinner, SLang.bind_pure]
+
+/-! ### Upward-counting variant of `probNatRec_loop` (used for ProbLang embedding)
+
+  The downward-counting `probNatRec_loop` above introduces a `n - rem` subtraction
+  in the body, which mismatches between Nat and Int when `rem > n` — making the
+  universal `IsEmbedding` requirement of `probLangWhile_isEmbedding` awkward to
+  satisfy. The upward variant counts `idx` from `0` to `n`, calling `step idx acc`
+  directly with no subtraction. This matches between SLang and ProbLang for all
+  `idx : ℕ`. -/
+
+/-- Upward-counting body: at state `(idx, acc)`, run `step idx acc`, return
+    `(idx+1, acc')`. -/
+def probNatRec_bodyUp (step : ℕ → T → SLang T) : ℕ × T → SLang (ℕ × T) :=
+  fun s => probBind (step s.1 s.2) (fun acc' => probPure (s.1 + 1, acc'))
+
+/-- Upward-counting `probWhile` formulation. State `(idx, acc)`, condition
+    `idx < n`, increment idx each iteration. -/
+def probNatRec_loopUp (base : T) (step : ℕ → T → SLang T) (n : ℕ) : SLang T :=
+  probBind
+    (probWhile (fun s : ℕ × T => decide (s.1 < n)) (probNatRec_bodyUp step) (0, base))
+    (fun s : ℕ × T => probPure s.2)
+
+/-! ### probWhileCut analysis for the upward variant. -/
+
+/-- At state `(k, acc)` with `n ≤ k`, the loop terminates immediately: any cut ≥ 1
+    yields `pure (k, acc)`. -/
+theorem probWhileCut_natRecUp_atTop [Countable T] (step : ℕ → T → SLang T) (n : ℕ)
+    (k : ℕ) (j : ℕ) (acc : T) (hk : n ≤ k) :
+    probWhileCut (fun s : ℕ × T => decide (s.1 < n)) (probNatRec_bodyUp step) (j + 1) (k, acc)
+    = probPure (k, acc) := by
+  show probWhileFunctional _ _ (probWhileCut _ _ j) (k, acc) = _
+  unfold probWhileFunctional
+  simp only [show ¬ k < n from Nat.not_lt.mpr hk, decide_false, Bool.false_eq_true, ↓reduceIte]
+  rfl
+
+/-- After enough cuts, `probWhileCut` from `(idx, acc)` with `idx ≤ n` equals running
+    `n - idx` body steps starting at index `idx`. We need `(n - idx) + 1 ≤ k` cuts.
+    Stated by induction on `rem := n - idx`. -/
+theorem probWhileCut_natRecUp_loop_ge [Countable T] (step : ℕ → T → SLang T) (n : ℕ) :
+    ∀ (rem : ℕ) (idx : ℕ) (acc : T) (k : ℕ), n - idx = rem → idx ≤ n → rem + 1 ≤ k →
+    probWhileCut (fun s : ℕ × T => decide (s.1 < n)) (probNatRec_bodyUp step) k (idx, acc)
+    = probBind (probNatRec_offset acc step idx rem)
+        (fun a => probPure (n, a)) := by
+  intro rem
+  induction rem with
+  | zero =>
+    intro idx acc k hrem hidx hk
+    have heq : idx = n := by omega
+    obtain ⟨k', rfl⟩ : ∃ k', k = k' + 1 := ⟨k - 1, by omega⟩
+    rw [heq]
+    rw [probWhileCut_natRecUp_atTop step n n k' acc (le_refl n)]
+    show probPure (n, acc) = probBind (probPure acc) _
+    rw [SLang.pure_bind]
+  | succ rem ih =>
+    intro idx acc k hrem hidx hk
+    obtain ⟨k', rfl⟩ : ∃ k', k = k' + 1 := ⟨k - 1, by omega⟩
+    have hidx_lt : idx < n := by omega
+    have hrem' : n - (idx + 1) = rem := by omega
+    have hidx1 : idx + 1 ≤ n := hidx_lt
+    have hk' : rem + 1 ≤ k' := by omega
+    show probWhileFunctional _ _ (probWhileCut _ _ k') (idx, acc) = _
+    unfold probWhileFunctional
+    simp only [show idx < n from hidx_lt, decide_true, ↓reduceIte]
+    have body_eval :
+        probNatRec_bodyUp step (idx, acc)
+        = probBind (step idx acc) (fun acc' => probPure (idx + 1, acc')) := by
+      show probBind (step (idx, acc).1 (idx, acc).2) _ = _; simp
+    show (probNatRec_bodyUp step (idx, acc)).probBind _ = _
+    rw [body_eval, SLang.bind_bind]
+    have ih' := fun a => ih (idx + 1) a k' hrem' hidx1 hk'
+    have rewrite_inner : (fun (a : T) =>
+        probBind (probPure (idx + 1, a))
+          (probWhileCut (fun s : ℕ × T => decide (s.1 < n)) (probNatRec_bodyUp step) k'))
+      = (fun (a : T) =>
+        probBind (probNatRec_offset a step (idx + 1) rem)
+          (fun b => probPure (n, b))) := by
+      funext a; rw [SLang.pure_bind]; exact ih' a
+    rw [rewrite_inner, ← SLang.bind_bind]
+    rfl
+
+/-- The two formulations are equal as SLang terms (upward variant). -/
+theorem probNatRec_eq_loopUp [Countable T] (base : T) (step : ℕ → T → SLang T) (n : ℕ) :
+    probNatRec base step n = probNatRec_loopUp base step n := by
+  rw [probNatRec_eq_offset]
+  unfold probNatRec_loopUp
+  have hwhile :
+      probWhile (fun s : ℕ × T => decide (s.1 < n)) (probNatRec_bodyUp step) (0, base)
+      = probBind (probNatRec_offset base step 0 (n - 0)) (fun a => probPure (n, a)) := by
+    funext x
+    refine probWhile_apply _ _ _ _ _ ?_
+    apply tendsto_atTop_of_eventually_const (i₀ := (n - 0) + 1)
+    intro k hk
+    rw [probWhileCut_natRecUp_loop_ge step n (n - 0) 0 base k rfl (Nat.zero_le _) hk]
+  rw [show n - 0 = n from Nat.sub_zero n] at hwhile
+  rw [hwhile, SLang.bind_bind]
+  have hinner : (fun a : T => probBind (probPure ((n : ℕ), a))
+                  (fun s : ℕ × T => probPure s.2))
+              = (fun a : T => probPure a) := by
+    funext a
+    rw [SLang.pure_bind]
+  rw [hinner, SLang.bind_pure]
+
+/-! ### Embeddable instances for primitives used by the generic combinator -/
+
+instance : Countable Nat := inferInstance
+instance : MeasurableSpace Nat := ⊤
+instance : MeasurableSingletonClass Nat := ⟨fun _ => trivial⟩
+
+/-- `Nat` embeds as the integer literal of its underlying value. -/
+instance instProbLangEmbeddableNat : ProbLangEmbeddable Nat where
+  as_expr n := .lit (.int n)
+  as_expr_isVal _ := .lit
+  as_expr_lc _ := .lit _
+
+instance : Countable Int := inferInstance
+instance : MeasurableSpace Int := ⊤
+instance : MeasurableSingletonClass Int := ⟨fun _ => trivial⟩
+
+instance : ProbLangEmbeddable Int where
+  as_expr z := .lit (.int z)
+  as_expr_isVal _ := .lit
+  as_expr_lc _ := .lit _
+
+/-- Pair of two embeddable types embeds as a ProbLang `.pair`. -/
+instance instProbLangEmbeddableProd (A B : Type)
+    [ProbLangEmbeddable A] [ProbLangEmbeddable B] : ProbLangEmbeddable (A × B) where
+  as_expr p := .pair (as_expr p.1) (as_expr p.2)
+  as_expr_isVal p := .pair (as_expr_isVal p.1) (as_expr_isVal p.2)
+  as_expr_lc p := .pair (as_expr_lc p.1) (as_expr_lc p.2)
+
+/-! ## ProbLang side of the generic combinator (upward-counting)
+
+  Target: build a closed ProbLang expression that embeds
+  `probNatRec_loopUp base step n`. We assemble it as a `probLangBind` over
+  `probLangWhile` with:
+    state type ℕ × T
+    cond  := λ s. fst s < n
+    body  := λ s. bind (stepE (fst s) (snd s)) (λ acc'. pair (fst s + 1) acc')
+    init  := as_expr (0, base)
+  Outer bind projects out the second component (the accumulator) at the end.
+
+  Going upward (rather than `n - rem` downward) avoids any Int-vs-Nat
+  subtraction mismatch — `fst s` is always non-negative since the only
+  states reachable from `(0, base)` via `+1` increments stay in ℕ. -/
+
+/-- Cond expression for the natRec loop: `λ s. fst s < nE`. The bound `nE` is an
+    arbitrary closed `Exp` (typically `.lit (.int n)` for static use, or `.fvar nV`
+    bound in an outer scope for runtime use). Caller's responsibility: `nE` is LC
+    and `nE` does not contain `xs`. -/
+def plProbNatRec_condE (xs : Var) (nE : Exp) : Exp :=
+  .lam (Exp.close (.binop .lt (.fst (.fvar xs)) nE) xs)
+
+/-- Body expression for the natRec loop. Parameterized by `stepE : ℕ → T → SLang T`.
+
+    Body: `λ s. let acc' := stepE (fst s) (snd s); pair (fst s + 1) acc'`. -/
+def plProbNatRec_bodyE (xs ws : Var) (stepE : Exp) : Exp :=
+  .lam (Exp.close
+    (probLangBind ws
+      (.app (.app stepE (.fst (.fvar xs))) (.snd (.fvar xs)))
+      (.pair (.binop .plus (.fst (.fvar xs)) (.lit (.int 1))) (.fvar ws)))
+    xs)
+
+/-- Closed ProbLang expression for `probNatRec_loopUp base step n`. The chosen
+    fresh variables `f, x, v, xs, ws, w` must be pairwise distinct and not
+    occur in `stepE`. -/
+def plProbNatRec_loop {T : Type} [ProbLangEmbeddable T]
+    (f x v xs ws w : Var) (nE : Exp) (base : T) (stepE : Exp) : Exp :=
+  probLangBind w
+    (probLangWhile f x v
+      (plProbNatRec_condE xs nE)
+      (plProbNatRec_bodyE xs ws stepE)
+      (@as_expr (Nat × T) _ (0, base)))
+    (.snd (.fvar w))
+
+/-- Variant of `plProbNatRec_loop` taking an arbitrary `Exp` for the initial accumulator
+    value (so we can pass a free variable bound in an outer scope). -/
+def plProbNatRec_loopE (f x v xs ws w : Var) (nE baseE stepE : Exp) : Exp :=
+  probLangBind w
+    (probLangWhile f x v
+      (plProbNatRec_condE xs nE)
+      (plProbNatRec_bodyE xs ws stepE)
+      (.pair (.lit (.int 0)) baseE))
+    (.snd (.fvar w))
+
+/-- `IsEmbedding` is invariant under any deterministic head step on the ProbLang side. -/
+theorem IsEmbedding.of_detHeadStep [SLangType T] [ProbLangEmbeddable T]
+    {s : SLang T} {e e' : Exp}
+    (hstep : ∀ σ, ¬ e.isValue ∧ DetHeadStep ⟨e, σ⟩ ⟨e', σ⟩)
+    (h : IsEmbedding s e') : IsEmbedding s e := by
+  intro σ
+  obtain ⟨hnv, hd⟩ := hstep σ
+  rw [limExec_detHeadStep hnv hd]; exact h σ
+
+/-- `IsEmbedding` invariance under `limExec`-equality on the ProbLang side. -/
+theorem IsEmbedding.of_limExec_eq [SLangType T] [ProbLangEmbeddable T]
+    {s : SLang T} {e e' : Exp}
+    (heq : ∀ σ, limExec ⟨e, σ⟩ = limExec ⟨e', σ⟩)
+    (h : IsEmbedding s e') : IsEmbedding s e := by
+  intro σ; rw [heq σ]; exact h σ
+
+/-- β-reduce a closed lambda applied to an `as_expr`-encoded argument. Lifts an
+    embedding of the substituted body to an embedding of the un-applied form.
+
+    This is the key helper for **dynamic** embeddings: the user-facing closed
+    sampler expression is a chain of lambdas (one per Nat/Bool/etc. parameter),
+    and applying it to encoded arguments at runtime β-reduces back to the
+    static-form body, whose embedding we can then prove inductively. -/
+theorem probLangApp_isEmbedding [SLangType T] [ProbLangEmbeddable T]
+    {A : Type} [ProbLangEmbeddable A]
+    {body : Exp} {x : Var} (hbody : Exp.IsLocallyClosed body)
+    {s : SLang T} {a : A}
+    (h : IsEmbedding s (Exp.subst body x (as_expr a))) :
+    IsEmbedding s (.app (.lam (Exp.close body x)) (as_expr a)) := by
+  refine IsEmbedding.of_detHeadStep
+    (e' := Exp.subst body x (as_expr a))
+    (fun σ => ⟨?_, ?_⟩) h
+  · intro ⟨h⟩; cases h
+  · have hd := DetHeadStep.app_lam (as_expr_isVal a) σ
+      (body := Exp.close body x)
+    rw [Exp.open_close_subst_lc_gen x _ _ hbody (as_expr_lc a)] at hd
+    exact hd
+
+/-! ### Dynamic-embedding infrastructure
+
+  Helpers for the per-sampler embedding proofs: each sampler is a chain of `λ`s
+  that need to be β-reduced, then composed with `probLangBind_isEmbedding` etc.
+
+  These helpers reduce the boilerplate from ~100s of LOC per sampler to ~50. -/
+
+/-- LC of a `.lam (close body x)` form. -/
+theorem Exp.IsLocallyClosed.lamClose {body : Exp} (x : Var) (hbody : Exp.IsLocallyClosed body) :
+    Exp.IsLocallyClosed (Exp.lam (Exp.close body x)) := by
+  refine Exp.IsLocallyClosed.lam ∅ _ (fun y _ => ?_)
+  rw [Exp.open_close_subst_lc x y _ hbody]
+  exact Exp.subst_lc hbody (.fvar _)
+
+/-- `subst` commutes through `.lam (close body x)` when the target var differs from `x`
+    and `x` is not free in the substituted value. -/
+theorem Exp.subst_lamClose {body v : Exp} {x y : Var} (hxy : x ≠ y) (hxv : x ∉ v.fv) :
+    Exp.subst (Exp.lam (Exp.close body x)) y v
+    = Exp.lam (Exp.close (Exp.subst body y v) x) := by
+  show Exp.lam _ = Exp.lam _
+  congr 1
+  rw [Exp.subst_close y x v body hxy.symm hxv]
+
+/-- β-reduce a closed lambda applied to an *arbitrary* argument expression `argE`,
+    given that `limExec` of the argument is `dirac (as_expr a, σ)` (i.e., `argE`
+    deterministically reduces to `as_expr a`). -/
+theorem probLangApp_argE_isEmbedding [SLangType T] [ProbLangEmbeddable T]
+    {A : Type} [ProbLangEmbeddable A]
+    {body argE : Exp} {x : Var} (hbody : Exp.IsLocallyClosed body)
+    {s : SLang T} {a : A}
+    (hargE : ∀ σ, limExec ⟨argE, σ⟩ = dirac ⟨as_expr a, σ⟩)
+    (h : IsEmbedding s (Exp.subst body x (as_expr a))) :
+    IsEmbedding s (.app (.lam (Exp.close body x)) argE) := by
+  intro σ
+  rw [limExec_app, hargE σ, Measure.dirac_bind Measurable.of_discrete]
+  show limExec ⟨.app (.lam (.close body x)) (as_expr a), σ⟩ = _
+  exact probLangApp_isEmbedding hbody h σ
+
+/-- β-reduce TWO closed lambdas applied to two `as_expr`-encoded arguments.
+    Specifically, the form `.app (.app (.lam (close (.lam (close body y)) x)) (as_expr a)) (as_expr b)`
+    embeds `s` when the doubly-substituted body does. -/
+theorem probLangApp2_isEmbedding [SLangType T] [ProbLangEmbeddable T]
+    {A B : Type} [ProbLangEmbeddable A] [ProbLangEmbeddable B]
+    {body : Exp} {x y : Var} (hxy : x ≠ y)
+    (hbody : Exp.IsLocallyClosed body)
+    (hxas : ∀ b : B, x ∉ (as_expr b).fv)
+    (hyas : ∀ a : A, y ∉ (as_expr a).fv)
+    {s : SLang T} {a : A} {b : B}
+    (h : IsEmbedding s
+      (Exp.subst (Exp.subst body y (as_expr b)) x (as_expr a))) :
+    IsEmbedding s
+      (.app (.app (.lam (Exp.close (Exp.lam (Exp.close body y)) x)) (as_expr a)) (as_expr b)) := by
+  have hinner_lc : Exp.IsLocallyClosed (Exp.lam (Exp.close body y)) :=
+    Exp.IsLocallyClosed.lamClose y hbody
+  -- Step 1: peel outer λ x via det step under [appL (as_expr b)] ectx.
+  have hstep : ∀ σ, DetStep
+    ⟨.app (.app (.lam (.close (.lam (.close body y)) x)) (as_expr a)) (as_expr b), σ⟩
+    ⟨.app (Exp.subst (Exp.lam (Exp.close body y)) x (as_expr a)) (as_expr b), σ⟩ := by
+    intro σ
+    have hbase : DetHeadStep
+      ⟨.app (.lam (Exp.close (Exp.lam (Exp.close body y)) x)) (as_expr a), σ⟩
+      ⟨Exp.subst (Exp.lam (Exp.close body y)) x (as_expr a), σ⟩ := by
+      have h := DetHeadStep.app_lam (as_expr_isVal a) σ
+        (body := Exp.close (Exp.lam (Exp.close body y)) x)
+      rw [Exp.open_close_subst_lc_gen x _ _ hinner_lc (as_expr_lc a)] at h
+      exact h
+    have hfill := DetStep.fill [.appL ⟨as_expr b, as_expr_isVal b⟩] hbase.toDetStep
+    simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip,
+               EctxItem.fillItem, Exp.ofVal] at hfill
+    exact hfill
+  refine IsEmbedding.of_limExec_eq (fun σ => limExec_detStep (hstep σ)) ?_
+  -- After peeling: .app (subst (.lam (close body y)) x (as_expr a)) (as_expr b)
+  -- = .app (.lam (close (subst body x (as_expr a)) y)) (as_expr b) by subst_lamClose
+  -- (need x ∉ (as_expr a).fv, which is hxas a... wait no. subst_lamClose pushes subst at y
+  -- through lam (close . x). The y here is x, and x_in_subst_lam is the binder. Wait let me re-read).
+  -- subst_lamClose: subst (lam (close body x)) y v = lam (close (subst body y v) x) when x ≠ y, x ∉ v.fv.
+  -- Here we want: subst (.lam (close body y)) x (as_expr a) = .lam (close (subst body x (as_expr a)) y)
+  -- This requires y ≠ x AND y ∉ (as_expr a).fv.
+  rw [Exp.subst_lamClose (Ne.symm hxy) (hyas a)]
+  refine probLangApp_isEmbedding ?_ ?_
+  · exact Exp.subst_lc hbody (as_expr_lc a)
+  · -- IsEmbedding s (subst (subst body x (as_expr a)) y (as_expr b))
+    -- Bridge to h via subst_subst_ne.
+    have hcomm : Exp.subst (Exp.subst body x (as_expr a)) y (as_expr b)
+        = Exp.subst (Exp.subst body y (as_expr b)) x (as_expr a) :=
+      Exp.subst_subst_ne hxy (hxas b) (hyas a) (as_expr_lc a) (as_expr_lc b)
+    rw [hcomm]
+    exact h
+
+/-- `binop mod (lit a) (lit b)` det-reduces to `lit (a % b)`. As a `limExec` equation. -/
+theorem limExec_mod_lit_lit (a b : Int) (σ : State) :
+    limExec ⟨.binop .mod (.lit (.int a)) (.lit (.int b)), σ⟩
+    = dirac ⟨.lit (.int (a % b)), σ⟩ := by
+  have hnv : ¬ (Exp.binop .mod (.lit (.int a)) (.lit (.int b))).isValue := by
+    intro ⟨h⟩; cases h
+  rw [limExec_detHeadStep hnv (DetHeadStep.binop .lit .lit (rfl) σ),
+      limExec_of_isVal IsVal.lit]
+
+/-- `binop div (lit a) (lit b)` det-reduces to `lit (a / b)`. As a `limExec` equation. -/
+theorem limExec_div_lit_lit (a b : Int) (σ : State) :
+    limExec ⟨.binop .div (.lit (.int a)) (.lit (.int b)), σ⟩
+    = dirac ⟨.lit (.int (a / b)), σ⟩ := by
+  have hnv : ¬ (Exp.binop .div (.lit (.int a)) (.lit (.int b))).isValue := by
+    intro ⟨h⟩; cases h
+  rw [limExec_detHeadStep hnv (DetHeadStep.binop .lit .lit (rfl) σ),
+      limExec_of_isVal IsVal.lit]
+
+/-! ### Helper reductions for the natRec loop
+
+  These are concrete `limExec` computations on the cond/body expressions when
+  applied to a state value `as_expr (rem, acc) = .pair (.lit (.int rem)) (as_expr acc)`. -/
+
+/-- Stepping through `.binop .lt (.lit (.int idx)) (.lit (.int n))`: a single
+    deterministic head step to `.lit (.bool (decide (idx < n)))`. -/
+theorem limExec_lt_lit_lit (idx n : Nat) (σ : State) :
+    limExec ⟨.binop .lt (.lit (.int idx)) (.lit (.int n)), σ⟩
+    = dirac ⟨.lit (.bool (decide ((idx : Int) < (n : Int)))), σ⟩ := by
+  have hnv : ¬ (Exp.binop .lt (.lit (.int idx)) (.lit (.int n))).isValue := by
+    intro ⟨h⟩; cases h
+  have heval : BinOp.eval .lt (.lit (.int idx)) (.lit (.int n))
+      = some (.lit (.bool (decide ((idx : Int) < (n : Int))))) := rfl
+  have hstep : DetHeadStep ⟨.binop .lt (.lit (.int idx)) (.lit (.int n)), σ⟩
+                            ⟨.lit (.bool (decide ((idx : Int) < (n : Int)))), σ⟩ :=
+    DetHeadStep.binop .lit .lit heval σ
+  rw [limExec_detHeadStep hnv hstep, limExec_of_isVal IsVal.lit]
+
+/-- Single-step reduction: `fst (pair v1 v2)` → `v1`. -/
+theorem limExec_fst_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State) :
+    limExec ⟨.fst (.pair e1 e2), σ⟩ = limExec ⟨e1, σ⟩ := by
+  have hnv : ¬ (Exp.fst (.pair e1 e2)).isValue := by intro ⟨h⟩; cases h
+  exact limExec_detHeadStep hnv (DetHeadStep.fst_pair h1 h2 σ)
+
+/-- Single-step reduction: `snd (pair v1 v2)` → `v2`. -/
+theorem limExec_snd_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State) :
+    limExec ⟨.snd (.pair e1 e2), σ⟩ = limExec ⟨e2, σ⟩ := by
+  have hnv : ¬ (Exp.snd (.pair e1 e2)).isValue := by intro ⟨h⟩; cases h
+  exact limExec_detHeadStep hnv (DetHeadStep.snd_pair h1 h2 σ)
+
+/-- Single-step reduction: `binop plus (lit a) (lit b)` → `lit (a + b)`. -/
+theorem limExec_plus_lit_lit (a b : Int) (σ : State) :
+    limExec ⟨.binop .plus (.lit (.int a)) (.lit (.int b)), σ⟩
+    = dirac ⟨.lit (.int (a + b)), σ⟩ := by
+  have hnv : ¬ (Exp.binop .plus (.lit (.int a)) (.lit (.int b))).isValue := by
+    intro ⟨h⟩; cases h
+  have heval : BinOp.eval .plus (.lit (.int a)) (.lit (.int b))
+      = some (.lit (.int (a + b))) := rfl
+  rw [limExec_detHeadStep hnv (DetHeadStep.binop .lit .lit heval σ),
+      limExec_of_isVal IsVal.lit]
+
+/-- Cond reduction: applying `plProbNatRec_condE xs n` to `as_expr (idx, acc)`
+    reduces to `lit (bool (decide (idx < n)))`. -/
+theorem limExec_plProbNatRec_condE [ProbLangEmbeddable T]
+    (xs : Var) (n idx : Nat) (acc : T) (σ : State)
+    (nE : Exp) (hxs_nE : xs ∉ nE.fv) (hnE_lc : Exp.IsLocallyClosed nE)
+    (hnE_red : ∀ σ', limExec ⟨nE, σ'⟩ = dirac ⟨.lit (.int n), σ'⟩) :
+    limExec ⟨.app (plProbNatRec_condE xs nE) (as_expr ((idx, acc) : Nat × T)), σ⟩
+    = dirac ⟨.lit (.bool (decide ((idx : Int) < (n : Int)))), σ⟩ := by
+  have has_expr_eq : (as_expr ((idx, acc) : Nat × T) : Exp)
+      = .pair (.lit (.int idx)) (as_expr acc) := rfl
+  rw [has_expr_eq]
+  have hpairval : IsVal (.pair (.lit (.int idx)) (as_expr acc) : Exp) :=
+    .pair .lit (as_expr_isVal acc)
+  unfold plProbNatRec_condE
+  rw [limExec_beta hpairval]
+  have hbody_lc : Exp.IsLocallyClosed
+      (.binop .lt (.fst (.fvar xs)) nE) :=
+    .binop _ (.fst (.fvar _)) hnE_lc
+  have hpair_lc : Exp.IsLocallyClosed
+      (.pair (.lit (.int idx)) (as_expr acc) : Exp) := .pair (.lit _) (as_expr_lc _)
+  rw [Exp.open_close_subst_lc_gen xs _ _ hbody_lc hpair_lc]
+  have hsubst_eq : Exp.subst (.binop .lt (.fst (.fvar xs)) nE) xs
+        (.pair (.lit (.int idx)) (as_expr acc))
+      = .binop .lt (.fst (.pair (.lit (.int idx)) (as_expr acc))) nE := by
+    show Exp.binop _ _ _ = Exp.binop _ _ _
+    rw [Exp.subst_fresh xs nE _ hxs_nE]
+    congr 1
+    show Exp.fst _ = Exp.fst _
+    simp [Exp.subst]
+  rw [hsubst_eq]
+  -- Step 1: reduce fst (pair lit_idx as_acc) → lit idx (under .binopL .lt nE_val ectx — but nE may not be a value).
+  -- Use limExec_app/limExec_fill_item properly. The fst is on the LEFT of binop lt with nE on the right.
+  -- nE on the right is NOT yet a value, so the binop's right-side hasn't been evaluated.
+  -- ProbLang's evaluation order: for `binop op e1 e2`, we evaluate e2 first (right), then e1, then the binop.
+  -- Wait — let me check the `.binopL` vs `.binopR` again.
+  -- EctxItem.binopL op v2: op e (.ofVal v2) — evaluating e (LEFT), v2 already a value (RIGHT).
+  -- EctxItem.binopR op e1: op e1 e — evaluating e (RIGHT), e1 not necessarily a value (LEFT).
+  -- So if e2 isn't a value yet, decompose with binopR. Once e2 is a value, decompose with binopL.
+  -- For our binop lt (fst pair) nE: nE not a value, so use binopR to evaluate nE first.
+  rw [show (Exp.binop .lt (.fst (.pair (.lit (.int idx)) (as_expr acc))) nE)
+        = EctxItem.fillItem (.binopR .lt (.fst (.pair (.lit (.int idx)) (as_expr acc)))) nE from rfl,
+      limExec_fill_item]
+  rw [hnE_red σ, Measure.dirac_bind Measurable.of_discrete]
+  -- Now: limExec ⟨binop lt (fst pair) (lit n), σ⟩.
+  show limExec ⟨.binop .lt (.fst (.pair (.lit (.int idx)) (as_expr acc))) (.lit (.int n)), σ⟩ = _
+  -- Now reduce fst-pair under binopL ectx.
+  have hstepFst : DetHeadStep ⟨.fst (.pair (.lit (.int idx)) (as_expr acc)), σ⟩
+                              ⟨.lit (.int idx), σ⟩ :=
+    DetHeadStep.fst_pair .lit (as_expr_isVal acc) σ
+  rw [show (Exp.binop .lt (.fst (.pair (.lit (.int idx)) (as_expr acc))) (.lit (.int n)))
+        = EctxItem.fillItem (.binopL .lt ⟨.lit (.int n), .lit⟩)
+              (.fst (.pair (.lit (.int idx)) (as_expr acc))) from rfl,
+      limExec_fill_item]
+  have hinner_nv : ¬ (Exp.fst (.pair (.lit (.int idx)) (as_expr acc))).isValue := by
+    intro ⟨h⟩; cases h
+  rw [limExec_detHeadStep hinner_nv hstepFst, limExec_of_isVal IsVal.lit,
+      Measure.dirac_bind Measurable.of_discrete]
+  show limExec ⟨_, σ⟩ = _
+  exact limExec_lt_lit_lit idx n σ
+
+/-- Body-side embedding: `app bodyE (as_expr (idx, acc))` embeds `probNatRec_bodyUp step (idx, acc)`.
+    This requires freshness conditions on `xs`, `ws` w.r.t. the value-form `as_expr`. -/
+theorem plProbNatRec_bodyE_isEmbedding [SLangType T] [ProbLangEmbeddable T]
+    {xs ws : Var} {stepE : Exp} {step : Nat → T → SLang T}
+    (hxs_ws : xs ≠ ws)
+    (hstepE_lc : Exp.IsLocallyClosed stepE)
+    (hxs_step : xs ∉ stepE.fv) (hws_step : ws ∉ stepE.fv)
+    (hxs_acc : ∀ a : T, xs ∉ (as_expr a).fv)
+    (hws_acc : ∀ a : T, ws ∉ (as_expr a).fv)
+    (hstep_emb : ∀ k a,
+      IsEmbedding (step k a) (.app (.app stepE (as_expr k)) (as_expr a)))
+    (idx : Nat) (acc : T) :
+    IsEmbedding (probNatRec_bodyUp step (idx, acc))
+                (.app (plProbNatRec_bodyE xs ws stepE) (as_expr ((idx, acc) : Nat × T))) := by
+  -- Step 1: the SLang body unfolds.
+  show IsEmbedding (probBind (step idx acc) (fun acc' => probPure ((idx + 1, acc') : Nat × T))) _
+  -- Step 2: as_expr (idx, acc) = .pair (.lit (.int idx)) (as_expr acc).
+  have has_expr_eq : (as_expr ((idx, acc) : Nat × T) : Exp)
+      = .pair (.lit (.int idx)) (as_expr acc) := rfl
+  rw [has_expr_eq]
+  set pair_expr : Exp := .pair (.lit (.int idx)) (as_expr acc) with hpair_expr_def
+  have hpair_isVal : IsVal pair_expr := .pair .lit (as_expr_isVal acc)
+  have hpair_lc : Exp.IsLocallyClosed pair_expr := .pair (.lit _) (as_expr_lc _)
+  have hxs_pair : xs ∉ pair_expr.fv := by
+    simp only [hpair_expr_def, Exp.fv, Finset.mem_union, not_or]
+    exact ⟨by simp [Exp.fv], hxs_acc acc⟩
+  have hws_pair : ws ∉ pair_expr.fv := by
+    simp only [hpair_expr_def, Exp.fv, Finset.mem_union, not_or]
+    exact ⟨by simp [Exp.fv], hws_acc acc⟩
+  -- Step 3: β-reduce. bodyE = .lam (close BodyInner xs).
+  unfold plProbNatRec_bodyE
+  set InnerArg : Exp := .app (.app stepE (.fst (.fvar xs))) (.snd (.fvar xs)) with hInnerArg_def
+  set PairExp : Exp :=
+    .pair (.binop .plus (.fst (.fvar xs)) (.lit (.int 1))) (.fvar ws) with hPairExp_def
+  have hInnerArg_lc : Exp.IsLocallyClosed InnerArg :=
+    .app (.app hstepE_lc (.fst (.fvar _))) (.snd (.fvar _))
+  have hPairExp_lc : Exp.IsLocallyClosed PairExp :=
+    .pair (.binop _ (.fst (.fvar _)) (.lit _)) (.fvar _)
+  have hBodyInner_lc : Exp.IsLocallyClosed (probLangBind ws InnerArg PairExp) := by
+    unfold probLangBind
+    refine .app (Exp.IsLocallyClosed.lam (insert ws PairExp.fv) _ (fun y _ => ?_)) hInnerArg_lc
+    rw [Exp.open_close_subst_lc ws y PairExp hPairExp_lc]
+    exact Exp.subst_lc hPairExp_lc (.fvar _)
+  -- One β step.
+  refine IsEmbedding.of_detHeadStep
+    (e' := Exp.subst (probLangBind ws InnerArg PairExp) xs pair_expr)
+    (fun σ => ⟨?_, ?_⟩) ?_
+  · -- ¬ isValue
+    intro ⟨h⟩; cases h
+  · -- DetHeadStep
+    have h := DetHeadStep.app_lam hpair_isVal σ
+      (body := Exp.close (probLangBind ws InnerArg PairExp) xs)
+    rw [Exp.open_close_subst_lc_gen xs _ _ hBodyInner_lc hpair_lc] at h
+    exact h
+  -- Step 4: compute the substitution. subst (probLangBind ws E1 E2) xs pair_expr
+  -- = probLangBind ws (subst E1 xs pair_expr) (subst E2 xs pair_expr).
+  have hsubst_bind : Exp.subst (probLangBind ws InnerArg PairExp) xs pair_expr
+      = probLangBind ws (Exp.subst InnerArg xs pair_expr) (Exp.subst PairExp xs pair_expr) := by
+    unfold probLangBind
+    show Exp.subst (.app _ _) xs _ = .app _ _
+    simp only [Exp.subst]
+    congr 1
+    rw [Exp.subst_close xs ws pair_expr PairExp hxs_ws hws_pair]
+  rw [hsubst_bind]
+  -- Step 5: compute subst InnerArg xs pair_expr.
+  have hsubst_innerArg : Exp.subst InnerArg xs pair_expr
+      = .app (.app stepE (.fst pair_expr)) (.snd pair_expr) := by
+    rw [hInnerArg_def]
+    simp only [Exp.subst]
+    rw [Exp.subst_fresh xs stepE pair_expr hxs_step]
+    simp [Exp.subst]
+  -- Step 6: compute subst PairExp xs pair_expr.
+  have hsubst_pairExp : Exp.subst PairExp xs pair_expr
+      = .pair (.binop .plus (.fst pair_expr) (.lit (.int 1))) (.fvar ws) := by
+    rw [hPairExp_def]
+    show Exp.pair _ _ = Exp.pair _ _
+    simp only [Exp.subst, if_pos rfl, if_neg hxs_ws]
+    simp
+  rw [hsubst_innerArg, hsubst_pairExp]
+  -- Step 7: apply probLangBind_isEmbedding.
+  refine probLangBind_isEmbedding (x := ws) ?_ ?_ ?_
+  · -- LC of the outer body (after subst).
+    exact .pair (.binop _ (.fst hpair_lc) (.lit _)) (.fvar _)
+  · -- IsEmbedding of inner: app (app stepE (fst pair)) (snd pair).
+    -- Use limExec_detStep twice: snd-pair-under-(appR (app stepE (fst pair)))
+    --                            and fst-pair-under-(appR stepE :: appL (as_expr acc, val)).
+    refine IsEmbedding.of_limExec_eq (fun σ => ?_) (hstep_emb idx acc)
+    have hpair_unfold : pair_expr = .pair (.lit (.int idx)) (as_expr acc) := hpair_expr_def
+    -- Step 1: under K1 := [appR (app stepE (fst pair))], snd pair → as_expr acc.
+    have hstep1 : DetStep
+        ⟨.app (.app stepE (.fst pair_expr)) (.snd pair_expr), σ⟩
+        ⟨.app (.app stepE (.fst pair_expr)) (as_expr acc), σ⟩ := by
+      have hbase : DetStep ⟨.snd pair_expr, σ⟩ ⟨as_expr acc, σ⟩ := by
+        rw [hpair_unfold]
+        exact (DetHeadStep.snd_pair .lit (as_expr_isVal acc) σ).toDetStep
+      have h := DetStep.fill [.appR (.app stepE (.fst pair_expr))] hbase
+      simp [Ectx.fill, EctxItem.fillItem] at h
+      exact h
+    rw [limExec_detStep hstep1]
+    -- Step 2: under K2 := [appR stepE, appL (as_expr acc, val)], fst pair → lit idx.
+    have hstep2 : DetStep
+        ⟨.app (.app stepE (.fst pair_expr)) (as_expr acc), σ⟩
+        ⟨.app (.app stepE (.lit (.int idx))) (as_expr acc), σ⟩ := by
+      have hbase : DetStep ⟨.fst pair_expr, σ⟩ ⟨.lit (.int idx), σ⟩ := by
+        rw [hpair_unfold]
+        exact (DetHeadStep.fst_pair .lit (as_expr_isVal acc) σ).toDetStep
+      have h := DetStep.fill [.appR stepE, .appL ⟨as_expr acc, as_expr_isVal acc⟩] hbase
+      simp [Ectx.fill, EctxItem.fillItem, Exp.ofVal] at h
+      exact h
+    rw [limExec_detStep hstep2]
+    rfl
+  · -- IsEmbedding of outer: subst (pair (binop plus (fst pair) (lit 1)) (fvar ws)) ws (as_expr t)
+    --                        = pair (binop plus (fst pair) (lit 1)) (as_expr t).
+    -- Need IsEmbedding (pure (idx+1, t)) (pair (binop plus (fst pair) (lit 1)) (as_expr t)).
+    -- This det-reduces (under pairL ectx) to pair (lit (idx+1)) (as_expr t) = as_expr (idx+1, t).
+    intro acc'
+    -- Compute the substitution.
+    have hsubst_outer : Exp.subst (.pair (.binop .plus (.fst pair_expr) (.lit (.int 1))) (.fvar ws))
+                          ws (as_expr acc')
+        = .pair (.binop .plus (.fst pair_expr) (.lit (.int 1))) (as_expr acc') := by
+      simp only [Exp.subst]
+      have h1 : Exp.subst pair_expr ws (as_expr acc') = pair_expr := by
+        exact Exp.subst_fresh ws pair_expr (as_expr acc') hws_pair
+      rw [h1]
+      simp
+    rw [hsubst_outer]
+    -- Want: IsEmbedding (pure (idx+1, acc')) (pair (binop plus (fst pair) (lit 1)) (as_expr acc')).
+    -- Apply IsEmbedding.of_limExec_eq + det reductions.
+    show IsEmbedding (probPure ((idx + 1, acc') : Nat × T)) _
+    refine IsEmbedding.of_limExec_eq (fun σ => ?_) probLangPure_isEmbedding
+    -- Goal: limExec ⟨pair (binop plus (fst pair) (lit 1)) (as_expr acc'), σ⟩
+    --     = limExec ⟨as_expr (idx+1, acc'), σ⟩.
+    -- as_expr (idx+1, acc') = pair (lit (idx+1)) (as_expr acc').
+    have hpair_unfold : pair_expr = .pair (.lit (.int idx)) (as_expr acc) := hpair_expr_def
+    -- Step 1: fst-pair under (binopR plus (lit 1) :: pairL (as_expr acc', val)).
+    have hstep1 : DetStep
+        ⟨.pair (.binop .plus (.fst pair_expr) (.lit (.int 1))) (as_expr acc'), σ⟩
+        ⟨.pair (.binop .plus (.lit (.int idx)) (.lit (.int 1))) (as_expr acc'), σ⟩ := by
+      have hbase : DetStep ⟨.fst pair_expr, σ⟩ ⟨.lit (.int idx), σ⟩ := by
+        rw [hpair_unfold]; exact (DetHeadStep.fst_pair .lit (as_expr_isVal acc) σ).toDetStep
+      have h := DetStep.fill
+        [.binopL .plus ⟨.lit (.int 1), .lit⟩,
+         .pairL ⟨as_expr acc', as_expr_isVal acc'⟩] hbase
+      simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip,
+        EctxItem.fillItem, Exp.ofVal] at h
+      exact h
+    rw [limExec_detStep hstep1]
+    -- Step 2: binop plus (lit idx) (lit 1) → lit (idx+1) under [pairL (as_expr acc', val)].
+    have hidx_plus : (idx : Int) + 1 = ((idx + 1 : Nat) : Int) := by push_cast; ring
+    have hstep2 : DetStep
+        ⟨.pair (.binop .plus (.lit (.int idx)) (.lit (.int 1))) (as_expr acc'), σ⟩
+        ⟨.pair (.lit (.int ((idx + 1 : Nat) : Int))) (as_expr acc'), σ⟩ := by
+      have hbase : DetStep ⟨.binop .plus (.lit (.int idx)) (.lit (.int 1)), σ⟩
+                            ⟨.lit (.int ((idx + 1 : Nat) : Int)), σ⟩ := by
+        have heval : BinOp.eval .plus (.lit (.int idx)) (.lit (.int 1))
+            = some (.lit (.int ((idx + 1 : Nat) : Int))) := by
+          show some _ = some _; rw [hidx_plus]
+        exact (DetHeadStep.binop .lit .lit heval σ).toDetStep
+      have h := DetStep.fill
+        [.pairL ⟨as_expr acc', as_expr_isVal acc'⟩] hbase
+      simp [Ectx.fill, EctxItem.fillItem, Exp.ofVal] at h
+      exact h
+    rw [limExec_detStep hstep2]
+    -- Goal: limExec ⟨pair (lit (idx+1)) (as_expr acc'), σ⟩ = limExec ⟨as_expr (idx+1, acc'), σ⟩
+    -- as_expr (idx+1, acc') = pair (lit (int (idx+1))) (as_expr acc'). Defeq.
+    rfl
+
+/-! ### Main embedding theorem for the generic combinator
+
+  Composes `probLangBind_isEmbedding` (outer projection) with
+  `probLangWhile_isEmbedding` (inner loop) and the cond/body reductions above. -/
+theorem plProbNatRec_loop_isEmbedding [SLangType T] [ProbLangEmbeddable T]
+    {f x v xs ws w : Var} {n : Nat} {base : T} {step : Nat → T → SLang T} {stepE : Exp}
+    {nE : Exp}
+    (hfx : f ≠ x) (hfv : f ≠ v) (hxv : x ≠ v)
+    (hxs_ws : xs ≠ ws) (_hxs_w : xs ≠ w) (hws_w : ws ≠ w)
+    (hxsf : xs ≠ f) (hxsx : xs ≠ x) (hxsv : xs ≠ v)
+    (hwsf : ws ≠ f) (hwsx : ws ≠ x) (hwsv : ws ≠ v)
+    (_hwf : w ≠ f) (_hwx : w ≠ x) (_hwv : w ≠ v)
+    (hstepE_lc : Exp.IsLocallyClosed stepE)
+    (hxs_step : xs ∉ stepE.fv) (hws_step : ws ∉ stepE.fv)
+    (hf_step : f ∉ stepE.fv) (hx_step : x ∉ stepE.fv) (hv_step : v ∉ stepE.fv)
+    (hnE_lc : Exp.IsLocallyClosed nE)
+    (hnE_red : ∀ σ, limExec ⟨nE, σ⟩ = dirac ⟨.lit (.int n), σ⟩)
+    (hxs_nE : xs ∉ nE.fv) (hf_nE : f ∉ nE.fv) (hx_nE : x ∉ nE.fv) (hv_nE : v ∉ nE.fv)
+    (hxs_acc : ∀ a : (Nat × T), xs ∉ (as_expr a).fv)
+    (hws_acc : ∀ a : (Nat × T), ws ∉ (as_expr a).fv)
+    (hf_acc : ∀ a : (Nat × T), f ∉ (as_expr a).fv)
+    (hx_acc : ∀ a : (Nat × T), x ∉ (as_expr a).fv)
+    (hv_acc : ∀ a : (Nat × T), v ∉ (as_expr a).fv)
+    (hw_acc : ∀ a : T, w ∉ (as_expr a).fv)
+    (hstep_emb : ∀ k acc,
+      IsEmbedding (step k acc) (.app (.app stepE (as_expr k)) (as_expr acc))) :
+    IsEmbedding (probNatRec_loopUp base step n)
+                (plProbNatRec_loop f x v xs ws w nE base stepE) := by
+  unfold probNatRec_loopUp plProbNatRec_loop
+  -- For the bind: `bind probWhile (fun s => pure s.2)` ↔ `probLangBind w probLangWhile (.snd (.fvar w))`.
+  apply probLangBind_isEmbedding (x := w)
+  · -- LC of .snd (.fvar w).
+    exact .snd (.fvar _)
+  · -- IsEmbedding (probWhile ...) (probLangWhile f x v condE bodyE init).
+    -- Helpers: condE/bodyE freshness for any var fresh wrt xs/ws/stepE.
+    have hcondE_fresh : ∀ a : Var, a ≠ xs → a ∉ nE.fv →
+        a ∉ (plProbNatRec_condE xs nE).fv := by
+      intro a ha ha_nE
+      unfold plProbNatRec_condE
+      simp only [Exp.fv]
+      apply Exp.close_preserve_not_fvar
+      simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or]
+      exact ⟨ha, ha_nE⟩
+    have hbodyE_fresh : ∀ a : Var, a ∉ stepE.fv → a ≠ xs → a ≠ ws →
+        a ∉ (plProbNatRec_bodyE xs ws stepE).fv := by
+      intro a ha_step ha_xs ha_ws
+      unfold plProbNatRec_bodyE
+      simp only [Exp.fv]
+      apply Exp.close_preserve_not_fvar
+      unfold probLangBind
+      simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, Finset.notMem_empty,
+                 false_or, or_false, not_or, not_false_iff]
+      have hclose_pair : a ∉ ((Exp.pair (.binop .plus (.fst (.fvar xs)) (.lit (.int 1)))
+            (.fvar ws)).close ws).fv := by
+        apply Exp.close_preserve_not_fvar
+        simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, Finset.notMem_empty,
+                   false_or, or_false, not_or, not_false_iff]
+        tauto
+      tauto
+    -- Apply probLangWhile_isEmbedding at type ℕ × T.
+    refine probLangWhile_isEmbedding (T := Nat × T) (init := (0, base))
+      hfx hfv hxv ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+    · -- LC of condE = plProbNatRec_condE xs nE.
+      unfold plProbNatRec_condE
+      refine .lam ∅ _ (fun y _ => ?_)
+      have hbody_lc : Exp.IsLocallyClosed (.binop .lt (.fst (.fvar xs)) nE) :=
+        .binop _ (.fst (.fvar _)) hnE_lc
+      rw [Exp.open_close_subst_lc xs y _ hbody_lc]
+      exact Exp.subst_lc hbody_lc (.fvar _)
+    · -- LC of bodyE.
+      unfold plProbNatRec_bodyE probLangBind
+      have hInner_lc : Exp.IsLocallyClosed
+          (.app (.lam (Exp.close (.pair (.binop .plus (.fst (.fvar xs)) (.lit (.int 1))) (.fvar ws)) ws))
+                (.app (.app stepE (.fst (.fvar xs))) (.snd (.fvar xs)))) := by
+        refine .app ?_ (.app (.app hstepE_lc (.fst (.fvar _))) (.snd (.fvar _)))
+        refine .lam ∅ _ (fun z _ => ?_)
+        rw [Exp.open_close_subst_lc ws z _ (by exact .pair (.binop _ (.fst (.fvar _)) (.lit _)) (.fvar _))]
+        exact Exp.subst_lc (.pair (.binop _ (.fst (.fvar _)) (.lit _)) (.fvar _)) (.fvar _)
+      refine .lam ∅ _ (fun y _ => ?_)
+      rw [Exp.open_close_subst_lc xs y _ hInner_lc]
+      exact Exp.subst_lc hInner_lc (.fvar _)
+    · exact hcondE_fresh f hxsf.symm hf_nE
+    · exact hbodyE_fresh f hf_step hxsf.symm hwsf.symm
+    · exact hcondE_fresh x hxsx.symm hx_nE
+    · exact hbodyE_fresh x hx_step hxsx.symm hwsx.symm
+    · exact hcondE_fresh v hxsv.symm hv_nE
+    · exact hbodyE_fresh v hv_step hxsv.symm hwsv.symm
+    · -- f ∉ as_expr.fv: we have hf_acc.
+      exact hf_acc
+    · -- x ∉ as_expr.fv: hx_acc.
+      exact hx_acc
+    · -- v ∉ as_expr.fv: hv_acc.
+      exact hv_acc
+    · -- hcond: ∀ s σ, limExec ⟨app condE (as_expr s), σ⟩ = dirac ⟨lit (bool (cond s)), σ⟩.
+      intro ⟨idx, acc⟩ σ
+      show limExec _ = dirac ⟨.lit (.bool (decide (idx < n))), σ⟩
+      have h := limExec_plProbNatRec_condE (T := T) xs n idx acc σ nE hxs_nE hnE_lc hnE_red
+      have hcast : decide ((idx : Int) < (n : Int)) = decide (idx < n) := by
+        congr 1
+        exact propext (by exact_mod_cast Iff.rfl)
+      rw [hcast] at h
+      exact h
+    · -- hbody: ∀ s, IsEmbedding (probNatRec_bodyUp step s) (app bodyE (as_expr s)).
+      intro ⟨idx, acc⟩
+      exact plProbNatRec_bodyE_isEmbedding hxs_ws hstepE_lc hxs_step hws_step
+        (fun a => by
+          -- xs ∉ as_expr a.fv where a : T. We have hxs_acc for Nat × T.
+          have := hxs_acc (0, a)
+          simp only [as_expr, Exp.fv, Finset.mem_union, not_or] at this
+          exact this.2)
+        (fun a => by
+          have := hws_acc (0, a)
+          simp only [as_expr, Exp.fv, Finset.mem_union, not_or] at this
+          exact this.2)
+        hstep_emb idx acc
+  · -- IsEmbedding of outer-bind body: ∀ s : Nat × T,
+    --   IsEmbedding (pure s.2) (subst (.snd (.fvar w)) w (as_expr s)).
+    intro ⟨idx, acc⟩
+    -- subst (.snd (.fvar w)) w (as_expr (idx, acc)) = .snd (as_expr (idx, acc)) = .snd (pair (lit idx) (as_expr acc)).
+    show IsEmbedding (probPure acc) (Exp.subst (.snd (.fvar w)) w (as_expr ((idx, acc) : Nat × T)))
+    have hsubst : Exp.subst (.snd (.fvar w)) w (as_expr ((idx, acc) : Nat × T))
+        = .snd (as_expr ((idx, acc) : Nat × T)) := by
+      simp [Exp.subst]
+    rw [hsubst]
+    -- limExec ⟨snd (pair (lit idx) (as_expr acc)), σ⟩ = limExec ⟨as_expr acc, σ⟩ via det.
+    refine IsEmbedding.of_limExec_eq (fun σ => ?_) probLangPure_isEmbedding
+    show limExec ⟨.snd (.pair (.lit (.int idx)) (as_expr acc)), σ⟩ = _
+    rw [limExec_snd_pair .lit (as_expr_isVal acc)]
+    rfl
 
 /-! ## Proof of concept: closed equivalence example -/
 

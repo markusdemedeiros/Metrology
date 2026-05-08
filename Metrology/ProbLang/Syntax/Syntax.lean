@@ -93,7 +93,7 @@ theorem BaseLit.beq_self_true (l : BaseLit) : (l == l) = true := by
 inductive UnOp | neg | minus
   deriving Inhabited, Countable, Repr, BEq
 
-inductive BinOp | plus | minus | mult | div | mod | and | or | xor | eq | lt | le
+inductive BinOp | plus | minus | mult | div | mod | and | or | xor | eq | lt | le | shl | shr
   deriving Inhabited, Countable, Repr, BEq
 
 inductive Ty
@@ -709,6 +709,10 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp) : Option Exp :=
   | eq,    .inr (.lit _),   .inl (.lit _)   => some <| .lit <| .bool false
   | lt,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 < z2))
   | le,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 ≤ z2))
+  -- Bit shifts on integers. Shift amount is converted to Nat via `toNat`
+  -- (negative shift amounts treat as 0 — caller's responsibility to ensure non-negative).
+  | shl,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 * 2 ^ z2.toNat)
+  | shr,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 / 2 ^ z2.toNat)
   |_,      _,        _        => none
 
 def State.update_heap (σ : State) (f : ExtTreeMap Loc Val → ExtTreeMap Loc Val) : State :=

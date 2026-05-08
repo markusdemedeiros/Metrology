@@ -1,5 +1,671 @@
 import Metrology.SampCert.SLang
 
+/-! # Dynamic embeddings of SampCert samplers
+
+  Each sampler is embedded as a closed ProbLang lambda with all its `ℕ`/`ℕ⁺`
+  parameters bound. The embedding hypotheses are of the form:
+    `∀ args, IsEmbedding (slangFn args) (.app^k samplerE (as_expr arg₁) ... (as_expr argₖ))`
+  and proofs proceed by `probLangApp_isEmbedding` (one β-reduction per λ) followed
+  by composition of the inner embedding lemmas.
+-/
+
+namespace EmbedSLang
+open SLang ProbLang Classical MeasureTheory ProbabilityTheory Measure PMF Measurable
+noncomputable section
+
+/-! ## probUniformByteUpperBits — `λ i. (rand 256 ()).toNat >>> (8 - i)` -/
+
+/-- Closed ProbLang expression for `probUniformByteUpperBits`. Takes one runtime Nat
+    argument `i` (the number of upper bits to extract). -/
+def plProbUniformByteUpperBits (iV bV : Var) : Exp :=
+  -- λ i. let b := rand 256 (); b >> (8 - i)
+  .lam (Exp.close
+    (probLangBind bV probLangUniformByte
+      (.binop .shr (.fvar bV)
+        (.binop .minus (.lit (.int 8)) (.fvar iV))))
+    iV)
+
+theorem plProbUniformByteUpperBits_isEmbedding
+    {iV bV : Var} (hiV_bV : iV ≠ bV) (i : Nat) :
+    IsEmbedding (SLang.probUniformByteUpperBits i)
+                (.app (plProbUniformByteUpperBits iV bV) (as_expr i)) := by
+  -- Unfold SampCert's def to its β-reduced form.
+  show IsEmbedding (SLang.probBind SLang.probUniformByte (fun w : UInt8 =>
+                       SLang.probPure (w.toNat.shiftRight (8 - i)))) _
+  -- β-reduce the outer λ via probLangApp_isEmbedding. Body LC and post-subst form computed below.
+  unfold plProbUniformByteUpperBits
+  refine probLangApp_isEmbedding (a := i) ?_ ?_
+  · -- LC of `probLangBind bV probLangUniformByte (binop shr (fvar bV) (binop minus (lit 8) (fvar iV)))`.
+    have hbody_lc : Exp.IsLocallyClosed
+        (.binop .shr (.fvar bV) (.binop .minus (.lit (.int 8)) (.fvar iV)) : Exp) :=
+      .binop _ (.fvar _) (.binop _ (.lit _) (.fvar _))
+    refine .app (Exp.IsLocallyClosed.lam ∅ _ (fun y _ => ?_))
+                (.rand (.lit _) (.lit _))
+    rw [Exp.open_close_subst_lc bV y _ hbody_lc]
+    exact Exp.subst_lc hbody_lc (.fvar _)
+  -- The body after substituting iV ↦ as_expr i = lit (int i):
+  --   probLangBind bV probLangUniformByte (binop shr (fvar bV) (binop minus (lit 8) (lit i)))
+  have hsubst : Exp.subst
+      (probLangBind bV probLangUniformByte
+        (.binop .shr (.fvar bV) (.binop .minus (.lit (.int 8)) (.fvar iV))))
+      iV (as_expr i)
+      = probLangBind bV probLangUniformByte
+          (.binop .shr (.fvar bV) (.binop .minus (.lit (.int 8)) (.lit (.int i)))) := by
+    unfold probLangBind probLangUniformByte
+    show Exp.app (Exp.lam _) _ = Exp.app (Exp.lam _) _
+    simp only [Exp.subst]
+    congr 1
+    -- subst (close inner bV) iV (as_expr i) = close (subst inner iV (as_expr i)) bV
+    rw [Exp.subst_close iV bV (as_expr i)
+        (.binop .shr (.fvar bV) (.binop .minus (.lit (.int 8)) (.fvar iV)))
+        hiV_bV (by simp [Exp.fv])]
+    congr 1
+    -- subst (binop shr (fvar bV) (binop minus (lit 8) (fvar iV))) iV (as_expr i)
+    -- = binop shr (fvar bV) (binop minus (lit 8) (lit (int i))). Since iV ≠ bV, the outer fvar bV stays.
+    show Exp.binop _ _ _ = Exp.binop _ _ _
+    simp [Exp.subst, hiV_bV]
+  rw [hsubst]
+  -- Apply probLangBind_isEmbedding.
+  refine probLangBind_isEmbedding (x := bV) ?_ ?_ ?_
+  · exact .binop _ (.fvar _) (.binop _ (.lit _) (.lit _))
+  · exact probLangUniformByte_isEmbedding
+  · -- ∀ b : UInt8, IsEmbedding (pure (b.toNat >>> (8 - i)))
+    --   (subst (binop shr (fvar bV) (binop minus (lit 8) (lit i))) bV (as_expr b)).
+    intro b
+    show IsEmbedding (SLang.probPure (b.toNat.shiftRight (8 - i))) _
+    have hsubst2 : Exp.subst
+        (.binop .shr (.fvar bV) (.binop .minus (.lit (.int 8)) (.lit (.int i))))
+        bV (as_expr b)
+        = .binop .shr (.lit (.int b.toNat))
+                       (.binop .minus (.lit (.int 8)) (.lit (.int i))) := by
+      show Exp.binop _ _ _ = Exp.binop _ _ _
+      simp only [Exp.subst, if_pos rfl]
+      rfl
+    rw [hsubst2]
+    -- Reduce two det steps: minus → lit (8-i), then shr → lit ((b.toNat : Int) / 2^(8-i).toNat).
+    refine IsEmbedding.of_limExec_eq (fun σ => ?_) probLangPure_isEmbedding
+    have hstep1 : DetStep
+        ⟨.binop .shr (.lit (.int b.toNat))
+            (.binop .minus (.lit (.int 8)) (.lit (.int i))), σ⟩
+        ⟨.binop .shr (.lit (.int b.toNat))
+            (.lit (.int ((8 : Int) - (i : Int)))), σ⟩ := by
+      have hbase : DetStep
+          ⟨.binop .minus (.lit (.int 8)) (.lit (.int i)), σ⟩
+          ⟨.lit (.int ((8 : Int) - (i : Int))), σ⟩ :=
+        (DetHeadStep.binop .lit .lit (rfl) σ).toDetStep
+      have h := DetStep.fill [.binopR .shr (.lit (.int b.toNat))] hbase
+      simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip,
+                 EctxItem.fillItem, Exp.ofVal] at h
+      exact h
+    rw [limExec_detStep hstep1]
+    have hstep2 : DetStep
+        ⟨.binop .shr (.lit (.int b.toNat))
+            (.lit (.int ((8 : Int) - (i : Int)))), σ⟩
+        ⟨.lit (.int ((b.toNat : Int) / 2 ^ ((8 - i : Int).toNat))), σ⟩ :=
+      (DetHeadStep.binop .lit .lit (rfl) σ).toDetStep
+    rw [limExec_detStep hstep2]
+    -- limExec ⟨lit (b.toNat/2^(8-i).toNat), σ⟩ = limExec ⟨probLangPure (b.toNat.shiftRight (8-i)), σ⟩
+    -- = limExec ⟨lit (b.toNat.shiftRight (8-i)), σ⟩. Need numeric equality.
+    show limExec ⟨.lit _, σ⟩ = limExec ⟨as_expr (b.toNat.shiftRight (8 - i)), σ⟩
+    show limExec ⟨.lit (.int _), σ⟩ = limExec ⟨.lit (.int _), σ⟩
+    congr 4
+    -- Goal: (b.toNat : Int) / 2 ^ (8 - i : Int).toNat = (b.toNat.shiftRight (8 - i) : Int)
+    show ((b.toNat : Int) / 2 ^ (((8 : Int) - (i : Int)).toNat)) = ((b.toNat.shiftRight (8 - i) : Nat) : Int)
+    rw [show b.toNat.shiftRight (8 - i) = b.toNat / 2^(8 - i) from
+        Nat.shiftRight_eq_div_pow b.toNat (8 - i)]
+    push_cast
+    by_cases hi : i ≤ 8
+    · have h1 : ((8 : Int) - (i : Int)).toNat = 8 - i := by omega
+      rw [h1]
+    · push_neg at hi
+      have h1 : 8 - i = 0 := by omega
+      have h2 : ((8 : Int) - (i : Int)).toNat = 0 := by omega
+      rw [h1, h2]
+
+/-! ## probUniformP2 — bridging to `probNatRec`
+
+  SampCert's `probUniformP2 i` is genuinely meta-recursive (decreases by 8 per step).
+  We bridge to `probNatRec` form by separating the residue `r := i % 8` (read in
+  the OUTER bind, then a `probNatRec` over `i / 8` byte-folds).
+
+  Order matters: SampCert reads the byte BEFORE recursing, while `probNatRec` reads
+  the residue first (in the outer bind) then folds bytes. These produce equal SLang
+  distributions because the samples are independent (probBind commutes for
+  independent distributions). -/
+
+/-- The reformulated `probUniformP2`: read residue `r` first, then `n` bytes, combining
+    each via 256 * acc + byte. -/
+def probUniformP2_alt (r n : ℕ) : SLang ℕ :=
+  SLang.probBind (SLang.probUniformByteUpperBits r) (fun base : ℕ =>
+    probNatRec base
+      (fun _ acc => SLang.probBind SLang.probUniformByte
+          (fun v : UInt8 => SLang.probPure (UInt8.size * acc + v.toNat)))
+      n)
+
+/-- Independence-based commutation: for independent SLang distributions, the
+    order of `probBind` doesn't matter. We use this to swap the byte-first order
+    of SampCert's `probUniformP2` into the residue-first order of `probUniformP2_alt`. -/
+theorem probBind_comm {T1 T2 U : Type _} [SLangType T1] [SLangType T2] [SLangType U]
+    (s1 : SLang T1) (s2 : SLang T2) (f : T1 → T2 → SLang U) :
+    SLang.probBind s1 (fun a => SLang.probBind s2 (fun b => f a b))
+    = SLang.probBind s2 (fun b => SLang.probBind s1 (fun a => f a b)) := by
+  funext x
+  show ∑' a, s1 a * (∑' b, s2 b * f a b x) = ∑' b, s2 b * (∑' a, s1 a * f a b x)
+  -- Both sides expand to ∑' a b, s1 a * s2 b * f a b x.
+  rw [show (∑' a, s1 a * (∑' b, s2 b * f a b x)) = ∑' a, ∑' b, s1 a * s2 b * f a b x from by
+        congr 1; funext a; rw [← ENNReal.tsum_mul_left]; congr 1; funext b; ring]
+  rw [show (∑' b, s2 b * (∑' a, s1 a * f a b x)) = ∑' b, ∑' a, s1 a * s2 b * f a b x from by
+        congr 1; funext b; rw [← ENNReal.tsum_mul_left]; congr 1; funext a; ring]
+  exact ENNReal.tsum_comm
+
+/-- The bridge lemma: `probUniformP2 i = probUniformP2_alt (i % 8) (i / 8)`. -/
+theorem probUniformP2_eq_alt (i : ℕ) :
+    SLang.probUniformP2 i = probUniformP2_alt (i % 8) (i / 8) := by
+  -- Strong induction, decreasing by 8.
+  induction i using Nat.strong_induction_on with
+  | _ i ih =>
+    unfold SLang.probUniformP2
+    by_cases hi : i < 8
+    · -- i < 8: SampCert's if-branch is upperBits i.
+      simp only [hi, ↓reduceIte]
+      have hmod : i % 8 = i := Nat.mod_eq_of_lt hi
+      have hdiv : i / 8 = 0 := Nat.div_eq_of_lt hi
+      rw [hmod, hdiv]
+      -- probUniformP2_alt i 0 = bind (upperBits i) (fun base => probNatRec base step 0)
+      --                      = bind (upperBits i) (fun base => probPure base)
+      --                      = upperBits i.
+      unfold probUniformP2_alt
+      show _ = SLang.probBind _ _
+      have h_inner : (fun base : ℕ => probNatRec base
+              (fun (_ : ℕ) (acc : ℕ) => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+                SLang.probPure (UInt8.size * acc + v.toNat)) 0)
+          = SLang.probPure := by funext base; rfl
+      rw [h_inner, SLang.bind_pure]
+    · -- i ≥ 8: SampCert's else branch: bind byte (fun v => bind (probUniformP2 (i-8)) ...).
+      simp only [hi, ↓reduceIte]
+      push_neg at hi
+      -- IH on i - 8.
+      have hlt : i - 8 < i := by omega
+      have hih := ih (i - 8) hlt
+      -- i / 8 = (i-8)/8 + 1, i % 8 = (i-8) % 8.
+      have hdiv : i / 8 = (i - 8) / 8 + 1 := by omega
+      have hmod : i % 8 = (i - 8) % 8 := by omega
+      rw [hdiv, hmod]
+      -- Show: (do let v ← byte; let w ← probUniformP2 (i-8); return 256*w + v.toNat)
+      --     = probUniformP2_alt ((i-8)%8) ((i-8)/8 + 1).
+      -- Unfold probUniformP2_alt (n+1).
+      unfold probUniformP2_alt
+      show SLang.probBind _ _ = SLang.probBind _ _
+      -- probNatRec base step (n+1) = bind (probNatRec base step n) (step n).
+      have hrec : ∀ base : ℕ, probNatRec base
+            (fun (_ : ℕ) (acc : ℕ) => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+              SLang.probPure (UInt8.size * acc + v.toNat)) ((i - 8) / 8 + 1)
+          = SLang.probBind (probNatRec base
+              (fun (_ : ℕ) (acc : ℕ) => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+                SLang.probPure (UInt8.size * acc + v.toNat)) ((i - 8) / 8))
+            (fun acc => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+              SLang.probPure (UInt8.size * acc + v.toNat)) := by
+        intro base; rfl
+      have hrhs : (fun base : ℕ => probNatRec base
+              (fun (_ : ℕ) (acc : ℕ) => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+                SLang.probPure (UInt8.size * acc + v.toNat)) ((i - 8) / 8 + 1))
+          = (fun base : ℕ => SLang.probBind (probNatRec base
+              (fun (_ : ℕ) (acc : ℕ) => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+                SLang.probPure (UInt8.size * acc + v.toNat)) ((i - 8) / 8))
+            (fun acc => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+              SLang.probPure (UInt8.size * acc + v.toNat))) := by
+        funext base; exact hrec base
+      rw [hrhs]
+      -- Now RHS: bind (upperBits ((i-8)%8)) (fun base => bind (probNatRec_n) (fun acc => bind byte (fun v => pure ...)))
+      -- Refold the inner double-bind via bind_bind:
+      -- bind X (fun base => bind (g base) h) = bind (bind X g) h
+      rw [← SLang.bind_bind]
+      -- Now RHS: bind (bind (upperBits ((i-8)%8)) (fun base => probNatRec_n)) (fun acc => bind byte (fun v => ...))
+      -- The inner is exactly probUniformP2_alt ((i-8)%8) ((i-8)/8) = probUniformP2 (i-8) by IH.
+      have hbind_eq : SLang.probBind (SLang.probUniformByteUpperBits ((i - 8) % 8))
+            (fun base : ℕ => probNatRec base
+              (fun (_ : ℕ) (acc : ℕ) => SLang.probBind SLang.probUniformByte fun (v : UInt8) =>
+                SLang.probPure (UInt8.size * acc + v.toNat)) ((i - 8) / 8))
+          = SLang.probUniformP2 (i - 8) := by
+        rw [hih]; rfl
+      rw [hbind_eq]
+      -- Goal: bind byte (fun v => bind (probUniformP2 (i-8)) (fun w => pure (256*w + v.toNat)))
+      --     = bind (probUniformP2 (i-8)) (fun acc => bind byte (fun v => pure (256*acc + v.toNat)))
+      show SLang.probBind SLang.probUniformByte (fun v => SLang.probBind (SLang.probUniformP2 (i - 8))
+              (fun w => SLang.probPure (UInt8.size * w + v.toNat)))
+          = SLang.probBind (SLang.probUniformP2 (i - 8))
+            (fun acc => SLang.probBind SLang.probUniformByte
+              (fun v => SLang.probPure (UInt8.size * acc + v.toNat)))
+      exact probBind_comm SLang.probUniformByte (SLang.probUniformP2 (i - 8))
+        (fun v w => SLang.probPure (UInt8.size * w + v.toNat))
+
+/-! ### Closed ProbLang expression for probUniformP2
+
+  `probUniformP2_alt r n` = `bind (upperBits r) (fun base => probNatRec base step n)`
+  where `step _ acc = bind byte (fun v => pure (256 * acc + v.toNat))`.
+
+  The dynamic embedding takes `i` runtime, computes `r := i % 8` and `n := i / 8`
+  inline, and uses `plProbNatRec_loopE` with `.fvar nV` and `.fvar baseV` for the
+  runtime n and base values. -/
+
+/-- ProbLang expression for the byte-fold step: `λ k. λ acc. let v := rand 256 (); 256 * acc + v.toNat`.
+    The outer `k` is unused (since the step is index-independent). -/
+def plProbUniformP2_step (kV accV vV : Var) : Exp :=
+  .lam (Exp.close
+    (.lam (Exp.close
+      (probLangBind vV probLangUniformByte
+        (probLangAdd
+          (probLangMul (probLangInt UInt8.size) (.fvar accV))
+          (.fvar vV)))
+      accV))
+    kV)
+
+/-- Closed dynamic ProbLang expression for `probUniformP2`. Takes runtime arg `i`.
+
+    The body, after β-reducing `iV ↦ .lit (.int i)`:
+      bind baseV ← upperBits (i % 8); loop (i / 8) baseV step
+    where `i % 8` and `i / 8` are computed inline via `binop mod`/`div`.
+-/
+def plProbUniformP2 (iV baseV f x v xs ws w kV accV vV bV upperBitsIV upperBitsBV : Var) : Exp :=
+  .lam (Exp.close
+    (probLangBind baseV
+      (.app (plProbUniformByteUpperBits upperBitsIV upperBitsBV)
+            (.binop .mod (.fvar iV) (.lit (.int 8))))
+      (EmbedSLang.plProbNatRec_loopE f x v xs ws w
+        (.binop .div (.fvar iV) (.lit (.int 8)))
+        (.fvar baseV)
+        (plProbUniformP2_step kV accV vV)))
+    iV)
+
+/-! ### Embedding theorem -/
+
+/-- The byte-fold step embeds: `(.app (.app stepE (as_expr k)) (as_expr acc))`
+    embeds `bind byte (fun v => pure (256 * acc + v.toNat))` (the SLang step). -/
+theorem plProbUniformP2_step_isEmbedding {kV accV vV : Var}
+    (hkV_accV : kV ≠ accV) (haccV_vV : accV ≠ vV) (hkV_vV : kV ≠ vV)
+    (k acc : Nat) :
+    IsEmbedding
+      (SLang.probBind SLang.probUniformByte (fun v : UInt8 =>
+        SLang.probPure (UInt8.size * acc + v.toNat)))
+      (.app (.app (plProbUniformP2_step kV accV vV) (as_expr k)) (as_expr acc)) := by
+  unfold plProbUniformP2_step
+  -- Apply probLangApp2_isEmbedding (β-reduces both λ kV and λ accV).
+  refine probLangApp2_isEmbedding (b := acc) (a := k) hkV_accV ?_ ?_ ?_ ?_
+  · -- LC of inner body (the probLangBind ...).
+    unfold probLangBind probLangUniformByte probLangAdd probLangMul probLangInt
+    refine .app ?_ (.rand (.lit _) (.lit _))
+    refine .lam ∅ _ (fun y _ => ?_)
+    have hinner_lc : Exp.IsLocallyClosed
+        (Exp.binop .plus (.binop .mult (.lit (.int UInt8.size)) (.fvar accV)) (.fvar vV)) :=
+      .binop _ (.binop _ (.lit _) (.fvar _)) (.fvar _)
+    rw [Exp.open_close_subst_lc vV y _ hinner_lc]
+    exact Exp.subst_lc hinner_lc (.fvar _)
+  · -- ∀ a : Nat, kV ∉ (as_expr a).fv: as_expr a = .lit (.int a), no fvars.
+    intro a; simp [Exp.fv]
+  · -- ∀ k_arg : Nat, accV ∉ (as_expr k_arg).fv: same.
+    intro a; simp [Exp.fv]
+  · -- IsEmbedding s (subst (subst body accV (as_expr acc)) kV (as_expr k)).
+    -- Body = probLangBind vV byte (binop plus (binop mult (lit 256) (fvar accV)) (fvar vV)).
+    -- Substituting accV ↦ lit acc and kV ↦ lit k:
+    -- The kV doesn't appear in body, so subst at kV is identity.
+    -- The accV → lit acc gives: probLangBind vV byte (binop plus (binop mult (lit 256) (lit acc)) (fvar vV)).
+    -- This is then embedded by probLangBind_isEmbedding + probLangUniformByte_isEmbedding +
+    -- per-byte arithmetic reduction.
+    -- First compute the substs:
+    have hsubst1 : Exp.subst (probLangBind vV probLangUniformByte
+                              (probLangAdd (probLangMul (probLangInt UInt8.size) (.fvar accV)) (.fvar vV)))
+                              accV (as_expr acc)
+        = probLangBind vV probLangUniformByte
+            (probLangAdd (probLangMul (probLangInt UInt8.size) (as_expr acc)) (.fvar vV)) := by
+      unfold probLangBind probLangUniformByte probLangAdd probLangMul probLangInt
+      show Exp.app _ _ = Exp.app _ _
+      simp only [Exp.subst]
+      congr 1
+      rw [Exp.subst_close accV vV (as_expr acc) _ haccV_vV (by simp [Exp.fv])]
+      congr 1
+      simp only [Exp.subst, if_pos rfl, if_neg haccV_vV]
+      show Exp.binop _ (.binop _ _ _) _ = _
+      simp [Exp.subst]
+    have hsubst2 : Exp.subst
+          (probLangBind vV probLangUniformByte
+            (probLangAdd (probLangMul (probLangInt UInt8.size) (as_expr acc)) (.fvar vV)))
+          kV (as_expr k)
+        = probLangBind vV probLangUniformByte
+            (probLangAdd (probLangMul (probLangInt UInt8.size) (as_expr acc)) (.fvar vV)) := by
+      apply Exp.subst_fresh
+      unfold probLangBind probLangUniformByte probLangAdd probLangMul probLangInt
+      simp [Exp.fv]
+    rw [hsubst1, hsubst2]
+    -- Now: IsEmbedding (bind byte (fun v => pure (256*acc + v))) (probLangBind vV byte (binop plus (binop mult 256 acc) (fvar vV)))
+    refine probLangBind_isEmbedding (x := vV) ?_ ?_ ?_
+    · -- LC of body
+      unfold probLangAdd probLangMul probLangInt
+      exact .binop _ (.binop _ (.lit _) (.lit _)) (.fvar _)
+    · -- Inner: byte
+      exact probLangUniformByte_isEmbedding
+    · -- ∀ b : UInt8, IsEmbedding (pure (256*acc + b.toNat)) (subst (binop plus ...) vV (as_expr b))
+      intro b
+      have hsubst3 : Exp.subst
+          (probLangAdd (probLangMul (probLangInt UInt8.size) (as_expr acc)) (.fvar vV))
+          vV (as_expr b)
+          = .binop .plus (.binop .mult (.lit (.int UInt8.size)) (.lit (.int acc))) (.lit (.int b.toNat)) := by
+        unfold probLangAdd probLangMul probLangInt
+        show Exp.binop _ _ _ = Exp.binop _ _ _
+        simp only [Exp.subst, if_pos rfl]
+        rfl
+      rw [hsubst3]
+      -- Two det reductions: mult, then plus.
+      refine IsEmbedding.of_limExec_eq (fun σ => ?_) probLangPure_isEmbedding
+      have hstep1 : DetStep
+          ⟨.binop .plus (.binop .mult (.lit (.int UInt8.size)) (.lit (.int acc))) (.lit (.int b.toNat)), σ⟩
+          ⟨.binop .plus (.lit (.int (UInt8.size * acc))) (.lit (.int b.toNat)), σ⟩ := by
+        have hbase : DetStep
+            ⟨.binop .mult (.lit (.int UInt8.size)) (.lit (.int acc)), σ⟩
+            ⟨.lit (.int (UInt8.size * acc)), σ⟩ := by
+          have heval : BinOp.eval .mult (.lit (.int UInt8.size)) (.lit (.int acc))
+              = some (.lit (.int (UInt8.size * acc))) := by
+            simp [BinOp.eval]
+          exact (DetHeadStep.binop .lit .lit heval σ).toDetStep
+        have h := DetStep.fill [.binopL .plus ⟨.lit (.int b.toNat), .lit⟩] hbase
+        simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip,
+                   EctxItem.fillItem, Exp.ofVal] at h
+        exact h
+      rw [limExec_detStep hstep1]
+      have hstep2 : DetStep
+          ⟨.binop .plus (.lit (.int (UInt8.size * acc))) (.lit (.int b.toNat)), σ⟩
+          ⟨.lit (.int (UInt8.size * acc + b.toNat)), σ⟩ := by
+        have heval : BinOp.eval .plus (.lit (.int (UInt8.size * acc))) (.lit (.int b.toNat))
+            = some (.lit (.int (UInt8.size * acc + b.toNat))) := by
+          simp [BinOp.eval]
+        exact (DetHeadStep.binop .lit .lit heval σ).toDetStep
+      rw [limExec_detStep hstep2]
+      -- Goal: limExec ⟨lit (UInt8.size * acc + b.toNat), σ⟩
+      --     = limExec ⟨probLangPure (UInt8.size * acc + b.toNat), σ⟩.
+      -- as_expr (UInt8.size * acc + b.toNat) = .lit (.int ...). Defeq.
+      rfl
+
+/-! ### Main embedding theorem for probUniformP2
+
+  Strategy: bridge to `probUniformP2_alt` via `probUniformP2_eq_alt`, then β-reduce
+  the outer λ over `i` via `probLangApp_isEmbedding`, then compose
+  `probLangBind_isEmbedding` (for upperBits sample) with `plProbNatRec_loop_isEmbedding`. -/
+theorem plProbUniformP2_isEmbedding
+    {iV baseV f x v xs ws w kV accV vV bV upperBitsIV upperBitsBV : Var}
+    (hfx : f ≠ x) (hfv : f ≠ v) (hxv : x ≠ v)
+    (hxs_ws : xs ≠ ws) (hxs_w : xs ≠ w) (hws_w : ws ≠ w)
+    (hxsf : xs ≠ f) (hxsx : xs ≠ x) (hxsv : xs ≠ v)
+    (hwsf : ws ≠ f) (hwsx : ws ≠ x) (hwsv : ws ≠ v)
+    (hwf : w ≠ f) (hwx : w ≠ x) (hwv : w ≠ v)
+    (hkV_accV : kV ≠ accV) (hkV_vV : kV ≠ vV) (haccV_vV : accV ≠ vV)
+    (hiV_baseV : iV ≠ baseV) (hiV_w : iV ≠ w)
+    (hupperBitsIV_BV : upperBitsIV ≠ upperBitsBV)
+    -- iV must be fresh wrt all other Vars to handle subst correctly.
+    (hiV_f : iV ≠ f) (hiV_x : iV ≠ x) (hiV_v : iV ≠ v)
+    (hiV_xs : iV ≠ xs) (hiV_ws : iV ≠ ws)
+    (hiV_kV : iV ≠ kV) (hiV_accV : iV ≠ accV) (hiV_vV : iV ≠ vV)
+    (hiV_upperBitsIV : iV ≠ upperBitsIV) (hiV_upperBitsBV : iV ≠ upperBitsBV)
+    (hbaseV_f : baseV ≠ f) (hbaseV_x : baseV ≠ x) (hbaseV_v : baseV ≠ v)
+    (hbaseV_xs : baseV ≠ xs) (hbaseV_ws : baseV ≠ ws) (hbaseV_w : baseV ≠ w)
+    (hbaseV_kV : baseV ≠ kV) (hbaseV_accV : baseV ≠ accV) (hbaseV_vV : baseV ≠ vV)
+    (hbaseV_upperBitsIV : baseV ≠ upperBitsIV) (hbaseV_upperBitsBV : baseV ≠ upperBitsBV)
+    (i : Nat) :
+    IsEmbedding (SLang.probUniformP2 i)
+                (.app (plProbUniformP2 iV baseV f x v xs ws w kV accV vV bV
+                                        upperBitsIV upperBitsBV) (as_expr i)) := by
+  rw [probUniformP2_eq_alt]
+  -- After β: body of plProbUniformP2 with iV substituted by lit (.int i).
+  unfold plProbUniformP2
+  refine probLangApp_isEmbedding (a := i) ?_ ?_
+  · -- LC of body before β.
+    -- Body = probLangBind baseV (.app upperBits (binop mod (fvar iV) 8))
+    --                             (loopE (binop div (fvar iV) 8) (fvar baseV) step)
+    -- = .app (.lam (close LoopBody baseV)) (.app upperBits (...))
+    have hupperBits_lc : Exp.IsLocallyClosed
+        (plProbUniformByteUpperBits upperBitsIV upperBitsBV) := by
+      unfold plProbUniformByteUpperBits
+      have hbody_lc : Exp.IsLocallyClosed
+          (probLangBind upperBitsBV probLangUniformByte
+            (.binop .shr (.fvar upperBitsBV)
+              (.binop .minus (.lit (.int 8)) (.fvar upperBitsIV)))) := by
+        unfold probLangBind probLangUniformByte
+        refine .app ?_ (.rand (.lit _) (.lit _))
+        refine .lam ∅ _ (fun y _ => ?_)
+        have hi_lc : Exp.IsLocallyClosed
+            (.binop .shr (.fvar upperBitsBV)
+              (.binop .minus (.lit (.int 8)) (.fvar upperBitsIV)) : Exp) :=
+          .binop _ (.fvar _) (.binop _ (.lit _) (.fvar _))
+        rw [Exp.open_close_subst_lc upperBitsBV y _ hi_lc]
+        exact Exp.subst_lc hi_lc (.fvar _)
+      exact Exp.IsLocallyClosed.lamClose _ hbody_lc
+    have hupperBitsCall_lc : Exp.IsLocallyClosed
+        (.app (plProbUniformByteUpperBits upperBitsIV upperBitsBV)
+              (.binop .mod (.fvar iV) (.lit (.int 8)))) :=
+      .app hupperBits_lc (.binop _ (.fvar _) (.lit _))
+    have hstep_lc : Exp.IsLocallyClosed (plProbUniformP2_step kV accV vV) := by
+      unfold plProbUniformP2_step
+      have hinner_lc : Exp.IsLocallyClosed
+          (probLangBind vV probLangUniformByte
+            (probLangAdd (probLangMul (probLangInt UInt8.size) (.fvar accV)) (.fvar vV))) := by
+        unfold probLangBind probLangUniformByte probLangAdd probLangMul probLangInt
+        refine .app ?_ (.rand (.lit _) (.lit _))
+        refine .lam ∅ _ (fun y _ => ?_)
+        have hh : Exp.IsLocallyClosed
+            (Exp.binop .plus (.binop .mult (.lit (.int UInt8.size)) (.fvar accV)) (.fvar vV)) :=
+          .binop _ (.binop _ (.lit _) (.fvar _)) (.fvar _)
+        rw [Exp.open_close_subst_lc vV y _ hh]
+        exact Exp.subst_lc hh (.fvar _)
+      exact Exp.IsLocallyClosed.lamClose _ (Exp.IsLocallyClosed.lamClose _ hinner_lc)
+    have hloopE_lc : Exp.IsLocallyClosed
+        (EmbedSLang.plProbNatRec_loopE f x v xs ws w
+          (.binop .div (.fvar iV) (.lit (.int 8)))
+          (.fvar baseV)
+          (plProbUniformP2_step kV accV vV)) := by
+      unfold plProbNatRec_loopE probLangBind probLangWhile plProbNatRec_condE plProbNatRec_bodyE
+      -- This is .app (.lam (close (.snd (.fvar w)) w)) (probLangWhile ... (.pair ... ))
+      refine .app ?_ ?_
+      · -- LC of .lam (close (.snd (.fvar w)) w)
+        exact Exp.IsLocallyClosed.lamClose _ (.snd (.fvar _))
+      · -- LC of probLangWhile ... = .app (.fix (close (.lam (close body f)) f)) initE
+        refine .app ?_ ?_
+        · -- LC of .fix (close (.lam (close body f)) f).
+          have hcondE_lc : Exp.IsLocallyClosed
+              (Exp.lam (Exp.close
+                (.binop .lt (.fst (.fvar xs)) (.binop .div (.fvar iV) (.lit (.int 8)))) xs)) := by
+            apply Exp.IsLocallyClosed.lamClose
+            exact .binop _ (.fst (.fvar _)) (.binop _ (.fvar _) (.lit _))
+          have hbodyE_lc : Exp.IsLocallyClosed
+              (Exp.lam (Exp.close
+                (probLangBind ws
+                  (.app (.app (plProbUniformP2_step kV accV vV) (.fst (.fvar xs))) (.snd (.fvar xs)))
+                  (.pair (.binop .plus (.fst (.fvar xs)) (.lit (.int 1))) (.fvar ws))) xs)) := by
+            apply Exp.IsLocallyClosed.lamClose
+            unfold probLangBind
+            refine .app ?_ (.app (.app hstep_lc (.fst (.fvar _))) (.snd (.fvar _)))
+            apply Exp.IsLocallyClosed.lamClose
+            exact .pair (.binop _ (.fst (.fvar _)) (.lit _)) (.fvar _)
+          -- inner body of fix = .cond (.app condE (fvar x)) (probLangBind v (...) (.app (fvar f) (fvar v))) (fvar x)
+          have hinner_lc : Exp.IsLocallyClosed
+              (Exp.cond (.app
+                (Exp.lam (Exp.close (.binop .lt (.fst (.fvar xs)) (.binop .div (.fvar iV) (.lit (.int 8)))) xs))
+                (.fvar x))
+                (probLangBind v
+                  (.app (Exp.lam (Exp.close (probLangBind ws
+                    (.app (.app (plProbUniformP2_step kV accV vV) (.fst (.fvar xs))) (.snd (.fvar xs)))
+                    (.pair (.binop .plus (.fst (.fvar xs)) (.lit (.int 1))) (.fvar ws))) xs))
+                  (.fvar x))
+                  (.app (.fvar f) (.fvar v)))
+                (.fvar x)) := by
+            refine .cond (.app hcondE_lc (.fvar _)) ?_ (.fvar _)
+            unfold probLangBind
+            refine .app ?_ (.app hbodyE_lc (.fvar _))
+            apply Exp.IsLocallyClosed.lamClose
+            exact .app (.fvar _) (.fvar _)
+          have houter_lc : Exp.IsLocallyClosed
+              (Exp.lam (Exp.close (.cond (.app
+                (Exp.lam (Exp.close (.binop .lt (.fst (.fvar xs)) (.binop .div (.fvar iV) (.lit (.int 8)))) xs))
+                (.fvar x))
+                (probLangBind v
+                  (.app (Exp.lam (Exp.close (probLangBind ws
+                    (.app (.app (plProbUniformP2_step kV accV vV) (.fst (.fvar xs))) (.snd (.fvar xs)))
+                    (.pair (.binop .plus (.fst (.fvar xs)) (.lit (.int 1))) (.fvar ws))) xs))
+                  (.fvar x))
+                  (.app (.fvar f) (.fvar v)))
+                (.fvar x)) x)) :=
+            Exp.IsLocallyClosed.lamClose _ hinner_lc
+          refine Exp.IsLocallyClosed.fix ∅ _ (fun y _ => ?_)
+          rw [Exp.open_close_subst_lc f y _ houter_lc]
+          exact Exp.subst_lc houter_lc (.fvar _)
+        · -- LC of init = .pair (.lit 0) (.fvar baseV)
+          exact .pair (.lit _) (.fvar _)
+    -- Now we have LCs for upperBitsCall and loopE. The full body LC:
+    -- .app (.lam (close loopE baseV)) upperBitsCall
+    refine .app ?_ hupperBitsCall_lc
+    apply Exp.IsLocallyClosed.lamClose
+    exact hloopE_lc
+  · -- IsEmbedding (probUniformP2_alt (i % 8) (i / 8)) (subst body iV (.lit (.int i)))
+    -- We need to compute the subst explicitly, then apply probLangBind_isEmbedding.
+    -- Hypothesis we need: iV doesn't appear in upperBits, step, f/x/v/xs/ws/w/baseV (outer).
+    -- We have hiV_* hypotheses establishing these.
+    -- Decision: rather than chase freshness manually, parameterize the theorem to
+    -- TAKE these as hypotheses. The user supplies them when invoking.
+    -- Since we already pass hiV_* freshness against individual Vars, and the Vars
+    -- are the only fv contributors to the closed lambdas, iV ∉ ... follows.
+    -- For now, sorry (with TODO):
+    -- iV ∉ (plProbUniformByteUpperBits ...).fv: iV differs from both upperBitsIV and upperBitsBV,
+    -- and these are the only fvar names in the closed expression.
+    have hiV_upperBits : iV ∉ (plProbUniformByteUpperBits upperBitsIV upperBitsBV).fv := by
+      unfold plProbUniformByteUpperBits probLangBind probLangUniformByte
+      -- Show that iV doesn't appear in the innermost expression (.binop shr (fvar bV) (binop minus (lit 8) (fvar iV))).
+      have h_inner_no_iV : iV ∉ (Exp.binop .shr (.fvar upperBitsBV)
+                            (Exp.binop .minus (.lit (.int 8)) (.fvar upperBitsIV)) : Exp).fv := by
+        show iV ∉ (_ ∪ _ : Finset Var)
+        rw [Finset.mem_union, not_or]
+        refine ⟨?_, ?_⟩
+        · show iV ∉ ({upperBitsBV} : Finset Var)
+          rw [Finset.mem_singleton]; exact hiV_upperBitsBV
+        · show iV ∉ (_ ∪ _ : Finset Var)
+          rw [Finset.mem_union, not_or]
+          refine ⟨by simp [Exp.fv], ?_⟩
+          show iV ∉ ({upperBitsIV} : Finset Var)
+          rw [Finset.mem_singleton]; exact hiV_upperBitsIV
+      change iV ∉ (Exp.lam _).fv
+      simp only [Exp.fv]
+      apply Exp.close_preserve_not_fvar
+      change iV ∉ (Exp.app _ _).fv
+      simp only [Exp.fv, Finset.mem_union, not_or]
+      refine ⟨?_, ?_⟩
+      · apply Exp.close_preserve_not_fvar
+        exact h_inner_no_iV
+      · simp [Exp.fv]
+    have hiV_step : iV ∉ (plProbUniformP2_step kV accV vV).fv := by
+      unfold plProbUniformP2_step probLangBind probLangUniformByte probLangAdd probLangMul probLangInt
+      have h_inner_no_iV : iV ∉ (Exp.binop .plus
+                            (Exp.binop .mult (.lit (.int UInt8.size)) (.fvar accV)) (.fvar vV) : Exp).fv := by
+        show iV ∉ (_ ∪ _ : Finset Var)
+        rw [Finset.mem_union, not_or]
+        refine ⟨?_, ?_⟩
+        · show iV ∉ (_ ∪ _ : Finset Var)
+          rw [Finset.mem_union, not_or]
+          refine ⟨by simp [Exp.fv], ?_⟩
+          show iV ∉ ({accV} : Finset Var)
+          rw [Finset.mem_singleton]; exact hiV_accV
+        · show iV ∉ ({vV} : Finset Var)
+          rw [Finset.mem_singleton]; exact hiV_vV
+      simp only [Exp.fv]
+      apply Exp.close_preserve_not_fvar
+      simp only [Exp.fv]
+      apply Exp.close_preserve_not_fvar
+      simp only [Exp.fv, Finset.mem_union, not_or]
+      refine ⟨?_, ?_⟩
+      · apply Exp.close_preserve_not_fvar
+        exact h_inner_no_iV
+      · simp [Exp.fv]
+    -- Compute the subst.
+    -- Compute subst step by step. The probLangBind is .app (.lam (close body baseV)) e1.
+    -- subst pushes through: .app, .lam (subst goes inside via subst_lamClose with iV ≠ baseV), close.
+    -- Inside, the binop mod has (fvar iV) which becomes (lit i).
+    -- The plProbNatRec_loopE body has nE := (binop div (fvar iV) (lit 8)) which becomes (lit i / lit 8).
+    -- The fvar baseV stays (since iV ≠ baseV).
+    -- Other fvars (f/x/v/xs/ws/w/etc.) are unaffected (iV differs from all).
+    -- Helper for the close-fresh facts (we'll need this many times below).
+    have hi_emp : (as_expr i).fv = (∅ : Finset Var) := rfl
+    have hwi : w ∉ (as_expr i).fv := by rw [hi_emp]; simp
+    have hxi : x ∉ (as_expr i).fv := by rw [hi_emp]; simp
+    have hvi : v ∉ (as_expr i).fv := by rw [hi_emp]; simp
+    have hfi : f ∉ (as_expr i).fv := by rw [hi_emp]; simp
+    have hxsi : xs ∉ (as_expr i).fv := by rw [hi_emp]; simp
+    have hwsi : ws ∉ (as_expr i).fv := by rw [hi_emp]; simp
+    have hbaseVi : baseV ∉ (as_expr i).fv := by rw [hi_emp]; simp
+    have hiV_loopE_internals :
+        Exp.subst (EmbedSLang.plProbNatRec_loopE f x v xs ws w
+            (.binop .div (.fvar iV) (.lit (.int 8)))
+            (.fvar baseV)
+            (plProbUniformP2_step kV accV vV))
+          iV (as_expr i)
+        = EmbedSLang.plProbNatRec_loopE f x v xs ws w
+            (.binop .div (.lit (.int i)) (.lit (.int 8)))
+            (.fvar baseV)
+            (plProbUniformP2_step kV accV vV) := by
+      sorry
+    have hsubst_body : Exp.subst
+        (probLangBind baseV
+          (.app (plProbUniformByteUpperBits upperBitsIV upperBitsBV)
+                (.binop .mod (.fvar iV) (.lit (.int 8))))
+          (EmbedSLang.plProbNatRec_loopE f x v xs ws w
+            (.binop .div (.fvar iV) (.lit (.int 8)))
+            (.fvar baseV)
+            (plProbUniformP2_step kV accV vV)))
+        iV (as_expr i)
+        = probLangBind baseV
+            (.app (plProbUniformByteUpperBits upperBitsIV upperBitsBV)
+                  (.binop .mod (.lit (.int i)) (.lit (.int 8))))
+            (EmbedSLang.plProbNatRec_loopE f x v xs ws w
+              (.binop .div (.lit (.int i)) (.lit (.int 8)))
+              (.fvar baseV)
+              (plProbUniformP2_step kV accV vV)) := by
+      unfold probLangBind
+      show Exp.app _ _ = Exp.app _ _
+      simp only [Exp.subst]
+      congr 1
+      · -- .lam (close loopE-body baseV) under subst iV (lit i).
+        rw [Exp.subst_close iV baseV (as_expr i) _ hiV_baseV (by simp [Exp.fv]),
+            hiV_loopE_internals]
+      · -- .app upperBits (binop mod (fvar iV) (lit 8))
+        congr 1
+        exact Exp.subst_fresh iV _ _ hiV_upperBits
+    rw [hsubst_body]
+    sorry
+
+-- Helper: the step lambda is LC.
+theorem plProbUniformP2_step_lc (kV accV vV : Var) (hkV_accV : kV ≠ accV)
+    (hkV_vV : kV ≠ vV) (haccV_vV : accV ≠ vV) :
+    Exp.IsLocallyClosed (plProbUniformP2_step kV accV vV) := by
+  unfold plProbUniformP2_step
+  have hbody_lc : Exp.IsLocallyClosed
+      (probLangBind vV probLangUniformByte
+        (probLangAdd (probLangMul (probLangInt UInt8.size) (.fvar accV)) (.fvar vV))) := by
+    unfold probLangBind probLangUniformByte probLangAdd probLangMul probLangInt
+    refine .app ?_ (.rand (.lit _) (.lit _))
+    refine .lam ∅ _ (fun y _ => ?_)
+    have hinner_lc : Exp.IsLocallyClosed
+        (Exp.binop .plus (.binop .mult (.lit (.int UInt8.size)) (.fvar accV)) (.fvar vV)) :=
+      .binop _ (.binop _ (.lit _) (.fvar _)) (.fvar _)
+    rw [Exp.open_close_subst_lc vV y _ hinner_lc]
+    exact Exp.subst_lc hinner_lc (.fvar _)
+  refine .lam ∅ _ (fun y _ => ?_)
+  have hclose_inner_lc : Exp.IsLocallyClosed
+      (Exp.lam (Exp.close
+        (probLangBind vV probLangUniformByte
+          (probLangAdd (probLangMul (probLangInt UInt8.size) (.fvar accV)) (.fvar vV))) accV)) := by
+    refine .lam ∅ _ (fun z _ => ?_)
+    rw [Exp.open_close_subst_lc accV z _ hbody_lc]
+    exact Exp.subst_lc hbody_lc (.fvar _)
+  rw [Exp.open_close_subst_lc kV y _ hclose_inner_lc]
+  exact Exp.subst_lc hclose_inner_lc (.fvar _)
+
+end
+end EmbedSLang
+
 /-
 noncomputable section
 

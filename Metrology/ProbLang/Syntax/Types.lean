@@ -222,11 +222,13 @@ theorem unboxed_type_ref_or_eqtype {τ : Ty} (h : UnboxedType τ) :
 
 def BinOp.intResTy : BinOp → Option Ty
   | .plus | .minus | .mult | .div | .mod  => some .int
+  | .shl  | .shr                          => some .int
   | .and  | .or    | .xor                 => none
   | .eq   | .lt    | .le                  => some .bool
 
 def BinOp.boolResTy : BinOp → Option Ty
   | .plus | .minus | .mult | .div | .mod  => none
+  | .shl  | .shr                          => none
   | .and  | .or    | .xor                 => some .bool
   | .eq                                   => some .bool
   | .lt   | .le                           => none

@@ -1336,6 +1336,22 @@ theorem bin_log_related_int_binop (Δ : TyEnv GF) (Γ : RelCtx GF)
     iexists (decide (n1 ≤ n2))
     ipure_intro
     exact ⟨rfl, rfl⟩
+  case shl =>
+    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
+    iapply (refines_binop_pure .shl _ _ _ IsVal.lit IsVal.lit IsVal.lit
+      (heval := rfl) (A := lrel_int))
+    unfold lrel_int
+    iexists (n1 * 2 ^ n2.toNat)
+    ipure_intro
+    exact ⟨rfl, rfl⟩
+  case shr =>
+    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
+    iapply (refines_binop_pure .shr _ _ _ IsVal.lit IsVal.lit IsVal.lit
+      (heval := rfl) (A := lrel_int))
+    unfold lrel_int
+    iexists (n1 / 2 ^ n2.toNat)
+    ipure_intro
+    exact ⟨rfl, rfl⟩
 
 theorem bin_log_related_bool_binop (Δ : TyEnv GF) (Γ : RelCtx GF)
     (op : BinOp) {e1 e2 e1' e2' : Exp} {τ : Ty}
@@ -1395,6 +1411,8 @@ theorem bin_log_related_bool_binop (Δ : TyEnv GF) (Γ : RelCtx GF)
   case mod   => simp [BinOp.boolResTy] at Hres
   case lt => simp [BinOp.boolResTy] at Hres
   case le => simp [BinOp.boolResTy] at Hres
+  case shl => simp [BinOp.boolResTy] at Hres
+  case shr => simp [BinOp.boolResTy] at Hres
   case and =>
     simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
     iapply (refines_binop_pure .and _ _ _ IsVal.lit IsVal.lit IsVal.lit
