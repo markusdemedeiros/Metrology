@@ -14,18 +14,13 @@ namespace ProbLang
 /-- `OpenInv e`: `e` can be evaluated inside a `|={E1, E2}=>` mask-shift, with
 the mask closed back in the post. -/
 def OpenInv (e : Exp) : Prop :=
-  ∀ {GF : BundledGFunctors} [ApproxisWpGS GF]
-    {E1 E2 : CoPset} {Φ : Val → IProp GF},
-    iprop((|={E1, E2}=> wp E2 e (fun v => iprop(|={E2, E1}=> Φ v)))) ⊢@{IProp GF}
-      wp E1 e Φ
+  ∀ {GF : BundledGFunctors} [ApproxisWpGS GF] {E1 E2 : CoPset} {Φ : Val → IProp GF}, iprop%
+    (|={E1, E2}=> wp E2 e (fun v => iprop% |={E2, E1}=> Φ v)) ⊢ wp E1 e Φ
 
 namespace OpenInv
 
-theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS GF]
-    {E1 E2 E3 : CoPset} {P Q : IProp GF}
-    (h : P ⊢@{IProp GF} iprop(|={E2, E3}=> Q)) :
-    iprop(|={E1, E2}=> P) ⊢@{IProp GF} iprop(|={E1, E3}=> Q) :=
-  Iris.fupd_elim h
+theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS GF] {E1 E2 E3 : CoPset} {P Q : IProp GF}
+    (h : P ⊢ |={E2, E3}=> Q) : iprop(|={E1, E2}=> P) ⊢ |={E1, E3}=> Q := fupd_elim h
 
 theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS GF]
     {E1 E2 E3 : CoPset} {P R Q : IProp GF}
@@ -38,27 +33,17 @@ theorem specCoupl_atomic_bridge_some {hlc : Bool} {GF : BundledGFunctors}
     {E1 E2 : CoPset}
     {σ₁ : State} {e₁' : Exp} {σ₁' : State} {ε₁ : ENNReal}
     {Φ : Val → IProp GF} {v : Val} :
-    specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
-        iprop(|={∅, E2}=>
-            stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗ errInterp ε₂ ∗
-              (|={E2, E1}=> Φ v)))
-      ⊢@{IProp GF}
-    specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
-        iprop(|={∅, E1}=>
-            stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗ errInterp ε₂ ∗ Φ v)) := by
+    iprop% specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
+        |={∅, E2}=> stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗ errInterp ε₂ ∗ (|={E2, E1}=> Φ v))
+      ⊢ specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
+        |={∅, E1}=> stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗ errInterp ε₂ ∗ Φ v) := by
   iintro HSC
   iapply specCoupl_mono_spatial
-  isplitr [HSC]
-  swap
-  · iexact HSC
+  iframe
   iintro %σ₂ %ρ' %ε₂ HBody
   imod HBody with ⟨Hσ, Hs, Hε, HΦc⟩
   imod HΦc with HΦ
-  imodintro
-  isplitl [Hσ]; · iassumption
-  isplitl [Hs]; · iassumption
-  isplitl [Hε]; · iassumption
-  iassumption
+  iframe
 
 theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
     [ApproxisWpGS GF]
@@ -67,11 +52,11 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
     {Φ : Val → IProp GF} :
     specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
         progCoupl e σ₂ ρ'.expr ρ'.state ε₂
-          (fun e₃ σ₃ e₃' σ₃' ε₃ =>
-            iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
-              iprop(|={∅, E2}=>
+          (fun e₃ σ₃ e₃' σ₃' ε₃ => iprop%
+            ▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ => iprop%
+              |={∅, E2}=>
                 stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
-                  wp E2 e₃ (fun v => iprop(|={E2, E1}=> Φ v)))))))
+                  wp E2 e₃ (fun v => iprop(|={E2, E1}=> Φ v)))))
       ⊢@{IProp GF}
     specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
         progCoupl e σ₂ ρ'.expr ρ'.state ε₂
@@ -80,11 +65,9 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
               iprop(|={∅, E1}=>
                 stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
                   wp E1 e₃ Φ))))) := by
-  iintro HSC
+  iintro _
   iapply specCoupl_mono_spatial
-  isplitr [HSC]
-  swap
-  · iexact HSC
+  iframe
   iintro %σ₂ %ρ' %ε₂ HBody
   iapply (progCoupl_mono (e₁ := e) (σ₁ := σ₂) (e₁' := ρ'.expr) (σ₁' := ρ'.state)
     (ε := ε₂)
@@ -166,9 +149,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
         imod HInnerBody with ⟨Hσ5, Hs5, Hε5, HΦc⟩
         imod HΦc with HΦv
         imodintro
-        isplitl [Hσ5]; · iassumption
-        isplitl [Hs5]; · iassumption
-        isplitl [Hε5]; · iassumption
+        iframe
         iapply wp_value_of_toVal htv
         iexact HΦv
     irevert HBody4
