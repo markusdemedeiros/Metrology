@@ -17,9 +17,8 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 namespace ProbLang
 
 theorem least_fixpoint_ne_outer {PROP : Type _} [BI PROP] {A : Type _} [OFE A]
-    {F1 F2 : (A → PROP) → (A → PROP)} {n : Nat}
-    (HF : ∀ Φ x, F1 Φ x ≡{n}≡ F2 Φ x) {x1 x2 : A} (Hx : x1 ≡{n}≡ x2) :
-    bi_least_fixpoint F1 x1 ≡{n}≡ bi_least_fixpoint F2 x2 := by
+    {F1 F2 : (A → PROP) → (A → PROP)} {n : Nat} (HF : ∀ Φ x, F1 Φ x ≡{n}≡ F2 Φ x)
+    {x1 x2 : A} (Hx : x1 ≡{n}≡ x2) : bi_least_fixpoint F1 x1 ≡{n}≡ bi_least_fixpoint F2 x2 := by
   refine forall_ne fun Φ => ?_
   refine wand_ne.ne ?_ (NonExpansive.ne Hx)
   refine intuitionistically_ne.ne ?_
@@ -34,9 +33,7 @@ error-credit interpretation. -/
 class ApproxisWpGS (GF : BundledGFunctors) extends SpecUpdateGS GF where
   hlc : Bool
   invGS : InvGS_gen hlc GF
-  /-- State interpretation: the program's local state. -/
   stateInterp : State → IProp GF
-  /-- Error-credit interpretation: the available error budget. -/
   errInterp : ENNReal → IProp GF
 
 attribute [reducible, instance] ApproxisWpGS.invGS
@@ -44,7 +41,7 @@ attribute [reducible, instance] ApproxisWpGS.invGS
 namespace ApproxisWpGS
 variable {GF : BundledGFunctors} [ApproxisWpGS GF]
 
-/-! ## `spec_coupl` modality
+/-! `spec_coupl` modality
 
 Lets us optionally prepend spec-side execution steps and erasable
 distributions on both sides before establishing the body `Z`. -/
@@ -76,8 +73,7 @@ abbrev specCouplCouple (E : CoPset)
   iprop(∃ (S : State → Cfg → Prop) (n : Nat)
           (μ₁ : MeasureTheory.Measure State) (μ₁' : MeasureTheory.Measure State)
           (ε₁ : ENNReal) (X₂ : Cfg → ENNReal) (r : ENNReal),
-    (⌜AddCoupl ε₁ {p : State × Cfg | S p.1 p.2}
-        μ₁ (μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))⌝) ∗
+    (⌜AddCoupl ε₁ {p : State × Cfg | S p.1 p.2} μ₁ (μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))⌝) ∗
     (⌜∀ ρ, X₂ ρ ≤ r⌝) ∗
     (⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))) ≤ ε⌝) ∗
     (⌜Erasable μ₁ σ₁⌝) ∗
@@ -92,23 +88,19 @@ proofs rely on `iexact` seeing through to the body when the `Φ` argument
 varies. Demoting this to `def` will break those proofs with
 `iexact: cannot unify specCouplPre E Z Φ s and specCouplPre E Z Ψ s`. -/
 abbrev specCouplPre (E : CoPset) (Z : State → Cfg → ENNReal → IProp GF)
-    (Φ : SpecCouplState → IProp GF) :
-    SpecCouplState → IProp GF :=
-  fun (s : SpecCouplState) =>
-    let σ₁ := s.1
-    let e₁' := s.2.1.expr
-    let σ₁' := s.2.1.state
-    let ε := s.2.2
-    iprop(⌜1 ≤ ε⌝ ∨ Z σ₁ s.2.1 ε ∨ specCouplCouple E σ₁ e₁' σ₁' ε Φ)
+    (Φ : SpecCouplState → IProp GF) : SpecCouplState → IProp GF :=
+  fun ⟨σ₁, ⟨e₁', σ₁'⟩, ε⟩ => iprop%
+    ⌜1 ≤ ε⌝ ∨
+    Z σ₁ ⟨e₁', σ₁'⟩ ε ∨
+    specCouplCouple E σ₁ e₁' σ₁' ε Φ
 
-/-- `spec_coupl` as the least fixpoint of `specCouplPre`.
-
-Marked `abbrev` (not `def`) for the same reason as `specCouplPre`: enables
-`iexact`/`ispecialize` to see through to the underlying `bi_least_fixpoint`. -/
 abbrev specCoupl (E : CoPset) (σ : State) (e' : Exp) (σ' : State) (ε : ENNReal)
     (Z : State → Cfg → ENNReal → IProp GF) : IProp GF :=
   bi_least_fixpoint (specCouplPre (GF := GF) E Z)
     ((σ, (⟨e', σ'⟩ : Cfg), ε) : SpecCouplState)
+
+macro "spec_trivial_left" : tactic => `(tactic| (isplitr; · ipure_intro; trivial))
+macro "spec_trivial_cases" : tactic => `(tactic| repeat spec_trivial_left)
 
 /-- `specCouplPre` is monotone in its `Φ` argument.
 
@@ -117,26 +109,17 @@ monotonicity is trivial. (Once the third coupling-disjunct is restored, the
 quantifier-under-fupd case will appeal to `Hwand`.) -/
 instance specCouplPre_mono {E : CoPset} {Z : State → Cfg → ENNReal → IProp GF} :
     BIMonoPred (specCouplPre (GF := GF) E Z) where
-  mono_pred := by
-    intro Φ Ψ _ _
+  mono_pred {Φ Ψ _ _} := by
     iintro #Hwand %s Hs
-    -- Three cases: vacuous, Z, or coupling. The first two pass through directly;
-    -- the third re-wraps the continuation by chaining `Hwand` under the fupd.
     icases Hs with ⟨HVac | HZ | HCpl⟩
     · ileft; iexact HVac
     · iright; ileft; iexact HZ
     · iright; iright
-      icases HCpl with ⟨%S, %n, %μ₁, %μ₁', %ε₁, %X₂, %r,
-        %HCpl_coupl, %HCpl_bnd, %HCpl_exp, %HCpl_e1, %HCpl_e2, HCpl_cont⟩
+      icases HCpl with ⟨%S, %n, %μ₁, %μ₁', %ε₁, %X₂, %r, %Hc, %Hb, %Hexp, %Herase₁, %Herase₂, Hcont⟩
       iexists S, n, μ₁, μ₁', ε₁, X₂, r
-      isplitr; · ipure_intro; exact HCpl_coupl
-      isplitr; · ipure_intro; exact HCpl_bnd
-      isplitr; · ipure_intro; exact HCpl_exp
-      isplitr; · ipure_intro; exact HCpl_e1
-      isplitr; · ipure_intro; exact HCpl_e2
+      spec_trivial_cases
       iintro %σ₂ %e₂' %σ₂' %HS
-      ihave HΦ := HCpl_cont $$ %σ₂ %e₂' %σ₂' %HS
-      imod HΦ
+      imod Hcont $$ %σ₂ %e₂' %σ₂' %HS with HΦ
       imodintro
       iapply Hwand
       iexact HΦ
@@ -145,12 +128,9 @@ instance specCouplPre_mono {E : CoPset} {Z : State → Cfg → ENNReal → IProp
     subst this; exact .of_eq rfl
 
 /-- Trivial introduction: if `1 ≤ ε`, the coupling holds vacuously. -/
-theorem specCoupl_err_ge_1 {E : CoPset} {σ : State} {e' : Exp} {σ' : State}
-    {ε : ENNReal} {Z : State → Cfg → ENNReal → IProp GF} (hε : 1 ≤ ε) :
-    ⊢@{IProp GF} specCoupl E σ e' σ' ε Z := by
-  unfold specCoupl
-  iapply (least_fixpoint_unfold_2 (specCouplPre E Z))
-  unfold specCouplPre
+theorem specCoupl_err_ge_1 {E : CoPset} {σ : State} {e' : Exp} {σ' : State} {ε : ENNReal}
+    {Z : State → Cfg → ENNReal → IProp GF} (hε : 1 ≤ ε) : ⊢ specCoupl E σ e' σ' ε Z := by
+  iapply least_fixpoint_unfold_2 (specCouplPre E Z)
   ileft
   ipure_intro
   exact hε
@@ -160,9 +140,7 @@ theorem specCoupl_ret {E : CoPset} {σ : State} {e' : Exp} {σ' : State}
     {ε : ENNReal} {Z : State → Cfg → ENNReal → IProp GF} :
     Z σ ⟨e', σ'⟩ ε ⊢@{IProp GF} specCoupl E σ e' σ' ε Z := by
   iintro HZ
-  unfold specCoupl
-  iapply (least_fixpoint_unfold_2 (specCouplPre E Z))
-  unfold specCouplPre
+  iapply least_fixpoint_unfold_2 (specCouplPre E Z)
   iright
   ileft
   iexact HZ
@@ -219,11 +197,7 @@ theorem specCoupl_mono {E : CoPset} {σ : State} {e' : Exp} {σ' : State}
     icases HCpl with ⟨%S, %n, %μ₁, %μ₁', %ε₁, %X₂, %r,
       %HCpl_coupl, %HCpl_bnd, %HCpl_exp, %HCpl_e1, %HCpl_e2, HCpl_cont⟩
     iexists S, n, μ₁, μ₁', ε₁, X₂, r
-    isplitr; · ipure_intro; exact HCpl_coupl
-    isplitr; · ipure_intro; exact HCpl_bnd
-    isplitr; · ipure_intro; exact HCpl_exp
-    isplitr; · ipure_intro; exact HCpl_e1
-    isplitr; · ipure_intro; exact HCpl_e2
+    spec_trivial_cases
     iexact HCpl_cont
 
 /-- Bind for `specCoupl` (spatial-continuation form): chain a `spec_coupl` with a
@@ -272,11 +246,7 @@ theorem specCoupl_bind {E1 E2 : CoPset} {σ : State} {e' : Exp} {σ' : State}
     icases HCpl with ⟨%S, %n, %μ₁, %μ₁', %ε₁, %X₂, %r,
       %HCpl_coupl, %HCpl_bnd, %HCpl_exp, %HCpl_e1, %HCpl_e2, HCpl_cont⟩
     iexists S, n, μ₁, μ₁', ε₁, X₂, r
-    isplitr; · ipure_intro; exact HCpl_coupl
-    isplitr; · ipure_intro; exact HCpl_bnd
-    isplitr; · ipure_intro; exact HCpl_exp
-    isplitr; · ipure_intro; exact HCpl_e1
-    isplitr; · ipure_intro; exact HCpl_e2
+    spec_trivial_cases
     iintro %σ₂ %e₂' %σ₂' %HS
     -- The recursive body produces `HZ -∗ specCoupl E2 ...` after applying
     -- HCpl_cont; we feed HZ to close. Mask plumbing: E2 → E1 → close.
@@ -371,10 +341,7 @@ theorem progCoupl_mono {e₁ : Exp} {σ₁ : State} {e₁' : Exp} {σ₁' : Stat
   iintro ⟨HZ, HCpl⟩
   icases HCpl with ⟨%n, %μ₁', %X₂, %Hred, %Hbnd, %Hexp, %Heras, HCont⟩
   iexists n, μ₁', X₂
-  isplitr; · ipure_intro; exact Hred
-  isplitr; · ipure_intro; exact Hbnd
-  isplitr; · ipure_intro; exact Hexp
-  isplitr; · ipure_intro; exact Heras
+  spec_trivial_cases
   iintro %e₂ %σ₂ %e₂' %σ₂'
   ihave HZ' := HCont $$ %e₂ %σ₂ %e₂' %σ₂'
   imod HZ'
@@ -421,8 +388,6 @@ unfold for `specCoupl`, the `match` on `e₁.toVal?`, the `progCoupl` body, and
 the inner `▷ specCoupl` where the `▷` justifies the contractive step. -/
 instance wpPre_contractive : Contractive (wpPre (GF := GF)) where
   distLater_dist := by
-    -- Structural walk of `wpPre`'s body. The recursive `wp` parameter only appears
-    -- under a `▷` modality; everything outside is non-expansive in `wp`.
     intro n wp wp' Hwp E e₁ Φ
     refine forall_ne fun σ₁ => ?_
     refine forall_ne fun e₁' => ?_
@@ -433,15 +398,10 @@ instance wpPre_contractive : Contractive (wpPre (GF := GF)) where
     refine least_fixpoint_ne_outer (fun Ψ s => ?_) (.of_eq rfl)
     refine or_ne.ne (.of_eq rfl) ?_
     refine or_ne.ne ?_ (.of_eq rfl)
-    -- Middle disjunct: branches on `e₁.toVal?`. The `some` branch is
-    -- wp-independent; the `none` branch wraps the recursive `wp` inside `▷`.
     cases htv : e₁.toVal? with
     | some v => exact .of_eq rfl
     | none =>
       refine progCoupl_ne fun e₃ σ₃ e₃' σ₃' ε₃ => ?_
-      -- Inner body: `▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ => ... wp ...)`.
-      -- Use `Contractive.distLater_dist` for `▷` (via `BILaterContractive`) to
-      -- strip the later: `distLater n (▷ P) (▷ Q) → dist n (▷ P) (▷ Q)`.
       apply Contractive.distLater_dist (f := later)
       intro m Hm
       refine specCoupl_ne fun σ₄ ρ'' ε₄ => ?_
@@ -449,8 +409,6 @@ instance wpPre_contractive : Contractive (wpPre (GF := GF)) where
       refine sep_ne.ne (.of_eq rfl) ?_
       refine sep_ne.ne (.of_eq rfl) ?_
       refine sep_ne.ne (.of_eq rfl) ?_
-      -- Goal: `wp E e₃ Φ ≡{m}≡ wp' E e₃ Φ`. From `Hwp : distLater n wp wp'`
-      -- and `Hm : m < n`, get `wp ≡{m}≡ wp'` via `DistLater.dist_lt`.
       exact DistLater.dist_lt (Hwp · · E e₃ Φ) Hm
 
 /-- The Approxis weakest precondition. -/
@@ -473,12 +431,7 @@ theorem wp_value_fupd {E : CoPset} {v : Val} {Φ : Val → IProp GF} :
   iapply wp_unfold
   unfold wpPre
   iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
-  -- Goal: |={E, ∅}=> specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
-  --   match (Exp.ofVal v).toVal? with | some v => ... | none => ...).
-  -- First reduce the match using (Exp.ofVal v).toVal? = some v.
   rw [Exp.toVal?_ofVal]
-  -- Now the body is |={∅, E}=> stateInterp σ₂ ∗ specInterp ρ' ∗ errInterp ε₂ ∗ Φ v.
-  -- Move the outer mask: fupd_mask_intro_discard E ⊆ E (always).
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
@@ -526,8 +479,6 @@ theorem wp_strong_mono' {E1 E2 : CoPset} {e : Exp} {Φ Ψ : Val → IProp GF}
     (HE : E1 ⊆ E2) :
     iprop(wp E1 e Φ ∗ wpStrongMonoCont E2 Φ Ψ) ⊢@{IProp GF} wp E2 e Ψ := by
   iintro ⟨HW, HΦ⟩
-  -- Löb-form: prove the universally-quantified statement once via `loeb_wand`,
-  -- then specialize.
   have Hloeb : ⊢@{IProp GF} wpStrongMonoStmt := by
     iapply loeb_wand
     iintro !>
@@ -553,42 +504,28 @@ theorem wp_strong_mono' {E1 E2 : CoPset} {e : Exp} {Φ Ψ : Val → IProp GF}
       imod HZ₁ with ⟨Hσ', Hs', Hε', HΦv⟩
       imod Hclose
       iapply HΦ' $$ [Hσ' Hs' Hε' HΦv]
-      isplitl [Hσ']; · iassumption
-      isplitl [Hs']; · iassumption
-      isplitl [Hε'] <;> iassumption
+      iframe
     | none =>
       iapply specCoupl_ret
-      -- Goal: progCoupl e' σ₂ ρ₂.expr ρ₂.state ε₂ (fun e₃ σ₃ e₃' σ₃' ε₃ =>
-      --   ▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ₄ ε₄ => |={∅,E2'}=> ... ∗ wp E2' e₃ Ψ'))
       iapply progCoupl_mono
       isplitr [HZ₁]
       swap
       · iexact HZ₁
       iintro %e₃ %σ₃ %e₃' %σ₃' %ε₃ HCont
-      -- HCont : ▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ₄ ε₄ => |={∅,E1'}=> ... ∗ wp E1' e₃ Φ')
-      -- Goal:   ▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ₄ ε₄ => |={∅,E2'}=> ... ∗ wp E2' e₃ Ψ')
       iintro !>
-      -- After ▷-strip, IH (which was ▷-bound by loeb_wand) is now usable.
       iapply specCoupl_mono_spatial
       isplitr [HCont]
       swap
       · iexact HCont
       iintro %σ₄ %ρ₄ %ε₄ HInner
-      -- HInner : |={∅,E1'}=> stateInterp σ₄ ∗ specInterp ρ₄ ∗ errInterp ε₄ ∗ wp E1' e₃ Φ'
-      -- Goal:   |={∅,E2'}=> stateInterp σ₄ ∗ specInterp ρ₄ ∗ errInterp ε₄ ∗ wp E2' e₃ Ψ'
       imod HInner with ⟨Hσ', Hs', Hε', HwpInner⟩
       imod Hclose
       imodintro
-      isplitl [Hσ']; · iassumption
-      isplitl [Hs']; · iassumption
-      isplitl [Hε']; · iassumption
-      -- Apply IH: wp E1' e₃ Φ' -∗ wp E2' e₃ Ψ'.
+      iframe
       iapply IH $$ %E1' %E2' %e₃ %Φ' %Ψ' %HE' HwpInner
       iexact HΦ'
-  -- Specialize to the actual parameters.
   iapply Hloeb $$ %E1 %E2 %e %Φ %Ψ %HE HW HΦ
 
-/-- Apply an intuitionistic wand to the postcondition of a `wp`. -/
 theorem wp_wand {E : CoPset} {e : Exp} {Φ Ψ : Val → IProp GF} :
     iprop(wp E e Φ ∗ □ (∀ v, Φ v -∗ Ψ v)) ⊢@{IProp GF} wp E e Ψ := by
   iintro ⟨HW, #HΦ⟩
@@ -596,16 +533,8 @@ theorem wp_wand {E : CoPset} {e : Exp} {Φ Ψ : Val → IProp GF} :
   isplitl [HW]; · iassumption
   iintro !> %σ %ρ %v %ε ⟨Hσ, Hs, Hε, HΦv⟩
   imodintro
-  isplitl [Hσ]; · iassumption
-  isplitl [Hs]; · iassumption
-  isplitl [Hε]; · iassumption
-  iapply HΦ $$ HΦv
-
--- TODO: `wp_frame_l/r` need a different formulation since `wp_wand` requires
--- a persistent (intuitionistic) wand and framing a spatial `R` doesn't fit
--- that mold. The full Rocq lemma uses `wp_strong_mono` directly with a
--- spatial-friendly continuation. Deferred until we have a spatial `wp_wand`
--- variant or rework these via `wp_strong_mono` directly.
+  iframe
+  iapply HΦ $$ [$]
 
 /-- Inside fancy-update absorption: if the post is `|={E}=> Φ v`, we can collapse it. -/
 theorem wp_fupd {E : CoPset} {e : Exp} {Φ : Val → IProp GF} :
@@ -615,11 +544,7 @@ theorem wp_fupd {E : CoPset} {e : Exp} {Φ : Val → IProp GF} :
   isplitl [HW]; · iassumption
   iintro !> %σ %ρ %v %ε ⟨Hσ, Hs, Hε, HΦ⟩
   imod HΦ
-  imodintro
-  isplitl [Hσ]; · iassumption
-  isplitl [Hs]; · iassumption
-  isplitl [Hε]; · iassumption
-  iassumption
+  iframe
 
 /-- Fancy-update absorbs into `wp` from outside. -/
 theorem fupd_wp {E : CoPset} {e : Exp} {Φ : Val → IProp GF} :
@@ -667,9 +592,7 @@ theorem wp_mask_mono {E1 E2 : CoPset} {e : Exp} {Φ : Val → IProp GF}
   isplitl [HW]; · iassumption
   iintro !> %σ %ρ %v %ε ⟨Hσ, Hs, Hε, HΦ⟩
   imodintro
-  isplitl [Hσ]; · iassumption
-  isplitl [Hs]; · iassumption
-  isplitl [Hε] <;> iassumption
+  iframe
 
 /-- Post-wand — spatial variant with frame, derived from `wp_wand`. -/
 theorem wp_wand_l {E : CoPset} {e : Exp} {Φ Ψ : Val → IProp GF} :
@@ -742,20 +665,6 @@ theorem fupd_specCoupl {E : CoPset} {σ : State} {e' : Exp} {σ' : State}
     iprop(|={E}=> specCoupl E σ e' σ' ε Z) ⊢@{IProp GF}
       specCoupl E σ e' σ' ε Z :=
   fupd_specCoupl_of_le (_root_.le_refl _)
-
-/-! ### `specCoupl` — coupling-intro lemmas
-
-General-purpose "construct a `specCoupl` from a raw `AddCoupl`-coupling"
-lemmas, used by program-logic proofs when discharging concrete primitive
-steps.
-
-* `specCoupl_erasables_exp` — full form with expectation bound.
-* `specCoupl_erasables` — specialization with constant cost.
-* `specCoupl_erasable_steps` — erasable LHS, `pexecN n` on RHS.
-* `specCoupl_steps` — pure `pexecN` on both sides (LHS is dirac σ).
-* `specCoupl_steps_det` — deterministic specialization.
-
-All `specCoupl` coupling-intro lemmas are now ported. -/
 
 /-- Induction principle for `specCoupl`. Mirrors Rocq's `spec_coupl_ind`.
 
@@ -1978,12 +1887,9 @@ theorem wp_frame_l {E : CoPset} {e : Exp} {R : IProp GF} {Φ : Val → IProp GF}
     | some v =>
       -- HBody : (match e'.toVal? = some v → |={∅, E'}=> ...)
       imod HBody with ⟨Hσ', Hs', Hε', HΦv⟩
+      simp only []
       imodintro
-      isplitl [Hσ']; · iassumption
-      isplitl [Hs']; · iassumption
-      isplitl [Hε']; · iassumption
-      isplitl [HR]; · iassumption
-      iassumption
+      iframe
     | none =>
       iapply progCoupl_mono
       isplitr [HBody]
@@ -1998,9 +1904,7 @@ theorem wp_frame_l {E : CoPset} {e : Exp} {R : IProp GF} {Φ : Val → IProp GF}
       iintro %σ₄ %ρ₄ %ε₄ HFinal
       imod HFinal with ⟨Hσ', Hs', Hε', HwpInner⟩
       imodintro
-      isplitl [Hσ']; · iassumption
-      isplitl [Hs']; · iassumption
-      isplitl [Hε']; · iassumption
+      iframe
       iapply IH $$ %E' %e₃ %R' %Φ' HR HwpInner
   iintro ⟨HR, HW⟩
   iapply Hloeb $$ %E %e %R %Φ HR HW
@@ -2111,20 +2015,6 @@ theorem wp_frame_step_r {E1 E2 : CoPset} {e : Exp} {R : IProp GF} {Φ : Val → 
   iintro !> %v HΦ HR'
   isplitl [HΦ]; · iassumption
   iassumption
-
-/-! ## Proofmode integration
-
-Port of Rocq's `proofmode_classes` section: class instances that enable
-`iMod`/`iModIntro`/`iInv`-style automation on `wp` goals.
-
-Iris-Lean only has `IsExcept0`, `ElimModal`, `FromModal` (no `Frame`,
-`AddModal`, `ElimAcc`). So we port the subset that fits:
-
-* `isExcept0_wp` — enables `◇` absorption into `wp`.
-* `elimModal_bupd_wp` — `iMod` on basic-update hypotheses.
-* `elimModal_fupd_wp` — `iMod` on fancy-update hypotheses at same mask.
-* `elimModal_specUpdate_wp` — `iMod` on `specUpdate` hypotheses.
-* `elimModal_specUpdateN_wp` — `iMod` on parameterized `specUpdateN` hypotheses. -/
 
 /-- `◇`-absorption: `◇ (wp E e Φ) ⊢ wp E e Φ`. Goes via
 `◇ wp ⊢ ◇ (|={E}=> wp) ⊢ |={E}=> wp ⊢ wp`. -/

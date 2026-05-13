@@ -431,6 +431,15 @@ partial def unexpFun : Term → UnexpandM Term
     | _ => return (← `(pl(rec $f $xs* := $e)))
   | x => return x
 
+
+@[app_unexpander Cfg.mk]
+meta def unexpCfg : Unexpander
+  | `($_ $e $s) => do
+    match e with
+    | `(pl($_)) => `(⟨pl($(← unpackPLExp e)), $s⟩)
+    | _         => `(⟨$e, $s⟩)
+  | _ => throw ()
+
 /-! ### Types -/
 
 @[app_unexpander Ty.int]

@@ -315,6 +315,10 @@ def pexecN (n : Nat) (ρ : Cfg) : Measure Cfg :=
   | 0 => dirac ρ
   | n + 1 => (stepOrFinal ρ).bind (pexecN n)
 
+@[measurability]
+def pexecN_measurable {n : Nat} : Measurable (pexecN n) := Measurable.of_discrete
+
+
 @[simp] theorem pexecN_zero (ρ : Cfg) : pexecN 0 ρ = dirac ρ := rfl
 
 theorem pexecN_succ (n : Nat) (ρ : Cfg) :
@@ -340,6 +344,10 @@ theorem pexecN_plus (n m : Nat) (ρ : Cfg) :
     congr 1
     funext ρ'
     exact ih ρ'
+
+theorem pexecN_det_trans {n m : Nat} {ρ ρ' ρ'' : Cfg} (Hn : pexecN n ρ = dirac ρ')
+    (Hm : pexecN m ρ' = dirac ρ'') : pexecN (n + m) ρ = dirac ρ'' := by
+  rw [pexecN_plus, Hn, dirac_bind pexecN_measurable, Hm]
 
 -- Rocq: lim_exec_pexec
 -- `limExec` factors through any finite iterate of `stepOrFinal`.

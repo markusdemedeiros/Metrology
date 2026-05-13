@@ -24,19 +24,14 @@ open scoped AppGS
 variable {GF : BundledGFunctors}
 
 instance heapView_tape_frag_discreteE (l : Loc) (t : Tape) :
-    OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree t)) := by
-  unfold HeapView.Frag
-  exact View.frag_discrete ⟨fun H => OFE.Discrete.discrete_0 H⟩
+    OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree t)) :=
+  View.frag_discrete ⟨fun H => OFE.Discrete.discrete_0 H⟩
 
-instance appTapesFrag_timeless [IApp : AppGS GF] (l : Loc) (t : Tape) :
-    BI.Timeless (iprop(l ↪ₐ t) : IProp GF) := by
-  unfold appTapesFrag
-  exact iOwn_timeless
+instance appTapesFrag_timeless [AppGS GF] (l : Loc) (t : Tape) :
+    BI.Timeless (iprop(l ↪ₐ t) : IProp GF) := iOwn_timeless
 
 instance specTapesFrag_timeless [ISpec : SpecGS GF] (l : Loc) (t : Tape) :
-    BI.Timeless (iprop(l ↪ₛ t) : IProp GF) := by
-  unfold specTapesFrag
-  exact iOwn_timeless
+    BI.Timeless (l ↪ₛ t : IProp GF) := iOwn_timeless
 
 instance heapView_heap_frag_discreteE (l : Loc) (v : Val) :
     OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree v)) := by

@@ -22,11 +22,9 @@ namespace OpenInv
 theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS GF] {E1 E2 E3 : CoPset} {P Q : IProp GF}
     (h : P ⊢ |={E2, E3}=> Q) : iprop(|={E1, E2}=> P) ⊢ |={E1, E3}=> Q := fupd_elim h
 
-theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS GF]
-    {E1 E2 E3 : CoPset} {P R Q : IProp GF}
-    (h : iprop(P ∗ R) ⊢@{IProp GF} iprop(|={E2, E3}=> Q)) :
-    iprop((|={E1, E2}=> P) ∗ R) ⊢@{IProp GF} iprop(|={E1, E3}=> Q) :=
-  (Iris.fupd_frame_r).trans (fupd_open_cont h)
+theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS GF] {E1 E2 E3 : CoPset}
+    {P R Q : IProp GF} (h : P ∗ R ⊢ |={E2, E3}=> Q) : (|={E1, E2}=> P) ∗ R ⊢ |={E1, E3}=> Q :=
+  fupd_frame_r.trans (fupd_elim h)
 
 theorem specCoupl_atomic_bridge_some {hlc : Bool} {GF : BundledGFunctors}
     [ApproxisWpGS GF] [InvGS_gen hlc GF]
@@ -45,8 +43,7 @@ theorem specCoupl_atomic_bridge_some {hlc : Bool} {GF : BundledGFunctors}
   imod HΦc with HΦ
   iframe
 
-theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
-    [ApproxisWpGS GF]
+theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS GF]
     {e : Exp} (h : Atomic e) {E1 E2 : CoPset}
     {σ₁ : State} {e₁' : Exp} {σ₁' : State} {ε₁ : ENNReal}
     {Φ : Val → IProp GF} :
@@ -69,28 +66,16 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
   iapply specCoupl_mono_spatial
   iframe
   iintro %σ₂ %ρ' %ε₂ HBody
-  iapply (progCoupl_mono (e₁ := e) (σ₁ := σ₂) (e₁' := ρ'.expr) (σ₁' := ρ'.state)
-    (ε := ε₂)
-    (Z₁ := fun e₂' σ₂' e₂'' σ₂''' ε' =>
-      iprop(⌜(∃ σ, 0 < primStep ⟨e, σ⟩ {⟨e₂', σ₂'⟩}) ∨ 1 ≤ ε'⌝ ∧
-        ▷ specCoupl ∅ σ₂' e₂'' σ₂''' ε' (fun σ₄ ρ'' ε₄ =>
-          iprop(|={∅, E2}=>
-            stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
-              wp E2 e₂' (fun v => iprop(|={E2, E1}=> Φ v)))))))
+  iapply (progCoupl_mono (e₁ := e) (σ₁ := σ₂) (e₁' := ρ'.expr) (σ₁' := ρ'.state) (ε := ε₂))
   isplitr
   swap
   · iapply (progCoupl_strengthen
       (e₁ := e) (σ₁ := σ₂) (e₁' := ρ'.expr) (σ₁' := ρ'.state) (ε := ε₂)
-      (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
-        iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
-          iprop(|={∅, E2}=>
-            stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
-              wp E2 e₃ (fun v => iprop(|={E2, E1}=> Φ v)))))))
+      )
     isplitr
     swap
     · iexact HBody
-    iintro !> %e₂' %σ₂' %e₂'' %σ₂'''
-    iintro !>
+    iintro !> %_ %_ %_ %_ !>
     iapply specCoupl_err_ge_1
     exact _root_.le_refl _
   iintro %e₃ %σ₃ %e₃' %σ₃' %ε₃ ⟨%Hreach, HInner⟩
@@ -113,35 +98,14 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors}
                 wp E1 e₃ Φ))) := by
       iintro ⟨Hσ4, Hs4, Hε4, HW4⟩
       ihave HW4' := (BI.equiv_iff.mp wp_unfold).1 $$ HW4
-      ispecialize HW4' $$ %σ₄ %ρ''.expr %ρ''.state %ε₄ [Hσ4 Hs4 Hε4]
-      · isplitl [Hσ4]; · iassumption
-        isplitl [Hs4]; · iassumption
-        iassumption
+      ispecialize HW4' $$ %σ₄ %ρ''.expr %ρ''.state %ε₄ [$]
       irevert HW4'
       refine BI.entails_wand ?_
-      refine fupd_open_cont (E1 := E2) (E2 := ∅) (E3 := ∅)
-        (P := specCoupl ∅ σ₄ ρ''.expr ρ''.state ε₄ (fun σ₂ ρ' ε₂ =>
-          match e₃.toVal? with
-          | some v => iprop(|={∅, E2}=>
-              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗ errInterp ε₂ ∗
-                (|={E2, E1}=> Φ v))
-          | none => progCoupl e₃ σ₂ ρ'.expr ρ'.state ε₂
-              (fun e₅ σ₅ e₅' σ₅' ε₅ =>
-                iprop(▷ specCoupl ∅ σ₅ e₅' σ₅' ε₅ (fun σ₆ ρ_₆ ε₆ =>
-                  iprop(|={∅, E2}=>
-                    stateInterp σ₆ ∗ SpecUpdateGS.specInterp ρ_₆ ∗ errInterp ε₆ ∗
-                      wp E2 e₅ (fun v => iprop(|={E2, E1}=> Φ v))))))))
-        (Q := specCoupl ∅ σ₄ ρ''.expr ρ''.state ε₄ (fun σ₄' ρ''' ε₄' =>
-            iprop(|={∅, E1}=>
-              stateInterp σ₄' ∗ SpecUpdateGS.specInterp ρ''' ∗ errInterp ε₄' ∗
-                wp E1 e₃ Φ))) ?_
-      -- Inner body: P ⊢ |={∅,∅}=> Q.
+      refine fupd_open_cont (E1 := E2) (E2 := ∅) (E3 := ∅) ?_
       iintro HSC
       iapply fupd_intro
       iapply specCoupl_mono_spatial
-      isplitr [HSC]
-      swap
-      · iexact HSC
+      iframe
       iintro %σ₅ %ρ''' %ε₅ HInnerBody
       cases htv : e₃.toVal? with
       | none => exact absurd ((Exp.toVal?_eq_none).mp htv) (fun nv => nv he₃val)
