@@ -109,6 +109,7 @@ theorem DetHeadStep.of_det (cfg1 cfg2 : Cfg)
     (hdet : headStep cfg1 {cfg2} = 1) : DetHeadStep cfg1 cfg2 :=
   ⟨⟨cfg2, hdet ▸ one_pos⟩, hdet⟩
 
+-- TODO: This should not be stated in terms of atoms, so that it can be generalized to the measurable case.
 structure DetStep (cfg1 cfg2 : Cfg) : Prop where
   safe : Reducible cfg1.expr cfg1.state
   det  : primStep cfg1 {cfg2} = 1

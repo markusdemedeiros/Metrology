@@ -5,21 +5,7 @@ public import Metrology.ProbLang.DetStep
 
 @[expose] public section
 
-/-!
-# Spec-side stepping rules
-
-Ports `clutch.prob_lang.spec.spec_rules`. Each rule says: holding spec ownership
-of `fill K e`, take one primitive deterministic step under `K` and produce
-`specUpdate E <post>`.
-
-All rules follow the same scaffold:
-1. `specAuth_specFrag_agree` to confirm the current program matches the frag.
-2. `specProg_update` (and a heap/tape update as needed) for the ghost transfer.
-3. `pexecN_1_of_DetStep` to witness the deterministic transition.
-
-**Out of scope:** Laplace rules, GWP mixin. **Deferred:** nat-indexed tape
-wrappers (depend on `nat_spec_tape` which isn't ported yet).
--/
+/-! # Spec-side stepping rules -/
 
 open Std Iris Iris.Std Iris.BI COFE ProbLang
 
