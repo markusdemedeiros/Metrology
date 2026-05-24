@@ -43,6 +43,8 @@ def displayFVars (pref : String) (A : Array Expr) : MetaM Unit := do
   for a in A do logInfo s!"{pref} {a}: {← inferType a}"
 
 def mkProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
+  -- Skip constructors with no fields — nothing to project.
+  if cinfo.numFields == 0 then return
   -- Collect the casesOn information
   let info ← getConstInfoInduct decl
   let casesOnInfo ← getConstVal <| mkCasesOnName decl
@@ -93,12 +95,12 @@ def mkProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Un
     safety := .safe
   }
 
-syntax (name := projections) "projections" : attr
+syntax (name := uncurriedProjections) "uncurriedProjections" : attr
 
 -- TODO: Add projection type itself to the context?
-def projectionsImpl : AttributeImpl := {
-    name  := `projections
-    descr := "Automatically construct projection functions for a inductive datatype"
+def uncurriedProjectionsImpl : AttributeImpl := {
+    name  := `uncurriedProjections
+    descr := "Automatically construct uncurried (tuple-returning) projection functions for an inductive datatype"
     add   := fun decl _stx _kind => do
       let info ← getConstInfoInduct decl
       unless info.numNested == 0 do
@@ -110,7 +112,95 @@ def projectionsImpl : AttributeImpl := {
         mkProjection decl x cinfo |>.run'
     }
 
-initialize registerBuiltinAttribute projectionsImpl
+initialize registerBuiltinAttribute uncurriedProjectionsImpl
+
+def SingleProjectionName (cinfo : ConstructorVal) (field : Name) : Name :=
+  cinfo.name.str "π" ++ field
+
+/-- For a single constructor `c` of `decl` and a chosen field index `ifield`,
+generate `decl.c.π.<fieldname> : params → decl params → Option fieldType`
+returning `some field` on the `c` branch and `none` elsewhere. -/
+def mkSingleProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal)
+    (ifield : Nat) (fieldName : Name) : MetaM Unit := do
+  let info ← getConstInfoInduct decl
+  let casesOnInfo ← getConstVal <| mkCasesOnName decl
+  let (e, τ) ← forallTelescope casesOnInfo.type fun xs _ => do
+    let params : Array Expr := xs[:info.numParams]
+    let majorIdx := info.numParams + 1 + info.numIndices
+    let targetIdx := info.numParams + 2 + ictor
+    unless xs.size > majorIdx && xs.size > targetIdx do
+      throwError "unexpected arity in casesOn type"
+    let majorArg := xs[majorIdx]!
+    let target_arg := xs[targetIdx]!
+
+    -- Compute the type of the chosen field by telescoping the target alternative.
+    let fieldType ← forallTelescope (← inferType target_arg) (fun args _ => do
+      unless ifield < args.size do
+        throwError "field index out of range"
+      inferType args[ifield]!)
+    let retNone ← mkNone fieldType
+    let returnType : Expr ← mkAppM ``Option #[fieldType]
+
+    let motive := mkLambda .anonymous .default (← inferType majorArg) returnType
+
+    let alts : Array Expr ← info.ctors.toArray.mapIdxM fun i ctorName => do
+      let ctor ← mkAppOptM ctorName (params.map some)
+      let ctorType ← inferType ctor
+      forallTelescope ctorType fun ctorargs _ =>
+        if (i = ictor)
+          then do
+            mkLambdaFVars ctorargs (← mkSome fieldType ctorargs[ifield]!)
+          else mkLambdaFVars ctorargs retNone
+
+    let e ← mkAppOptM casesOnInfo.name ((params ++ #[motive, majorArg] ++ alts).map some)
+    let e ← mkLambdaFVars (params ++ #[majorArg]) e
+
+    let eτ ← mkArrow (← inferType majorArg) returnType
+    let eτ ← mkForallFVars params eτ
+    return (e, eτ)
+
+  addAndCompile <| .defnDecl {
+    name := SingleProjectionName cinfo fieldName
+    levelParams := casesOnInfo.levelParams.drop 1
+    type := τ
+    value := e
+    hints := ReducibilityHints.abbrev
+    safety := .safe
+  }
+
+/-- For each constructor of `decl`, emit one `decl.c.π.<field>` per argument.
+Throws if two arguments within a single constructor share a name. -/
+def mkSingleProjections (decl : Name) (ictor : Nat) (cinfo : ConstructorVal) : MetaM Unit := do
+  -- Collect the user-facing field names for this constructor.
+  let fieldNames ← forallBoundedTelescope cinfo.type (some cinfo.numParams) fun _ rest => do
+    forallTelescope rest fun args _ => args.mapM fun a => a.fvarId!.getUserName
+  -- Check for duplicates within this constructor.
+  let mut seen : NameSet := {}
+  for nm in fieldNames do
+    if seen.contains nm then
+      throwError "constructor `{cinfo.name}` has duplicate field name `{nm}`; \
+        @[curriedProjections] requires distinct argument names within each constructor"
+    seen := seen.insert nm
+  for h : i in [:fieldNames.size] do
+    mkSingleProjection decl ictor cinfo i fieldNames[i]
+
+syntax (name := curriedProjections) "curriedProjections" : attr
+
+def curriedProjectionsImpl : AttributeImpl := {
+    name  := `curriedProjections
+    descr := "Generate per-field (curried) projection functions for an inductive datatype"
+    add   := fun decl _stx _kind => do
+      let info ← getConstInfoInduct decl
+      unless info.numNested == 0 do
+        throwError "expected inductive with no nesting"
+      unless info.numIndices == 0 do
+        throwError "expected inductive with no indexing"
+      let _ ← info.ctors.toArray.mapIdxM fun x y => do
+        let cinfo ← getConstInfoCtor y
+        mkSingleProjections decl x cinfo |>.run'
+    }
+
+initialize registerBuiltinAttribute curriedProjectionsImpl
 
 def ConstructorName (cinfo : ConstructorVal) : Name := cinfo.name.str "ι"
 

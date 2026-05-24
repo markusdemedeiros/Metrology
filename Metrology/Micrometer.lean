@@ -61,7 +61,7 @@ def MeasurableSyntax.cylinder [I : MeasurableSyntax Syntax Gen] : Set (Set Synta
 instance MeasurableSyntax.instMeasurableSpace [MeasurableSyntax Syntax Gen] : MeasurableSpace Syntax :=
   .generateFrom cylinder
 
-@[projections, constructors]
+@[uncurriedProjections, constructors]
 inductive LitSyntax (R Z B : Type _) where
 | real (r : R)
 | int (z : Z)
@@ -93,7 +93,7 @@ instance [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B] :
 -- This way there's only one step to unfold.
 -- Perhaps we can generate the shape inductives then?
 
-@[projections, constructors]
+@[uncurriedProjections, constructors]
 inductive ExprSyntax R Z B where
 | rand
 | lit (l : LitSyntax R Z B)
