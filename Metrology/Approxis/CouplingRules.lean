@@ -2,6 +2,7 @@ module
 
 public import Metrology.Approxis.Lifting
 public import Metrology.Approxis.PrimitiveLaws
+public import Metrology.ProbLang.Metatheory
 
 @[expose] public section
 
@@ -72,50 +73,6 @@ theorem later_timeless_fupd {PROP : Type _} [BI PROP] [BIUpdate PROP] [BIFUpdate
 end TimelessTapes
 
 /-! ## Core probability fact: uniform coupling under bijection -/
-
-theorem Cfg.lintegral_uniform {z : Int} (Hz : 0 < z) (σ : State) (φ : Cfg → ENNReal) :
-    ∫⁻ c, φ c ∂(Cfg.uniform z σ) =
-      ((z.toNat : ENNReal)⁻¹) * ∑ n ∈ Finset.Ico (0 : Int) z,
-        φ (⟨.lit (.int n), σ⟩ : Cfg) := by
-  classical
-  have Huniform : Cfg.uniform z σ =
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z)
-          (Finset.nonempty_Ico.mpr Hz)).toMeasure).map
-        (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg)) := by
-    unfold Cfg.uniform Int.isPos
-    simp only [Hz, dite_true]
-  rw [Huniform,
-      MeasureTheory.lintegral_map (Measurable.of_discrete) Measurable.of_discrete]
-  rw [MeasureTheory.lintegral_countable']
-  have hcard : (Finset.Ico (0 : Int) z).card = z.toNat := by
-    rw [Int.card_Ico]
-    omega
-  have hpmf_mem : ∀ n ∈ Finset.Ico (0 : Int) z,
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z) (Finset.nonempty_Ico.mpr Hz)).toMeasure)
-        {n} = ((z.toNat : ENNReal)⁻¹) := by
-    intro n hn
-    rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
-        PMF.uniformOfFinset_apply_of_mem _ hn, hcard]
-  have hpmf_notmem : ∀ n ∉ Finset.Ico (0 : Int) z,
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z) (Finset.nonempty_Ico.mpr Hz)).toMeasure)
-        {n} = 0 := by
-    intro n hn
-    rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
-        PMF.uniformOfFinset_apply_of_notMem _ hn]
-  have htsum : ∑' n : Int, φ (⟨.lit (.int n), σ⟩ : Cfg) *
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z) (Finset.nonempty_Ico.mpr Hz)).toMeasure)
-        {n}
-      = ∑ n ∈ Finset.Ico (0 : Int) z,
-          φ (⟨.lit (.int n), σ⟩ : Cfg) * ((z.toNat : ENNReal)⁻¹) := by
-    rw [tsum_eq_sum (s := Finset.Ico (0 : Int) z) ?_]
-    · refine Finset.sum_congr rfl fun n hn => ?_
-      rw [hpmf_mem n hn]
-    · intro n hn
-      rw [hpmf_notmem n hn, mul_zero]
-  rw [htsum]
-  rw [Finset.mul_sum]
-  refine Finset.sum_congr rfl fun n _ => ?_
-  ring
 
 /-- Uniform-measure coupling under a bijection on the support: for `f` that
 restricts to a bijection on `Ico 0 z`, `Cfg.uniform z σ` and `Cfg.uniform z σ'`

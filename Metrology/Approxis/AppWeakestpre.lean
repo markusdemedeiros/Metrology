@@ -2,6 +2,7 @@ module
 
 public import Metrology.Iris.SpecUpdate
 public import Metrology.Iris.ErrorCredits
+public import Metrology.Iris.Fixpoint
 public import Metrology.Couplings.AdditiveCouplings
 public import Metrology.Couplings.Couplings
 public import Metrology.ProbLang.Exec
@@ -15,15 +16,6 @@ public import Iris.ProofMode.InstancesUpdates
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 
 namespace ProbLang
-
-theorem least_fixpoint_ne_outer {PROP : Type _} [BI PROP] {A : Type _} [OFE A]
-    {F1 F2 : (A → PROP) → (A → PROP)} {n : Nat} (HF : ∀ Φ x, F1 Φ x ≡{n}≡ F2 Φ x)
-    {x1 x2 : A} (Hx : x1 ≡{n}≡ x2) : bi_least_fixpoint F1 x1 ≡{n}≡ bi_least_fixpoint F2 x2 := by
-  refine forall_ne fun Φ => ?_
-  refine wand_ne.ne ?_ (NonExpansive.ne Hx)
-  refine intuitionistically_ne.ne ?_
-  refine forall_ne fun y => ?_
-  exact wand_ne.ne (HF _ _) (.of_eq rfl)
 
 /-! ## Approxis ghost state class -/
 
