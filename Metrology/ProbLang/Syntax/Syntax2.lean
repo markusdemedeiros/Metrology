@@ -133,81 +133,342 @@ section BaseLit
 
 /-# Measure space on base lits -/
 
-/-- A cylinder is a `BaseLit` whose `rT`-payloads have been replaced by `Set rT`. -/
-abbrev BaseLitCyl (rT : Type _) := ProbLang.BaseLit (Set rT)
 
 namespace ProbLang.BaseLit
+
+/-- A cylinder is a `BaseLit` whose `rT`-payloads have been replaced by `Set rT`. -/
+abbrev Cylinder (rT : Type _) := BaseLit (Set rT)
+
+/-- A tree with all data forgotten, in order to be countable. -/
+abbrev Shape := BaseLit Unit
 
 /-- Interpret a cylinder as the set of `BaseLit rT` it describes. Each branch is the image of
 the corresponding constructor over the cartesian product of its arg-sets — singleton sets for
 discrete leaves, the carried `Set rT` for real-leaves, and recursive `flatten` for sub-cylinders. -/
-@[simp] def flatten {rT : Type _} : BaseLitCyl rT → Set (BaseLit rT)
-  | .int z => (BaseLit.int (rT := rT)) '' {z}
-  | .bool b => (BaseLit.bool (rT := rT)) '' {b}
-  | .unit => (fun _ : Unit => (BaseLit.unit : BaseLit rT)) '' {()}
-  | .loc l => (BaseLit.loc (rT := rT)) '' {l}
-  | .lbl l => (BaseLit.lbl (rT := rT)) '' {l}
-  | .real Sr => (BaseLit.real (rT := rT)) '' Sr
-  | .prod c1 c2 =>
-      (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) ''
-        (flatten c1 ×ˢ flatten c2)
-  | .nest c Sr =>
-      (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) ''
-        (flatten c ×ˢ Sr)
+@[simp] def Cylinder.flatten {rT : Type _} : Cylinder rT → Set (BaseLit rT)
+  | int z        => int '' {z}
+  | bool b       => bool '' {b}
+  | unit         => {unit}
+  | loc l        => loc '' {l}
+  | lbl l        => lbl '' {l}
+  | real Sr      => real '' Sr
+  | prod c1 c2   => (fun p => prod p.1 p.2) '' (flatten c1 ×ˢ flatten c2)
+  | nest c Sr    => (fun p => nest p.1 p.2) '' (flatten c ×ˢ Sr)
 
 /-- A cylinder has measurable leaves if every `Set rT` it carries is measurable. -/
 inductive HasMeasurableLeaves {rT : Type _} [MeasurableSpace rT] :
-    BaseLitCyl rT → Prop where
-  | int : HasMeasurableLeaves (.int z)
-  | bool : HasMeasurableLeaves (.bool b)
-  | unit : HasMeasurableLeaves .unit
-  | loc : HasMeasurableLeaves (.loc z)
-  | lbl : HasMeasurableLeaves (.lbl z)
-  | real Sᵣ : MeasurableSet Sᵣ → HasMeasurableLeaves (.real Sᵣ)
-  | prod :
-    HasMeasurableLeaves c1 →
-    HasMeasurableLeaves c2 →
-    HasMeasurableLeaves (.prod c1 c2)
-  | nest Sᵣ :
-    HasMeasurableLeaves c →
-    MeasurableSet Sᵣ →
-    HasMeasurableLeaves (.nest c Sᵣ)
+    Cylinder rT → Prop where
+  | int     : HasMeasurableLeaves (int z)
+  | bool    : HasMeasurableLeaves (bool b)
+  | unit    : HasMeasurableLeaves unit
+  | loc     : HasMeasurableLeaves (loc z)
+  | lbl     : HasMeasurableLeaves (lbl z)
+  | real Sᵣ : MeasurableSet Sᵣ → HasMeasurableLeaves (real Sᵣ)
+  | prod    : HasMeasurableLeaves c1 → HasMeasurableLeaves c2 → HasMeasurableLeaves (prod c1 c2)
+  | nest Sᵣ : HasMeasurableLeaves c → MeasurableSet Sᵣ → HasMeasurableLeaves (nest c Sᵣ)
 
-instance [MeasurableSpace rT] : MeasurableSpace (BaseLit rT) :=
-  .generateFrom <| BaseLit.flatten '' { c : BaseLitCyl rT | c.HasMeasurableLeaves }
+instance instMeasurableSpaceBaseLit [MeasurableSpace rT] : MeasurableSpace (BaseLit rT) :=
+  .generateFrom <| Cylinder.flatten '' { c : Cylinder rT | c.HasMeasurableLeaves }
 
-/-- A shape names which constructor was used at each node of a `BaseLit` tree, with all
-`rT`-payloads forgotten. Shapes are `BaseLit Unit`, hence countable. -/
-@[simp] def shape : BaseLit rT → BaseLit Unit
-  | .int z => .int z
-  | .bool b => .bool b
-  | .unit => .unit
-  | .loc l => .loc l
-  | .lbl l => .lbl l
-  | .real _ => .real ()
-  | .prod b1 b2 => .prod (shape b1) (shape b2)
-  | .nest b _ => .nest (shape b) ()
+/-! ### Cylinder intersection.
+
+`Cylinder.inter? c c'` returns `some c''` when `flatten c'' = flatten c ∩ flatten c'`, and
+`none` when the structural intersection is empty (different top constructors or mismatched
+discrete leaves). The cylinder type is closed under intersection because every cylinder has
+a top constructor and the recursive structure matches up. -/
+
+/-- Partial intersection of cylinders. -/
+def Cylinder.inter? {rT : Type _} : Cylinder rT → Cylinder rT → Option (Cylinder rT)
+  | .int z₁,  .int z₂  => if z₁ = z₂ then some (.int z₁) else none
+  | .bool b₁, .bool b₂ => if b₁ = b₂ then some (.bool b₁) else none
+  | .unit,    .unit    => some .unit
+  | .loc l₁,  .loc l₂  => if l₁ = l₂ then some (.loc l₁) else none
+  | .lbl l₁,  .lbl l₂  => if l₁ = l₂ then some (.lbl l₁) else none
+  | .real S₁, .real S₂ => some (.real (S₁ ∩ S₂))
+  | .prod c₁ c₂, .prod c₁' c₂' =>
+      match Cylinder.inter? c₁ c₁', Cylinder.inter? c₂ c₂' with
+      | some r₁, some r₂ => some (.prod r₁ r₂)
+      | _, _ => none
+  | .nest c S, .nest c' S' =>
+      match Cylinder.inter? c c' with
+      | some r => some (.nest r (S ∩ S'))
+      | none   => none
+  | _, _ => none
+
+/-- The cylinder flatten of the intersection equals the intersection of the flattens.
+For mismatched cylinders (where `inter?` returns `none`) the intersection is empty. -/
+theorem Cylinder.flatten_inter {rT : Type _} :
+    ∀ (c₁ c₂ : Cylinder rT),
+      Cylinder.flatten c₁ ∩ Cylinder.flatten c₂
+        = (Cylinder.inter? c₁ c₂).elim ∅ Cylinder.flatten := by
+  intro c₁
+  induction c₁ with
+  | int z₁ | bool b₁ | unit | loc l₁ | lbl l₁ =>
+    intro c₂; cases c₂ <;> simp [Cylinder.inter?] <;>
+      (try (split_ifs <;> simp <;> aesop)) <;>
+      (try (ext b; cases b <;> simp))
+  | real S₁ =>
+    intro c₂; cases c₂ <;> simp [Cylinder.inter?] <;>
+      ext b <;> cases b <;> simp <;> aesop
+  | prod c₁ c₂ ih₁ ih₂ =>
+    intro c'
+    cases c' with
+    | prod c₁' c₂' =>
+      have hinj : Function.Injective (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) := by
+        rintro ⟨_, _⟩ ⟨_, _⟩ h; simp at h; exact Prod.ext h.1 h.2
+      show ((fun p : BaseLit rT × BaseLit rT => prod p.1 p.2) ''
+                (Cylinder.flatten c₁ ×ˢ Cylinder.flatten c₂)) ∩
+           ((fun p : BaseLit rT × BaseLit rT => prod p.1 p.2) ''
+                (Cylinder.flatten c₁' ×ˢ Cylinder.flatten c₂')) = _
+      rw [← Set.image_inter hinj, Set.prod_inter_prod, ih₁, ih₂]
+      cases hr₁ : Cylinder.inter? c₁ c₁' <;>
+        cases hr₂ : Cylinder.inter? c₂ c₂' <;>
+        simp [Cylinder.inter?, hr₁, hr₂]
+    | int _ | bool _ | unit | loc _ | lbl _ | real _ | nest _ _ =>
+      simp [Cylinder.inter?] <;>
+        first | done | (ext b; cases b <;> simp)
+  | nest c S ih =>
+    intro c'
+    cases c' with
+    | nest c'' S' =>
+      have hinj : Function.Injective (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) := by
+        rintro ⟨_, _⟩ ⟨_, _⟩ h; simp at h; exact Prod.ext h.1 h.2
+      show ((fun p : BaseLit rT × rT => nest p.1 p.2) ''
+                (Cylinder.flatten c ×ˢ S)) ∩
+           ((fun p : BaseLit rT × rT => nest p.1 p.2) ''
+                (Cylinder.flatten c'' ×ˢ S')) = _
+      rw [← Set.image_inter hinj, Set.prod_inter_prod, ih]
+      cases hr : Cylinder.inter? c c'' <;> simp [Cylinder.inter?, hr]
+    | int _ | bool _ | unit | loc _ | lbl _ | real _ | prod _ _ =>
+      simp [Cylinder.inter?] <;>
+        first | done | (ext b; cases b <;> simp)
+
+theorem Cylinder.flatten_inter_some {rT : Type _} {c₁ c₂ c : Cylinder rT}
+    (h : Cylinder.inter? c₁ c₂ = some c) :
+    Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ := by
+  rw [Cylinder.flatten_inter, h]; rfl
+
+theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT] :
+    ∀ {c₁ c₂ c : Cylinder rT},
+      c₁.HasMeasurableLeaves → c₂.HasMeasurableLeaves →
+      Cylinder.inter? c₁ c₂ = some c → c.HasMeasurableLeaves := by
+  intro c₁
+  induction c₁ with
+  | int z₁ | bool b₁ | unit | loc l₁ | lbl l₁ =>
+    intro c₂ c h₁ h₂ h
+    cases c₂ <;> simp_all [Cylinder.inter?] <;>
+      (try obtain ⟨_, rfl⟩ := h) <;> constructor
+  | real S₁ =>
+    intro c₂ c h₁ h₂ h
+    cases c₂ <;> simp_all [Cylinder.inter?]
+    subst h
+    cases h₁ with | real _ hS₁ => cases h₂ with | real _ hS₂ => exact .real _ (hS₁.inter hS₂)
+  | prod c₁ c₂ ih₁ ih₂ =>
+    intro c₂' c h₁ h₂ h
+    cases c₂' <;> simp_all [Cylinder.inter?]
+    cases h₁ with | prod hh₁ hh₂ => cases h₂ with | prod hh₁' hh₂' =>
+    split at h
+    · rename_i hr₁ hr₂
+      simp at h; subst h
+      exact .prod (ih₁ hh₁ hh₁' hr₁) (ih₂ hh₂ hh₂' hr₂)
+    · exact absurd h (by intro h; cases h)
+  | nest c S ih =>
+    intro c₂ c' h₁ h₂ h
+    cases c₂ <;> simp_all [Cylinder.inter?]
+    cases h₁ with | nest _ hh₁ hS₁ => cases h₂ with | nest _ hh₂ hS₂ =>
+    split at h
+    · rename_i hr
+      simp at h; subst h
+      exact .nest _ (ih hh₁ hh₂ hr) (hS₁.inter hS₂)
+    · exact absurd h (by intro h; cases h)
+
+@[simp] def shape : BaseLit rT → Shape
+  | int z        => int z
+  | bool b       => bool b
+  | unit         => unit
+  | loc l        => loc l
+  | lbl l        => lbl l
+  | real _       => real ()
+  | prod b1 b2   => prod (shape b1) (shape b2)
+  | nest b _     => nest (shape b) ()
 
 /-- The "universe cylinder" for a given shape: `univ` at every leaf, same skeleton as the shape. -/
-@[simp] def shapeCyl : BaseLit Unit → BaseLitCyl rT
-  | .int z => .int z
-  | .bool b => .bool b
-  | .unit => .unit
-  | .loc l => .loc l
-  | .lbl l => .lbl l
-  | .real () => .real Set.univ
-  | .prod s1 s2 => .prod (ProbLang.BaseLit.shapeCyl s1) (ProbLang.BaseLit.shapeCyl s2)
-  | .nest s () => .nest (ProbLang.BaseLit.shapeCyl s) Set.univ
+@[simp] def Shape.cylinder : Shape → Cylinder rT
+  | int z        => int z
+  | bool b       => bool b
+  | unit         => unit
+  | loc l        => loc l
+  | lbl l        => lbl l
+  | real ()      => real Set.univ
+  | prod s1 s2   => prod (cylinder s1) (cylinder s2)
+  | nest s ()    => nest (cylinder s) Set.univ
 
-@[simp] def stratum (s : BaseLit Unit) : Set (BaseLit rT) := shape (rT := rT) ⁻¹' {s}
+/-! ### Per-constructor covers.
 
-theorem shapeCyl_HasMeasurableLeaves [MeasurableSpace rT] (s : BaseLit Unit) :
-    (shapeCyl (rT := rT) s).HasMeasurableLeaves := by
+Each term in an inductive type is classified as one of
+- Recursive
+- Syntax Leaf (must be countable)
+- Data Leaf (must be measurable)
+
+Now we define cover sets: a set equal to `Set.range ctor` which is easier to deal with
+measurability conditions for. Here's how each argument contributes:
+- Recursie: Union over all shapes of shapeCyl
+- Syntax leaf: Union over all elements of that element
+- Data leaf: ⊤
+
+Nullary constructors get no arguments.
+-/
+
+def cover.int : Set (BaseLit rT) :=
+  ⋃ z, Cylinder.flatten (.int z)
+
+def cover.bool : Set (BaseLit rT) :=
+  ⋃ b, Cylinder.flatten (.bool b)
+
+def cover.unit : Set (BaseLit rT) :=
+  Cylinder.flatten .unit
+
+def cover.loc : Set (BaseLit rT) :=
+  ⋃ l, Cylinder.flatten (.loc l)
+
+def cover.lbl : Set (BaseLit rT) :=
+  ⋃ l, Cylinder.flatten (.lbl l)
+
+def cover.real : Set (BaseLit rT) :=
+  Cylinder.flatten (.real ⊤)
+
+def cover.prod : Set (BaseLit rT) :=
+  ⋃ (p : Shape × Shape), Cylinder.flatten (.prod p.1.cylinder p.2.cylinder)
+
+def cover.nest : Set (BaseLit rT) :=
+  ⋃ (s : Shape), Cylinder.flatten (.nest s.cylinder ⊤)
+
+/-! Three generic helper lemmas next for provving measurability of a cover -/
+
+/-- Cylinder of a given shape has measurable leaves -/
+theorem Shape.cylinder_hasMeasurableLeaves [MeasurableSpace rT] (s : Shape) :
+    (s.cylinder (rT := rT)).HasMeasurableLeaves := by
   induction s <;> constructor <;> measurability
 
-theorem ProbLang.BaseLit.flatten_shapeCyl (s : BaseLit Unit) :
-    (shapeCyl (rT := rT) s).flatten = shape ⁻¹' {s} := by
+/-- Flattening a cylinder of a shape equals set of terms with a given shape -/
+@[simp] theorem Shape.cylinder_preimage_shape (s : Shape) :
+    (s.cylinder (rT := rT)).flatten = shape ⁻¹' {s} := by
   ext b; induction b generalizing s <;> cases s <;> simp_all
+
+/-- Flattening a cylinder gives a measurable set -/
+@[measurability]
+theorem flatten_measurable [MeasurableSpace rT] {c : Cylinder rT}
+    (hc : c.HasMeasurableLeaves) : MeasurableSet c.flatten :=
+  MeasurableSpace.measurableSet_generateFrom ⟨c, hc, rfl⟩
+
+attribute [aesop safe constructors (rule_sets := [Measurable])]
+  ProbLang.BaseLit.HasMeasurableLeaves
+
+attribute [aesop safe apply (rule_sets := [Measurable])]
+  Shape.cylinder_hasMeasurableLeaves
+
+/-! ### The cylinder flatten family is a π-system that spans `BaseLit rT`. -/
+
+/-- The cylinder flatten family is closed under nonempty intersection. -/
+theorem Cylinder.flatten_isPiSystem [MeasurableSpace rT] :
+    IsPiSystem
+      ({S : Set (BaseLit rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
+  rintro _ ⟨c₁, hc₁, rfl⟩ _ ⟨c₂, hc₂, rfl⟩ hne
+  have hi : Cylinder.inter? c₁ c₂ ≠ none := by
+    intro h
+    have : Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ = ∅ := by
+      rw [Cylinder.flatten_inter, h]; rfl
+    exact hne.ne_empty this
+  obtain ⟨c, hc⟩ : ∃ c, Cylinder.inter? c₁ c₂ = some c := Option.ne_none_iff_exists'.mp hi
+  exact ⟨c, Cylinder.hasMeasurableLeaves_inter hc₁ hc₂ hc, Cylinder.flatten_inter_some hc⟩
+
+/-- The cylinder flatten family is countably spanning. -/
+theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace rT] :
+    IsCountablySpanning
+      ({S : Set (BaseLit rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
+  obtain ⟨enc⟩ := nonempty_encodable Shape
+  refine ⟨fun n =>
+    match enc.decode n with
+    | some s => Cylinder.flatten (Shape.cylinder s : Cylinder rT)
+    | none => Cylinder.flatten (.unit : Cylinder rT), ?_, ?_⟩
+  · intro n
+    cases h : enc.decode n with
+    | none => exact ⟨.unit, .unit, by simp [h]⟩
+    | some s => exact ⟨Shape.cylinder s, Shape.cylinder_hasMeasurableLeaves s, by simp [h]⟩
+  · ext b
+    simp only [Set.mem_iUnion, Set.mem_univ, iff_true]
+    refine ⟨enc.encode (shape b), ?_⟩
+    have hd : enc.decode (enc.encode (shape b)) = some (shape b) := enc.encodek _
+    rw [hd]
+    simp [Shape.cylinder_preimage_shape]
+
+/-! ### Measurability of the per-constructor covers. -/
+
+macro "solve_cover_measurable" : tactic => `(tactic|
+  first
+  | exact .iUnion fun _ => flatten_measurable (by measurability)
+  | exact flatten_measurable (by measurability))
+
+@[measurability]
+theorem cover.int.measurable [MeasurableSpace rT] : MeasurableSet (int (rT := rT)) := by
+  solve_cover_measurable
+
+@[measurability]
+theorem cover.bool.measurable [MeasurableSpace rT] : MeasurableSet (bool (rT := rT)) := by
+  solve_cover_measurable
+
+@[measurability]
+theorem cover.unit.measurable [MeasurableSpace rT] : MeasurableSet (unit (rT := rT)) := by
+  solve_cover_measurable
+
+@[measurability]
+theorem cover.loc.measurable [MeasurableSpace rT] : MeasurableSet (loc (rT := rT)) := by
+  solve_cover_measurable
+
+@[measurability]
+theorem cover.lbl.measurable [MeasurableSpace rT] : MeasurableSet (lbl (rT := rT)) := by
+  solve_cover_measurable
+
+@[measurability]
+theorem cover.real.measurable [MeasurableSpace rT] : MeasurableSet (real (rT := rT)) := by
+  solve_cover_measurable
+
+@[measurability]
+theorem cover.prod.measurable [MeasurableSpace rT] : MeasurableSet (prod (rT := rT)) := by
+  solve_cover_measurable
+
+@[measurability]
+theorem cover.nest.measurable [MeasurableSpace rT] : MeasurableSet (nest (rT := rT)) := by
+  solve_cover_measurable
+
+-- TODO: When metaprogramming, try changing this to a new simp set
+-- Can't do here because it's defined in the same file, but it might work when defining programatically
+macro "solve_cover_eq_range" ctor:ident : tactic => `(tactic|
+  (ext b; cases b <;> simp [$ctor:ident]))
+
+theorem cover.int_eq_range : cover.int (rT := rT) = .range .int  := by
+  solve_cover_eq_range cover.int
+
+theorem cover.bool_eq_range : cover.bool (rT := rT) = .range .bool := by
+  solve_cover_eq_range cover.bool
+
+theorem cover.unit_eq_range : cover.unit (rT := rT) = { .unit } := by
+  solve_cover_eq_range cover.unit
+
+theorem cover.loc_eq_range : cover.loc (rT := rT) = .range .loc := by
+  solve_cover_eq_range cover.loc
+
+theorem cover.lbl_eq_range : cover.lbl (rT := rT) = .range .lbl := by
+  solve_cover_eq_range cover.lbl
+
+theorem cover.real_eq_range : cover.real (rT := rT) = .range .real := by
+  solve_cover_eq_range cover.real
+
+theorem cover.prod_eq_range : cover.prod (rT := rT) = .range (Function.uncurry .prod) := by
+  solve_cover_eq_range cover.prod
+
+theorem cover.nest_eq_range : cover.nest (rT := rT) = .range (Function.uncurry BaseLit.nest) := by
+  solve_cover_eq_range cover.nest
 
 end ProbLang.BaseLit
 
@@ -215,1107 +476,326 @@ section Measurability
 
 open ProbLang.BaseLit
 
-theorem BaseLit.flatten_measurable [MeasurableSpace rT] {c : BaseLitCyl rT}
-    (hc : c.HasMeasurableLeaves) : MeasurableSet (BaseLit.flatten c) :=
-  MeasurableSpace.measurableSet_generateFrom ⟨c, hc, rfl⟩
-
-/-- Each stratum is measurable. -/
-theorem ProbLang.BaseLit.stratum_measurable [MeasurableSpace rT] (s : BaseLit Unit) :
-    MeasurableSet (shape (rT := rT) ⁻¹' {s}) := by
-  rw [← ProbLang.BaseLit.flatten_shapeCyl]
-  exact BaseLit.flatten_measurable (shapeCyl_HasMeasurableLeaves s)
-
-/-- Shapes are countable. -/
-example : Countable (BaseLit Unit) := inferInstance
-
-/-! ### Covers — sets in `BaseLit rT` cut out by the top-level constructor.
-
-Each cover is defined as a countable union of strata: one stratum per choice of shape for each
-recursive sub-`BaseLit` argument of the constructor. Measurability is then immediate. -/
-
-/-- Cover for the `prod` constructor: the union of all `.prod _ _`-shaped strata. -/
-def ProbLang.BaseLit.ecov_prod : Set (BaseLit rT) :=
-  ⋃ (p : BaseLit Unit × BaseLit Unit), stratum (.prod p.1 p.2)
-
-theorem ProbLang.BaseLit.ecov_prod_measurable [MeasurableSpace rT] :
-    MeasurableSet (ProbLang.BaseLit.ecov_prod (rT := rT)) :=
-  MeasurableSet.iUnion (fun _ => stratum_measurable _)
-
-/-- The prod-cover is the range of `BaseLit.prod` (derived characterization). -/
-theorem ProbLang.BaseLit.ecov_prod_eq_range :
-    (ProbLang.BaseLit.ecov_prod (rT := rT))
-      = Set.range (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) := by
-  ext b
-  simp only [ecov_prod, stratum, Set.mem_iUnion, Set.mem_preimage, Set.mem_singleton_iff,
-             Set.mem_range]
-  constructor
-  · rintro ⟨⟨s1, s2⟩, hb⟩
-    cases b with
-    | prod b1 b2 => exact ⟨⟨b1, b2⟩, rfl⟩
-    | _ => simp [shape] at hb
-  · rintro ⟨⟨b1, b2⟩, rfl⟩
-    exact ⟨(b1.shape, b2.shape), by simp [shape]⟩
-
-/-- Cover for the `nest` constructor. -/
-def ProbLang.BaseLit.ecov_nest : Set (BaseLit rT) :=
-  ⋃ (s : BaseLit Unit), stratum (.nest s ())
-
-theorem ProbLang.BaseLit.ecov_nest_measurable [MeasurableSpace rT] :
-    MeasurableSet (ProbLang.BaseLit.ecov_nest (rT := rT)) :=
-  MeasurableSet.iUnion (fun _ => stratum_measurable _)
-
-/-- The nest-cover is the range of `BaseLit.nest` (derived characterization). -/
-theorem ProbLang.BaseLit.ecov_nest_eq_range :
-    (ProbLang.BaseLit.ecov_nest (rT := rT))
-      = Set.range (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) := by
-  ext b
-  simp only [ecov_nest, stratum, Set.mem_iUnion, Set.mem_preimage, Set.mem_singleton_iff,
-             Set.mem_range]
-  constructor
-  · rintro ⟨s, hb⟩
-    cases b with
-    | nest b1 r => exact ⟨⟨b1, r⟩, rfl⟩
-    | _ => simp [shape] at hb
-  · rintro ⟨⟨b1, r⟩, rfl⟩
-    exact ⟨b1.shape, by simp [shape]⟩
-
-/-- Default `BaseLit rT` value, used as junk return for off-cover projection cases. -/
-instance : Inhabited (BaseLit rT) := ⟨.unit⟩
 
 /-! ### Projections — composed from the metaprogrammed `.π`.
 Generic Option-cylinder infrastructure (`OptionCyl`, `Measurable.option_of_cyl_preimages`,
 `Set.image_eq_range_inter_preimage_option`, `Measurable.option_map`, `Option.pair`,
 `Measurable.option_pair`, `MeasurableEmbedding.some_mk`, `MeasurableSet.singleton_none`)
-lives in `Metrology.ProbLang.Measure`. -/
+'m nlives in `Metrology.ProbLang.Measure`. -/
 
-/-- Image of a set under `prod` equals the cover intersected with the projection-preimage. -/
-theorem ProbLang.BaseLit.image_prod_eq
-    (T : Set (BaseLit rT × BaseLit rT)) :
-    (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) '' T
-      = ecov_prod ∩ BaseLit.prod.π ⁻¹' (some '' T) := by
-  rw [ecov_prod_eq_range]
-  exact Set.image_eq_range_inter_preimage_option _ BaseLit.prod.π (by intro ⟨b1, b2⟩; rfl) T
+/- Per-component projection machinery — superseded by the direct π-system proofs of
+`prod.measurableEmbedding` and `nest.measurableEmbedding`. Kept commented out for reference.
 
-/-- `BaseLit.prod.π b` agrees with `Option.pair (BaseLit.prod.π.b1 b, BaseLit.prod.π.b2 b)`.
-
-Because `BaseLit.prod.π.b1` and `BaseLit.prod.π.b2` both come from the same underlying `prod.π b`, the joint
-function `(BaseLit.prod.π.b1 b, BaseLit.prod.π.b2 b)` is always `(none, none)` or `(some _, some _)` — so the
-Option-pairing recovers `BaseLit.prod.π b` exactly. -/
 theorem ProbLang.BaseLit.prod_π_eq_pair {rT : Type _} (b : BaseLit rT) :
     BaseLit.prod.π b = Option.pair (BaseLit.prod.π.b1 b, BaseLit.prod.π.b2 b) := by
-  cases b with
-  | prod b1 b2 =>
-    show some (b1, b2) = Option.pair (some b1, some b2)
-    rfl
-  | int z => rfl
-  | bool _ => rfl
-  | unit => rfl
-  | loc _ => rfl
-  | lbl _ => rfl
-  | real _ => rfl
-  | nest _ _ => rfl
+  cases b <;> rfl
 
-/-- Definitional unfolding of `BaseLit.prod.π.b1` on each constructor. -/
-theorem ProbLang.BaseLit.prod_π_b1_def_prod {rT : Type _} (b1 b2 : BaseLit rT) :
-    BaseLit.prod.π.b1 (BaseLit.prod b1 b2) = some b1 := rfl
-theorem ProbLang.BaseLit.prod_π_b1_def_int {rT : Type _} (z : Int) :
-    BaseLit.prod.π.b1 (BaseLit.int z : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b1_def_bool {rT : Type _} (b : Bool) :
-    BaseLit.prod.π.b1 (BaseLit.bool b : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b1_def_unit {rT : Type _} :
-    BaseLit.prod.π.b1 (BaseLit.unit : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b1_def_loc {rT : Type _} (l : Loc) :
-    BaseLit.prod.π.b1 (BaseLit.loc l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b1_def_lbl {rT : Type _} (l : Lbl) :
-    BaseLit.prod.π.b1 (BaseLit.lbl l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b1_def_real {rT : Type _} (r : rT) :
-    BaseLit.prod.π.b1 (BaseLit.real r) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b1_def_nest {rT : Type _} (b : BaseLit rT) (r : rT) :
-    BaseLit.prod.π.b1 (BaseLit.nest b r) = none := rfl
-
-/-- Per-cylinder preimage fact for `BaseLit.prod.π.b1`. -/
 theorem ProbLang.BaseLit.prod_π_b1_preimage_some_flatten {rT : Type _}
-    (c : BaseLitCyl rT) :
-    BaseLit.prod.π.b1 ⁻¹' (some '' BaseLit.flatten c)
-      = ⋃ s2 : BaseLit Unit,
-          BaseLit.flatten ((BaseLit.prod c (shapeCyl s2)) : BaseLitCyl rT) := by
-  ext b
-  cases b with
-  | prod b1 b2 =>
-    rw [Set.mem_preimage, prod_π_b1_def_prod, Set.mem_iUnion]
-    constructor
-    · rintro ⟨a, ha, heq⟩
-      rw [Option.some_inj] at heq
-      -- heq : a = b1
-      refine ⟨b2.shape, ?_⟩
-      simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-      refine ⟨(b1, b2), ⟨?_, ?_⟩, rfl⟩
-      · rw [← heq]; exact ha
-      · rw [ProbLang.BaseLit.flatten_shapeCyl]; rfl
-    · rintro ⟨s2, hb2⟩
-      simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod] at hb2
-      obtain ⟨⟨b1', b2'⟩, ⟨hb1', _⟩, heq⟩ := hb2
-      have hp : b1' = b1 ∧ b2' = b2 := by
-        have := heq; simp at this; exact this
-      obtain ⟨rfl, rfl⟩ := hp
-      exact ⟨b1', hb1', rfl⟩
-  | int z =>
-    rw [Set.mem_preimage, prod_π_b1_def_int, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s2, hb2⟩
-      simp [BaseLit.flatten] at hb2
-  | bool b =>
-    rw [Set.mem_preimage, prod_π_b1_def_bool, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s2, hb2⟩
-      simp [BaseLit.flatten] at hb2
-  | unit =>
-    rw [Set.mem_preimage, prod_π_b1_def_unit, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s2, hb2⟩
-      simp [BaseLit.flatten] at hb2
-  | loc l =>
-    rw [Set.mem_preimage, prod_π_b1_def_loc, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s2, hb2⟩
-      simp [BaseLit.flatten] at hb2
-  | lbl l =>
-    rw [Set.mem_preimage, prod_π_b1_def_lbl, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s2, hb2⟩
-      simp [BaseLit.flatten] at hb2
-  | real r =>
-    rw [Set.mem_preimage, prod_π_b1_def_real, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s2, hb2⟩
-      simp [BaseLit.flatten] at hb2
-  | nest b r =>
-    rw [Set.mem_preimage, prod_π_b1_def_nest, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s2, hb2⟩
-      simp [BaseLit.flatten] at hb2
+    (c : Cylinder rT) :
+    BaseLit.prod.π.b1 ⁻¹' (some '' Cylinder.flatten c)
+      = ⋃ s2 : Shape,
+          Cylinder.flatten ((BaseLit.prod c (s2.cylinder)) : Cylinder rT) := by
+  ext b; cases b <;> simp
 
-/-- Measurability of `BaseLit.prod.π.b1`. Per-cylinder preimage is a countable union of cylinders;
-σ-algebra induction extends to arbitrary measurable codomain sets. -/
+theorem ProbLang.BaseLit.prod_π_b1_preimage_none {rT : Type _} :
+    BaseLit.prod.π.b1 ⁻¹' ({none} : Set (Option (BaseLit rT)))
+      = (cover.prod : Set (BaseLit rT))ᶜ := by
+  ext b; cases b <;> simp [cover.prod]
+
+theorem ProbLang.BaseLit.measurable_option_of_cov_and_basic
+    [MeasurableSpace rT]
+    {π : BaseLit rT → Option (BaseLit rT)}
+    {cov : Set (BaseLit rT)}
+    (h_cov_meas : MeasurableSet cov)
+    (h_none : π ⁻¹' ({none} : Set (Option (BaseLit rT))) = covᶜ)
+    (h_basic : ∀ c : Cylinder rT, c.HasMeasurableLeaves →
+                  MeasurableSet (π ⁻¹' (some '' Cylinder.flatten c))) :
+    Measurable π := by
+  apply Measurable.option_of_cov h_cov_meas h_none
+  intro S hS
+  induction hS with
+  | basic G hG =>
+    obtain ⟨c, hc, rfl⟩ := hG
+    exact h_basic c hc
+  | empty => simp [Set.image_empty]
+  | compl G _ ih =>
+    rw [Set.image_compl_some, Set.preimage_diff, Set.preimage_compl, h_none, compl_compl]
+    exact h_cov_meas.diff ih
+  | iUnion f _ ih =>
+    rw [Set.image_iUnion, Set.preimage_iUnion]
+    exact MeasurableSet.iUnion ih
+
+@[fun_prop]
 theorem ProbLang.BaseLit.measurable_prod_π_b1 [MeasurableSpace rT] :
-    Measurable (BaseLit.prod.π.b1 : BaseLit rT → Option (BaseLit rT)) := by
-  apply Measurable.option_of_cyl_preimages
-  rintro (_ | S) hc
-  · -- BaseLit.prod.π.b1⁻¹' {none} = ecov_prodᶜ
-    have hrw : BaseLit.prod.π.b1 ⁻¹' (OptionCyl.flatten (none : OptionCyl (BaseLit rT)))
-             = (ecov_prod : Set (BaseLit rT))ᶜ := by
-      ext b
-      simp only [OptionCyl.flatten, Set.mem_preimage, Set.mem_singleton_iff,
-                 Set.mem_compl_iff, ecov_prod, stratum, Set.mem_iUnion,
-                 Set.mem_preimage, Set.mem_singleton_iff]
-      cases b with
-      | prod b1 b2 =>
-        rw [prod_π_b1_def_prod]
-        refine ⟨?_, ?_⟩
-        · intro hcontr; exact absurd hcontr (Option.some_ne_none _)
-        · intro hne
-          exfalso; apply hne; exact ⟨(b1.shape, b2.shape), by simp [shape]⟩
-      | int z =>
-        rw [prod_π_b1_def_int]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | bool b =>
-        rw [prod_π_b1_def_bool]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | unit =>
-        rw [prod_π_b1_def_unit]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | loc l =>
-        rw [prod_π_b1_def_loc]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | lbl l =>
-        rw [prod_π_b1_def_lbl]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | real r =>
-        rw [prod_π_b1_def_real]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | nest b r =>
-        rw [prod_π_b1_def_nest]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-    rw [hrw]; exact ecov_prod_measurable.compl
-  · -- BaseLit.prod.π.b1⁻¹' (some '' S) for measurable S ⊆ BaseLit rT.
-    -- By σ-algebra induction on S: base case is S = flatten c for c ∈ HasMeasurableLeaves.
-    cases hc with
-    | some hS =>
-      -- Use generic σ-algebra induction: predicate P(S) := MeasurableSet (BaseLit.prod.π.b1⁻¹' (some '' S))
-      -- holds on cylinders (load-bearing fact) and is closed under σ-alg operations.
-      have P_holds : ∀ S : Set (BaseLit rT), MeasurableSet S →
-                       MeasurableSet (BaseLit.prod.π.b1 ⁻¹' (some '' S)) := by
-        intro S hS
-        induction hS with
-        | basic G hG =>
-          obtain ⟨c, hc, rfl⟩ := hG
-          rw [prod_π_b1_preimage_some_flatten c]
-          exact MeasurableSet.iUnion fun s2 =>
-            BaseLit.flatten_measurable (.prod hc (shapeCyl_HasMeasurableLeaves s2))
-        | empty =>
-          simp [Set.image_empty]
-        | compl G _ ih =>
-          -- BaseLit.prod.π.b1⁻¹' (some '' Gᶜ) = (BaseLit.prod.π.b1⁻¹' (some '' G))ᶜ ∩ (BaseLit.prod.π.b1⁻¹' (range some))
-          -- = (BaseLit.prod.π.b1⁻¹' (some '' G))ᶜ ∩ ecov_prod
-          have hrange : (some : BaseLit rT → Option (BaseLit rT)) '' Gᶜ
-                      = (some '' Set.univ) \ (some '' G) := by
-            ext x
-            cases x with
-            | none => simp
-            | some a =>
-              simp only [Set.mem_image, Set.mem_diff, Set.mem_univ, Set.mem_compl_iff]
-              refine ⟨?_, ?_⟩
-              · rintro ⟨a', ha', heq⟩
-                refine ⟨⟨a', trivial, heq⟩, ?_⟩
-                rintro ⟨a'', ha'', heq2⟩
-                rw [Option.some_inj] at heq
-                rw [Option.some_inj] at heq2
-                rw [← heq2] at heq
-                exact ha' (heq ▸ ha'')
-              · rintro ⟨_, hne⟩
-                refine ⟨a, ?_, rfl⟩
-                intro hG
-                exact hne ⟨a, hG, rfl⟩
-          rw [hrange, Set.preimage_diff]
-          have h_univ : MeasurableSet (BaseLit.prod.π.b1 ⁻¹' (some '' (Set.univ : Set (BaseLit rT)))) := by
-            -- some '' univ = (singleton none)ᶜ in Option α. Preimage under BaseLit.prod.π.b1 = ecov_prod
-            -- (where BaseLit.prod.π.b1 returns some _, i.e., the prod constructor).
-            have hrange : (some : BaseLit rT → Option (BaseLit rT)) '' Set.univ
-                        = {none}ᶜ := by
-              ext x
-              cases x with
-              | none => simp
-              | some a => simp
-            rw [hrange]
-            rw [Set.preimage_compl]
-            -- BaseLit.prod.π.b1⁻¹' {none} = ecov_prodᶜ; complement = ecov_prod.
-            have hnone_eq : BaseLit.prod.π.b1 ⁻¹' ({none} : Set (Option (BaseLit rT)))
-                          = (ecov_prod : Set (BaseLit rT))ᶜ := by
-              ext b
-              cases b with
-              | prod b1 b2 =>
-                rw [Set.mem_preimage, prod_π_b1_def_prod]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨?_, ?_⟩
-                · intro hcontr; exact absurd hcontr (Option.some_ne_none _)
-                · intro hne
-                  exfalso; apply hne
-                  exact ⟨(b1.shape, b2.shape), by simp [stratum, shape]⟩
-              | int z =>
-                rw [Set.mem_preimage, prod_π_b1_def_int]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | bool b =>
-                rw [Set.mem_preimage, prod_π_b1_def_bool]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | unit =>
-                rw [Set.mem_preimage, prod_π_b1_def_unit]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | loc l =>
-                rw [Set.mem_preimage, prod_π_b1_def_loc]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | lbl l =>
-                rw [Set.mem_preimage, prod_π_b1_def_lbl]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | real r =>
-                rw [Set.mem_preimage, prod_π_b1_def_real]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | nest b r =>
-                rw [Set.mem_preimage, prod_π_b1_def_nest]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-            rw [hnone_eq]
-            simp
-            exact ecov_prod_measurable
-          exact h_univ.diff ih
-        | iUnion f _ ih =>
-          -- some '' (⋃ f) = ⋃ (some '' f)
-          rw [Set.image_iUnion, Set.preimage_iUnion]
-          exact MeasurableSet.iUnion ih
-      exact P_holds S hS
+    Measurable (BaseLit.prod.π.b1 : BaseLit rT → Option (BaseLit rT)) :=
+  measurable_option_of_cov_and_basic
+    cover.prod.measurable prod_π_b1_preimage_none
+    (fun c hc => by
+      rw [prod_π_b1_preimage_some_flatten c]
+      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
 
-/-- Definitional unfolding of `BaseLit.prod.π.b2` on each constructor. -/
-theorem ProbLang.BaseLit.prod_π_b2_def_prod {rT : Type _} (b1 b2 : BaseLit rT) :
-    BaseLit.prod.π.b2 (BaseLit.prod b1 b2) = some b2 := rfl
-theorem ProbLang.BaseLit.prod_π_b2_def_int {rT : Type _} (z : Int) :
-    BaseLit.prod.π.b2 (BaseLit.int z : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b2_def_bool {rT : Type _} (b : Bool) :
-    BaseLit.prod.π.b2 (BaseLit.bool b : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b2_def_unit {rT : Type _} :
-    BaseLit.prod.π.b2 (BaseLit.unit : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b2_def_loc {rT : Type _} (l : Loc) :
-    BaseLit.prod.π.b2 (BaseLit.loc l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b2_def_lbl {rT : Type _} (l : Lbl) :
-    BaseLit.prod.π.b2 (BaseLit.lbl l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b2_def_real {rT : Type _} (r : rT) :
-    BaseLit.prod.π.b2 (BaseLit.real r) = none := rfl
-theorem ProbLang.BaseLit.prod_π_b2_def_nest {rT : Type _} (b : BaseLit rT) (r : rT) :
-    BaseLit.prod.π.b2 (BaseLit.nest b r) = none := rfl
-
-/-- Per-cylinder preimage fact for `BaseLit.prod.π.b2`. -/
 theorem ProbLang.BaseLit.prod_π_b2_preimage_some_flatten {rT : Type _}
-    (c : BaseLitCyl rT) :
-    BaseLit.prod.π.b2 ⁻¹' (some '' BaseLit.flatten c)
-      = ⋃ s1 : BaseLit Unit,
-          BaseLit.flatten ((BaseLit.prod (shapeCyl s1) c) : BaseLitCyl rT) := by
-  ext b
-  cases b with
-  | prod b1 b2 =>
-    rw [Set.mem_preimage, prod_π_b2_def_prod, Set.mem_iUnion]
-    constructor
-    · rintro ⟨a, ha, heq⟩
-      rw [Option.some_inj] at heq
-      refine ⟨b1.shape, ?_⟩
-      simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-      refine ⟨(b1, b2), ⟨?_, ?_⟩, rfl⟩
-      · rw [ProbLang.BaseLit.flatten_shapeCyl]; rfl
-      · rw [← heq]; exact ha
-    · rintro ⟨s1, hb2⟩
-      simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod] at hb2
-      obtain ⟨⟨b1', b2'⟩, ⟨_, hb2'⟩, heq⟩ := hb2
-      have hp : b1' = b1 ∧ b2' = b2 := by
-        have := heq; simp at this; exact this
-      obtain ⟨rfl, rfl⟩ := hp
-      exact ⟨b2', hb2', rfl⟩
-  | int z =>
-    rw [Set.mem_preimage, prod_π_b2_def_int, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s1, hb2⟩; simp [BaseLit.flatten] at hb2
-  | bool b =>
-    rw [Set.mem_preimage, prod_π_b2_def_bool, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s1, hb2⟩; simp [BaseLit.flatten] at hb2
-  | unit =>
-    rw [Set.mem_preimage, prod_π_b2_def_unit, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s1, hb2⟩; simp [BaseLit.flatten] at hb2
-  | loc l =>
-    rw [Set.mem_preimage, prod_π_b2_def_loc, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s1, hb2⟩; simp [BaseLit.flatten] at hb2
-  | lbl l =>
-    rw [Set.mem_preimage, prod_π_b2_def_lbl, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s1, hb2⟩; simp [BaseLit.flatten] at hb2
-  | real r =>
-    rw [Set.mem_preimage, prod_π_b2_def_real, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s1, hb2⟩; simp [BaseLit.flatten] at hb2
-  | nest b r =>
-    rw [Set.mem_preimage, prod_π_b2_def_nest, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨a, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s1, hb2⟩; simp [BaseLit.flatten] at hb2
+    (c : Cylinder rT) :
+    BaseLit.prod.π.b2 ⁻¹' (some '' Cylinder.flatten c)
+      = ⋃ s1 : Shape,
+          Cylinder.flatten ((BaseLit.prod (s1.cylinder) c) : Cylinder rT) := by
+  ext b; cases b <;> simp
 
-/-- Symmetric for the second projection. -/
+theorem ProbLang.BaseLit.prod_π_b2_preimage_none {rT : Type _} :
+    BaseLit.prod.π.b2 ⁻¹' ({none} : Set (Option (BaseLit rT)))
+      = (cover.prod : Set (BaseLit rT))ᶜ := by
+  ext b; cases b <;> simp [cover.prod]
+
+@[fun_prop]
 theorem ProbLang.BaseLit.measurable_prod_π_b2 [MeasurableSpace rT] :
-    Measurable (BaseLit.prod.π.b2 : BaseLit rT → Option (BaseLit rT)) := by
-  apply Measurable.option_of_cyl_preimages
-  rintro (_ | S) hc
-  · -- BaseLit.prod.π.b2⁻¹' {none} = ecov_prodᶜ (same shape as BaseLit.prod.π.b1)
-    have hrw : BaseLit.prod.π.b2 ⁻¹' (OptionCyl.flatten (none : OptionCyl (BaseLit rT)))
-             = (ecov_prod : Set (BaseLit rT))ᶜ := by
-      ext b
-      simp only [OptionCyl.flatten, Set.mem_preimage, Set.mem_singleton_iff,
-                 Set.mem_compl_iff, ecov_prod, stratum, Set.mem_iUnion,
-                 Set.mem_preimage, Set.mem_singleton_iff]
-      cases b with
-      | prod b1 b2 =>
-        rw [prod_π_b2_def_prod]
-        refine ⟨?_, ?_⟩
-        · intro hcontr; exact absurd hcontr (Option.some_ne_none _)
-        · intro hne
-          exfalso; apply hne; exact ⟨(b1.shape, b2.shape), by simp [shape]⟩
-      | int z =>
-        rw [prod_π_b2_def_int]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | bool b =>
-        rw [prod_π_b2_def_bool]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | unit =>
-        rw [prod_π_b2_def_unit]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | loc l =>
-        rw [prod_π_b2_def_loc]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | lbl l =>
-        rw [prod_π_b2_def_lbl]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | real r =>
-        rw [prod_π_b2_def_real]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-      | nest b r =>
-        rw [prod_π_b2_def_nest]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨⟨s1, s2⟩, hb⟩; simp [shape] at hb
-    rw [hrw]; exact ecov_prod_measurable.compl
-  · -- BaseLit.prod.π.b2⁻¹' (some '' S) for measurable S. Same σ-alg induction shape as BaseLit.prod.π.b1.
-    cases hc with
-    | some hS =>
-      have P_holds : ∀ S : Set (BaseLit rT), MeasurableSet S →
-                       MeasurableSet (BaseLit.prod.π.b2 ⁻¹' (some '' S)) := by
-        intro S hS
-        induction hS with
-        | basic G hG =>
-          obtain ⟨c, hc, rfl⟩ := hG
-          rw [prod_π_b2_preimage_some_flatten c]
-          exact MeasurableSet.iUnion fun s1 =>
-            BaseLit.flatten_measurable (.prod (shapeCyl_HasMeasurableLeaves s1) hc)
-        | empty =>
-          simp [Set.image_empty]
-        | compl G _ ih =>
-          have hrange : (some : BaseLit rT → Option (BaseLit rT)) '' Gᶜ
-                      = (some '' Set.univ) \ (some '' G) := by
-            ext x
-            cases x with
-            | none => simp
-            | some a =>
-              simp only [Set.mem_image, Set.mem_diff, Set.mem_univ, Set.mem_compl_iff]
-              refine ⟨?_, ?_⟩
-              · rintro ⟨a', ha', heq⟩
-                refine ⟨⟨a', trivial, heq⟩, ?_⟩
-                rintro ⟨a'', ha'', heq2⟩
-                rw [Option.some_inj] at heq
-                rw [Option.some_inj] at heq2
-                rw [← heq2] at heq
-                exact ha' (heq ▸ ha'')
-              · rintro ⟨_, hne⟩
-                refine ⟨a, ?_, rfl⟩
-                intro hG
-                exact hne ⟨a, hG, rfl⟩
-          rw [hrange, Set.preimage_diff]
-          have h_univ : MeasurableSet (BaseLit.prod.π.b2 ⁻¹' (some '' (Set.univ : Set (BaseLit rT)))) := by
-            have hrange : (some : BaseLit rT → Option (BaseLit rT)) '' Set.univ
-                        = {none}ᶜ := by
-              ext x
-              cases x with
-              | none => simp
-              | some a => simp
-            rw [hrange]
-            rw [Set.preimage_compl]
-            have hnone_eq : BaseLit.prod.π.b2 ⁻¹' ({none} : Set (Option (BaseLit rT)))
-                          = (ecov_prod : Set (BaseLit rT))ᶜ := by
-              ext b
-              cases b with
-              | prod b1 b2 =>
-                rw [Set.mem_preimage, prod_π_b2_def_prod]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨?_, ?_⟩
-                · intro hcontr; exact absurd hcontr (Option.some_ne_none _)
-                · intro hne
-                  exfalso; apply hne
-                  exact ⟨(b1.shape, b2.shape), by simp [stratum, shape]⟩
-              | int z =>
-                rw [Set.mem_preimage, prod_π_b2_def_int]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | bool b =>
-                rw [Set.mem_preimage, prod_π_b2_def_bool]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | unit =>
-                rw [Set.mem_preimage, prod_π_b2_def_unit]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | loc l =>
-                rw [Set.mem_preimage, prod_π_b2_def_loc]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | lbl l =>
-                rw [Set.mem_preimage, prod_π_b2_def_lbl]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | real r =>
-                rw [Set.mem_preimage, prod_π_b2_def_real]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-              | nest b r =>
-                rw [Set.mem_preimage, prod_π_b2_def_nest]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_prod, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨⟨s1, s2⟩, hb⟩; simp [stratum, shape] at hb
-            rw [hnone_eq]
-            simp
-            exact ecov_prod_measurable
-          exact h_univ.diff ih
-        | iUnion f _ ih =>
-          rw [Set.image_iUnion, Set.preimage_iUnion]
-          exact MeasurableSet.iUnion ih
-      exact P_holds S hS
+    Measurable (BaseLit.prod.π.b2 : BaseLit rT → Option (BaseLit rT)) :=
+  measurable_option_of_cov_and_basic
+    cover.prod.measurable prod_π_b2_preimage_none
+    (fun c hc => by
+      rw [prod_π_b2_preimage_some_flatten c]
+      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
 
-/-- **Generic σ-algebra induction for cover-restricted measurability.**
-
-If the target's σ-algebra is `generateFrom 𝒞`, and `cov ∩ f⁻¹' G` is measurable for every
-generator `G ∈ 𝒞`, then the same holds for every measurable `G`. The σ-algebra induction
-threads `cov ∩ _` through the lattice operations. -/
-theorem MeasurableSet.cover_inter_preimage_of_gen
-    {α β : Type _} [MeasurableSpace α] [mβ : MeasurableSpace β]
-    {𝒞 : Set (Set β)} (hβ : mβ = MeasurableSpace.generateFrom 𝒞)
-    {cov : Set α} (hcov : MeasurableSet cov) (f : α → β)
-    (hgen : ∀ G ∈ 𝒞, MeasurableSet (cov ∩ f ⁻¹' G)) :
-    ∀ G : Set β, MeasurableSet G → MeasurableSet (cov ∩ f ⁻¹' G) := by
-  intro G hG
-  rw [hβ] at hG
-  induction hG with
-  | basic G' hG' => exact hgen G' hG'
-  | empty => simp
-  | compl G' _ ih =>
-    have hext : cov ∩ f ⁻¹' G'ᶜ = cov \ (cov ∩ f ⁻¹' G') := by
-      ext b; constructor
-      · rintro ⟨hc, hG'⟩
-        exact ⟨hc, fun ⟨_, hG''⟩ => hG' hG''⟩
-      · rintro ⟨hc, hne⟩
-        exact ⟨hc, fun h => hne ⟨hc, h⟩⟩
-    rw [hext]; exact hcov.diff ih
-  | iUnion G' _ ih =>
-    have hext : cov ∩ f ⁻¹' (⋃ i, G' i) = ⋃ i, cov ∩ f ⁻¹' G' i := by
-      ext b; simp only [Set.mem_inter_iff, Set.mem_preimage, Set.mem_iUnion]
-      exact ⟨fun ⟨hc, i, hin⟩ => ⟨i, hc, hin⟩, fun ⟨i, hc, hin⟩ => ⟨hc, i, hin⟩⟩
-    rw [hext]; exact .iUnion ih
-
-/-- Specialization to the `BaseLit rT` σ-algebra (a cylinder-generated σ-algebra). -/
-theorem ProbLang.BaseLit.cover_meas_of_gen [MeasurableSpace rT]
-    (cov : Set (BaseLit rT)) (hcov : MeasurableSet cov)
-    (f : BaseLit rT → BaseLit rT)
-    (hgen : ∀ c, c.HasMeasurableLeaves → MeasurableSet (cov ∩ f ⁻¹' BaseLit.flatten c)) :
-    ∀ G : Set (BaseLit rT), MeasurableSet G → MeasurableSet (cov ∩ f ⁻¹' G) := by
-  refine MeasurableSet.cover_inter_preimage_of_gen rfl hcov f ?_
-  rintro _ ⟨c, hc, rfl⟩
-  exact hgen c hc
-
-/-- **Subtype-restricted measurability from cover-restricted measurability.**
-
-If `cov ⊆ α` is measurable and `cov ∩ f⁻¹' G` is measurable for every measurable `G ⊆ β`,
-then the subtype-restricted function `↥cov → β` is measurable. -/
-theorem Measurable.of_cover_inter_preimage
-    {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
-    {cov : Set α} {f : α → β}
-    (h : ∀ G : Set β, MeasurableSet G → MeasurableSet (cov ∩ f ⁻¹' G)) :
-    Measurable (fun (b : ↥cov) => f b.val) := by
-  intro G hG
-  have hext : (fun (b : ↥cov) => f b.val) ⁻¹' G
-            = (Subtype.val : ↥cov → α) ⁻¹' (cov ∩ f ⁻¹' G) := by
-    ext ⟨b, hb⟩
-    simp only [Set.mem_preimage, Set.mem_inter_iff]
-    exact ⟨fun h => ⟨hb, h⟩, fun ⟨_, h⟩ => h⟩
-  rw [hext]
-  exact MeasurableSet.preimage (h G hG) measurable_subtype_coe
-
-/-- **Cover-restricted measurability from subtype-restricted measurability** (the converse). -/
-theorem MeasurableSet.cover_inter_preimage_of_subtype
-    {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
-    {cov : Set α} (hcov : MeasurableSet cov) {f : α → β}
-    (h : Measurable (fun (b : ↥cov) => f b.val)) :
-    ∀ G : Set β, MeasurableSet G → MeasurableSet (cov ∩ f ⁻¹' G) := by
-  intro G hG
-  have hsub : MeasurableSet ((fun (b : ↥cov) => f b.val) ⁻¹' G) := h hG
-  have hext : (fun (b : ↥cov) => f b.val) ⁻¹' G
-            = (Subtype.val : ↥cov → α) ⁻¹' (cov ∩ f ⁻¹' G) := by
-    ext ⟨b, hb⟩
-    simp only [Set.mem_preimage, Set.mem_inter_iff]
-    exact ⟨fun h => ⟨hb, h⟩, fun ⟨_, h⟩ => h⟩
-  rw [hext] at hsub
-  rw [show cov ∩ f ⁻¹' G
-        = Subtype.val '' ((Subtype.val : ↥cov → α) ⁻¹' (cov ∩ f ⁻¹' G)) by
-      rw [Subtype.image_preimage_coe, ← Set.inter_assoc, Set.inter_self]]
-  exact MeasurableSet.subtype_image hcov hsub
-
-/-- Global measurability of `BaseLit.prod.π`, derived from per-component measurabilities. -/
+@[fun_prop]
 theorem ProbLang.BaseLit.measurable_prod_π [MeasurableSpace rT] :
     Measurable (BaseLit.prod.π : BaseLit rT → Option (BaseLit rT × BaseLit rT)) := by
-  have hrw : (BaseLit.prod.π : BaseLit rT → Option (BaseLit rT × BaseLit rT))
-           = Option.pair ∘ (fun b => (BaseLit.prod.π.b1 b, BaseLit.prod.π.b2 b)) := by
-    funext b; exact prod_π_eq_pair b
-  rw [hrw]
+  rw [funext prod_π_eq_pair]
   exact Measurable.option_pair.comp (Measurable.prodMk measurable_prod_π_b1 measurable_prod_π_b2)
 
-/-- Image of a set under `nest` equals the cover intersected with the projection-preimage. -/
-theorem ProbLang.BaseLit.image_nest_eq
-    (T : Set (BaseLit rT × rT)) :
-    (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) '' T
-      = ecov_nest ∩ BaseLit.nest.π ⁻¹' (some '' T) := by
-  rw [ecov_nest_eq_range]
-  exact Set.image_eq_range_inter_preimage_option _ BaseLit.nest.π (by intro ⟨b1, r⟩; rfl) T
-
-/-- Definitional unfolding of `BaseLit.nest.π.b` on each constructor. -/
-theorem ProbLang.BaseLit.nest_π_b_def_nest {rT : Type _} (b : BaseLit rT) (r : rT) :
-    BaseLit.nest.π.b (BaseLit.nest b r) = some b := rfl
-theorem ProbLang.BaseLit.nest_π_b_def_int {rT : Type _} (z : Int) :
-    BaseLit.nest.π.b (BaseLit.int z : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_b_def_bool {rT : Type _} (b : Bool) :
-    BaseLit.nest.π.b (BaseLit.bool b : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_b_def_unit {rT : Type _} :
-    BaseLit.nest.π.b (BaseLit.unit : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_b_def_loc {rT : Type _} (l : Loc) :
-    BaseLit.nest.π.b (BaseLit.loc l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_b_def_lbl {rT : Type _} (l : Lbl) :
-    BaseLit.nest.π.b (BaseLit.lbl l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_b_def_real {rT : Type _} (r : rT) :
-    BaseLit.nest.π.b (BaseLit.real r) = none := rfl
-theorem ProbLang.BaseLit.nest_π_b_def_prod {rT : Type _} (b1 b2 : BaseLit rT) :
-    BaseLit.nest.π.b (BaseLit.prod b1 b2) = none := rfl
-
-/-- Definitional unfolding of `BaseLit.nest.π.r` on each constructor. -/
-theorem ProbLang.BaseLit.nest_π_r_def_nest {rT : Type _} (b : BaseLit rT) (r : rT) :
-    BaseLit.nest.π.r (BaseLit.nest b r) = some r := rfl
-theorem ProbLang.BaseLit.nest_π_r_def_int {rT : Type _} (z : Int) :
-    BaseLit.nest.π.r (BaseLit.int z : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_r_def_bool {rT : Type _} (b : Bool) :
-    BaseLit.nest.π.r (BaseLit.bool b : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_r_def_unit {rT : Type _} :
-    BaseLit.nest.π.r (BaseLit.unit : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_r_def_loc {rT : Type _} (l : Loc) :
-    BaseLit.nest.π.r (BaseLit.loc l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_r_def_lbl {rT : Type _} (l : Lbl) :
-    BaseLit.nest.π.r (BaseLit.lbl l : BaseLit rT) = none := rfl
-theorem ProbLang.BaseLit.nest_π_r_def_real {rT : Type _} (r : rT) :
-    BaseLit.nest.π.r (BaseLit.real r) = none := rfl
-theorem ProbLang.BaseLit.nest_π_r_def_prod {rT : Type _} (b1 b2 : BaseLit rT) :
-    BaseLit.nest.π.r (BaseLit.prod b1 b2) = none := rfl
-
-/-- Per-cylinder preimage fact for `BaseLit.nest.π.b`. -/
 theorem ProbLang.BaseLit.nest_π_b_preimage_some_flatten {rT : Type _}
-    (c : BaseLitCyl rT) :
-    BaseLit.nest.π.b ⁻¹' (some '' BaseLit.flatten c)
-      = BaseLit.flatten ((BaseLit.nest c (Set.univ : Set rT)) : BaseLitCyl rT) := by
+    (c : Cylinder rT) :
+    BaseLit.nest.π.b ⁻¹' (some '' Cylinder.flatten c)
+      = Cylinder.flatten ((BaseLit.nest c (Set.univ : Set rT)) : Cylinder rT) := by
   ext b
-  cases b with
-  | nest b1 r =>
-    rw [Set.mem_preimage, nest_π_b_def_nest]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod, Set.mem_univ, and_true]
-    constructor
-    · rintro ⟨a, ha, heq⟩
-      rw [Option.some_inj] at heq
-      refine ⟨(b1, r), ?_, rfl⟩
-      rw [← heq]; exact ha
-    · rintro ⟨⟨b1', r'⟩, hb1', heq⟩
-      have hp : b1' = b1 ∧ r' = r := by
-        have := heq; simp at this; exact this
-      obtain ⟨rfl, rfl⟩ := hp
-      exact ⟨b1', hb1', rfl⟩
-  | int z =>
-    rw [Set.mem_preimage, nest_π_b_def_int]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨⟨b1', r'⟩, _, hcontr⟩; simp at hcontr
-  | bool b =>
-    rw [Set.mem_preimage, nest_π_b_def_bool]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨⟨b1', r'⟩, _, hcontr⟩; simp at hcontr
-  | unit =>
-    rw [Set.mem_preimage, nest_π_b_def_unit]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨⟨b1', r'⟩, _, hcontr⟩; simp at hcontr
-  | loc l =>
-    rw [Set.mem_preimage, nest_π_b_def_loc]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨⟨b1', r'⟩, _, hcontr⟩; simp at hcontr
-  | lbl l =>
-    rw [Set.mem_preimage, nest_π_b_def_lbl]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨⟨b1', r'⟩, _, hcontr⟩; simp at hcontr
-  | real r =>
-    rw [Set.mem_preimage, nest_π_b_def_real]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨⟨b1', r'⟩, _, hcontr⟩; simp at hcontr
-  | prod b1 b2 =>
-    rw [Set.mem_preimage, nest_π_b_def_prod]
-    simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨⟨b1', r'⟩, _, hcontr⟩; simp at hcontr
+  cases b <;> simp
 
-/-- Per-cylinder preimage fact for `BaseLit.nest.π.r`: at a measurable set `S ⊆ rT`,
-preimage is `⋃ s, flatten (.nest (shapeCyl s) S)`. -/
 theorem ProbLang.BaseLit.nest_π_r_preimage_some_S {rT : Type _}
     (S : Set rT) :
     BaseLit.nest.π.r ⁻¹' (some '' S)
-      = ⋃ s : BaseLit Unit,
-          BaseLit.flatten ((BaseLit.nest (shapeCyl s) S) : BaseLitCyl rT) := by
-  ext b
-  cases b with
-  | nest b1 r =>
-    rw [Set.mem_preimage, nest_π_r_def_nest, Set.mem_iUnion]
-    constructor
-    · rintro ⟨a, ha, heq⟩
-      rw [Option.some_inj] at heq
-      refine ⟨b1.shape, ?_⟩
-      simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod]
-      refine ⟨(b1, r), ⟨?_, ?_⟩, rfl⟩
-      · rw [ProbLang.BaseLit.flatten_shapeCyl]; rfl
-      · rw [← heq]; exact ha
-    · rintro ⟨s, hb⟩
-      simp only [BaseLit.flatten, Set.mem_image, Set.mem_prod] at hb
-      obtain ⟨⟨b1', r'⟩, ⟨_, hr'⟩, heq⟩ := hb
-      have hp : b1' = b1 ∧ r' = r := by
-        have := heq; simp at this; exact this
-      obtain ⟨rfl, rfl⟩ := hp
-      exact ⟨r', hr', rfl⟩
-  | int z =>
-    rw [Set.mem_preimage, nest_π_r_def_int, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s, hb⟩; simp [BaseLit.flatten] at hb
-  | bool b =>
-    rw [Set.mem_preimage, nest_π_r_def_bool, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s, hb⟩; simp [BaseLit.flatten] at hb
-  | unit =>
-    rw [Set.mem_preimage, nest_π_r_def_unit, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s, hb⟩; simp [BaseLit.flatten] at hb
-  | loc l =>
-    rw [Set.mem_preimage, nest_π_r_def_loc, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s, hb⟩; simp [BaseLit.flatten] at hb
-  | lbl l =>
-    rw [Set.mem_preimage, nest_π_r_def_lbl, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s, hb⟩; simp [BaseLit.flatten] at hb
-  | real r =>
-    rw [Set.mem_preimage, nest_π_r_def_real, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s, hb⟩; simp [BaseLit.flatten] at hb
-  | prod b1 b2 =>
-    rw [Set.mem_preimage, nest_π_r_def_prod, Set.mem_iUnion]
-    refine ⟨?_, ?_⟩
-    · rintro ⟨_, _, hcontr⟩; exact absurd hcontr (Option.some_ne_none _)
-    · rintro ⟨s, hb⟩; simp [BaseLit.flatten] at hb
+      = ⋃ s : Shape,
+          Cylinder.flatten ((BaseLit.nest (s.cylinder) S) : Cylinder rT) := by
+  ext b; cases b <;> simp
 
-/-- Measurability of `BaseLit.nest.π.b`. -/
+theorem ProbLang.BaseLit.nest_π_b_preimage_none {rT : Type _} :
+    BaseLit.nest.π.b ⁻¹' ({none} : Set (Option (BaseLit rT)))
+      = (cover.nest : Set (BaseLit rT))ᶜ := by
+  ext b; cases b <;> simp [cover.nest]
+
+@[fun_prop]
 theorem ProbLang.BaseLit.measurable_nest_π_b [MeasurableSpace rT] :
-    Measurable (BaseLit.nest.π.b : BaseLit rT → Option (BaseLit rT)) := by
-  apply Measurable.option_of_cyl_preimages
-  rintro (_ | S) hc
-  · -- BaseLit.nest.π.b⁻¹' {none} = ecov_nestᶜ
-    have hrw : BaseLit.nest.π.b ⁻¹' (OptionCyl.flatten (none : OptionCyl (BaseLit rT)))
-             = (ecov_nest : Set (BaseLit rT))ᶜ := by
-      ext b
-      simp only [OptionCyl.flatten, Set.mem_preimage, Set.mem_singleton_iff,
-                 Set.mem_compl_iff, ecov_nest, stratum, Set.mem_iUnion,
-                 Set.mem_preimage, Set.mem_singleton_iff]
-      cases b with
-      | nest b1 r =>
-        rw [nest_π_b_def_nest]
-        refine ⟨?_, ?_⟩
-        · intro hcontr; exact absurd hcontr (Option.some_ne_none _)
-        · intro hne; exfalso; apply hne; exact ⟨b1.shape, by simp [shape]⟩
-      | int z =>
-        rw [nest_π_b_def_int]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | bool b =>
-        rw [nest_π_b_def_bool]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | unit =>
-        rw [nest_π_b_def_unit]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | loc l =>
-        rw [nest_π_b_def_loc]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | lbl l =>
-        rw [nest_π_b_def_lbl]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | real r =>
-        rw [nest_π_b_def_real]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | prod b1 b2 =>
-        rw [nest_π_b_def_prod]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-    rw [hrw]; exact ecov_nest_measurable.compl
-  · cases hc with
-    | some hS =>
-      have P_holds : ∀ S : Set (BaseLit rT), MeasurableSet S →
-                       MeasurableSet (BaseLit.nest.π.b ⁻¹' (some '' S)) := by
-        intro S hS
-        induction hS with
-        | basic G hG =>
-          obtain ⟨c, hc, rfl⟩ := hG
-          rw [nest_π_b_preimage_some_flatten c]
-          exact BaseLit.flatten_measurable
-            (.nest _ hc MeasurableSet.univ)
-        | empty => simp [Set.image_empty]
-        | compl G _ ih =>
-          have hrange : (some : BaseLit rT → Option (BaseLit rT)) '' Gᶜ
-                      = (some '' Set.univ) \ (some '' G) := by
-            ext x
-            cases x with
-            | none => simp
-            | some a =>
-              simp only [Set.mem_image, Set.mem_diff, Set.mem_univ, Set.mem_compl_iff]
-              refine ⟨?_, ?_⟩
-              · rintro ⟨a', ha', heq⟩
-                refine ⟨⟨a', trivial, heq⟩, ?_⟩
-                rintro ⟨a'', ha'', heq2⟩
-                rw [Option.some_inj] at heq
-                rw [Option.some_inj] at heq2
-                rw [← heq2] at heq
-                exact ha' (heq ▸ ha'')
-              · rintro ⟨_, hne⟩
-                refine ⟨a, ?_, rfl⟩
-                intro hG; exact hne ⟨a, hG, rfl⟩
-          rw [hrange, Set.preimage_diff]
-          have h_univ : MeasurableSet (BaseLit.nest.π.b ⁻¹' (some '' (Set.univ : Set (BaseLit rT)))) := by
-            have hrng : (some : BaseLit rT → Option (BaseLit rT)) '' Set.univ
-                      = {none}ᶜ := by
-              ext x; cases x with | none => simp | some a => simp
-            rw [hrng, Set.preimage_compl]
-            have hnone_eq : BaseLit.nest.π.b ⁻¹' ({none} : Set (Option (BaseLit rT)))
-                          = (ecov_nest : Set (BaseLit rT))ᶜ := by
-              ext b
-              cases b with
-              | nest b1 r =>
-                rw [Set.mem_preimage, nest_π_b_def_nest]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨?_, ?_⟩
-                · intro hcontr; exact absurd hcontr (Option.some_ne_none _)
-                · intro hne; exfalso; apply hne
-                  exact ⟨b1.shape, by simp [stratum, shape]⟩
-              | int z =>
-                rw [Set.mem_preimage, nest_π_b_def_int]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨s, hb⟩; simp [stratum, shape] at hb
-              | bool b =>
-                rw [Set.mem_preimage, nest_π_b_def_bool]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨s, hb⟩; simp [stratum, shape] at hb
-              | unit =>
-                rw [Set.mem_preimage, nest_π_b_def_unit]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨s, hb⟩; simp [stratum, shape] at hb
-              | loc l =>
-                rw [Set.mem_preimage, nest_π_b_def_loc]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨s, hb⟩; simp [stratum, shape] at hb
-              | lbl l =>
-                rw [Set.mem_preimage, nest_π_b_def_lbl]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨s, hb⟩; simp [stratum, shape] at hb
-              | real r =>
-                rw [Set.mem_preimage, nest_π_b_def_real]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨s, hb⟩; simp [stratum, shape] at hb
-              | prod b1 b2 =>
-                rw [Set.mem_preimage, nest_π_b_def_prod]
-                simp only [Set.mem_singleton_iff, Set.mem_compl_iff, ecov_nest, Set.mem_iUnion]
-                refine ⟨fun _ => ?_, fun _ => trivial⟩
-                rintro ⟨s, hb⟩; simp [stratum, shape] at hb
-            rw [hnone_eq]; simp; exact ecov_nest_measurable
-          exact h_univ.diff ih
-        | iUnion f _ ih =>
-          rw [Set.image_iUnion, Set.preimage_iUnion]
-          exact MeasurableSet.iUnion ih
-      exact P_holds S hS
+    Measurable (BaseLit.nest.π.b : BaseLit rT → Option (BaseLit rT)) :=
+  measurable_option_of_cov_and_basic
+    cover.nest.measurable nest_π_b_preimage_none
+    (fun c hc => by
+      rw [nest_π_b_preimage_some_flatten c]
+      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
 
-/-- Measurability of `BaseLit.nest.π.r` (rT-valued projection). -/
+theorem ProbLang.BaseLit.nest_π_r_preimage_none {rT : Type _} :
+    BaseLit.nest.π.r ⁻¹' ({none} : Set (Option rT))
+      = (cover.nest : Set (BaseLit rT))ᶜ := by
+  ext b; cases b <;> simp [cover.nest]
+
+@[fun_prop]
 theorem ProbLang.BaseLit.measurable_nest_π_r [MeasurableSpace rT] :
-    Measurable (BaseLit.nest.π.r : BaseLit rT → Option rT) := by
-  apply Measurable.option_of_cyl_preimages
-  rintro (_ | S) hc
-  · -- BaseLit.nest.π.r⁻¹' {none} = ecov_nestᶜ
-    have hrw : BaseLit.nest.π.r ⁻¹' (OptionCyl.flatten (none : OptionCyl rT))
-             = (ecov_nest : Set (BaseLit rT))ᶜ := by
-      ext b
-      simp only [OptionCyl.flatten, Set.mem_preimage, Set.mem_singleton_iff,
-                 Set.mem_compl_iff, ecov_nest, stratum, Set.mem_iUnion,
-                 Set.mem_preimage, Set.mem_singleton_iff]
-      cases b with
-      | nest b1 r =>
-        rw [nest_π_r_def_nest]
-        refine ⟨?_, ?_⟩
-        · intro hcontr; exact absurd hcontr (Option.some_ne_none _)
-        · intro hne; exfalso; apply hne; exact ⟨b1.shape, by simp [shape]⟩
-      | int z =>
-        rw [nest_π_r_def_int]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | bool b =>
-        rw [nest_π_r_def_bool]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | unit =>
-        rw [nest_π_r_def_unit]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | loc l =>
-        rw [nest_π_r_def_loc]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | lbl l =>
-        rw [nest_π_r_def_lbl]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | real r =>
-        rw [nest_π_r_def_real]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-      | prod b1 b2 =>
-        rw [nest_π_r_def_prod]
-        refine ⟨fun _ => ?_, fun _ => rfl⟩
-        rintro ⟨s, hb⟩; simp [shape] at hb
-    rw [hrw]; exact ecov_nest_measurable.compl
-  · cases hc with
-    | some hS =>
-      -- BaseLit.nest.π.r⁻¹' (some '' S) = ⋃ s, flatten (.nest (shapeCyl s) S). Direct.
-      show MeasurableSet (BaseLit.nest.π.r ⁻¹' (some '' S))
+    Measurable (BaseLit.nest.π.r : BaseLit rT → Option rT) :=
+  Measurable.option_of_cov
+    cover.nest.measurable nest_π_r_preimage_none
+    (fun S hS => by
       rw [nest_π_r_preimage_some_S]
-      exact MeasurableSet.iUnion fun s =>
-        BaseLit.flatten_measurable (.nest _ (shapeCyl_HasMeasurableLeaves s) hS)
+      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
 
-/-- Joint pairing equation for `BaseLit.nest.π`. -/
 theorem ProbLang.BaseLit.nest_π_eq_pair {rT : Type _} (b : BaseLit rT) :
     BaseLit.nest.π b = Option.pair (BaseLit.nest.π.b b, BaseLit.nest.π.r b) := by
-  cases b with
-  | nest b1 r => show some (b1, r) = Option.pair (some b1, some r); rfl
-  | int z => rfl
-  | bool _ => rfl
-  | unit => rfl
-  | loc _ => rfl
-  | lbl _ => rfl
-  | real _ => rfl
-  | prod _ _ => rfl
+  cases b <;> rfl
 
-/-- Global measurability of `BaseLit.nest.π`, derived from per-component measurabilities. -/
+@[fun_prop]
 theorem ProbLang.BaseLit.measurable_nest_π [MeasurableSpace rT] :
     Measurable (BaseLit.nest.π : BaseLit rT → Option (BaseLit rT × rT)) := by
-  have hrw : (BaseLit.nest.π : BaseLit rT → Option (BaseLit rT × rT))
-           = Option.pair ∘ (fun b => (BaseLit.nest.π.b b, BaseLit.nest.π.r b)) := by
-    funext b; exact nest_π_eq_pair b
-  rw [hrw]
+  rw [funext nest_π_eq_pair]
   exact Measurable.option_pair.comp (Measurable.prodMk measurable_nest_π_b measurable_nest_π_r)
 
-/-- Cover-restricted measurability for `BaseLit.nest.π` follows from global measurability. -/
-theorem ProbLang.BaseLit.cover_meas_nest_π [MeasurableSpace rT]
-    {T : Set (Option (BaseLit rT × rT))} (hT : MeasurableSet T) :
-    MeasurableSet (ecov_nest ∩ BaseLit.nest.π ⁻¹' T) :=
-  ecov_nest_measurable.inter (measurable_nest_π hT)
+-/
 
-/-- Cover-restricted measurability for `BaseLit.prod.π` follows from global measurability. -/
-theorem ProbLang.BaseLit.cover_meas_prod_π [MeasurableSpace rT]
-    {T : Set (Option (BaseLit rT × BaseLit rT))} (hT : MeasurableSet T) :
-    MeasurableSet (ecov_prod ∩ BaseLit.prod.π ⁻¹' T) :=
-  ecov_prod_measurable.inter (measurable_prod_π hT)
+/-- Preimage of `flatten (.prod c1 c2)` under the curried `BaseLit.prod` is the product
+of the two leaf-flattens. -/
+@[simp] theorem BaseLit.preimage_prod_flatten {rT : Type _} (c1 c2 : Cylinder rT) :
+    (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) ⁻¹'
+        Cylinder.flatten (.prod c1 c2)
+      = Cylinder.flatten c1 ×ˢ Cylinder.flatten c2 := by
+  ext ⟨_, _⟩; simp
 
 /-- Preimage of `flatten c` under the curried `BaseLit.prod` is empty for non-`.prod` `c`. -/
-theorem BaseLit.preimage_flatten_of_ne_prod {rT : Type _} {c : BaseLitCyl rT}
+theorem BaseLit.preimage_flatten_of_ne_prod {rT : Type _} {c : Cylinder rT}
     (h : ∀ c1 c2, c ≠ .prod c1 c2) :
-    (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) ⁻¹' BaseLit.flatten c = ∅ := by
-  ext ⟨a, b⟩
-  cases c <;> simp_all [BaseLit.flatten]
+    (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) ⁻¹' Cylinder.flatten c = ∅ := by
+  ext ⟨_, _⟩; cases c <;> simp_all
 
 /-- Measurability of `BaseLit.prod` as a binary function. -/
+@[fun_prop]
 theorem BaseLit.measurable_prod [MeasurableSpace rT] :
     Measurable (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) := by
   apply measurable_generateFrom
   rintro G ⟨c, hc, rfl⟩
   cases hc with
-  | @prod c1 c2 h1 h2 =>
-    have heq : (fun p : BaseLit rT × BaseLit rT => BaseLit.prod p.1 p.2) ⁻¹'
-                  BaseLit.flatten (.prod c1 c2)
-             = BaseLit.flatten c1 ×ˢ BaseLit.flatten c2 := by
-      ext ⟨a, b⟩; simp [BaseLit.flatten]
-    rw [heq]
-    exact (BaseLit.flatten_measurable h1).prod (BaseLit.flatten_measurable h2)
-  | _ =>
-    rw [BaseLit.preimage_flatten_of_ne_prod (by intros; nofun)]
-    exact MeasurableSet.empty
+  | @prod c1 c2 h1 h2 => simp only [BaseLit.preimage_prod_flatten]; measurability
+  | _ => rw [BaseLit.preimage_flatten_of_ne_prod (by intros; nofun)]; exact .empty
+
+/-- Preimage of `flatten (.nest c Sr)` under the curried `BaseLit.nest` is the product
+of the leaf-flatten and `Sr`. -/
+@[simp] theorem BaseLit.preimage_nest_flatten {rT : Type _} (c : Cylinder rT) (Sr : Set rT) :
+    (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) ⁻¹' Cylinder.flatten (.nest c Sr)
+      = Cylinder.flatten c ×ˢ Sr := by
+  ext ⟨_, _⟩; simp
 
 /-- Preimage of `flatten c` under the curried `BaseLit.nest` is empty for non-`.nest` `c`. -/
-theorem BaseLit.preimage_flatten_of_ne_nest {rT : Type _} {c : BaseLitCyl rT}
+theorem BaseLit.preimage_flatten_of_ne_nest {rT : Type _} {c : Cylinder rT}
     (h : ∀ c0 Sr, c ≠ .nest c0 Sr) :
-    (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) ⁻¹' BaseLit.flatten c = ∅ := by
-  ext ⟨a, b⟩
-  cases c <;> simp_all [BaseLit.flatten]
+    (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) ⁻¹' Cylinder.flatten c = ∅ := by
+  ext ⟨_, _⟩; cases c <;> simp_all
 
 /-- Measurability of `BaseLit.nest` as a binary function. -/
+@[fun_prop]
 theorem BaseLit.measurable_nest [MeasurableSpace rT] :
     Measurable (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) := by
   apply measurable_generateFrom
   rintro G ⟨c, hc, rfl⟩
   cases hc with
-  | @nest c Sr h hSr =>
-    have heq : (fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) ⁻¹'
-                  BaseLit.flatten (.nest c Sr)
-             = BaseLit.flatten c ×ˢ Sr := by
-      ext ⟨a, b⟩; simp [BaseLit.flatten]
-    rw [heq]
-    exact (BaseLit.flatten_measurable h).prod hSr
-  | _ =>
-    rw [BaseLit.preimage_flatten_of_ne_nest (by intros; nofun)]
-    exact MeasurableSet.empty
+  | @nest c Sr h hSr => simp only [BaseLit.preimage_nest_flatten]; measurability
+  | _ => rw [BaseLit.preimage_flatten_of_ne_nest (by intros; nofun)]; exact .empty
 
+/-! ### Each constructor is a `MeasurableEmbedding`.
+
+Three proof patterns, dispatched by position kind:
+* **Syntax-leaf** (`int`, `bool`, `loc`, `lbl`): image is a countable iUnion of singleton
+  flattens; `Measurable.of_discrete` on the domain side.
+* **Nullary / data-leaf** (`unit`, `real`): image equals one cylinder flatten directly.
+* **Recursive** (`prod`, `nest`): use `of_measurable_inverse` with `(c.π · ).getD default`. -/
+
+namespace ProbLang.BaseLit
+
+theorem int.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (BaseLit.int : Int → BaseLit rT) := by
+  refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  have : (BaseLit.int : Int → BaseLit rT) '' S = ⋃ z ∈ S, Cylinder.flatten (.int z) := by
+    ext b; cases b <;> aesop
+  rw [this]
+  exact .biUnion S.to_countable fun _ _ => flatten_measurable .int
+
+theorem bool.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (BaseLit.bool : Bool → BaseLit rT) := by
+  refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  have : (BaseLit.bool : Bool → BaseLit rT) '' S = ⋃ b ∈ S, Cylinder.flatten (.bool b) := by
+    ext b; cases b <;> aesop
+  rw [this]
+  exact .biUnion S.to_countable fun _ _ => flatten_measurable .bool
+
+theorem loc.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (BaseLit.loc : Loc → BaseLit rT) := by
+  refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  have : (BaseLit.loc : Loc → BaseLit rT) '' S = ⋃ l ∈ S, Cylinder.flatten (.loc l) := by
+    ext b; cases b <;> aesop
+  rw [this]
+  exact .biUnion S.to_countable fun _ _ => flatten_measurable .loc
+
+theorem lbl.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (BaseLit.lbl : Lbl → BaseLit rT) := by
+  refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  have : (BaseLit.lbl : Lbl → BaseLit rT) '' S = ⋃ l ∈ S, Cylinder.flatten (.lbl l) := by
+    ext b; cases b <;> aesop
+  rw [this]
+  exact .biUnion S.to_countable fun _ _ => flatten_measurable .lbl
+
+theorem unit.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (fun _ : Unit => (BaseLit.unit : BaseLit rT)) := by
+  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
+  · exact measurable_const
+  · rw [show Set.range (fun _ : Unit => (BaseLit.unit : BaseLit rT)) = cover.unit from by
+        rw [cover.unit_eq_range]; ext; simp]
+    exact cover.unit.measurable
+  · exact measurable_const
+  · intro; rfl
+
+/-- The `BaseLit.real` constructor is measurable. -/
+theorem measurable_real [MeasurableSpace rT] :
+    Measurable (BaseLit.real : rT → BaseLit rT) := by
+  apply measurable_generateFrom
+  rintro G ⟨c, hc, rfl⟩
+  cases hc with
+  | @real S hS =>
+    show MeasurableSet (BaseLit.real ⁻¹' (BaseLit.real '' S))
+    rw [Set.preimage_image_eq _ (by intro _ _; simp [BaseLit.real.injEq, imp_self])]
+    exact hS
+  | _ => convert MeasurableSet.empty; ext r; simp_all
+
+theorem real.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (BaseLit.real : rT → BaseLit rT) := by
+  refine ⟨fun _ _ h => by injection h, measurable_real, fun S hS => ?_⟩
+  exact flatten_measurable (.real _ hS)
+
+/-- Abbreviation for the cylinder-flatten family. -/
+private abbrev cylSets (rT : Type _) [MeasurableSpace rT] : Set (Set (BaseLit rT)) :=
+  {S | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}
+
+/-- Direct proof of `MeasurableEmbedding (uncurry prod)` via σ-algebra induction over the
+π-system of cylinder rectangles, with no detour through `prod.π`. -/
+theorem prod.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (Function.uncurry (BaseLit.prod : BaseLit rT → BaseLit rT → BaseLit rT)) := by
+  refine ⟨?_, BaseLit.measurable_prod, fun S hS => ?_⟩
+  · rintro ⟨_, _⟩ ⟨_, _⟩ h; simp [Function.uncurry] at h; exact Prod.ext h.1 h.2
+  have h_pi : IsPiSystem (Set.image2 (· ×ˢ ·) (cylSets rT) (cylSets rT)) :=
+    Cylinder.flatten_isPiSystem.prod Cylinder.flatten_isPiSystem
+  have h_gen : (Prod.instMeasurableSpace : MeasurableSpace (BaseLit rT × BaseLit rT))
+             = MeasurableSpace.generateFrom (Set.image2 (· ×ˢ ·) (cylSets rT) (cylSets rT)) :=
+    (generateFrom_eq_prod rfl rfl
+      Cylinder.flatten_isCountablySpanning Cylinder.flatten_isCountablySpanning).symm
+  refine MeasurableSpace.induction_on_inter (C := fun S _ =>
+      MeasurableSet (Function.uncurry BaseLit.prod '' S))
+      h_gen h_pi ?_ ?_ ?_ ?_ S hS
+  · simp
+  · rintro _ ⟨_, ⟨c₁, hc₁, rfl⟩, _, ⟨c₂, hc₂, rfl⟩, rfl⟩
+    show MeasurableSet (Function.uncurry BaseLit.prod '' (Cylinder.flatten c₁ ×ˢ Cylinder.flatten c₂))
+    exact flatten_measurable (.prod hc₁ hc₂)
+  · intro T hTm ih
+    have hinj : Function.Injective
+        (Function.uncurry (BaseLit.prod : BaseLit rT → BaseLit rT → BaseLit rT)) := by
+      rintro ⟨_, _⟩ ⟨_, _⟩ h; simp [Function.uncurry] at h; exact Prod.ext h.1 h.2
+    rw [Set.compl_eq_univ_diff, Set.image_diff hinj, Set.image_univ, ← cover.prod_eq_range]
+    exact cover.prod.measurable.diff ih
+  · intro f _ _ ih
+    rw [Set.image_iUnion]
+    exact .iUnion ih
+
+/-- Direct proof of `MeasurableEmbedding (uncurry nest)`. -/
+theorem nest.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (Function.uncurry (BaseLit.nest : BaseLit rT → rT → BaseLit rT)) := by
+  refine ⟨?_, BaseLit.measurable_nest, fun S hS => ?_⟩
+  · rintro ⟨_, _⟩ ⟨_, _⟩ h; simp [Function.uncurry] at h; exact Prod.ext h.1 h.2
+  have h_pi : IsPiSystem (Set.image2 (· ×ˢ ·) (cylSets rT) {S : Set rT | MeasurableSet S}) :=
+    Cylinder.flatten_isPiSystem.prod fun _ hS _ hT _ => hS.inter hT
+  have h_gen : (Prod.instMeasurableSpace : MeasurableSpace (BaseLit rT × rT))
+             = MeasurableSpace.generateFrom
+                 (Set.image2 (· ×ˢ ·) (cylSets rT) {S : Set rT | MeasurableSet S}) :=
+    (generateFrom_eq_prod rfl MeasurableSpace.generateFrom_measurableSet
+      Cylinder.flatten_isCountablySpanning isCountablySpanning_measurableSet).symm
+  refine MeasurableSpace.induction_on_inter (C := fun S _ =>
+      MeasurableSet (Function.uncurry BaseLit.nest '' S))
+      h_gen h_pi ?_ ?_ ?_ ?_ S hS
+  · simp
+  · rintro _ ⟨_, ⟨c, hc, rfl⟩, S, hS, rfl⟩
+    show MeasurableSet (Function.uncurry BaseLit.nest '' (Cylinder.flatten c ×ˢ S))
+    exact flatten_measurable (.nest _ hc hS)
+  · intro T hTm ih
+    have hinj : Function.Injective
+        (Function.uncurry (BaseLit.nest : BaseLit rT → rT → BaseLit rT)) := by
+      rintro ⟨_, _⟩ ⟨_, _⟩ h; simp [Function.uncurry] at h; exact Prod.ext h.1 h.2
+    rw [Set.compl_eq_univ_diff, Set.image_diff hinj, Set.image_univ, ← cover.nest_eq_range]
+    exact cover.nest.measurable.diff ih
+  · intro f _ _ ih
+    rw [Set.image_iUnion]
+    exact .iUnion ih
+
+end ProbLang.BaseLit
+
+@[fun_prop]
 theorem BaseLit.measurable_rec
     {rT : Type _} [MeasurableSpace rT] [Inhabited rT]
     {α : Type _} [MeasurableSpace α]
@@ -1323,9 +803,6 @@ theorem BaseLit.measurable_rec
     (f_loc  : Loc  → α) (f_lbl  : Lbl  → α) (f_real : rT → α)
     (f_prod : BaseLit rT × BaseLit rT → α)
     (f_nest : BaseLit rT × rT → α)
-    (_h_int  : Measurable f_int)  (_h_bool : Measurable f_bool)
-    (_h_unit : Measurable f_unit)
-    (_h_loc  : Measurable f_loc)  (_h_lbl  : Measurable f_lbl)
     (h_real : Measurable f_real)
     (h_prod : Measurable f_prod) (h_nest : Measurable f_nest) :
     Measurable (fun b : BaseLit rT =>
@@ -1352,69 +829,19 @@ theorem BaseLit.measurable_rec
             (f_prod ⁻¹' S))
         ∪ ((fun p : BaseLit rT × rT => BaseLit.nest p.1 p.2) ''
             (f_nest ⁻¹' S)) := by
-    ext b; cases b <;> simp [Set.mem_preimage]; exact ⟨fun h => ⟨(), h⟩, fun ⟨_, h⟩ => h⟩
+    ext b; cases b <;> aesop
   rw [hdecomp]
-  refine MeasurableSet.union (MeasurableSet.union (MeasurableSet.union
-    (MeasurableSet.union (MeasurableSet.union (MeasurableSet.union
-    (MeasurableSet.union ?_ ?_) ?_) ?_) ?_) ?_) ?_) ?_
-  -- int branch: countable union of singleton-generators
-  · have : (BaseLit.int (rT := rT)) '' (f_int ⁻¹' S)
-          = ⋃ z ∈ f_int ⁻¹' S, BaseLit.flatten (rT := rT) (.int z) := by
-      ext b; simp [BaseLit.flatten]; tauto
-    rw [this]
-    exact .biUnion (Set.to_countable _) fun z _ =>
-      .basic _ ⟨.int z, .int, rfl⟩
-  -- bool branch
-  · have : (BaseLit.bool (rT := rT)) '' (f_bool ⁻¹' S)
-          = ⋃ b ∈ f_bool ⁻¹' S, BaseLit.flatten (rT := rT) (.bool b) := by
-      ext b; simp [BaseLit.flatten]; tauto
-    rw [this]
-    exact .biUnion (Set.to_countable _) fun b _ =>
-      .basic _ ⟨.bool b, .bool, rfl⟩
-  -- unit branch: countable union (of one or zero singletons)
-  · have : ((fun _ : Unit => (BaseLit.unit : BaseLit rT))) '' (f_unit ⁻¹' S)
-          = ⋃ _ ∈ f_unit ⁻¹' S, BaseLit.flatten (rT := rT) (.unit) := by
-      ext b; simp [BaseLit.flatten]; tauto
-    rw [this]
-    exact .biUnion (Set.to_countable _) fun _ _ =>
-      .basic _ ⟨.unit, .unit, rfl⟩
-  -- loc branch
-  · have : (BaseLit.loc (rT := rT)) '' (f_loc ⁻¹' S)
-          = ⋃ l ∈ f_loc ⁻¹' S, BaseLit.flatten (rT := rT) (.loc l) := by
-      ext b; simp [BaseLit.flatten]; tauto
-    rw [this]
-    exact .biUnion (Set.to_countable _) fun l _ =>
-      .basic _ ⟨.loc l, .loc, rfl⟩
-  -- lbl branch
-  · have : (BaseLit.lbl (rT := rT)) '' (f_lbl ⁻¹' S)
-          = ⋃ l ∈ f_lbl ⁻¹' S, BaseLit.flatten (rT := rT) (.lbl l) := by
-      ext b; simp [BaseLit.flatten]; tauto
-    rw [this]
-    exact .biUnion (Set.to_countable _) fun l _ =>
-      .basic _ ⟨.lbl l, .lbl, rfl⟩
-  -- real branch: this is *directly* a flattened cylinder
-  · have : (BaseLit.real (rT := rT)) '' (f_real ⁻¹' S)
-          = BaseLit.flatten (.real (f_real ⁻¹' S)) := by
-      simp [BaseLit.flatten]
-    rw [this]
-    exact .basic _ ⟨.real (f_real ⁻¹' S),
-                    .real _ (h_real hS),
-                    rfl⟩
-  -- prod branch: rewrite image as cover ∩ projection-preimage, then use cover-restricted
-  -- measurability of `BaseLit.prod.π`. The Option wrapper goes through `some` (a measurable embedding).
-  · rw [ProbLang.BaseLit.image_prod_eq]
-    exact ProbLang.BaseLit.cover_meas_prod_π
-      (MeasurableEmbedding.some_mk.measurableSet_image' (h_prod hS))
-  -- nest branch: same pattern.
-  · rw [ProbLang.BaseLit.image_nest_eq]
-    exact ProbLang.BaseLit.cover_meas_nest_π
-      (MeasurableEmbedding.some_mk.measurableSet_image' (h_nest hS))
+  iterate 7 refine .union ?_ ?_
+  · exact int.measurableEmbedding.measurableSet_image'   .of_discrete
+  · exact bool.measurableEmbedding.measurableSet_image'  .of_discrete
+  · exact unit.measurableEmbedding.measurableSet_image'  .of_discrete
+  · exact loc.measurableEmbedding.measurableSet_image'   .of_discrete
+  · exact lbl.measurableEmbedding.measurableSet_image'   .of_discrete
+  · exact real.measurableEmbedding.measurableSet_image'  (h_real hS)
+  · exact prod.measurableEmbedding.measurableSet_image'  (h_prod hS)
+  · exact nest.measurableEmbedding.measurableSet_image'  (h_nest hS)
 end Measurability
 end BaseLit
-
-
-
-
 
 
 

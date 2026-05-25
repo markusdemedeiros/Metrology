@@ -117,6 +117,56 @@ initialize registerBuiltinAttribute uncurriedProjectionsImpl
 def SingleProjectionName (cinfo : ConstructorVal) (field : Name) : Name :=
   cinfo.name.str "π" ++ field
 
+/-- For the projection `projName` of `decl` at field index `ifield` (with chosen
+constructor index `ictor` aka `cinfo`), emit one `@[simp]`-tagged rfl theorem
+per constructor `c'` of `decl`, of the form:
+  * if `c' = cinfo`:  `projName params (c' params args) = some args[ifield]`
+  * otherwise:        `projName params (c' params args) = none`
+Theorems are named `projName.eq_<short c'>`. -/
+def mkSingleProjectionEqTheorems (decl : Name) (ictor : Nat) (_cinfo : ConstructorVal)
+    (ifield : Nat) (projName : Name) (projLevelParams : List Name) : MetaM Unit := do
+  let info ← getConstInfoInduct decl
+  let projLevels : List Level := projLevelParams.map Level.param
+  for h : i in [:info.ctors.length] do
+    let ctorName := info.ctors[i]
+    let ctorInfo ← getConstInfoCtor ctorName
+    forallTelescope ctorInfo.type fun xs _ => do
+      let params : Array Expr := xs[:info.numParams]
+      let ctorArgs : Array Expr := xs[info.numParams:]
+      -- LHS: projName @params (ctorName @params @ctorArgs)
+      let ctorApp ← mkAppOptM ctorName (xs.map some)
+      let projConst : Expr := Expr.const projName projLevels
+      let projApplied := mkAppN projConst params
+      let lhs := mkApp projApplied ctorApp
+      let lhsType ← inferType lhs
+      let rhs ←
+        if i = ictor then
+          unless ifield < ctorArgs.size do
+            throwError "field index out of range while building eq theorem"
+          let fieldExpr := ctorArgs[ifield]!
+          let fieldType ← inferType fieldExpr
+          mkAppOptM ``Option.some #[some fieldType, some fieldExpr]
+        else
+          let fieldType ←
+            match lhsType with
+            | .app (.const ``Option _) ft => pure ft
+            | _ => throwError "expected projection LHS to have type `Option _`, got {lhsType}"
+          mkAppOptM ``Option.none #[some fieldType]
+      let eqType ← mkEq lhs rhs
+      let proof ← mkEqRefl lhs
+      let eqTypeClosed ← mkForallFVars (params ++ ctorArgs) eqType
+      let proofClosed ← mkLambdaFVars (params ++ ctorArgs) proof
+      let ctorShort := ctorName.componentsRev.head!.toString
+      let thmName := projName.str ("eq_" ++ ctorShort)
+      addDecl <| .thmDecl {
+        name := thmName
+        levelParams := projLevelParams
+        type := (← instantiateMVars eqTypeClosed)
+        value := (← instantiateMVars proofClosed)
+      }
+      addSimpTheorem (ext := simpExtension) thmName (post := true) (inv := false)
+        AttributeKind.global (prio := eval_prio default)
+
 /-- For a single constructor `c` of `decl` and a chosen field index `ifield`,
 generate `decl.c.π.<fieldname> : params → decl params → Option fieldType`
 returning `some field` on the `c` branch and `none` elsewhere. -/
@@ -159,14 +209,18 @@ def mkSingleProjection (decl : Name) (ictor : Nat) (cinfo : ConstructorVal)
     let eτ ← mkForallFVars params eτ
     return (e, eτ)
 
+  let projName := SingleProjectionName cinfo fieldName
+  let projLevelParams := casesOnInfo.levelParams.drop 1
   addAndCompile <| .defnDecl {
-    name := SingleProjectionName cinfo fieldName
-    levelParams := casesOnInfo.levelParams.drop 1
+    name := projName
+    levelParams := projLevelParams
     type := τ
     value := e
     hints := ReducibilityHints.abbrev
     safety := .safe
   }
+  -- Emit one `@[simp]`-tagged definitional-unfolding theorem per constructor.
+  mkSingleProjectionEqTheorems decl ictor cinfo ifield projName projLevelParams
 
 /-- For each constructor of `decl`, emit one `decl.c.π.<field>` per argument.
 Throws if two arguments within a single constructor share a name. -/
