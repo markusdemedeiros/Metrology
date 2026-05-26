@@ -277,3 +277,110 @@ abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDens
 
 theorem count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
     (f : T → ENNReal) (t : T) : count f {t} = f t := by simp
+
+/-! ### Building `MeasurableEmbedding` from a π-system of rectangles.
+
+For an n-ary function `f : X₁ × ⋯ × Xₙ → Z`, given (i) injectivity, (ii) measurability,
+(iii) a π-system on each factor whose product rectangles generate the product σ-algebra,
+(iv) measurability of `f` on a basic rectangle, and (v) a measurable cover of `Set.range f`,
+we get `MeasurableEmbedding f`. Each higher-arity version reduces to the binary one by
+nesting rectangles on the right. -/
+
+/-- Binary version. -/
+theorem measurableEmbedding_of_piSystem₂
+    {X Y Z : Type*} [MeasurableSpace X] [MeasurableSpace Y] [MeasurableSpace Z]
+    {f : X × Y → Z} (h_inj : Function.Injective f) (h_meas : Measurable f)
+    {𝓒₁ : Set (Set X)} {𝓒₂ : Set (Set Y)}
+    (h_gen : (Prod.instMeasurableSpace : MeasurableSpace (X × Y))
+              = MeasurableSpace.generateFrom (Set.image2 (· ×ˢ ·) 𝓒₁ 𝓒₂))
+    (h_pi : IsPiSystem (Set.image2 (· ×ˢ ·) 𝓒₁ 𝓒₂))
+    (h_basic : ∀ ⦃A⦄, A ∈ 𝓒₁ → ∀ ⦃B⦄, B ∈ 𝓒₂ → MeasurableSet (f '' (A ×ˢ B)))
+    {cov : Set Z} (h_cov_meas : MeasurableSet cov) (h_cov_range : cov = .range f) :
+    MeasurableEmbedding f := by
+  refine ⟨h_inj, h_meas, fun S hS => ?_⟩
+  refine MeasurableSpace.induction_on_inter (C := fun S _ => MeasurableSet (f '' S))
+      h_gen h_pi ?_ ?_ ?_ ?_ S hS
+  · simp
+  · rintro _ ⟨_, hA, _, hB, rfl⟩; exact h_basic hA hB
+  · intro T _ ih
+    rw [Set.compl_eq_univ_diff, Set.image_diff h_inj, Set.image_univ, ← h_cov_range]
+    exact h_cov_meas.diff ih
+  · intro f _ _ ih
+    rw [Set.image_iUnion]
+    exact .iUnion ih
+
+/-- Ternary version: reduces to binary by treating `Y × Z` as a single factor. -/
+theorem measurableEmbedding_of_piSystem₃
+    {X₁ X₂ X₃ Z : Type*} [MeasurableSpace X₁] [MeasurableSpace X₂] [MeasurableSpace X₃]
+    [MeasurableSpace Z]
+    {f : X₁ × X₂ × X₃ → Z} (h_inj : Function.Injective f) (h_meas : Measurable f)
+    {𝓒₁ : Set (Set X₁)} {𝓒₂ : Set (Set X₂)} {𝓒₃ : Set (Set X₃)}
+    (h_gen : (Prod.instMeasurableSpace : MeasurableSpace (X₁ × X₂ × X₃))
+              = MeasurableSpace.generateFrom
+                  (Set.image2 (· ×ˢ ·) 𝓒₁ (Set.image2 (· ×ˢ ·) 𝓒₂ 𝓒₃)))
+    (h_pi : IsPiSystem (Set.image2 (· ×ˢ ·) 𝓒₁ (Set.image2 (· ×ˢ ·) 𝓒₂ 𝓒₃)))
+    (h_basic : ∀ ⦃A₁⦄, A₁ ∈ 𝓒₁ → ∀ ⦃A₂⦄, A₂ ∈ 𝓒₂ → ∀ ⦃A₃⦄, A₃ ∈ 𝓒₃ →
+                MeasurableSet (f '' (A₁ ×ˢ A₂ ×ˢ A₃)))
+    {cov : Set Z} (h_cov_meas : MeasurableSet cov) (h_cov_range : cov = .range f) :
+    MeasurableEmbedding f :=
+  measurableEmbedding_of_piSystem₂ (f := f) h_inj h_meas h_gen h_pi
+    (fun _ hA₁ _ hRest => by
+      obtain ⟨_, hA₂, _, hA₃, rfl⟩ := hRest
+      exact h_basic hA₁ hA₂ hA₃)
+    h_cov_meas h_cov_range
+
+/-- 4-ary version: reduces to ternary by destructuring the right-nested rectangle. -/
+theorem measurableEmbedding_of_piSystem₄
+    {X₁ X₂ X₃ X₄ Z : Type*}
+    [MeasurableSpace X₁] [MeasurableSpace X₂] [MeasurableSpace X₃] [MeasurableSpace X₄]
+    [MeasurableSpace Z]
+    {f : X₁ × X₂ × X₃ × X₄ → Z} (h_inj : Function.Injective f) (h_meas : Measurable f)
+    {𝓒₁ : Set (Set X₁)} {𝓒₂ : Set (Set X₂)} {𝓒₃ : Set (Set X₃)} {𝓒₄ : Set (Set X₄)}
+    (h_gen : (Prod.instMeasurableSpace : MeasurableSpace (X₁ × X₂ × X₃ × X₄))
+              = MeasurableSpace.generateFrom
+                  (Set.image2 (· ×ˢ ·) 𝓒₁
+                    (Set.image2 (· ×ˢ ·) 𝓒₂ (Set.image2 (· ×ˢ ·) 𝓒₃ 𝓒₄))))
+    (h_pi : IsPiSystem
+              (Set.image2 (· ×ˢ ·) 𝓒₁
+                (Set.image2 (· ×ˢ ·) 𝓒₂ (Set.image2 (· ×ˢ ·) 𝓒₃ 𝓒₄))))
+    (h_basic : ∀ ⦃A₁⦄, A₁ ∈ 𝓒₁ → ∀ ⦃A₂⦄, A₂ ∈ 𝓒₂ → ∀ ⦃A₃⦄, A₃ ∈ 𝓒₃ → ∀ ⦃A₄⦄, A₄ ∈ 𝓒₄ →
+                MeasurableSet (f '' (A₁ ×ˢ A₂ ×ˢ A₃ ×ˢ A₄)))
+    {cov : Set Z} (h_cov_meas : MeasurableSet cov) (h_cov_range : cov = .range f) :
+    MeasurableEmbedding f :=
+  measurableEmbedding_of_piSystem₂ (f := f) h_inj h_meas h_gen h_pi
+    (fun _ hA₁ _ hRest => by
+      obtain ⟨_, hA₂, _, hRest', rfl⟩ := hRest
+      obtain ⟨_, hA₃, _, hA₄, rfl⟩ := hRest'
+      exact h_basic hA₁ hA₂ hA₃ hA₄)
+    h_cov_meas h_cov_range
+
+/-- 5-ary version. -/
+theorem measurableEmbedding_of_piSystem₅
+    {X₁ X₂ X₃ X₄ X₅ Z : Type*}
+    [MeasurableSpace X₁] [MeasurableSpace X₂] [MeasurableSpace X₃] [MeasurableSpace X₄]
+    [MeasurableSpace X₅] [MeasurableSpace Z]
+    {f : X₁ × X₂ × X₃ × X₄ × X₅ → Z}
+    (h_inj : Function.Injective f) (h_meas : Measurable f)
+    {𝓒₁ : Set (Set X₁)} {𝓒₂ : Set (Set X₂)} {𝓒₃ : Set (Set X₃)} {𝓒₄ : Set (Set X₄)}
+    {𝓒₅ : Set (Set X₅)}
+    (h_gen : (Prod.instMeasurableSpace : MeasurableSpace (X₁ × X₂ × X₃ × X₄ × X₅))
+              = MeasurableSpace.generateFrom
+                  (Set.image2 (· ×ˢ ·) 𝓒₁
+                    (Set.image2 (· ×ˢ ·) 𝓒₂
+                      (Set.image2 (· ×ˢ ·) 𝓒₃ (Set.image2 (· ×ˢ ·) 𝓒₄ 𝓒₅)))))
+    (h_pi : IsPiSystem
+              (Set.image2 (· ×ˢ ·) 𝓒₁
+                (Set.image2 (· ×ˢ ·) 𝓒₂
+                  (Set.image2 (· ×ˢ ·) 𝓒₃ (Set.image2 (· ×ˢ ·) 𝓒₄ 𝓒₅)))))
+    (h_basic : ∀ ⦃A₁⦄, A₁ ∈ 𝓒₁ → ∀ ⦃A₂⦄, A₂ ∈ 𝓒₂ → ∀ ⦃A₃⦄, A₃ ∈ 𝓒₃ →
+                ∀ ⦃A₄⦄, A₄ ∈ 𝓒₄ → ∀ ⦃A₅⦄, A₅ ∈ 𝓒₅ →
+                MeasurableSet (f '' (A₁ ×ˢ A₂ ×ˢ A₃ ×ˢ A₄ ×ˢ A₅)))
+    {cov : Set Z} (h_cov_meas : MeasurableSet cov) (h_cov_range : cov = .range f) :
+    MeasurableEmbedding f :=
+  measurableEmbedding_of_piSystem₂ (f := f) h_inj h_meas h_gen h_pi
+    (fun _ hA₁ _ hR => by
+      obtain ⟨_, hA₂, _, hR', rfl⟩ := hR
+      obtain ⟨_, hA₃, _, hR'', rfl⟩ := hR'
+      obtain ⟨_, hA₄, _, hA₅, rfl⟩ := hR''
+      exact h_basic hA₁ hA₂ hA₃ hA₄ hA₅)
+    h_cov_meas h_cov_range

@@ -14,7 +14,7 @@ open Set
 
 /-- Sigma algebra on `Option` values obtained by lifting the sigma algebra on `some` values,
     as well as the singleton `none` set. -/
-local instance [MeasurableSpace α] : MeasurableSpace (Option α) :=
+local instance instMeasurableSpaceOption_micrometer [MeasurableSpace α] : MeasurableSpace (Option α) :=
   .generateFrom <| {{ none }} ∪ ((some '' ·) '' MeasurableSet)
 
 section Option

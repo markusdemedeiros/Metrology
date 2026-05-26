@@ -295,14 +295,16 @@ def mkConstructor (decl : Name) (_ictor : Nat) (cinfo : ConstructorVal) : MetaM 
           mkLambdaFVars #[x] (← mkAppOptM cinfo.name (params.map some ++ mkAppArgs.map some))
     let bodyClosed ← mkLambdaFVars params body
 
+    let iotaName := ConstructorName cinfo
     addAndCompile <| .defnDecl {
-      name := ConstructorName cinfo
+      name := iotaName
       levelParams := cinfo.levelParams
       type := typClosed
       value := bodyClosed
       hints := ReducibilityHints.abbrev
       safety := .safe
     }
+    simpExtension.add (.toUnfold iotaName) AttributeKind.global
 
 syntax (name := constructors) "constructors" : attr
 
