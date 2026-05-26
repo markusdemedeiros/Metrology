@@ -32,8 +32,9 @@ example (E : CoPset) (v : Val) :
 
 /-- Alloc → load roundtrip: `let x = ref v in !x = v`.
 
-Note the result expression is `.load (.lit (.loc l))` post-step. Without
-`twp_bind` (not yet ported), we can only test isolated primitive laws. -/
+The result expression here is `.load (.lit (.loc l))` post-step. Composing
+this with `twp_load` via `tglWp_bind` would give the full
+let-binding form. -/
 example (E : CoPset) (v : Val) :
     ⊢@{IProp GF} tglWp E (.alloc (.ofVal v))
       (fun w => iprop(∃ l : Loc,
@@ -205,6 +206,90 @@ example (E : CoPset) (v : Val) (R : Prop) (HR : R) :
   iapply tglWp_frame_l (R := iprop(⌜R⌝))
   isplitr [HW]; swap; · iexact HW
   ipure_intro; exact HR
+
+/-- `twp_rand_exp` (the wrapper) smoke test on `rand 2 ()` with the
+geometric-style error fn `F 0 = 0`, `F 1 = ε`. Continuation receives
+the per-outcome credit. -/
+example (E : CoPset) (ε : ENNReal) (Hε : ε ≤ 1) :
+    ⊢@{IProp GF} ↯ε -∗
+      tglWp E (.rand (.lit (.int 2)) (.lit .unit))
+        (fun w => iprop(∃ n : Int, ⌜0 ≤ n ∧ n < 2 ∧
+          w = ⟨.lit (.int n), IsVal.lit⟩⌝)) := by
+  iintro Hcr
+  let F : ℕ → ENNReal := fun n => if n = 0 then 0 else ε
+  iapply (twp_rand_exp (z := 2) (ε₁ := ε) (ε₂ := F)
+    (Hz := by decide)
+    (HSum := by
+      simp only [F, show (2 : Int).toNat = 2 from rfl,
+        Finset.sum_range_succ, Finset.sum_range_zero, zero_add,
+        Nat.reduceEqDiff, ↓reduceIte, if_pos rfl]
+      rw [show ((2 : ℕ) : ENNReal) = 1 + 1 from by norm_num, add_mul, one_mul]
+      exact le_add_left _ _)) $$ Hcr
+  iintro %n ⟨%Hn, _⟩
+  iexists n
+  ipure_intro
+  exact ⟨Hn.1, Hn.2, rfl⟩
+
+/-- `twp_rand_exp_nat` smoke test: `rand 1 ()` with zero error distribution.
+The single outcome `n = 0` returns `↯0` to the continuation. -/
+example (E : CoPset) (ε : ENNReal) :
+    ⊢@{IProp GF} ↯ε -∗
+      tglWp E (.rand (.lit (.int 1)) (.lit .unit))
+        (fun w => iprop(⌜w = ⟨.lit (.int 0), IsVal.lit⟩⌝)) := by
+  iintro Hε
+  iapply (twp_rand_exp_nat (z := 1) (ε₁ := ε) (ε₂ := fun _ => 0)
+    (Hz := by decide) (Hbd := fun _ => zero_le _)
+    (HSum := by
+      simp only [show (1 : Int).toNat = 1 from rfl, zero_div]
+      exact zero_le _)) $$ Hε
+  iintro %n ⟨%Hn, _⟩
+  -- `0 ≤ n < 1` forces `n = 0`.
+  obtain ⟨Hn₁, Hn₂⟩ := Hn
+  interval_cases n
+  ipure_intro; rfl
+
+/-! ## End-to-end adequacy smoke tests
+
+These exercise the full chain `tglWp` triple → `Tgl` Prop bound at the
+metalogic level, using the now-complete `twp_tgl` adequacy theorem. -/
+
+section AdequacySmokeTests
+
+variable {GF : BundledGFunctors}
+  [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
+
+/-- A value at zero error has `Tgl = 0` after adequacy. -/
+example (v : Val) (σ : State) (φ : Val → Prop) (hφ : φ v) :
+    Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
+  refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
+  intro _ _; iapply tglWp_value; ipure_intro; exact hφ
+
+/-- Mass at ε = 0 for a value: `1 ≤ limExec _ Set.univ`. -/
+example (v : Val) (σ : State) :
+    1 ≤ (limExec ⟨Exp.ofVal v, σ⟩) Set.univ := by
+  have h : Tgl (limExec ⟨Exp.ofVal v, σ⟩) (fun _ => True) 0 := by
+    refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ)
+      (φ := fun _ => True) ?_
+    intro _ _; iapply tglWp_value; ipure_intro; trivial
+  have := Tgl.termination_ineq h
+  rwa [tsub_zero] at this
+
+/-- ε-limit form (`twp_tgl_limit`): a value with the WP triple at every
+`ε' > 0` yields `Tgl ... 0`. -/
+example (v : Val) (σ : State) (φ : Val → Prop) (hφ : φ v) :
+    Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
+  refine twp_tgl_limit (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
+  intro _ _ _ _; iapply tglWp_value; ipure_intro; exact hφ
+
+/-- Pgl bound via adequacy: at ε = 0, the limit-exec measure of the
+non-value-or-`¬φ` set is `0`. -/
+example (v : Val) (σ : State) (φ : Val → Prop) (hφ : φ v) :
+    Pgl 0 (fun ρ => ∃ w, ρ.expr = Exp.ofVal w ∧ φ w)
+      (limExec ⟨Exp.ofVal v, σ⟩) := by
+  refine twp_pgl_lim (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
+  intro _; iintro _; iapply tglWp_value; ipure_intro; exact hφ
+
+end AdequacySmokeTests
 
 end TotalEris
 end ProbLang

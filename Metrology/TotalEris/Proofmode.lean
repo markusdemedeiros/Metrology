@@ -55,6 +55,24 @@ macro_rules
   | `(tactic| twp_pures) =>
     `(tactic| (try repeat twp_pure))
 
+/-- `twp_pure_at <e₁> ↦ <e₂>` — explicit pure-step with both endpoints
+pinned. Use when `twp_pure`'s implicit `PureExec` synthesis fails because
+typeclass search can't see through an opaque definition in the LHS. The
+precondition `φ` is left implicit (synthesized from the chosen
+`PureExec` instance) and `Hφ` is discharged via the `True.intro` term
+`trivial` — this works when the `PureExec` instance has `φ = True` (e.g.
+`pureExec_cond_true`, `pureExec_cond_false`). -/
+macro "twp_pure_at " e1:term:max " ↦ " e2:term:max : tactic =>
+  `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
+      (n := 1) (e₁ := $e1) (e₂ := $e2) _ trivial))
+
+/-- `twp_pure_at <e₁> ↦ <e₂> by <hφ>` — variant with an explicit proof of
+the `PureExec` precondition (needed when `trivial` can't discharge it,
+e.g., for `pureExec_binop` whose `φ` is a value-and-equation conjunction). -/
+macro "twp_pure_at " e1:term:max " ↦ " e2:term:max " by " h:term : tactic =>
+  `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
+      (n := 1) (e₁ := $e1) (e₂ := $e2) _ $h))
+
 syntax "twp_lam" : tactic
 macro_rules
   | `(tactic| twp_lam) =>

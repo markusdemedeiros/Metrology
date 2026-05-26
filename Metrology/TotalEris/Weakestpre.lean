@@ -76,6 +76,7 @@ instance pglWpPre_contractive : Contractive (pglWpPre (GF := GF)) where
       refine least_fixpoint_ne_outer (fun Ψ s => ?_) (.of_eq rfl)
       rcases s with ⟨ρ, ε'⟩
       refine or_ne.ne (.of_eq rfl) ?_
+      refine or_ne.ne ?_ (.of_eq rfl)
       refine exists_ne fun R => ?_
       refine exists_ne fun ε₁ => ?_
       refine exists_ne fun X₂ => ?_

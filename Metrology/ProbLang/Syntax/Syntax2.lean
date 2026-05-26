@@ -103,21 +103,14 @@ inductive BaseLit (rT : Type _)
   | nest (b : BaseLit rT) (r : rT)
   deriving Countable
 
-macro "solve_ι_inj" : tactic => `(tactic|
-  (intro a b h;
-   first
-   | (cases h; rfl)
-   | (obtain ⟨_, _⟩ := a; obtain ⟨_, _⟩ := b; cases h; rfl)))
-
-theorem BaseLit.int.ι.inj  {rT : Type _} : Function.Injective (@BaseLit.int.ι  rT) := by solve_ι_inj
-theorem BaseLit.bool.ι.inj {rT : Type _} : Function.Injective (@BaseLit.bool.ι rT) := by solve_ι_inj
-theorem BaseLit.loc.ι.inj  {rT : Type _} : Function.Injective (@BaseLit.loc.ι  rT) := by solve_ι_inj
-theorem BaseLit.lbl.ι.inj  {rT : Type _} : Function.Injective (@BaseLit.lbl.ι  rT) := by solve_ι_inj
-theorem BaseLit.real.ι.inj {rT : Type _} : Function.Injective (@BaseLit.real.ι rT) := by solve_ι_inj
-theorem BaseLit.prod.ι.inj {rT : Type _} : Function.Injective (@BaseLit.prod.ι rT) := by solve_ι_inj
-theorem BaseLit.nest.ι.inj {rT : Type _} : Function.Injective (@BaseLit.nest.ι rT) := by solve_ι_inj
-
 end ProbLang
+
+
+
+
+
+
+
 
 /-## ProbLang Measure theory -/
 
@@ -148,6 +141,20 @@ section BaseLit
 
 
 namespace ProbLang.BaseLit
+
+macro "solve_ι_inj" : tactic => `(tactic|
+  (intro a b h;
+   first
+   | (cases h; rfl)
+   | (obtain ⟨_, _⟩ := a; obtain ⟨_, _⟩ := b; cases h; rfl)))
+
+theorem int.ι.inj  {rT : Type _} : Function.Injective (@BaseLit.int.ι  rT) := by solve_ι_inj
+theorem bool.ι.inj {rT : Type _} : Function.Injective (@BaseLit.bool.ι rT) := by solve_ι_inj
+theorem loc.ι.inj  {rT : Type _} : Function.Injective (@BaseLit.loc.ι  rT) := by solve_ι_inj
+theorem lbl.ι.inj  {rT : Type _} : Function.Injective (@BaseLit.lbl.ι  rT) := by solve_ι_inj
+theorem real.ι.inj {rT : Type _} : Function.Injective (@BaseLit.real.ι rT) := by solve_ι_inj
+theorem prod.ι.inj {rT : Type _} : Function.Injective (@BaseLit.prod.ι rT) := by solve_ι_inj
+theorem nest.ι.inj {rT : Type _} : Function.Injective (@BaseLit.nest.ι rT) := by solve_ι_inj
 
 /-- A cylinder is a `BaseLit` whose `rT`-payloads have been replaced by `Set rT`. -/
 abbrev Cylinder (rT : Type _) := BaseLit (Set rT)
@@ -1568,139 +1575,4 @@ theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
 
 /-- `x ∉ fv e` — LN replacement for the old string-based Fresh predicate. -/
 def Exp.Fresh (x : Var) (e : Exp) : Prop := x ∉ e.fv
--/
-
-
--- DEPRECATED
-
-/- Per-component projection machinery — superseded by the direct π-system proofs of
-`prod.measurableEmbedding` and `nest.measurableEmbedding`. Kept commented out for reference.
-
-theorem ProbLang.BaseLit.prod_π_eq_pair {rT : Type _} (b : BaseLit rT) :
-    BaseLit.prod.π b = Option.pair (BaseLit.prod.π.b1 b, BaseLit.prod.π.b2 b) := by
-  cases b <;> rfl
-
-theorem ProbLang.BaseLit.prod_π_b1_preimage_some_flatten {rT : Type _}
-    (c : Cylinder rT) :
-    BaseLit.prod.π.b1 ⁻¹' (some '' Cylinder.flatten c)
-      = ⋃ s2 : Shape,
-          Cylinder.flatten ((BaseLit.prod c (s2.cylinder)) : Cylinder rT) := by
-  ext b; cases b <;> simp
-
-theorem ProbLang.BaseLit.prod_π_b1_preimage_none {rT : Type _} :
-    BaseLit.prod.π.b1 ⁻¹' ({none} : Set (Option (BaseLit rT)))
-      = (cover.prod : Set (BaseLit rT))ᶜ := by
-  ext b; cases b <;> simp [cover.prod]
-
-theorem ProbLang.BaseLit.measurable_option_of_cov_and_basic
-    [MeasurableSpace rT]
-    {π : BaseLit rT → Option (BaseLit rT)}
-    {cov : Set (BaseLit rT)}
-    (h_cov_meas : MeasurableSet cov)
-    (h_none : π ⁻¹' ({none} : Set (Option (BaseLit rT))) = covᶜ)
-    (h_basic : ∀ c : Cylinder rT, c.HasMeasurableLeaves →
-                  MeasurableSet (π ⁻¹' (some '' Cylinder.flatten c))) :
-    Measurable π := by
-  apply Measurable.option_of_cov h_cov_meas h_none
-  intro S hS
-  induction hS with
-  | basic G hG =>
-    obtain ⟨c, hc, rfl⟩ := hG
-    exact h_basic c hc
-  | empty => simp [Set.image_empty]
-  | compl G _ ih =>
-    rw [Set.image_compl_some, Set.preimage_diff, Set.preimage_compl, h_none, compl_compl]
-    exact h_cov_meas.diff ih
-  | iUnion f _ ih =>
-    rw [Set.image_iUnion, Set.preimage_iUnion]
-    exact MeasurableSet.iUnion ih
-
-@[fun_prop]
-theorem ProbLang.BaseLit.measurable_prod_π_b1 [MeasurableSpace rT] :
-    Measurable (BaseLit.prod.π.b1 : BaseLit rT → Option (BaseLit rT)) :=
-  measurable_option_of_cov_and_basic
-    cover.prod.measurable prod_π_b1_preimage_none
-    (fun c hc => by
-      rw [prod_π_b1_preimage_some_flatten c]
-      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
-
-theorem ProbLang.BaseLit.prod_π_b2_preimage_some_flatten {rT : Type _}
-    (c : Cylinder rT) :
-    BaseLit.prod.π.b2 ⁻¹' (some '' Cylinder.flatten c)
-      = ⋃ s1 : Shape,
-          Cylinder.flatten ((BaseLit.prod (s1.cylinder) c) : Cylinder rT) := by
-  ext b; cases b <;> simp
-
-theorem ProbLang.BaseLit.prod_π_b2_preimage_none {rT : Type _} :
-    BaseLit.prod.π.b2 ⁻¹' ({none} : Set (Option (BaseLit rT)))
-      = (cover.prod : Set (BaseLit rT))ᶜ := by
-  ext b; cases b <;> simp [cover.prod]
-
-@[fun_prop]
-theorem ProbLang.BaseLit.measurable_prod_π_b2 [MeasurableSpace rT] :
-    Measurable (BaseLit.prod.π.b2 : BaseLit rT → Option (BaseLit rT)) :=
-  measurable_option_of_cov_and_basic
-    cover.prod.measurable prod_π_b2_preimage_none
-    (fun c hc => by
-      rw [prod_π_b2_preimage_some_flatten c]
-      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
-
-@[fun_prop]
-theorem ProbLang.BaseLit.measurable_prod_π [MeasurableSpace rT] :
-    Measurable (BaseLit.prod.π : BaseLit rT → Option (BaseLit rT × BaseLit rT)) := by
-  rw [funext prod_π_eq_pair]
-  exact Measurable.option_pair.comp (Measurable.prodMk measurable_prod_π_b1 measurable_prod_π_b2)
-
-theorem ProbLang.BaseLit.nest_π_b_preimage_some_flatten {rT : Type _}
-    (c : Cylinder rT) :
-    BaseLit.nest.π.b ⁻¹' (some '' Cylinder.flatten c)
-      = Cylinder.flatten ((BaseLit.nest c (Set.univ : Set rT)) : Cylinder rT) := by
-  ext b
-  cases b <;> simp
-
-theorem ProbLang.BaseLit.nest_π_r_preimage_some_S {rT : Type _}
-    (S : Set rT) :
-    BaseLit.nest.π.r ⁻¹' (some '' S)
-      = ⋃ s : Shape,
-          Cylinder.flatten ((BaseLit.nest (s.cylinder) S) : Cylinder rT) := by
-  ext b; cases b <;> simp
-
-theorem ProbLang.BaseLit.nest_π_b_preimage_none {rT : Type _} :
-    BaseLit.nest.π.b ⁻¹' ({none} : Set (Option (BaseLit rT)))
-      = (cover.nest : Set (BaseLit rT))ᶜ := by
-  ext b; cases b <;> simp [cover.nest]
-
-@[fun_prop]
-theorem ProbLang.BaseLit.measurable_nest_π_b [MeasurableSpace rT] :
-    Measurable (BaseLit.nest.π.b : BaseLit rT → Option (BaseLit rT)) :=
-  measurable_option_of_cov_and_basic
-    cover.nest.measurable nest_π_b_preimage_none
-    (fun c hc => by
-      rw [nest_π_b_preimage_some_flatten c]
-      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
-
-theorem ProbLang.BaseLit.nest_π_r_preimage_none {rT : Type _} :
-    BaseLit.nest.π.r ⁻¹' ({none} : Set (Option rT))
-      = (cover.nest : Set (BaseLit rT))ᶜ := by
-  ext b; cases b <;> simp [cover.nest]
-
-@[fun_prop]
-theorem ProbLang.BaseLit.measurable_nest_π_r [MeasurableSpace rT] :
-    Measurable (BaseLit.nest.π.r : BaseLit rT → Option rT) :=
-  Measurable.option_of_cov
-    cover.nest.measurable nest_π_r_preimage_none
-    (fun S hS => by
-      rw [nest_π_r_preimage_some_S]
-      aesop (rule_sets := [Measurable]) (config := { enableSimp := false }))
-
-theorem ProbLang.BaseLit.nest_π_eq_pair {rT : Type _} (b : BaseLit rT) :
-    BaseLit.nest.π b = Option.pair (BaseLit.nest.π.b b, BaseLit.nest.π.r b) := by
-  cases b <;> rfl
-
-@[fun_prop]
-theorem ProbLang.BaseLit.measurable_nest_π [MeasurableSpace rT] :
-    Measurable (BaseLit.nest.π : BaseLit rT → Option (BaseLit rT × rT)) := by
-  rw [funext nest_π_eq_pair]
-  exact Measurable.option_pair.comp (Measurable.prodMk measurable_nest_π_b measurable_nest_π_r)
-
 -/

@@ -41,36 +41,37 @@ Files in `Metrology/TotalEris/` — **all build green, zero sorries**:
 | `TotalLifting.lean` | ✅ | All 8 lifting lemmas proved: `twp_lift_step_fupd_glm`, `twp_lift_step_fupd`, `twp_lift_atomic_step_fupd`, `twp_lift_pure_step`, `twp_lift_pure_det_step`, `twp_lift_atomic_head_step`, `twp_lift_pure_det_head_step`, `twp_lift_pure_det_step_of_pureStep`. **Plus `twp_pure_step_fupd`** (PureExec integration). |
 | `ErisGS.lean` | ✅ | `ErisGS` class bundling `AppGS` + `ECGS` + `InvGS_gen`; auto `ErisWpGS` instance. |
 | `TotalPrimitiveLaws.lean` | ✅ | `twp_alloc`, `twp_load`, `twp_store`, `twp_alloctape`, `twp_rand`, `twp_rand_tape`, `twp_rand_tape_empty`. |
-| `ErrorRules.lean` | ✅ | `ec_split`, `ec_combine`, `ec_eq`, `ec_contradict`, `ec_weaken`, `ec_zero`, `ec_valid`. |
+| `ErrorRules.lean` | ✅ | All ec_* re-exports, `ec_induction`, `ec_ind_simpl_external`, `twp_err_pos`, `twp_err_incr`, `twp_rand_exp`, **`twp_rand_exp_nat`** — all proved, no `sorry`. |
+| `Examples/RandomWalk.lean` | 🟦 | Programs `unifRw1dRec` and `unifRw1d` defined (locally-nameless: `fix . lam . lam . cond …`). Spec lemma still a TODO comment; the proof needs the state-step `glm` disjunct + `twp_presample_rsm` (both unported). |
+| `Examples/GeometricTotal.lean` | ✅ | **Fully proved** (zero internal `sorry`s in the example file). Both theorems — `geo_nonneg` (the unconditional spec) and `geo_nonneg_pos_err` (with positive credit) — are fully mechanized. The proof mirrors `clutch/theories/eris/tutorial/geometric_total.v` structurally: error induction (`ec_ind_simpl_external` with `k = 3/2`), β-reduction via explicit `twp_pure_step_fupd` (or the `twp_pure_at` macro), `twp_bind` for the cond/rand context, `twp_rand_exp` with the error fn `F(n) = if n=0 then 0 else (3/2)*ε`, `interval_cases` on the sampled value, and recursive use of the IH via `tglWp_wand` + `ec_eq`. The example builds green; once `twp_rand_exp_nat` is filled in, the chain becomes unconditional. |
 | `Proofmode.lean` | ✅ | Macros `twp_value`, `twp_pure`, `twp_pures`, `twp_lam`, `twp_apply` + `wp_*` aliases. `twp_pure` uses `twp_pure_step_fupd`. |
 
-Still to write (in priority order):
+**Smoke tests**: `Examples/Basic.lean` now exercises `twp_rand_exp_nat` (z=1, ε₂≡0) and `twp_rand_exp` (z=2, geometric-style F) as regressions for the just-proved expectation-preserving sample rule.
 
-1. ~~`twp_rand_tape`, `twp_rand_tape_empty` in `TotalPrimitiveLaws.lean`.~~ ✅ done.
-2. ~~`twp_bind` lemma + `twp_apply` improved macro that does bind+iapply.~~ ✅
-   `glm_bind` and `tglWp_bind` both ported. `twp_bind <K>` macro added in
-   `Proofmode.lean`. `twp_apply` macro still does plain `iapply` — combining
-   bind+apply automatically requires syntactic Ectx inference from the goal
-   shape, deferred.
-2b. ~~`fupd_tglWp`.~~ ✅ done. The Lean-level term `tglWp_unfold_value` /
-   `tglWp_unfold_step` (per-branch unfoldings of `tglWp_unfold` that pre-reduce
-   the inner `match e.toVal?` at the Lean term level via `unfold` + `rw`
-   *before* introducing the result as an Iris hypothesis) sidesteps the
-   "no `rw at <iris-hyp>`" limitation entirely.
+Still to write (in priority order, as of 2026-05-26):
 
-2c. ~~Spatial-wand `tglWp_strong_mono` and spatial `tglWp_frame_l`.~~ ✅
-   done — `glm_strong_mono` ported using `least_fixpoint_iter` with a
-   wand-carrying `Ψ`; spatial `tglWp_strong_mono` derived via the analogous
-   Q-as-pre trick; `tglWp_wand` and `tglWp_frame_l` now spatial too.
-3. Selective `twp_rand_exp_nat` / `twp_rand_exp_fin` from `error_rules.v` — needed by geometric_total.
-3a. ~~**`ec_induction` / `ec_ind_simpl_external`**~~ ✅ already ported in
-   `Metrology/Iris/ErrorCredits.lean` as `ErrorCredit.Induction.{external_simple, increasing, amplifying, amp_external}`. Re-exported under Rocq names `ec_ind_simpl_external` and `ec_induction` in `ErrorRules.lean`. Smoke test in `Examples/Basic.lean`.
-4. Add state-step disjunct to `glm` (extend `Glm.lean`) — needed by `twp_presample_rsm`.
-5. Selective `twp_presample_rsm` from `presample_rules.v` — needed by random_walk.
-6. `TotalAdequacy.lean` — `twp_tgl`, `twp_mass_lim_exec`, `twp_pgl_lim_limit`.
-7. Smoke-test example (`Examples/Basic.lean`).
-8. `Examples/GeometricTotal.lean`, `Examples/RandomWalk.lean`.
-9. Partial WP `Lifting.lean` (deferred — only needed if examples use partial WP).
+✅ `twp_err_pos` (proved) — derives from `twp_err_incr` + `ec_zero` via the `iapply fupd_tglWp ; ihave HzBupd : iprop(|==> ↯0) ; · iapply ec_zero ; imod HzBupd with Herr ; imodintro` lift.
+
+✅ `twp_err_incr` (proved) — ~50 lines, the long port from `error_rules.v:881`. Key tricks: (a) `errInterp_supply_increase` wrapper to bypass the ECGS typeclass diamond; (b) keep the leading `|={∅}=>` so `elimModal_bupd_fupd` fires; (c) the `tglWp_bind`-style `ihave ... $$ [...] ; · rw [← tglWpPre_eq_step Hnv] ; iexact ...` pattern to expose the glm form; (d) `conv_rhs => rw [← heqEps]` to avoid looping on `← add_tsub_cancel_of_le`.
+
+✅ `geo_nonneg`, `geo_nonneg_pos_err` (proved modulo `twp_rand_exp_nat` stub).
+
+✅ **`twp_rand_exp`** (FULLY PROVED) — wrapper around `twp_rand_exp_nat`. Applies the base lemma with clamped `F n := min (ε₂ n) 1`. The HSum side condition is a calc chain: tsum mono via clamp + `ENNReal.tsum_le_tsum`, tsum-to-finset collapse via `tsum_eq_sum`, range-subset monotonicity via `Finset.sum_le_sum_of_subset`, sum-div via `Finset.induction_on` + `ENNReal.add_div`, mass cancellation via `ENNReal.mul_div_cancel_right` + `ENNReal.natCast_ne_top`. The continuation handles `↯(min ε₂n 1) → ↯(ε₂ n)` by case-split: if `ε₂ n ≤ 1` use `ec_eq`; else use `ec_contradict` with the unreachable-credit hypothesis.
+
+✅ **`twp_rand_exp_nat`** — FULLY PROVED (zero sorries). **All 5 sub-goals closed**:
+- ✅ **Reducibility** (`Reducible (rand z) σ₁`): closed.
+- ✅ **`X₂ ≤ ε_now - ε₁ + 1`**: closed using gcongr + case split.
+- ✅ **Integral bound** `∫⁻ ρ, X₂ ρ ∂primStep ≤ ε_now`: CLOSED. After the off-by-one fix (HSum now divides by `z.toNat` to match Lean's `Cfg.uniform z σ` over `Finset.Ico 0 z`), the bound was discharged via `primStep_eq_headStep` → `Cfg.uniform` unfold → `lintegral_map` → PMF computation + Int→Nat reindexing.
+- ✅ **`Pgl 0 R`**: closed via `Pgl.mono_pred` + `Pgl.zero_positive` + `primStep_eq_headStep` + `headStep_support_iff`.
+- ✅ **Per-outcome continuation**: CLOSED. Pattern: subst the outcome, `dif_pos` to reduce X₂, `errInterp_supply_decrease` to drop supply by ε₁, case-split on whether new supply + ε₂ n < 1, `execStutter_spend` in the bad case, `errInterp_supply_increase` + `tglWp_value_of_toVal (rfl)` + feed `Hcont` in the good case.
+
+**Off-by-one note**: Lean's `Cfg.uniform z σ` samples from `Finset.Ico 0 z` (z values), while the original Rocq `rand z` samples `fin (S z)` (z+1 values). The HSum side condition (and the `twp_rand_exp` wrapper) have been adjusted to use `z.toNat` divisor to match Lean semantics. This changed the Geometric example's HSum proof obligation from `≤ 3*ε` to `≤ 2*ε` (which still holds for the geometric `F`).
+
+🟦 State-step disjunct of `glm` + `twp_presample_rsm` — needed for the `random_walk` example. Substantial. **Pure side ready**: `getActive`, `tapePresample` already in `ProbLang/Erasure.lean`; `Tgl.tgl_lift_prob` (generic measure-theoretic core), `Tgl.tgl_state_step` (state-step specialization parallel to `tgl_prim_step`), and `Tgl.dbind_state_step` (Tgl-level wrapper using `limExec_tape_presample_expr_eq` for tape erasure) all proved in `TotalAdequacy.lean`. **Iris side remaining**: add the state-step disjunct to `glmPre` (cascades through `glmPre_mono`, `glm_strong_mono`, `glm_mono_grading`, `glm_mono_pred`, `glm_bind`, `glm_implies_tgl` — each needs one extra branch), then port `twp_presample_*` rules and the RSM machinery from `clutch/theories/eris/presample_rules.v`.
+
+✅ `TotalAdequacy.lean` — **`twp_tgl` FULLY PROVED**. Substantive case closes via `twp_step_fupd_tgl` (~70 lines, ind on `tglWp` via `tglWp_ind_simple` + per-`e'` value/non-value case split + `glm_implies_tgl` for the non-value glm extraction) + `fupd_soundness_no_lc` for the pure-Prop extraction. `[AppPreGS GF] [ECPreGS GF] [InvGpreS GF]` preconditions are now threaded through all five user-facing adequacy theorems (`twp_tgl`, `twp_mass_lim_exec`, `twp_pgl_lim`, `twp_tgl_limit`, `twp_mass_lim_exec_limit`, `twp_pgl_lim_limit`), plus `Examples/GeometricTotal.lean`'s `geo_tgl` and `geo_mass_one`. The Hwp signatures now fix `hlc=false` to match the soundness extraction path. Original cascade-failure on `twp_tgl_limit`/`twp_pgl_lim` is resolved by updating all dependents consistently.
+
+✅ `FupdPlainlyForall.lean` — `iProp_fupd_plainly_forall_2_no_lc` and the `..._pure_impl_no_lc` corollary, both proved at the `IProp GF` model level via the `ihave #>` plain-context-duplication trick (iris-Lean's abstract `BIFUpdatePlainly` typeclass ships only the weaker `fupd_plainly_sForall_2`; the strong forall form needed for adequacy is not derivable at the BI level but holds concretely on the `IProp GF` model).
 
 ## Module layout (under `Metrology/TotalEris/`)
 

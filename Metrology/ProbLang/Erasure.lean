@@ -60,6 +60,16 @@ noncomputable def tapeIndexUniform (N : Int) :
           exact ⟨le_refl _, by omega⟩⟩)
   else 0
 
+/-- List of all currently allocated tape addresses in `σ`. Rocq:
+`get_active σ`. Used by the state-step disjunct of `glm` to enumerate
+the tapes that may be presampled at a given step. -/
+def getActive (σ : State) : List Loc := σ.tapes.keys
+
+theorem getActive_mem_iff {σ : State} {α : Loc} :
+    α ∈ getActive σ ↔ α ∈ σ.tapes := by
+  unfold getActive
+  exact Std.ExtTreeMap.mem_keys
+
 /-- The local "uniform presample on tape `α`" distribution on `State`.
 Given an existing tape `α` of bound `N` with current content `bs`, this
 returns the `State`-measure obtained by sampling `n ∈ [0, N)` uniformly

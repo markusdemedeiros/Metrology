@@ -8,6 +8,8 @@ public import Metrology.TotalEris.ErisGS
 public import Metrology.TotalEris.TotalPrimitiveLaws
 public import Metrology.TotalEris.ErrorRules
 public import Metrology.TotalEris.Proofmode
+public import Metrology.TotalEris.TotalAdequacy
+public import Metrology.TotalEris.PresampleRules
 
 @[expose] public section
 
