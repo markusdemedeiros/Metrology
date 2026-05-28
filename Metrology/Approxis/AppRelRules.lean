@@ -15,8 +15,12 @@ open scoped AppGS
 
 namespace ProbLang
 
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 section AppRelRules
-variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ## Forward reductions on the LHS -/
 
@@ -28,7 +32,7 @@ theorem nat_repeat_later_eq_laterN (n : Nat) (P : IProp GF) :
 
 /-- `refines_pure_l` (app_rel_rules.v:27): if `e` pure-steps to `e'` in `n` steps,
 `▷^n (REL K[e'] << t : A) ⊢ REL K[e] << t : A`. -/
-theorem refines_pure_l {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
+theorem refines_pure_l {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
     {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
     Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (refines E (K.fill e') t A)
       ⊢@{IProp GF} refines E (K.fill e) t A := by
@@ -37,7 +41,7 @@ theorem refines_pure_l {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
   iintro H
   iintro %K' %ε HK Hna Herr Hpos
   iapply (wp_pure_step_later (Hex := HexK) Hφ)
-  ihave H0 : iprop(▷^[n] (∀ (K₂ : Ectx) (ε₂ : ENNReal),
+  ihave H0 : iprop(▷^[n] (∀ (K₂ : Ectx rT) (ε₂ : ENNReal),
       (⤇ K₂.fill t) -∗ (naOwnP E) -∗ (↯ ε₂) -∗ (⌜(0 : ENNReal) < ε₂⌝) -∗
       wp ⊤ (K.fill e') (fun v => iprop(∃ v' ε',
         (⤇ K₂.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v')))) $$ [H]
@@ -66,7 +70,7 @@ theorem refines_pure_l {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
   iexact H6
 
 /-- `refines_pure_r` (app_rel_rules.v:73): RHS pure step. -/
-theorem refines_pure_r {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
+theorem refines_pure_r {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
     {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
     refines E t (K.fill e') A ⊢@{IProp GF} refines E t (K.fill e) A := by
   unfold refines
@@ -88,9 +92,9 @@ theorem refines_pure_r {E : CoPset} {K : Ectx} {e e' t : Exp} {A : lrel GF}
 /-- `refines_step_r` (app_rel_rules.v): single-step RHS spec helper. The user
 provides, for any outer context `K''`, a `specUpdate` from `⤇ K''.fill e₂` to
 `∃ v, ⤇ K''.fill v ∗ refines E e₁ (K'.fill v) A`. -/
-theorem refines_step_r {E : CoPset} {K' : Ectx} {e1 e2 : Exp} {A : lrel GF} :
-    iprop(∀ (K : Ectx), (⤇ K.fill e2) -∗
-            specUpdate ⊤ (∃ (v : Val), iprop((⤇ K.fill v.1) ∗
+theorem refines_step_r {E : CoPset} {K' : Ectx rT} {e1 e2 : Exp rT} {A : lrel rT GF} :
+    iprop(∀ (K : Ectx rT), (⤇ K.fill e2) -∗
+            specUpdate rT ⊤ (∃ (v : Val rT), iprop((⤇ K.fill v.1) ∗
               refines E e1 (K'.fill v.1) A)))
       ⊢@{IProp GF} refines E e1 (K'.fill e2) A := by
   iintro He
@@ -112,8 +116,8 @@ theorem refines_step_r {E : CoPset} {K' : Ectx} {e1 e2 : Exp} {A : lrel GF} :
 
 /-- `refines_steps_r` (app_rel_rules.v): variant of `refines_step_r` where the
 RHS reduct `e₂'` is known. Useful when the value isn't fresh. -/
-theorem refines_steps_r {E : CoPset} {K' : Ectx} {e1 e2 e2' : Exp} {A : lrel GF} :
-    iprop(∀ (K : Ectx), (⤇ K.fill e2) -∗ specUpdate ⊤ (⤇ K.fill e2'))
+theorem refines_steps_r {E : CoPset} {K' : Ectx rT} {e1 e2 e2' : Exp rT} {A : lrel rT GF} :
+    iprop(∀ (K : Ectx rT), (⤇ K.fill e2) -∗ specUpdate rT ⊤ (⤇ K.fill e2'))
       ⊢@{IProp GF} (|={⊤}=> refines E e1 (K'.fill e2') A) -∗
         refines E e1 (K'.fill e2) A := by
   unfold refines
@@ -146,20 +150,20 @@ the Lean-level goal is `refines ... ⊢ refines ...`, (2) enter iris with `iintr
 then `iintro %K' %ε ...` — `He`'s post still has `refines` since `unfold` happened
 at the goal-shape level BEFORE any iintro. Key: do `show` with a `change`-like
 entailment reshape that works outside iris proofmode. -/
-theorem refines_wp_l {E : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF} :
+theorem refines_wp_l {E : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel rT GF} :
     iprop(wp ⊤ e1 (fun v => refines E (K.fill v.1) t A))
       ⊢@{IProp GF} refines E (K.fill e1) t A := by
   show iprop(wp ⊤ e1 (fun v => refines E (K.fill v.1) t A)) ⊢@{IProp GF}
-    iprop(∀ (K' : Ectx) (ε : ENNReal),
+    iprop(∀ (K' : Ectx rT) (ε : ENNReal),
       (⤇ (K'.fill t)) -∗
       (naOwnP E) -∗
       (↯ ε) -∗
       (⌜ (0 : ENNReal) < ε ⌝) -∗
-      wp ⊤ (K.fill e1) (fun v => iprop(∃ (v' : Val) (ε' : ENNReal),
+      wp ⊤ (K.fill e1) (fun v => iprop(∃ (v' : Val rT) (ε' : ENNReal),
         (⤇ (K'.fill v'.1)) ∗ (naOwnP ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A v v')))
   iintro He %K' %ε HK Hna Herr Hpos
   iapply wp_bind (K := K)
-  let R : IProp GF := iprop((⤇ K'.fill t) ∗ (naOwnP E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
+  let R : IProp GF := iprop((⤇ K'.fill t) ∗ (naOwnP (rT := rT) (hlc := hlc) E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
   ihave HR : R $$ [HK Hna Herr Hpos]
   · isplitl [HK]; · iassumption
     isplitl [Hna]; · iassumption
@@ -191,23 +195,23 @@ continuation to allow spec-side steps + invariant opening.
 
 Takes `OpenInv e1` (mirrors Rocq's `Atomic StronglyAtomic e1`) so that callers
 can open invariants (mask-shift `⊤ → E'`) for the duration of the single step. -/
-theorem refines_atomic_l {E E' : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF}
+theorem refines_atomic_l {E E' : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel rT GF}
     (Hopen : OpenInv e1) :
-    iprop(∀ (K' : Ectx),
+    iprop(∀ (K' : Ectx rT),
             (⤇ (K'.fill t)) -∗
-            (|={⊤, E'}=> wp E' e1 (fun v => iprop(|={E', ⊤}=> ∃ (t' : Exp),
+            (|={⊤, E'}=> wp E' e1 (fun v => iprop(|={E', ⊤}=> ∃ (t' : Exp rT),
               (⤇ (K'.fill t')) ∗ refines E (K.fill v.1) t' A))))
       ⊢@{IProp GF} refines E (K.fill e1) t A := by
-  show iprop(∀ (K' : Ectx),
+  show iprop(∀ (K' : Ectx rT),
             (⤇ (K'.fill t)) -∗
-            (|={⊤, E'}=> wp E' e1 (fun v => iprop(|={E', ⊤}=> ∃ (t' : Exp),
+            (|={⊤, E'}=> wp E' e1 (fun v => iprop(|={E', ⊤}=> ∃ (t' : Exp rT),
               (⤇ (K'.fill t')) ∗ refines E (K.fill v.1) t' A)))) ⊢@{IProp GF}
-    iprop(∀ (K' : Ectx) (ε : ENNReal),
+    iprop(∀ (K' : Ectx rT) (ε : ENNReal),
       (⤇ (K'.fill t)) -∗
       (naOwnP E) -∗
       (↯ ε) -∗
       (⌜ (0 : ENNReal) < ε ⌝) -∗
-      wp ⊤ (K.fill e1) (fun v => iprop(∃ (v' : Val) (ε' : ENNReal),
+      wp ⊤ (K.fill e1) (fun v => iprop(∃ (v' : Val rT) (ε' : ENNReal),
         (⤇ (K'.fill v'.1)) ∗ (naOwnP ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A v v')))
   iintro Hlog %K' %ε HK Hna Herr Hpos
   iapply wp_bind (K := K)
@@ -217,7 +221,7 @@ theorem refines_atomic_l {E E' : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF}
   ispecialize Hlog $$ %K' HK
   imod Hlog with HW
   imodintro
-  let R : IProp GF := iprop((naOwnP E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
+  let R : IProp GF := iprop((naOwnP (rT := rT) (hlc := hlc) E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
   ihave HR : R $$ [Hna Herr Hpos]
   · isplitl [Hna]; · iassumption
     isplitl [Herr]; · iassumption
@@ -254,7 +258,7 @@ theorem refines_atomic_l {E E' : CoPset} {K : Ectx} {e1 t : Exp} {A : lrel GF}
 ownership under later). The Lean `wp_alloc` returns the fragment directly without `▷`,
 so we drop the `▷` in the port. Callers who have `▷` in their context can use
 `iNext`-style stripping earlier. -/
-theorem refines_alloc_l {E : CoPset} {K : Ectx} {v : Val} {t : Exp} {A : lrel GF} :
+theorem refines_alloc_l {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), (l ↦ v) -∗ refines E (K.fill (.lit (.loc l))) t A)
       ⊢@{IProp GF} refines E (K.fill (.alloc v.1)) t A := by
   iintro Hlog
@@ -268,8 +272,8 @@ theorem refines_alloc_l {E : CoPset} {K : Ectx} {v : Val} {t : Exp} {A : lrel GF
 /-- `refines_load_l` (app_rel_rules.v:255).
 
 **Port note**: `▷`s dropped (Lean convention, same rationale as `refines_alloc_l`). -/
-theorem refines_load_l {E : CoPset} {K : Ectx} {l : Loc} {t : Exp} {A : lrel GF} :
-    iprop(∃ v : Val, (l ↦ v) ∗ ((l ↦ v) -∗ refines E (K.fill v.1) t A))
+theorem refines_load_l {E : CoPset} {K : Ectx rT} {l : Loc} {t : Exp rT} {A : lrel rT GF} :
+    iprop(∃ v : Val rT, (l ↦ v) ∗ ((l ↦ v) -∗ refines E (K.fill v.1) t A))
       ⊢@{IProp GF} refines E (K.fill (.load (.lit (.loc l)))) t A := by
   iintro ⟨%v, Hl, Hlog⟩
   iapply (refines_wp_l (K := K) (e1 := .load (.lit (.loc l))))
@@ -281,9 +285,9 @@ theorem refines_load_l {E : CoPset} {K : Ectx} {l : Loc} {t : Exp} {A : lrel GF}
 /-- `refines_store_l` (app_rel_rules.v:266).
 
 **Port note**: `▷`s dropped (Lean convention, same rationale as `refines_alloc_l`). -/
-theorem refines_store_l {E : CoPset} {K : Ectx} {l : Loc} {v' : Val} {t : Exp}
-    {A : lrel GF} :
-    iprop(∃ v : Val, (l ↦ v) ∗ ((l ↦ v') -∗ refines E (K.fill (.lit .unit)) t A))
+theorem refines_store_l {E : CoPset} {K : Ectx rT} {l : Loc} {v' : Val rT} {t : Exp rT}
+    {A : lrel rT GF} :
+    iprop(∃ v : Val rT, (l ↦ v) ∗ ((l ↦ v') -∗ refines E (K.fill (.lit .unit)) t A))
       ⊢@{IProp GF} refines E (K.fill (.store (.lit (.loc l)) v'.1)) t A := by
   iintro ⟨%v, Hl, Hlog⟩
   iapply (refines_wp_l (K := K) (e1 := .store (.lit (.loc l)) v'.1))
@@ -299,7 +303,7 @@ theorem refines_store_l {E : CoPset} {K : Ectx} {l : Loc} {v' : Val} {t : Exp}
 /-! ## Stateful reductions on the RHS -/
 
 /-- `refines_alloc_r` (app_rel_rules.v:119). -/
-theorem refines_alloc_r {E : CoPset} {K : Ectx} {v : Val} {t : Exp} {A : lrel GF} :
+theorem refines_alloc_r {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), (l ↦ₛ v) -∗
             refines E t (K.fill (.lit (.loc l))) A)
       ⊢@{IProp GF} refines E t (K.fill (.alloc v.1)) A := by
@@ -320,7 +324,7 @@ theorem refines_alloc_r {E : CoPset} {K : Ectx} {v : Val} {t : Exp} {A : lrel GF
   ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.loc l)))) $$ [HKRes]
   · rw [hfcL]; iexact HKRes
   iapply specUpdate_ret
-  have hv_eq : (⟨v.1, v.2⟩ : Val) = v := rfl
+  have hv_eq : (⟨v.1, v.2⟩ : Val rT) = v := rfl
   ihave Hl' : iprop(l ↦ₛ v) $$ [Hl]
   · rw [← hv_eq]; iexact Hl
   ispecialize Hlog $$ %l Hl'
@@ -330,8 +334,8 @@ theorem refines_alloc_r {E : CoPset} {K : Ectx} {v : Val} {t : Exp} {A : lrel GF
 
 Note Rocq's `refines_load_r` takes `l ↦ₛ{q} v` with fractional permission; we port with
 full ownership for simplicity (most callers have full permission). -/
-theorem refines_load_r {E : CoPset} {K : Ectx} {l : Loc} {v : Val} {t : Exp}
-    {A : lrel GF} :
+theorem refines_load_r {E : CoPset} {K : Ectx rT} {l : Loc} {v : Val rT} {t : Exp rT}
+    {A : lrel rT GF} :
     iprop((l ↦ₛ v) ∗ ((l ↦ₛ v) -∗ refines E t (K.fill v.1) A))
       ⊢@{IProp GF} refines E t (K.fill (.load (.lit (.loc l)))) A := by
   iintro ⟨Hl, Hlog⟩
@@ -356,8 +360,8 @@ theorem refines_load_r {E : CoPset} {K : Ectx} {l : Loc} {v : Val} {t : Exp}
   iapply Hlog $$ %K' %ε HKRes' Hna Herr Hpos
 
 /-- `refines_store_r` (app_rel_rules.v:144). -/
-theorem refines_store_r {E : CoPset} {K : Ectx} {l : Loc} {v v' : Val} {e : Exp}
-    {A : lrel GF} :
+theorem refines_store_r {E : CoPset} {K : Ectx rT} {l : Loc} {v v' : Val rT} {e : Exp rT}
+    {A : lrel rT GF} :
     iprop((l ↦ₛ v) ∗ ((l ↦ₛ v') -∗ refines E e (K.fill (.lit .unit)) A))
       ⊢@{IProp GF} refines E e (K.fill (.store (.lit (.loc l)) v'.1)) A := by
   iintro ⟨Hl, Hlog⟩
@@ -392,7 +396,7 @@ the `wp_rand{,_lbl}*` lemmas from `PrimitiveLaws.lean`. -/
 
 /-- `refines_randU_l`: LHS unit-rand step. Concludes the LHS at any
 `n ∈ [0, z)` chosen by the continuation. -/
-theorem refines_randU_l {E : CoPset} {K : Ectx} {z : Int} {t : Exp} {A : lrel GF}
+theorem refines_randU_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A : lrel rT GF}
     (Hz : 0 < z) :
     iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
             refines E (K.fill (.lit (.int n))) t A)
@@ -405,8 +409,8 @@ theorem refines_randU_l {E : CoPset} {K : Ectx} {z : Int} {t : Exp} {A : lrel GF
   ipure_intro; exact Hbnds
 
 /-- `refines_randT_l`: LHS tape-rand pop. Consumes the head `n` of tape `α`. -/
-theorem refines_randT_l {E : CoPset} {K : Ectx} {l : Loc} {z n : Int}
-    {ns : List Int} {t : Exp} {A : lrel GF} :
+theorem refines_randT_l {E : CoPset} {K : Ectx rT} {l : Loc} {z n : Int}
+    {ns : List Int} {t : Exp rT} {A : lrel rT GF} :
     iprop(appNatTape l z (n :: ns) ∗
             (appNatTape l z ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
               refines E (K.fill (.lit (.int n))) t A))
@@ -420,8 +424,8 @@ theorem refines_randT_l {E : CoPset} {K : Ectx} {l : Loc} {z n : Int}
   ipure_intro; exact Hbnds
 
 /-- `refines_randT_empty_l`: LHS rand on an empty tape — uniform sample, tape stays empty. -/
-theorem refines_randT_empty_l {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
-    {t : Exp} {A : lrel GF} (Hz : 0 < z) :
+theorem refines_randT_empty_l {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
+    {t : Exp rT} {A : lrel rT GF} (Hz : 0 < z) :
     iprop(appNatTape l z [] ∗
             (∀ (n : Int), appNatTape l z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
               refines E (K.fill (.lit (.int n))) t A))
@@ -435,7 +439,7 @@ theorem refines_randT_empty_l {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
   ipure_intro; exact Hbnds
 
 /-- `refines_randU_r`: RHS unit-rand step. -/
-theorem refines_randU_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lrel GF}
+theorem refines_randU_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : lrel rT GF}
     (Hz : 0 < z) :
     iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
             refines E e (K.fill (.lit (.int n))) A)
@@ -467,8 +471,8 @@ theorem refines_randU_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lrel GF
 
 /-- `refines_randT_r`: RHS tape-rand pop. The continuation receives the popped
 value and the tail tape. -/
-theorem refines_randT_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
-    {n : Int} {ns : List Int} {e : Exp} {A : lrel GF} :
+theorem refines_randT_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
+    {n : Int} {ns : List Int} {e : Exp rT} {A : lrel rT GF} :
     iprop(specNatTape l z (n :: ns) ∗
             (specNatTape l z ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
               refines E e (K.fill (.lit (.int n))) A))
@@ -520,8 +524,8 @@ theorem refines_randT_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
     iexact Hpos
 
 /-- `refines_randT_empty_r`: RHS rand on an empty tape — uniform sample, tape empty. -/
-theorem refines_randT_empty_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
-    {e : Exp} {A : lrel GF} (Hz : 0 < z) :
+theorem refines_randT_empty_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
+    {e : Exp rT} {A : lrel rT GF} (Hz : 0 < z) :
     iprop(specNatTape l z [] ∗
             (∀ (n : Int), specNatTape l z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
               refines E e (K.fill (.lit (.int n))) A))
@@ -553,7 +557,7 @@ theorem refines_randT_empty_r {E : CoPset} {K : Ectx} {l : Loc} {z : Int}
   iexact Hpos
 
 /-- `refines_alloctape_l`: LHS tape allocation. -/
-theorem refines_alloctape_l {E : CoPset} {K : Ectx} {z : Int} {t : Exp} {A : lrel GF} :
+theorem refines_alloctape_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), appTapesFrag l (Tape.empty z) -∗
             refines E (K.fill (.lit (.lbl l))) t A)
       ⊢@{IProp GF} refines E (K.fill (.tape (.lit (.int z)))) t A := by
@@ -565,7 +569,7 @@ theorem refines_alloctape_l {E : CoPset} {K : Ectx} {z : Int} {t : Exp} {A : lre
 
 /-- `refines_alloctape_r`: RHS tape allocation. The fresh location's spec tape
 fragment is delivered via the continuation. -/
-theorem refines_alloctape_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lrel GF} :
+theorem refines_alloctape_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), specNatTape l z [] -∗
             refines E e (K.fill (.lit (.lbl l))) A)
       ⊢@{IProp GF} refines E e (K.fill (.tape (.lit (.int z)))) A := by
@@ -594,9 +598,9 @@ theorem refines_alloctape_r {E : CoPset} {K : Ectx} {z : Int} {e : Exp} {A : lre
 /-! ## Structural rules -/
 
 /-- `refines_wand` (app_rel_rules.v:330): weakening the result relation. -/
-theorem refines_wand {E : CoPset} {e1 e2 : Exp} {A A' : lrel GF} :
+theorem refines_wand {E : CoPset} {e1 e2 : Exp rT} {A A' : lrel rT GF} :
     iprop(refines E e1 e2 A) ⊢@{IProp GF}
-      iprop((∀ (v1 v2 : Val), A v1 v2 ={⊤}=∗ A' v1 v2) -∗ refines E e1 e2 A') := by
+      iprop((∀ (v1 v2 : Val rT), A v1 v2 ={⊤}=∗ A' v1 v2) -∗ refines E e1 e2 A') := by
   iintro He HAA
   have Hfill1 : e1 = Ectx.empty.fill e1 := rfl
   have Hfill2 : e2 = Ectx.empty.fill e2 := rfl
@@ -615,9 +619,9 @@ theorem refines_wand {E : CoPset} {e1 e2 : Exp} {A A' : lrel GF} :
 /-- `refines_arrow_val` (app_rel_rules.v:228). Requires the closedness
 witness for `v, v'` (port-specific: `lrel_arr` carries closedness as a
 conjunct because Lean's `Val` isn't intrinsically closed). -/
-theorem refines_arrow_val {v v' : Val} {A A' : lrel GF}
+theorem refines_arrow_val {v v' : Val rT} {A A' : lrel rT GF}
     (hv : v.1.isClosedEmpty ∧ v'.1.isClosedEmpty) :
-    iprop(□ (∀ (v1 v2 : Val), A v1 v2 -∗
+    iprop(□ (∀ (v1 v2 : Val rT), A v1 v2 -∗
             refines ⊤ (.app v.1 v1.1) (.app v'.1 v2.1) A'))
       ⊢@{IProp GF} refines (⊤ : CoPset) v.1 v'.1 (lrel_arr A A') := by
   iintro #H
@@ -633,9 +637,9 @@ theorem refines_arrow_val {v v' : Val} {A A' : lrel GF}
 refinement of argument. Reduces to `refines_arrow_val` via `refines_ret`
 injection of `A v1 v2` into `□ REL v1 << v2 : A`. Requires closedness of
 `v, v'` (port-specific: lrel_arr carries a closedness conjunct). -/
-theorem refines_arrow {v v' : Val} {A A' : lrel GF}
+theorem refines_arrow {v v' : Val rT} {A A' : lrel rT GF}
     (hv : v.1.isClosedEmpty ∧ v'.1.isClosedEmpty) :
-    iprop(□ (∀ (v1 v2 : Val),
+    iprop(□ (∀ (v1 v2 : Val rT),
             □ refines (⊤ : CoPset) v1.1 v2.1 A -∗
             refines ⊤ (.app v.1 v1.1) (.app v'.1 v2.1) A'))
       ⊢@{IProp GF} refines (⊤ : CoPset) v.1 v'.1 (lrel_arr A A') := by
@@ -653,7 +657,7 @@ theorem refines_arrow {v v' : Val} {A A' : lrel GF}
 /-- `refines_get_ec` (app_rel_rules.v): introduces an error-credit `↯ε` into
 the precondition. The user provides a refinement parametric in any positive ε,
 having access to `↯ε`. -/
-theorem refines_get_ec {E : CoPset} {e e' : Exp} {A : lrel GF} :
+theorem refines_get_ec {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} :
     iprop(∀ (ε : ENNReal), (↯ε) -∗ (⌜0 < ε⌝) -∗ refines E e e' A)
       ⊢@{IProp GF} refines E e e' A := by
   iintro Hcnt
@@ -682,7 +686,7 @@ couple two unlabeled rands via a bijection `f` on `[0, z)`. Uses
 `wp_couple_rand_rand` from `CouplingRules.lean`.
 
 **Port note**: `▷` dropped on the continuation (Lean convention; matches heap-op ports). -/
-theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
+theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : Int}
     (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
@@ -712,14 +716,14 @@ theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : In
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n
   ispecialize Hcnt $$ %Hn
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
+  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
 /-- `refines_couple_TU`: couple a LHS tape-rand (on empty tape α) with a RHS
 unit-rand via bijection `f`. -/
-theorem refines_couple_TU {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
+theorem refines_couple_TU {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : Int}
     (α : Loc) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
@@ -753,14 +757,14 @@ theorem refines_couple_TU {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipure_intro; exact Hn
   ispecialize Hcnt $$ Hbnds
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
+  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
 /-- `refines_couple_UT`: symmetric — couple LHS unit-rand with RHS tape-rand on
 empty tape α' via bijection `f`. -/
-theorem refines_couple_UT {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
+theorem refines_couple_UT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : Int}
     (α' : Loc) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
@@ -794,14 +798,14 @@ theorem refines_couple_UT {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipure_intro; exact Hn
   ispecialize Hcnt $$ Hbnds
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
+  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
 /-- `refines_couple_TT`: couple two empty tapes via a bijection. Uses the
 existing `wp_couple_rand_lbl_rand_lbl`. -/
-theorem refines_couple_TT {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
+theorem refines_couple_TT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : Int}
     (α α' : Loc) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
@@ -836,7 +840,7 @@ theorem refines_couple_TT {E : CoPset} {K K' : Ectx} {A : lrel GF} {z : Int}
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipure_intro; exact Hn
   ispecialize Hcnt $$ Hbnds
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val) =
+  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos

@@ -690,6 +690,7 @@ inductive EctxItem (α : Type _)
   | randL (v2 : Val α)
   | randR (e1 : Exp α)
   | scrut (p : Pat α)
+  deriving Countable
 
 @[simp] def EctxItem.fillItem (Ki : EctxItem α) (e : Exp α) : Exp α :=
   match Ki with

@@ -19,7 +19,7 @@ Status: all four top-level theorems (`geo_nonneg`, `geo_nonneg_pos_err`,
 dependency chain**, including through `twp_rand_exp` /
 `twp_rand_exp_nat` and the total-adequacy chain (`twp_tgl`,
 `twp_mass_lim_exec`, etc.). `geo_tgl` and `geo_mass_one` require
-`[AppPreGS GF] [ECPreGS GF] [InvGpreS GF]` (passed through from
+`[AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]` (passed through from
 `twp_tgl`). -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
@@ -30,7 +30,10 @@ namespace ProbLang
 namespace TotalEris
 namespace Examples
 
-variable {hlc : Bool} {GF : BundledGFunctors.{0,0,0}} [ErisGS hlc GF]
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {hlc : Bool} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
 
 /-! ## The geometric sampler
 
@@ -50,7 +53,7 @@ Definition geometric : val :=
 ```
 Under locally-nameless: outer `fix` binds the recursive name (`bvar 1`
 inside the body); inner `lam` binds the argument (`bvar 0`). -/
-def geometric : Exp :=
+def geometric : Exp rT :=
   Exp.fix <| Exp.lam <|
     Exp.cond
       (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))
@@ -59,7 +62,7 @@ def geometric : Exp :=
 
 /-- The result-postcondition shared by all geometric specs: the sampler
 returns a non-negative integer. -/
-abbrev geoPost : Val → IProp GF :=
+abbrev geoPost : Val rT → IProp GF :=
   fun w => iprop(∃ m : Int, ⌜w = ⟨.lit (.int m), IsVal.lit⟩ ∧ 0 ≤ m⌝)
 
 /-! ## Spec: `geo_nonneg_pos_err`
@@ -69,42 +72,43 @@ abbrev geoPost : Val → IProp GF :=
   Mirrors `geometric_total.v:147`. -/
 theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     iprop(↯ε) ⊢@{IProp GF}
-      tglWp E (Exp.app geometric (Exp.lit .unit)) geoPost := by
+      tglWp E (Exp.app (geometric (rT := rT)) (Exp.lit .unit))
+        (geoPost (rT := rT) (GF := GF)) := by
   -- Error induction via `ec_ind_simpl_external` with multiplier `k = 3/2`.
   -- Gives us an IH `↯((3/2) * ε) -∗ WP geometric()` together with `↯ε`.
-  apply ec_ind_simpl_external (k := (3/2 : NNReal)) hε (by norm_num)
+  refine ec_ind_simpl_external (k := (3/2 : NNReal)) hε (by norm_num) ?_
   iintro ⟨IH, Herr⟩
   -- β-reduce `geometric ()` via two pure steps (`app_fix`, `app_lam`).
   -- `unfold geometric` exposes the `fix`; let-bind the inner body so the
   -- explicit `e₁`/`e₂` arguments to `twp_pure_step_fupd` match.
   unfold geometric
-  set innerBody : Exp :=
+  set innerBody : Exp rT :=
     Exp.cond
       (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))
       (Exp.lit (.int 0))
       (Exp.binop .plus (Exp.app (Exp.bvar 1) (Exp.bvar 0)) (Exp.lit (.int 1)))
     with hInner
   -- Step 1: `app_fix`.
-  twp_pure_at
-    (Exp.app (Exp.fix (Exp.lam innerBody)) (Exp.lit .unit))
-    ↦ (Exp.app (Exp.open' (Exp.lam innerBody) (Exp.fix (Exp.lam innerBody)))
-        (Exp.lit .unit))
-    by (show (Exp.lit .unit).isValue from ⟨IsVal.lit⟩)
+  iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
+    (e₁ := Exp.app (Exp.fix (Exp.lam innerBody)) (Exp.lit .unit))
+    (e₂ := Exp.app (Exp.open' (Exp.lam innerBody) (Exp.fix (Exp.lam innerBody)))
+      (Exp.lit .unit))
+    (Exp.lit .unit : Exp rT).isValue ⟨IsVal.lit⟩)
   -- Reduce the substitution `bvar 1 := geometric` (leaves the inner `lam`).
   simp only [hInner, Exp.open', Exp.openRec, ↓reduceIte, Nat.reduceAdd,
     Nat.reduceEqDiff]
   -- Step 2: `app_lam` with argument `()`.
-  set reducedBody : Exp :=
+  set reducedBody : Exp rT :=
     Exp.cond
       (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))
       (Exp.lit (.int 0))
       (Exp.binop .plus (Exp.app (Exp.fix (Exp.lam innerBody)) (Exp.bvar 0))
         (Exp.lit (.int 1)))
     with hReduced
-  twp_pure_at
-    (Exp.app (Exp.lam reducedBody) (Exp.lit .unit))
-    ↦ (Exp.open' reducedBody (Exp.lit .unit))
-    by (show (Exp.lit .unit).isValue from ⟨IsVal.lit⟩)
+  iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
+    (e₁ := Exp.app (Exp.lam reducedBody) (Exp.lit .unit))
+    (e₂ := Exp.open' reducedBody (Exp.lit .unit))
+    (Exp.lit .unit : Exp rT).isValue ⟨IsVal.lit⟩)
   simp only [hReduced, Exp.open', Exp.openRec, ↓reduceIte]
   -- Collapse `openRec 2 () innerBody = innerBody` (innerBody has only
   -- bvar 0/1, so a level-2 open is a no-op).
@@ -181,16 +185,18 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
           (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
             (.lit (.int 1)))])
     iapply hBindCond0
-    -- Step B: reduce `binop eq 0 0 → lit true` (pure step).
-    twp_pure_at
-      (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩)
-        (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
-      ↦ (Exp.lit (.bool true))
-      by (show (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩).isValue ∧
-                (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩).isValue ∧
-                BinOp.eval .eq (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩)
-                  (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩) = some (.lit (.bool true))
-            from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩)
+    -- Step B: reduce `binop eq 0 0 → lit true` (pure step). `ofVal` is reducible;
+    -- normalise so the goal exposes the literal form before invoking `PureExec`.
+    simp only [Exp.ofVal]
+    iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
+      (e₁ := (Exp.binop .eq (Exp.lit (.int 0)) (Exp.lit (.int 0)) : Exp rT))
+      (e₂ := (Exp.lit (.bool true) : Exp rT))
+      _
+      (show (Exp.lit (.int 0) : Exp rT).isValue ∧
+            (Exp.lit (.int 0) : Exp rT).isValue ∧
+            BinOp.eval .eq (.lit (.int 0) : Exp rT) (.lit (.int 0))
+              = some (Exp.lit (.bool true) : Exp rT)
+        from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
     -- Step C: value collapse — `tglWp E (lit true) (fun v => P v) ⊢ P (lit true)`.
     iapply (ErisWpGS.tglWp_value_of_toVal
       (v := ⟨.lit (.bool true), IsVal.lit⟩) rfl)
@@ -235,15 +241,16 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
             (.lit (.int 1)))])
     iapply hBindCond1
     -- Step B: reduce `binop eq 1 0 → lit false`.
-    twp_pure_at
-      (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 1), IsVal.lit⟩)
-        (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
-      ↦ (Exp.lit (.bool false))
-      by (show (Exp.ofVal ⟨.lit (.int 1), IsVal.lit⟩).isValue ∧
-                (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩).isValue ∧
-                BinOp.eval .eq (Exp.ofVal ⟨.lit (.int 1), IsVal.lit⟩)
-                  (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩) = some (.lit (.bool false))
-            from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩)
+    simp only [Exp.ofVal]
+    iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
+      (e₁ := (Exp.binop .eq (Exp.lit (.int 1)) (Exp.lit (.int 0)) : Exp rT))
+      (e₂ := (Exp.lit (.bool false) : Exp rT))
+      _
+      (show (Exp.lit (.int 1) : Exp rT).isValue ∧
+            (Exp.lit (.int 0) : Exp rT).isValue ∧
+            BinOp.eval .eq (.lit (.int 1) : Exp rT) (.lit (.int 0))
+              = some (Exp.lit (.bool false) : Exp rT)
+        from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
     -- Step C: value collapse.
     iapply (ErisWpGS.tglWp_value_of_toVal
       (v := ⟨.lit (.bool false), IsVal.lit⟩) rfl)
@@ -286,13 +293,15 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     subst Hweq
     simp only [Exp.ofVal]
     -- Step I: reduce `binop plus (lit m) (lit 1) → lit (m + 1)`.
-    twp_pure_at
-      (Exp.binop .plus (Exp.lit (.int m)) (Exp.lit (.int 1)))
-      ↦ (Exp.lit (.int (m + 1)))
-      by (show (Exp.lit (.int m)).isValue ∧ (Exp.lit (.int 1)).isValue ∧
-                BinOp.eval .plus (.lit (.int m)) (.lit (.int 1))
-                  = some (.lit (.int (m+1)))
-            from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩)
+    iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
+      (e₁ := (Exp.binop .plus (Exp.lit (.int m)) (Exp.lit (.int 1)) : Exp rT))
+      (e₂ := (Exp.lit (.int (m + 1)) : Exp rT))
+      _
+      (show (Exp.lit (.int m) : Exp rT).isValue ∧
+            (Exp.lit (.int 1) : Exp rT).isValue ∧
+            BinOp.eval .plus (.lit (.int m) : Exp rT) (.lit (.int 1))
+              = some (Exp.lit (.int (m+1)) : Exp rT)
+        from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
     -- Step J: value-collapse + close `geoPost` with `m + 1 ≥ 0`.
     iapply (ErisWpGS.tglWp_value_of_toVal
       (v := ⟨.lit (.int (m + 1)), IsVal.lit⟩) rfl)
@@ -306,8 +315,9 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   integer with probability 1. Mirrors `geometric_total.v:220`. Obtained
   from `geo_nonneg_pos_err` by `twp_err_pos`. -/
 theorem geo_nonneg (E : CoPset) :
-    ⊢@{IProp GF} tglWp E (Exp.app geometric (Exp.lit .unit)) geoPost := by
-  have Hnv : (Exp.app geometric (Exp.lit .unit)).toVal? = none :=
+    ⊢@{IProp GF} tglWp E (Exp.app (geometric (rT := rT)) (Exp.lit .unit))
+      (geoPost (rT := rT) (GF := GF)) := by
+  have Hnv : (Exp.app (geometric (rT := rT)) (Exp.lit .unit)).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (twp_err_pos Hnv)
   iintro %ε %Hε Herr
@@ -319,20 +329,20 @@ theorem geo_nonneg (E : CoPset) :
   Pure-Prop version of `geoPost`, suitable for feeding into `twp_tgl`. -/
 
 /-- Pure predicate version of `geoPost`. -/
-def geoPredicate (v : Val) : Prop :=
+def geoPredicate (v : Val rT) : Prop :=
   ∃ m : Int, v = ⟨.lit (.int m), IsVal.lit⟩ ∧ 0 ≤ m
 
 /-- The geometric sampler almost-surely terminates at a non-negative
 integer (Tgl-form). -/
-theorem geo_tgl [AppPreGS GF] [ECPreGS GF] [InvGpreS GF] (σ : State) :
+theorem geo_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF] (σ : State rT) :
     Tgl (limExec ⟨Exp.app geometric (Exp.lit .unit), σ⟩) geoPredicate 0 := by
   refine twp_tgl (GF := GF) (e := Exp.app geometric (Exp.lit .unit)) (σ := σ)
     (φ := geoPredicate) ?_
   intro _
-  have hwp : ⊢@{IProp GF} tglWp ⊤ (Exp.app geometric (Exp.lit .unit))
-      (fun v => iprop(⌜geoPredicate v⌝)) := by
-    have := geo_nonneg (GF := GF) ⊤
-    refine this.trans (ErisWpGS.tglWp_mono (Φ := geoPost) ?_)
+  have hwp : ⊢@{IProp GF} tglWp ⊤ (Exp.app (geometric (rT := rT)) (Exp.lit .unit))
+      (fun v : Val rT => iprop(⌜geoPredicate v⌝)) := by
+    have := geo_nonneg (rT := rT) (GF := GF) ⊤
+    refine this.trans (ErisWpGS.tglWp_mono (Φ := geoPost (rT := rT) (GF := GF)) ?_)
     intro v
     iintro ⟨%m, %Hm⟩
     ipure_intro
@@ -341,7 +351,7 @@ theorem geo_tgl [AppPreGS GF] [ECPreGS GF] [InvGpreS GF] (σ : State) :
   iapply hwp
 
 /-- The geometric sampler almost-surely terminates. -/
-theorem geo_mass_one [AppPreGS GF] [ECPreGS GF] [InvGpreS GF] (σ : State) :
+theorem geo_mass_one [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF] (σ : State rT) :
     1 ≤ (limExec ⟨Exp.app geometric (Exp.lit .unit), σ⟩) Set.univ := by
   have h := Tgl.termination_ineq (geo_tgl (GF := GF) σ)
   rwa [tsub_zero] at h

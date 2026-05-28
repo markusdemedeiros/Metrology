@@ -12,11 +12,16 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 open scoped ENNReal
 
 namespace ProbLang
+
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 namespace TotalEris
 
 namespace ErisWpGS
 
-variable {GF : BundledGFunctors} [ErisWpGS GF]
+variable {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
 
 /-! # `pgl_wp` — partial-correctness weakest precondition
 
@@ -46,24 +51,24 @@ which is the only structure for which the Iris-Lean `Contractive` instance
 proof completes within the default heartbeat budget. It is logically
 equivalent to Rocq's top-level `match to_val e1 with ... end`. -/
 abbrev pglWpPre
-    (wp : CoPset → Exp → (Val → IProp GF) → IProp GF)
-    (E : CoPset) (e₁ : Exp) (Φ : Val → IProp GF) : IProp GF :=
-  iprop(∀ (σ₁ : State) (ε₁ : ENNReal),
-    (stateInterp σ₁ ∗ errInterp ε₁) -∗
+    (wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF)
+    (E : CoPset) (e₁ : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
+  iprop(∀ (σ₁ : State rT) (ε₁ : ENNReal),
+    (stateInterp σ₁ ∗ errInterp (rT := rT) ε₁) -∗
       match e₁.toVal? with
       | some v => iprop(|={E}=>
-          stateInterp σ₁ ∗ errInterp ε₁ ∗ Φ v)
+          stateInterp σ₁ ∗ errInterp (rT := rT) ε₁ ∗ Φ v)
       | none => iprop(|={E, ∅}=>
           glm e₁ σ₁ ε₁ (fun ρ ε₂ =>
             iprop(▷ (|={∅, E}=>
-              stateInterp ρ.state ∗ errInterp ε₂ ∗ wp E ρ.expr Φ)))))
+              stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ wp E ρ.expr Φ)))))
 
 /-- The function space the fixpoint operates on. -/
-abbrev PglWpType := CoPset → Exp → (Val → IProp GF) → IProp GF
+abbrev PglWpType := CoPset → Exp rT → (Val rT → IProp GF) → IProp GF
 
 /-- `pglWpPre` is `Contractive`: the only recursive use of the `wp`
 parameter sits under `▷`, justifying the contractive step. -/
-instance pglWpPre_contractive : Contractive (pglWpPre (GF := GF)) where
+instance pglWpPre_contractive : Contractive (pglWpPre (rT := rT) (GF := GF)) where
   distLater_dist := by
     intro n wp wp' Hwp E e Φ
     refine forall_ne fun σ => ?_
@@ -97,18 +102,18 @@ instance pglWpPre_contractive : Contractive (pglWpPre (GF := GF)) where
       exact DistLater.dist_lt (Hwp · · E ρ'.expr Φ) Hm
 
 /-- The Eris partial-correctness weakest precondition. -/
-noncomputable def pglWp (E : CoPset) (e : Exp) (Φ : Val → IProp GF) : IProp GF :=
-  fixpoint (pglWpPre (GF := GF)) E e Φ
+noncomputable def pglWp (E : CoPset) (e : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
+  fixpoint (pglWpPre (rT := rT) (GF := GF)) E e Φ
 
 /-- Fixpoint unfolding for `pglWp`. -/
-theorem pglWp_unfold {E : CoPset} {e : Exp} {Φ : Val → IProp GF} :
-    pglWp (GF := GF) E e Φ ≡ pglWpPre (pglWp (GF := GF)) E e Φ :=
+theorem pglWp_unfold {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+    pglWp (GF := GF) E e Φ ≡ pglWpPre (pglWp (rT := rT) (GF := GF)) E e Φ :=
   (fixpoint_unfold ⟨pglWpPre, OFE.ne_of_contractive _⟩) E e Φ
 
 /-! ## Value rules -/
 
 /-- Value introduction (fupd-flavored). -/
-theorem pglWp_value_fupd {E : CoPset} {v : Val} {Φ : Val → IProp GF} :
+theorem pglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     iprop(|={E}=> Φ v) ⊢@{IProp GF} pglWp E (Exp.ofVal v) Φ := by
   iintro HΦ
   iapply pglWp_unfold
@@ -122,7 +127,7 @@ theorem pglWp_value_fupd {E : CoPset} {v : Val} {Φ : Val → IProp GF} :
   iexact HΦ'
 
 /-- Plain value introduction. -/
-theorem pglWp_value {E : CoPset} {v : Val} {Φ : Val → IProp GF} :
+theorem pglWp_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     Φ v ⊢@{IProp GF} pglWp E (Exp.ofVal v) Φ := by
   iintro HΦ
   iapply pglWp_value_fupd
@@ -131,8 +136,8 @@ theorem pglWp_value {E : CoPset} {v : Val} {Φ : Val → IProp GF} :
 
 /-- General value form: from `e.toVal? = some v`, introduce `pglWp E e Φ`
 from `Φ v`. -/
-theorem pglWp_value_of_toVal {E : CoPset} {e : Exp} {v : Val}
-    {Φ : Val → IProp GF} (h : e.toVal? = some v) :
+theorem pglWp_value_of_toVal {E : CoPset} {e : Exp rT} {v : Val rT}
+    {Φ : Val rT → IProp GF} (h : e.toVal? = some v) :
     Φ v ⊢@{IProp GF} pglWp E e Φ := by
   rw [← Exp.ofVal_of_toVal_some h]
   exact pglWp_value

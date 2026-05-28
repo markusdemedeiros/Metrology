@@ -10,7 +10,7 @@ public import Metrology.ProbLang.Syntax.Types
 /-!
 # Type Interpretation
 
-Nonexpansive map `interp : Ty → TyEnv GF → lrel GF` sending each syntactic
+Nonexpansive map `interp : Ty → TyEnv rT GF → lrel rT GF` sending each syntactic
 type to its logical relation under a type-variable environment.
 -/
 
@@ -18,79 +18,84 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 
 namespace ProbLang
 
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 section TyEnvSetup
 variable {GF : BundledGFunctors}
 
-abbrev TyEnv (GF : BundledGFunctors) := Nat → lrel GF
+abbrev TyEnv (rT : Type _) (GF : BundledGFunctors) := Nat → lrel rT GF
 
-def TyEnv.cons (X : lrel GF) (Δ : TyEnv GF) : TyEnv GF
+def TyEnv.cons (X : lrel rT GF) (Δ : TyEnv rT GF) : TyEnv rT GF
   | 0 => X
   | n + 1 => Δ n
 
-theorem TyEnv.cons_ne_head {n : Nat} {X Y : lrel GF} {Δ : TyEnv GF}
+theorem TyEnv.cons_ne_head {n : Nat} {X Y : lrel rT GF} {Δ : TyEnv rT GF}
     (h : X ≡{n}≡ Y) : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons Y Δ) := by
   intro k
   cases k with
   | zero => exact h
   | succ m => exact Dist.rfl
 
-theorem TyEnv.cons_ne_tail {n : Nat} {X : lrel GF} {Δ Δ' : TyEnv GF}
+theorem TyEnv.cons_ne_tail {n : Nat} {X : lrel rT GF} {Δ Δ' : TyEnv rT GF}
     (h : Δ ≡{n}≡ Δ') : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons X Δ') := by
   intro k
   cases k with
   | zero => exact Dist.rfl
   | succ m => exact h m
 
-@[reducible] def ctxLookup (x : Nat) (Δ : TyEnv GF) : lrel GF := Δ x
+@[reducible] def ctxLookup (x : Nat) (Δ : TyEnv rT GF) : lrel rT GF := Δ x
 
 end TyEnvSetup
 
 section interp
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-/-- A function `TyEnv GF → lrel GF` paired with its pointwise
+/-- A function `TyEnv rT GF → lrel rT GF` paired with its pointwise
 nonexpansiveness witness. -/
-structure NEFun (GF : BundledGFunctors) where
-  fn  : TyEnv GF → lrel GF
-  ne  : ∀ {n : Nat} {Δ Δ' : TyEnv GF}, Δ ≡{n}≡ Δ' → fn Δ ≡{n}≡ fn Δ'
+structure NEFun (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+    (GF : BundledGFunctors) where
+  fn  : TyEnv rT GF → lrel rT GF
+  ne  : ∀ {n : Nat} {Δ Δ' : TyEnv rT GF}, Δ ≡{n}≡ Δ' → fn Δ ≡{n}≡ fn Δ'
 
 namespace NEFun
-variable {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-@[reducible] noncomputable def const (L : lrel GF) : NEFun GF :=
+@[reducible] noncomputable def const (L : lrel rT GF) : NEFun rT GF :=
   { fn := fun _ => L, ne := fun _ => Dist.rfl }
 
-@[reducible] def ofCtx (x : Nat) : NEFun GF :=
+@[reducible] def ofCtx (x : Nat) : NEFun rT GF :=
   { fn := fun Δ => ctxLookup x Δ, ne := fun h => h x }
 
-@[reducible] noncomputable def map2 (F : lrel GF → lrel GF → lrel GF)
-    [OFE.NonExpansive₂ F] (A B : NEFun GF) : NEFun GF :=
+@[reducible] noncomputable def map2 (F : lrel rT GF → lrel rT GF → lrel rT GF)
+    [OFE.NonExpansive₂ F] (A B : NEFun rT GF) : NEFun rT GF :=
   { fn := fun Δ => F (A.fn Δ) (B.fn Δ)
     ne := fun h => OFE.NonExpansive₂.ne (A.ne h) (B.ne h) }
 
-@[reducible] noncomputable def map1 (F : lrel GF → lrel GF)
-    [OFE.NonExpansive F] (A : NEFun GF) : NEFun GF :=
+@[reducible] noncomputable def map1 (F : lrel rT GF → lrel rT GF)
+    [OFE.NonExpansive F] (A : NEFun rT GF) : NEFun rT GF :=
   { fn := fun Δ => F (A.fn Δ)
     ne := fun h => OFE.NonExpansive.ne (f := F) (A.ne h) }
 
-@[reducible] noncomputable def rec' (A : NEFun GF) : NEFun GF :=
+@[reducible] noncomputable def rec' (A : NEFun rT GF) : NEFun rT GF :=
   { fn := fun Δ => lrel_rec
       { f := fun X => A.fn (TyEnv.cons X Δ)
         ne := ⟨fun {_ _ _} hXY => A.ne (TyEnv.cons_ne_head hXY)⟩ }
     ne := fun h => lrel_rec_ne (fun _ => A.ne (TyEnv.cons_ne_tail h)) }
 
-@[reducible] noncomputable def forall' (A : NEFun GF) : NEFun GF :=
+@[reducible] noncomputable def forall' (A : NEFun rT GF) : NEFun rT GF :=
   { fn := fun Δ => lrel_forall (fun X => A.fn (TyEnv.cons X Δ))
     ne := fun h => lrel_forall_ne (fun _ => A.ne (TyEnv.cons_ne_tail h)) }
 
-@[reducible] noncomputable def exists' (A : NEFun GF) : NEFun GF :=
+@[reducible] noncomputable def exists' (A : NEFun rT GF) : NEFun rT GF :=
   { fn := fun Δ => lrel_exists (fun X => A.fn (TyEnv.cons X Δ))
     ne := fun h => lrel_exists_ne (fun _ => A.ne (TyEnv.cons_ne_tail h)) }
 
 end NEFun
 
 /-- Bundled interpretation paired with a pointwise ne-witness. -/
-noncomputable def interpNE : Ty → NEFun GF
+noncomputable def interpNE : Ty → NEFun rT GF
   | .unit         => NEFun.const lrel_unit
   | .int          => NEFun.const lrel_int
   | .bool         => NEFun.const lrel_bool
@@ -104,10 +109,10 @@ noncomputable def interpNE : Ty → NEFun GF
   | .forall' τ'   => NEFun.forall' (interpNE τ')
   | .exists' τ'   => NEFun.exists' (interpNE τ')
 
-noncomputable def interp (τ : Ty) (Δ : TyEnv GF) : lrel GF :=
+noncomputable def interp (τ : Ty) (Δ : TyEnv rT GF) : lrel rT GF :=
   (interpNE (GF := GF) τ).fn Δ
 
-theorem interp_ne_env (τ : Ty) {n : Nat} {Δ Δ' : TyEnv GF}
+theorem interp_ne_env (τ : Ty) {n : Nat} {Δ Δ' : TyEnv rT GF}
     (h : Δ ≡{n}≡ Δ') : interp τ Δ ≡{n}≡ interp τ Δ' :=
   (interpNE (GF := GF) τ).ne h
 
@@ -119,21 +124,21 @@ inline `have h : interp ... = lrel_... := rfl; rw [h]` patterns: if the shape
 of `interp` ever changes (e.g. an extra wrapper), only these lemmas need
 updating. -/
 
-@[simp] theorem interp_unit (Δ : TyEnv GF) : interp Ty.unit Δ = lrel_unit := rfl
-@[simp] theorem interp_int  (Δ : TyEnv GF) : interp Ty.int  Δ = lrel_int  := rfl
-@[simp] theorem interp_bool (Δ : TyEnv GF) : interp Ty.bool Δ = lrel_bool := rfl
-@[simp] theorem interp_tape (Δ : TyEnv GF) : interp Ty.tape Δ = lrel_tape := rfl
+@[simp] theorem interp_unit (Δ : TyEnv rT GF) : interp Ty.unit Δ = lrel_unit := rfl
+@[simp] theorem interp_int  (Δ : TyEnv rT GF) : interp Ty.int  Δ = lrel_int  := rfl
+@[simp] theorem interp_bool (Δ : TyEnv rT GF) : interp Ty.bool Δ = lrel_bool := rfl
+@[simp] theorem interp_tape (Δ : TyEnv rT GF) : interp Ty.tape Δ = lrel_tape := rfl
 
-theorem interp_prod (Δ : TyEnv GF) (τ1 τ2 : Ty) :
+theorem interp_prod (Δ : TyEnv rT GF) (τ1 τ2 : Ty) :
     interp (Ty.prod τ1 τ2) Δ = lrel_prod (interp τ1 Δ) (interp τ2 Δ) := rfl
 
-theorem interp_sum (Δ : TyEnv GF) (τ1 τ2 : Ty) :
+theorem interp_sum (Δ : TyEnv rT GF) (τ1 τ2 : Ty) :
     interp (Ty.sum τ1 τ2) Δ = lrel_sum (interp τ1 Δ) (interp τ2 Δ) := rfl
 
-theorem interp_arrow (Δ : TyEnv GF) (τ1 τ2 : Ty) :
+theorem interp_arrow (Δ : TyEnv rT GF) (τ1 τ2 : Ty) :
     interp (Ty.arrow τ1 τ2) Δ = lrel_arr (interp τ1 Δ) (interp τ2 Δ) := rfl
 
-theorem interp_ref (Δ : TyEnv GF) (τ : Ty) :
+theorem interp_ref (Δ : TyEnv rT GF) (τ : Ty) :
     interp (Ty.ref τ) Δ = lrel_ref (interp τ Δ) := rfl
 
 end interp
@@ -141,10 +146,10 @@ end interp
 /-! ## Closedness of related values -/
 
 section interp_closed
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Every `interp τ Δ` value-relation only relates closed values. -/
-theorem interp_closed {Δ : TyEnv GF} (τ : Ty) (v v' : Val) :
+theorem interp_closed {Δ : TyEnv rT GF} (τ : Ty) (v v' : Val rT) :
     (interp τ Δ).car v v' ⊢@{IProp GF}
       iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) :=
   (interp τ Δ).closed v v'
@@ -153,21 +158,21 @@ end interp_closed
 
 /-! ## Unboxed-value predicate -/
 
-@[simp] def Exp.isUnboxedV : Exp → Prop
+@[simp] def Exp.isUnboxedV : Exp rT → Prop
   | .lit _ => True
   | .inl (.lit _) => True
   | .inr (.lit _) => True
   | _ => False
 
-@[reducible] def Val.isUnboxed (v : Val) : Prop := v.1.isUnboxedV
+@[reducible] def Val.isUnboxed (v : Val rT) : Prop := v.1.isUnboxedV
 
 /-! ## Soundness of the semantic type interpretation -/
 
 section interp_sound
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Unboxed-type values are unboxed. -/
-theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
+theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
     (H : UnboxedType τ) :
     (interp τ Δ).car v v' ⊢@{IProp GF} ⌜ Val.isUnboxed v ∧ Val.isUnboxed v' ⌝ := by
   cases H
@@ -190,10 +195,10 @@ theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
 
 /-- At an unboxed type, both related values are bare literals. Stronger than
 `unboxed_type_sound`: `UnboxedType` doesn't include sums. -/
-theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
+theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
     (H : UnboxedType τ) :
     (interp τ Δ).car v v' ⊢@{IProp GF}
-      ⌜∃ l l' : BaseLit, v.1 = .lit l ∧ v'.1 = .lit l'⌝ := by
+      ⌜∃ l l' : BaseLit rT, v.1 = .lit l ∧ v'.1 = .lit l'⌝ := by
   cases H
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩
@@ -213,7 +218,7 @@ theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv GF} {v v' : Val}
     exact ⟨_, _, h1, h2⟩
 
 /-- At equality-types, both related values are pointwise equal. -/
-theorem eq_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val} (H : EqType τ) :
+theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType τ) :
     (interp τ Δ).car v v' ⊢@{IProp GF} ⌜ v = v' ⌝ := by
   induction H generalizing v v'
   · show iprop(⌜ _ ⌝) ⊢ _
@@ -255,7 +260,7 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv GF} {v v' : Val} (H : EqType τ) :
       rw [h1, h2, heq]
 
 /-- Decidable equality at unboxed types. -/
-theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv GF} {v1 v2 w1 w2 : Val}
+theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
     (H : UnboxedType τ) :
     (interp τ Δ).car v1 v2 ⊢@{IProp GF}
       (interp τ Δ).car w1 w2 -∗ |={⊤}=> ⌜ v1 = w1 ↔ v2 = w2 ⌝ := by
@@ -448,17 +453,18 @@ semantics (see `iris/bi/big_op.v`: `big_sepM2_def := ⌜dom m1 = dom m2⌝ ∧
 [∗ map] k ↦ xy ∈ map_zip m1 m2, Φ k xy.1 xy.2`). -/
 
 /-- Relational typing context: atoms → (persistent) relation. -/
-abbrev RelCtx (GF : BundledGFunctors) := List (Var × lrel GF)
+abbrev RelCtx (rT : Type _) (GF : BundledGFunctors) := List (Var × lrel rT GF)
 
 /-- Value substitution: atoms → pairs of values. -/
-abbrev ValSubstMap := List (Var × (Val × Val))
+abbrev ValSubstMap (rT : Type _) := List (Var × (Val rT × Val rT))
 
 namespace RelCtx
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {GF : BundledGFunctors}
 
 /-- Lookup in a relational context. **Rightmost** binding wins (matching
 `Exp.substMap`'s foldr semantics: rightmost is applied first / wins). -/
-def lookup : RelCtx GF → Var → Option (lrel GF)
+def lookup : RelCtx rT GF → Var → Option (lrel rT GF)
   | [], _ => none
   | (y, A) :: rest, x =>
     match lookup rest x with
@@ -466,7 +472,7 @@ def lookup : RelCtx GF → Var → Option (lrel GF)
     | none => if x = y then some A else none
 
 /-- An entry's existence in `Γ` implies the lookup at its key is some. -/
-theorem lookup_isSome_of_mem {Γ : RelCtx GF} {p : Var × lrel GF}
+theorem lookup_isSome_of_mem {Γ : RelCtx rT GF} {p : Var × lrel rT GF}
     (h : p ∈ Γ) : (Γ.lookup p.1).isSome := by
   induction Γ with
   | nil => cases h
@@ -486,9 +492,10 @@ theorem lookup_isSome_of_mem {Γ : RelCtx GF} {p : Var × lrel GF}
 end RelCtx
 
 namespace ValSubstMap
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
 /-- Lookup in a value substitution. **Rightmost** binding wins. -/
-def lookup : ValSubstMap → Var → Option (Val × Val)
+def lookup : ValSubstMap rT → Var → Option (Val rT × Val rT)
   | [], _ => none
   | (y, p) :: rest, x =>
     match lookup rest x with
@@ -496,13 +503,13 @@ def lookup : ValSubstMap → Var → Option (Val × Val)
     | none => if x = y then some p else none
 
 /-- Left projection as a `SubstMap`. -/
-def fst (vs : ValSubstMap) : SubstMap := vs.map (fun p => (p.1, p.2.1.1))
+def fst (vs : ValSubstMap rT) : SubstMap rT := vs.map (fun p => (p.1, p.2.1.1))
 
 /-- Right projection as a `SubstMap`. -/
-def snd (vs : ValSubstMap) : SubstMap := vs.map (fun p => (p.1, p.2.2.1))
+def snd (vs : ValSubstMap rT) : SubstMap rT := vs.map (fun p => (p.1, p.2.2.1))
 
 /-- Lookup commutes with `.fst` projection. -/
-theorem fst_lookup (vs : ValSubstMap) (x : Var) :
+theorem fst_lookup (vs : ValSubstMap rT) (x : Var) :
     SubstMap.lookup vs.fst x = (vs.lookup x).map (fun p => p.1.1) := by
   induction vs with
   | nil => rfl
@@ -516,7 +523,7 @@ theorem fst_lookup (vs : ValSubstMap) (x : Var) :
     | none => simp
 
 /-- Lookup commutes with `.snd` projection. -/
-theorem snd_lookup (vs : ValSubstMap) (x : Var) :
+theorem snd_lookup (vs : ValSubstMap rT) (x : Var) :
     SubstMap.lookup vs.snd x = (vs.lookup x).map (fun p => p.2.1) := by
   induction vs with
   | nil => rfl
@@ -530,7 +537,7 @@ theorem snd_lookup (vs : ValSubstMap) (x : Var) :
     | none => simp
 
 /-- A lookup that returns `some` implies the key appears in the list. -/
-theorem mem_of_lookup_isSome {vs : ValSubstMap} {x : Var}
+theorem mem_of_lookup_isSome {vs : ValSubstMap rT} {x : Var}
     (h : (vs.lookup x).isSome) : ∃ p ∈ vs, p.1 = x := by
   induction vs with
   | nil => simp [ValSubstMap.lookup] at h
@@ -551,7 +558,7 @@ theorem mem_of_lookup_isSome {vs : ValSubstMap} {x : Var}
       · simp at h
 
 /-- If a key appears in vs, lookup is some. -/
-theorem lookup_isSome_of_mem {vs : ValSubstMap} {x : Var}
+theorem lookup_isSome_of_mem {vs : ValSubstMap rT} {x : Var}
     (hmem : ∃ w, (x, w) ∈ vs) : (vs.lookup x).isSome := by
   obtain ⟨w, hmem⟩ := hmem
   induction vs with
@@ -574,11 +581,11 @@ theorem lookup_isSome_of_mem {vs : ValSubstMap} {x : Var}
         cases this
 
 /-- Delete all entries with key `x` from a value substitution map. -/
-def delete (vs : ValSubstMap) (x : Var) : ValSubstMap :=
+def delete (vs : ValSubstMap rT) (x : Var) : ValSubstMap rT :=
   vs.filter (fun p => !decide (p.1 = x))
 
 /-- After deleting `x`, lookup at `x` returns `none`. -/
-theorem lookup_delete_self (vs : ValSubstMap) (x : Var) :
+theorem lookup_delete_self (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).lookup x = none := by
   induction vs with
   | nil => rfl
@@ -598,7 +605,7 @@ theorem lookup_delete_self (vs : ValSubstMap) (x : Var) :
       simp [Ne.symm hzx]
 
 /-- After deleting `x`, lookup at any other key is unchanged. -/
-theorem lookup_delete_other (vs : ValSubstMap) (x z : Var) (hxz : z ≠ x) :
+theorem lookup_delete_other (vs : ValSubstMap rT) (x z : Var) (hxz : z ≠ x) :
     (vs.delete x).lookup z = vs.lookup z := by
   induction vs with
   | nil => rfl
@@ -632,14 +639,14 @@ theorem lookup_delete_other (vs : ValSubstMap) (x z : Var) (hxz : z ≠ x) :
       rw [ih]
 
 /-- Membership in `vs.delete x` excludes any pair with key `x`. -/
-theorem mem_delete (vs : ValSubstMap) (x : Var) (p : Var × (Val × Val)) :
+theorem mem_delete (vs : ValSubstMap rT) (x : Var) (p : Var × (Val rT × Val rT)) :
     p ∈ vs.delete x ↔ p ∈ vs ∧ p.1 ≠ x := by
   unfold delete
   rw [List.mem_filter]
   simp
 
 /-- The fst-projection of `vs.delete x` filters x out of vs.fst. -/
-theorem fst_delete (vs : ValSubstMap) (x : Var) :
+theorem fst_delete (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).fst = vs.fst.filter (fun p => !decide (p.1 = x)) := by
   unfold delete fst
   induction vs with
@@ -658,7 +665,7 @@ theorem fst_delete (vs : ValSubstMap) (x : Var) :
       exact ih
 
 /-- Snd analog. -/
-theorem snd_delete (vs : ValSubstMap) (x : Var) :
+theorem snd_delete (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).snd = vs.snd.filter (fun p => !decide (p.1 = x)) := by
   unfold delete snd
   induction vs with
@@ -677,7 +684,7 @@ theorem snd_delete (vs : ValSubstMap) (x : Var) :
       exact ih
 
 /-- Domain of `vs.delete x` excludes x. -/
-theorem map_fst_delete_notMem (vs : ValSubstMap) (x : Var) :
+theorem map_fst_delete_notMem (vs : ValSubstMap rT) (x : Var) :
     x ∉ ((vs.delete x).map (·.1)).toFinset := by
   intro h
   simp only [List.mem_toFinset, List.mem_map] at h
@@ -686,7 +693,7 @@ theorem map_fst_delete_notMem (vs : ValSubstMap) (x : Var) :
   exact hpmem.2 hpeq
 
 /-- Domain of `vs.delete x` is contained in domain of vs. -/
-theorem map_fst_delete_subset (vs : ValSubstMap) (x : Var) :
+theorem map_fst_delete_subset (vs : ValSubstMap rT) (x : Var) :
     ((vs.delete x).map (·.1)).toFinset ⊆ (vs.map (·.1)).toFinset := by
   intro z hz
   simp only [List.mem_toFinset, List.mem_map] at hz ⊢
@@ -695,7 +702,7 @@ theorem map_fst_delete_subset (vs : ValSubstMap) (x : Var) :
   exact ⟨p, hpmem.1, hpeq⟩
 
 /-- The pair returned by `lookup` is the rightmost matching member. -/
-theorem mem_of_lookup_eq_some {vs : ValSubstMap} {y : Var} {w1 w2 : Val}
+theorem mem_of_lookup_eq_some {vs : ValSubstMap rT} {y : Var} {w1 w2 : Val rT}
     (h : vs.lookup y = some (w1, w2)) : (y, (w1, w2)) ∈ vs := by
   induction vs with
   | nil => simp [ValSubstMap.lookup] at h
@@ -720,18 +727,18 @@ theorem mem_of_lookup_eq_some {vs : ValSubstMap} {y : Var} {w1 w2 : Val}
 
 /-- After delete + cons of new x-binding, fst-projection equals
 substituting via subst _ x w in front of the deleted vs.fst. Used in `bin_log_related_rename`. -/
-theorem fst_cons_delete (vs : ValSubstMap) (x : Var) (w1 w2 : Val) :
+theorem fst_cons_delete (vs : ValSubstMap rT) (x : Var) (w1 w2 : Val rT) :
     ValSubstMap.fst ((x, (w1, w2)) :: vs.delete x)
       = (x, w1.1) :: (vs.delete x).fst := rfl
 
-theorem snd_cons_delete (vs : ValSubstMap) (x : Var) (w1 w2 : Val) :
+theorem snd_cons_delete (vs : ValSubstMap rT) (x : Var) (w1 w2 : Val rT) :
     ValSubstMap.snd ((x, (w1, w2)) :: vs.delete x)
       = (x, w2.1) :: (vs.delete x).snd := rfl
 
 end ValSubstMap
 
 section env_typed
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- The relational typing assertion on value substitutions.
 
@@ -739,23 +746,23 @@ Pointwise property: for every variable `x`, either both `Γ` and `vs` are
 undefined at `x`, or both are defined and the pair in `vs x` lies in the
 relation assigned by `Γ x`. Matches the unfolded semantics of Rocq's
 `big_sepM2`. -/
-noncomputable def env_ltyped2 (Γ : RelCtx GF) (vs : ValSubstMap) : IProp GF :=
+noncomputable def env_ltyped2 (Γ : RelCtx rT GF) (vs : ValSubstMap rT) : IProp GF :=
   iprop((⌜∀ x, (Γ.lookup x).isSome ↔ (vs.lookup x).isSome⌝) ∗
     (⌜∀ p ∈ vs, p.2.1.1.isClosed .empty ∧ p.2.2.1.isClosed .empty⌝) ∗
-    (∀ (x : Var) (A : lrel GF) (v1 v2 : Val),
+    (∀ (x : Var) (A : lrel rT GF) (v1 v2 : Val rT),
       (⌜Γ.lookup x = some A⌝) -∗
       (⌜vs.lookup x = some (v1, v2)⌝) -∗
       A v1 v2))
 
 /-- `env_ltyped2` is persistent: both conjuncts are persistent (pure
 propositions and a forall of persistent lrels). -/
-instance env_ltyped2_persistent (Γ : RelCtx GF) (vs : ValSubstMap) :
+instance env_ltyped2_persistent (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     Persistent (env_ltyped2 Γ vs) := by
   unfold env_ltyped2
   infer_instance
 
 /-- Domain agreement: `Γ.lookup x = some _ ↔ vs.lookup x = some _`. -/
-theorem env_ltyped2_domEq (Γ : RelCtx GF) (vs : ValSubstMap) :
+theorem env_ltyped2_domEq (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
       iprop(⌜∀ x, (Γ.lookup x).isSome ↔ (vs.lookup x).isSome⌝) := by
   unfold env_ltyped2
@@ -763,7 +770,7 @@ theorem env_ltyped2_domEq (Γ : RelCtx GF) (vs : ValSubstMap) :
   ipure_intro; exact H
 
 /-- Closedness: every binding in `vs` is closed. -/
-theorem env_ltyped2_allClosed (Γ : RelCtx GF) (vs : ValSubstMap) :
+theorem env_ltyped2_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
       iprop(⌜∀ p ∈ vs, p.2.1.1.isClosed .empty ∧ p.2.2.1.isClosed .empty⌝) := by
   unfold env_ltyped2
@@ -772,10 +779,10 @@ theorem env_ltyped2_allClosed (Γ : RelCtx GF) (vs : ValSubstMap) :
 
 /-- Lookup-by-Γ: if `Γ x = some A`, the substitution has a matching pair
 and the pair is in `A`. -/
-theorem env_ltyped2_lookup (Γ : RelCtx GF) (vs : ValSubstMap) (x : Var) (A : lrel GF)
+theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (A : lrel rT GF)
     (hΓ : Γ.lookup x = some A) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
-      iprop(∃ (v1 v2 : Val), (⌜vs.lookup x = some (v1, v2)⌝) ∗ A v1 v2) := by
+      iprop(∃ (v1 v2 : Val rT), (⌜vs.lookup x = some (v1, v2)⌝) ∗ A v1 v2) := by
   unfold env_ltyped2
   iintro ⟨%Hdom, %Hclosed, Hall⟩
   have hvs : (vs.lookup x).isSome := (Hdom x).mp (by rw [hΓ]; rfl)
@@ -787,7 +794,7 @@ theorem env_ltyped2_lookup (Γ : RelCtx GF) (vs : ValSubstMap) (x : Var) (A : lr
   · ipure_intro; exact hvs_eq
 
 /-- Empty-Γ empty-vs. -/
-theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx GF) [] := by
+theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx rT GF) [] := by
   unfold env_ltyped2
   isplitr
   · ipure_intro; intro x; simp [RelCtx.lookup, ValSubstMap.lookup]
@@ -797,8 +804,8 @@ theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx GF) [] := by
   simp [RelCtx.lookup] at hΓ
 
 /-- Empty-Γ forces vs empty. -/
-theorem env_ltyped2_empty_inv (vs : ValSubstMap) :
-    env_ltyped2 ([] : RelCtx GF) vs ⊢@{IProp GF} ⌜vs = []⌝ := by
+theorem env_ltyped2_empty_inv (vs : ValSubstMap rT) :
+    env_ltyped2 ([] : RelCtx rT GF) vs ⊢@{IProp GF} ⌜vs = []⌝ := by
   unfold env_ltyped2
   iintro ⟨%Hdom, _, _⟩
   ipure_intro
@@ -816,8 +823,8 @@ theorem env_ltyped2_empty_inv (vs : ValSubstMap) :
 
 /-- Extending both contexts preserves `env_ltyped2`. Requires the new values
 to be closed (since `env_ltyped2` records closedness of all bindings). -/
-theorem env_ltyped2_insert (Γ : RelCtx GF) (vs : ValSubstMap)
-    (x : Var) (A : lrel GF) (v1 v2 : Val)
+theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
+    (x : Var) (A : lrel rT GF) (v1 v2 : Val rT)
     (hv1c : v1.1.isClosed .empty) (hv2c : v2.1.isClosed .empty) :
     iprop(A v1 v2 ∗ env_ltyped2 Γ vs) ⊢@{IProp GF}
       env_ltyped2 ((x, A) :: Γ) ((x, (v1, v2)) :: vs) := by
@@ -875,7 +882,7 @@ theorem env_ltyped2_insert (Γ : RelCtx GF) (vs : ValSubstMap)
       iexact HA
 
 /-- Helper: a `RelCtx.lookup` that returns `some` implies the key appears in the list. -/
-theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx GF} {y : Var}
+theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx rT GF} {y : Var}
     (h : (Γ.lookup y).isSome) : y ∈ (Γ.map (·.1)).toFinset := by
   induction Γ with
   | nil => simp [RelCtx.lookup] at h
@@ -897,8 +904,8 @@ theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx GF} {y : Var}
 
 /-- Drop a head binding for a fresh atom: if `y ∉ Γ.dom`, then
 `env_ltyped2 ((y, A) :: Γ) vs ⊢ env_ltyped2 Γ (vs.delete y)`. -/
-theorem env_ltyped2_drop_head (Γ : RelCtx GF) (vs : ValSubstMap)
-    (y : Var) (A : lrel GF)
+theorem env_ltyped2_drop_head (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
+    (y : Var) (A : lrel rT GF)
     (hyNotDom : y ∉ (Γ.map (·.1)).toFinset) :
     env_ltyped2 ((y, A) :: Γ) vs ⊢@{IProp GF} env_ltyped2 Γ (vs.delete y) := by
   unfold env_ltyped2
@@ -960,30 +967,30 @@ end env_typed
 /-! ## The semantic typing judgement
 
 Mirrors `bin_log_related` (interp.v:274–279). Takes an already-lifted
-relational context `Γ : RelCtx GF` (clients holding a syntactic `Tctx`
+relational context `Γ : RelCtx rT GF` (clients holding a syntactic `Tctx`
 can lift via `fun x => (Γ.lookupTy x).map (fun τ => interp τ Δ)` or a
 list analogue). -/
 
 section bin_log_related
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-noncomputable def bin_log_related (E : CoPset) (Γ : RelCtx GF)
-    (e e' : Exp) (A : lrel GF) : IProp GF :=
-  iprop(∀ (vs : ValSubstMap),
+noncomputable def bin_log_related (E : CoPset) (Γ : RelCtx rT GF)
+    (e e' : Exp rT) (A : lrel rT GF) : IProp GF :=
+  iprop(∀ (vs : ValSubstMap rT),
     env_ltyped2 Γ vs -∗
     refines E (Exp.substMap vs.fst e) (Exp.substMap vs.snd e') A)
 
 /-- Convenience wrapper: take a syntactic type `τ` and a type-env `Δ`,
 and use `interp τ Δ` as the relation. -/
-noncomputable abbrev bin_log_related_ty (E : CoPset) (Δ : TyEnv GF)
-    (Γ : RelCtx GF) (e e' : Exp) (τ : Ty) : IProp GF :=
+noncomputable abbrev bin_log_related_ty (E : CoPset) (Δ : TyEnv rT GF)
+    (Γ : RelCtx rT GF) (e e' : Exp rT) (τ : Ty) : IProp GF :=
   bin_log_related E Γ e e' (interp τ Δ)
 
 /-- **α-renaming for `bin_log_related`.** From related-at-`x` infer related-at-`y`
 for the appropriately-renamed expressions, when both atoms are outside `Γ.dom`,
 distinct, and `y` doesn't already appear in the bodies. -/
-theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx GF}
-    {x y : Var} {A : lrel GF} {τE τE' : Exp} {B : lrel GF}
+theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx rT GF}
+    {x y : Var} {A : lrel rT GF} {τE τE' : Exp rT} {B : lrel rT GF}
     (hxy : x ≠ y)
     (hxNotDom : x ∉ (Γ.map (·.1)).toFinset)
     (hyNotDom : y ∉ (Γ.map (·.1)).toFinset)
@@ -1024,7 +1031,7 @@ theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx GF}
     · iexact HA_w
     iexact HvsDrop
   -- Apply Hold at vs' := (x, (w1, w2)) :: vs.delete y.
-  set vs' : ValSubstMap := (x, (w1, w2)) :: vs.delete y with hvs'_def
+  set vs' : ValSubstMap rT := (x, (w1, w2)) :: vs.delete y with hvs'_def
   ihave Hrefines := Hold $$ %vs' Hvs'
   -- Domain agreement: x ∉ vs.dom (since x ≠ y and x ∉ Γ.dom).
   ihave %Hvs_dom := env_ltyped2_domEq _ vs $$ Hvs
@@ -1115,8 +1122,8 @@ theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx GF}
   iexact Hrefines
 
 /-- α-renaming for `bin_log_related_ty` (interp-typed wrapper). -/
-theorem bin_log_related_ty_rename {E : CoPset} {Δ : TyEnv GF} {Γ : RelCtx GF}
-    {x y : Var} {A : lrel GF} {τE τE' : Exp} {τ : Ty}
+theorem bin_log_related_ty_rename {E : CoPset} {Δ : TyEnv rT GF} {Γ : RelCtx rT GF}
+    {x y : Var} {A : lrel rT GF} {τE τE' : Exp rT} {τ : Ty}
     (hxy : x ≠ y)
     (hxNotDom : x ∉ (Γ.map (·.1)).toFinset)
     (hyNotDom : y ∉ (Γ.map (·.1)).toFinset)
@@ -1146,14 +1153,14 @@ going through a general renaming-equivariance lemma
 (`interp_substComp`) as internal tools. -/
 
 section interp_subst
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Composing a `TyEnv` with a renaming. -/
-@[reducible] def TyEnv.comp (Δ : TyEnv GF) (ξ : Nat → Nat) : TyEnv GF :=
+@[reducible] def TyEnv.comp (Δ : TyEnv rT GF) (ξ : Nat → Nat) : TyEnv rT GF :=
   fun n => Δ (ξ n)
 
 /-- `cons X (Δ ∘ ξ) = cons X Δ ∘ upren ξ`. -/
-theorem TyEnv.comp_upren (X : lrel GF) (Δ : TyEnv GF) (ξ : Nat → Nat) :
+theorem TyEnv.comp_upren (X : lrel rT GF) (Δ : TyEnv rT GF) (ξ : Nat → Nat) :
     TyEnv.cons X (TyEnv.comp Δ ξ) = TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ) := by
   funext n; cases n with
   | zero => rfl
@@ -1161,7 +1168,7 @@ theorem TyEnv.comp_upren (X : lrel GF) (Δ : TyEnv GF) (ξ : Nat → Nat) :
 
 /-- **Renaming equivariance.** Renaming `τ` by `ξ` syntactically is
 equivalent to composing the environment with `ξ` semantically. -/
-theorem interp_rename (τ : Ty) (ξ : Nat → Nat) (Δ : TyEnv GF) :
+theorem interp_rename (τ : Ty) (ξ : Nat → Nat) (Δ : TyEnv rT GF) :
     interp (τ.rename ξ) Δ ≡ interp τ (TyEnv.comp Δ ξ) := by
   induction τ generalizing ξ Δ
   -- int, bool, unit, tape: all rfl
@@ -1235,7 +1242,7 @@ theorem interp_rename (τ : Ty) (ξ : Nat → Nat) (Δ : TyEnv GF) :
 
 /-- **`interp_ren`**: shifting `τ` and consing the env preserves
 interpretation. -/
-theorem interp_ren (τ : Ty) (X : lrel GF) (Δ : TyEnv GF) :
+theorem interp_ren (τ : Ty) (X : lrel rT GF) (Δ : TyEnv rT GF) :
     interp (Ty.shift τ) (TyEnv.cons X Δ) ≡ interp τ Δ := by
   unfold Ty.shift
   have h := interp_rename τ (· + 1) (TyEnv.cons X Δ)
@@ -1246,12 +1253,12 @@ theorem interp_ren (τ : Ty) (X : lrel GF) (Δ : TyEnv GF) :
 
 /-- Lift a syntactic substitution to a semantic env by interpreting each
 image type under `Δ`. -/
-@[reducible] noncomputable def semSubst (σ : Nat → Ty) (Δ : TyEnv GF) : TyEnv GF :=
+@[reducible] noncomputable def semSubst (σ : Nat → Ty) (Δ : TyEnv rT GF) : TyEnv rT GF :=
   fun n => interp (σ n) Δ
 
 /-- Commutation of `up σ` with `cons X`: `semSubst (up σ) (cons X Δ) = cons X (semSubst σ Δ)`,
 up to pointwise equivalence. (Equality would require extensionality on `lrel`.) -/
-theorem semSubst_up (σ : Nat → Ty) (X : lrel GF) (Δ : TyEnv GF) :
+theorem semSubst_up (σ : Nat → Ty) (X : lrel rT GF) (Δ : TyEnv rT GF) :
     ∀ n, semSubst (up σ) (TyEnv.cons X Δ) n ≡ TyEnv.cons X (semSubst σ Δ) n
   | 0 => by unfold semSubst up; rfl
   | k + 1 => by
@@ -1262,7 +1269,7 @@ theorem semSubst_up (σ : Nat → Ty) (X : lrel GF) (Δ : TyEnv GF) :
 /-- **Substitution equivariance.** Substituting in `τ` syntactically is
 equivalent to evaluating under the semantic environment obtained by
 interpreting each substitution image. -/
-theorem interp_substG (τ : Ty) (σ : Nat → Ty) (Δ : TyEnv GF) :
+theorem interp_substG (τ : Ty) (σ : Nat → Ty) (Δ : TyEnv rT GF) :
     interp (τ.subst σ) Δ ≡ interp τ (semSubst σ Δ) := by
   induction τ generalizing σ Δ
   · intro _ _; rfl
@@ -1334,7 +1341,7 @@ theorem interp_substG (τ : Ty) (σ : Nat → Ty) (Δ : TyEnv GF) :
 `interp.v:210–212`. With `Ty.single τ τ' = τ[τ'/0]`, this reads:
 interpreting `τ[τ'/0]` is the same as interpreting `τ` under an
 environment extended with the interpretation of `τ'`. -/
-theorem interp_subst (τ' τ : Ty) (Δ : TyEnv GF) :
+theorem interp_subst (τ' τ : Ty) (Δ : TyEnv rT GF) :
     interp (Ty.single τ τ') Δ ≡ interp τ (TyEnv.cons (interp τ' Δ) Δ) := by
   unfold Ty.single
   have h := interp_substG τ (fun n => match n with | 0 => τ' | k + 1 => .var k) Δ

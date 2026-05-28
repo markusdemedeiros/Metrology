@@ -29,10 +29,14 @@ atomicity proofs for non-syntactically-atomic programs (a future extension).
 
 namespace ProbLang
 
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 /-- `Atomic e` — every primitive step from `e` (at any state) reduces to a
 configuration whose expression is a value. This is the strong/physical flavor
 of atomicity. -/
-def Atomic (e : Exp) : Prop :=
+def Atomic (e : Exp rT) : Prop :=
   ∀ σ e' σ', 0 < primStep ⟨e, σ⟩ {⟨e', σ'⟩} → e'.isValue
 
 namespace Atomic
@@ -44,7 +48,7 @@ For an expression `e` whose `decompItem = none` (i.e., it's a head-redex shape),
 is positive. This lets us invert primStep positivity case-by-case via
 `HeadStepSupport`. -/
 theorem primStep_eq_headStep_of_decomp_nil
-    {e : Exp} (hd : e.decompItem = none) (σ : State) :
+    {e : Exp rT} (hd : e.decompItem = none) (σ : State rT) :
     primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
   have hde : e.decomp = ([], e) := by
     rw [Exp.decomp_unfold, hd]
@@ -54,9 +58,9 @@ theorem primStep_eq_headStep_of_decomp_nil
 
 /-- `load (.lit (.loc l))` is atomic: it produces either `0 mass` (lookup fails)
 or a dirac at a value. -/
-theorem load (l : Loc) : Atomic (.load (.lit (.loc l))) := by
+theorem load (l : Loc) : Atomic (rT := rT) (.load (.lit (.loc l))) := by
   intro σ e' σ' hpos
-  have hd : (Exp.load (.lit (.loc l))).decompItem = none := rfl
+  have hd : (Exp.load (.lit (.loc l)) : Exp rT).decompItem = none := rfl
   rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
   cases hpos with
   | LoadS _ he' =>
@@ -67,7 +71,7 @@ theorem load (l : Loc) : Atomic (.load (.lit (.loc l))) := by
 
 /-- `store (.lit (.loc l)) v` is atomic when `v` is a value: result is always
 `.lit .unit`. -/
-theorem store (l : Loc) (v : Val) :
+theorem store (l : Loc) (v : Val rT) :
     Atomic (.store (.lit (.loc l)) v.1) := by
   intro σ e' σ' hpos
   have hv : v.1.toVal? = some v := Exp.toVal?_ofVal v
@@ -82,7 +86,7 @@ theorem store (l : Loc) (v : Val) :
   | StoreS _ _ _ => exact IsVal.lit.toIsValue
 
 /-- `alloc v` is atomic when `v` is a value: result is always `.lit (.loc ℓ)`. -/
-theorem alloc (v : Val) : Atomic (.alloc v.1) := by
+theorem alloc (v : Val rT) : Atomic (.alloc v.1) := by
   intro σ e' σ' hpos
   have hv : v.1.toVal? = some v := Exp.toVal?_ofVal v
   have hd : (Exp.alloc v.1).decompItem = none := by
@@ -93,9 +97,9 @@ theorem alloc (v : Val) : Atomic (.alloc v.1) := by
   | AllocS _ _ _ => exact IsVal.lit.toIsValue
 
 /-- `rand z ()` is atomic: result is always `.lit (.int n)`. -/
-theorem rand_unit (z : Int) : Atomic (.rand (.lit (.int z)) (.lit .unit)) := by
+theorem rand_unit (z : Int) : Atomic (rT := rT) (.rand (.lit (.int z)) (.lit .unit)) := by
   intro σ e' σ' hpos
-  have hd : (Exp.rand (.lit (.int z)) (.lit .unit)).decompItem = none := rfl
+  have hd : (Exp.rand (.lit (.int z)) (.lit .unit) : Exp rT).decompItem = none := rfl
   rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
   cases hpos with
   | RandNoTapeS _ _ _ => exact IsVal.lit.toIsValue
@@ -103,9 +107,9 @@ theorem rand_unit (z : Int) : Atomic (.rand (.lit (.int z)) (.lit .unit)) := by
 
 /-- `rand z (lbl l)` is atomic: result is always `.lit (.int n)`. -/
 theorem rand_lbl (z : Int) (l : Loc) :
-    Atomic (.rand (.lit (.int z)) (.lit (.lbl l))) := by
+    Atomic (rT := rT) (.rand (.lit (.int z)) (.lit (.lbl l))) := by
   intro σ e' σ' hpos
-  have hd : (Exp.rand (.lit (.int z)) (.lit (.lbl l))).decompItem = none := rfl
+  have hd : (Exp.rand (.lit (.int z)) (.lit (.lbl l)) : Exp rT).decompItem = none := rfl
   rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
   cases hpos with
   | RandTapeS _ _ _ _ => exact IsVal.lit.toIsValue

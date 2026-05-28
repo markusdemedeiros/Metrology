@@ -20,6 +20,10 @@ unchanged from Clutch — types were de-Bruijn already.
 namespace ProbLang
 open Cslib Exp
 
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLangℝ rT]
+
 abbrev Renaming := Nat → Nat
 abbrev Substitution := Nat → Ty
 
@@ -264,7 +268,7 @@ end Tctx
 
 /-- Wrapping `unfold` in this identity makes unfolding a recursive type take a
     real computation step. Under LN, `λ x. x` is `lam (bvar 0)`. -/
-def recUnfold : Exp := .lam (.bvar 0)
+def recUnfold : Exp rT := .lam (.bvar 0)
 
 /-! ## Pattern typing -/
 
@@ -272,7 +276,7 @@ def recUnfold : Exp := .lam (.bvar 0)
     yields bindings of type `τb`. The LN `.wildcard` pattern binds the whole
     scrutinee (there is no separate `.var` pattern since bindings live outside
     `Pat`). -/
-inductive PatTyped : Ty → Pat → Ty → Prop
+inductive PatTyped : Ty → Pat rT → Ty → Prop
   | wildcard {τ}        : PatTyped τ .wildcard τ
   | lit_int {z}        : PatTyped .int  (.lit (.int z))  .unit
   | lit_bool {b}       : PatTyped .bool (.lit (.bool b)) .unit
@@ -297,7 +301,7 @@ there's no dedicated `Typed.letrec` rule — derive it from `fix` + `lam`.
 -/
 
 /-- `Typed Γ e τ` — expression `e` has type `τ` under typing context `Γ`. -/
-inductive Typed : Tctx → Exp → Ty → Prop
+inductive Typed : Tctx → Exp rT → Ty → Prop
   | fvar {Γ x τ} : Γ x = some τ → Typed Γ (.fvar x) τ
   | lit_int  {Γ z} : Typed Γ (.lit (.int z)) .int
   | lit_bool {Γ b} : Typed Γ (.lit (.bool b)) .bool
@@ -398,7 +402,7 @@ cofinite-typing hypothesis to a cofinite-LC witness directly. The `tlam`
 and `tunpack` cases use that an LC term is unchanged by opening
 (`Exp.open_lc`). -/
 
-theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp} {τ : Ty}
+theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp rT} {τ : Ty}
     (h : Typed Γ e τ) : Exp.IsLocallyClosed e := by
   induction h with
   | fvar _ => exact .fvar _
@@ -446,7 +450,7 @@ theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp} {τ : Ty}
   | scrut _ _ ih => exact .scrut _ ih
 
 /-- Every typed expression's free variables lie in the typing context's domain. -/
-theorem Typed.fvSubset {Γ : Tctx} {e : Exp} {τ : Ty}
+theorem Typed.fvSubset {Γ : Tctx} {e : Exp rT} {τ : Ty}
     (h : Typed Γ e τ) : ∀ x ∈ e.fv, (Γ x).isSome := by
   induction h with
   | fvar hx =>
@@ -594,7 +598,7 @@ preserves typing.
 The proof is induction on `Typed`. Cofinite cases use `subst_open_var` to
 push `subst` through `open'`, mirroring `Properties.open_close_to_subst`. -/
 
-theorem Typed.rename_aux {e : Exp} {τ : Ty}
+theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
     {Γ' : Tctx} (h : Typed Γ' e τ) :
     ∀ (x y : Var) (τ_x : Ty) (Γ : Tctx),
       Γ' = Γ.insert x τ_x → y ∉ e.fv ∪ {x} →
@@ -770,7 +774,7 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
   | tunfold _ ih =>
       intro x y τ_x Γ heq hy; subst heq
       simp only [Exp.subst]
-      have hunf : Exp.subst recUnfold x (Exp.fvar y) = recUnfold := by
+      have hunf : Exp.subst (recUnfold (rT := rT)) x (Exp.fvar y) = recUnfold := by
         simp [recUnfold, Exp.subst]
       rw [hunf]
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
@@ -845,7 +849,7 @@ theorem Typed.rename_aux {e : Exp} {τ : Ty}
       simp only [Exp.fv] at hy
       exact .scrut (ih x y τ_x Γ rfl hy) hp
 
-theorem Typed.rename {Γ : Tctx} {e : Exp} {τ τ_x : Ty}
+theorem Typed.rename {Γ : Tctx} {e : Exp rT} {τ τ_x : Ty}
     (x y : Var) (h : Typed (Γ.insert x τ_x) e τ) (hy : y ∉ e.fv ∪ {x}) :
     Typed (Γ.insert y τ_x) (Exp.subst e x (Exp.fvar y)) τ :=
   Typed.rename_aux h x y τ_x Γ rfl hy
@@ -860,7 +864,7 @@ when only a single-atom typing is in hand. Proofs are non-trivial standard
 LN renaming theory; deferred. -/
 
 /-- Cofinite α-rename: a typing at one fresh atom can be lifted to all fresh atoms. -/
-theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp} {τ τ' : Ty}
+theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp rT} {τ τ' : Ty}
     (_hx : x ∉ e.fv) (he : Typed (Γ.insert x τ) e τ') :
     ∀ y ∉ insert x e.fv,
       Typed (Γ.insert y τ) (Exp.open' (Exp.close e x) (Exp.fvar y)) τ' := by
@@ -878,7 +882,7 @@ theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp} {τ τ' : Ty}
     · exact hyx (Finset.mem_singleton.mp h)
   exact Typed.rename x y he hyu
 
-theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp} {τ τ' : Ty}
+theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp rT} {τ τ' : Ty}
     (_hf : f ∉ e.fv) (he : Typed (Γ.insert f (.arrow τ τ')) e (.arrow τ τ')) :
     ∀ g ∉ insert f e.fv,
       Typed (Γ.insert g (.arrow τ τ'))
@@ -895,7 +899,7 @@ theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp} {τ τ' : Ty}
     · exact hgf (Finset.mem_singleton.mp h)
   exact Typed.rename f g he hgu
 
-theorem Typed.rename_unpack {Γ : Tctx} {x : Var} {e2 : Exp} {τ τ2 : Ty}
+theorem Typed.rename_unpack {Γ : Tctx} {x : Var} {e2 : Exp rT} {τ τ2 : Ty}
     (_hx : x ∉ e2.fv)
     (he2 : Typed ((Γ.shift).insert x τ) e2 τ2.shift) :
     ∀ y ∉ insert x e2.fv,

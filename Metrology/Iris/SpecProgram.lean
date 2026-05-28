@@ -8,34 +8,40 @@ public import Iris.Std.HeapInstances
 public import Metrology.Iris.Algebra
 public import Metrology.ProbLang.Syntax.Syntax
 public import Metrology.ProbLang.Syntax.Notation
+public import Metrology.ProbLang.Discrete
 
 @[expose] public section
 
 section SpecRA
 open Std Iris Iris.Std COFE ProbLang
 
-instance : COFE Exp := COFE.ofDiscrete _ Eq_Equivalence
-instance : OFE.Discrete Exp := ⟨id⟩
-instance (x : Exp) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
+set_option linter.unusedSectionVars false
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
+instance : COFE (Exp rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : OFE.Discrete (Exp rT) := ⟨id⟩
+instance (x : Exp rT) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
 instance : COFE Tape := COFE.ofDiscrete _ Eq_Equivalence
 instance : OFE.Discrete Tape := ⟨id⟩
 instance (x : Tape) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-instance : COFE Val := COFE.ofDiscrete _ Eq_Equivalence
-instance : OFE.Discrete Val := ⟨id⟩
-instance (x : Val) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
+instance : COFE (Val rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : OFE.Discrete (Val rT) := ⟨id⟩
+instance (x : Val rT) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-instance : OFE.Leibniz Exp := ⟨id⟩
+instance : OFE.Leibniz (Exp rT) := ⟨id⟩
 instance : OFE.Leibniz Tape := ⟨id⟩
-instance : OFE.Leibniz Val := ⟨id⟩
+instance : OFE.Leibniz (Val rT) := ⟨id⟩
 
-abbrev SpecProg := Auth ℕ+ (Option (Excl Exp))
-abbrev SpecHeap := HeapView ℕ+ Loc (Agree Val) LocHeap
+abbrev SpecProg (rT : Type _) [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :=
+  Auth ℕ+ (Option (Excl (Exp rT)))
+abbrev SpecHeap (rT : Type _) [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :=
+  HeapView ℕ+ Loc (Agree (Val rT)) LocHeap
 abbrev SpecTapes := HeapView ℕ+ Loc (Agree Tape) LocHeap
 
-def SpecProg.auth (e : Exp) : SpecProg := ● (some <| .excl e)
-def SpecProg.frag (e : Exp) : SpecProg := ◯ (some <| .excl e)
+def SpecProg.auth (e : Exp rT) : SpecProg rT := ● (some <| .excl e)
+def SpecProg.frag (e : Exp rT) : SpecProg rT := ◯ (some <| .excl e)
 
 def LocHeap.asAgree [OFE V] (h : LocHeap V) : LocHeap (Agree V) :=
   PartialMap.map LocHeap toAgree h
@@ -59,28 +65,30 @@ theorem LocHeap.asAgree_insert [OFE V] (h : LocHeap V) (l : Loc) (v : V) :
   · rw [LocHeap.asAgree_get?, LawfulPartialMap.get?_insert_ne hk,
         LawfulPartialMap.get?_insert_ne hk, LocHeap.asAgree_get?]
 
-class SpecPreGS (GF : BundledGFunctors) where
-  prog : ElemG GF (constOF SpecProg)
-  heap : ElemG GF (constOF SpecHeap)
+class SpecPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
+    [MeasurableSingletonClass rT] (GF : BundledGFunctors) where
+  prog : ElemG GF (constOF (SpecProg rT))
+  heap : ElemG GF (constOF (SpecHeap rT))
   tapes : ElemG GF (constOF SpecTapes)
 
 attribute [reducible, instance] SpecPreGS.prog SpecPreGS.heap SpecPreGS.tapes
 
-class SpecGS (GF : BundledGFunctors) extends SpecPreGS GF where
+class SpecGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
+    [MeasurableSingletonClass rT] (GF : BundledGFunctors) extends SpecPreGS rT GF where
   γprog : GName
   γheap : GName
   γtapes : GName
 
 section Resources
 
-variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
+variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 
-def specProgAuth (e : Exp) : IProp GF := iOwn (E := ISpec.prog) ISpec.γprog (.auth e)
-def specProgFrag (e : Exp) : IProp GF := iOwn (E := ISpec.prog) ISpec.γprog (.frag e)
+def specProgAuth (e : Exp rT) : IProp GF := iOwn (E := ISpec.prog) ISpec.γprog (.auth e)
+def specProgFrag (e : Exp rT) : IProp GF := iOwn (E := ISpec.prog) ISpec.γprog (.frag e)
 
-def specHeapAuth (σ : LocHeap Val) : IProp GF :=
+def specHeapAuth (σ : LocHeap (Val rT)) : IProp GF :=
   iOwn (E := ISpec.heap) ISpec.γheap (HeapView.Auth (.own 1) (LocHeap.asAgree σ))
-def specHeapFrag (ℓ : Loc) (v : Val) : IProp GF :=
+def specHeapFrag (ℓ : Loc) (v : Val rT) : IProp GF :=
   iOwn (E := ISpec.heap) ISpec.γheap (HeapView.Frag ℓ (.own 1) (toAgree v))
 
 def specTapesAuth (σ : LocHeap Tape) : IProp GF :=
@@ -88,7 +96,7 @@ def specTapesAuth (σ : LocHeap Tape) : IProp GF :=
 def specTapesFrag (ℓ : Loc) (t : Tape) : IProp GF :=
   iOwn (E := ISpec.tapes) ISpec.γtapes (HeapView.Frag ℓ (.own 1) (toAgree t))
 
-def ProbLang.Cfg.specAuth (c : Cfg) : IProp GF :=
+def ProbLang.Cfg.specAuth (c : Cfg rT) : IProp GF :=
   let ⟨e, ⟨σ, τ⟩⟩ := c
   iprop(specProgAuth e ∗ specHeapAuth σ ∗ specTapesAuth τ)
 
@@ -102,11 +110,11 @@ end Resources
 
 section Algebra
 
-variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
+variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 
-open ProbLang Cfg
+open ProbLang.Cfg
 
-theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp} (H : some (Excl.excl e1) ≼ some (Excl.excl e2)) :
+theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp rT} (H : some (Excl.excl e1) ≼ some (Excl.excl e2)) :
     e1 = e2 := by
   have H' := Option.inc_iff.mp H
   simp at H'
@@ -115,18 +123,18 @@ theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp} (H : some (Excl.excl e1) ≼ som
   · have H'' := Excl.inc_iff.mp H'
     simp at H''
 
-theorem specAuth_specFrag_agree {e1 e2 : Exp} {σ : State} :
+theorem specAuth_specFrag_agree {e1 e2 : Exp rT} {σ : State rT} :
     ⊢@{IProp GF} specAuth ⟨e1, σ⟩ -∗ ⤇ e2 -∗ ⌜e1 = e2⌝ := by
   unfold specAuth specProgAuth specProgFrag
   iintro ⟨He, -, -⟩ Hf
   ihave Hv := iOwn_cmraValid_op (E := ISpec.prog) $$ [He Hf]
   · isplitl [He] <;> iassumption
-  ihave %hv := internalCmraValid_discrete (A := SpecProg) (PROP := IProp GF) $$ Hv
+  ihave %hv := internalCmraValid_discrete (A := SpecProg rT) (PROP := IProp GF) $$ Hv
   ipure_intro
   obtain ⟨hinc, _⟩ := Auth.auth_both_valid_discrete.mp hv
   exact some_excl_inc_excl_exp_eq hinc |>.symm
 
-theorem specProg_update {e1 e2 e3 : Exp} {σ : State} :
+theorem specProg_update {e1 e2 e3 : Exp rT} {σ : State rT} :
     ⊢@{IProp GF} specAuth ⟨e1, σ⟩ -∗ ⤇ e2 ==∗ specAuth ⟨e3, σ⟩ ∗ ⤇ e3 := by
   iintro Ha Hf
   ihave %he := specAuth_specFrag_agree (GF := GF) $$ Ha Hf
@@ -146,13 +154,13 @@ theorem specProg_update {e1 e2 e3 : Exp} {σ : State} :
   isplitl [Hh] <;> try iassumption
 
 
-theorem spec_auth_lookup_heap {e : Exp} {σ : State} {l : Loc} {v : Val} :
+theorem spec_auth_lookup_heap {e : Exp rT} {σ : State rT} {l : Loc} {v : Val rT} :
     ⊢@{IProp GF} specAuth ⟨e, σ⟩ -∗ l ↦ₛ v -∗ ⌜σ.heap[l]? = some v⌝ := by
   unfold specAuth specHeapAuth specHeapFrag
   iintro ⟨-, Hh, -⟩ Hf
   ihave Hv := iOwn_cmraValid_op (E := ISpec.heap) $$ [Hh Hf]
   · isplitl [Hh] <;> iassumption
-  ihave %hv := internalCmraValid_discrete (A := SpecHeap) (PROP := IProp GF) $$ Hv
+  ihave %hv := internalCmraValid_discrete (A := SpecHeap rT) (PROP := IProp GF) $$ Hv
   ipure_intro
   obtain ⟨v', _, _, Hlookup, _, Hinc⟩ := HeapView.auth_op_frag_valid_total_discrete_iff hv
   -- Hlookup : PartialMap.get? (asAgree σ.heap) l = some v'
@@ -171,15 +179,15 @@ theorem spec_auth_lookup_heap {e : Exp} {σ : State} {l : Loc} {v : Val} :
     have : v = w := Agree.toAgree_included_L.mp Hinc'
     exact this ▸ rfl
 
-theorem spec_auth_update_heap {e : Exp} {σ : State} {l : Loc} {v w : Val} :
+theorem spec_auth_update_heap {e : Exp rT} {σ : State rT} {l : Loc} {v w : Val rT} :
     ⊢@{IProp GF} specAuth ⟨e, σ⟩ -∗ l ↦ₛ v ==∗
-      specAuth ⟨e, σ.update_heap (fun h : LocHeap Val => PartialMap.insert h l w)⟩ ∗
+      specAuth ⟨e, σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l w)⟩ ∗
         l ↦ₛ w := by
   iintro Ha Hf
   ihave %Hlk := spec_auth_lookup_heap (GF := GF) $$ Ha Hf
   unfold specAuth specHeapAuth specHeapFrag
   ihave ⟨He, Hh, Ht⟩ := Ha
-  have Hval_toAgree : ✓ (toAgree w : Agree Val) := by
+  have Hval_toAgree : ✓ (toAgree w : Agree (Val rT)) := by
     intro n; simp [Agree.validN_iff, toAgree]
   have Hupd :
       HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap) •
@@ -201,10 +209,10 @@ theorem spec_auth_update_heap {e : Exp} {σ : State} {l : Loc} {v w : Val} :
   isplitl [He] <;> try iassumption
   isplitl [Hh] <;> try iassumption
 
-theorem spec_auth_heap_alloc {e : Exp} {σ : State} (v : Val) :
+theorem spec_auth_heap_alloc {e : Exp rT} {σ : State rT} (v : Val rT) :
     ⊢@{IProp GF} specAuth ⟨e, σ⟩ ==∗
       specAuth ⟨e, σ.update_heap
-          (fun h : LocHeap Val => PartialMap.insert h σ.heap.fresh v)⟩ ∗
+          (fun h : LocHeap (Val rT) => PartialMap.insert h σ.heap.fresh v)⟩ ∗
         σ.heap.fresh ↦ₛ v := by
   iintro Ha
   unfold specAuth specHeapAuth specHeapFrag
@@ -213,7 +221,7 @@ theorem spec_auth_heap_alloc {e : Exp} {σ : State} (v : Val) :
     rw [LocHeap.asAgree_get?]
     show (σ.heap[σ.heap.fresh]?).map toAgree = none
     rw [ExtTreeMap.fresh_get?]; rfl
-  have Hval_toAgree : ✓ (toAgree v : Agree Val) := by
+  have Hval_toAgree : ✓ (toAgree v : Agree (Val rT)) := by
     intro n; simp [Agree.validN_iff, toAgree]
   have Hupd :
       HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap) ~~>
@@ -231,7 +239,7 @@ theorem spec_auth_heap_alloc {e : Exp} {σ : State} (v : Val) :
   isplitl [He] <;> try iassumption
   isplitl [Hh] <;> try iassumption
 
-theorem spec_auth_lookup_tape {e : Exp} {σ : State} {l : Loc} {t : Tape} :
+theorem spec_auth_lookup_tape {e : Exp rT} {σ : State rT} {l : Loc} {t : Tape} :
     ⊢@{IProp GF} specAuth ⟨e, σ⟩ -∗ l ↪ₛ t -∗ ⌜σ.tapes[l]? = some t⌝ := by
   unfold specAuth specTapesAuth specTapesFrag
   iintro ⟨-, -, Ht⟩ Hf
@@ -251,7 +259,7 @@ theorem spec_auth_lookup_tape {e : Exp} {σ : State} {l : Loc} {t : Tape} :
     have : t = w := Agree.toAgree_included_L.mp Hinc'
     exact this ▸ rfl
 
-theorem spec_auth_update_tape {e : Exp} {σ : State} {l : Loc} {t s : Tape} :
+theorem spec_auth_update_tape {e : Exp rT} {σ : State rT} {l : Loc} {t s : Tape} :
     ⊢@{IProp GF} specAuth ⟨e, σ⟩ -∗ l ↪ₛ t ==∗
       specAuth ⟨e, σ.update_tapes (fun h : LocHeap Tape => PartialMap.insert h l s)⟩ ∗
         l ↪ₛ s := by
@@ -279,7 +287,7 @@ theorem spec_auth_update_tape {e : Exp} {σ : State} {l : Loc} {t s : Tape} :
   isplitl [He] <;> try iassumption
   isplitl [Hh] <;> try iassumption
 
-theorem spec_auth_tape_alloc {e : Exp} {σ : State} (t : Tape) :
+theorem spec_auth_tape_alloc {e : Exp rT} {σ : State rT} (t : Tape) :
     ⊢@{IProp GF} specAuth ⟨e, σ⟩ ==∗
       specAuth ⟨e, σ.update_tapes
           (fun h : LocHeap Tape => PartialMap.insert h σ.tapes.fresh t)⟩ ∗
@@ -340,14 +348,14 @@ End theory.
 
 /-! ## Allocation
 
-Mirrors Rocq `spec_ra_init` (commented below). Allocates a fresh `SpecGS GF`
+Mirrors Rocq `spec_ra_init` (commented below). Allocates a fresh `SpecGS rT GF`
 instance, producing the authoritative spec state `specAuth ⟨e, σ⟩` paired
 with the program fragment `⤇ e`. Heap/tape fragments are *not* produced by
 this version (the adequacy use-site discards them via `_`). -/
-theorem spec_ra_init {GF : BundledGFunctors} [ISPre : SpecPreGS GF]
-    (e : Exp) (σ : State) :
-    ⊢@{IProp GF} |==> ∃ IS : SpecGS GF,
-      @ProbLang.Cfg.specAuth _ IS ⟨e, σ⟩ ∗ @specProgFrag _ IS e := by
+theorem spec_ra_init {GF : BundledGFunctors} [ISPre : SpecPreGS rT GF]
+    (e : Exp rT) (σ : State rT) :
+    ⊢@{IProp GF} |==> ∃ IS : SpecGS rT GF,
+      @ProbLang.Cfg.specAuth rT _ _ _ GF IS ⟨e, σ⟩ ∗ @specProgFrag rT _ _ _ GF IS e := by
   imod (iOwn_alloc (E := ISPre.prog) (SpecProg.auth e • SpecProg.frag e)
     (Auth.auth_both_valid_2 trivial .rfl)) with ⟨%γp, Hp⟩
   imod (iOwn_alloc (E := ISPre.heap)
@@ -357,7 +365,7 @@ theorem spec_ra_init {GF : BundledGFunctors} [ISPre : SpecPreGS GF]
     (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.tapes))
     HeapView.auth_one_valid) with ⟨%γT, HT⟩
   imodintro
-  let IS : SpecGS GF := {
+  let IS : SpecGS rT GF := {
     toSpecPreGS := ISPre
     γprog := γp
     γheap := γH
@@ -443,13 +451,13 @@ SpecProgram.lean:350–354 above). -/
 
 section NatSpecTape
 
-variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
+variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 
 /-- Spec-side user-level tape: `l` points to a tape of bound `z` whose
 contents, as plain integers, match `ns`. -/
 noncomputable def specNatTape (l : Loc) (z : Int) (ns : List Int) : IProp GF :=
   iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
-    (⌜fs.map (fun x => x.val) = ns⌝) ∗ l ↪ₛ ⟨z, fs⟩)
+    (⌜fs.map (fun x => x.val) = ns⌝) ∗ @specTapesFrag rT _ _ _ GF ISpec l ⟨z, fs⟩)
 
 /-- `l ↪ₛN⟨z; ns⟩` — spec-side user-level tape points-to. -/
 notation:51 l:51 " ↪ₛN⟨" z:51 "; " ns:51 "⟩" => specNatTape l z ns
@@ -501,9 +509,9 @@ Needed by `lrel_ref`/`lrel_tape` functionality/injectivity proofs in
 `Metrology/Approxis/Model.lean`. -/
 
 section ValidHelpers
-variable {GF : BundledGFunctors} [ISpec : SpecGS GF]
+variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 
-theorem specHeapFrag_valid_2 {l : Loc} {v1 v2 : Val} :
+theorem specHeapFrag_valid_2 {l : Loc} {v1 v2 : Val rT} :
     ⊢@{IProp GF} specHeapFrag l v1 -∗ specHeapFrag l v2 -∗ False := by
   iintro H1 H2
   unfold specHeapFrag

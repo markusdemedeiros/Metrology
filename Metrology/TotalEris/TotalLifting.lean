@@ -8,10 +8,15 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 open scoped ENNReal
 
 namespace ProbLang
+
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 namespace TotalEris
 namespace ErisWpGS
 
-variable {GF : BundledGFunctors} [ErisWpGS GF]
+variable {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
 
 /-! # Total-WP lifting lemmas
 
@@ -21,13 +26,13 @@ the partial-WP lifting in `Metrology/TotalEris/Lifting.lean`. -/
 
 /-- Lift a `glm`-shaped predicate into `tgl_wp`. Rocq:
 `twp_lift_step_fupd_glm`. -/
-theorem twp_lift_step_fupd_glm {E : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
+theorem twp_lift_step_fupd_glm {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State) (ε₁ : ENNReal),
-      (stateInterp σ₁ ∗ errInterp ε₁) -∗
+    iprop(∀ (σ₁ : State rT) (ε₁ : ENNReal),
+      (stateInterp σ₁ ∗ errInterp (rT := rT) ε₁) -∗
         |={E, ∅}=> glm e₁ σ₁ ε₁ (fun ρ ε₂ =>
           iprop(|={∅, E}=>
-            stateInterp ρ.state ∗ errInterp ε₂ ∗ tglWp E ρ.expr Φ))) ⊢@{IProp GF}
+            stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ))) ⊢@{IProp GF}
       tglWp E e₁ Φ := by
   iintro HG
   iapply tglWp_unfold
@@ -41,11 +46,11 @@ theorem twp_lift_step_fupd_glm {E : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
 /-- Lift a step rule that doesn't need an `err_interp` change.
 
 Rocq: `twp_lift_step_fupd`. -/
-theorem twp_lift_step_fupd {E : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
+theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E, ∅}=>
+    iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
       (⌜Reducible e₁ σ₁⌝) ∗
-      ∀ (e₂ : Exp) (σ₂ : State),
+      ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗
         |={∅}=> |={∅, E}=>
           stateInterp σ₂ ∗ tglWp E e₂ Φ) ⊢@{IProp GF}
@@ -82,11 +87,11 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
 
 /-- Lift an atomic-step (post-condition delivered on the value
 of the stepped expression). Rocq: `twp_lift_atomic_step_fupd`. -/
-theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
+theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E₁}=>
+    iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E₁}=>
       (⌜Reducible e₁ σ₁⌝) ∗
-      ∀ (e₂ : Exp) (σ₂ : State),
+      ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E₁}=>
           stateInterp σ₂ ∗
           iprop(match e₂.toVal? with
@@ -118,12 +123,12 @@ theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val → IProp GF} {e₁ 
 
 /-- Lift a pure (state-preserving, possibly-nondeterministic) reduction.
 Rocq: `twp_lift_pure_step`. -/
-theorem twp_lift_pure_step {E : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
+theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
     (Hstep : ∀ σ₁ e₂ σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} → σ₂ = σ₁) :
     iprop(|={E}=>
-      ∀ (e₂ : Exp) (σ : State),
+      ∀ (e₂ : Exp rT) (σ : State rT),
         (⌜0 < primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩}⌝) -∗
         tglWp E e₂ Φ) ⊢@{IProp GF}
       tglWp E e₁ Φ := by
@@ -144,7 +149,7 @@ theorem twp_lift_pure_step {E : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
   iapply H; ipure_intro; exact Hstep'
 
 /-- Single deterministic pure step. Rocq: `twp_lift_pure_det_step`. -/
-theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val → IProp GF} {e₁ e₂ : Exp}
+theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
     (Hpuredet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} →
@@ -167,11 +172,11 @@ are easier to discriminate (no ambient context). The bridges below convert
 between the two views. -/
 
 /-- Atomic-step lifting via `headStep`. Rocq: `twp_lift_atomic_head_step`. -/
-theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val → IProp GF} {e₁ : Exp}
+theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State), stateInterp σ₁ -∗ |={E}=>
-      (⌜∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
-      ∀ (e₂ : Exp) (σ₂ : State),
+    iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E}=>
+      (⌜∃ ρ : Cfg rT, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
+      ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E}=>
           stateInterp σ₂ ∗
           iprop(match e₂.toVal? with
@@ -191,9 +196,9 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val → IProp GF} {e₁ : E
   iapply HCont $$ %e₂ %σ₂ %hpos
 
 /-- Pure-deterministic head-step lifting. Rocq: `twp_lift_pure_det_head_step`. -/
-theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val → IProp GF} {e₁ e₂ : Exp}
+theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
-    (Hsafe : ∀ σ₁, ∃ ρ : Cfg, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
+    (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
     (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   iapply twp_lift_pure_det_step hv (Hsafe := fun σ => Reducible.of_head (Hsafe σ))
@@ -206,7 +211,7 @@ theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val → IProp GF} {e₁ e
 /-- From a single `PureStep e₁ e₂` (deterministic, state-preserving, safe),
 take one step. Used by the `n+1` case of `twp_pure_step_fupd`. -/
 theorem twp_lift_pure_det_step_of_pureStep
-    {E : CoPset} {Φ : Val → IProp GF} {e₁ e₂ : Exp}
+    {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (h : PureStep e₁ e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   -- The first reducibility witness gives us a non-value status.
@@ -221,11 +226,11 @@ theorem twp_lift_pure_det_step_of_pureStep
   have htot := primStep_univ_le_one ⟨e₁, σ⟩
   have hpt := h.det σ
   by_contra hne
-  have hother : (⟨e₂', σ₂⟩ : Cfg) ≠ ⟨e₂, σ⟩ := by
+  have hother : (⟨e₂', σ₂⟩ : Cfg rT) ≠ ⟨e₂, σ⟩ := by
     intro heq
     cases heq
     exact hne ⟨rfl, rfl⟩
-  have hadd : primStep ⟨e₁, σ⟩ ({⟨e₂', σ₂⟩} ∪ {⟨e₂, σ⟩} : Set Cfg) =
+  have hadd : primStep ⟨e₁, σ⟩ ({⟨e₂', σ₂⟩} ∪ {⟨e₂, σ⟩} : Set (Cfg rT)) =
       primStep ⟨e₁, σ⟩ {⟨e₂', σ₂⟩} + primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩} :=
     MeasureTheory.measure_union (by simp [hother]) (MeasurableSet.singleton _)
   have hsum_le : primStep ⟨e₁, σ⟩ {⟨e₂', σ₂⟩} + primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩} ≤
@@ -240,7 +245,7 @@ theorem twp_lift_pure_det_step_of_pureStep
 
 /-- Take `n` pure-deterministic steps. Rocq: `twp_pure_step_fupd`. -/
 theorem twp_pure_step_fupd
-    {E : CoPset} {Φ : Val → IProp GF} {n : ℕ} {e₁ e₂ : Exp}
+    {E : CoPset} {Φ : Val rT → IProp GF} {n : ℕ} {e₁ e₂ : Exp rT}
     (φ : Prop) [HEx : PureExec φ n e₁ e₂] (Hφ : φ) :
     tglWp E e₂ Φ ⊢@{IProp GF} tglWp E e₁ Φ := by
   have Hex := HEx.pure_exec Hφ

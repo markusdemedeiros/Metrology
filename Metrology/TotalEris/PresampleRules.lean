@@ -25,7 +25,10 @@ open scoped AppGS ENNReal
 namespace ProbLang
 namespace TotalEris
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS hlc GF]
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-- Basic *total* presample rule. Given tape ownership `α ↪ₐ ⟨N, bs⟩`
 with positive bound `N`, the WP can be advanced by appending a freshly
@@ -39,7 +42,7 @@ Proof strategy:
    and per-outcome `X₂ ≡ ε_now` (no credit spent on presample).
 4. Per outcome: update ghost tape via `app_state_update_tape`, feed
    the IH via `tglWp_unfold_step`, mod through the body fupd. -/
-theorem twp_presample {E : CoPset} {e : Exp} {α : Loc} {Φ : Val → IProp GF}
+theorem twp_presample {E : CoPset} {e : Exp rT} {α : Loc} {Φ : Val rT → IProp GF}
     {t : Tape} (hN : 0 < t.bound) (hv : e.toVal? = none) :
     iprop(α ↪ₐ t ∗
       (∀ (n : { z : Int // 0 ≤ z ∧ z < t.bound }),
@@ -114,9 +117,9 @@ composition. On any `σ'` that has the form `σ.update_tapes (insert α
 ⟨N, bs ++ [n]⟩)` for some `n`, extracts `ε₂ n`; off-support, returns
 `0`. Used as the `glmStateStep` continuation's per-outcome credit. -/
 noncomputable def presampleAdvCompX₂
-    (σ : State) (α : Loc) (N : Int)
+    (σ : State rT) (α : Loc) (N : Int)
     (bs : List { z : Int // 0 ≤ z ∧ z < N })
-    (ε₂ : { z : Int // 0 ≤ z ∧ z < N } → ENNReal) (σ' : State) : ENNReal :=
+    (ε₂ : { z : Int // 0 ≤ z ∧ z < N } → ENNReal) (σ' : State rT) : ENNReal :=
   if h : ∃ n : { z : Int // 0 ≤ z ∧ z < N },
       σ' = σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)
     then ε₂ (Classical.choose h)
@@ -137,8 +140,8 @@ the presample integral, `hPointwise` collapses the integrand to `ε₂ n`,
 `tapeIndexUniform_lintegral_eq_cfg_uniform` routes through the proven
 `Cfg.uniform` computation to a finite sum, and the HSum-image form is
 matched via `Finset.sum_image` + `Finset.sum_attach`. -/
-theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
-    {Φ : Val → IProp GF} {t : Tape} (hN : 0 < t.bound)
+theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
+    {Φ : Val rT → IProp GF} {t : Tape} (hN : 0 < t.bound)
     {ε₁ : ENNReal}
     {ε₂ : { z : Int // 0 ≤ z ∧ z < t.bound } → ENNReal}
     (Hbd : ∀ n, ε₂ n ≤ 1)
@@ -160,7 +163,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
   obtain ⟨N, bs⟩ := t
   simp only at hN hlookup Hbd ε₂ HSum
   -- Get the supply bound `ε₁ ≤ ε_now`.
-  ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
+  ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp (rT := rT) ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
       $$ [Hε_now Herr]
   · iapply errInterp_supply_bound
     isplitl [Hε_now]; · iexact Hε_now
@@ -260,7 +263,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
       have hLI : ∫⁻ n : { z : Int // 0 ≤ z ∧ z < N }, ε₂ n ∂tapeIndexUniform N
           = ∑ z ∈ Finset.Ico (0:Int) N, F z / (N.toNat : ℝ≥0∞) := by
         have hf_eq : ∀ n : { z : Int // 0 ≤ z ∧ z < N },
-            ε₂ n = (fun ρ : Cfg => match ρ.expr with
+            ε₂ n = (fun ρ : Cfg rT => match ρ.expr with
               | .lit (.int m) => F m | _ => 0) ⟨.lit (.int (↑n)), σ₁⟩ := by
           intro n; rw [hεF n]
         simp_rw [hf_eq]
@@ -270,11 +273,11 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
         have hCfgUniform :
             Cfg.uniform N σ₁ =
               (PMF.uniformOfFinset (Finset.Ico (0:Int) N) hNonempty).toMeasure.map
-                (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg)) := by
+                (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) := by
           unfold Cfg.uniform; simp only [Int.isPos, dif_pos hN]
         rw [hCfgUniform, MeasureTheory.lintegral_map .of_discrete .of_discrete]
         -- `∫⁻ z, F z ∂uniform = ∑ z ∈ Ico 0 N, F z / N.toNat`.
-        have hIndic : (fun z : Int => (match (⟨.lit (.int z), σ₁⟩ : Cfg).expr with
+        have hIndic : (fun z : Int => (match (⟨.lit (.int z), σ₁⟩ : Cfg rT).expr with
               | .lit (.int m) => F m | _ => 0))
             = ((Finset.Ico (0:Int) N) : Set Int).indicator F := by
           funext z
@@ -348,7 +351,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
     have : Classical.choose _ = n := (hInj n _ hch_spec).symm
     rw [this]
   -- Peel ε₁ off the supply: ε_now → ε_now - ε₁ = ε_rem.
-  ihave HbupdDec : iprop(|==> ErisWpGS.errInterp (ε_now - ε₁)) $$ [Hε_now Herr]
+  ihave HbupdDec : iprop(|==> ErisWpGS.errInterp (rT := rT) (ε_now - ε₁)) $$ [Hε_now Herr]
   · iapply errInterp_supply_decrease
     isplitl [Hε_now]; · iexact Hε_now
     iexact Herr
@@ -356,7 +359,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
   -- Case split on whether (ε_rem + ε₂ n) < 1.
   by_cases hlt : ε_now - ε₁ + ε₂ n < 1
   · -- Sub-case `< 1`: increase supply by ε₂ n, feed Hcont.
-    ihave HbupdInc : iprop(|==> (ErisWpGS.errInterp (ε_now - ε₁ + ε₂ n) ∗ ↯(ε₂ n))) $$ [Hε_rem]
+    ihave HbupdInc : iprop(|==> (ErisWpGS.errInterp (rT := rT) (ε_now - ε₁ + ε₂ n) ∗ ↯(ε₂ n))) $$ [Hε_rem]
     · iapply errInterp_supply_increase hlt
       iexact Hε_rem
     imod HbupdInc with ⟨Hε_new, Hε₂_cr⟩

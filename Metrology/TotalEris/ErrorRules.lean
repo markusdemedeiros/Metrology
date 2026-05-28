@@ -22,6 +22,11 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEr
 open scoped ENNReal AppGS
 
 namespace ProbLang
+
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 namespace TotalEris
 
 variable {hlc : Bool} {GF : BundledGFunctors}
@@ -102,13 +107,13 @@ end ECGSOnly
 
 section ErisGSStubs
 
-variable [ErisGS hlc GF]
+variable [ErisGS rT hlc GF]
 
 /-- Pre-specialized `supply_decrease` against the `ECGS` instance carried
 by `ErisGS`. Same `∗`-bundling trick as `errInterp_supply_bound`. -/
 theorem errInterp_supply_decrease {εₛ ε : ENNReal} :
-    iprop(ErisWpGS.errInterp εₛ ∗ ↯ε)
-      ⊢@{IProp GF} iprop(|==> ErisWpGS.errInterp (εₛ - ε)) := by
+    iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε)
+      ⊢@{IProp GF} iprop(|==> ErisWpGS.errInterp (rT := rT) (εₛ - ε)) := by
   show iprop(ecAuth εₛ ∗ ↯ε) ⊢ iprop(|==> ecAuth (εₛ - ε))
   iintro ⟨Hs, Hε⟩
   iapply (ErrorCredit.supply_decrease (GF := GF)) $$ Hs Hε
@@ -118,8 +123,8 @@ by `ErisGS`. Bundles both arguments into a `∗` to dodge the wand-source
 typeclass diamond. Returns both inputs together with the bound so the
 caller doesn't lose `↯ε` / `errInterp εₛ` from the iris context. -/
 theorem errInterp_supply_bound {εₛ ε : ENNReal} :
-    iprop(ErisWpGS.errInterp εₛ ∗ ↯ε)
-      ⊢@{IProp GF} iprop(ErisWpGS.errInterp εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝) := by
+    iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε)
+      ⊢@{IProp GF} iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝) := by
   show iprop(ecAuth εₛ ∗ ↯ε) ⊢ iprop(ecAuth εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝)
   iintro ⟨Hs, Hε⟩
   ihave %hLe := ErrorCredit.supply_bound (GF := GF) $$ Hs Hε
@@ -132,14 +137,14 @@ by `ErisGS` (i.e., `ErisGS.ecGS`). The outer-scope `[ECGS GF]` was lifted
 into its own `ECGSOnly` section so that this section only sees the
 `ErisGS`-derived ECGS, dodging the typeclass diamond. -/
 theorem errInterp_supply_increase {ε δ : ENNReal} (h : ε + δ < 1) :
-    iprop(ErisWpGS.errInterp ε)
-      ⊢@{IProp GF} iprop(|==> (ErisWpGS.errInterp (ε + δ) ∗ ↯δ)) := by
+    iprop(ErisWpGS.errInterp (rT := rT) ε)
+      ⊢@{IProp GF} iprop(|==> (ErisWpGS.errInterp (rT := rT) (ε + δ) ∗ ↯δ)) := by
   simp only [erisWpGS_errInterp_eq]
   exact ErrorCredit.supply_increase h
 
 /-- "Error increase" rule: given `↯ε`, we may freely "borrow" up to any
 `ε' > ε`. Rocq: `twp_err_incr` (`error_rules.v:881`). -/
-theorem twp_err_incr {E : CoPset} {e : Exp} {ε : ENNReal} {Φ : Val → IProp GF}
+theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → IProp GF}
     (Hnv : e.toVal? = none) :
     iprop(↯ε ∗ ∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗ ↯ε' -∗ tglWp E e Φ)
       ⊢@{IProp GF} tglWp E e Φ := by
@@ -188,11 +193,11 @@ theorem twp_err_incr {E : CoPset} {e : Exp} {ε : ENNReal} {Φ : Val → IProp G
     -- · rw [← heqS] ; iexact HwpUnfold`.)
     ihave HwpUnfold := (BI.equiv_iff.mp tglWp_unfold).1 $$ HwpRes
     have heqS := tglWpPre_eq_step (wp := tglWp) (E := E) (e := e) (Φ := Φ) Hnv
-    ihave HwpStep : iprop(∀ (σ : State) (ε : ENNReal),
-        (stateInterp σ ∗ errInterp ε) -∗
+    ihave HwpStep : iprop(∀ (σ : State rT) (ε : ENNReal),
+        (stateInterp σ ∗ errInterp (rT := rT) ε) -∗
           |={E, ∅}=> glm e σ ε (fun ρ ε₂ =>
             iprop(|={∅, E}=>
-              stateInterp ρ.state ∗ errInterp ε₂ ∗ tglWp E ρ.expr Φ)))
+              stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ)))
       $$ [HwpUnfold]
     · rw [← heqS]; iexact HwpUnfold
     -- Instantiate at σ₁ / (ε₂ + (ε' - ε₂)) using Hσ₁ and HsuppNew.
@@ -207,7 +212,7 @@ theorem twp_err_incr {E : CoPset} {e : Exp} {ε : ENNReal} {Φ : Val → IProp G
     have heqEps : ε₂ + (ε' - ε₂) = ε' := add_tsub_cancel_of_le hle
     ihave HGlm' : iprop(glm e σ₁ ε'
         (fun ρ ε₂ => iprop(|={∅, E}=>
-          stateInterp ρ.state ∗ errInterp ε₂ ∗ tglWp E ρ.expr Φ))) $$ [HGlm]
+          stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ))) $$ [HGlm]
     · conv_rhs => rw [← heqEps]
       iexact HGlm
     imodintro
@@ -218,7 +223,7 @@ theorem twp_err_incr {E : CoPset} {e : Exp} {ε : ENNReal} {Φ : Val → IProp G
 assume ownership of an arbitrary positive amount of error credits. Rocq:
 `twp_err_pos` (`error_rules.v:967`). Derived from `twp_err_incr` +
 `ec_zero` (start from zero credits, bump to any ε > 0). -/
-theorem twp_err_pos {E : CoPset} {e : Exp} {Φ : Val → IProp GF}
+theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
     (Hnv : e.toVal? = none) :
     iprop(∀ (ε : ENNReal), ⌜0 < ε⌝ -∗ ↯ε -∗ tglWp E e Φ)
       ⊢@{IProp GF} tglWp E e Φ := by
@@ -241,16 +246,16 @@ distribution" function `ε₂ : ℕ → ENNReal` whose average over `[0,z)` is
 bounded by `ε₁`, we may sample `n : Int` in `[0, z)` and recover `↯(ε₂ n)`
 in the postcondition. Rocq: `twp_rand_exp_nat` (`error_rules.v:165`). -/
 theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
-    {ε₂ : ℕ → ENNReal} {Φ : Val → IProp GF} (Hz : 0 < z)
+    {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
     (Hbd : ∀ n, ε₂ n ≤ 1)
     (HSum : (∑' n : ℕ, if n < z.toNat then ε₂ n / z.toNat else 0) ≤ ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
       iprop((∀ (n : Int), ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
-        Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)) -∗
+        Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)) -∗
       tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
   iintro Herr Hcont
   -- The expression `rand z ()` is not a value.
-  have Hnv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit)).toVal? = none :=
+  have Hnv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (twp_lift_step_fupd_glm Hnv)
   iintro %σ₁ %ε_now ⟨Hσ, Hε_now⟩
@@ -258,7 +263,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   imodintro
   -- Extract `ε₁ ≤ ε_now` (the supply-bound) as a Lean hypothesis. This is
   -- the key fact for the integral bound + per-outcome carried-supply trick.
-  ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
+  ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp (rT := rT) ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
       $$ [Hε_now Herr]
   · iapply errInterp_supply_bound
     isplitl [Hε_now]; · iexact Hε_now
@@ -272,9 +277,9 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   -- `ε₁`; the remaining `ε₃` rides along with each outcome's X₂.
   iapply glm_prim_step
   iexists (fun ρ => ∃ (n : Int), 0 ≤ n ∧ n < z ∧
-    ρ = (⟨.lit (.int n), σ₁⟩ : Cfg))
+    ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT))
   iexists 0
-  iexists (fun ρ : Cfg => (ε_now - ε₁) + match ρ.1 with
+  iexists (fun ρ : Cfg rT => (ε_now - ε₁) + match ρ.1 with
     | .lit (.int n) =>
         if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
     | _ => 0)
@@ -307,7 +312,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     -- `(ε_now - ε₁) * μ(univ) ≤ ε_now - ε₁` since `μ(univ) ≤ 1`.
     have hμ_le_one : (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) Set.univ ≤ 1 := primStep_univ_le_one _
     calc (ε_now - ε₁) * (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) Set.univ +
-            ∫⁻ (a : Cfg), (match a.expr with
+            ∫⁻ (a : Cfg rT), (match a.expr with
                 | .lit (.int n) => if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
                 | _ => 0)
               ∂primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩
@@ -319,7 +324,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
             -- `Finset.Ico 0 z` support, and reindexing `n : Int` ↦
             -- `n.toNat : ℕ` to match HSum's form.
             -- Reduce primStep to headStep (= Cfg.uniform on rand z ()).
-            have hheadred : ∃ ρ : Cfg,
+            have hheadred : ∃ ρ : Cfg rT,
                 0 < (headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ} :=
               ⟨⟨.lit (.int 0), σ₁⟩, by
                 rw [headStep_support_iff]
@@ -334,7 +339,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
                 Cfg.uniform z σ₁ =
                   (PMF.uniformOfFinset (Finset.Ico (0:Int) z)
                       (Finset.nonempty_Ico.mpr Hz)).toMeasure.map
-                    (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg)) := by
+                    (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) := by
               unfold Cfg.uniform
               simp only [Int.isPos, dif_pos Hz]
             rw [hCfgUniform]
@@ -418,7 +423,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   -- must be of the form `⟨lit n, σ₁⟩` with `0 ≤ n < z` (i.e., `R`).
   isplitr
   · ipure_intro
-    have hheadred : ∃ ρ : Cfg, 0 < (headStep ⟨_, σ₁⟩) {ρ} :=
+    have hheadred : ∃ ρ : Cfg rT, 0 < (headStep ⟨_, σ₁⟩) {ρ} :=
       ⟨⟨.lit (.int 0), σ₁⟩, by
         rw [headStep_support_iff]; exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
     have hps_eq : primStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩
@@ -442,7 +447,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   -- Decrease supply: consume `↯ε₁` to drop supply from `ε_now` to
   -- `ε_now - ε₁`. Mirrors Rocq's `ec_supply_decrease`. The outer
   -- `|={∅}=>` absorbs the `|==>`.
-  ihave Hsupp1 : iprop(|==> ErisWpGS.errInterp (ε_now - ε₁)) $$ [Hε_now Herr]
+  ihave Hsupp1 : iprop(|==> ErisWpGS.errInterp (rT := rT) (ε_now - ε₁)) $$ [Hε_now Herr]
   · iapply errInterp_supply_decrease
     isplitl [Hε_now]; · iexact Hε_now
     iexact Herr
@@ -477,11 +482,11 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
 Unlike the underlying `twp_rand_exp_nat`, this wrapper does NOT require
 `ε₂ n ≤ 1`; values above 1 are clamped internally (see `eris_rules.v`). -/
 theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
-    {ε₂ : ℕ → ENNReal} {Φ : Val → IProp GF} (Hz : 0 < z)
+    {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
     (HSum : (∑ n ∈ Finset.range z.toNat, ε₂ n) ≤ z.toNat * ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
       iprop((∀ (n : Int), ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
-        Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)) -∗
+        Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)) -∗
       tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
   -- Apply `twp_rand_exp_nat` with the clamped `F n := min (ε₂ n) 1`.
   iintro Herr Hcont

@@ -17,13 +17,16 @@ namespace ProbLang
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
+set_option linter.unusedSectionVars false
+
 section Soundness
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS hlc GF]
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Recursive predicate: K's binder atoms are pairwise distinct AND each is
 fresh in Γrc.dom (and accumulated dom from outer binders). Used to close the
 binder cases of `bin_log_related_under_typed_ctx`. -/
-def Ctx.BindersFresh : Ctx → Finset Var → Prop
+def Ctx.BindersFresh : Ctx rT → Finset Var → Prop
   | [], _ => True
   | k :: K', S =>
     (∀ x ∈ k.binderAtoms, x ∉ S) ∧
@@ -32,7 +35,7 @@ def Ctx.BindersFresh : Ctx → Finset Var → Prop
 /-- If a `CtxItem`'s binder atoms are empty, the freshness predicate at the
 extended union reduces to freshness at the original set. -/
 theorem Ctx.BindersFresh.cast_no_binder
-    {K' : Ctx} {S : Finset Var} {bAtoms : Finset Var}
+    {K' : Ctx rT} {S : Finset Var} {bAtoms : Finset Var}
     (hEmpty : bAtoms = ∅)
     (h : Ctx.BindersFresh K' (S ∪ bAtoms)) :
     Ctx.BindersFresh K' S :=
@@ -40,7 +43,7 @@ theorem Ctx.BindersFresh.cast_no_binder
 
 /-- Anti-monotonicity in the freshness set: if `K`'s binders are fresh in a
 larger set `T`, they're fresh in any subset `S ⊆ T`. -/
-theorem Ctx.BindersFresh.mono {K : Ctx} {S T : Finset Var}
+theorem Ctx.BindersFresh.mono {K : Ctx rT} {S T : Finset Var}
     (hST : S ⊆ T) (h : Ctx.BindersFresh K T) : Ctx.BindersFresh K S := by
   induction K generalizing S T with
   | nil => trivial
@@ -51,7 +54,7 @@ theorem Ctx.BindersFresh.mono {K : Ctx} {S T : Finset Var}
 /-- The `Hbinders` precongruence premise restricts to the tail context `K'`
 when shedding the head item `k`. -/
 theorem binders_tail
-    {k : CtxItem} {K' : Ctx} {e e' : Exp}
+    {k : CtxItem rT} {K' : Ctx rT} {e e' : Exp rT}
     (Hb : ∀ x ∈ Ctx.binderAtoms (k :: K'),
       x ∉ e.fv ∧ x ∉ e'.fv ∧ x ∉ Ctx.payloadFv (k :: K')) :
     ∀ x ∈ Ctx.binderAtoms K',
@@ -63,12 +66,12 @@ theorem binders_tail
 
 /-- The empty typing context relates to the empty relational context at any
 type environment. -/
-theorem TctxRelated.empty_nil {Δ : TyEnv GF} :
-    TctxRelated Δ Tctx.empty ([] : RelCtx GF) := by
+theorem TctxRelated.empty_nil {Δ : TyEnv rT GF} :
+    TctxRelated Δ Tctx.empty ([] : RelCtx rT GF) := by
   intro x; simp [Tctx.empty, RelCtx.lookup]
 
 /-- A relational context related to the empty typing context is itself empty. -/
-theorem TctxRelated.eq_nil_of_empty {Δ : TyEnv GF} {Γrc : RelCtx GF}
+theorem TctxRelated.eq_nil_of_empty {Δ : TyEnv rT GF} {Γrc : RelCtx rT GF}
     (HCtx : TctxRelated Δ Tctx.empty Γrc) : Γrc = [] := by
   cases Γrc with
   | nil => rfl
@@ -82,7 +85,7 @@ theorem TctxRelated.eq_nil_of_empty {Δ : TyEnv GF} {Γrc : RelCtx GF}
 
 /-- A name not in the relational context's domain has no lookup result. -/
 theorem RelCtx.lookup_eq_none_of_notMem
-    {Γrc : RelCtx GF} {x : Var}
+    {Γrc : RelCtx rT GF} {x : Var}
     (hxRc : x ∉ (Γrc.map (·.1)).toFinset) :
     Γrc.lookup x = none := by
   cases hRc : Γrc.lookup x with
@@ -96,7 +99,7 @@ theorem RelCtx.lookup_eq_none_of_notMem
 Used by the `lam`, `fix`, and `unpackR` cases to package what
 `bin_log_related_*_step` expects from `K'.fill e` and `K'.fill e'`. -/
 theorem ctx_fill_lc_fv
-    {Γtc : Tctx} {Γrc : RelCtx GF} {Δ : TyEnv GF} {K : Ctx} {e : Exp} {τ : Ty}
+    {Γtc : Tctx} {Γrc : RelCtx rT GF} {Δ : TyEnv rT GF} {K : Ctx rT} {e : Exp rT} {τ : Ty}
     (HCtxRel : TctxRelated Δ Γtc Γrc)
     (Hty : Typed Γtc (K.fill e) τ) :
     (K.fill e).IsLocallyClosed ∧ (K.fill e).fv ⊆ (Γrc.map (·.1)).toFinset :=
@@ -106,7 +109,7 @@ theorem ctx_fill_lc_fv
 `Hbinders` predicate. Used in every binder case of the precongruence
 induction to feed `TypedCtx.fill_typed` for both `e` and `e'`. -/
 theorem binders_proj_pair
-    {K : Ctx} {e₁ e₂ : Exp}
+    {K : Ctx rT} {e₁ e₂ : Exp rT}
     (Hb : ∀ y ∈ Ctx.binderAtoms K, y ∉ e₁.fv ∧ y ∉ e₂.fv ∧ y ∉ Ctx.payloadFv K) :
     (∀ y ∈ Ctx.binderAtoms K, y ∉ e₁.fv ∧ y ∉ Ctx.payloadFv K) ∧
     (∀ y ∈ Ctx.binderAtoms K, y ∉ e₂.fv ∧ y ∉ Ctx.payloadFv K) :=
@@ -114,7 +117,7 @@ theorem binders_proj_pair
    fun y hy => ⟨(Hb y hy).2.1, (Hb y hy).2.2⟩⟩
 
 /-- Domain of `(x, A) :: Γrc` is `Γrc.dom ∪ {x}`. -/
-theorem RelCtx.dom_cons (x : Var) (A : lrel GF) (Γrc : RelCtx GF) :
+theorem RelCtx.dom_cons (x : Var) (A : lrel rT GF) (Γrc : RelCtx rT GF) :
     (((x, A) :: Γrc).map (·.1)).toFinset = (Γrc.map (·.1)).toFinset ∪ {x} := by
   simp [List.map_cons, List.toFinset_cons, Finset.union_comm]
 
@@ -124,7 +127,7 @@ in the `lam`, `fix`, and `unpackR` cases of `bin_log_related_under_typed_ctx`,
 where we need to establish freshness in the *extended* relational domain
 `(x, _) :: Γrc'`. -/
 theorem Ctx.BindersFresh.cons_extend
-    {K' : Ctx} {Γrc : RelCtx GF} {x : Var} {A : lrel GF} {bAtoms : Finset Var}
+    {K' : Ctx rT} {Γrc : RelCtx rT GF} {x : Var} {A : lrel rT GF} {bAtoms : Finset Var}
     (hSingleton : bAtoms = {x})
     (h : Ctx.BindersFresh K' ((Γrc.map (·.1)).toFinset ∪ bAtoms)) :
     Ctx.BindersFresh K' (((x, A) :: Γrc).map (·.1)).toFinset :=
@@ -137,8 +140,8 @@ expected by `bin_log_related_lam` and `bin_log_related_fix`: for every fresh
 `y ∉ L`, the body-renamed-to-`y` is related at the *extended* relational
 context `(y, A) :: Γrc'` with the closing operation correctly inverted. -/
 theorem bin_log_related_close_cofinite
-    {Δ : TyEnv GF} {Γrc' : RelCtx GF} {x : Var} {A : lrel GF} {τ : Ty}
-    {Ke Ke' : Exp}
+    {Δ : TyEnv rT GF} {Γrc' : RelCtx rT GF} {x : Var} {A : lrel rT GF} {τ : Ty}
+    {Ke Ke' : Exp rT}
     (hxRc : x ∉ (Γrc'.map (·.1)).toFinset)
     (hKe_lc : Ke.IsLocallyClosed) (hKe'_lc : Ke'.IsLocallyClosed)
     (Hbody : ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ
@@ -159,7 +162,7 @@ theorem bin_log_related_close_cofinite
 (closing erases `x`). The `hKe_fv` hypothesis bounds `Ke.fv` by
 `((x, _) :: Γrc').dom = Γrc'.dom ∪ {x}`. -/
 theorem close_fv_in_outer_dom
-    {Γrc' : RelCtx GF} {x : Var} {Ke : Exp} {A : lrel GF}
+    {Γrc' : RelCtx rT GF} {x : Var} {Ke : Exp rT} {A : lrel rT GF}
     (hKe_fv : Ke.fv ⊆ (((x, A) :: Γrc').map (·.1)).toFinset)
     {z : Var} (hz : z ∈ (Ke.close x).fv) :
     z ∈ (Γrc'.map (·.1)).toFinset := by
@@ -173,7 +176,7 @@ theorem close_fv_in_outer_dom
 opening of `close x` at any fresh `y`. Used twice per binder case in
 `bin_log_related_lam_step` / `_fix_step`. -/
 theorem open_close_subst_lc_at
-    {Ke : Exp} (x y : Var) (hKe_lc : Ke.IsLocallyClosed) :
+    {Ke : Exp rT} (x y : Var) (hKe_lc : Ke.IsLocallyClosed) :
     (Exp.open' (Ke.close x) (.fvar y)).IsLocallyClosed := by
   rw [Exp.open_close_subst_lc x y _ hKe_lc]
   exact Exp.subst_lc hKe_lc (Exp.IsLocallyClosed.fvar y)
@@ -187,8 +190,8 @@ This is the key step that combines (a) `bin_log_related_lam` (cofinite-binder
 introduction) with (b) `bin_log_related_ty_rename` (α-renaming the binder atom
 from a fixed `x` to a cofinite `y`). -/
 theorem bin_log_related_lam_step
-    {Δ : TyEnv GF} {Γrc' : RelCtx GF} {x : Var} {τ_arg τ_body : Ty}
-    {Ke Ke' : Exp}
+    {Δ : TyEnv rT GF} {Γrc' : RelCtx rT GF} {x : Var} {τ_arg τ_body : Ty}
+    {Ke Ke' : Exp rT}
     (hxRc : x ∉ (Γrc'.map (·.1)).toFinset)
     (hKe_lc : Ke.IsLocallyClosed)
     (hKe'_lc : Ke'.IsLocallyClosed)
@@ -208,8 +211,8 @@ theorem bin_log_related_lam_step
 /-- Helper for the fix binder case (same template as `bin_log_related_lam_step`,
 applied to `bin_log_related_fix`). -/
 theorem bin_log_related_fix_step
-    {Δ : TyEnv GF} {Γrc' : RelCtx GF} {f : Var} {τ1 τ2 : Ty}
-    {Ke Ke' : Exp}
+    {Δ : TyEnv rT GF} {Γrc' : RelCtx rT GF} {f : Var} {τ1 τ2 : Ty}
+    {Ke Ke' : Exp rT}
     (hfRc : f ∉ (Γrc'.map (·.1)).toFinset)
     (hKe_lc : Ke.IsLocallyClosed)
     (hKe'_lc : Ke'.IsLocallyClosed)
@@ -236,15 +239,15 @@ typing of the holes (used in binder cases to derive LC + fv-bounds on
 context's binder atoms don't clash with `e.fv ∪ e'.fv ∪ payloadFv K`, also
 needed for `TypedCtx.fill_typed`. -/
 theorem bin_log_related_under_typed_ctx
-    {Γtc : Tctx} {e e' : Exp} {τ : Ty} {Γtc' : Tctx} {τ' : Ty} {K : Ctx}
+    {Γtc : Tctx} {e e' : Exp rT} {τ : Ty} {Γtc' : Tctx} {τ' : Ty} {K : Ctx rT}
     (HK : TypedCtx K Γtc τ Γtc' τ')
     (Hty_e : Typed Γtc e τ) (Hty_e' : Typed Γtc e' τ)
     (Hbinders : ∀ x ∈ Ctx.binderAtoms K,
       x ∉ e.fv ∧ x ∉ e'.fv ∧ x ∉ Ctx.payloadFv K)
-    (Hrel : ∀ (Δ : TyEnv GF) (Γrc : RelCtx GF),
+    (Hrel : ∀ (Δ : TyEnv rT GF) (Γrc : RelCtx rT GF),
       TctxRelated Δ Γtc Γrc →
       ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ Γrc e e' τ) :
-    ∀ (Δ : TyEnv GF) (Γrc' : RelCtx GF),
+    ∀ (Δ : TyEnv rT GF) (Γrc' : RelCtx rT GF),
       TctxRelated Δ Γtc' Γrc' →
       Ctx.BindersFresh K (Γrc'.map (·.1)).toFinset →
       ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ Γrc' (K.fill e) (K.fill e') τ' := by
@@ -490,7 +493,7 @@ theorem bin_log_related_under_typed_ctx
       have HfreshK'Outer : Ctx.BindersFresh K' (Γrc'.map (·.1)).toFinset :=
         Ctx.BindersFresh.cast_no_binder rfl HfreshTail
       obtain ⟨HbindersK'_e, HbindersK'_e'⟩ := binders_proj_pair HbindersK'
-      have HCtxShift := HCtx.shift (default : lrel GF)
+      have HCtxShift := HCtx.shift (default : lrel rT GF)
       obtain ⟨hKfe_lc, hKfe_fv⟩ :=
         ctx_fill_lc_fv HCtxShift (TypedCtx.fill_typed Hty_e HKtail HbindersK'_e)
       obtain ⟨hKfe'_lc, hKfe'_fv⟩ :=
@@ -541,15 +544,16 @@ end Soundness
 
 section RefinesSound
 open MeasureTheory
-variable {GF : BundledGFunctors} [RefinesPreGS GF]
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {GF : BundledGFunctors} [RefinesPreGS rT GF]
 
 /-- The bool-equality value relation extracted from `lrel_bool`. -/
-def boolEqVal (v v' : Val) : Prop :=
+def boolEqVal (v v' : Val rT) : Prop :=
   ∃ b : Bool, v.1 = .lit (.bool b) ∧ v'.1 = .lit (.bool b)
 
-omit [RefinesPreGS GF] in
+omit [RefinesPreGS rT GF] in
 /-- `lrel_bool` extracts purely to `boolEqVal`. -/
-theorem lrel_bool_to_boolEqVal [ApproxisRGS false GF] (v v' : Val) :
+theorem lrel_bool_to_boolEqVal [ApproxisRGS rT false GF] (v v' : Val rT) :
     ⊢@{IProp GF} iprop((lrel_bool (GF := GF)).car v v' -∗ ⌜boolEqVal v v'⌝) := by
   iintro Hbool
   ihave ⟨%b, %h⟩ := lrel_bool_unfold v v' $$ Hbool
@@ -603,13 +607,13 @@ unrestricted version follows by alpha-renaming, which is not yet ported.
 Also requires typing of `e`, `e'`, and that `K`'s binder atoms are fresh
 in `e.fv ∪ e'.fv ∪ payloadFv K`. -/
 theorem refines_sound_open_fresh
-    (Γtc : Tctx) (e e' : Exp) (τ : Ty)
+    (Γtc : Tctx) (e e' : Exp rT) (τ : Ty)
     (Hty_e : Typed Γtc e τ) (Hty_e' : Typed Γtc e' τ)
-    (Hlog : ∀ (_IR : ApproxisRGS false GF) (Δ : TyEnv GF) (Γrc : RelCtx GF),
+    (Hlog : ∀ (_IR : ApproxisRGS rT false GF) (Δ : TyEnv rT GF) (Γrc : RelCtx rT GF),
       TctxRelated Δ Γtc Γrc →
       ⊢@{IProp GF} bin_log_related_ty (hlc := false) (GF := GF)
         (⊤ : CoPset) Δ Γrc e e' τ) :
-    ∀ (K : Ctx) (σ₀ : State) (b : Bool),
+    ∀ (K : Ctx rT) (σ₀ : State rT) (b : Bool),
       TypedCtx K Γtc τ Tctx.empty .bool →
       Ctx.BindersFresh K ∅ →
       (∀ x ∈ Ctx.binderAtoms K,
@@ -617,7 +621,7 @@ theorem refines_sound_open_fresh
       limExec ⟨K.fill e,  σ₀⟩ (finalBool b) ≤
       limExec ⟨K.fill e', σ₀⟩ (finalBool b) := by
   intro K σ₀ b Htyped HfreshK Hbinders
-  have hRewriteFb : ∀ (e0 : Exp),
+  have hRewriteFb : ∀ (e0 : Exp rT),
       limExec ⟨e0, σ₀⟩ (finalBool b) =
       (limExecV ⟨e0, σ₀⟩) {.lit (.bool b)} := by
     intro e0
@@ -634,21 +638,21 @@ theorem refines_sound_open_fresh
     · intro IR
       have HrelClosed :
           ⊢@{IProp GF}
-            bin_log_related_ty (⊤ : CoPset) (default : TyEnv GF) []
+            bin_log_related_ty (⊤ : CoPset) (default : TyEnv rT GF) []
               (K.fill e) (K.fill e') .bool :=
         bin_log_related_under_typed_ctx Htyped Hty_e Hty_e' Hbinders
           (Hlog IR) _ _ TctxRelated.empty_nil HfreshK
       unfold bin_log_related_ty bin_log_related at HrelClosed
       show ⊢@{IProp GF} refines (⊤ : CoPset)
-        (Exp.substMap (ValSubstMap.fst ([] : ValSubstMap)) (K.fill e))
-        (Exp.substMap (ValSubstMap.snd ([] : ValSubstMap)) (K.fill e'))
-        (interp Ty.bool (default : TyEnv GF))
+        (Exp.substMap (ValSubstMap.fst ([] : ValSubstMap rT)) (K.fill e))
+        (Exp.substMap (ValSubstMap.snd ([] : ValSubstMap rT)) (K.fill e'))
+        (interp Ty.bool (default : TyEnv rT GF))
       ihave Hf := HrelClosed
-      iapply Hf $$ %([] : ValSubstMap)
+      iapply Hf $$ %([] : ValSubstMap rT)
       iapply env_ltyped2_empty
   apply AddCoupl.set_leq_zero (MeasurableSet.singleton _) (MeasurableSet.singleton _) hCpl
   rintro a b' ⟨v, v', hv, hv', ⟨b'', hvb1, hvb2⟩⟩ ha
-  have toVal?_to_eq : ∀ {e : Exp} {w : Val}, e.toVal? = some w → e = w.1 := fun he => by
+  have toVal?_to_eq : ∀ {e : Exp rT} {w : Val rT}, e.toVal? = some w → e = w.1 := fun he => by
     unfold Exp.toVal? at he
     split at he
     · rw [← Option.some.inj he]
@@ -658,16 +662,16 @@ theorem refines_sound_open_fresh
   injection hvb1 with hbool
   injection hbool with hbb
   subst hbb
-  show b' ∈ ({.lit (.bool b)} : Set Exp)
+  show b' ∈ ({.lit (.bool b)} : Set (Exp rT))
   exact (toVal?_to_eq hv').trans hvb2
 
 /-- **Soundness of the logical relation (closed case), restricted to fresh contexts.** -/
-theorem refines_sound_fresh (e e' : Exp) (τ : Ty)
+theorem refines_sound_fresh (e e' : Exp rT) (τ : Ty)
     (Hty_e : Typed Tctx.empty e τ) (Hty_e' : Typed Tctx.empty e' τ)
-    (Hlog : ∀ (_IR : ApproxisRGS false GF) (Δ : TyEnv GF),
+    (Hlog : ∀ (_IR : ApproxisRGS rT false GF) (Δ : TyEnv rT GF),
       ⊢@{IProp GF} refines (hlc := false) (GF := GF)
         (⊤ : CoPset) e e' (interp τ Δ)) :
-    ∀ (K : Ctx) (σ₀ : State) (b : Bool),
+    ∀ (K : Ctx rT) (σ₀ : State rT) (b : Bool),
       TypedCtx K Tctx.empty τ Tctx.empty .bool →
       Ctx.BindersFresh K ∅ →
       (∀ x ∈ Ctx.binderAtoms K,

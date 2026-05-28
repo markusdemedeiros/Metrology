@@ -17,6 +17,10 @@ open scoped AppGS
 
 namespace ProbLang
 
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 /-! ## Timeless instances for tape predicates -/
 
 section TimelessTapes
@@ -28,33 +32,33 @@ instance heapView_tape_frag_discreteE (l : Loc) (t : Tape) :
     OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree t)) :=
   View.frag_discrete ⟨fun H => OFE.Discrete.discrete_0 H⟩
 
-instance appTapesFrag_timeless [AppGS GF] (l : Loc) (t : Tape) :
+instance appTapesFrag_timeless [AppGS rT GF] (l : Loc) (t : Tape) :
     BI.Timeless (iprop(l ↪ₐ t) : IProp GF) := iOwn_timeless
 
-instance specTapesFrag_timeless [ISpec : SpecGS GF] (l : Loc) (t : Tape) :
+instance specTapesFrag_timeless [ISpec : SpecGS rT GF] (l : Loc) (t : Tape) :
     BI.Timeless (l ↪ₛ t : IProp GF) := iOwn_timeless
 
-instance heapView_heap_frag_discreteE (l : Loc) (v : Val) :
+instance heapView_heap_frag_discreteE (l : Loc) (v : Val rT) :
     OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree v)) := by
   unfold HeapView.Frag
   exact View.frag_discrete ⟨fun H => OFE.Discrete.discrete_0 H⟩
 
-instance appHeapFrag_timeless [IApp : AppGS GF] (l : Loc) (v : Val) :
+instance appHeapFrag_timeless [IApp : AppGS rT GF] (l : Loc) (v : Val rT) :
     BI.Timeless (iprop(l ↦ v) : IProp GF) := by
   unfold appHeapFrag
   exact iOwn_timeless
 
-instance specHeapFrag_timeless [ISpec : SpecGS GF] (l : Loc) (v : Val) :
+instance specHeapFrag_timeless [ISpec : SpecGS rT GF] (l : Loc) (v : Val rT) :
     BI.Timeless (iprop(l ↦ₛ v) : IProp GF) := by
   unfold specHeapFrag
   exact iOwn_timeless
 
-instance appNatTape_timeless [IApp : AppGS GF] (l : Loc) (z : Int) (ns : List Int) :
+instance appNatTape_timeless [IApp : AppGS rT GF] (l : Loc) (z : Int) (ns : List Int) :
     BI.Timeless (appNatTape l z ns : IProp GF) := by
   unfold appNatTape
   infer_instance
 
-instance specNatTape_timeless [ISpec : SpecGS GF] (l : Loc) (z : Int) (ns : List Int) :
+instance specNatTape_timeless [ISpec : SpecGS rT GF] (l : Loc) (z : Int) (ns : List Int) :
     BI.Timeless (specNatTape l z ns : IProp GF) := by
   unfold specNatTape
   infer_instance
@@ -77,12 +81,12 @@ end TimelessTapes
 /-- Uniform-measure coupling under a bijection on the support: for `f` that
 restricts to a bijection on `Ico 0 z`, `Cfg.uniform z σ` and `Cfg.uniform z σ'`
 are exactly coupled along `{(⟨#n, σ⟩, ⟨#(f n), σ'⟩) | n ∈ Ico 0 z}`. -/
-theorem Cfg.uniform_addCoupl_bij {z : Int} (Hz : 0 < z) (σ σ' : State)
+theorem Cfg.uniform_addCoupl_bij {z : Int} (Hz : 0 < z) (σ σ' : State rT)
     (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m) :
     AddCoupl 0
-      {p : Cfg × Cfg | ∃ n : Int, 0 ≤ n ∧ n < z ∧
+      {p : Cfg rT × Cfg rT | ∃ n : Int, 0 ≤ n ∧ n < z ∧
         p.1 = ⟨.lit (.int n), σ⟩ ∧ p.2 = ⟨.lit (.int (f n)), σ'⟩}
       (Cfg.uniform z σ) (Cfg.uniform z σ') := by
   classical
@@ -91,8 +95,8 @@ theorem Cfg.uniform_addCoupl_bij {z : Int} (Hz : 0 < z) (σ σ' : State)
   show ∫⁻ c, φ c ∂(Cfg.uniform z σ) ≤ ∫⁻ c, ψ c ∂(Cfg.uniform z σ')
   rw [Cfg.lintegral_uniform Hz σ φ, Cfg.lintegral_uniform Hz σ' ψ]
   refine mul_le_mul_right ?_ _
-  have hreindex : ∑ m ∈ Finset.Ico (0 : Int) z, ψ (⟨.lit (.int m), σ'⟩ : Cfg)
-      = ∑ n ∈ Finset.Ico (0 : Int) z, ψ (⟨.lit (.int (f n)), σ'⟩ : Cfg) := by
+  have hreindex : ∑ m ∈ Finset.Ico (0 : Int) z, ψ (⟨.lit (.int m), σ'⟩ : Cfg rT)
+      = ∑ n ∈ Finset.Ico (0 : Int) z, ψ (⟨.lit (.int (f n)), σ'⟩ : Cfg rT) := by
     symm
     refine Finset.sum_bij (fun n _ => f n) ?_ ?_ ?_ ?_
     · intro n hn
@@ -116,26 +120,26 @@ theorem Cfg.uniform_addCoupl_bij {z : Int} (Hz : 0 < z) (σ σ' : State)
   exact Hle ⟨n, hn.1, hn.2, rfl, rfl⟩
 
 /-- `primStep` of `rand #z ()` (unlabeled) equals `Cfg.uniform z σ`. -/
-theorem primStep_rand_unit {z : Int} (Hz : 0 < z) (σ : State) :
-    primStep (⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩ : Cfg) = Cfg.uniform z σ := by
+theorem primStep_rand_unit {z : Int} (Hz : 0 < z) (σ : State rT) :
+    primStep (⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩
-        {⟨.lit (.int 0), σ⟩} :=
+        ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
     (headStep_support_iff _ _ _ _).mpr (.RandNoTapeS Hz (_root_.le_refl _) Hz)
   rw [primStep_eq_headStep ⟨_, Hhead⟩]
   rfl
 
 /-- `primStep` of `rand #z (lbl α)` when the tape has the wrong bound. -/
 theorem primStep_rand_lbl_wrong {z M : Int} (Hz : 0 < z) (HneM : z ≠ M)
-    (σ : State) (l : Loc) (fs : List { z' : Int // 0 ≤ z' ∧ z' < M })
+    (σ : State rT) (l : Loc) (fs : List { z' : Int // 0 ≤ z' ∧ z' < M })
     (Hlk : σ.tapes[l]? = some ⟨M, fs⟩) :
-    primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg) = Cfg.uniform z σ := by
+    primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
-        {⟨.lit (.int 0), σ⟩} :=
+        ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
     (headStep_support_iff _ _ _ _).mpr
       (.RandTapeOtherS Hz Hlk HneM (_root_.le_refl _) Hz rfl)
   rw [primStep_eq_headStep ⟨_, Hhead⟩]
   show (match σ.tapes[l]? with
-        | none => (0 : MeasureTheory.Measure Cfg)
+        | none => (0 : MeasureTheory.Measure (Cfg rT))
         | some ⟨M, ns⟩ =>
           if M = z then
             match ns with
@@ -147,16 +151,16 @@ theorem primStep_rand_lbl_wrong {z M : Int} (Hz : 0 < z) (HneM : z ≠ M)
   simp only [if_neg (Ne.symm HneM)]
 
 /-- `primStep` of `rand #z (lbl α)` when the tape has the correct bound and is empty. -/
-theorem primStep_rand_lbl_empty {z : Int} (Hz : 0 < z) (σ : State) (l : Loc)
+theorem primStep_rand_lbl_empty {z : Int} (Hz : 0 < z) (σ : State rT) (l : Loc)
     (Hlk : σ.tapes[l]? = some ⟨z, []⟩) :
-    primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg) = Cfg.uniform z σ := by
+    primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
-        {⟨.lit (.int 0), σ⟩} :=
+        ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
     (headStep_support_iff _ _ _ _).mpr
       (.RandTapeEmptyS Hz Hlk rfl (_root_.le_refl _) Hz rfl)
   rw [primStep_eq_headStep ⟨_, Hhead⟩]
   show (match σ.tapes[l]? with
-        | none => (0 : MeasureTheory.Measure Cfg)
+        | none => (0 : MeasureTheory.Measure (Cfg rT))
         | some ⟨M, ns⟩ =>
           if M = z then
             match ns with
@@ -173,17 +177,17 @@ open MeasureTheory in
 /-- Lift a coupling between `μ` and `primStep ⟨e, σ⟩` to one between `μ` and
 `primStep ⟨K.fill e, σ⟩` via `λ a (e', σ'). ∃ e'', e' = K.fill e'' ∧ R a (e'', σ')`. -/
 theorem AddCoupl_steps_ctx_bind_r {α} [MeasurableSpace α] [DiscreteMeasurableSpace α]
-    {μ : Measure α} {e : Exp} {σ : State} {R : Set (α × Cfg)} {ε : ENNReal}
-    {K : Ectx} (hv : ¬ e.isValue)
+    {μ : Measure α} {e : Exp rT} {σ : State rT} {R : Set (α × Cfg rT)} {ε : ENNReal}
+    {K : Ectx rT} (hv : ¬ e.isValue)
     (Hcpl : AddCoupl ε R μ (primStep ⟨e, σ⟩)) :
     AddCoupl ε
-      {p : α × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R (p.1, ⟨e'', p.2.state⟩)}
+      {p : α × Cfg rT | ∃ e'', p.2.expr = K.fill e'' ∧ R (p.1, ⟨e'', p.2.state⟩)}
       μ (primStep ⟨K.fill e, σ⟩) := by
   rw [primStep_fill (K := K) hv]
   rw [show μ = μ.map id from (MeasureTheory.Measure.map_id).symm]
-  refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+  refine AddCoupl.map (f := id) (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
     Measurable.of_discrete Measurable.of_discrete
-    (R := {p : α × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R (p.1, ⟨e'', p.2.state⟩)}) ?_ Hcpl
+    (R := {p : α × Cfg rT | ∃ e'', p.2.expr = K.fill e'' ∧ R (p.1, ⟨e'', p.2.state⟩)}) ?_ Hcpl
   intro a ⟨e', σ'⟩ HR
   refine ⟨e', rfl, ?_⟩
   exact HR
@@ -192,38 +196,38 @@ open MeasureTheory in
 /-- Variant of `AddCoupl_steps_ctx_bind_r` where the relation only depends on
 the expression of the second component. -/
 theorem AddCoupl_steps_ctx_bind_r_no_state
-    {μ : Measure Cfg} {e : Exp} {σ : State} {R : Exp → Exp → Prop} {ε : ENNReal}
-    {K : Ectx} (hv : ¬ e.isValue)
-    (Hcpl : AddCoupl ε {p : Cfg × Cfg | R p.1.expr p.2.expr} μ (primStep ⟨e, σ⟩)) :
+    {μ : Measure (Cfg rT)} {e : Exp rT} {σ : State rT} {R : Exp rT → Exp rT → Prop} {ε : ENNReal}
+    {K : Ectx rT} (hv : ¬ e.isValue)
+    (Hcpl : AddCoupl ε {p : Cfg rT × Cfg rT | R p.1.expr p.2.expr} μ (primStep ⟨e, σ⟩)) :
     AddCoupl ε
-      {p : Cfg × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R p.1.expr e''}
+      {p : Cfg rT × Cfg rT | ∃ e'', p.2.expr = K.fill e'' ∧ R p.1.expr e''}
       μ (primStep ⟨K.fill e, σ⟩) := by
   rw [primStep_fill (K := K) hv]
   rw [show μ = μ.map id from (MeasureTheory.Measure.map_id).symm]
-  refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+  refine AddCoupl.map (f := id) (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
     Measurable.of_discrete Measurable.of_discrete
-    (R := {p : Cfg × Cfg | ∃ e'', p.2.expr = K.fill e'' ∧ R p.1.expr e''}) ?_ Hcpl
+    (R := {p : Cfg rT × Cfg rT | ∃ e'', p.2.expr = K.fill e'' ∧ R p.1.expr e''}) ?_ Hcpl
   intro a b HR
   refine ⟨b.expr, rfl, ?_⟩
   exact HR
 
 section CouplingRules
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
 
 /-- Same-bound bijective coupling: `f : Int → Int` restricts to a bijection on
 `[0, z)`. -/
 theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
-    (Hz : 0 < z) (K : Ectx) (E : CoPset) (Φ : Val → IProp GF) :
+    (Hz : 0 < z) (K : Ectx rT) (E : CoPset) (Φ : Val rT → IProp GF) :
     iprop((⤇ K.fill (.rand (.lit (.int z)) (.lit .unit))) ∗
         (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
           (⤇ K.fill (.lit (.int (f n)))) -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)))
+          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro ⟨Hj, Hcnt⟩
-  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit)).toVal? = none :=
+  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
@@ -244,7 +248,7 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  let R : Cfg → Cfg → Prop := fun c₁ c₂ =>
+  let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
@@ -254,17 +258,17 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
   isplitr
   · ipure_intro
     rw [primStep_rand_unit Hz]
-    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit)).isValue := by
+    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
     rw [primStep_fill Hv_rand, primStep_rand_unit Hz]
     have Hbase := Cfg.uniform_addCoupl_bij Hz σ₁ σ₁' f hdom hbij
     have : AddCoupl 0
-        {p : Cfg × Cfg | R p.1 p.2}
+        {p : Cfg rT × Cfg rT | R p.1 p.2}
         ((Cfg.uniform z σ₁).map id)
-        ((Cfg.uniform z σ₁').map (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))) := by
-      refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+        ((Cfg.uniform z σ₁').map (fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))) := by
+      refine AddCoupl.map (f := id) (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
         Measurable.of_discrete Measurable.of_discrete
-        (R := {p : Cfg × Cfg | R p.1 p.2})
+        (R := {p : Cfg rT × Cfg rT | R p.1 p.2})
         ?_
         Hbase
       intro a b hab
@@ -298,17 +302,17 @@ Both tapes are unchanged; the draw is uniform and `f` links the values. -/
 theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
-    (Hz : 0 < z) (HneM : z ≠ M) (K : Ectx) (E : CoPset) (α α' : Loc)
-    (xs ys : List Int) (Φ : Val → IProp GF) :
+    (Hz : 0 < z) (HneM : z ≠ M) (K : Ectx rT) (E : CoPset) (α α' : Loc)
+    (xs ys : List Int) (Φ : Val rT → IProp GF) :
     iprop(▷ appNatTape α M xs ∗ ▷ specNatTape α' M ys ∗
         (⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) ∗
         (∀ (n : Int),
           appNatTape α M xs ∗ specNatTape α' M ys ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)))
+          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl α))) Φ := by
   iintro ⟨Hα, Hα', Hj, Hcnt⟩
-  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α))).toVal? = none :=
+  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α)) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
@@ -349,7 +353,7 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  let R : Cfg → Cfg → Prop := fun c₁ c₂ =>
+  let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
@@ -359,17 +363,17 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
   isplitr
   · ipure_intro
     rw [primStep_rand_lbl_wrong Hz HneM σ₁ α fs Hlk_α]
-    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α'))).isValue := by
+    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α')) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
     rw [primStep_fill Hv_rand, primStep_rand_lbl_wrong Hz HneM σ₁' α' fs' Hlk_α']
     have Hbase := Cfg.uniform_addCoupl_bij Hz σ₁ σ₁' f hdom hbij
     have : AddCoupl 0
-        {p : Cfg × Cfg | R p.1 p.2}
+        {p : Cfg rT × Cfg rT | R p.1 p.2}
         ((Cfg.uniform z σ₁).map id)
-        ((Cfg.uniform z σ₁').map (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))) := by
-      refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+        ((Cfg.uniform z σ₁').map (fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))) := by
+      refine AddCoupl.map (f := id) (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
         Measurable.of_discrete Measurable.of_discrete
-        (R := {p : Cfg × Cfg | R p.1 p.2})
+        (R := {p : Cfg rT × Cfg rT | R p.1 p.2})
         ?_
         Hbase
       intro a b hab
@@ -418,16 +422,16 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
 theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
-    (Hz : 0 < z) (K : Ectx) (E : CoPset) (α α' : Loc) (Φ : Val → IProp GF) :
+    (Hz : 0 < z) (K : Ectx rT) (E : CoPset) (α α' : Loc) (Φ : Val rT → IProp GF) :
     iprop(▷ appNatTape α z [] ∗ ▷ specNatTape α' z [] ∗
         (⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) ∗
         (∀ (n : Int),
           appNatTape α z [] ∗ specNatTape α' z [] ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)))
+          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl α))) Φ := by
   iintro ⟨Hα, Hα', Hj, Hcnt⟩
-  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α))).toVal? = none :=
+  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α)) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
@@ -471,7 +475,7 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  let R : Cfg → Cfg → Prop := fun c₁ c₂ =>
+  let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
@@ -481,17 +485,17 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   isplitr
   · ipure_intro
     rw [primStep_rand_lbl_empty Hz σ₁ α Hlk_α]
-    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α'))).isValue := by
+    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α')) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
     rw [primStep_fill Hv_rand, primStep_rand_lbl_empty Hz σ₁' α' Hlk_α']
     have Hbase := Cfg.uniform_addCoupl_bij Hz σ₁ σ₁' f hdom hbij
     have : AddCoupl 0
-        {p : Cfg × Cfg | R p.1 p.2}
+        {p : Cfg rT × Cfg rT | R p.1 p.2}
         ((Cfg.uniform z σ₁).map id)
-        ((Cfg.uniform z σ₁').map (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))) := by
-      refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+        ((Cfg.uniform z σ₁').map (fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))) := by
+      refine AddCoupl.map (f := id) (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
         Measurable.of_discrete Measurable.of_discrete
-        (R := {p : Cfg × Cfg | R p.1 p.2})
+        (R := {p : Cfg rT × Cfg rT | R p.1 p.2})
         ?_
         Hbase
       intro a b hab
@@ -541,16 +545,16 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
 theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
-    (Hz : 0 < z) (K : Ectx) (E : CoPset) (α : Loc) (Φ : Val → IProp GF) :
+    (Hz : 0 < z) (K : Ectx rT) (E : CoPset) (α : Loc) (Φ : Val rT → IProp GF) :
     iprop(▷ appNatTape α z [] ∗
         (⤇ K.fill (.rand (.lit (.int z)) (.lit .unit))) ∗
         (∀ (n : Int),
           appNatTape α z [] ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)))
+          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl α))) Φ := by
   iintro ⟨Hα, Hj, Hcnt⟩
-  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α))).toVal? = none :=
+  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α)) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
@@ -583,7 +587,7 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  let R : Cfg → Cfg → Prop := fun c₁ c₂ =>
+  let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
@@ -593,17 +597,17 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
   isplitr
   · ipure_intro
     rw [primStep_rand_lbl_empty Hz σ₁ α Hlk_α]
-    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit)).isValue := by
+    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
     rw [primStep_fill Hv_rand, primStep_rand_unit Hz]
     have Hbase := Cfg.uniform_addCoupl_bij Hz σ₁ σ₁' f hdom hbij
     have : AddCoupl 0
-        {p : Cfg × Cfg | R p.1 p.2}
+        {p : Cfg rT × Cfg rT | R p.1 p.2}
         ((Cfg.uniform z σ₁).map id)
-        ((Cfg.uniform z σ₁').map (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))) := by
-      refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+        ((Cfg.uniform z σ₁').map (fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))) := by
+      refine AddCoupl.map (f := id) (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
         Measurable.of_discrete Measurable.of_discrete
-        (R := {p : Cfg × Cfg | R p.1 p.2})
+        (R := {p : Cfg rT × Cfg rT | R p.1 p.2})
         ?_
         Hbase
       intro a b hab
@@ -644,16 +648,16 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
 theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
-    (Hz : 0 < z) (K : Ectx) (E : CoPset) (α' : Loc) (Φ : Val → IProp GF) :
+    (Hz : 0 < z) (K : Ectx rT) (E : CoPset) (α' : Loc) (Φ : Val rT → IProp GF) :
     iprop(▷ specNatTape α' z [] ∗
         (⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) ∗
         (∀ (n : Int),
           specNatTape α' z [] ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val)))
+          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro ⟨Hα', Hj, Hcnt⟩
-  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit)).toVal? = none :=
+  have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
@@ -686,7 +690,7 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  let R : Cfg → Cfg → Prop := fun c₁ c₂ =>
+  let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
@@ -696,17 +700,17 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
   isplitr
   · ipure_intro
     rw [primStep_rand_unit Hz]
-    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α'))).isValue := by
+    have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α')) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
     rw [primStep_fill Hv_rand, primStep_rand_lbl_empty Hz σ₁' α' Hlk_α']
     have Hbase := Cfg.uniform_addCoupl_bij Hz σ₁ σ₁' f hdom hbij
     have : AddCoupl 0
-        {p : Cfg × Cfg | R p.1 p.2}
+        {p : Cfg rT × Cfg rT | R p.1 p.2}
         ((Cfg.uniform z σ₁).map id)
-        ((Cfg.uniform z σ₁').map (fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))) := by
-      refine AddCoupl.map (f := id) (g := fun ρ : Cfg => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg))
+        ((Cfg.uniform z σ₁').map (fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))) := by
+      refine AddCoupl.map (f := id) (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
         Measurable.of_discrete Measurable.of_discrete
-        (R := {p : Cfg × Cfg | R p.1 p.2})
+        (R := {p : Cfg rT × Cfg rT | R p.1 p.2})
         ?_
         Hbase
       intro a b hab

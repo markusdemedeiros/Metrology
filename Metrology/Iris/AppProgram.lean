@@ -27,9 +27,9 @@ program-side heap/tape ghost-maps with the spec resources.
 Here we separate concerns:
 - `AppPreGS` / `AppGS` own *program* heap and tape γ-names.
 - `SpecGS` owns spec-side γ-names (already in `SpecProgram.lean`).
-- The Approxis "combined" instance is the union `[AppGS GF] [SpecGS GF] [ecGS GF]`.
+- The Approxis "combined" instance is the union `[AppGS rT GF] [SpecGS GF] [ecGS GF]`.
 
-The CMRAs (`SpecHeap = HeapView ℕ+ Loc (Agree Val) LocHeap`, etc.) are reused
+The CMRAs (`SpecHeap = HeapView ℕ+ Loc (Agree (Val rT)) LocHeap`, etc.) are reused
 verbatim from `SpecProgram.lean` — nothing spec-specific about them, just
 "ghost-map over Loc".
 -/
@@ -37,18 +37,23 @@ verbatim from `SpecProgram.lean` — nothing spec-specific about them, just
 section AppProgramRA
 open Std Iris Iris.Std COFE ProbLang
 
+set_option linter.unusedSectionVars false
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 /-! ## Ghost-state classes -/
 
 /-- The preGS bundle: which CMRAs live in `GF`. Reuses `SpecHeap`/`SpecTapes`
 from `SpecProgram.lean` — the algebra is identical for program and spec. -/
-class AppPreGS (GF : BundledGFunctors) where
-  heap : ElemG GF (constOF SpecHeap)
+class AppPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
+    [MeasurableSingletonClass rT] (GF : BundledGFunctors) where
+  heap : ElemG GF (constOF (SpecHeap rT))
   tapes : ElemG GF (constOF SpecTapes)
 
 attribute [reducible, instance] AppPreGS.heap AppPreGS.tapes
 
 /-- The full GS: picks concrete γ names for the program-side heap and tapes. -/
-class AppGS (GF : BundledGFunctors) extends AppPreGS GF where
+class AppGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
+    [MeasurableSingletonClass rT] (GF : BundledGFunctors) extends AppPreGS rT GF where
   γheap : GName
   γtapes : GName
 
@@ -56,14 +61,14 @@ class AppGS (GF : BundledGFunctors) extends AppPreGS GF where
 
 section Resources
 
-variable {GF : BundledGFunctors} [IApp : AppGS GF]
+variable {GF : BundledGFunctors} [IApp : AppGS rT GF]
 
 /-- Authoritative program heap. -/
-def appHeapAuth (σ : LocHeap Val) : IProp GF :=
+def appHeapAuth (σ : LocHeap (Val rT)) : IProp GF :=
   iOwn (E := IApp.heap) IApp.γheap (HeapView.Auth (.own 1) (LocHeap.asAgree σ))
 
 /-- Fragment witnessing `l ↦ v` on the program heap. -/
-def appHeapFrag (ℓ : Loc) (v : Val) : IProp GF :=
+def appHeapFrag (ℓ : Loc) (v : Val rT) : IProp GF :=
   iOwn (E := IApp.heap) IApp.γheap (HeapView.Frag ℓ (.own 1) (toAgree v))
 
 /-- Authoritative program tapes. -/
@@ -75,7 +80,7 @@ def appTapesFrag (ℓ : Loc) (t : Tape) : IProp GF :=
   iOwn (E := IApp.tapes) IApp.γtapes (HeapView.Frag ℓ (.own 1) (toAgree t))
 
 /-- Bundled state interpretation: both heap and tapes at once. -/
-def appStateAuth (σ : State) : IProp GF :=
+def appStateAuth (σ : State rT) : IProp GF :=
   iprop(appHeapAuth σ.heap ∗ appTapesAuth σ.tapes)
 
 end Resources
@@ -102,15 +107,15 @@ act on the program-side γ names. -/
 section Algebra
 open scoped AppGS
 
-variable {GF : BundledGFunctors} [IApp : AppGS GF]
+variable {GF : BundledGFunctors} [IApp : AppGS rT GF]
 
-theorem app_state_lookup_heap {σ : State} {l : Loc} {v : Val} :
+theorem app_state_lookup_heap {σ : State rT} {l : Loc} {v : Val rT} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↦ v -∗ ⌜σ.heap[l]? = some v⌝ := by
   unfold appStateAuth appHeapAuth appHeapFrag
   iintro ⟨Hh, -⟩ Hf
   ihave Hv := iOwn_cmraValid_op (E := IApp.heap) $$ [Hh Hf]
   · isplitl [Hh] <;> iassumption
-  ihave %hv := internalCmraValid_discrete (A := SpecHeap) (PROP := IProp GF) $$ Hv
+  ihave %hv := internalCmraValid_discrete (A := SpecHeap rT) (PROP := IProp GF) $$ Hv
   ipure_intro
   obtain ⟨v', _, _, Hlookup, _, Hinc⟩ := HeapView.auth_op_frag_valid_total_discrete_iff hv
   rw [LocHeap.asAgree_get?] at Hlookup
@@ -124,15 +129,15 @@ theorem app_state_lookup_heap {σ : State} {l : Loc} {v : Val} :
     have : v = w := Agree.toAgree_included_L.mp Hinc'
     exact this ▸ rfl
 
-theorem app_state_update_heap {σ : State} {l : Loc} {v w : Val} :
+theorem app_state_update_heap {σ : State rT} {l : Loc} {v w : Val rT} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↦ v ==∗
-      appStateAuth (σ.update_heap (fun h : LocHeap Val => PartialMap.insert h l w)) ∗
+      appStateAuth (σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l w)) ∗
         l ↦ w := by
   iintro Ha Hf
   ihave %Hlk := app_state_lookup_heap (GF := GF) $$ Ha Hf
   unfold appStateAuth appHeapAuth appHeapFrag
   ihave ⟨Hh, Ht⟩ := Ha
-  have Hval_toAgree : ✓ (toAgree w : Agree Val) := by
+  have Hval_toAgree : ✓ (toAgree w : Agree (Val rT)) := by
     intro n; simp [Agree.validN_iff, toAgree]
   have Hupd :
       HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap) •
@@ -151,10 +156,10 @@ theorem app_state_update_heap {σ : State} {l : Loc} {v w : Val} :
   isplitr [Hf] <;> try iassumption
   isplitl [Hh] <;> try iassumption
 
-theorem app_state_heap_alloc {σ : State} (v : Val) :
+theorem app_state_heap_alloc {σ : State rT} (v : Val rT) :
     ⊢@{IProp GF} appStateAuth σ ==∗
       appStateAuth (σ.update_heap
-          (fun h : LocHeap Val => PartialMap.insert h σ.heap.fresh v)) ∗
+          (fun h : LocHeap (Val rT) => PartialMap.insert h σ.heap.fresh v)) ∗
         σ.heap.fresh ↦ v := by
   iintro Ha
   unfold appStateAuth appHeapAuth appHeapFrag
@@ -163,7 +168,7 @@ theorem app_state_heap_alloc {σ : State} (v : Val) :
     rw [LocHeap.asAgree_get?]
     show (σ.heap[σ.heap.fresh]?).map toAgree = none
     rw [ExtTreeMap.fresh_get?]; rfl
-  have Hval_toAgree : ✓ (toAgree v : Agree Val) := by
+  have Hval_toAgree : ✓ (toAgree v : Agree (Val rT)) := by
     intro n; simp [Agree.validN_iff, toAgree]
   have Hupd :
       HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap) ~~>
@@ -180,7 +185,7 @@ theorem app_state_heap_alloc {σ : State} (v : Val) :
   isplitr [Hf] <;> try iassumption
   isplitl [Hh] <;> try iassumption
 
-theorem app_state_lookup_tape {σ : State} {l : Loc} {t : Tape} :
+theorem app_state_lookup_tape {σ : State rT} {l : Loc} {t : Tape} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↪ₐ t -∗ ⌜σ.tapes[l]? = some t⌝ := by
   unfold appStateAuth appTapesAuth appTapesFrag
   iintro ⟨-, Ht⟩ Hf
@@ -200,7 +205,7 @@ theorem app_state_lookup_tape {σ : State} {l : Loc} {t : Tape} :
     have : t = w := Agree.toAgree_included_L.mp Hinc'
     exact this ▸ rfl
 
-theorem app_state_update_tape {σ : State} {l : Loc} {t s : Tape} :
+theorem app_state_update_tape {σ : State rT} {l : Loc} {t s : Tape} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↪ₐ t ==∗
       appStateAuth (σ.update_tapes (fun h : LocHeap Tape => PartialMap.insert h l s)) ∗
         l ↪ₐ s := by
@@ -227,7 +232,7 @@ theorem app_state_update_tape {σ : State} {l : Loc} {t s : Tape} :
   isplitr [Hf] <;> try iassumption
   isplitl [Hh] <;> try iassumption
 
-theorem app_state_tape_alloc {σ : State} (t : Tape) :
+theorem app_state_tape_alloc {σ : State rT} (t : Tape) :
     ⊢@{IProp GF} appStateAuth σ ==∗
       appStateAuth (σ.update_tapes
           (fun h : LocHeap Tape => PartialMap.insert h σ.tapes.fresh t)) ∗
@@ -272,7 +277,7 @@ the `↪`/`Function.Embedding` collision. -/
 section NatTape
 open scoped AppGS
 
-variable {GF : BundledGFunctors} [AppGS GF]
+variable {GF : BundledGFunctors} [AppGS rT GF]
 
 /-- Predicate: every element of `ns : List Int` lies in `[0, z)`. -/
 def Tape.inBounds (z : Int) (ns : List Int) : Prop :=
@@ -294,7 +299,7 @@ end AppGS
 section NatTapeInterface
 open scoped AppGS
 
-variable {GF : BundledGFunctors} [AppGS GF]
+variable {GF : BundledGFunctors} [AppGS rT GF]
 
 /-- Empty user-level tape collapses to the backend empty tape. -/
 theorem app_natTape_to_empty {l : Loc} {z : Int} :
@@ -342,14 +347,14 @@ end NatTapeInterface
 
 /-! ## Allocation
 
-Allocates a fresh `AppGS GF` instance, producing the authoritative program
+Allocates a fresh `AppGS rT GF` instance, producing the authoritative program
 state `appStateAuth σ`. Analogue of `spec_ra_init` restricted to the
 program-side (no prog-exclusive component — the program heap/tape γ-names
 live separately from the spec ones). -/
-theorem app_ra_init {GF : BundledGFunctors} [IAPre : AppPreGS GF]
-    (σ : State) :
-    ⊢@{IProp GF} |==> ∃ IA : AppGS GF,
-      @appStateAuth _ IA σ := by
+theorem app_ra_init {GF : BundledGFunctors} [IAPre : AppPreGS rT GF]
+    (σ : State rT) :
+    ⊢@{IProp GF} |==> ∃ IA : AppGS rT GF,
+      @appStateAuth rT _ _ _ GF IA σ := by
   imod (iOwn_alloc (E := IAPre.heap)
     (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap))
     HeapView.auth_one_valid) with ⟨%γH, HH⟩
@@ -357,7 +362,7 @@ theorem app_ra_init {GF : BundledGFunctors} [IAPre : AppPreGS GF]
     (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.tapes))
     HeapView.auth_one_valid) with ⟨%γT, HT⟩
   imodintro
-  let IA : AppGS GF := {
+  let IA : AppGS rT GF := {
     toAppPreGS := IAPre
     γheap := γH
     γtapes := γT }
@@ -372,9 +377,9 @@ Two full-fraction `↦` fragments at the same location are inconsistent
 functionality/injectivity proofs in `Metrology/Approxis/Model.lean`. -/
 
 section ValidHelpers
-variable {GF : BundledGFunctors} [IApp : AppGS GF]
+variable {GF : BundledGFunctors} [IApp : AppGS rT GF]
 
-theorem appHeapFrag_valid_2 {l : Loc} {v1 v2 : Val} :
+theorem appHeapFrag_valid_2 {l : Loc} {v1 v2 : Val rT} :
     ⊢@{IProp GF} appHeapFrag l v1 -∗ appHeapFrag l v2 -∗ False := by
   iintro H1 H2
   unfold appHeapFrag

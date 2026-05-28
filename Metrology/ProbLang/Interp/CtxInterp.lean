@@ -26,29 +26,32 @@ as possible:
 namespace ProbLang
 namespace EvalPrim
 
-/-- Interpreter error type. -/
-inductive Error
-  | fail      : Error
-  | stuck     : String → Exp → Error
-  | unsupported : String → Error
-  | segfault  : Loc → Error
+set_option linter.unusedSectionVars false
+variable {rT : Type _} [ProbLangℝ rT]
 
-instance : ToString Error where
+/-- Interpreter error type. -/
+inductive Error (rT : Type _)
+  | fail      : Error rT
+  | stuck     : String → Exp rT → Error rT
+  | unsupported : String → Error rT
+  | segfault  : Loc → Error rT
+
+instance : ToString (Error rT) where
   toString
     | .fail           => "fail"
-    | .stuck msg e    => s!"stuck ({msg}): {repr e}"
+    | .stuck msg _    => s!"stuck ({msg})"
     | .segfault ℓ     => s!"segfault at location {ℓ}"
     | .unsupported msg => s!"unsupported: {msg}"
 
-def throw' (err : Error) : IO α :=
+def throw' (err : Error rT) : IO α :=
   throw (IO.userError (toString err))
 
 /-- Sample uniformly from [0, z).  Returns an error if z ≤ 0. -/
-def sampleUniform (z : Int) : IO Int := do
+def sampleUniform (rT : Type _) [ProbLangℝ rT] (z : Int) : IO Int := do
   if 0 < z then
     return ← IO.rand 0 z.toNat
   else
-    throw' (.stuck "rand: bound must be positive" (.lit (.int z)))
+    throw' (Error.stuck (rT := rT) "rand: bound must be positive" (.lit (.int z)))
 
 /-!
 ### Head step
@@ -63,7 +66,7 @@ It corresponds 1-to-1 with the cases of `headStep`.
     updated) heap.  The expression is *not* necessarily a value — it is the
     reduct of the redex, which will be spliced back into the context by
     `primStep`. -/
-def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
+def headStep (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : IO (Exp rT) := do
   match e with
   -- Beta reduction: app (lam e) v ↦ e[0 := v]
   | .app (.lam body) e2 =>
@@ -76,7 +79,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
   | .unop op v =>
     match op.eval v with
     | some r => return r
-    | none   => throw' (.stuck s!"unop: type error on {repr v}" e)
+    | none   => throw' (.stuck s!"unop: type error" e)
 
   -- Binary operator: headStep (binop op e1 e2) = op.eval e1 e2
   | .binop op v1 v2 =>
@@ -113,7 +116,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
   | .load (.lit (.loc ℓ)) =>
     let heap ← σ.get
     match heap[ℓ]? with
-    | none   => throw' (.segfault ℓ)
+    | none   => throw' (Error.segfault (rT := rT) ℓ)
     | some v => return .ofVal v
 
   | .store (.lit (.loc ℓ)) v =>
@@ -122,18 +125,18 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
     | some v' =>
       let heap ← σ.get
       match heap[ℓ]? with
-      | none   => throw' (.segfault ℓ)
+      | none   => throw' (Error.segfault (rT := rT) ℓ)
       | some _ =>
         σ.modify (·.insert ℓ v')
         return .lit .unit
 
   -- Tape operations: unsupported
-  | .tape _   => throw' (.unsupported "tape allocation")
-  | .rand _ (.lit (.lbl _)) => throw' (.unsupported "rand with tape")
+  | .tape _   => throw' (Error.unsupported (rT := rT) "tape allocation")
+  | .rand _ (.lit (.lbl _)) => throw' (Error.unsupported (rT := rT) "rand with tape")
 
   -- Probabilistic sampling (no tape): headStep (rand z unit) = Uniform [0,z)
   | .rand (.lit (.int z)) (.lit .unit) =>
-    let n ← sampleUniform z
+    let n ← sampleUniform rT z
     return .lit (.int n)
 
   -- Scrutinize: headStep (scrut v pat) = inl(bindings) | inr(unit)
@@ -143,7 +146,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
     | none          => return .inr (.lit .unit)
 
   -- Stuck / failure
-  | .fail => throw' .fail
+  | .fail => throw' (Error.fail (rT := rT))
 
   | _ => throw' (.stuck "headStep: no reduction rule" e)
 
@@ -161,7 +164,7 @@ Concretely:
 2. Run `headStep` on the redex `e'`.
 3. Return `K.fill e_new` as the new expression.
 -/
-def primStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
+def primStep (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : IO (Exp rT) := do
   let (K, redex) := e.decomp
   let e_new ← headStep σ redex
   return K.fill e_new
@@ -173,7 +176,7 @@ def primStep (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Exp := do
 If `e` is already a value, return it immediately — the decomposition of a
 value is `([], e)` and `headStep` would be stuck, so we check first.
 -/
-partial def eval (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Val := do
+partial def eval (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : IO (Val rT) := do
   match e.toVal? with
   | some v => return v
   | none   =>
@@ -181,8 +184,8 @@ partial def eval (σ : IO.Ref (ExtTreeMap Loc Val)) (e : Exp) : IO Val := do
     eval σ e'
 
 /-- Run an expression from an empty initial heap. -/
-@[expose] def run (e : Exp) : IO Val := do
-  let σ ← IO.mkRef (∅ : ExtTreeMap Loc Val)
+@[expose] def run (e : Exp rT) : IO (Val rT) := do
+  let σ ← IO.mkRef (∅ : ExtTreeMap Loc (Val rT) compare)
   eval σ e
 
 end EvalPrim

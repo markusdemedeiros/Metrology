@@ -8,29 +8,35 @@ public import Metrology.Approxis.AppWeakestpre
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
+/-! For the Approxis layer, carry the abstract real type `rT` as a section variable. -/
+
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 namespace ProbLang.ApproxisWpGS
 
-variable {GF : BundledGFunctors} [ApproxisWpGS GF]
+variable {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
 
-theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
     (Hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
-      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε) -∗
+    iprop(∀ (σ₁ : (State rT)) (e₁' : (Exp rT)) (σ₁' : (State rT)) (ε : ENNReal),
+      (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε) -∗
         |={E, ∅}=>
-        ∃ (X : Cfg → Cfg → ENNReal) (ε₁ ε₂ : ENNReal),
+        ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
           (⌜Reducible e₁ σ₁⌝) ∗
           (⌜Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
-          (⌜∀ (h₁ h₂ : Cfg → ENNReal),
+          (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
               (∀ a b, h₁ a ≤ h₂ b + X a b) →
               (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
                 (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε₁⌝) ∗
-          (∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+          (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)),
             iprop(▷ |={∅, E}=>
-              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₂', σ₂'⟩ ∗
-                errInterp (X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ + ε₂) ∗ wp E e₂ Φ))) ⊢@{IProp GF}
+              stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₂', σ₂'⟩ ∗
+                errInterp (rT := rT) (X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ + ε₂) ∗ wp E e₂ Φ))) ⊢@{IProp GF}
       wp E e₁ Φ := by
   iintro H
   iapply wp_lift_step_couple
@@ -45,7 +51,7 @@ theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : Exp} {Φ : Val → IPr
   iapply (progCoupl_steps_adv (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
     iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
       iprop(|={∅, E}=>
-        stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+        stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
           wp E e₃ Φ)))) Hεsum Hred Hred' Hbnd Hcpl)
   iintro %e₂ %σ₂ %e₂' %σ₂'
   imodintro
@@ -54,24 +60,24 @@ theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : Exp} {Φ : Val → IPr
   ispecialize H $$ %e₂ %σ₂ %e₂' %σ₂'
   iexact H
 
-theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : Exp} {Φ : Val → IProp GF}
+theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
     (Hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
-      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε) -∗
+    iprop(∀ (σ₁ : (State rT)) (e₁' : (Exp rT)) (σ₁' : (State rT)) (ε : ENNReal),
+      (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε) -∗
         |={E, ∅}=>
-        ∃ (X : Cfg → Cfg → ENNReal),
+        ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal),
           (⌜Reducible e₁ σ₁⌝) ∗
           (⌜Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
-          (⌜∀ (h₁ h₂ : Cfg → ENNReal),
+          (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
               (∀ a b, h₁ a ≤ h₂ b + X a b) →
               (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
                 (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε⌝) ∗
-          (∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+          (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)),
             iprop(▷ |={∅, E}=>
-              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₂', σ₂'⟩ ∗
-                errInterp (X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩) ∗ wp E e₂ Φ))) ⊢@{IProp GF}
+              stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₂', σ₂'⟩ ∗
+                errInterp (rT := rT) (X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩) ∗ wp E e₂ Φ))) ⊢@{IProp GF}
       wp E e₁ Φ := by
   iintro H
   iapply wp_lift_step_couple
@@ -86,7 +92,7 @@ theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : Exp} {Φ : Val → IP
   iapply (progCoupl_steps_adv' (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
     iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
       iprop(|={∅, E}=>
-        stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+        stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
           wp E e₃ Φ)))) Hred Hred' Hbnd Hcpl)
   iintro %e₂ %σ₂ %e₂' %σ₂'
   imodintro
@@ -96,26 +102,26 @@ theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : Exp} {Φ : Val → IP
   iexact H
 
 /-- The continuation may bail out if `X(ρ₂) + ε₂ ≥ 1`, saturating the error budget. -/
-theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : Exp}
-    {Φ : Val → IProp GF} (Hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε : ENNReal),
-      (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε) -∗
+theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : (Exp rT)}
+    {Φ : (Val rT) → IProp GF} (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : (State rT)) (e₁' : (Exp rT)) (σ₁' : (State rT)) (ε : ENNReal),
+      (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε) -∗
         |={E, ∅}=>
-        ∃ (X : Cfg → Cfg → ENNReal) (ε₁ ε₂ : ENNReal),
+        ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
           (⌜Reducible e₁ σ₁⌝) ∗
           (⌜Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
-          (⌜∀ (h₁ h₂ : Cfg → ENNReal),
+          (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
               (∀ a b, h₁ a ≤ h₂ b + X a b) →
               (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
                 (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε₁⌝) ∗
-          (∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+          (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)),
             iprop(▷ |={∅, E}=>
               (⌜ 1 ≤ X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ + ε₂ ⌝) ∨
-              (stateInterp σ₂ ∗ SpecUpdateGS.specInterp ⟨e₂', σ₂'⟩ ∗
-                errInterp (X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ + ε₂) ∗ wp E e₂ Φ)))) ⊢@{IProp GF}
+              (stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₂', σ₂'⟩ ∗
+                errInterp (rT := rT) (X ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ + ε₂) ∗ wp E e₂ Φ)))) ⊢@{IProp GF}
       wp E e₁ Φ := by
   iintro H
   iapply wp_lift_step_couple
@@ -130,7 +136,7 @@ theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : Exp}
   iapply (progCoupl_steps_adv (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
     iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
       iprop(|={∅, E}=>
-        stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗ errInterp ε₄ ∗
+        stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
           wp E e₃ Φ)))) Hεsum Hred Hred' Hbnd Hcpl)
   iintro %e₂ %σ₂ %e₂' %σ₂'
   imodintro

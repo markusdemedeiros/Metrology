@@ -9,7 +9,13 @@ public import Metrology.ProbLang.DetStep
 
 open Std Iris Iris.Std Iris.BI COFE ProbLang
 
+
+
 namespace ProbLang
+
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
 /-! ## Bridge: `DetStep` ⇒ `pexecN 1 ρ = MeasureTheory.Measure.dirac ρ'` -/
 
@@ -45,7 +51,7 @@ theorem Measure.eq_dirac_of_singleton_mass_one {α : Type _}
     exact ha (by simpa using hxa ▸ hx)
 
 /-- One-step deterministic advance: `DetStep ρ ρ'` gives `pexecN 1 ρ = dirac ρ'`. -/
-theorem pexecN_1_of_DetStep {ρ ρ' : Cfg} (h : DetStep ρ ρ') :
+theorem pexecN_1_of_DetStep {ρ ρ' : Cfg rT} (h : DetStep ρ ρ') :
     pexecN 1 ρ = MeasureTheory.Measure.dirac ρ' := by
   rw [pexecN_one]
   have hnv : ¬ ρ.expr.isValue := by
@@ -56,7 +62,7 @@ theorem pexecN_1_of_DetStep {ρ ρ' : Cfg} (h : DetStep ρ ρ') :
   exact Measure.eq_dirac_of_singleton_mass_one h.det (primStep_univ_le_one ρ)
 
 /-- `n`-step version: `DetExec n ρ ρ'` gives `pexecN n ρ = dirac ρ'`. -/
-theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg} (h : DetExec n ρ ρ') :
+theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec n ρ ρ') :
     pexecN n ρ = MeasureTheory.Measure.dirac ρ' := by
   induction n generalizing ρ with
   | zero =>
@@ -69,7 +75,7 @@ theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg} (h : DetExec n ρ ρ') :
         ih ⟨hrest⟩]
 
 /-- `nsteps PureStep n e1 e2` at a fixed state gives `DetExec n ⟨e1,σ⟩ ⟨e2,σ⟩`. -/
-theorem DetExec.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp} (σ : State)
+theorem DetExec.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp rT} (σ : State rT)
     (h : nsteps PureStep n e1 e2) :
     DetExec n ⟨e1, σ⟩ ⟨e2, σ⟩ := by
   induction n generalizing e1 with
@@ -79,8 +85,8 @@ theorem DetExec.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp} (σ : State)
     exact (ih hrest).succ ⟨hstep.safe σ, hstep.det σ⟩
 
 /-- `PureExec φ n e1 e2 + φ` gives `pexecN n ⟨e1,σ⟩ = dirac ⟨e2,σ⟩`. -/
-theorem pexecN_of_PureExec {φ : Prop} {n : ℕ} {e1 e2 : Exp}
-    [h : PureExec φ n e1 e2] (σ : State) (hφ : φ) :
+theorem pexecN_of_PureExec {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
+    [h : PureExec φ n e1 e2] (σ : State rT) (hφ : φ) :
     pexecN n ⟨e1, σ⟩ = MeasureTheory.Measure.dirac ⟨e2, σ⟩ :=
   pexecN_of_DetExec (DetExec.of_nsteps_PureStep σ (h.pure_exec hφ))
 
@@ -99,7 +105,7 @@ The two below are tape-specific and used by `step_alloctape` / `step_rand`. -/
 
 /-- Tape allocation: `tape #z` deterministically allocates a fresh empty tape of
 bound `z`. -/
-theorem DetHeadStep.tape {z : Int} (σ : State) :
+theorem DetHeadStep.tape {z : Int} (σ : State rT) :
     DetHeadStep ⟨.tape (.lit (.int z)), σ⟩
       ⟨.lit (.lbl σ.tapes.fresh),
        σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ :=
@@ -109,7 +115,7 @@ theorem DetHeadStep.tape {z : Int} (σ : State) :
 `rand z α` deterministically returns `n` and pops the head. -/
 theorem DetHeadStep.rand_tape {z : Int} (l : Loc)
     (n : { k : Int // 0 ≤ k ∧ k < z }) (ns : List { k : Int // 0 ≤ k ∧ k < z })
-    {σ : State} (htape : σ.tapes[l]? = some ⟨z, n :: ns⟩) :
+    {σ : State rT} (htape : σ.tapes[l]? = some ⟨z, n :: ns⟩) :
     DetHeadStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
       ⟨.lit (.int n), σ.update_tapes (·.insert l ⟨z, ns⟩)⟩ :=
   .of_det _ _ (by simp [headStep, htape])
@@ -118,12 +124,12 @@ theorem DetHeadStep.rand_tape {z : Int} (l : Loc)
 
 section Rules
 
-variable {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [SpecGS GF]
+variable {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [SpecGS rT GF]
 
 /-- Pure reduction under an evaluation context. -/
-theorem step_pure {E : CoPset} (K : Ectx) {e e' : Exp} {φ : Prop} {n : ℕ}
+theorem step_pure {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : ℕ}
     (Hφ : φ) [Hex : PureExec φ n e e'] :
-    ⤇ (K.fill e) ⊢@{IProp GF} specUpdate E (⤇ (K.fill e')) := by
+    ⤇ (K.fill e) ⊢@{IProp GF} specUpdate rT E (⤇ (K.fill e')) := by
   have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
   iintro HK
   unfold specUpdate
@@ -139,9 +145,9 @@ theorem step_pure {E : CoPset} (K : Ectx) {e e' : Exp} {φ : Prop} {n : ℕ}
   isplitl [HρNew] <;> iassumption
 
 /-- Allocation under an evaluation context. -/
-theorem step_alloc {E : CoPset} (K : Ectx) {v : Exp} (hv : IsVal v) :
+theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
     ⤇ (K.fill (.alloc v)) ⊢@{IProp GF}
-      specUpdate E iprop(∃ (l : Loc), (⤇ (K.fill (.lit (.loc l)))) ∗ (l ↦ₛ ⟨v, hv⟩)) := by
+      specUpdate rT E iprop(∃ (l : Loc), (⤇ (K.fill (.lit (.loc l)))) ∗ (l ↦ₛ ⟨v, hv⟩)) := by
   iintro HK
   unfold specUpdate
   iintro %ρ Hρ
@@ -149,7 +155,7 @@ theorem step_alloc {E : CoPset} (K : Ectx) {v : Exp} (hv : IsVal v) :
   ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
   subst Heq
   set l := σ.heap.fresh with hl
-  set σ' := σ.update_heap (fun h : LocHeap Val => PartialMap.insert h l ⟨v, hv⟩)
+  set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l ⟨v, hv⟩)
     with hσ'
   imod specProg_update (e3 := K.fill (.lit (.loc l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
   ihave HAlloc := spec_auth_heap_alloc (v := ⟨v, hv⟩) (GF := GF)
@@ -171,9 +177,9 @@ theorem step_alloc {E : CoPset} (K : Ectx) {v : Exp} (hv : IsVal v) :
   isplitl [HKNew] <;> iassumption
 
 /-- Heap load under an evaluation context. -/
-theorem step_load {E : CoPset} (K : Ectx) {l : Loc} {v : Val} :
+theorem step_load {E : CoPset} (K : Ectx rT) {l : Loc} {v : Val rT} :
     iprop((⤇ (K.fill (.load (.lit (.loc l))))) ∗ (l ↦ₛ v)) ⊢@{IProp GF}
-      specUpdate E iprop((⤇ (K.fill (Exp.ofVal v))) ∗ (l ↦ₛ v)) := by
+      specUpdate rT E iprop((⤇ (K.fill (Exp.ofVal v))) ∗ (l ↦ₛ v)) := by
   iintro ⟨HK, Hl⟩
   unfold specUpdate
   iintro %ρ Hρ
@@ -192,10 +198,10 @@ theorem step_load {E : CoPset} (K : Ectx) {l : Loc} {v : Val} :
   isplitl [HKNew] <;> iassumption
 
 /-- Heap store under an evaluation context. -/
-theorem step_store {E : CoPset} (K : Ectx) {l : Loc} {e : Exp} {v_old v_new : Val}
+theorem step_store {E : CoPset} (K : Ectx rT) {l : Loc} {e : Exp rT} {v_old v_new : Val rT}
     (hv : IsVal e) (hnew : e.toVal? = some v_new) :
     iprop((⤇ (K.fill (.store (.lit (.loc l)) e))) ∗ (l ↦ₛ v_old)) ⊢@{IProp GF}
-      specUpdate E iprop((⤇ (K.fill (.lit .unit))) ∗ (l ↦ₛ v_new)) := by
+      specUpdate rT E iprop((⤇ (K.fill (.lit .unit))) ∗ (l ↦ₛ v_new)) := by
   iintro ⟨HK, Hl⟩
   unfold specUpdate
   iintro %ρ Hρ
@@ -203,7 +209,7 @@ theorem step_store {E : CoPset} (K : Ectx) {l : Loc} {e : Exp} {v_old v_new : Va
   ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
   subst Heq
   ihave %Hlk := spec_auth_lookup_heap (GF := GF) $$ Hρ Hl
-  set σ' := σ.update_heap (fun h : LocHeap Val => PartialMap.insert h l v_new)
+  set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l v_new)
     with hσ'
   imod specProg_update (e3 := K.fill (.lit .unit)) $$ Hρ HK with ⟨HρNew, HKNew⟩
   ihave HUpd := spec_auth_update_heap (GF := GF) (e := K.fill (.lit .unit))
@@ -223,9 +229,9 @@ theorem step_store {E : CoPset} (K : Ectx) {l : Loc} {e : Exp} {v_old v_new : Va
   isplitl [HKNew] <;> iassumption
 
 /-- Allocate a tape under an evaluation context. -/
-theorem step_alloctape {E : CoPset} (K : Ectx) (z : Int) :
+theorem step_alloctape {E : CoPset} (K : Ectx rT) (z : Int) :
     ⤇ (K.fill (.tape (.lit (.int z)))) ⊢@{IProp GF}
-      specUpdate E iprop(∃ (l : Loc),
+      specUpdate rT E iprop(∃ (l : Loc),
         (⤇ (K.fill (.lit (.lbl l)))) ∗ (l ↪ₛ Tape.empty z)) := by
   iintro HK
   unfold specUpdate
@@ -256,11 +262,11 @@ theorem step_alloctape {E : CoPset} (K : Ectx) (z : Int) :
   isplitl [HKNew] <;> iassumption
 
 /-- Read from a non-empty tape under an evaluation context. -/
-theorem step_rand {E : CoPset} (K : Ectx) {z : Int} (l : Loc)
+theorem step_rand {E : CoPset} (K : Ectx rT) {z : Int} (l : Loc)
     (n : { k : Int // 0 ≤ k ∧ k < z }) (ns : List { k : Int // 0 ≤ k ∧ k < z }) :
     iprop((⤇ (K.fill (.rand (.lit (.int z)) (.lit (.lbl l))))) ∗ (l ↪ₛ ⟨z, n :: ns⟩))
         ⊢@{IProp GF}
-      specUpdate E iprop((⤇ (K.fill (.lit (.int n)))) ∗ (l ↪ₛ ⟨z, ns⟩)) := by
+      specUpdate rT E iprop((⤇ (K.fill (.lit (.int n)))) ∗ (l ↪ₛ ⟨z, ns⟩)) := by
   iintro ⟨HK, Hl⟩
   unfold specUpdate
   iintro %ρ Hρ

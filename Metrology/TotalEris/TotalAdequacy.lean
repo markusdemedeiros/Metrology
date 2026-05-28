@@ -42,6 +42,9 @@ open scoped AppGS ENNReal
 namespace ProbLang
 namespace TotalEris
 
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {hlc : Bool} {GF : BundledGFunctors}
 
 /-- Graded-probability total lift `Tgl μ φ ε`: the measure `μ` has mass at
@@ -50,30 +53,30 @@ least `1 - ε` concentrated on value-cfg outcomes satisfying `φ`. Rocq:
 
 The Rocq form is `1 - ε ≤ prob μ φ` where `prob μ φ = μ {ρ | φ ρ}`
 restricted to value outcomes. Here we phrase it directly using the
-predicate `∃ v, ρ.expr = .ofVal v ∧ φ v` which lifts `φ : Val → Prop`
-to a `Cfg → Prop`. -/
+predicate `∃ v, ρ.expr = .ofVal v ∧ φ v` which lifts `φ : (Val rT) → Prop`
+to a `(Cfg rT) → Prop`. -/
 @[expose]
-def Tgl (μ : MeasureTheory.Measure Cfg) (φ : Val → Prop) (ε : ENNReal) : Prop :=
-  1 - ε ≤ μ {ρ : Cfg | ∃ v : Val, ρ.expr = Exp.ofVal v ∧ φ v}
+def Tgl (μ : MeasureTheory.Measure (Cfg rT)) (φ : (Val rT) → Prop) (ε : ENNReal) : Prop :=
+  1 - ε ≤ μ {ρ : (Cfg rT) | ∃ v : (Val rT), ρ.expr = Exp.ofVal v ∧ φ v}
 
 namespace Tgl
 
 /-- Termination-mass inequality. Rocq: `tgl_termination_ineq`
 (`graded_predicate_lifting.v:744`). The masses on the φ-set bound the
 overall mass from below. -/
-theorem termination_ineq {μ : MeasureTheory.Measure Cfg} {φ : Val → Prop}
+theorem termination_ineq {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
     {ε : ENNReal} (h : Tgl μ φ ε) : 1 - ε ≤ μ Set.univ :=
   h.trans (MeasureTheory.measure_mono (Set.subset_univ _))
 
 /-- `Tgl μ φ ε` together with `μ Set.univ ≤ 1` (sub-probability) gives
 `Pgl ε (¬ value-and-φ) μ`. Rocq: `tgl_implies_pgl`. -/
-theorem implies_pgl {μ : MeasureTheory.Measure Cfg} {φ : Val → Prop}
+theorem implies_pgl {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
     {ε : ENNReal} (hμ : μ Set.univ ≤ 1) (h : Tgl μ φ ε) :
     Pgl ε (fun ρ => ∃ v, ρ.expr = Exp.ofVal v ∧ φ v) μ := by
   -- Chain: `μ Sᶜ ≤ μ univ - μ S ≤ 1 - μ S ≤ ε`, the first from
   -- `μ S + μ Sᶜ = μ univ` (with μ S ≠ ⊤), the third from `Tgl`'s
   -- `1 - ε ≤ μ S` via `tsub_le_iff_left`.
-  set S : Set Cfg := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
+  set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   show μ Sᶜ ≤ ε
   have hSc_add : μ Sᶜ + μ S = μ Set.univ := by
     rw [add_comm, MeasureTheory.measure_add_measure_compl MeasurableSet.of_discrete]
@@ -93,55 +96,55 @@ theorem implies_pgl {μ : MeasureTheory.Measure Cfg} {φ : Val → Prop}
   exact (ENNReal.add_le_add_iff_left hS_ne_top).mp hcomb
 
 /-- Monotonicity in the error grade. Rocq: `tgl_mon_grading`. -/
-theorem mono_grading {μ : MeasureTheory.Measure Cfg} {φ : Val → Prop}
+theorem mono_grading {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
     {ε ε' : ENNReal} (hε : ε ≤ ε') (h : Tgl μ φ ε) : Tgl μ φ ε' :=
   (tsub_le_tsub_left hε 1).trans h
 
 /-- `1 ≤ ε` trivially gives `Tgl μ φ ε` for any `μ`, `φ`. Rocq:
 `tgl_ge_1`. -/
-theorem of_ge_one {μ : MeasureTheory.Measure Cfg} {φ : Val → Prop}
+theorem of_ge_one {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
     {ε : ENNReal} (hε : 1 ≤ ε) : Tgl μ φ ε := by
   show 1 - ε ≤ _
   rw [tsub_eq_zero_of_le hε]
   exact zero_le _
 
 /-- Monotonicity in the predicate (covariant). Rocq: `tgl_mon_pred`. -/
-theorem mono_pred {μ : MeasureTheory.Measure Cfg} {φ ψ : Val → Prop}
+theorem mono_pred {μ : MeasureTheory.Measure (Cfg rT)} {φ ψ : (Val rT) → Prop}
     {ε : ENNReal} (hφψ : ∀ v, φ v → ψ v) (h : Tgl μ φ ε) : Tgl μ ψ ε := by
   refine h.trans (MeasureTheory.measure_mono ?_)
   rintro x ⟨v, hxv, hφ⟩
   exact ⟨v, hxv, hφψ v hφ⟩
 
 /-- Predicate extensionality. Rocq: `tgl_ext`. -/
-theorem ext {μ : MeasureTheory.Measure Cfg} {φ ψ : Val → Prop}
+theorem ext {μ : MeasureTheory.Measure (Cfg rT)} {φ ψ : (Val rT) → Prop}
     {ε : ENNReal} (h_iff : ∀ v, φ v ↔ ψ v) (h : Tgl μ φ ε) : Tgl μ ψ ε :=
   mono_pred (fun v => (h_iff v).mp) h
 
 /-- Dirac on a value config satisfies `Tgl` at grade 0 whenever the
 value satisfies the predicate. Rocq: `tgl_dret`. -/
-theorem of_dirac_val {v : Val} {σ : State} {φ : Val → Prop} (hφ : φ v) :
-    Tgl (MeasureTheory.Measure.dirac (⟨Exp.ofVal v, σ⟩ : Cfg)) φ 0 := by
+theorem of_dirac_val {v : (Val rT)} {σ : (State rT)} {φ : (Val rT) → Prop} (hφ : φ v) :
+    Tgl (MeasureTheory.Measure.dirac (⟨Exp.ofVal v, σ⟩ : (Cfg rT))) φ 0 := by
   show 1 - 0 ≤ _
   rw [tsub_zero]
-  have h_mem : (⟨Exp.ofVal v, σ⟩ : Cfg) ∈
-      {ρ : Cfg | ∃ v', ρ.expr = Exp.ofVal v' ∧ φ v'} := ⟨v, rfl, hφ⟩
+  have h_mem : (⟨Exp.ofVal v, σ⟩ : (Cfg rT)) ∈
+      {ρ : (Cfg rT) | ∃ v', ρ.expr = Exp.ofVal v' ∧ φ v'} := ⟨v, rfl, hφ⟩
   rw [MeasureTheory.Measure.dirac_apply' _ MeasurableSet.of_discrete]
   simp [Set.indicator_of_mem h_mem]
 
 /-- `Tgl` for `limExec` at a value config: when `e` is already a value
 `v` with `φ v`, the program terminates at grade `0`. Pure structural
 fact independent of the WP soundness. -/
-theorem of_limExec_val {v : Val} {σ : State} {φ : Val → Prop} (hφ : φ v) :
-    Tgl (limExec (⟨Exp.ofVal v, σ⟩ : Cfg)) φ 0 := by
-  show Tgl (limExec (⟨v.1, σ⟩ : Cfg)) φ 0
+theorem of_limExec_val {v : (Val rT)} {σ : (State rT)} {φ : (Val rT) → Prop} (hφ : φ v) :
+    Tgl (limExec (⟨Exp.ofVal v, σ⟩ : (Cfg rT))) φ 0 := by
+  show Tgl (limExec (⟨v.1, σ⟩ : (Cfg rT))) φ 0
   rw [limExec_of_isVal v.2]
   exact of_dirac_val hφ
 
 /-- ε-limit: if `Tgl μ φ ε` holds for every `ε > ε'`, then `Tgl μ φ ε'`.
 Rocq: `tgl_epsilon_limit`. Needed for `twp_tgl_limit`. -/
-theorem epsilon_limit {μ : MeasureTheory.Measure Cfg} {φ : Val → Prop}
+theorem epsilon_limit {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
     {ε' : ENNReal} (h : ∀ ε, ε' < ε → Tgl μ φ ε) : Tgl μ φ ε' := by
-  set S : Set Cfg := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
+  set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   show 1 - ε' ≤ μ S
   -- By contradiction: pick `c` strictly between `μ S` and `1 - ε'`. Then
   -- both `c < 1 - ε'` and the needed `ε' < 1 - c` are equivalent to
@@ -161,7 +164,7 @@ theorem epsilon_limit {μ : MeasureTheory.Measure Cfg} {φ : Val → Prop}
   exact absurd hTglS (_root_.not_le.mpr hμSc)
 
 /-- Generic measure-theoretic core. Both `tgl_prim_step` (prim-step on
-`Cfg`) and `tgl_state_step` (tape presample on `State`) specialize to
+`(Cfg rT)`) and `tgl_state_step` (tape presample on `(State rT)`) specialize to
 this. -/
 theorem tgl_lift_prob
     {α : Type*} [MeasurableSpace α] [DiscreteMeasurableSpace α]
@@ -218,8 +221,8 @@ Given an `R`-and-grade decomposition of one prim_step (`Pgl R ε₁`,
 expected `ε₂`-grading bounded by `ε - ε₁`), plus a continuation that
 holds on the `R`-cone, we get the same bound after stepping. -/
 theorem tgl_prim_step
-    {e : Exp} {σ : State} {ε ε₁ : ENNReal} {ε₂ : Cfg → ENNReal}
-    {R : Cfg → Prop} {P : Set Cfg}
+    {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
+    {R : (Cfg rT) → Prop} {P : Set (Cfg rT)}
     (Hred : Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
@@ -230,16 +233,16 @@ theorem tgl_prim_step
   tgl_lift_prob (M := primStep ⟨e, σ⟩) (R := R) (ε₂ := ε₂)
     (k := fun ρ => (limExec ρ) P) Hpgl Hsum Hcont
 
-/-- State-step analog of `tgl_prim_step`: the pure measure-theoretic
+/-- (State rT)-step analog of `tgl_prim_step`: the pure measure-theoretic
 core for a single tape-presample. Requires the tape `α` to be active
 with positive bound (which makes `tapePresample σ α` a probability
 measure). Used by the future `tgl_state_step`-driven branch of
 `glm_implies_tgl`. -/
 theorem tgl_state_step
-    {e : Exp} {σ : State} {α : Loc} {t : Tape}
+    {e : (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
-    {ε ε₁ : ENNReal} {ε₂ : State → ENNReal}
-    {R : State → Prop} {P : Set Cfg}
+    {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
+    {R : (State rT) → Prop} {P : Set (Cfg rT)}
     (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂tapePresample σ α) ≤ ε)
     (Hpgl : Pgl ε₁ R (tapePresample σ α))
     (Hcont : ∀ σ', R σ' → 1 - ε₂ σ' ≤ (limExec ⟨e, σ'⟩) P) :
@@ -261,14 +264,14 @@ without needing to unfold to the raw measure inequality.
 Mirrors the prim-step branch of Rocq's `twp_step_fupd_tgl_prim_step` +
 `tgl_dbind`. -/
 theorem dbind_prim_step
-    {e : Exp} {σ : State} {ε ε₁ : ENNReal} {ε₂ : Cfg → ENNReal}
-    {R : Cfg → Prop} {φ : Val → Prop}
+    {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
+    {R : (Cfg rT) → Prop} {φ : (Val rT) → Prop}
     (Hred : Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → Tgl (limExec ρ) φ (ε₂ ρ)) :
     Tgl (limExec ⟨e, σ⟩) φ ε := by
-  set S : Set Cfg := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
+  set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   show 1 - ε ≤ (limExec ⟨e, σ⟩) S
   -- `e` is reducible, hence non-value, hence `limExec ⟨e, σ⟩ = primStep ⟨e, σ⟩ >>= limExec`.
   have hnv : ¬ (e.isValue) := by
@@ -286,16 +289,16 @@ theorem dbind_prim_step
 erasure equality (`limExec_tape_presample_expr_eq`) to bridge the
 presampled bind back to `limExec ⟨e, σ⟩`. -/
 theorem dbind_state_step
-    {e : Exp} {σ : State} {α : Loc} {t : Tape}
+    {e : (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
-    {ε ε₁ : ENNReal} {ε₂ : State → ENNReal}
-    {R : State → Prop} {φ : Val → Prop}
+    {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
+    {R : (State rT) → Prop} {φ : (Val rT) → Prop}
     (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂tapePresample σ α) ≤ ε)
     (Hpgl : Pgl ε₁ R (tapePresample σ α))
     (Hcont : ∀ σ', R σ' → Tgl (limExec ⟨e, σ'⟩) φ (ε₂ σ')) :
     Tgl (limExec ⟨e, σ⟩) φ ε := by
-  set S : Set Cfg := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
-  set S' : Set Exp := {e | ∃ v, e = Exp.ofVal v ∧ φ v}
+  set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
+  set S' : Set (Exp rT) := {e | ∃ v, e = Exp.ofVal v ∧ φ v}
   have hS_pre : S = (·.expr) ⁻¹' S' := rfl
   show 1 - ε ≤ (limExec ⟨e, σ⟩) S
   -- The Tgl bound on the bind via `tgl_state_step`.
@@ -329,14 +332,14 @@ end Tgl
 /-- **Iris-side core**: extract a pure `Tgl` bound from a `glm` claim
 whose leaf body carries a per-leaf pure `Tgl` claim under `|={∅}=>`.
 Mirrors the inner induction of Rocq's `twp_step_fupd_tgl`. -/
-theorem glm_implies_tgl [ErisGS false GF]
-    {φ : Val → Prop} {e : Exp} {σ : State} {ε : ENNReal} :
+theorem glm_implies_tgl [ErisGS rT false GF]
+    {φ : (Val rT) → Prop} {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} :
     glm (GF := GF) e σ ε
         (fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝))
       ⊢@{IProp GF} iprop(|={∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
-  let Z : Cfg → ENNReal → IProp GF :=
+  let Z : (Cfg rT) → ENNReal → IProp GF :=
     fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝)
-  let Ψ : GlmState → IProp GF :=
+  let Ψ : (GlmState rT) → IProp GF :=
     fun s => iprop(|={∅}=> ⌜Tgl (limExec s.1) φ s.2⌝)
   have : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
   iintro HG
@@ -396,7 +399,7 @@ theorem glm_implies_tgl [ErisGS false GF]
         ipure_intro
         exact Tgl.dbind_state_step Hαt.1 Hαt.2 Hsum Hpgl Hf
   iapply (glm_strong_ind (GF := GF) (Z := Z) (Ψ := Ψ)) $$ HInd
-        %(⟨⟨e, σ⟩, ε⟩ : GlmState)
+        %(⟨⟨e, σ⟩, ε⟩ : (GlmState rT))
   iexact HG
 
 /-- **Iris-side adequacy step**: from a `tglWp` triple with pure post
@@ -405,13 +408,13 @@ theorem glm_implies_tgl [ErisGS false GF]
 The outer induction is `tglWp_ind_simple`; per-`e'`, we case-split on
 whether `e'` is a value. The non-value case calls `glm_implies_tgl` to
 extract the pure `Tgl` from the `glm` body produced by `tglWp_unfold_step`. -/
-theorem twp_step_fupd_tgl [ErisGS false GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {φ : Val → Prop} :
-    iprop(stateInterp σ ∗ errInterp ε ∗ tglWp ⊤ e (fun v => iprop(⌜φ v⌝)))
+theorem twp_step_fupd_tgl [ErisGS rT false GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop} :
+    iprop(stateInterp σ ∗ errInterp (rT := rT) ε ∗ tglWp ⊤ e (fun v => iprop(⌜φ v⌝)))
       ⊢@{IProp GF} iprop(|={⊤,∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
   iintro ⟨Hσ, Hε, HW⟩
-  let Q : Exp → IProp GF := fun e' => iprop(
-    ∀ σ' ε', stateInterp σ' ∗ errInterp ε' -∗
+  let Q : (Exp rT) → IProp GF := fun e' => iprop(
+    ∀ σ' ε', stateInterp σ' ∗ errInterp (rT := rT) ε' -∗
       |={⊤,∅}=> ⌜Tgl (limExec ⟨e', σ'⟩) φ ε'⌝)
   have : NonExpansive Q := nonExpansive_of_discrete_leibniz Q
   ihave Hq : Q e $$ [HW]
@@ -426,8 +429,8 @@ theorem twp_step_fupd_tgl [ErisGS false GF]
     -- HBody now has the `match e'.toVal? with ...` shape — case on htv.
     cases htv : e'.toVal? with
     | some v =>
-      -- Value case: HBody reduces to `|={⊤}=> stateInterp σ' ∗ errInterp ε' ∗ ⌜φ v⌝`.
-      ihave HBody' : iprop(|={⊤}=> stateInterp σ' ∗ errInterp ε' ∗ ⌜φ v⌝) $$ [HBody]
+      -- Value case: HBody reduces to `|={⊤}=> stateInterp σ' ∗ errInterp (rT := rT) ε' ∗ ⌜φ v⌝`.
+      ihave HBody' : iprop(|={⊤}=> stateInterp σ' ∗ errInterp (rT := rT) ε' ∗ ⌜φ v⌝) $$ [HBody]
       · iexact HBody
       imod HBody' with ⟨_, _, %hφ⟩
       imod (BIFUpdate.subset (E1 := ⊤) (E2 := ∅) Std.LawfulSet.empty_subset) with _
@@ -443,7 +446,7 @@ theorem twp_step_fupd_tgl [ErisGS false GF]
       -- the glm body via `glm_strong_mono` to fit `glm_implies_tgl`.
       ihave HBody' : iprop(|={⊤,∅}=> glm e' σ' ε'
           (fun ρ ε₂ => iprop(|={∅,⊤}=>
-            stateInterp ρ.state ∗ errInterp ε₂ ∗ Q ρ.expr))) $$ [HBody]
+            stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ Q ρ.expr))) $$ [HBody]
       · iexact HBody
       imod HBody' with HG
       -- HG : glm e' σ' ε' (fun ρ ε₂ => |={∅,⊤}=> ...).
@@ -452,7 +455,7 @@ theorem twp_step_fupd_tgl [ErisGS false GF]
       ihave HG' : iprop(glm e' σ' ε'
           (fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝))) $$ [HG]
       · iapply (glm_strong_mono (Z₁ := fun ρ ε₂ => iprop(|={∅,⊤}=>
-            stateInterp ρ.state ∗ errInterp ε₂ ∗ Q ρ.expr))
+            stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ Q ρ.expr))
           (Z₂ := fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝)))
         isplitr [HG]
         swap
@@ -480,9 +483,9 @@ Proof structure: trivial-`ε ≥ 1` case closes from `1 - ε = 0`. For
 `ec_alloc`, then invoke `twp_step_fupd_tgl` (the iris-side adequacy
 helper) and finally `fupd_soundness_no_lc` to extract the pure
 inequality at the metalogic level. -/
-theorem twp_tgl [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {φ : Val → Prop}
-    (Hwp : ∀ [ErisGS false GF], iprop(↯ε) ⊢@{IProp GF}
+theorem twp_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Tgl (limExec ⟨e, σ⟩) φ ε := by
   -- Trivial case: `1 ≤ ε` makes the bound `1 - ε = 0 ≤ μ S` vacuous.
@@ -499,7 +502,7 @@ theorem twp_tgl [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
   iintro _
   imod (app_ra_init (GF := GF) σ) with ⟨%IA, HappAuth⟩
   imod (ec_alloc (GF := GF) ε hε) with ⟨%γec, HecAuth, HecFrag⟩
-  letI IES : ErisGS false GF := {
+  letI IES : ErisGS rT false GF := {
     appGS := IA
     ecGS := { toECPreGS := inferInstance, γec := γec }
     invGS := Hinv }
@@ -516,10 +519,10 @@ satisfying the WP triple, we get `Tgl` at grade 0 (regardless of ε).
 This is the "easy half" of `twp_tgl` — extractable via iris soundness
 without needing the full induction. Requires the `*Pre` typeclasses to
 allocate ghost state inside the proof. -/
-theorem twp_tgl_value [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {v : Val} {σ : State} {ε : ENNReal} {φ : Val → Prop}
+theorem twp_tgl_value [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {v : (Val rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (hε : ε < 1)
-    (Hwp : ∀ [ErisGS false GF], iprop(↯ε) ⊢@{IProp GF}
+    (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ (Exp.ofVal v) (fun v => iprop(⌜φ v⌝))) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
   -- Extract `φ v` via iris soundness, then use `of_limExec_val`.
@@ -529,7 +532,7 @@ theorem twp_tgl_value [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
   iintro _
   imod (app_ra_init (GF := GF) σ) with ⟨%IA, HappAuth⟩
   imod (ec_alloc (GF := GF) ε hε) with ⟨%γec, HecAuth, HecFrag⟩
-  letI IES : ErisGS false GF := {
+  letI IES : ErisGS rT false GF := {
     appGS := IA
     ecGS := { toECPreGS := inferInstance, γec := γec }
     invGS := Hinv }
@@ -553,9 +556,9 @@ theorem twp_tgl_value [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
 /-- **Adequacy 2**: termination mass. Rocq: `twp_mass_lim_exec`
 (`total_adequacy.v:437`). Derived directly from `twp_tgl` +
 `Tgl.termination_ineq`. -/
-theorem twp_mass_lim_exec [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {φ : Val → Prop}
-    (Hwp : ∀ [ErisGS false GF], iprop(↯ε) ⊢@{IProp GF}
+theorem twp_mass_lim_exec [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     1 - ε ≤ (limExec ⟨e, σ⟩) Set.univ :=
   Tgl.termination_ineq (twp_tgl Hwp)
@@ -564,9 +567,9 @@ theorem twp_mass_lim_exec [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
 execution. Rocq: `twp_pgl_lim` (`total_adequacy.v:447`). Derived from
 `twp_tgl` + `Tgl.implies_pgl` + the sub-probability fact that
 `limExec ρ Set.univ ≤ 1`. -/
-theorem twp_pgl_lim [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {φ : Val → Prop}
-    (Hwp : ∀ [ErisGS false GF], iprop(↯ε) ⊢@{IProp GF}
+theorem twp_pgl_lim [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Pgl ε (fun ρ => ∃ v, ρ.expr = Exp.ofVal v ∧ φ v) (limExec ⟨e, σ⟩) := by
   refine Tgl.implies_pgl ?_ (twp_tgl Hwp)
@@ -575,25 +578,25 @@ theorem twp_pgl_lim [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
 /-- **Adequacy 1, limit form**: the WP triple only needs to hold for every
 `ε' > ε`. Rocq: `twp_tgl_limit` (`total_adequacy.v:463`). Derived from
 `twp_tgl` + `Tgl.epsilon_limit`. -/
-theorem twp_tgl_limit [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {φ : Val → Prop}
-    (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS false GF], iprop(↯ε') ⊢@{IProp GF}
+theorem twp_tgl_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT false GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Tgl (limExec ⟨e, σ⟩) φ ε :=
   Tgl.epsilon_limit (fun ε' hε' => twp_tgl (Hwp ε' hε'))
 
 /-- **Adequacy 2, limit form**: termination mass via the limit form. -/
-theorem twp_mass_lim_exec_limit [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {φ : Val → Prop}
-    (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS false GF], iprop(↯ε') ⊢@{IProp GF}
+theorem twp_mass_lim_exec_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT false GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     1 - ε ≤ (limExec ⟨e, σ⟩) Set.univ :=
   Tgl.termination_ineq (twp_tgl_limit Hwp)
 
 /-- **Adequacy 3, limit form**: Pgl bound via the limit form. -/
-theorem twp_pgl_lim_limit [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {φ : Val → Prop}
-    (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS false GF], iprop(↯ε') ⊢@{IProp GF}
+theorem twp_pgl_lim_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT false GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Pgl ε (fun ρ => ∃ v, ρ.expr = Exp.ofVal v ∧ φ v) (limExec ⟨e, σ⟩) := by
   refine Tgl.implies_pgl ?_ (twp_tgl_limit Hwp)
@@ -603,10 +606,10 @@ theorem twp_pgl_lim_limit [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
 syntactic form that reduces to a value), the WP triple at `e` gives
 `Tgl ... 0`. Derived from `twp_tgl_value` by rewriting `e` to
 `Exp.ofVal v` via `Exp.ofVal_of_toVal_some`. -/
-theorem twp_tgl_of_toVal [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
-    {e : Exp} {σ : State} {ε : ENNReal} {v : Val} {φ : Val → Prop}
+theorem twp_tgl_of_toVal [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {v : (Val rT)} {φ : (Val rT) → Prop}
     (hev : e.toVal? = some v) (hε : ε < 1)
-    (Hwp : ∀ [ErisGS false GF], iprop(↯ε) ⊢@{IProp GF}
+    (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Tgl (limExec ⟨e, σ⟩) φ 0 := by
   have hev' : Exp.ofVal v = e := Exp.ofVal_of_toVal_some hev

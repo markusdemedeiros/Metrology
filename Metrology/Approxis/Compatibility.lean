@@ -21,30 +21,33 @@ open scoped AppGS
 
 namespace ProbLang
 
+set_option linter.unusedSectionVars false
+
 section Compatibility
-variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-- Helper: unfold `lrel_arr` application. Proves that `(lrel_arr A B).car v v'`
 is definitionally `⌜v.closed ∧ v'.closed⌝ ∗ □ (∀ w w', A w w' -∗ REL (v w) << (v' w') : B)`,
 bridging the `.car`/`lrel.mk` projection that iris tactics don't reduce. The
 closedness conjunct is port-specific (Lean's `Val` isn't intrinsically closed). -/
-theorem lrel_arr_unfold (A B : lrel GF) (v v' : Val) :
+theorem lrel_arr_unfold (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_arr A B).car v v' ⊢@{IProp GF}
       iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-        □ (∀ (w1 w2 : Val), A w1 w2 -∗
+        □ (∀ (w1 w2 : Val rT), A w1 w2 -∗
           refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) :=
   BIBase.Entails.rfl
 
-theorem lrel_arr_unfold_wand (A B : lrel GF) (v v' : Val) :
+theorem lrel_arr_unfold_wand (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_arr A B).car v v' ⊢@{IProp GF}
-      iprop(□ (∀ (w1 w2 : Val), A w1 w2 -∗
+      iprop(□ (∀ (w1 w2 : Val rT), A w1 w2 -∗
         refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) := by
   iintro H
   ihave H' := lrel_arr_unfold A B v v' $$ H
   icases H' with ⟨_, HW⟩
   iexact HW
 
-theorem lrel_arr_unfold_closed (A B : lrel GF) (v v' : Val) :
+theorem lrel_arr_unfold_closed (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_arr A B).car v v' ⊢@{IProp GF}
       iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) := by
   iintro H
@@ -52,14 +55,14 @@ theorem lrel_arr_unfold_closed (A B : lrel GF) (v v' : Val) :
   icases H' with ⟨%hc, _⟩
   ipure_intro; exact hc
 
-theorem lrel_arr_fold (A B : lrel GF) (v v' : Val) :
+theorem lrel_arr_fold (A B : lrel rT GF) (v v' : Val rT) :
     iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-      □ (∀ (w1 w2 : Val), A w1 w2 -∗
+      □ (∀ (w1 w2 : Val rT), A w1 w2 -∗
         refines (⊤ : CoPset) (Exp.app v.1 w1.1) (Exp.app v'.1 w2.1) B)) ⊢@{IProp GF}
       (lrel_arr A B).car v v' :=
   BIBase.Entails.rfl
 
-theorem refines_pair {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
+theorem refines_pair {e1 e2 e1' e2' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e1 e1' A) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' B -∗
             refines ⊤ (Exp.pair e1 e2) (Exp.pair e1' e2') (lrel_prod A B)) := by
@@ -93,7 +96,7 @@ theorem refines_pair {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
   iexact HB
 
 /-- `refines_injl` (compatibility.v:31): left-injection compatibility. -/
-theorem refines_injl {e e' : Exp} {A B : lrel GF} :
+theorem refines_injl {e e' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e e' A)
       ⊢@{IProp GF} refines ⊤ (.inl e) (.inl e') (lrel_sum A B) := by
   show _ ⊢@{IProp GF}
@@ -116,7 +119,7 @@ theorem refines_injl {e e' : Exp} {A B : lrel GF} :
   iexact HA
 
 /-- `refines_injr` (compatibility.v:41): right-injection compatibility. -/
-theorem refines_injr {e e' : Exp} {A B : lrel GF} :
+theorem refines_injr {e e' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e e' B)
       ⊢@{IProp GF} refines ⊤ (.inr e) (.inr e') (lrel_sum A B) := by
   show _ ⊢@{IProp GF}
@@ -139,7 +142,7 @@ theorem refines_injr {e e' : Exp} {A B : lrel GF} :
   iexact HB
 
 /-- `refines_app` (compatibility.v:51): function application compatibility. -/
-theorem refines_app {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
+theorem refines_app {e1 e2 e1' e2' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e1 e1' (lrel_arr A B)) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' A -∗
             refines ⊤ (Exp.app e1 e2) (Exp.app e1' e2') B) := by
@@ -169,7 +172,7 @@ theorem refines_app {e1 e2 e1' e2' : Exp} {A B : lrel GF} :
 the body doesn't reference the bound variable. In Lean, `.lam e2`'s beta-step
 gives `Exp.open' e2 v`, which equals `e2` only when e2 is locally closed.
 We require `e2.IsLocallyClosed` and `e2'.IsLocallyClosed` as hypotheses. -/
-theorem refines_seq (A : lrel GF) {e1 e2 e1' e2' : Exp} {B : lrel GF}
+theorem refines_seq (A : lrel rT GF) {e1 e2 e1' e2' : Exp rT} {B : lrel rT GF}
     (he2 : e2.IsLocallyClosed) (he2' : e2'.IsLocallyClosed) :
     iprop(refines ⊤ e1 e1' A) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' B -∗
@@ -212,52 +215,52 @@ theorem refines_seq (A : lrel GF) {e1 e2 e1' e2' : Exp} {B : lrel GF}
 
 /-- Helper: build `(lrel_exists C).car v v'` from a closedness witness and the
 existential body. Defeq via `lrel.mk` projection. -/
-theorem lrel_exists_unfold (C : lrel GF → lrel GF) (v v' : Val) :
+theorem lrel_exists_unfold (C : lrel rT GF → lrel rT GF) (v v' : Val rT) :
     iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-      (∃ A : lrel GF, (C A).car v v'))
+      (∃ A : lrel rT GF, (C A).car v v'))
       ⊢@{IProp GF} (lrel_exists C).car v v' :=
   BIBase.Entails.rfl
 
 /-- Helper: `(lrel_nat).car v v' ⊢ ∃ n : Nat, v = #n ∧ v' = #n`. -/
-theorem lrel_nat_unfold (v v' : Val) :
+theorem lrel_nat_unfold (v v' : Val rT) :
     (lrel_nat (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ n : Nat,
         ⌜v.1 = .lit (.int (n : Int)) ∧ v'.1 = .lit (.int (n : Int))⌝) :=
   BIBase.Entails.rfl
 
 /-- Helper: `(lrel_pos_nat).car v v' ⊢ ∃ n : Nat, 0 < n ∧ v = #n ∧ v' = #n`. -/
-theorem lrel_pos_nat_unfold (v v' : Val) :
+theorem lrel_pos_nat_unfold (v v' : Val rT) :
     (lrel_pos_nat (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ n : Nat, ⌜0 < n ∧
         v.1 = .lit (.int (n : Int)) ∧ v'.1 = .lit (.int (n : Int))⌝) :=
   BIBase.Entails.rfl
 
 /-- Helper: `(lrel_int).car v v' ⊢ ∃ n : Int, v = #n ∧ v' = #n`. -/
-theorem lrel_int_unfold (v v' : Val) :
+theorem lrel_int_unfold (v v' : Val rT) :
     (lrel_int (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ n : Int,
         ⌜v.1 = .lit (.int n) ∧ v'.1 = .lit (.int n)⌝) :=
   BIBase.Entails.rfl
 
 /-- Helper: `(lrel_prod A B).car v v' ⊢ ∃ a1 a2 b1 b2, v=(a1,b1) ∧ v'=(a2,b2) ∧ A a1 a2 ∧ B b1 b2`. -/
-theorem lrel_prod_unfold (A B : lrel GF) (v v' : Val) :
+theorem lrel_prod_unfold (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_prod A B).car v v' ⊢@{IProp GF}
-      iprop(∃ (a1 a2 b1 b2 : Val),
+      iprop(∃ (a1 a2 b1 b2 : Val rT),
         (⌜v.1 = .pair a1.1 b1.1⌝) ∗ (⌜v'.1 = .pair a2.1 b2.1⌝) ∗
         A a1 a2 ∗ B b1 b2) :=
   BIBase.Entails.rfl
 
 /-- Helper: `(lrel_sum A B).car v v' ⊢ ∃ w1 w2, ((inl form) ∨ (inr form))`. -/
-theorem lrel_sum_unfold (A B : lrel GF) (v v' : Val) :
+theorem lrel_sum_unfold (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_sum A B).car v v' ⊢@{IProp GF}
-      iprop(∃ (w1 w2 : Val),
+      iprop(∃ (w1 w2 : Val rT),
         ((⌜v.1 = .inl w1.1⌝) ∗ (⌜v'.1 = .inl w2.1⌝) ∗ A w1 w2)
         ∨
         ((⌜v.1 = .inr w1.1⌝) ∗ (⌜v'.1 = .inr w2.1⌝) ∗ B w1 w2)) :=
   BIBase.Entails.rfl
 
 /-- Helper: `(lrel_bool).car v v' ⊢ ∃ b : Bool, v=#b ∧ v'=#b`. -/
-theorem lrel_bool_unfold (v v' : Val) :
+theorem lrel_bool_unfold (v v' : Val rT) :
     (lrel_bool (GF := GF)).car v v' ⊢@{IProp GF}
       iprop(∃ b : Bool, ⌜v.1 = .lit (.bool b) ∧ v'.1 = .lit (.bool b)⌝) :=
   BIBase.Entails.rfl
@@ -270,7 +273,7 @@ recurse on the projected component (`refines_fst`/`refines_snd`) or apply the
 appropriate IH (`refines_case`/`refines_if`). -/
 
 /-- `refines_fst`: if `e ≤ e' : A × B`, then `fst e ≤ fst e' : A`. -/
-theorem refines_fst {e e' : Exp} {A B : lrel GF} :
+theorem refines_fst {e e' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e e' (lrel_prod A B))
       ⊢@{IProp GF} refines ⊤ (.fst e) (.fst e') A := by
   show _ ⊢@{IProp GF}
@@ -302,7 +305,7 @@ theorem refines_fst {e e' : Exp} {A B : lrel GF} :
 
 /-- `refines_case`: case-split compatibility. After binding e0, the value
 is `inl w` or `inr w`; we step the case to `e1 w` or `e2 w` and apply IH. -/
-theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp} {A B C : lrel GF} :
+theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp rT} {A B C : lrel rT GF} :
     iprop(refines ⊤ e0 e0' (lrel_sum A B)) ⊢@{IProp GF}
       iprop(refines ⊤ e1 e1' (lrel_arr A C) -∗
         refines ⊤ e2 e2' (lrel_arr B C) -∗
@@ -360,9 +363,9 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp} {A B C : lrel GF} :
 literal values gives a deterministic result. Steps both sides via PureExec
 on `binop op v1 v2 → r`, then concludes via `refines_ret` with `r` in the
 provided result relation `Hres : Aresult r r`. -/
-theorem refines_binop_pure (op : BinOp) (v1 v2 r : Exp)
+theorem refines_binop_pure (op : BinOp) (v1 v2 r : Exp rT)
     (hv1 : IsVal v1) (hv2 : IsVal v2) (hrv : IsVal r)
-    (heval : op.eval v1 v2 = some r) {A : lrel GF}
+    (heval : op.eval v1 v2 = some r) {A : lrel rT GF}
     (HA : ⊢@{IProp GF} A ⟨r, hrv⟩ ⟨r, hrv⟩) :
     ⊢@{IProp GF} refines ⊤ (.binop op v1 v2) (.binop op v1 v2) A := by
   have hf : Exp.binop op v1 v2 = Ectx.fill [] (Exp.binop op v1 v2) := rfl
@@ -381,7 +384,7 @@ theorem refines_binop_pure (op : BinOp) (v1 v2 r : Exp)
 /-- `refines_alloctape`: tape-allocation compatibility. After binding the
 bound argument to value `n : Int`, allocate fresh tapes on both sides and
 establish the `lrel_tape` invariant. -/
-theorem refines_alloctape {e e' : Exp} :
+theorem refines_alloctape {e e' : Exp rT} :
     iprop(refines ⊤ e e' lrel_int)
       ⊢@{IProp GF} refines ⊤ (.tape e) (.tape e') lrel_tape := by
   show _ ⊢@{IProp GF}
@@ -450,7 +453,7 @@ theorem refines_alloctape {e e' : Exp} :
 
 /-- `refines_alloc`: alloc compatibility. After binding `e/e'` to value pair
 related at `A`, alloc fresh refs on both sides and establish the invariant. -/
-theorem refines_alloc {e e' : Exp} {A : lrel GF} :
+theorem refines_alloc {e e' : Exp rT} {A : lrel rT GF} :
     iprop(refines ⊤ e e' A)
       ⊢@{IProp GF} refines ⊤ (.alloc e) (.alloc e') (lrel_ref A) := by
   show _ ⊢@{IProp GF}
@@ -468,7 +471,7 @@ theorem refines_alloc {e e' : Exp} {A : lrel GF} :
   iintro %l' Hl'
   iapply (refines_alloc_l (K := []))
   iintro %l Hl
-  ihave HInvBody : iprop(▷ ∃ (w1 w2 : Val),
+  ihave HInvBody : iprop(▷ ∃ (w1 w2 : Val rT),
       (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2) $$ [Hl Hl' HA]
   · iintro !>
     iexists v, v'
@@ -476,7 +479,7 @@ theorem refines_alloc {e e' : Exp} {A : lrel GF} :
     isplitl [Hl']; · iexact Hl'
     iexact HA
   imod (Iris.inv_alloc (N := logN.@ ((l, l') : Loc × Loc)) (E := ⊤)
-    (P := iprop(∃ (w1 w2 : Val),
+    (P := iprop(∃ (w1 w2 : Val rT),
       (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2))) $$ [HInvBody] with #HInv
   · iexact HInvBody
   iapply refines_ret (e1 := Ectx.fill [] (.lit (.loc l)))
@@ -491,7 +494,7 @@ theorem refines_alloc {e e' : Exp} {A : lrel GF} :
   iexact HInv
 
 /-- `refines_if`: if-then-else compatibility. -/
-theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp} {A : lrel GF} :
+theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     iprop(refines ⊤ e0 e0' lrel_bool) ⊢@{IProp GF}
       iprop(refines ⊤ e1 e1' A -∗ refines ⊤ e2 e2' A -∗
         refines ⊤ (.cond e0 e1 e2) (.cond e0' e1' e2') A) := by
@@ -535,7 +538,7 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp} {A : lrel GF} :
     iexact IH2
 
 /-- `refines_snd`: if `e ≤ e' : A × B`, then `snd e ≤ snd e' : B`. -/
-theorem refines_snd {e e' : Exp} {A B : lrel GF} :
+theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e e' (lrel_prod A B))
       ⊢@{IProp GF} refines ⊤ (.snd e) (.snd e') B := by
   show _ ⊢@{IProp GF}
@@ -566,7 +569,7 @@ theorem refines_snd {e e' : Exp} {A B : lrel GF} :
   iexact HB
 
 /-- Helper: `(lrel_tape).car v v'` exposes the tape locations and bound. -/
-theorem lrel_tape_unfold (v v' : Val) :
+theorem lrel_tape_unfold (v v' : Val rT) :
     (lrel_tape (GF := GF)).car v v' ⊢@{IProp GF}
       iprop(∃ (α1 α2 : Loc) (z : Int),
         (⌜ v.1 = .lit (.lbl α1) ⌝) ∗ (⌜ v'.1 = .lit (.lbl α2) ⌝) ∗
@@ -577,9 +580,9 @@ theorem lrel_tape_unfold (v v' : Val) :
 /-- `refines_pack` (compatibility.v:73): existential-packing compatibility.
 Given `REL e << e' : C A` for a specific `A`, conclude `REL e << e' : ∃ A, C A`.
 Requires a proof that `C A` only relates closed values (port-specific). -/
-theorem refines_pack (A : lrel GF) {e e' : Exp} {C : lrel GF → lrel GF}
+theorem refines_pack (A : lrel rT GF) {e e' : Exp rT} {C : lrel rT GF → lrel rT GF}
     (_hC : OFE.NonExpansive C)
-    (hCclosed : ∀ v v' : Val, (C A).car v v' ⊢@{IProp GF}
+    (hCclosed : ∀ v v' : Val rT, (C A).car v v' ⊢@{IProp GF}
       iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝)) :
     refines (⊤ : CoPset) e e' (C A)
       ⊢@{IProp GF} refines ⊤ e e' (lrel_exists C) := by
@@ -609,10 +612,10 @@ Two pure beta steps over the value-restricted forall encoding (via
 semantic type `A`.
 
 **Port note**: same `IsLocallyClosed` requirement as `refines_seq`. -/
-theorem refines_forall {e e' : Exp} {C : lrel GF → lrel GF}
+theorem refines_forall {e e' : Exp rT} {C : lrel rT GF → lrel rT GF}
     (he : e.IsLocallyClosed) (he' : e'.IsLocallyClosed)
     (he_fv : e.fv = ∅) (he'_fv : e'.fv = ∅) :
-    BI.intuitionistically (BI.forall (fun A : lrel GF => refines (⊤ : CoPset) e e' (C A)))
+    BI.intuitionistically (BI.forall (fun A : lrel rT GF => refines (⊤ : CoPset) e e' (C A)))
       ⊢@{IProp GF} refines ⊤ (.lam e) (.lam e') (lrel_forall C) := by
   iintro #H
   iapply (refines_ret (e1 := Exp.lam e) (e2 := Exp.lam e')
@@ -676,12 +679,12 @@ theorem step_fupd_intro_later {E1 E2 : CoPset} {P : IProp GF} (HE : E2 ⊆ E1) :
 
 /-- Helper: `(lrel_ref A).car v v'` exposes the existence of related locations
 plus the heap invariant. -/
-theorem lrel_ref_unfold (A : lrel GF) (v v' : Val) :
+theorem lrel_ref_unfold (A : lrel rT GF) (v v' : Val rT) :
     (lrel_ref A).car v v' ⊢@{IProp GF}
       iprop(∃ (l l' : Loc),
         (⌜ v.1 = .lit (.loc l) ⌝) ∗ (⌜ v'.1 = .lit (.loc l') ⌝) ∗
         Iris.inv (logN.@ ((l, l') : Loc × Loc))
-          (iprop(∃ (w1 w2 : Val),
+          (iprop(∃ (w1 w2 : Val rT),
             (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2))) :=
   BIBase.Entails.rfl
 
@@ -691,7 +694,7 @@ Stores to related references preserve the refinement.
 Same structure as `refines_load`: refines_bind on e2 then e1, destructure
 `lrel_ref A` to get `(l, l', inv ...)`, refines_atomic_l, open inv,
 step_store + wp_store, close inv with the NEW values. -/
-theorem refines_store {e1 e2 e1' e2' : Exp} {A : lrel GF} :
+theorem refines_store {e1 e2 e1' e2' : Exp rT} {A : lrel rT GF} :
     iprop(refines ⊤ e1 e1' (lrel_ref A)) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' A -∗
         refines ⊤ (.store e1 e2) (.store e1' e2') lrel_unit) := by
@@ -753,7 +756,7 @@ theorem refines_store {e1 e2 e1' e2' : Exp} {A : lrel GF} :
   iapply (wp_store (l := l) (v := w) (v' := v1))
   isplitl [Hv1]; · iexact Hv1
   iintro Hw1'
-  ihave HCloseArg : iprop(▷ (∃ (w1 w2 : Val),
+  ihave HCloseArg : iprop(▷ (∃ (w1 w2 : Val rT),
       (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2)) $$ [Hw1' Hv2' HwA]
   · iintro !>
     iexists w, w'
@@ -783,7 +786,7 @@ invariant, produce the value post.
 
 Uses `wp_step_fupd` (AppWeakestpre.lean:2048) to absorb the `▷ A.car w1 w2`
 witness from the inv-open through `wp_load`'s atomic step. -/
-theorem refines_load {e e' : Exp} {A : lrel GF} :
+theorem refines_load {e e' : Exp rT} {A : lrel rT GF} :
     iprop(refines ⊤ e e' (lrel_ref A))
       ⊢@{IProp GF} refines ⊤ (.load e) (.load e') A := by
   show _ ⊢@{IProp GF}
@@ -797,11 +800,11 @@ theorem refines_load {e e' : Exp} {A : lrel GF} :
   have hfillv : Ectx.fill [EctxItem.load] v.1 = Exp.load v.1 := rfl
   have hfillv' : Ectx.fill [EctxItem.load] v'.1 = Exp.load v'.1 := rfl
   rw [hfillv, hfillv', heq, heq']
-  have hfill_empty : Exp.load (.lit (.loc l)) = Ectx.fill [] (Exp.load (.lit (.loc l))) := rfl
+  have hfill_empty : (Exp.load (.lit (.loc l)) : Exp rT) = Ectx.fill [] (Exp.load (.lit (.loc l))) := rfl
   rw [hfill_empty]
   iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)))
-    (K := []) (e1 := Exp.load (.lit (.loc l))) (t := Exp.load (.lit (.loc l')))
-    (A := A) (OpenInv.of_atomic (Atomic.load l)))
+    (K := []) (e1 := (Exp.load (.lit (.loc l)) : Exp rT)) (t := (Exp.load (.lit (.loc l')) : Exp rT))
+    (A := A) (OpenInv.of_atomic (Atomic.load (rT := rT) l)))
   iintro %K' Hr
   have hsub : (↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
     fun _ _ => CoPset.mem_full
@@ -829,7 +832,7 @@ theorem refines_load {e e' : Exp} {A : lrel GF} :
   iapply specUpdate_ret
   have HE : (∅ : CoPset) ⊆ (⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) :=
     Std.LawfulSet.empty_subset
-  have hv : (Exp.load (.lit (.loc l))).toVal? = none :=
+  have hv : ((Exp.load (.lit (.loc l)) : Exp rT)).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_step_fupd (P := A.car w1 w2)
     (E1 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc))) (E2 := ∅) HE hv)
@@ -842,7 +845,7 @@ theorem refines_load {e e' : Exp} {A : lrel GF} :
   isplitl [Hw1]; · iexact Hw1
   iintro Hw1'
   iintro #HwA
-  ihave HCloseArg : iprop(▷ (∃ (w1 w2 : Val),
+  ihave HCloseArg : iprop(▷ (∃ (w1 w2 : Val rT),
       (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2)) $$ [Hw1' Hw2' HwA]
   · iintro !>
     iexists w1, w2
@@ -874,7 +877,7 @@ the bound at `lrel_pos_nat`. Under the current operational semantics,
 (it is no longer stuck), so a `lrel_int`-bounded variant is provable
 via degenerate dirac-dirac coupling on the nonpos branch — not done
 here since callers already have positivity in practice. -/
-theorem refines_rand_tape {e1 e1' e2 e2' : Exp} :
+theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     iprop(refines ⊤ e1 e1' lrel_pos_nat) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' lrel_tape -∗
         refines ⊤ (.rand e1 e2) (.rand e1' e2') lrel_nat) := by
@@ -903,13 +906,13 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp} :
   have hfillv : Ectx.fill [EctxItem.randL w] v.1 = Exp.rand v.1 w.1 := rfl
   have hfillv' : Ectx.fill [EctxItem.randL w'] v'.1 = Exp.rand v'.1 w'.1 := rfl
   rw [hfillv, hfillv', HvM, Hv'M, Hw, Hw']
-  have hfill_empty : Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α)) =
+  have hfill_empty : (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α)) : Exp rT) =
     Ectx.fill [] (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α))) := rfl
   rw [hfill_empty]
   iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((α, α') : Loc × Loc)))
-    (K := []) (e1 := Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α)))
-    (t := Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α')))
-    (A := lrel_nat) (OpenInv.of_atomic (Atomic.rand_lbl (M : Int) α)))
+    (K := []) (e1 := (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α)) : Exp rT))
+    (t := (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α')) : Exp rT))
+    (A := lrel_nat) (OpenInv.of_atomic (Atomic.rand_lbl (rT := rT) (M : Int) α)))
   iintro %K' Hr
   have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
     fun _ _ => CoPset.mem_full
@@ -1008,7 +1011,7 @@ longer stuck), so a `lrel_int`-bounded variant is provable via a
 degenerate dirac-dirac coupling on the nonpos branch — not done here
 since callers already have positivity in practice. Conclusion stays at
 `lrel_nat` since the positive-bound result is in `[0, n)`. -/
-theorem refines_rand_unit {e e' : Exp} :
+theorem refines_rand_unit {e e' : Exp rT} :
     iprop(refines ⊤ e e' lrel_pos_nat)
       ⊢@{IProp GF}
         refines ⊤ (Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] e)
@@ -1029,17 +1032,17 @@ theorem refines_rand_unit {e e' : Exp} :
       Exp.rand v'.1 (.lit .unit) := rfl
   rw [hfillv, hfillv', Hv, Hv']
   · have hnpos : (0 : Int) < (n : Int) := by exact_mod_cast hn_pos
-    have hfill_emp : Exp.rand (.lit (.int (n : Int))) (.lit .unit) =
+    have hfill_emp : (Exp.rand (.lit (.int (n : Int))) (.lit .unit) : Exp rT) =
       Ectx.fill [] (Exp.rand (.lit (.int (n : Int))) (.lit .unit)) := rfl
     rw [hfill_emp]
-    iapply (refines_couple_rands_lr (E := ⊤) (K := []) (K' := []) (A := lrel_nat)
+    iapply (refines_couple_rands_lr (rT := rT) (E := ⊤) (K := []) (K' := []) (A := lrel_nat)
       (z := (n : Int)) (f := id)
       (hdom := fun _ h0 hlt => ⟨h0, hlt⟩)
       (hbij := fun m h0 hlt => ⟨m, ⟨⟨h0, hlt⟩, rfl⟩, fun n' ⟨_, heq⟩ => heq⟩)
       (Hz := hnpos))
     iintro %m ⟨%Hm0, %Hmn⟩
-    have hfill1 : Ectx.fill [] (Exp.lit (.int m)) = Exp.lit (.int m) := rfl
-    have hfill2 : Ectx.fill [] (Exp.lit (.int (id m))) = Exp.lit (.int m) := rfl
+    have hfill1 : (Ectx.fill [] (Exp.lit (.int m)) : Exp rT) = Exp.lit (.int m) := rfl
+    have hfill2 : (Ectx.fill [] (Exp.lit (.int (id m))) : Exp rT) = Exp.lit (.int m) := rfl
     rw [hfill1, hfill2]
     iapply (refines_ret (e1 := Exp.lit (.int m)) (e2 := Exp.lit (.int m))
       (v1 := ⟨.lit (.int m), IsVal.lit⟩) (v2 := ⟨.lit (.int m), IsVal.lit⟩)
@@ -1055,7 +1058,7 @@ theorem refines_rand_unit {e e' : Exp} :
 the bound at `lrel_int` (any integer) and concludes at `lrel_int`.
 Case-splits on `0 < n`: positive uses the existing `wp_couple_rand_lbl_rand_lbl{,_wrong}`
 flow; nonpos opens the tape invariant and uses `wp_rand_lbl_nonpos{,_r}`. -/
-theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp} :
+theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
     iprop(refines ⊤ e1 e1' lrel_int) ⊢@{IProp GF}
       iprop(refines ⊤ e2 e2' lrel_tape -∗
         refines ⊤ (.rand e1 e2) (.rand e1' e2') lrel_int) := by
@@ -1086,13 +1089,13 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp} :
   rw [hfillv, hfillv', Hv, Hv', Hw, Hw']
   by_cases hnpos : 0 < n
   · -- Positive bound: same proof as refines_rand_tape, parameterized over lrel_int.
-    have hfill_empty : Exp.rand (.lit (.int n)) (.lit (.lbl α)) =
+    have hfill_empty : (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT) =
       Ectx.fill [] (Exp.rand (.lit (.int n)) (.lit (.lbl α))) := rfl
     rw [hfill_empty]
     iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((α, α') : Loc × Loc)))
-      (K := []) (e1 := Exp.rand (.lit (.int n)) (.lit (.lbl α)))
-      (t := Exp.rand (.lit (.int n)) (.lit (.lbl α')))
-      (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl n α)))
+      (K := []) (e1 := (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT))
+      (t := (Exp.rand (.lit (.int n)) (.lit (.lbl α')) : Exp rT))
+      (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl (rT := rT) n α)))
     iintro %K' Hr
     have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
       fun _ _ => CoPset.mem_full
@@ -1172,13 +1175,13 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp} :
       ipure_intro
       exact ⟨rfl, rfl⟩
   · -- Nonpositive bound: open invariant, both sides step deterministically to -1.
-    have hfill_empty : Exp.rand (.lit (.int n)) (.lit (.lbl α)) =
+    have hfill_empty : (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT) =
       Ectx.fill [] (Exp.rand (.lit (.int n)) (.lit (.lbl α))) := rfl
     rw [hfill_empty]
     iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((α, α') : Loc × Loc)))
-      (K := []) (e1 := Exp.rand (.lit (.int n)) (.lit (.lbl α)))
-      (t := Exp.rand (.lit (.int n)) (.lit (.lbl α')))
-      (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl n α)))
+      (K := []) (e1 := (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT))
+      (t := (Exp.rand (.lit (.int n)) (.lit (.lbl α')) : Exp rT))
+      (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl (rT := rT) n α)))
     iintro %K' Hr
     have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
       fun _ _ => CoPset.mem_full
@@ -1219,7 +1222,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp} :
 bound at `lrel_int` (any integer) and concludes at `lrel_int`. Case-splits
 on `0 < n`: positive lifts to `lrel_pos_nat`+`refines_rand_unit`+widening;
 nonpos uses degenerate dirac-(-1) coupling via `wp_rand_nonpos`/`_r`. -/
-theorem refines_rand_unit_int {e e' : Exp} :
+theorem refines_rand_unit_int {e e' : Exp rT} :
     iprop(refines ⊤ e e' lrel_int)
       ⊢@{IProp GF}
         refines ⊤ (Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] e)
@@ -1240,17 +1243,17 @@ theorem refines_rand_unit_int {e e' : Exp} :
       Exp.rand v'.1 (.lit .unit) := rfl
   rw [hfillv, hfillv', Hv, Hv']
   by_cases hnpos : 0 < n
-  · have hfill_emp : Exp.rand (.lit (.int n)) (.lit .unit) =
+  · have hfill_emp : (Exp.rand (.lit (.int n)) (.lit .unit) : Exp rT) =
       Ectx.fill [] (Exp.rand (.lit (.int n)) (.lit .unit)) := rfl
     rw [hfill_emp]
-    iapply (refines_couple_rands_lr (E := ⊤) (K := []) (K' := []) (A := lrel_int)
+    iapply (refines_couple_rands_lr (rT := rT) (E := ⊤) (K := []) (K' := []) (A := lrel_int)
       (z := n) (f := id)
       (hdom := fun _ h0 hlt => ⟨h0, hlt⟩)
       (hbij := fun m h0 hlt => ⟨m, ⟨⟨h0, hlt⟩, rfl⟩, fun n' ⟨_, heq⟩ => heq⟩)
       (Hz := hnpos))
     iintro %m _
-    have hfill1 : Ectx.fill [] (Exp.lit (.int m)) = Exp.lit (.int m) := rfl
-    have hfill2 : Ectx.fill [] (Exp.lit (.int (id m))) = Exp.lit (.int m) := rfl
+    have hfill1 : (Ectx.fill [] (Exp.lit (.int m)) : Exp rT) = Exp.lit (.int m) := rfl
+    have hfill2 : (Ectx.fill [] (Exp.lit (.int (id m))) : Exp rT) = Exp.lit (.int m) := rfl
     rw [hfill1, hfill2]
     iapply (refines_ret (e1 := Exp.lit (.int m)) (e2 := Exp.lit (.int m))
       (v1 := ⟨.lit (.int m), IsVal.lit⟩) (v2 := ⟨.lit (.int m), IsVal.lit⟩)

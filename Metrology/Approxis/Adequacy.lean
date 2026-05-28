@@ -14,8 +14,11 @@ open scoped AppGS
 
 namespace ProbLang.AdequacyHelpers
 
+set_option linter.unusedSectionVars false
+
 section FupdPlainForall
 
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {GF : BundledGFunctors} [InvGS_gen false GF]
 
 open Iris Iris.BI Iris.BI.BIBase Iris.ProofMode
@@ -173,11 +176,11 @@ theorem fupd_stepFupdN_plain_forall_1
     exact step_fupdN_except_0 ∅ ∅ (iprop(∀ x, Φ x)) n
 
 theorem fupd_stepFupdN_plain_forall_3
-    (Ψ : State → Exp → State → IProp GF)
+    (Ψ : (State rT) → (Exp rT) → (State rT) → IProp GF)
     [instP : ∀ a b c, Plain (Ψ a b c)] (n : Nat) :
-    iprop(∀ (a : State) (b : Exp) (c : State),
+    iprop(∀ (a : (State rT)) (b : (Exp rT)) (c : (State rT)),
         |={∅}=> |={∅}[∅]▷=>^[n] Ψ a b c) ⊢@{IProp GF}
-      iprop(|={∅}=> |={∅}[∅]▷=>^[n] ∀ (a : State) (b : Exp) (c : State), Ψ a b c) := by
+      iprop(|={∅}=> |={∅}[∅]▷=>^[n] ∀ (a : (State rT)) (b : (Exp rT)) (c : (State rT)), Ψ a b c) := by
   refine (forall_mono (fun a => forall_mono (fun b =>
     fupd_stepFupdN_plain_forall_1 (GF := GF) (fun c => Ψ a b c) n))).trans ?_
   refine (forall_mono (fun a =>
@@ -187,11 +190,11 @@ theorem fupd_stepFupdN_plain_forall_3
     (fun a => iprop(∀ b c, Ψ a b c)) n
 
 theorem fupd_stepFupdN_plain_forall_4
-    (Ψ : Exp → State → Exp → State → IProp GF)
+    (Ψ : (Exp rT) → (State rT) → (Exp rT) → (State rT) → IProp GF)
     [∀ a b c d, Plain (Ψ a b c d)] (n : Nat) :
-    iprop(∀ (a : Exp) (b : State) (c : Exp) (d : State),
+    iprop(∀ (a : (Exp rT)) (b : (State rT)) (c : (Exp rT)) (d : (State rT)),
         |={∅}=> |={∅}[∅]▷=>^[n] Ψ a b c d) ⊢@{IProp GF}
-      iprop(|={∅}=> |={∅}[∅]▷=>^[n] ∀ (a : Exp) (b : State) (c : Exp) (d : State), Ψ a b c d) := by
+      iprop(|={∅}=> |={∅}[∅]▷=>^[n] ∀ (a : (Exp rT)) (b : (State rT)) (c : (Exp rT)) (d : (State rT)), Ψ a b c d) := by
   refine (forall_mono (fun a => forall_mono (fun b => forall_mono (fun c =>
     fupd_stepFupdN_plain_forall_1 (GF := GF) (fun d => Ψ a b c d) n)))).trans ?_
   refine (forall_mono (fun a => forall_mono (fun b =>
@@ -223,21 +226,25 @@ end ProbLang.AdequacyHelpers
 
 namespace ProbLang
 
+set_option linter.unusedSectionVars false
+
 open ProbLang.AdequacyHelpers
 
-def adequacyRel (φ : Val → Val → Prop) : Set (Exp × Exp) :=
-  fun p => ∃ (v v' : Val), p.1.toVal? = some v ∧ p.2.toVal? = some v' ∧ φ v v'
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
+def adequacyRel (φ : (Val rT) → (Val rT) → Prop) : Set ((Exp rT) × (Exp rT)) :=
+  fun p => ∃ (v v' : (Val rT)), p.1.toVal? = some v ∧ p.2.toVal? = some v' ∧ φ v v'
 
 section Adequacy
 
-variable {GF : BundledGFunctors} [IA : ApproxisGS false GF]
+variable {GF : BundledGFunctors} [IA : ApproxisGS rT false GF]
 
-theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
-    (e₁' : Exp) (σ₁' : State)
-    (Z : State → Cfg → ENNReal → IProp GF)
-    (φ : Val → Val → Prop) (ε : ENNReal) :
+theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : (Exp rT)) (σ₁ : (State rT))
+    (e₁' : (Exp rT)) (σ₁' : (State rT))
+    (Z : (State rT) → (Cfg rT) → ENNReal → IProp GF)
+    (φ : (Val rT) → (Val rT) → Prop) (ε : ENNReal) :
     specCoupl ∅ σ₁ e₁' σ₁' ε Z ⊢@{IProp GF}
-      (∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
+      (∀ (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)) (ε' : ENNReal),
         Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
           (⌜AddCoupl ε' (adequacyRel φ)
             (asExpr (execN m ⟨e₁, σ₂⟩))
@@ -246,9 +253,9 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
         (⌜AddCoupl ε (adequacyRel φ)
           (asExpr (execN m ⟨e₁, σ₁⟩))
           (limExecV ⟨e₁', σ₁'⟩)⌝) := by
-  set Ψ : State → Cfg → ENNReal → IProp GF :=
+  set Ψ : (State rT) → (Cfg rT) → ENNReal → IProp GF :=
     fun σ₀ ⟨e₀', σ₀'⟩ ε₀ =>
-      iprop((∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
+      iprop((∀ (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)) (ε' : ENNReal),
         Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
           (⌜AddCoupl ε' (adequacyRel φ)
             (asExpr (execN m ⟨e₁, σ₂⟩))
@@ -308,7 +315,7 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
       exact Himpl Hpure
     iapply BIFUpdate.mono
     · refine stepFupdN_mono (E := ∅) (E' := ∅) (n := n)
-        (P := iprop(∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+        (P := iprop(∀ (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)),
           ⌜S σ₂ ⟨e₂', σ₂'⟩⌝ -∗ ⌜AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
             (asExpr (execN m ⟨e₁, σ₂⟩))
             (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)) ?_
@@ -336,7 +343,7 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
         (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF))
     iintro %HS
     ispecialize HCont $$ %HS
-    ihave HCont' : iprop(|={∅}=> (((∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
+    ihave HCont' : iprop(|={∅}=> (((∀ (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)) (ε' : ENNReal),
             Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
               (⌜AddCoupl ε' (adequacyRel φ)
                 (asExpr (execN m ⟨e₁, σ₂⟩))
@@ -352,13 +359,13 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
     iapply HΨ
     iexact HZ
 
-theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
-    (e₁' : Exp) (σ₁' : State)
-    (Z : Exp → State → Exp → State → ENNReal → IProp GF)
-    (φ : Val → Val → Prop) (ε : ENNReal)
+theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : (Exp rT)) (σ₁ : (State rT))
+    (e₁' : (Exp rT)) (σ₁' : (State rT))
+    (Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF)
+    (φ : (Val rT) → (Val rT) → Prop) (ε : ENNReal)
     (Hnone : e₁.toVal? = none) :
     progCoupl e₁ σ₁ e₁' σ₁' ε Z ⊢@{IProp GF}
-      (∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
+      (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)) (ε' : ENNReal),
         Z e₂ σ₂ e₂' σ₂' ε' -∗ |={∅}=> |={∅}[∅]▷=>^[n]
           (⌜AddCoupl ε' (adequacyRel φ)
             (asExpr (execN m ⟨e₂, σ₂⟩))
@@ -374,7 +381,7 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
   iapply BIFUpdate.mono
   ·
     refine stepFupdN_mono (E := ∅) (E' := ∅) (n := n)
-      (P := iprop(⌜∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+      (P := iprop(⌜∀ (e₂ : (Exp rT)) (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)),
           AddCoupl (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩) (adequacyRel φ)
             (asExpr (execN m ⟨e₂, σ₂⟩))
             (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)) ?_
@@ -391,7 +398,7 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
         exact Hpure e₂ σ₂ e₂' σ₂')
   iapply BIFUpdate.mono
   · refine stepFupdN_mono (E := ∅) (E' := ∅) (n := n)
-      (P := iprop(∀ (e₂ : Exp) (σ₂ : State) (e₂' : Exp) (σ₂' : State),
+      (P := iprop(∀ (e₂ : (Exp rT)) (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)),
           ⌜AddCoupl (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩) (adequacyRel φ)
             (asExpr (execN m ⟨e₂, σ₂⟩))
             (limExecV ⟨e₂', σ₂'⟩)⌝ : IProp GF)) ?_
@@ -407,12 +414,12 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp) (σ₁ : State)
   iapply Hcoupl
   iexact Hcnt
 
-theorem wp_adequacy_spec_coupl_zero (m : Nat) (e₁ : Exp) (σ₁ : State)
-    (e₁' : Exp) (σ₁' : State)
-    (Z : State → Cfg → ENNReal → IProp GF)
-    (φ : Val → Val → Prop) (ε : ENNReal) :
+theorem wp_adequacy_spec_coupl_zero (m : Nat) (e₁ : (Exp rT)) (σ₁ : (State rT))
+    (e₁' : (Exp rT)) (σ₁' : (State rT))
+    (Z : (State rT) → (Cfg rT) → ENNReal → IProp GF)
+    (φ : (Val rT) → (Val rT) → Prop) (ε : ENNReal) :
     specCoupl ∅ σ₁ e₁' σ₁' ε Z ⊢@{IProp GF}
-      (∀ (σ₂ : State) (e₂' : Exp) (σ₂' : State) (ε' : ENNReal),
+      (∀ (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)) (ε' : ENNReal),
         Z σ₂ ⟨e₂', σ₂'⟩ ε' -∗ |={∅}=>
           (⌜AddCoupl ε' (adequacyRel φ)
             (asExpr (execN m ⟨e₁, σ₂⟩))
@@ -423,40 +430,40 @@ theorem wp_adequacy_spec_coupl_zero (m : Nat) (e₁ : Exp) (σ₁ : State)
           (limExecV ⟨e₁', σ₁'⟩)⌝) :=
   wp_adequacy_spec_coupl 0 m e₁ σ₁ e₁' σ₁' Z φ ε
 
-theorem wpPre_value_Z_eq {v : Val} {Φ : Val → IProp GF} (E : CoPset) :
-    (fun (σ₂ : State) (ρ' : Cfg) (ε₂ : ENNReal) =>
-      iprop(|={∅, E}=> stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗
-        errInterp ε₂ ∗ Φ v))
-    = (fun (σ₂ : State) (ρ' : Cfg) (ε₂ : ENNReal) =>
+theorem wpPre_value_Z_eq {v : (Val rT)} {Φ : (Val rT) → IProp GF} (E : CoPset) :
+    (fun (σ₂ : (State rT)) (ρ' : (Cfg rT)) (ε₂ : ENNReal) =>
+      iprop(|={∅, E}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗
+        errInterp (rT := rT) ε₂ ∗ Φ v))
+    = (fun (σ₂ : (State rT)) (ρ' : (Cfg rT)) (ε₂ : ENNReal) =>
       match (Exp.ofVal v).toVal? with
       | some v => iprop(|={∅, E}=>
-          stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗
-            errInterp ε₂ ∗ Φ v)
+          stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗
+            errInterp (rT := rT) ε₂ ∗ Φ v)
       | none => iprop(progCoupl (Exp.ofVal v) σ₂ ρ'.expr ρ'.state ε₂
           (fun e₃ σ₃ e₃' σ₃' ε₃ =>
             iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
               iprop(|={∅, E}=>
-                stateInterp σ₄ ∗ SpecUpdateGS.specInterp ρ'' ∗
-                  errInterp ε₄ ∗ wp (GF := GF) E e₃ Φ)))))) := by
+                stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗
+                  errInterp (rT := rT) ε₄ ∗ wp (GF := GF) E e₃ Φ)))))) := by
   funext σ₂ ρ' ε₂
   rw [Exp.toVal?_ofVal]
 
-theorem wpPre_match_eq (motive : Option Val → Sort u)
-    (x : Option Val) (some_f : (v : Val) → motive (some v))
+theorem wpPre_match_eq (motive : Option (Val rT) → Sort u)
+    (x : Option (Val rT)) (some_f : (v : (Val rT)) → motive (some v))
     (none_f : Unit → motive none) :
-    ProbLang.wpPre_value_Z_eq.match_1 motive x some_f none_f =
-    ProbLang.ApproxisWpGS.wpPre.match_1 motive x some_f none_f := by
+    ProbLang.wpPre_value_Z_eq.match_1 (rT := rT) motive x some_f none_f =
+    ProbLang.ApproxisWpGS.wpPre.match_1 (rT := rT) motive x some_f none_f := by
   cases x <;> rfl
 
-theorem wp_value_specCoupl_unfold {e : Exp} {v : Val} {Φ : Val → IProp GF}
+theorem wp_value_specCoupl_unfold {e : (Exp rT)} {v : (Val rT)} {Φ : (Val rT) → IProp GF}
     (E : CoPset) (He : e.toVal? = some v) :
     wp (GF := GF) E e Φ ⊢@{IProp GF}
-      ∀ (σ₁ : State) (e₁' : Exp) (σ₁' : State) (ε₁ : ENNReal),
-        (stateInterp σ₁ ∗ SpecUpdateGS.specInterp ⟨e₁', σ₁'⟩ ∗ errInterp ε₁) -∗
+      ∀ (σ₁ : (State rT)) (e₁' : (Exp rT)) (σ₁' : (State rT)) (ε₁ : ENNReal),
+        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε₁) -∗
           |={E, ∅}=> specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
             iprop(|={∅, E}=>
-              stateInterp σ₂ ∗ SpecUpdateGS.specInterp ρ' ∗
-                errInterp ε₂ ∗ Φ v)) := by
+              stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗
+                errInterp (rT := rT) ε₂ ∗ Φ v)) := by
   have he_eq : e = Exp.ofVal v := (Exp.ofVal_of_toVal_some He).symm
   subst he_eq
   rw [wpPre_value_Z_eq (E := E) (v := v) (Φ := Φ)]
@@ -469,10 +476,10 @@ theorem wp_value_specCoupl_unfold {e : Exp} {v : Val} {Φ : Val → IProp GF}
     iassumption
   iexact Hwp'
 
-theorem wp_adequacy_val_fupd (e e' : Exp) (σ σ' : State) (n : Nat)
-    (φ : Val → Val → Prop) (v : Val) (ε : ENNReal) (He : e.toVal? = some v) :
+theorem wp_adequacy_val_fupd (e e' : (Exp rT)) (σ σ' : (State rT)) (n : Nat)
+    (φ : (Val rT) → (Val rT) → Prop) (v : (Val rT)) (ε : ENNReal) (He : e.toVal? = some v) :
     (appStateAuth σ ∗ specAuth ⟨e', σ'⟩ ∗ ecAuth ε ∗
-        wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))
+        wp ⊤ e (fun v => iprop(∃ v' : (Val rT), ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))
       ⊢@{IProp GF} |={⊤, ∅}=>
         (⌜AddCoupl ε (adequacyRel φ)
           (asExpr (execN n ⟨e, σ⟩))
@@ -506,17 +513,17 @@ theorem wp_adequacy_val_fupd (e e' : Exp) (σ σ' : State) (n : Nat)
     rw [execN_succ_isValue (ρ := ⟨Exp.ofVal v, σ₂⟩) hv_is_val n,
         limExec_of_isVal (e := Exp.ofVal v') (σ := σ₂') v'.2,
         MeasureTheory.Measure.map_dirac'
-          (Measurable.of_discrete (f := (·.expr : Cfg → Exp))),
+          (Measurable.of_discrete (f := (·.expr : (Cfg rT) → (Exp rT)))),
         MeasureTheory.Measure.map_dirac'
-          (Measurable.of_discrete (f := (·.expr : Cfg → Exp)))]
+          (Measurable.of_discrete (f := (·.expr : (Cfg rT) → (Exp rT))))]
     exact AddCoupl.dirac (a := Exp.ofVal v) (b := Exp.ofVal v')
       (ε := ε') (adequacyRel φ)
       ⟨v, v', Exp.toVal?_ofVal v, Exp.toVal?_ofVal v', Hφrel⟩
 
-theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp) (σ σ' : State)
-    (n : Nat) (φ : Val → Val → Prop) :
+theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : (Exp rT)) (σ σ' : (State rT))
+    (n : Nat) (φ : (Val rT) → (Val rT) → Prop) :
     (appStateAuth σ ∗ specAuth ⟨e', σ'⟩ ∗ ecAuth ε ∗
-        wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))
+        wp ⊤ e (fun v => iprop(∃ v' : (Val rT), ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))
       ⊢@{IProp GF} |={⊤, ∅}=> |={∅}[∅]▷=>^[n]
         (⌜AddCoupl ε (adequacyRel φ)
           (asExpr (execN n ⟨e, σ⟩))
@@ -540,7 +547,7 @@ theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp) (σ σ' : State)
     ·
       obtain ⟨w⟩ : Nonempty (IsVal e) := He
       obtain ⟨w', hw'⟩ := w.check?_some
-      let v : Val := ⟨e, w'⟩
+      let v : (Val rT) := ⟨e, w'⟩
       have Hv : e.toVal? = some v := by simp [Exp.toVal?, hw', v]
       ihave HvF := wp_adequacy_val_fupd (GF := GF) e e' σ σ' (n+1) φ v ε Hv $$
         [Hσ Hs Hε Hwp]
@@ -584,13 +591,13 @@ theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp) (σ σ' : State)
 end Adequacy
 
 theorem wp_adequacy_exec_n {GF : BundledGFunctors}
-    [IPre : AppPreGS GF] [ISPre : SpecPreGS GF] [IECPre : ECPreGS GF]
+    [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
     [IInvPre : InvGpreS GF]
-    (e e' : Exp) (σ σ' : State) (n : Nat) (φ : Val → Val → Prop)
+    (e e' : (Exp rT)) (σ σ' : (State rT)) (n : Nat) (φ : (Val rT) → (Val rT) → Prop)
     (ε : ENNReal)
-    (Hwp : ∀ (_ : ApproxisGS false GF),
+    (Hwp : ∀ (_ : ApproxisGS rT false GF),
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε -∗
-        wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
+        wp ⊤ e (fun v => iprop(∃ v' : (Val rT), ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
     AddCoupl ε (adequacyRel φ) (asExpr (execN n ⟨e, σ⟩))
         (limExecV ⟨e', σ'⟩) := by
   by_cases hε1 : (1 : ENNReal) ≤ ε
@@ -606,7 +613,7 @@ theorem wp_adequacy_exec_n {GF : BundledGFunctors}
   imod (app_ra_init (GF := GF) σ) with ⟨%IA, HappAuth⟩
   imod (spec_ra_init (GF := GF) e' σ') with ⟨%ISpec, HspecAuth, HspecFrag⟩
   imod (ec_alloc (GF := GF) ε hε_lt) with ⟨%γec, HecAuth, HecFrag⟩
-  let IAS : ApproxisGS false GF := {
+  let IAS : ApproxisGS rT false GF := {
     appGS  := IA
     specGS := ISpec
     ecGS   := { toECPreGS := IECPre, γec := γec }
@@ -621,47 +628,47 @@ theorem wp_adequacy_exec_n {GF : BundledGFunctors}
   iexact Hstep
 
 theorem wp_adequacy {GF : BundledGFunctors}
-    [IPre : AppPreGS GF] [ISPre : SpecPreGS GF] [IECPre : ECPreGS GF]
+    [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
     [IInvPre : InvGpreS GF]
-    (e e' : Exp) (σ σ' : State) (ε : ENNReal) (φ : Val → Val → Prop)
-    (Hwp : ∀ (_ : ApproxisGS false GF),
+    (e e' : (Exp rT)) (σ σ' : (State rT)) (ε : ENNReal) (φ : (Val rT) → (Val rT) → Prop)
+    (Hwp : ∀ (_ : ApproxisGS rT false GF),
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε -∗
-        wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
+        wp ⊤ e (fun v => iprop(∃ v' : (Val rT), ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
     AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩)
         (limExecV ⟨e', σ'⟩) := by
-  have Hlifted : AddCoupl ε (fun (p : Cfg × Exp) => adequacyRel φ (p.1.expr, p.2))
+  have Hlifted : AddCoupl ε (fun (p : (Cfg rT) × (Exp rT)) => adequacyRel φ (p.1.expr, p.2))
       (limExec ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
     apply limExec_AddCoupl
     intro n
     have H := wp_adequacy_exec_n (GF := GF) e e' σ σ' n φ ε Hwp
     have Hmap_id :
-        (limExecV (⟨e', σ'⟩ : Cfg)) =
-          (limExecV (⟨e', σ'⟩ : Cfg)).map id := by
+        (limExecV (⟨e', σ'⟩ : (Cfg rT))) =
+          (limExecV (⟨e', σ'⟩ : (Cfg rT))).map id := by
       rw [MeasureTheory.Measure.map_id]
     rw [Hmap_id] at H
-    have := AddCoupl.map_inv (α' := Exp) (β' := Exp)
-      (f := fun (c : Cfg) => c.expr) (g := id) Measurable.of_discrete measurable_id H
+    have := AddCoupl.map_inv (α' := (Exp rT)) (β' := (Exp rT))
+      (f := fun (c : (Cfg rT)) => c.expr) (g := id) Measurable.of_discrete measurable_id H
     exact this
   have Hmap_id :
-      (limExecV (⟨e', σ'⟩ : Cfg)) =
-        (limExecV (⟨e', σ'⟩ : Cfg)).map id := by
+      (limExecV (⟨e', σ'⟩ : (Cfg rT))) =
+        (limExecV (⟨e', σ'⟩ : (Cfg rT))).map id := by
     rw [MeasureTheory.Measure.map_id]
   rw [Hmap_id] at Hlifted
-  have H_pushed := AddCoupl.map (α' := Exp) (β' := Exp)
-    (f := fun (c : Cfg) => c.expr) (g := id) Measurable.of_discrete measurable_id
-    (S := fun (p : Cfg × Exp) => adequacyRel φ (p.1.expr, p.2))
+  have H_pushed := AddCoupl.map (α' := (Exp rT)) (β' := (Exp rT))
+    (f := fun (c : (Cfg rT)) => c.expr) (g := id) Measurable.of_discrete measurable_id
+    (S := fun (p : (Cfg rT) × (Exp rT)) => adequacyRel φ (p.1.expr, p.2))
     (R := adequacyRel φ)
     (fun {a b} h => h) Hlifted
   simp only [MeasureTheory.Measure.map_id] at H_pushed
   exact H_pushed
 
 theorem wp_adequacy_error_lim {GF : BundledGFunctors}
-    [IPre : AppPreGS GF] [ISPre : SpecPreGS GF] [IECPre : ECPreGS GF]
+    [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
     [IInvPre : InvGpreS GF]
-    (e e' : Exp) (σ σ' : State) (ε : ENNReal) (φ : Val → Val → Prop)
-    (Hwp : ∀ (_ : ApproxisGS false GF) (ε' : ENNReal), ε < ε' →
+    (e e' : (Exp rT)) (σ σ' : (State rT)) (ε : ENNReal) (φ : (Val rT) → (Val rT) → Prop)
+    (Hwp : ∀ (_ : ApproxisGS rT false GF) (ε' : ENNReal), ε < ε' →
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε' -∗
-        wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
+        wp ⊤ e (fun v => iprop(∃ v' : (Val rT), ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
     AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩)
         (limExecV ⟨e', σ'⟩) := by
   by_cases hε_top : ε = (⊤ : ENNReal)
@@ -678,13 +685,13 @@ theorem wp_adequacy_error_lim {GF : BundledGFunctors}
   exact Hwp Hinst (ε + δ) Hlt
 
 theorem wp_adequacy_mass {GF : BundledGFunctors}
-    [IPre : AppPreGS GF] [ISPre : SpecPreGS GF] [IECPre : ECPreGS GF]
+    [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
     [IInvPre : InvGpreS GF]
-    (e e' : Exp) (σ σ' : State) (φ : Val → Val → Prop)
+    (e e' : (Exp rT)) (σ σ' : (State rT)) (φ : (Val rT) → (Val rT) → Prop)
     (ε : ENNReal)
-    (Hwp : ∀ (_ : ApproxisGS false GF),
+    (Hwp : ∀ (_ : ApproxisGS rT false GF),
       ⊢@{IProp GF} iprop(⤇ e' -∗ ec ε -∗
-        wp ⊤ e (fun v => iprop(∃ v' : Val, ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
+        wp ⊤ e (fun v => iprop(∃ v' : (Val rT), ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
     limExecV ⟨e, σ⟩ Set.univ ≤
         limExecV ⟨e', σ'⟩ Set.univ + ε := by
   have := AddCoupl.mass_leq (wp_adequacy e e' σ σ' ε φ Hwp)

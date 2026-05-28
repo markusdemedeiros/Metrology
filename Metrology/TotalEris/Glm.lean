@@ -19,6 +19,11 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 open scoped ENNReal
 
 namespace ProbLang
+
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+
 namespace TotalEris
 
 /-! # `glm` graded lifting modality
@@ -89,7 +94,7 @@ Rocq `erisWpGS`. No spec side — Eris is a unary logic.  -/
 class ErisWpGS (GF : BundledGFunctors) where
   hlc : Bool
   invGS : InvGS_gen hlc GF
-  stateInterp : State → IProp GF
+  stateInterp : State rT → IProp GF
   errInterp : ENNReal → IProp GF
 
 attribute [reducible, instance] ErisWpGS.invGS
@@ -139,7 +144,7 @@ theorem execStutter_mono_pred {P Q : ENNReal → IProp GF} {ε : ENNReal} :
     iprop((P ε -∗ Q ε) ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε :=
   execStutter_mono (_root_.le_refl ε)
 
-variable [ErisWpGS GF]
+variable [ErisWpGS (rT := rT) GF]
 
 /-! ## `glm` fixpoint state and pre-functor
 
@@ -155,11 +160,11 @@ Definition glm e σ ε Z := glm' Z ((e, σ), ε).
 /-- Packed state for the `glm` fixpoint: a config paired with an error
 budget. -/
 @[expose]
-abbrev GlmState : Type _ := Cfg × ENNReal
+abbrev GlmState (rT : Type _) [ProbLang.ProbLangℝ rT] : Type _ := Cfg rT × ENNReal
 
-instance : COFE GlmState := COFE.ofDiscrete _ Eq_Equivalence
-instance : OFE.Discrete GlmState := ⟨id⟩
-instance : OFE.Leibniz GlmState := ⟨id⟩
+instance : COFE (GlmState rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : OFE.Discrete (GlmState rT) := ⟨id⟩
+instance : OFE.Leibniz (GlmState rT) := ⟨id⟩
 
 /-- The `prim_step` disjunct, factored out: a relation `R`, an outer error
 `ε₁`, and a per-outcome continuation `X₂` bounded by some `r`, such that
@@ -167,14 +172,14 @@ instance : OFE.Leibniz GlmState := ⟨id⟩
 within budget, and the body `Z` holds on every `R`-related successor under
 the empty mask. -/
 abbrev glmPrimStep
-    (e₁ : Exp) (σ₁ : State) (ε : ENNReal)
-    (Z : Cfg → ENNReal → IProp GF) : IProp GF :=
-  iprop(∃ (R : Cfg → Prop) (ε₁ : ENNReal) (X₂ : Cfg → ENNReal) (r : ENNReal),
+    (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
+    (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
+  iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
     (⌜Reducible e₁ σ₁⌝) ∗
     (⌜∀ ρ, X₂ ρ ≤ r⌝) ∗
     (⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e₁, σ₁⟩)) ≤ ε⌝) ∗
     (⌜Pgl ε₁ R (primStep ⟨e₁, σ₁⟩)⌝) ∗
-    (∀ (ρ : Cfg), (⌜R ρ⌝) -∗
+    (∀ (ρ : Cfg rT), (⌜R ρ⌝) -∗
       |={∅}=> execStutter (Z ρ) (X₂ ρ)))
 
 /-- The *state-step* (presampling) disjunct: at some tape `α` with
@@ -185,15 +190,15 @@ every `R`-related successor state under the empty mask. Unlike
 `glmPrimStep`, the continuation references `Φ` (the recursive
 position) — presampling does not terminate, it just refines the state. -/
 abbrev glmStateStep
-    (e₁ : Exp) (σ₁ : State) (ε : ENNReal)
-    (Φ : GlmState → IProp GF) : IProp GF :=
+    (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
+    (Φ : GlmState rT → IProp GF) : IProp GF :=
   iprop(∃ (α : Loc) (t : Tape),
     ⌜σ₁.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
-    ∃ (R : State → Prop) (ε₁ : ENNReal) (X₂ : State → ENNReal) (r : ENNReal),
+    ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
       (⌜∀ σ', X₂ σ' ≤ r⌝) ∗
       (⌜ε₁ + (∫⁻ σ', X₂ σ' ∂(tapePresample σ₁ α)) ≤ ε⌝) ∗
       (⌜Pgl ε₁ R (tapePresample σ₁ α)⌝) ∗
-      (∀ (σ' : State), ⌜R σ'⌝ -∗
+      (∀ (σ' : State rT), ⌜R σ'⌝ -∗
         |={∅}=> execStutter (fun ε'' => Φ (⟨e₁, σ'⟩, ε'')) (X₂ σ')))
 
 /-- One-step `glm` pre-functor. Disjuncts:
@@ -204,8 +209,8 @@ abbrev glmStateStep
 3. *State-step* — presample on a positively-bounded active tape; see
    `glmStateStep`. -/
 abbrev glmPre
-    (Z : Cfg → ENNReal → IProp GF)
-    (Φ : GlmState → IProp GF) : GlmState → IProp GF :=
+    (Z : Cfg rT → ENNReal → IProp GF)
+    (Φ : GlmState rT → IProp GF) : GlmState rT → IProp GF :=
   fun ⟨ρ, ε⟩ => iprop%
     (∀ (ε' : ENNReal), (⌜ε < ε'⌝) -∗
         |={∅}=> execStutter (fun ε'' => Φ (ρ, ε'')) ε') ∨
@@ -215,13 +220,13 @@ abbrev glmPre
 /-- `glm e σ ε Z` is the least fixpoint of `glmPre Z`, evaluated at
 `(⟨e, σ⟩, ε)`. -/
 @[expose]
-abbrev glm (e : Exp) (σ : State) (ε : ENNReal)
-    (Z : Cfg → ENNReal → IProp GF) : IProp GF :=
-  bi_least_fixpoint (glmPre (GF := GF) Z) ((⟨e, σ⟩, ε) : GlmState)
+abbrev glm (e : Exp rT) (σ : State rT) (ε : ENNReal)
+    (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
+  bi_least_fixpoint (glmPre (GF := GF) Z) ((⟨e, σ⟩, ε) : GlmState rT)
 
 /-- The pre-functor is monotone in `Φ`. -/
-instance glmPre_mono {Z : Cfg → ENNReal → IProp GF} :
-    BIMonoPred (glmPre (GF := GF) Z) where
+instance glmPre_mono {Z : Cfg rT → ENNReal → IProp GF} :
+    BIMonoPred (glmPre (GF := GF) (rT := rT) Z) where
   mono_pred {Φ Ψ _ _} := by
     iintro #Hwand %s Hs
     rcases s with ⟨ρ, ε⟩
@@ -265,12 +270,12 @@ instance glmPre_mono {Z : Cfg → ENNReal → IProp GF} :
 
 /-- Unfolding equation: `glm` equals one application of the pre-functor at
 the fixpoint. -/
-theorem glm_unfold {e : Exp} {σ : State} {ε : ENNReal}
-    {Z : Cfg → ENNReal → IProp GF} :
+theorem glm_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} :
     glm (GF := GF) e σ ε Z ≡
       glmPre (GF := GF) Z
         (fun s => glm s.1.expr s.1.state s.2 Z)
-        ((⟨e, σ⟩, ε) : GlmState) :=
+        ((⟨e, σ⟩, ε) : GlmState rT) :=
   least_fixpoint_unfold _
 
 /-- **Strong induction principle for `glm`.** Specialization of iris's
@@ -283,8 +288,8 @@ available at every recursive position — implies `Ψ ⟨e, σ⟩ ε`.
 
 Rocq counterpart: `glm_strong_ind` (`total_adequacy.v` private). -/
 theorem glm_strong_ind
-    {Z : Cfg → ENNReal → IProp GF}
-    {Ψ : GlmState → IProp GF} [NonExpansive Ψ] :
+    {Z : Cfg rT → ENNReal → IProp GF}
+    {Ψ : GlmState rT → IProp GF} [NonExpansive Ψ] :
     iprop(□ (∀ s, glmPre Z
               (fun s' => iprop(Ψ s' ∧ bi_least_fixpoint (glmPre Z) s')) s
               -∗ Ψ s)) ⊢@{IProp GF}
@@ -302,12 +307,12 @@ without requiring `□`.
 
 Mirrors Rocq's `glm_strong_mono` (specialised to equal grading; the
 ε-relaxation form would compose with `glm_mono_grading`, deferred). -/
-theorem glm_strong_mono {e : Exp} {σ : State} {ε : ENNReal}
-    {Z₁ Z₂ : Cfg → ENNReal → IProp GF} :
+theorem glm_strong_mono {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
     iprop((∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') ∗ glm e σ ε Z₁) ⊢@{IProp GF}
       glm e σ ε Z₂ := by
   iintro ⟨HZ, HG⟩
-  letI Ψ : GlmState → IProp GF := fun s => iprop(
+  letI Ψ : GlmState rT → IProp GF := fun s => iprop(
     (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') -∗ bi_least_fixpoint (glmPre Z₂) s)
   letI : NonExpansive Ψ := by
     constructor
@@ -315,7 +320,7 @@ theorem glm_strong_mono {e : Exp} {σ : State} {ε : ENNReal}
     have : s = s' := OFE.Leibniz.eq_of_eqv (OFE.Discrete.discrete_0 hd)
     subst this; exact .of_eq rfl
   -- Apply the iter to derive `Ψ ⟨..., ε⟩` from `HG`.
-  ihave HΨ : iprop(Ψ ((⟨e, σ⟩, ε) : GlmState)) $$ [HG]
+  ihave HΨ : iprop(Ψ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
   · iapply least_fixpoint_iter (F := glmPre Z₁) (Φ := Ψ)
     swap; · iexact HG
     -- Discharge: `□ (∀ y, glmPre Z₁ Ψ y -∗ Ψ y)`.
@@ -368,8 +373,8 @@ theorem glm_strong_mono {e : Exp} {σ : State} {ε : ENNReal}
 /-- Monotonicity in the error grade: `ε ≤ ε' → glm e σ ε Z ⊢ glm e σ ε' Z`.
 Direct single-step weakening of the bound in both disjuncts (the recursive
 calls are unchanged). Rocq: `glm_mono_grading`. -/
-theorem glm_mono_grading {e : Exp} {σ : State} {ε ε' : ENNReal}
-    {Z : Cfg → ENNReal → IProp GF} (Hε : ε ≤ ε') :
+theorem glm_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
     glm e σ ε Z ⊢@{IProp GF} glm e σ ε' Z := by
   iintro HG
   ihave HG' := (BI.equiv_iff.mp glm_unfold).1 $$ HG
@@ -400,8 +405,8 @@ theorem glm_mono_grading {e : Exp} {σ : State} {ε ε' : ENNReal}
 
 /-- Combined ε-relaxation + body weakening. Direct composition of
 `glm_strong_mono` and `glm_mono_grading`. -/
-theorem glm_strong_mono_grading {e : Exp} {σ : State} {ε ε' : ENNReal}
-    {Z₁ Z₂ : Cfg → ENNReal → IProp GF} (Hε : ε ≤ ε') :
+theorem glm_strong_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
+    {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
     iprop((∀ ρ ε'', Z₁ ρ ε'' -∗ Z₂ ρ ε'') ∗ glm e σ ε Z₁) ⊢@{IProp GF}
       glm e σ ε' Z₂ := by
   iintro ⟨HZ, HG⟩
@@ -413,8 +418,8 @@ theorem glm_strong_mono_grading {e : Exp} {σ : State} {ε ε' : ENNReal}
 
 /-- Monotonicity in the body `Z` under an *intuitionistic* continuation
 entailment. Specialised, easier-to-use form of `glm_strong_mono`. -/
-theorem glm_mono_pred {e : Exp} {σ : State} {ε : ENNReal}
-    {Z₁ Z₂ : Cfg → ENNReal → IProp GF} :
+theorem glm_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
     iprop((□ (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε')) ∗ glm e σ ε Z₁) ⊢@{IProp GF}
       glm e σ ε Z₂ := by
   iintro ⟨#HZ, HG⟩
@@ -465,21 +470,21 @@ Uses `least_fixpoint_iter` with `Φ s := bi_least_fixpoint (glmPre Z) ⟨K.fillC
 The outer `e` does NOT need to be a non-value — Lean's `Hsv` (the
 non-value-ness needed for `primStep_fill`) is derived per-iteration from the
 prim-step branch's `Reducible` witness via `val_stuck`. -/
-theorem glm_bind {K : Ectx} {e : Exp} {σ : State} {ε : ENNReal}
-    {Z : Cfg → ENNReal → IProp GF} :
+theorem glm_bind {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} :
     glm e σ ε (fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε') ⊢@{IProp GF}
       glm (K.fill e) σ ε Z := by
   iintro HG
   classical
-  let Kinv : Exp → Option Exp := Function.partialInv K.fill
+  let Kinv : Exp rT → Option (Exp rT) := Function.partialInv K.fill
   have Kinv_left : ∀ e', Kinv (K.fill e') = some e' :=
     Function.partialInv_left (Ectx.fill_injective K)
-  letI Z' : Cfg → ENNReal → IProp GF :=
+  letI Z' : Cfg rT → ENNReal → IProp GF :=
     fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε'
-  letI Φ : GlmState → IProp GF :=
-    fun s => bi_least_fixpoint (glmPre Z) ((⟨K.fill s.1.expr, s.1.state⟩, s.2) : GlmState)
+  letI Φ : GlmState rT → IProp GF :=
+    fun s => bi_least_fixpoint (glmPre Z) ((⟨K.fill s.1.expr, s.1.state⟩, s.2) : GlmState rT)
   letI : NonExpansive Φ := nonExpansive_of_discrete_leibniz Φ
-  ihave HΦ : iprop(Φ ((⟨e, σ⟩, ε) : GlmState)) $$ [HG]
+  ihave HΦ : iprop(Φ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
   · iapply least_fixpoint_iter (F := glmPre Z') (Φ := Φ)
     swap; · iexact HG
     iintro !> %s HF
@@ -571,14 +576,14 @@ theorem glm_bind {K : Ectx} {e : Exp} {σ : State} {ε : ENNReal}
 
 /-- *Right-introduction* for the `prim_step` disjunct: from the appropriate
 coupling data, conclude `glm e σ ε Z`. Equivalent to Rocq's `glm_prim_step`. -/
-theorem glm_prim_step {e : Exp} {σ : State} {ε : ENNReal}
-    {Z : Cfg → ENNReal → IProp GF} :
-    iprop(∃ (R : Cfg → Prop) (ε₁ : ENNReal) (X₂ : Cfg → ENNReal) (r : ENNReal),
+theorem glm_prim_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} :
+    iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
       ⌜Reducible e σ⌝ ∗
       ⌜∀ ρ, X₂ ρ ≤ r⌝ ∗
       ⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e, σ⟩)) ≤ ε⌝ ∗
       ⌜Pgl ε₁ R (primStep ⟨e, σ⟩)⌝ ∗
-      (∀ (ρ : Cfg), (⌜R ρ⌝) -∗ |={∅}=> execStutter (Z ρ) (X₂ ρ))) ⊢@{IProp GF}
+      (∀ (ρ : Cfg rT), (⌜R ρ⌝) -∗ |={∅}=> execStutter (Z ρ) (X₂ ρ))) ⊢@{IProp GF}
         glm e σ ε Z := by
   iintro HPS
   unfold glm
@@ -589,15 +594,15 @@ theorem glm_prim_step {e : Exp} {σ : State} {ε : ENNReal}
 /-- *Right-introduction* for the state-step disjunct: from the coupling
 data on `tapePresample σ α` (with positively-bounded tape `α`), conclude
 `glm e σ ε Z`. -/
-theorem glm_state_step {e : Exp} {σ : State} {ε : ENNReal}
-    {Z : Cfg → ENNReal → IProp GF} :
+theorem glm_state_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∃ (α : Loc) (t : Tape),
         ⌜σ.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
-        ∃ (R : State → Prop) (ε₁ : ENNReal) (X₂ : State → ENNReal) (r : ENNReal),
+        ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
           ⌜∀ σ', X₂ σ' ≤ r⌝ ∗
           ⌜ε₁ + (∫⁻ σ', X₂ σ' ∂(tapePresample σ α)) ≤ ε⌝ ∗
           ⌜Pgl ε₁ R (tapePresample σ α)⌝ ∗
-          (∀ (σ' : State), ⌜R σ'⌝ -∗
+          (∀ (σ' : State rT), ⌜R σ'⌝ -∗
             |={∅}=> execStutter (fun ε'' => glm e σ' ε'' Z) (X₂ σ'))) ⊢@{IProp GF}
           glm e σ ε Z := by
   iintro HSS
@@ -607,8 +612,8 @@ theorem glm_state_step {e : Exp} {σ : State} {ε : ENNReal}
   iexact HSS
 
 /-- *Right-introduction* for the out-of-thin-air disjunct. -/
-theorem glm_credit_bump {e : Exp} {σ : State} {ε : ENNReal}
-    {Z : Cfg → ENNReal → IProp GF} :
+theorem glm_credit_bump {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗
       |={∅}=> execStutter (fun ε'' => glm e σ ε'' Z) ε') ⊢@{IProp GF}
         glm e σ ε Z := by

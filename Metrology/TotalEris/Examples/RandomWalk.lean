@@ -53,7 +53,10 @@ namespace ProbLang
 namespace TotalEris
 namespace Examples
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS hlc GF]
+set_option linter.unusedSectionVars false
+
+variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-! ## The recursive random-walk body
 
@@ -69,7 +72,7 @@ variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS hlc GF]
   innermost body); the two `lam`s bind `"n"` (bvar 1) and `"α"` (bvar 0). -/
 
 /-- The recursive body of the 1D random walk. -/
-def unifRw1dRec : Exp :=
+def unifRw1dRec : Exp rT :=
   -- rec "f" "n" "α"  ≡  fix (lam (lam body))
   Exp.fix <| Exp.lam <| Exp.lam <|
     -- if n < 1 then ()
@@ -96,7 +99,7 @@ def unifRw1dRec : Exp :=
         (Exp.rand (Exp.lit (.int 1)) (Exp.bvar 0)))
 
 /-- Top-level program: `let α = alloc 1 in unifRw1dRec 1 α`. -/
-def unifRw1d : Exp :=
+def unifRw1d : Exp rT :=
   Exp.app
     (Exp.lam <|
       Exp.app
@@ -214,7 +217,7 @@ from position 1. Rocq: `unif_rw_1d_terminate`.
 `rand 1` off-by-one degeneracy — see the module docstring at the top of
 this file for the full analysis. -/
 theorem unif_rw_1d_terminate (E : CoPset) :
-    ⊢@{IProp GF} tglWp E unifRw1d
+    ⊢@{IProp GF} tglWp (rT := rT) E unifRw1d
       (fun v => iprop(⌜v = ⟨.lit .unit, IsVal.lit⟩⌝)) := by
   sorry
 

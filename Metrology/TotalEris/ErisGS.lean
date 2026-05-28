@@ -28,7 +28,12 @@ from `Metrology/Iris/ErrorCredits.lean`. -/
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 
 namespace ProbLang
+
+set_option linter.unusedSectionVars false
+
 namespace TotalEris
+
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
 /-- Concrete ghost-state class for Eris.
 
@@ -36,8 +41,9 @@ Mirrors `Metrology.Approxis.ApproxisGS` minus the spec-side `SpecGS`
 (Eris is unary). Uses `extends` via field projections rather than
 nested `extends`-clauses, to avoid Lean's diamond-inheritance field
 collapse — see the comment in `ApproxisGS`. -/
-class ErisGS (hlc : outParam Bool) (GF : BundledGFunctors) where
-  appGS : AppGS GF
+class ErisGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
+    [MeasurableSingletonClass rT] (hlc : outParam Bool) (GF : BundledGFunctors) where
+  appGS : AppGS rT GF
   ecGS  : ECGS GF
   invGS : InvGS_gen hlc GF
 
@@ -45,10 +51,10 @@ attribute [reducible, instance] ErisGS.appGS ErisGS.ecGS ErisGS.invGS
 
 section ErisInstance
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 @[reducible]
-noncomputable instance erisWpGS_of_components : ErisWpGS GF where
+noncomputable instance erisWpGS_of_components : ErisWpGS (rT := rT) GF where
   hlc := hlc
   invGS := inferInstance
   stateInterp σ := appStateAuth σ
@@ -57,10 +63,10 @@ noncomputable instance erisWpGS_of_components : ErisWpGS GF where
 /-! ### Unfolding lemmas -/
 
 @[simp] theorem erisWpGS_stateInterp_eq :
-    (ErisWpGS.stateInterp : State → IProp GF) = appStateAuth := rfl
+    (ErisWpGS.stateInterp (rT := rT) : State rT → IProp GF) = appStateAuth := rfl
 
 @[simp] theorem erisWpGS_errInterp_eq :
-    (ErisWpGS.errInterp : ENNReal → IProp GF) = ecAuth := rfl
+    (ErisWpGS.errInterp (rT := rT) : ENNReal → IProp GF) = ecAuth := rfl
 
 end ErisInstance
 
