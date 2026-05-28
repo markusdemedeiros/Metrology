@@ -286,6 +286,27 @@ For an n-ary function `f : X₁ × ⋯ × Xₙ → Z`, given (i) injectivity, (i
 we get `MeasurableEmbedding f`. Each higher-arity version reduces to the binary one by
 nesting rectangles on the right. -/
 
+/-- Unary version. -/
+theorem measurableEmbedding_of_piSystem₁
+    {X Z : Type*} [mX : MeasurableSpace X] [MeasurableSpace Z]
+    {f : X → Z} (h_inj : Function.Injective f) (h_meas : Measurable f)
+    {𝓒 : Set (Set X)}
+    (h_gen : mX = MeasurableSpace.generateFrom 𝓒)
+    (h_pi : IsPiSystem 𝓒)
+    (h_basic : ∀ ⦃A⦄, A ∈ 𝓒 → MeasurableSet (f '' A))
+    {cov : Set Z} (h_cov_meas : MeasurableSet cov) (h_cov_range : cov = .range f) :
+    MeasurableEmbedding f := by
+  refine ⟨h_inj, h_meas, fun S hS => ?_⟩
+  refine MeasurableSpace.induction_on_inter (C := fun S _ => MeasurableSet (f '' S))
+      h_gen h_pi ?_ h_basic ?_ ?_ S hS
+  · simp
+  · intro T _ ih
+    rw [Set.compl_eq_univ_diff, Set.image_diff h_inj, Set.image_univ, ← h_cov_range]
+    exact h_cov_meas.diff ih
+  · intro f _ _ ih
+    rw [Set.image_iUnion]
+    exact .iUnion ih
+
 /-- Binary version. -/
 theorem measurableEmbedding_of_piSystem₂
     {X Y Z : Type*} [MeasurableSpace X] [MeasurableSpace Y] [MeasurableSpace Z]
@@ -353,6 +374,42 @@ theorem measurableEmbedding_of_piSystem₄
       obtain ⟨_, hA₃, _, hA₄, rfl⟩ := hRest'
       exact h_basic hA₁ hA₂ hA₃ hA₄)
     h_cov_meas h_cov_range
+
+/-! ### Discrete (top σ-algebra, countable) helpers. -/
+
+/-- Family of singletons-or-`univ` (so it always has the universe). -/
+def singletonsAndUniv (X : Type*) : Set (Set X) :=
+  insert Set.univ (Set.range (Singleton.singleton : X → Set X))
+
+theorem singletonsAndUniv_isPiSystem {X : Type*} : IsPiSystem (singletonsAndUniv X) := by
+  rintro A hA B hB hne
+  rcases hA with rfl | ⟨a, rfl⟩ <;> rcases hB with rfl | ⟨b, rfl⟩
+  · simp [singletonsAndUniv]
+  · exact Or.inr ⟨b, by simp⟩
+  · exact Or.inr ⟨a, by simp⟩
+  · obtain ⟨x, hxa, hxb⟩ := hne
+    cases hxa; cases hxb
+    simp [singletonsAndUniv]
+
+theorem singletonsAndUniv_isCountablySpanning {X : Type*} [Countable X] :
+    IsCountablySpanning (singletonsAndUniv X) := by
+  refine ⟨fun _ => (Set.univ : Set X), fun _ => Or.inl rfl, ?_⟩
+  ext x; simp
+
+theorem singletonsAndUniv_generateFrom {X : Type*} [Countable X] [MeasurableSpace X]
+    [DiscreteMeasurableSpace X] :
+    MeasurableSpace.generateFrom (singletonsAndUniv X) = (inferInstance : MeasurableSpace X) := by
+  refine le_antisymm (MeasurableSpace.generateFrom_le ?_) ?_
+  · rintro _ (rfl | ⟨x, rfl⟩)
+    · exact MeasurableSet.univ
+    · exact MeasurableSet.singleton x
+  · intro S _
+    have hS : S = ⋃ x ∈ S, ({x} : Set X) := by ext y; simp
+    rw [hS]
+    refine .biUnion S.to_countable (fun x _ => .basic _ ?_)
+    exact Or.inr ⟨x, rfl⟩
+
+/-! ### 5-ary version. -/
 
 /-- 5-ary version. -/
 theorem measurableEmbedding_of_piSystem₅

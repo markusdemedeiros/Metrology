@@ -3,11 +3,18 @@ module
 public import Std
 public import Std.Data.ExtTreeMap.Lemmas
 public import Mathlib.Data.Countable.Basic
+public import Mathlib.MeasureTheory.MeasurableSpace.Basic
+public import Mathlib.MeasureTheory.MeasurableSpace.Defs
 public import Mathlib.Tactic.DeriveCountable
 import all Mathlib.Tactic.DeriveCountable
 public import Mathlib.Logic.Equiv.List
 public import Cslib.Foundations.Data.HasFresh
 public import Cslib.Foundations.Syntax.HasSubstitution
+public import Mathlib.Probability.ProbabilityMassFunction.Basic
+public import Mathlib.Probability.Kernel.Defs
+public import Mathlib.Probability.Distributions.Uniform
+
+meta import Metrology.Meta
 
 @[expose] public section
 
@@ -46,6 +53,7 @@ namespace ProbLang
 
 /-- Free-variable atoms. Strings, when provided by the user, or auto-generated internal
 free variables. -/
+@[uncurriedProjections, constructors]
 inductive Var : Type where
   | named (s : String)
   | internal (n : Nat)
@@ -73,29 +81,39 @@ abbrev Loc : Type := Int
 
 abbrev Lbl : Type := Int
 
-inductive BaseLit | int (z : Int) | bool (b : Bool) | unit | loc (loc : Loc) | lbl (lbl : Lbl)
-  deriving Inhabited, DecidableEq, Countable, Repr, BEq
+/-- Type of real numbers equipped with some base sigma algebra.
+ProbLang is parameterized by this type, and the type of expressions is discrete
+when the type of reals is also discrete.
 
-theorem BaseLit.beq_self_true (l : BaseLit) : (l == l) = true := by
-  cases l with
-  | int z =>
-    show (Int.decEq z z).decide = true
-    exact decide_eq_true rfl
-  | bool b => cases b <;> rfl
-  | unit => rfl
-  | loc l =>
-    show decide (l = l) = true
-    rw [decide_eq_true rfl]
-  | lbl l =>
-    show decide (l = l) = true
-    rw [decide_eq_true rfl]
+This allows us to gradually port the development to use a continuous semantics. -/
+class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T where
+  instDecidableEq : DecidableEq T
 
+attribute [reducible, instance] ProbLangℝ.instDecidableEq
+
+/-- Type of base literals with a given type of reals. Countable etc when rT is. -/
+@[uncurriedProjections, curriedProjections, constructors]
+inductive BaseLit (rT : Type _)
+  | int (z : Int)
+  | bool (b : Bool)
+  | unit
+  | loc (loc : Loc)
+  | lbl (lbl : Lbl)
+  | real (r : rT)
+  -- TEMP for measurability prototyping
+  | prod (b1 b2 : BaseLit rT)
+  | nest (b : BaseLit rT) (r : rT)
+  deriving Countable, BEq
+
+@[uncurriedProjections, curriedProjections, constructors]
 inductive UnOp | neg | minus
   deriving Inhabited, Countable, Repr, BEq
 
+@[uncurriedProjections, curriedProjections, constructors]
 inductive BinOp | plus | minus | mult | div | mod | and | or | xor | eq | lt | le | shl | shr
   deriving Inhabited, Countable, Repr, BEq
 
+@[uncurriedProjections, curriedProjections, constructors]
 inductive Ty
   | int | bool | unit
   | prod (τ1 τ2 : Ty)
@@ -109,60 +127,66 @@ inductive Ty
   | exists' (τ : Ty)
   deriving Inhabited, DecidableEq, Countable, Repr, BEq
 
-inductive Pat
+@[uncurriedProjections, curriedProjections, constructors]
+inductive Pat (rT : Type _)
   | wildcard
-  | lit (b : BaseLit)
-  | pair (p1 p2 : Pat)
-  | inl (p : Pat)
-  | inr (p : Pat)
-  deriving Inhabited, DecidableEq, Countable, Repr, BEq
+  | lit (b : BaseLit rT)
+  | pair (p1 p2 : Pat rT)
+  | inl (p : Pat rT)
+  | inr (p : Pat rT)
+  deriving Inhabited, Countable, BEq
 
-inductive Exp
+@[uncurriedProjections, curriedProjections, constructors]
+inductive Exp (rT : Type _)
   /-- Bound variable -/
   | bvar (n : Nat)
   /-- Free variable -/
   | fvar (x : Var)
   /-- Literal value -/
-  | lit (b : BaseLit)
+  | lit (b : BaseLit rT)
   /-- Lambda: binds its argument -/
-  | lam (e : Exp)
+  | lam (e : Exp rT)
   /-- Fixpoint: binds the entire expression -/
-  | fix (e : Exp)
+  | fix (e : Exp rT)
   /-- Application -/
-  | app (e1 e2 : Exp)
+  | app (e1 e2 : Exp rT)
   /-- Base operations -/
-  | unop (u : UnOp) (e : Exp)
-  | binop (b : BinOp) (e1 e2 : Exp)
-  | cond (ec et tf : Exp)
+  | unop (u : UnOp) (e : Exp rT)
+  | binop (b : BinOp) (e1 e2 : Exp rT)
+  | cond (ec et tf : Exp rT)
   /-- Pairs -/
-  | pair (e1 e2 : Exp)
-  | fst (e : Exp)
-  | snd (e : Exp)
+  | pair (e1 e2 : Exp rT)
+  | fst (e : Exp rT)
+  | snd (e : Exp rT)
   /-- Sums -/
-  | inl (e : Exp)
-  | inr (e : Exp)
-  | case (ec el er : Exp)
+  | inl (e : Exp rT)
+  | inr (e : Exp rT)
+  | case (ec el er : Exp rT)
   /-- Heap -/
-  | alloc (e : Exp)
-  | load (e : Exp)
-  | store (el ev : Exp)
+  | alloc (e : Exp rT)
+  | load (e : Exp rT)
+  | store (el ev : Exp rT)
   /-- Allocate random tape, sized as its argument -/
-  | tape (e : Exp)
+  | tape (e : Exp rT)
   /-- Unform random sample [0, en), with tape et -/
-  | rand (en et : Exp)
+  | rand (en et : Exp rT)
   /-- Halt and fail -/
   | fail
   /-- Pattern matching primitive -/
-  | scrut (e : Exp) (pat : Pat)
-  deriving Inhabited, Countable, Repr, BEq
+  | scrut (e : Exp rT) (pat : Pat rT)
+  deriving Inhabited, Countable, BEq
+
+section WithRealParam
+
+variable {rT : Type _} [ProbLangℝ rT]
 
 /-- Phantom constructor: annotate an expression with a type. -/
-@[reducible] def Exp.annotated (_τ : Ty) (e : Exp) : Exp := e
+@[reducible] def Exp.annotated (_τ : Ty) (e : Exp rT) : Exp rT := e
 
 namespace Exp
 
 /-- Recursive variable opening. Replace `bvar i` with `sub` at depth `i`. -/
-@[simp, scoped grind =] def openRec (i : Nat) (sub : Exp) : Exp → Exp
+@[simp, scoped grind =] def openRec (i : Nat) (sub : Exp rT) : Exp rT → Exp rT
   | bvar j => if i = j then sub else bvar j
   | fvar x => fvar x
   | lit b => lit b
@@ -187,10 +211,10 @@ namespace Exp
   | scrut e p => scrut (openRec i sub e) p
 
 /-- Open the outermost binder. -/
-@[simp, scoped grind =] def open' (e sub : Exp) : Exp := openRec 0 sub e
+@[simp, scoped grind =] def open' (e sub : Exp rT) : Exp rT := openRec 0 sub e
 
 /-- Recursive variable closing. Replace `fvar x` with `bvar i` at depth `i`. -/
-@[simp, scoped grind =] def closeRec (i : Nat) (x : Var) : Exp → Exp
+@[simp, scoped grind =] def closeRec (i : Nat) (x : Var) : Exp rT → Exp rT
   | bvar j => bvar j
   | fvar y => if x = y then bvar i else fvar y
   | lit b => lit b
@@ -215,10 +239,10 @@ namespace Exp
   | scrut e p => scrut (closeRec i x e) p
 
 /-- Close the x using the outermost binder (bvar 0). -/
-@[simp, scoped grind =] def close (e : Exp) (x : Var) : Exp := closeRec 0 x e
+@[simp, scoped grind =] def close (e : Exp rT) (x : Var) : Exp rT := closeRec 0 x e
 
 /-- Free-variable substitution. -/
-@[simp, scoped grind =] def subst (e : Exp) (x : Var) (sub : Exp) : Exp :=
+@[simp, scoped grind =] def subst (e : Exp rT) (x : Var) (sub : Exp rT) : Exp rT :=
   match e with
   | bvar j => bvar j
   | fvar y => if x = y then sub else fvar y
@@ -243,11 +267,11 @@ namespace Exp
   | fail => fail
   | scrut e p => scrut (subst e x sub) p
 
-instance : HasSubstitution Exp Var Exp where
+instance : HasSubstitution (Exp rT) Var (Exp rT) where
   subst := Exp.subst
 
 /-- Free variables of an expression. -/
-@[simp, scoped grind =] def fv : Exp → Finset Var
+@[simp, scoped grind =] def fv : Exp rT → Finset Var
   | bvar _ => {}
   | fvar x => {x}
   | lit _ => {}
@@ -272,15 +296,15 @@ instance : HasSubstitution Exp Var Exp where
   | scrut e _ => fv e
 
 /-- An expression is locally closed. -/
-inductive IsLocallyClosed : Exp → Prop
+inductive IsLocallyClosed : Exp rT → Prop
   | fvar (x : Var) :
     IsLocallyClosed (fvar x)
-  | lit (b : BaseLit) :
+  | lit (b : BaseLit rT) :
     IsLocallyClosed (lit b)
-  | lam (L : Finset Var) (e : Exp) :
+  | lam (L : Finset Var) (e : Exp rT) :
     (∀ x ∉ L, IsLocallyClosed (open' e (fvar x))) →
     IsLocallyClosed (lam e)
-  | fix (L : Finset Var) (e : Exp) :
+  | fix (L : Finset Var) (e : Exp rT) :
     (∀ x ∉ L, IsLocallyClosed (open' e (fvar x))) →
     IsLocallyClosed (fix e)
   | app {e1 e2} :
@@ -339,7 +363,7 @@ inductive IsLocallyClosed : Exp → Prop
     IsLocallyClosed (rand e1 e2)
   | fail :
     IsLocallyClosed fail
-  | scrut {e} (p : Pat) :
+  | scrut {e} (p : Pat rT) :
     IsLocallyClosed e →
     IsLocallyClosed (scrut e p)
 
@@ -366,8 +390,32 @@ attribute [scoped grind .]
 
 end Exp
 
+instance [DecidableEq α] : DecidableEq (BaseLit α)
+  | .int z1, .int z2 => decidable_of_iff (z1 = z2) (by simp)
+  | .bool b1, .bool b2 => decidable_of_iff (b1 = b2) (by simp)
+  | .unit, .unit => isTrue rfl
+  | .loc l1, .loc l2 => decidable_of_iff (l1 = l2) (by simp)
+  | .lbl l1, .lbl l2 => decidable_of_iff (l1 = l2) (by simp)
+  | .real r1, .real r2 => decidable_of_iff (r1 = r2) (by simp)
+  | .prod a1 b1, .prod a2 b2 =>
+      have := instDecidableEqBaseLit a1 a2
+      have := instDecidableEqBaseLit b1 b2
+      decidable_of_iff (a1 = a2 ∧ b1 = b2) (by simp)
+  | .nest b1 r1, .nest b2 r2 =>
+      have := instDecidableEqBaseLit b1 b2
+      decidable_of_iff (b1 = b2 ∧ r1 = r2) (by simp)
+  | .int _, .bool _ | .int _, .unit | .int _, .loc _ | .int _, .lbl _ | .int _, .real _ | .int _, .prod _ _ | .int _, .nest _ _
+  | .bool _, .int _ | .bool _, .unit | .bool _, .loc _ | .bool _, .lbl _ | .bool _, .real _ | .bool _, .prod _ _ | .bool _, .nest _ _
+  | .unit, .int _ | .unit, .bool _ | .unit, .loc _ | .unit, .lbl _ | .unit, .real _ | .unit, .prod _ _ | .unit, .nest _ _
+  | .loc _, .int _ | .loc _, .bool _ | .loc _, .unit | .loc _, .lbl _ | .loc _, .real _ | .loc _, .prod _ _ | .loc _, .nest _ _
+  | .lbl _, .int _ | .lbl _, .bool _ | .lbl _, .unit | .lbl _, .loc _ | .lbl _, .real _ | .lbl _, .prod _ _ | .lbl _, .nest _ _
+  | .real _, .int _ | .real _, .bool _ | .real _, .unit | .real _, .loc _ | .real _, .lbl _ | .real _, .prod _ _ | .real _, .nest _ _
+  | .prod _ _, .int _ | .prod _ _, .bool _ | .prod _ _, .unit | .prod _ _, .loc _ | .prod _ _, .lbl _ | .prod _ _, .real _ | .prod _ _, .nest _ _
+  | .nest _ _, .int _ | .nest _ _, .bool _ | .nest _ _, .unit | .nest _ _, .loc _ | .nest _ _, .lbl _ | .nest _ _, .real _ | .nest _ _, .prod _ _ =>
+      isFalse (by intro h; cases h)
+
 /-- Try to match an expression against a pattern. -/
-def Pat.tryMatch : Pat → Exp → Option Exp
+def Pat.tryMatch : Pat rT → Exp rT → Option (Exp rT)
   | .wildcard, e => some e
   | .lit b, .lit b' => if b == b' then some (.lit .unit) else none
   | .pair p1 p2, .pair e1 e2 => do
@@ -378,31 +426,59 @@ def Pat.tryMatch : Pat → Exp → Option Exp
   | .inr p, .inr e => p.tryMatch e
   | _, _ => none
 
+theorem BaseLit.beq_self_true (l : BaseLit rT) : (l == l) = true := by
+  cases l with
+  | int z =>
+    show (Int.decEq z z).decide = true
+    exact decide_eq_true rfl
+  | bool b => cases b <;> rfl
+  | unit => rfl
+  | loc l =>
+    show decide (l = l) = true
+    rw [decide_eq_true rfl]
+  | lbl l => exact of_decide_eq_self_eq_true _
+  | real r =>
+    show (r == r) = true
+    exact BEq.refl r
+  | prod _ _ => sorry
+  | nest _ _ => sorry
+
 /-- `tryMatch (.lit l) (.lit l) = some (.lit .unit)`. -/
-theorem Pat.tryMatch_lit_eq (l : BaseLit) :
+theorem Pat.tryMatch_lit_eq (l : BaseLit rT) :
     Pat.tryMatch (.lit l) (.lit l) = some (.lit .unit) := by
   show (if (l == l) = true then some (Exp.lit BaseLit.unit) else none) = _
-  rw [if_pos (BaseLit.beq_self_true l)]
+  refine Option.ite_some_none_eq_some.mpr ⟨?_, rfl⟩
+  exact BaseLit.beq_self_true l
 
 /-- `tryMatch (.lit l1) (.lit l2) = none` when `l1 ≠ l2`. -/
-theorem Pat.tryMatch_lit_ne {l1 l2 : BaseLit} (h : ¬ (l1 == l2) = true) :
+theorem Pat.tryMatch_lit_ne {l1 l2 : BaseLit rT} (h : ¬ (l1 == l2) = true) :
     Pat.tryMatch (.lit l1) (.lit l2) = none := by
   show (if (l1 == l2) = true then some (Exp.lit BaseLit.unit) else none) = _
   rw [if_neg h]
 
 /- ## Sublanguages -/
 
-abbrev Fragment := Exp → Type
+abbrev Fragment (rT : Type _) := Exp rT → Type
 
-abbrev FragExp (F : Fragment) := (e : Exp) × F e
+abbrev FragExp (F : Fragment rT) := (e : Exp rT) × F e
 
-def Both (F G : Fragment) : Fragment := fun e => F e × G e
-def Either (F G : Fragment) : Fragment := fun e => F e ⊕ G e
-def Any : Fragment := fun _ => Unit
-def None : Fragment := fun _ => Empty
-def Overlay (F : Fragment) (M : Exp → Type) : Fragment := fun e => F e × M e
+def Both (F G : Fragment rT) : Fragment rT :=
+  fun e => F e × G e
 
-def SubFrag (F G : Fragment) := ∀ e, F e → G e
+def Either (F G : Fragment rT) : Fragment rT :=
+  fun e => F e ⊕ G e
+
+def Any : Fragment rT :=
+  fun _ => Unit
+
+def None : Fragment rT :=
+  fun _ => Empty
+
+def Overlay (F : Fragment rT) (M : Exp rT → Type) : Fragment rT :=
+  fun e => F e × M e
+
+def SubFrag (F G : Fragment rT) :=
+  ∀ e, F e → G e
 scoped infixr:25 " ⊆f " => SubFrag
 
 def SubFrag.id : F ⊆f F := fun _ x => x
@@ -410,12 +486,12 @@ def SubFrag.comp (f : F ⊆f G) (g : G ⊆f H) : F ⊆f H := fun e x => g e (f e
 def SubFrag.map (f : F ⊆f G) : FragExp F → FragExp G
   | ⟨e, w⟩ => ⟨e, f e w⟩
 
-def FragExp.erase : FragExp F → Exp := Sigma.fst
+def FragExp.erase {F : Fragment rT} : FragExp F → Exp rT := Sigma.fst
 
-class Checkable (F : Fragment) where
-  check? : (e : Exp) → Option (F e)
+class Checkable (F : Fragment rT) where
+  check? : (e : Exp rT) → Option (F e)
 
-def FragExp.mk? [Checkable F] (e : Exp) : Option (FragExp F) :=
+def FragExp.mk? {F : Fragment rT} [Checkable F] (e : Exp rT) : Option (FragExp F) :=
   (Checkable.check? e).map (⟨e, ·⟩)
 
 instance [Checkable F] [Checkable G] : Checkable (Both F G) where
@@ -426,7 +502,7 @@ instance [Checkable F] [Checkable G] : Checkable (Both F G) where
 /-- Type-valued witness that an expression is a value. Values are:
     literals, lambda abstractions (which are closed-over functions), fixpoints
     (also functions), and pair/inl/inr of values. -/
-inductive IsVal : Exp → Type
+inductive IsVal : Exp rT → Type
   | lit  : IsVal (.lit b)
   | lam  : IsVal (.lam e)
   | fix  : IsVal (.fix e)
@@ -435,12 +511,12 @@ inductive IsVal : Exp → Type
   | inr  : IsVal e → IsVal (.inr e)
 
 /-- A value is an expression paired with a Type-valued witness. -/
-@[expose] def Val := (e : Exp) × IsVal e
+@[expose] def Val (α : Type _) := (e : Exp α) × IsVal e
 
 namespace IsVal
 
 /-- Decidable check. -/
-def check? : (e : Exp) → Option (IsVal e)
+def check? : (e : Exp rT) → Option (IsVal e)
   | .lit _ => some .lit
   | .lam _ => some .lam
   | .fix _ => some .fix
@@ -461,9 +537,9 @@ instance : Subsingleton (IsVal e) := ⟨subsingleton⟩
 
 end IsVal
 
-instance : Checkable IsVal where check? := IsVal.check?
+instance : Checkable (@IsVal rT) where check? := IsVal.check?
 
-def Exp.isValue (e : Exp) : Prop := Nonempty (IsVal e)
+def Exp.isValue (e : Exp rT) : Prop := Nonempty (IsVal e)
 
 def IsVal.toIsValue (w : IsVal e) : e.isValue := ⟨w⟩
 
@@ -480,13 +556,13 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .inr h => by obtain ⟨w, hw⟩ := check?_some h; exact ⟨.inr w, by simp [check?, hw]⟩
 
 /-- Recursive Prop-valued value predicate. -/
-@[simp] def Exp.isValueR : Exp → Prop
+@[simp] def Exp.isValueR : Exp rT → Prop
   | .lit _ | .lam _ | .fix _ => True
   | .pair e1 e2 => e1.isValueR ∧ e2.isValueR
   | .inl e | .inr e => e.isValueR
   | _ => False
 
-theorem Exp.isValue_iff_isValueR {e : Exp} : e.isValue ↔ e.isValueR := by
+theorem Exp.isValue_iff_isValueR {e : Exp α} : e.isValue ↔ e.isValueR := by
   constructor
   · rintro ⟨w⟩; induction w with
     | lit | lam | fix => trivial
@@ -500,27 +576,27 @@ theorem Exp.isValue_iff_isValueR {e : Exp} : e.isValue ↔ e.isValueR := by
     | inr _ ih => exact ⟨.inr (ih h).some⟩
     | _ => exact absurd h id
 
-theorem IsVal.not_isValue_of_check?_none {e : Exp} (h : IsVal.check? e = none) : ¬e.isValue :=
+theorem IsVal.not_isValue_of_check?_none {e : Exp α} (h : IsVal.check? e = none) : ¬e.isValue :=
   fun ⟨w⟩ => by obtain ⟨_, hw⟩ := w.check?_some; simp_all
 
-theorem IsVal.check?_eq_none {e : Exp} (h : ¬e.isValue) : IsVal.check? e = none := by
+theorem IsVal.check?_eq_none {e : Exp α} (h : ¬e.isValue) : IsVal.check? e = none := by
   cases hc : IsVal.check? e with
   | none => rfl
   | some w => exact absurd ⟨w⟩ h
 
-instance Exp.decIsValue (e : Exp) : Decidable e.isValue :=
+instance Exp.decIsValue (e : Exp α) : Decidable e.isValue :=
   match hc : IsVal.check? e with
   | some w => isTrue ⟨w⟩
   | none => isFalse (IsVal.not_isValue_of_check?_none hc)
 
-@[simp] theorem Val.isValue (v : Val) : v.1.isValue := ⟨v.2⟩
+@[simp] theorem Val.isValue (v : @Val α) : v.1.isValue := ⟨v.2⟩
 
 @[ext]
-theorem Val.ext {v1 v2 : Val} (h : v1.1 = v2.1) : v1 = v2 := by
+theorem Val.ext {v1 v2 : Val α} (h : v1.1 = v2.1) : v1 = v2 := by
   obtain ⟨e1, w1⟩ := v1; obtain ⟨e2, w2⟩ := v2
   simp at h; subst h; congr 1; exact IsVal.subsingleton w1 w2
 
-instance : Countable Val := by
+instance [Countable α] : Countable (Val α) := by
   unfold Val; exact instCountableSigma
 
 instance instCountableExtTreeMapLoc {V : Type _} [Countable V] :
@@ -535,19 +611,19 @@ instance instCountableExtTreeMapLoc {V : Type _} [Countable V] :
   intro H1 H2 He
   exact ExtTreeMap.ext_getElem? (congrFun (congrArg getElem? (Hf_items (Hf_v He))))
 
-def Exp.toVal? (e : Exp) : Option Val :=
+def Exp.toVal? (e : Exp α) : Option (Val α) :=
   match IsVal.check? e with
   | some w => some ⟨e, w⟩
   | none => none
 
-@[simp] theorem Exp.toVal?_eq_none {e : Exp} : e.toVal? = none ↔ ¬e.isValue := by
+@[simp] theorem Exp.toVal?_eq_none {e : Exp α} : e.toVal? = none ↔ ¬e.isValue := by
   constructor
   · intro h
     simp only [toVal?] at h
     exact IsVal.not_isValue_of_check?_none (by cases hc : IsVal.check? e <;> simp_all)
   · intro h; simp [toVal?, IsVal.check?_eq_none h]
 
-def Exp.ofVal (v : Val) : Exp := v.1
+def Exp.ofVal (v : Val α) : Exp α := v.1
 
 structure Tape where
   bound : Int
@@ -568,53 +644,54 @@ instance [Countable V] : Countable (LocHeap V) :=
 instance : GetElem? (LocHeap V) Loc V (fun (m : ExtTreeMap Loc V compare) k => k ∈ m) :=
   inferInstanceAs (GetElem? (ExtTreeMap Loc V compare) _ _ _)
 
-structure State where
-  heap  : LocHeap Val
+structure State (α : Type _) where
+  heap  : LocHeap (Val α)
   tapes : LocHeap Tape
   deriving Inhabited, Countable
 
-theorem Exp.toVal?_ofVal (v : Val) : (Exp.ofVal v).toVal? = some v := by
+theorem Exp.toVal?_ofVal (v : Val α) : (Exp.ofVal v).toVal? = some v := by
   obtain ⟨e, w⟩ := v
   simp only [Exp.ofVal, Exp.toVal?]
   cases hc : IsVal.check? e with
   | none => exact absurd w.toIsValue (IsVal.not_isValue_of_check?_none hc)
   | some w' => exact congrArg some (Val.ext rfl)
 
-theorem Exp.ofVal_of_toVal_some {e : Exp} {v : Val} (h : e.toVal? = some v) : Exp.ofVal v = e := by
+theorem Exp.ofVal_of_toVal_some {e : Exp α} {v : Val α} (h : e.toVal? = some v) : Exp.ofVal v = e := by
   simp only [toVal?] at h
   split at h
   · simp at h; exact congrArg Sigma.fst h.symm
   · simp at h
 
-theorem Exp.ofVal_injective : Function.Injective Exp.ofVal :=
+theorem Exp.ofVal_injective : Function.Injective (@Exp.ofVal α) :=
   fun _ _ h => Val.ext h
 
 /- ## Evaluation contexts -/
 
-inductive EctxItem
-  | appL (v2 : Val)
-  | appR (e1 : Exp)
+@[uncurriedProjections, curriedProjections, constructors]
+inductive EctxItem (α : Type _)
+  | appL (v2 : Val α)
+  | appR (e1 : Exp α)
   | unop (op : UnOp)
-  | binopL (op : BinOp) (v2 : Val)
-  | binopR (op : BinOp) (e1 : Exp)
-  | condC (e1 e2 : Exp)
-  | pairL (v2 : Val)
-  | pairR (e1 : Exp)
+  | binopL (op : BinOp) (v2 : Val α)
+  | binopR (op : BinOp) (e1 : Exp α)
+  | condC (e1 e2 : Exp α)
+  | pairL (v2 : Val α)
+  | pairR (e1 : Exp α)
   | fst
   | snd
   | inl
   | inr
-  | case (e1 e2 : Exp)
+  | case (e1 e2 : Exp α)
   | alloc
   | load
-  | storeL (v2 : Val)
-  | storeR (e1 : Exp)
+  | storeL (v2 : Val α)
+  | storeR (e1 : Exp α)
   | tape
-  | randL (v2 : Val)
-  | randR (e1 : Exp)
-  | scrut (p : Pat)
+  | randL (v2 : Val α)
+  | randR (e1 : Exp α)
+  | scrut (p : Pat α)
 
-@[simp] def EctxItem.fillItem (Ki : EctxItem) (e : Exp) : Exp :=
+@[simp] def EctxItem.fillItem (Ki : EctxItem α) (e : Exp α) : Exp α :=
   match Ki with
   | appL v2 => .app e (.ofVal v2)
   | appR e1 => .app e1 e
@@ -638,7 +715,7 @@ inductive EctxItem
   | .randR e1 => .rand e1 e
   | .scrut p => .scrut e p
 
-def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
+def Exp.decompItem (e : Exp α) : Option (EctxItem α × Exp α) :=
   match e with
   | app e1 e2 =>
     e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
@@ -681,13 +758,13 @@ def Exp.decompItem (e : Exp) : Option (EctxItem × Exp) :=
 
 /- ## Deterministic evaluation helpers -/
 
-def UnOp.eval (op : UnOp) (v : Exp) : Option Exp :=
+def UnOp.eval (op : UnOp) (v : Exp α) : Option (Exp α) :=
   match op, v with
   | neg, .lit (.bool b) => some <| .lit <| .bool <| ¬ b
   | minus, .lit (.int z) => some <| .lit <| .int <| z.neg
   | _, _ => none
 
-def BinOp.eval (op : BinOp) (v1 v2 : Exp) : Option Exp :=
+def BinOp.eval (op : BinOp) (v1 v2 : Exp rT) : Option (Exp rT) :=
   match op, v1, v2 with
   | plus,  .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 + z2)
   | minus, .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 - z2)
@@ -715,29 +792,29 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp) : Option Exp :=
   | shr,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 / 2 ^ z2.toNat)
   |_,      _,        _        => none
 
-def State.update_heap (σ : State) (f : ExtTreeMap Loc Val → ExtTreeMap Loc Val) : State :=
+def State.update_heap (σ : State α) (f : ExtTreeMap Loc (Val α) → ExtTreeMap Loc (Val α)) : State α :=
   ⟨f σ.heap, σ.tapes⟩
 
-def State.update_tapes (σ : State) (f : ExtTreeMap Loc Tape → ExtTreeMap Loc Tape) : State :=
+def State.update_tapes (σ : State α) (f : ExtTreeMap Loc Tape → ExtTreeMap Loc Tape) : State α :=
   ⟨σ.heap, f σ.tapes⟩
 
-theorem State.update_tapes_twice (σ : State) (l : Loc) (ys xs : Tape) :
+theorem State.update_tapes_twice (σ : State α) (l : Loc) (ys xs : Tape) :
     (σ.update_tapes (·.insert l xs)).update_tapes (·.insert l ys) =
     σ.update_tapes (·.insert l ys) := by
   unfold State.update_tapes; simp; grind
 
-theorem State.update_tapes_same {σ σ' : State}
+theorem State.update_tapes_same {σ σ' : State α}
     (h : σ.update_tapes (·.insert l xs) = σ'.update_tapes (·.insert l ys)) :
     xs = ys := by
   have key := congrArg (·.tapes[l]?) h
   simp [State.update_tapes, LocHeap] at key
   exact key
 
-theorem State.update_tapes_no_change {σ : State} (h : σ.tapes[l]? = some ys) :
+theorem State.update_tapes_no_change {σ : State α} (h : σ.tapes[l]? = some ys) :
     σ.update_tapes (·.insert l ys) = σ := by
   unfold State.update_tapes; congr 2; grind
 
-theorem State.update_tapes_same' {σ σ' : State} {xs : List { z : Int // 0 ≤ z ∧ z < n }}
+theorem State.update_tapes_same' {σ σ' : State α} {xs : List { z : Int // 0 ≤ z ∧ z < n }}
     {x y : { z : Int // 0 ≤ z ∧ z < n }}
     (h : σ.update_tapes (·.insert l ⟨n, xs ++ [x]⟩) = σ'.update_tapes (·.insert l ⟨n, xs ++ [y]⟩)) :
     x = y := by
@@ -745,31 +822,31 @@ theorem State.update_tapes_same' {σ σ' : State} {xs : List { z : Int // 0 ≤ 
   simp [Tape.mk.injEq] at heq
   exact heq
 
-theorem State.update_tapes_neq' {σ σ' : State} {xs : List { z : Int // 0 ≤ z ∧ z < n }}
+theorem State.update_tapes_neq' {σ σ' : State α} {xs : List { z : Int // 0 ≤ z ∧ z < n }}
     {x y : { z : Int // 0 ≤ z ∧ z < n }} (hne : x ≠ y) :
     σ.update_tapes (·.insert l ⟨n, xs ++ [x]⟩) ≠ σ'.update_tapes (·.insert l ⟨n, xs ++ [y]⟩) :=
   (hne <| State.update_tapes_same' ·)
 
-structure Cfg where
-  expr : Exp
-  state : State
+structure Cfg α where
+  expr : Exp α
+  state : State α
   deriving Countable
 
 theorem Ectx.fillItem_injective : Function.Injective (EctxItem.fillItem K) := by
   cases K <;> simp [Function.Injective, EctxItem.fillItem]
 
-theorem EctxItem.fillItem_isValue {K : EctxItem} : (K.fillItem e).isValue → e.isValue := by
+theorem EctxItem.fillItem_isValue {K : EctxItem α} : (K.fillItem e).isValue → e.isValue := by
   rintro ⟨w⟩
   cases K <;> (simp only [EctxItem.fillItem] at w; cases w) <;> exact ‹IsVal e›.toIsValue
 
-theorem EctxItem.fillItem_noVal_inj {Ki1 Ki2 : EctxItem} {e1 e2 : Exp}
+theorem EctxItem.fillItem_noVal_inj {Ki1 Ki2 : EctxItem α} {e1 e2 : Exp α}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
     (h : Ki1.fillItem e1 = Ki2.fillItem e2) : Ki1 = Ki2 := by
   cases Ki1 <;> cases Ki2 <;> simp_all [EctxItem.fillItem, Exp.ofVal] <;>
     grind [Val.ext_iff, Val.isValue, Exp.isValue_iff_isValueR]
 
 @[simp]
-def Exp.height : Exp → Nat
+def Exp.height : Exp α → Nat
   | bvar _ | fvar _ | lit _ => 1
   | lam e => 1 + e.height
   | fix e => 1 + e.height
@@ -791,10 +868,10 @@ def Exp.height : Exp → Nat
   | scrut e _ => 1 + e.height
   | fail => 1
 
-private theorem Exp.toVal?_of_isVal {e : Exp} (w : IsVal e) : ∃ v : Val, e.toVal? = some v ∧ v.1 = e :=
+private theorem Exp.toVal?_of_isVal {e : Exp α} (w : IsVal e) : ∃ v : Val α, e.toVal? = some v ∧ v.1 = e :=
   let ⟨w', hw'⟩ := w.check?_some; ⟨⟨e, w'⟩, by simp [toVal?, hw'], rfl⟩
 
-theorem EctxItem.decompItem_fillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue) :
+theorem EctxItem.decompItem_fillItem (Ki : EctxItem α) {e : Exp α} (hv : ¬e.isValue) :
     (Ki.fillItem e).decompItem = some (Ki, e) := by
   cases Ki with
   | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
@@ -804,63 +881,63 @@ theorem EctxItem.decompItem_fillItem (Ki : EctxItem) {e : Exp} (hv : ¬e.isValue
          hv', Exp.ofVal, Val.ext_iff, hv'e]
   | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv]
 
-theorem Exp.decompItem_fill {e e' : Exp} {Ki : EctxItem}
+theorem Exp.decompItem_fill {e e' : Exp α} {Ki : EctxItem α}
     (h : e.decompItem = some (Ki, e')) : Ki.fillItem e' = e ∧ ¬e'.isValue := by
   simp only [decompItem, toVal?] at h
-  have aux : ∀ x, IsVal.check? x = none → ¬Exp.isValue x :=
+  have aux : ∀ x : Exp α, IsVal.check? x = none → ¬x.isValue :=
     fun x h => IsVal.not_isValue_of_check?_none h
   cases e <;> simp_all [Exp.ofVal] <;>
     (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all)) <;>
     (split at h <;> simp_all <;> (try obtain ⟨rfl, rfl⟩ := h; simp_all))
 
-theorem EctxItem.fillItem_noVal {Ki : EctxItem} {e : Exp} (hv : ¬e.isValue) :
+theorem EctxItem.fillItem_noVal {Ki : EctxItem α} {e : Exp α} (hv : ¬e.isValue) :
     ¬(Ki.fillItem e).isValue := (hv <| EctxItem.fillItem_isValue ·)
 
-abbrev Ectx := List EctxItem
+abbrev Ectx α := List (EctxItem α)
 
 theorem List.eq_nil_or_snoc (l : List α) : l = [] ∨ ∃ l' x, l = l' ++ [x] := by
   rcases List.eq_nil_or_concat l with h | ⟨l', x, h⟩
   · exact .inl h
   · exact .inr ⟨l', x, List.concat_eq_append .. ▸ h⟩
 
-def Ectx.empty : Ectx := []
+def Ectx.empty : Ectx α := []
 
-def Ectx.comp (e1 e2 : Ectx) : Ectx := e2 ++ e1
+def Ectx.comp (e1 e2 : Ectx α) : Ectx α := e2 ++ e1
 
-def Ectx.fill (K : Ectx) (e : Exp) : Exp := K.foldl (flip EctxItem.fillItem) e
+def Ectx.fill (K : Ectx α) (e : Exp α) : Exp α := K.foldl (flip EctxItem.fillItem) e
 
-theorem fill_app (K1 K2 : Ectx) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
+theorem fill_app (K1 K2 : Ectx α) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :=
   List.foldl_append
 
-@[simp] theorem Ectx.fill_snoc (K : Ectx) (Ki : EctxItem) (e : Exp) :
+@[simp] theorem Ectx.fill_snoc (K : Ectx α) (Ki : EctxItem α) (e : Exp α) :
     Ectx.fill (K ++ [Ki]) e = Ki.fillItem (K.fill e) :=
   List.foldl_append
 
-theorem Ectx.fill_comp (K1 K2 : Ectx) (e : Exp) :
+theorem Ectx.fill_comp (K1 K2 : Ectx α) (e : Exp α) :
     K1.fill (K2.fill e) = (K1.comp K2).fill e := by
   simp [Ectx.comp, fill_app]
 
-theorem Ectx.fill_injective (K : Ectx) : Function.Injective K.fill := by
+theorem Ectx.fill_injective (K : Ectx α) : Function.Injective K.fill := by
   induction K with
   | nil => intro _ _ h; exact h
   | cons Ki K ih => exact fun _ _ h => Ectx.fillItem_injective (ih h)
 
-theorem Ectx.fill_noVal {K : Ectx} {e : Exp} (hv : ¬e.isValue) : ¬(K.fill e).isValue := by
+theorem Ectx.fill_noVal {K : Ectx α} {e : Exp α} (hv : ¬e.isValue) : ¬(K.fill e).isValue := by
   induction K generalizing e with
   | nil => exact hv
   | cons Ki K ih => exact ih (EctxItem.fillItem_noVal hv)
 
-theorem Ectx.fill_isValue {K : Ectx} {e : Exp} (hv : (K.fill e).isValue) : e.isValue :=
+theorem Ectx.fill_isValue {K : Ectx α} {e : Exp α} (hv : (K.fill e).isValue) : e.isValue :=
   if h : e.isValue then h else absurd hv (Ectx.fill_noVal h)
 
-theorem Exp.decompItem_height {e : Exp} (h : e.decompItem = some (Ki, e')) :
+theorem Exp.decompItem_height {e : Exp α} (h : e.decompItem = some (Ki, e')) :
     e'.height < e.height := by
   simp only [decompItem, toVal?] at h
   cases e <;> simp_all <;>
     (split at h <;> simp_all <;> try omega) <;>
     (split at h <;> simp_all <;> try omega)
 
-def Exp.decomp (e : Exp) : Ectx × Exp :=
+def Exp.decomp (e : Exp α) : Ectx α × Exp α :=
   match _h : e.decompItem with
   | some (Ki, e') =>
       let (K, e'') := decomp e'
@@ -869,21 +946,21 @@ def Exp.decomp (e : Exp) : Ectx × Exp :=
   termination_by e.height
   decreasing_by exact Exp.decompItem_height _h
 
-theorem Exp.decomp_unfold (e : Exp) :
+theorem Exp.decomp_unfold (e : Exp α) :
     e.decomp =
       match _ : e.decompItem with
       | some (Ki, e') => let (K, e'') := e'.decomp; (K ++ [Ki], e'')
       | none => ([], e) :=
   Exp.decomp.eq_1 e
 
-theorem Exp.decomp_inv_nil {e e' : Exp} (h : e.decomp = ([], e')) :
+theorem Exp.decomp_inv_nil {e e' : Exp α} (h : e.decomp = ([], e')) :
     e.decompItem = none ∧ e = e' := by
   rw [Exp.decomp] at h
   split at h
   · simp_all [List.append_eq_nil_iff]
   · exact ⟨by assumption, (Prod.mk.inj h).2⟩
 
-theorem Exp.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Exp}
+theorem Exp.decomp_inv_cons {Ki : EctxItem α} {K : Ectx α} {e e'' : Exp α}
     (h : e.decomp = (K ++ [Ki], e'')) :
     ∃ e', e.decompItem = some (Ki, e') ∧ e'.decomp = (K, e'') := by
   rw [decomp_unfold] at h
@@ -900,9 +977,9 @@ theorem Exp.decomp_inv_cons {Ki : EctxItem} {K : Ectx} {e e'' : Exp}
     exact ⟨e', hd, Prod.ext hK' (by simp [he])⟩
   · simp_all [List.append_eq_nil_iff]
 
-theorem Exp.decomp_fill {K : Ectx} {e e' : Exp} (h : e.decomp = (K, e')) :
+theorem Exp.decomp_fill {K : Ectx α} {e e' : Exp α} (h : e.decomp = (K, e')) :
     K.fill e' = e := by
-  suffices ∀ n K (e e' : Exp), K.length = n → e.decomp = (K, e') → K.fill e' = e by
+  suffices ∀ n K (e e' : Exp α), K.length = n → e.decomp = (K, e') → K.fill e' = e by
     exact this K.length K e e' rfl h
   intro n
   induction n with
@@ -920,9 +997,9 @@ theorem Exp.decomp_fill {K : Ectx} {e e' : Exp} (h : e.decomp = (K, e')) :
     rw [ih K'' e'' e' (by simp at hlen; omega) hK'']
     exact (decompItem_fill hKi).1
 
-theorem Exp.decomp_val_empty {K : Ectx} {e e' : Exp}
+theorem Exp.decomp_val_empty {K : Ectx α} {e e' : Exp α}
     (hd : e.decomp = (K, e')) (hv : e'.isValue) : K = [] := by
-  suffices ∀ n K (e e' : Exp), K.length = n → e.decomp = (K, e') → e'.isValue → K = [] by
+  suffices ∀ n K (e e' : Exp α), K.length = n → e.decomp = (K, e') → e'.isValue → K = [] by
     exact this K.length K e e' rfl hd hv
   intro n
   induction n with
@@ -939,7 +1016,7 @@ theorem Exp.decomp_val_empty {K : Ectx} {e e' : Exp}
     rw [(decomp_inv_nil hK'').2] at hKi
     exact absurd hv (decompItem_fill hKi).2
 
-theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
+theorem Exp.decomp_fill_comp {e e' : Exp α} {K K' : Ectx α}
     (hv : ¬e.isValue) (hd : e.decomp = (K', e')) :
     (K.fill e).decomp = (K' ++ K, e') := by
   suffices ∀ n K, K.length = n → (K.fill e).decomp = (K' ++ K, e') by
@@ -960,6 +1037,7 @@ theorem Exp.decomp_fill_comp {e e' : Exp} {K K' : Ectx}
     simp only [ih K'' (by simp at hlen; omega), List.append_assoc]
 
 /-- `x ∉ fv e` — LN replacement for the old string-based Fresh predicate. -/
-def Exp.Fresh (x : Var) (e : Exp) : Prop := x ∉ e.fv
+def Exp.Fresh (x : Var) (e : Exp α) : Prop := x ∉ e.fv
 
+end WithRealParam
 end ProbLang
