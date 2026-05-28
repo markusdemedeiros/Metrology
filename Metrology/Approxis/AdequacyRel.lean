@@ -15,7 +15,6 @@ public import Iris.Instances.Lib.FUpd
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 open Iris Iris.BI Iris.ProofMode OFE COFE Iris.Std DisjointLeibnizSet Auth HeapView
 open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS

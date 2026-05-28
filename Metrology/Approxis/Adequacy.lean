@@ -14,7 +14,6 @@ open scoped AppGS
 
 namespace ProbLang.AdequacyHelpers
 
-set_option linter.unusedSectionVars false
 
 section FupdPlainForall
 
@@ -175,6 +174,7 @@ theorem fupd_stepFupdN_plain_forall_1
       (iprop(◇ ∀ x, Φ x))).trans ?_
     exact step_fupdN_except_0 ∅ ∅ (iprop(∀ x, Φ x)) n
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem fupd_stepFupdN_plain_forall_3
     (Ψ : (State rT) → (Exp rT) → (State rT) → IProp GF)
     [instP : ∀ a b c, Plain (Ψ a b c)] (n : Nat) :
@@ -189,6 +189,7 @@ theorem fupd_stepFupdN_plain_forall_3
   exact fupd_stepFupdN_plain_forall_1 (GF := GF)
     (fun a => iprop(∀ b c, Ψ a b c)) n
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem fupd_stepFupdN_plain_forall_4
     (Ψ : (Exp rT) → (State rT) → (Exp rT) → (State rT) → IProp GF)
     [∀ a b c d, Plain (Ψ a b c d)] (n : Nat) :
@@ -226,7 +227,6 @@ end ProbLang.AdequacyHelpers
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 open ProbLang.AdequacyHelpers
 
@@ -448,6 +448,7 @@ theorem wpPre_value_Z_eq {v : (Val rT)} {Φ : (Val rT) → IProp GF} (E : CoPset
   funext σ₂ ρ' ε₂
   rw [Exp.toVal?_ofVal]
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem wpPre_match_eq (motive : Option (Val rT) → Sort u)
     (x : Option (Val rT)) (some_f : (v : (Val rT)) → motive (some v))
     (none_f : Unit → motive none) :

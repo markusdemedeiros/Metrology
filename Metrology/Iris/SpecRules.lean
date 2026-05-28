@@ -13,7 +13,6 @@ open Std Iris Iris.Std Iris.BI COFE ProbLang
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
@@ -74,6 +73,7 @@ theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec n ρ ρ') :
         MeasureTheory.Measure.dirac_bind Measurable.of_discrete,
         ih ⟨hrest⟩]
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- `nsteps PureStep n e1 e2` at a fixed state gives `DetExec n ⟨e1,σ⟩ ⟨e2,σ⟩`. -/
 theorem DetExec.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp rT} (σ : State rT)
     (h : nsteps PureStep n e1 e2) :
@@ -103,6 +103,7 @@ theorem ExtTreeMap.insert_eq_PartialMap_insert {V : Type _}
 The heap variants `DetHeadStep.alloc`/`load`/`store` already live in `DetStep.lean`.
 The two below are tape-specific and used by `step_alloctape` / `step_rand`. -/
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Tape allocation: `tape #z` deterministically allocates a fresh empty tape of
 bound `z`. -/
 theorem DetHeadStep.tape {z : Int} (σ : State rT) :
@@ -111,6 +112,7 @@ theorem DetHeadStep.tape {z : Int} (σ : State rT) :
        σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ :=
   .of_det _ _ (by simp [headStep])
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Tape rand: with `σ.tapes[α] = some ⟨z, n :: ns⟩`, the random sample
 `rand z α` deterministically returns `n` and pops the head. -/
 theorem DetHeadStep.rand_tape {z : Int} (l : Loc)

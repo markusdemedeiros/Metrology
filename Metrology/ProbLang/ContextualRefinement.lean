@@ -154,12 +154,15 @@ namespace Ctx
 applied *last*, so `[outer, ..., inner].fill e` is `outer[...[inner[e]]...]`. -/
 def fill (K : Ctx rT) (e : Exp rT) : Exp rT := K.foldr CtxItem.fill e
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem fill_nil (e : Exp rT) : fill ([] : Ctx rT) e = e := rfl
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem fill_cons (k : CtxItem rT) (K : Ctx rT) (e : Exp rT) :
     fill (k :: K) e = k.fill (K.fill e) := rfl
 
 /-- Clutch's `fill_ctx_app`: filling by `K' ++ K` is the same as filling
+omit [Countable rT] [MeasurableSingletonClass rT] in
 by `K` and then by `K'`. Uses `foldr_append`. -/
 theorem fill_append (K K' : Ctx rT) (e : Exp rT) :
     fill (K' ++ K) e = fill K' (fill K e) := by
@@ -332,6 +335,7 @@ def CtxItem.payloadFv : CtxItem rT → Finset Var
   | .randR e1 => e1.fv
   | _ => ∅
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Closing a free variable can only remove atoms from the fv set. -/
 theorem Exp.closeRec_fv_subset (e : Exp rT) (x : Var) (k : Nat) (y : Var)
     (hy : y ∈ (Exp.closeRec k x e).fv) : y ∈ e.fv := by
@@ -392,6 +396,7 @@ well-typed term. (Clutch `typed_ctx_item_typed`.)
 For the binder frames (`lam`/`fix`/`unpackL`/`unpackR`), this requires the
 frame's binder atom to be fresh in the hole. Elaborator-built frames
 satisfy this automatically since binder atoms come from the `freshAtom`
+omit [Countable rT] [MeasurableSingletonClass rT] in
 counter and never appear in user expressions. -/
 theorem TypedCtxItem.fill_typed {k : CtxItem rT} {Γ τ Γ' τ'} {e : Exp rT}
     (he : Typed Γ e τ) (hk : TypedCtxItem k Γ τ Γ' τ')
@@ -507,6 +512,7 @@ theorem TypedCtx.fill_typed {K : Ctx rT} {Γ τ Γ' τ'} {e : Exp rT}
       show Typed Γ3 (k.fill (K.fill e)) τ3
       exact TypedCtxItem.fill_typed hIH hk hfreshk
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Composing well-typed contexts. (Clutch `typed_ctx_compose`.) -/
 theorem TypedCtx.compose {K K' : Ctx rT} {Γ1 Γ2 Γ3 τ1 τ2 τ3}
     (hK : TypedCtx K Γ1 τ1 Γ2 τ2) (hK' : TypedCtx K' Γ2 τ2 Γ3 τ3) :
@@ -536,9 +542,11 @@ scoped notation Γ " ⊨ " e " ≤ctx≤ " e' " : " τ => CtxRefines Γ e e' τ
 
 namespace CtxRefines
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem refl {Γ τ} (e : Exp rT) : CtxRefines Γ e e τ := by
   intro _ _ _ _; exact le_refl _
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem trans {Γ τ} {e1 e2 e3 : Exp rT}
     (h12 : CtxRefines Γ e1 e2 τ) (h23 : CtxRefines Γ e2 e3 τ) :
     CtxRefines Γ e1 e3 τ := by
@@ -571,6 +579,7 @@ namespace CtxEquiv
 theorem refl {Γ τ} (e : Exp rT) : CtxEquiv Γ e e τ :=
   ⟨.refl e, .refl e⟩
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem symm {Γ τ} {e1 e2 : Exp rT} (h : CtxEquiv Γ e1 e2 τ) : CtxEquiv Γ e2 e1 τ :=
   ⟨h.2, h.1⟩
 

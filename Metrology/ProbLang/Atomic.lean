@@ -29,10 +29,15 @@ atomicity proofs for non-syntactically-atomic programs (a future extension).
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- `Atomic e` — every primitive step from `e` (at any state) reduces to a
 configuration whose expression is a value. This is the strong/physical flavor
 of atomicity. -/
@@ -47,6 +52,7 @@ For an expression `e` whose `decompItem = none` (i.e., it's a head-redex shape),
 `primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩` always, regardless of whether the headStep
 is positive. This lets us invert primStep positivity case-by-case via
 `HeadStepSupport`. -/
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem primStep_eq_headStep_of_decomp_nil
     {e : Exp rT} (hd : e.decompItem = none) (σ : State rT) :
     primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by

@@ -13,7 +13,6 @@ open scoped ENNReal
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
@@ -105,6 +104,7 @@ instance pglWpPre_contractive : Contractive (pglWpPre (rT := rT) (GF := GF)) whe
 noncomputable def pglWp (E : CoPset) (e : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
   fixpoint (pglWpPre (rT := rT) (GF := GF)) E e Φ
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Fixpoint unfolding for `pglWp`. -/
 theorem pglWp_unfold {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     pglWp (GF := GF) E e Φ ≡ pglWpPre (pglWp (rT := rT) (GF := GF)) E e Φ :=
@@ -112,6 +112,7 @@ theorem pglWp_unfold {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
 
 /-! ## Value rules -/
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Value introduction (fupd-flavored). -/
 theorem pglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     iprop(|={E}=> Φ v) ⊢@{IProp GF} pglWp E (Exp.ofVal v) Φ := by
@@ -126,6 +127,7 @@ theorem pglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   isplitl [Hε]; · iexact Hε
   iexact HΦ'
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Plain value introduction. -/
 theorem pglWp_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     Φ v ⊢@{IProp GF} pglWp E (Exp.ofVal v) Φ := by
@@ -134,6 +136,7 @@ theorem pglWp_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   imodintro
   iexact HΦ
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- General value form: from `e.toVal? = some v`, introduce `pglWp E e Φ`
 from `Φ v`. -/
 theorem pglWp_value_of_toVal {E : CoPset} {e : Exp rT} {v : Val rT}

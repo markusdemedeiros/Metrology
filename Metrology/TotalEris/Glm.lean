@@ -20,7 +20,6 @@ open scoped ENNReal
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
@@ -268,6 +267,7 @@ instance glmPre_mono {Z : Cfg rT → ENNReal → IProp GF} :
   mono_pred_ne.ne {_ s s'} hd := by
     have := eq_of_dist_discrete_leibniz hd; subst this; exact .of_eq rfl
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Unfolding equation: `glm` equals one application of the pre-functor at
 the fixpoint. -/
 theorem glm_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
@@ -278,6 +278,7 @@ theorem glm_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
         ((⟨e, σ⟩, ε) : GlmState rT) :=
   least_fixpoint_unfold _
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- **Strong induction principle for `glm`.** Specialization of iris's
 `least_fixpoint_ind` to the `glm` fixpoint.
 
@@ -298,6 +299,7 @@ theorem glm_strong_ind
   iapply least_fixpoint_ind (F := glmPre Z) (Φ := Ψ)
   iexact HM
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Strong monotonicity in the body `Z` under a *spatial* continuation wand.
 
 Uses the standard "carry the wand through the fixpoint" trick: the
@@ -370,6 +372,7 @@ theorem glm_strong_mono {e : Exp rT} {σ : State rT} {ε : ENNReal}
         iapply HP; iexact Hwand
   iapply HΨ; iexact HZ
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Monotonicity in the error grade: `ε ≤ ε' → glm e σ ε Z ⊢ glm e σ ε' Z`.
 Direct single-step weakening of the bound in both disjuncts (the recursive
 calls are unchanged). Rocq: `glm_mono_grading`. -/
@@ -403,6 +406,7 @@ theorem glm_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
     isplitr; · ipure_intro; exact Hpgl
     iexact HCont
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Combined ε-relaxation + body weakening. Direct composition of
 `glm_strong_mono` and `glm_mono_grading`. -/
 theorem glm_strong_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
@@ -416,6 +420,7 @@ theorem glm_strong_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
   · iexact HZ
   iexact HG
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Monotonicity in the body `Z` under an *intuitionistic* continuation
 entailment. Specialised, easier-to-use form of `glm_strong_mono`. -/
 theorem glm_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
@@ -574,6 +579,7 @@ theorem glm_bind {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal}
 
 /-! ## Introduction rules for `glm` -/
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- *Right-introduction* for the `prim_step` disjunct: from the appropriate
 coupling data, conclude `glm e σ ε Z`. Equivalent to Rocq's `glm_prim_step`. -/
 theorem glm_prim_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
@@ -591,6 +597,7 @@ theorem glm_prim_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
   iright; ileft
   iexact HPS
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- *Right-introduction* for the state-step disjunct: from the coupling
 data on `tapePresample σ α` (with positively-bounded tape `α`), conclude
 `glm e σ ε Z`. -/
@@ -611,6 +618,7 @@ theorem glm_state_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
   iright; iright
   iexact HSS
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- *Right-introduction* for the out-of-thin-air disjunct. -/
 theorem glm_credit_bump {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :

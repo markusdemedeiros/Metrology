@@ -22,7 +22,6 @@ open scoped AppGS
 namespace ProbLang
 namespace TotalEris
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
@@ -228,7 +227,7 @@ example (E : CoPset) (v : Val rT) (R : Prop) (HR : R) :
 /-- `twp_rand_exp` (the wrapper) smoke test on `rand 2 ()` with the
 geometric-style error fn `F 0 = 0`, `F 1 = ε`. Continuation receives
 the per-outcome credit. -/
-example (E : CoPset) (ε : ENNReal) (Hε : ε ≤ 1) :
+example (E : CoPset) (ε : ENNReal) :
     ⊢@{IProp GF} ↯ε -∗
       tglWp E (.rand (.lit (.int 2)) (.lit .unit))
         (fun w : Val rT => iprop(∃ n : Int, ⌜0 ≤ n ∧ n < 2 ∧
@@ -240,7 +239,7 @@ example (E : CoPset) (ε : ENNReal) (Hε : ε ≤ 1) :
     (HSum := by
       simp only [F, show (2 : Int).toNat = 2 from rfl,
         Finset.sum_range_succ, Finset.sum_range_zero, zero_add,
-        Nat.reduceEqDiff, ↓reduceIte, if_pos rfl]
+        Nat.reduceEqDiff, ↓reduceIte]
       rw [show ((2 : ℕ) : ENNReal) = 1 + 1 from by norm_num, add_mul, one_mul]
       exact le_self_add)) $$ Hcr
   iintro %n ⟨%Hn, _⟩

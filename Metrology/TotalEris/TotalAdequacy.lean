@@ -42,7 +42,6 @@ open scoped AppGS ENNReal
 namespace ProbLang
 namespace TotalEris
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {hlc : Bool} {GF : BundledGFunctors}
@@ -61,6 +60,7 @@ def Tgl (μ : MeasureTheory.Measure (Cfg rT)) (φ : (Val rT) → Prop) (ε : ENN
 
 namespace Tgl
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Termination-mass inequality. Rocq: `tgl_termination_ineq`
 (`graded_predicate_lifting.v:744`). The masses on the φ-set bound the
 overall mass from below. -/
@@ -68,6 +68,7 @@ theorem termination_ineq {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) �
     {ε : ENNReal} (h : Tgl μ φ ε) : 1 - ε ≤ μ Set.univ :=
   h.trans (MeasureTheory.measure_mono (Set.subset_univ _))
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- `Tgl μ φ ε` together with `μ Set.univ ≤ 1` (sub-probability) gives
 `Pgl ε (¬ value-and-φ) μ`. Rocq: `tgl_implies_pgl`. -/
 theorem implies_pgl {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
@@ -95,11 +96,13 @@ theorem implies_pgl {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Pro
     exact h_one_minus_le
   exact (ENNReal.add_le_add_iff_left hS_ne_top).mp hcomb
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Monotonicity in the error grade. Rocq: `tgl_mon_grading`. -/
 theorem mono_grading {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
     {ε ε' : ENNReal} (hε : ε ≤ ε') (h : Tgl μ φ ε) : Tgl μ φ ε' :=
   (tsub_le_tsub_left hε 1).trans h
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- `1 ≤ ε` trivially gives `Tgl μ φ ε` for any `μ`, `φ`. Rocq:
 `tgl_ge_1`. -/
 theorem of_ge_one {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
@@ -108,6 +111,7 @@ theorem of_ge_one {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
   rw [tsub_eq_zero_of_le hε]
   exact zero_le _
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Monotonicity in the predicate (covariant). Rocq: `tgl_mon_pred`. -/
 theorem mono_pred {μ : MeasureTheory.Measure (Cfg rT)} {φ ψ : (Val rT) → Prop}
     {ε : ENNReal} (hφψ : ∀ v, φ v → ψ v) (h : Tgl μ φ ε) : Tgl μ ψ ε := by
@@ -115,11 +119,13 @@ theorem mono_pred {μ : MeasureTheory.Measure (Cfg rT)} {φ ψ : (Val rT) → Pr
   rintro x ⟨v, hxv, hφ⟩
   exact ⟨v, hxv, hφψ v hφ⟩
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Predicate extensionality. Rocq: `tgl_ext`. -/
 theorem ext {μ : MeasureTheory.Measure (Cfg rT)} {φ ψ : (Val rT) → Prop}
     {ε : ENNReal} (h_iff : ∀ v, φ v ↔ ψ v) (h : Tgl μ φ ε) : Tgl μ ψ ε :=
   mono_pred (fun v => (h_iff v).mp) h
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Dirac on a value config satisfies `Tgl` at grade 0 whenever the
 value satisfies the predicate. Rocq: `tgl_dret`. -/
 theorem of_dirac_val {v : (Val rT)} {σ : (State rT)} {φ : (Val rT) → Prop} (hφ : φ v) :
@@ -131,6 +137,7 @@ theorem of_dirac_val {v : (Val rT)} {σ : (State rT)} {φ : (Val rT) → Prop} (
   rw [MeasureTheory.Measure.dirac_apply' _ MeasurableSet.of_discrete]
   simp [Set.indicator_of_mem h_mem]
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- `Tgl` for `limExec` at a value config: when `e` is already a value
 `v` with `φ v`, the program terminates at grade `0`. Pure structural
 fact independent of the WP soundness. -/
@@ -140,6 +147,7 @@ theorem of_limExec_val {v : (Val rT)} {σ : (State rT)} {φ : (Val rT) → Prop}
   rw [limExec_of_isVal v.2]
   exact of_dirac_val hφ
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- ε-limit: if `Tgl μ φ ε` holds for every `ε > ε'`, then `Tgl μ φ ε'`.
 Rocq: `tgl_epsilon_limit`. Needed for `twp_tgl_limit`. -/
 theorem epsilon_limit {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}

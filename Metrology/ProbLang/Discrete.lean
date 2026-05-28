@@ -35,8 +35,6 @@ namespace BaseLit
   | .loc l      => .loc l
   | .lbl l      => .lbl l
   | .real r     => .real {r}
-  | .prod b1 b2 => .prod (singletonCyl b1) (singletonCyl b2)
-  | .nest b r   => .nest (singletonCyl b) {r}
 
 theorem singletonCyl_flatten {rT : Type _} (b : BaseLit rT) :
     (singletonCyl b).flatten = {b} := by
@@ -47,8 +45,6 @@ theorem singletonCyl_flatten {rT : Type _} (b : BaseLit rT) :
   | loc l => simp
   | lbl l => simp
   | real r => simp
-  | prod b1 b2 ih1 ih2 => simp [ih1, ih2]
-  | nest b r ih => simp [ih]
 
 theorem singletonCyl_hasMeasurableLeaves
     {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] (b : BaseLit rT) :
@@ -60,8 +56,6 @@ theorem singletonCyl_hasMeasurableLeaves
   | loc l => exact .loc
   | lbl l => exact .lbl
   | real r => exact .real _ (MeasurableSet.singleton r)
-  | prod b1 b2 ih1 ih2 => exact .prod ih1 ih2
-  | nest b r ih => exact .nest _ ih (MeasurableSet.singleton r)
 
 instance instMeasurableSingletonClass
     {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] :

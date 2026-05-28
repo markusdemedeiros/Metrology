@@ -28,6 +28,7 @@ def execExactN (N : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   | 0 => if ρ.expr.isValue then dirac ρ else 0
   | N + 1 => if ρ.expr.isValue then 0 else (primStep ρ).bind (execExactN N)
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- execN is the sum of its conditional distributions -/
 theorem execExactN_sum {n : Nat} {ρ : Cfg rT} {S} :
     execN n ρ S = ∑'(N : Nat), if N < n then execExactN N ρ S else 0 := by
@@ -123,6 +124,7 @@ We do not port the `markov` structure itself. Rocq's `step_or_final`, `pexec n`
 and `exec n` all collapse to our `execN` because `mstate_ret = Cfg`. See
 `notes/plan-markov.md` for the full port plan. -/
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- `∑'` and `⨆` commute for monotone ℕ-indexed ENNReal sequences. -/
 theorem ENNReal.tsum_iSup_of_monotone {f : ℕ → Cfg rT → ENNReal} (hf : ∀ a, Monotone (f · a)) :
     ∑' a, ⨆ n, f n a = ⨆ n, ∑' a, f n a := by
@@ -131,6 +133,7 @@ theorem ENNReal.tsum_iSup_of_monotone {f : ℕ → Cfg rT → ENNReal} (hf : ∀
 
 /-- Apply an `iSup` of measures at a singleton of a discrete space (specialized
 to `Cfg`). Mathlib does not provide a `Measure.iSup_apply` for general sets;
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 this is the specialized form we need. -/
 theorem iSup_measure_apply {f : ℕ → Measure (Cfg rT)} {c : Cfg rT} :
     (⨆ i, f i) {c} = ⨆ i, f i {c} := by
@@ -176,6 +179,7 @@ theorem Measure.bind_mono_right {α β : Type*} [MeasurableSpace α] [Measurable
       bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
   exact lintegral_mono (fun a => h a S)
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Helper: `execN n ≤ execN (n+1)`. -/
 private theorem execN_succ_le (n : ℕ) (ρ : Cfg rT) : execN n ρ ≤ execN (n + 1) ρ := by
   induction n generalizing ρ with
@@ -188,14 +192,17 @@ private theorem execN_succ_le (n : ℕ) (ρ : Cfg rT) : execN n ρ ≤ execN (n 
 
 /-! ### Primitive unfoldings -/
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 -- Rocq: (boundary; no direct analogue — `stepN_O` / `exec 0` cases)
 @[simp] theorem execN_zero (ρ : Cfg rT) : execN 0 ρ = 0 := rfl
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 -- Rocq: Lemma exec_is_final — applied to the successor case
 @[simp] theorem execN_succ_isValue {ρ : Cfg rT} (hv : ρ.expr.isValue) (n : Nat) :
     execN (n + 1) ρ = dirac ρ := by
   simp [execN, hv]
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 -- Rocq: Lemma exec_Sn_not_final
 theorem execN_succ_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) (n : Nat) :
     execN (n + 1) ρ = (primStep ρ).bind (execN n) := by
@@ -211,10 +218,12 @@ that have reached a value. -/
 def stepOrFinal (ρ : Cfg rT) : Measure (Cfg rT) :=
   if ρ.expr.isValue then dirac ρ else primStep ρ
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem stepOrFinal_isValue {ρ : Cfg rT} (hv : ρ.expr.isValue) :
     stepOrFinal ρ = dirac ρ := by
   simp [stepOrFinal, hv]
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem stepOrFinal_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) :
     stepOrFinal ρ = primStep ρ := by
   simp [stepOrFinal, hv]
@@ -263,6 +272,7 @@ with `execN` directly otherwise. -/
 
 /-! ### `limExec` basics (ported from `SampCert/SLang.lean`) -/
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 -- Rocq: lim_exec_final (value case)
 theorem limExec_of_isVal {e : Exp rT} {σ : State rT} (Hv : IsVal e) :
     limExec ⟨e, σ⟩ = dirac ⟨e, σ⟩ := by
@@ -324,11 +334,14 @@ def pexecN (n : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
 def pexecN_measurable {n : Nat} : Measurable (pexecN (rT := rT) n) := Measurable.of_discrete
 
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem pexecN_zero (ρ : Cfg rT) : pexecN 0 ρ = dirac ρ := rfl
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem pexecN_succ (n : Nat) (ρ : Cfg rT) :
     pexecN (n + 1) ρ = (stepOrFinal ρ).bind (pexecN n) := rfl
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 -- Rocq: pexec_1 / stepN_1
 theorem pexecN_one (ρ : Cfg rT) : pexecN 1 ρ = stepOrFinal ρ := by
   show (stepOrFinal ρ).bind (pexecN 0) = stepOrFinal ρ

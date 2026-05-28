@@ -23,7 +23,6 @@ open scoped ENNReal AppGS
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 

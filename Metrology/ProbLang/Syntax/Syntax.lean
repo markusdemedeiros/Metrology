@@ -100,9 +100,6 @@ inductive BaseLit (rT : Type _)
   | loc (loc : Loc)
   | lbl (lbl : Lbl)
   | real (r : rT)
-  -- TEMP for measurability prototyping
-  | prod (b1 b2 : BaseLit rT)
-  | nest (b : BaseLit rT) (r : rT)
   deriving Countable, BEq
 
 @[uncurriedProjections, curriedProjections, constructors]
@@ -397,21 +394,12 @@ instance [DecidableEq α] : DecidableEq (BaseLit α)
   | .loc l1, .loc l2 => decidable_of_iff (l1 = l2) (by simp)
   | .lbl l1, .lbl l2 => decidable_of_iff (l1 = l2) (by simp)
   | .real r1, .real r2 => decidable_of_iff (r1 = r2) (by simp)
-  | .prod a1 b1, .prod a2 b2 =>
-      have := instDecidableEqBaseLit a1 a2
-      have := instDecidableEqBaseLit b1 b2
-      decidable_of_iff (a1 = a2 ∧ b1 = b2) (by simp)
-  | .nest b1 r1, .nest b2 r2 =>
-      have := instDecidableEqBaseLit b1 b2
-      decidable_of_iff (b1 = b2 ∧ r1 = r2) (by simp)
-  | .int _, .bool _ | .int _, .unit | .int _, .loc _ | .int _, .lbl _ | .int _, .real _ | .int _, .prod _ _ | .int _, .nest _ _
-  | .bool _, .int _ | .bool _, .unit | .bool _, .loc _ | .bool _, .lbl _ | .bool _, .real _ | .bool _, .prod _ _ | .bool _, .nest _ _
-  | .unit, .int _ | .unit, .bool _ | .unit, .loc _ | .unit, .lbl _ | .unit, .real _ | .unit, .prod _ _ | .unit, .nest _ _
-  | .loc _, .int _ | .loc _, .bool _ | .loc _, .unit | .loc _, .lbl _ | .loc _, .real _ | .loc _, .prod _ _ | .loc _, .nest _ _
-  | .lbl _, .int _ | .lbl _, .bool _ | .lbl _, .unit | .lbl _, .loc _ | .lbl _, .real _ | .lbl _, .prod _ _ | .lbl _, .nest _ _
-  | .real _, .int _ | .real _, .bool _ | .real _, .unit | .real _, .loc _ | .real _, .lbl _ | .real _, .prod _ _ | .real _, .nest _ _
-  | .prod _ _, .int _ | .prod _ _, .bool _ | .prod _ _, .unit | .prod _ _, .loc _ | .prod _ _, .lbl _ | .prod _ _, .real _ | .prod _ _, .nest _ _
-  | .nest _ _, .int _ | .nest _ _, .bool _ | .nest _ _, .unit | .nest _ _, .loc _ | .nest _ _, .lbl _ | .nest _ _, .real _ | .nest _ _, .prod _ _ =>
+  | .int _, .bool _ | .int _, .unit | .int _, .loc _ | .int _, .lbl _ | .int _, .real _
+  | .bool _, .int _ | .bool _, .unit | .bool _, .loc _ | .bool _, .lbl _ | .bool _, .real _
+  | .unit, .int _ | .unit, .bool _ | .unit, .loc _ | .unit, .lbl _ | .unit, .real _
+  | .loc _, .int _ | .loc _, .bool _ | .loc _, .unit | .loc _, .lbl _ | .loc _, .real _
+  | .lbl _, .int _ | .lbl _, .bool _ | .lbl _, .unit | .lbl _, .loc _ | .lbl _, .real _
+  | .real _, .int _ | .real _, .bool _ | .real _, .unit | .real _, .loc _ | .real _, .lbl _ =>
       isFalse (by intro h; cases h)
 
 /-- Try to match an expression against a pattern. -/
@@ -440,8 +428,6 @@ theorem BaseLit.beq_self_true (l : BaseLit rT) : (l == l) = true := by
   | real r =>
     show (r == r) = true
     exact BEq.refl r
-  | prod _ _ => sorry
-  | nest _ _ => sorry
 
 /-- `tryMatch (.lit l) (.lit l) = some (.lit .unit)`. -/
 theorem Pat.tryMatch_lit_eq (l : BaseLit rT) :

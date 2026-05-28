@@ -402,6 +402,7 @@ cofinite-typing hypothesis to a cofinite-LC witness directly. The `tlam`
 and `tunpack` cases use that an LC term is unchanged by opening
 (`Exp.open_lc`). -/
 
+omit [ProbLangℝ rT] in
 theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp rT} {τ : Ty}
     (h : Typed Γ e τ) : Exp.IsLocallyClosed e := by
   induction h with
@@ -449,6 +450,7 @@ theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp rT} {τ : Ty}
   | rand_unit _ _ ih1 ih2 => exact .rand ih1 ih2
   | scrut _ _ ih => exact .scrut _ ih
 
+omit [ProbLangℝ rT] in
 /-- Every typed expression's free variables lie in the typing context's domain. -/
 theorem Typed.fvSubset {Γ : Tctx} {e : Exp rT} {τ : Ty}
     (h : Typed Γ e τ) : ∀ x ∈ e.fv, (Γ x).isSome := by
@@ -598,6 +600,7 @@ preserves typing.
 The proof is induction on `Typed`. Cofinite cases use `subst_open_var` to
 push `subst` through `open'`, mirroring `Properties.open_close_to_subst`. -/
 
+omit [ProbLangℝ rT] in
 theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
     {Γ' : Tctx} (h : Typed Γ' e τ) :
     ∀ (x y : Var) (τ_x : Ty) (Γ : Tctx),

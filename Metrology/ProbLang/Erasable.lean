@@ -51,6 +51,7 @@ def Erasable (μ : Measure (State rT)) (σ : State rT) : Prop :=
 
 /-- Two measures on `Cfg` are equal iff they agree on every singleton.
 Uses `⊤`-measurable space + countability of `Cfg` via `tsum` over
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 singletons. -/
 theorem Cfg.measure_ext_singletons {μ ν : Measure (Cfg rT)}
     (h : ∀ c : Cfg rT, μ {c} = ν {c}) : μ = ν := by
@@ -74,6 +75,7 @@ namespace Erasable
 
 /-- The dirac distribution at `σ` is erasable at `σ`. The bind collapses
 to a single evaluation at `σ`, after which the projection is trivially
+omit [Countable rT] [MeasurableSingletonClass rT] in
 equal. -/
 theorem dret (σ : State rT) : Erasable (Measure.dirac σ) σ := by
   intro e m
@@ -86,6 +88,7 @@ then `μ₁ >>= μ₂` is erasable at `σ`.
 Clutch's proof has a support-conditional hypothesis (`μ₁ σ' > 0`). For
 measures we strengthen it to an unconditional hypothesis; the
 conditional form follows because any kernel can be modified on a null
+omit [Countable rT] [MeasurableSingletonClass rT] in
 set without changing the bind. -/
 theorem dbind {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
     (h₁ : Erasable μ₁ σ) (h₂ : ∀ σ', Erasable (μ₂ σ') σ') :
@@ -197,6 +200,7 @@ theorem mass {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) :
   exact hboth
 
 /-- A two-branch erasable combinator: dispatching on a measurable Boolean
+omit [Countable rT] [MeasurableSingletonClass rT] in
 function through a total distribution yields an erasable combination. -/
 theorem dbind_predicate {A : Type*} [MeasurableSpace A] [DiscreteMeasurableSpace A]
     {μ : Measure A} {μ₁ μ₂ : Measure (State rT)} {σ : State rT} {f : A → Bool}
@@ -233,6 +237,7 @@ def Rewritable (ρ : Cfg rT) (μ : Measure (Cfg rT)) : Prop :=
 
 namespace Rewritable
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Dirac rewritability: `limExec ρ = dirac ρ >>= limExec`. -/
 theorem dret (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
   show limExec ρ = (Measure.dirac ρ).bind limExec

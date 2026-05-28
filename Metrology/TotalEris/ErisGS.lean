@@ -29,7 +29,6 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 namespace TotalEris
 

@@ -55,6 +55,7 @@ theorem PureExec.fill (K : Ectx rT) {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     [h : PureExec φ n e1 e2] : PureExec φ n (K.fill e1) (K.fill e2) where
   pure_exec hφ := PureStep.fill_nsteps K (h.pure_exec hφ)
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem PureExec.reducible {σ : State rT} {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     Reducible e1 σ := by
@@ -81,12 +82,14 @@ theorem rtc_pure_step_val {n : ℕ} {v : Val rT} {e : Exp rT}
     obtain ⟨ρ, hρ⟩ := hstep.safe default
     exact absurd v.2.toIsValue (val_stuck hρ)
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem as_val_isSome {e : Exp rT} (h : ∃ v : Val rT, v.1 = e) : e.isValue := by
   obtain ⟨⟨_, hv⟩, rfl⟩ := h
   exact hv.toIsValue
 
 
 /-- Build a `PureHeadStep e1 e2` from a proof that `headStep` always maps
+    omit [Countable rT] [MeasurableSingletonClass rT] in
     `⟨e1, σ⟩` to `dirac ⟨e2, σ⟩`. The `safe` field is derived automatically. -/
 theorem PureHeadStep.of_det (e1 e2 : Exp rT)
     (hdet : ∀ σ, headStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1) :
@@ -106,9 +109,11 @@ structure DetHeadStep (cfg1 cfg2 : Cfg rT) : Prop where
   safe : ∃ ρ : Cfg rT, 0 < headStep cfg1 {ρ}
   det  : headStep cfg1 {cfg2} = 1
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetHeadStep.pos {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) : 0 < headStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetHeadStep.of_det (cfg1 cfg2 : Cfg rT)
     (hdet : headStep cfg1 {cfg2} = 1) : DetHeadStep cfg1 cfg2 :=
   ⟨⟨cfg2, hdet ▸ one_pos⟩, hdet⟩
@@ -118,6 +123,7 @@ structure DetStep (cfg1 cfg2 : Cfg rT) : Prop where
   safe : Reducible cfg1.expr cfg1.state
   det  : primStep cfg1 {cfg2} = 1
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetStep.pos {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) : 0 < primStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
@@ -128,6 +134,7 @@ theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) :
 class DetExec (n : ℕ) (cfg1 cfg2 : Cfg rT) : Prop where
   det_exec : nsteps DetStep n cfg1 cfg2
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetExec.succ {cfg1 cfg2 cfg3 : Cfg rT} {n : ℕ}
     (hstep : DetStep cfg1 cfg2) [hrest : DetExec n cfg2 cfg3] :
     DetExec (n + 1) cfg1 cfg3 where
@@ -316,9 +323,11 @@ theorem DetStep.fill (K : Ectx rT) {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) 
   safe := h.safe.fill K
   det := by rw [← primStep_fill_singleton (val_stuck h.pos)]; exact h.det
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetExec.refl (cfg : Cfg rT) : DetExec 0 cfg cfg where
   det_exec := rfl
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetExec.cons {cfg1 cfg2 cfg3 : Cfg rT} {n : ℕ}
     (hstep : DetStep cfg1 cfg2) (hrest : DetExec n cfg2 cfg3) :
     DetExec (n + 1) cfg1 cfg3 where

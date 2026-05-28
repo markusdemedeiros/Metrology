@@ -17,7 +17,6 @@ open scoped AppGS
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
@@ -174,6 +173,7 @@ theorem primStep_rand_lbl_empty {z : Int} (Hz : 0 < z) (σ : State rT) (l : Loc)
 /-! ## Coupling-context helpers -/
 
 open MeasureTheory in
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Lift a coupling between `μ` and `primStep ⟨e, σ⟩` to one between `μ` and
 `primStep ⟨K.fill e, σ⟩` via `λ a (e', σ'). ∃ e'', e' = K.fill e'' ∧ R a (e'', σ')`. -/
 theorem AddCoupl_steps_ctx_bind_r {α} [MeasurableSpace α] [DiscreteMeasurableSpace α]
@@ -193,6 +193,7 @@ theorem AddCoupl_steps_ctx_bind_r {α} [MeasurableSpace α] [DiscreteMeasurableS
   exact HR
 
 open MeasureTheory in
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Variant of `AddCoupl_steps_ctx_bind_r` where the relation only depends on
 the expression of the second component. -/
 theorem AddCoupl_steps_ctx_bind_r_no_state

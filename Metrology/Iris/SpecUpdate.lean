@@ -12,7 +12,6 @@ open Std Iris Iris.Std Iris.BI COFE ProbLang MeasureTheory.Measure Measurable
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 /-- Spec Update. Gives an interpretation of a spec into an resource. -/
 class SpecUpdateGS (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]

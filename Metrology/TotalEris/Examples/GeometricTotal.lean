@@ -30,7 +30,6 @@ namespace ProbLang
 namespace TotalEris
 namespace Examples
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {hlc : Bool} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
@@ -150,8 +149,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     (HSum := by
       -- `∑ n ∈ range 2, F n = F 0 + F 1 = 0 + (3/2)*ε = (3/2)*ε ≤ 2 * ε`.
       simp only [F, show (2 : Int).toNat = 2 from rfl, Finset.sum_range_succ,
-        Finset.sum_range_zero, zero_add, Nat.reduceEqDiff, ↓reduceIte,
-        if_true, if_false]
+        Finset.sum_range_zero, zero_add, Nat.reduceEqDiff, ↓reduceIte]
       rw [show ((2 : ℕ) : ENNReal) = 2 from by norm_num]
       -- Goal reduces to `(3/2)*ε ≤ 2 * ε`. Multiplying by 2: `3*ε ≤ 4*ε`. ✓
       rw [show (2 : ENNReal) = (3/2 : NNReal) + (1/2 : NNReal) from by
@@ -204,7 +202,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     -- After C, the goal still has `cond (ofVal ⟨lit true, lit⟩) …`. The
     -- `PureExec`/`iapply` unifier won't reduce `ofVal` even though defeq —
     -- so `simp only [Exp.ofVal]` makes the literal form syntactic.
-    simp only [Exp.ofVal]
+    simp only
     -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true`.
     twp_pure_at
       (Exp.cond (.lit (.bool true)) (.lit (.int 0))
@@ -254,7 +252,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     -- Step C: value collapse.
     iapply (ErisWpGS.tglWp_value_of_toVal
       (v := ⟨.lit (.bool false), IsVal.lit⟩) rfl)
-    simp only [Exp.ofVal]
+    simp only
     -- Step D: `cond (lit false) et ef → ef` via `pureExec_cond_false`.
     twp_pure_at
       (Exp.cond (.lit (.bool false)) (.lit (.int 0))

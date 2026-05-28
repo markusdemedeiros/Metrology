@@ -23,7 +23,6 @@ namespace ProbLang
 
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
@@ -69,12 +68,15 @@ end ApproxisInstance
 
 /-! ### `toVal?` simp lemmas for head-step successor expressions -/
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_lit (b : (BaseLit rT)) :
     (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit⟩ := rfl
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_lam (e : (Exp rT)) :
     (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam⟩ := rfl
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_fix (e : (Exp rT)) :
     (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix⟩ := rfl
 

@@ -9,7 +9,6 @@ open scoped ENNReal
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
@@ -24,6 +23,7 @@ Port of `clutch/theories/eris/total_lifting.v`. These let us prove
 `tgl_wp` triples by exhibiting an appropriate `glm` coupling. Mirrors
 the partial-WP lifting in `Metrology/TotalEris/Lifting.lean`. -/
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Lift a `glm`-shaped predicate into `tgl_wp`. Rocq:
 `twp_lift_step_fupd_glm`. -/
 theorem twp_lift_step_fupd_glm {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}

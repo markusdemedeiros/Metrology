@@ -15,7 +15,6 @@ public import Metrology.ProbLang.Discrete
 section SpecRA
 open Std Iris Iris.Std COFE ProbLang
 
-set_option linter.unusedSectionVars false
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
 instance : COFE (Exp rT) := COFE.ofDiscrete _ Eq_Equivalence
@@ -114,6 +113,7 @@ variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 
 open ProbLang.Cfg
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp rT} (H : some (Excl.excl e1) ≼ some (Excl.excl e2)) :
     e1 = e2 := by
   have H' := Option.inc_iff.mp H

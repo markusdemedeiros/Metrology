@@ -28,12 +28,14 @@ def Exp.asValM [MeasurableSpace T] (e : Exp rT) (f : Val rT → Measure T) : Mea
 def Exp.isValM [MeasurableSpace T] (e : Exp rT) (m : Measure T) : Measure T :=
   if e.isValue then m else 0
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp rT} {m : Measure T} (He : e.isValue) :
     e.isValM m = m := if_pos He
 
 theorem Exp.isValM_some' [MeasurableSpace T] {e : Exp rT} {m : Measure T} (w : IsVal e) :
     e.isValM m = m := isValM_some w.toIsValue
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp rT} {m : Measure T} (He : ¬ e.isValue) :
     e.isValM m = 0 := if_neg He
 
@@ -235,10 +237,12 @@ def headStepKernel : Kernel (Cfg rT) (Cfg rT) where
   measurable' := .of_discrete
   toFun := headStep
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
     0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
   head_case <;> simp [Exp.isValue_iff_isValueR]
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem Exp.toVal?_isValue {e : Exp rT} : e.toVal? = some v → e.isValue := by
   intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
@@ -355,6 +359,7 @@ inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
   Pat.tryMatch p e = none →
   HeadStepSupport ⟨.scrut e p, σ⟩ ⟨.inr (.lit .unit), σ⟩
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp]
 theorem dirac_singleton_pos {a b : Cfg rT} :
     0 < (dirac a) {b} ↔ a = b := by
@@ -363,6 +368,7 @@ theorem dirac_singleton_pos {a b : Cfg rT} :
     split <;> simp; trivial
   · simp_all [dirac_apply_of_mem (Set.mem_singleton _)]
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp]
 theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp rT} {m : Measure T} {s : Set T} :
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
@@ -377,6 +383,7 @@ theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
   cases opt <;> simp [Option.unwrapM]
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp]
 theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp rT} {f : Val rT → Measure T} :
     0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
@@ -398,6 +405,7 @@ theorem Cfg.uniform_singleton_pos_inv {z : Int} {σ : State rT} {ρ : Cfg rT}
     have ⟨h1, h2⟩ := (Cfg.mk.injEq ..).mp h
     exact ⟨h2.symm, .inr ⟨Hz, h1.symm⟩⟩
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State rT}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) :
     0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩} := by
@@ -499,15 +507,18 @@ theorem headStep_support_iff (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
       rw [if_neg (Ne.symm hzN)]
       exact Cfg.uniform_singleton_nonpos Hz
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp rT} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
   rw [Exp.isValM, if_pos he]; infer_instance
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp rT} {f : Val rT → Measure T}
     {v : Val rT} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
     IsProbabilityMeasure (e.asValM f) := by
   simp [Exp.asValM, hv]; infer_instance
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
     IsProbabilityMeasure (Cfg.uniform z σ) := by
   unfold Cfg.uniform Int.isPos

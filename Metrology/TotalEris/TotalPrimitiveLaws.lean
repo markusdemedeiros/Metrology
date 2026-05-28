@@ -23,7 +23,6 @@ open scoped AppGS
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
@@ -32,12 +31,15 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingl
 Local re-statement so this file does not depend on Approxis's
 `PrimitiveLaws.lean` (eris should not need Approxis at all). -/
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_lit (b : BaseLit rT) :
     (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit⟩ := rfl
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_lam (e : Exp rT) :
     (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam⟩ := rfl
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_fix (e : Exp rT) :
     (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix⟩ := rfl
 

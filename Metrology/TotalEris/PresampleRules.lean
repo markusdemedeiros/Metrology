@@ -25,7 +25,6 @@ open scoped AppGS ENNReal
 namespace ProbLang
 namespace TotalEris
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]

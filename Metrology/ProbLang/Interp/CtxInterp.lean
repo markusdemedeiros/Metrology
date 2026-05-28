@@ -26,7 +26,6 @@ as possible:
 namespace ProbLang
 namespace EvalPrim
 
-set_option linter.unusedSectionVars false
 variable {rT : Type _} [ProbLangℝ rT]
 
 /-- Interpreter error type. -/

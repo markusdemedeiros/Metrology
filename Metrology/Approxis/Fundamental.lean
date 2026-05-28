@@ -20,7 +20,6 @@ namespace ProbLang
 open Cslib Exp
 
 section Fundamental
-set_option linter.unusedSectionVars false
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
@@ -798,6 +797,7 @@ theorem refines_proper_wand (E : CoPset) (e e' : Exp rT) {A B : lrel rT GF}
     refines E e e' A ⊢@{IProp GF} refines E e e' B :=
   refines_proper_entails E e e' h
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- lrel-level OFE-rewrite at a value pair: bridge `A v v'` and `B v v'`
 when `A ≡ B`. Used for value-relation level rewrites under e.g.
 `lrel_exists` instantiation. -/
@@ -1981,6 +1981,7 @@ theorem TctxRelated.insert {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT GF
         show some (interp τ' Δ) = some A
         rw [heq]
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Helper: an `isSome` lookup in a `RelCtx` gives a list-membership witness. -/
 theorem RelCtx.exists_mem_of_lookup_isSome {Γ : RelCtx rT GF} {x : Var}
     (h : (Γ.lookup x).isSome) : ∃ p ∈ Γ, p.1 = x := by

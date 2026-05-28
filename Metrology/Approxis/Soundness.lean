@@ -17,7 +17,6 @@ namespace ProbLang
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
-set_option linter.unusedSectionVars false
 
 section Soundness
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
@@ -32,6 +31,7 @@ def Ctx.BindersFresh : Ctx rT → Finset Var → Prop
     (∀ x ∈ k.binderAtoms, x ∉ S) ∧
     Ctx.BindersFresh K' (S ∪ k.binderAtoms)
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- If a `CtxItem`'s binder atoms are empty, the freshness predicate at the
 extended union reduces to freshness at the original set. -/
 theorem Ctx.BindersFresh.cast_no_binder
@@ -41,6 +41,7 @@ theorem Ctx.BindersFresh.cast_no_binder
     Ctx.BindersFresh K' S :=
   Finset.union_empty S ▸ hEmpty ▸ h
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Anti-monotonicity in the freshness set: if `K`'s binders are fresh in a
 larger set `T`, they're fresh in any subset `S ⊆ T`. -/
 theorem Ctx.BindersFresh.mono {K : Ctx rT} {S T : Finset Var}
@@ -51,6 +52,7 @@ theorem Ctx.BindersFresh.mono {K : Ctx rT} {S T : Finset Var}
     exact ⟨fun y hy hyS => h.1 y hy (hST hyS),
            ih (Finset.union_subset_union hST Finset.Subset.rfl) h.2⟩
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- The `Hbinders` precongruence premise restricts to the tail context `K'`
 when shedding the head item `k`. -/
 theorem binders_tail
@@ -83,6 +85,7 @@ theorem TctxRelated.eq_nil_of_empty {Δ : TyEnv rT GF} {Γrc : RelCtx rT GF}
     | some _ => rw [hr] at h; cases h
     | none => rw [hr] at h; simp at h
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- A name not in the relational context's domain has no lookup result. -/
 theorem RelCtx.lookup_eq_none_of_notMem
     {Γrc : RelCtx rT GF} {x : Var}
@@ -105,6 +108,7 @@ theorem ctx_fill_lc_fv
     (K.fill e).IsLocallyClosed ∧ (K.fill e).fv ⊆ (Γrc.map (·.1)).toFinset :=
   ⟨Hty.isLocallyClosed, fv_subset_relCtxDom HCtxRel Hty⟩
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Project the per-hole binder-disjointness premise out of the combined
 `Hbinders` predicate. Used in every binder case of the precongruence
 induction to feed `TypedCtx.fill_typed` for both `e` and `e'`. -/
@@ -116,11 +120,13 @@ theorem binders_proj_pair
   ⟨fun y hy => ⟨(Hb y hy).1, (Hb y hy).2.2⟩,
    fun y hy => ⟨(Hb y hy).2.1, (Hb y hy).2.2⟩⟩
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Domain of `(x, A) :: Γrc` is `Γrc.dom ∪ {x}`. -/
 theorem RelCtx.dom_cons (x : Var) (A : lrel rT GF) (Γrc : RelCtx rT GF) :
     (((x, A) :: Γrc).map (·.1)).toFinset = (Γrc.map (·.1)).toFinset ∪ {x} := by
   simp [List.map_cons, List.toFinset_cons, Finset.union_comm]
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Lift a tail-freshness witness `Ctx.BindersFresh K' (S ∪ k.binderAtoms)`
 across a singleton-binder context item. This is the standard derivation used
 in the `lam`, `fix`, and `unpackR` cases of `bin_log_related_under_typed_ctx`,
@@ -172,6 +178,7 @@ theorem close_fv_in_outer_dom
   · exact hz_outer
   · exact absurd (Finset.mem_singleton.mp hz_x ▸ hz) (Exp.close_var_not_fvar x Ke)
 
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Locally-closed-after-α-rename: if `Ke` is locally closed, so is its
 opening of `close x` at any fresh `y`. Used twice per binder case in
 `bin_log_related_lam_step` / `_fix_step`. -/

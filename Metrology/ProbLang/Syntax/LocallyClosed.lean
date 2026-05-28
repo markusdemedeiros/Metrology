@@ -20,7 +20,6 @@ open Cslib Exp
 
 namespace Exp
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _}
 variable {x y : Var} {e e' u t : Exp rT}

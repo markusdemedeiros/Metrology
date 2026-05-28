@@ -37,7 +37,6 @@ verbatim from `SpecProgram.lean` — nothing spec-specific about them, just
 section AppProgramRA
 open Std Iris Iris.Std COFE ProbLang
 
-set_option linter.unusedSectionVars false
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
 /-! ## Ghost-state classes -/

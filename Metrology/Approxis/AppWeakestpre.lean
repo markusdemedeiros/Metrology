@@ -19,7 +19,6 @@ namespace ProbLang
 
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
