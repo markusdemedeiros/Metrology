@@ -72,39 +72,17 @@ variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-- The recursive body of the 1D random walk. -/
 def unifRw1dRec : Exp rT :=
-  -- rec "f" "n" "α"  ≡  fix (lam (lam body))
-  Exp.fix <| Exp.lam <| Exp.lam <|
-    -- if n < 1 then ()
-    Exp.cond
-      (Exp.binop .lt (Exp.bvar 1) (Exp.lit (.int 1)))
-      (Exp.lit .unit)
-      -- else let x = rand α 1 in (let-binds bvar 0 going forward; we use
-      -- a `lam`+`app` desugar for `let x = e1 in e2`).
-      (Exp.app
-        (Exp.lam <|
-          -- inner body with x = bvar 0, α = bvar 1, n = bvar 2, f = bvar 3.
-          Exp.cond
-            (Exp.binop .lt (Exp.bvar 0) (Exp.lit (.int 1)))
-            -- f (n - 1) α
-            (Exp.app
-              (Exp.app (Exp.bvar 3)
-                (Exp.binop .minus (Exp.bvar 2) (Exp.lit (.int 1))))
-              (Exp.bvar 1))
-            -- f (n + 1) α
-            (Exp.app
-              (Exp.app (Exp.bvar 3)
-                (Exp.binop .plus (Exp.bvar 2) (Exp.lit (.int 1))))
-              (Exp.bvar 1)))
-        (Exp.rand (Exp.lit (.int 1)) (Exp.bvar 0)))
+  pl(rec f n α :=
+      if n < #1 then #.unit
+      else
+        let x := rand(#1, α);
+        if x < #1
+          then f (n - #1) α
+          else f (n + #1) α)
 
 /-- Top-level program: `let α = alloc 1 in unifRw1dRec 1 α`. -/
 def unifRw1d : Exp rT :=
-  Exp.app
-    (Exp.lam <|
-      Exp.app
-        (Exp.app unifRw1dRec (Exp.lit (.int 1)))
-        (Exp.bvar 0))
-    (Exp.alloc (Exp.lit (.int 1)))
+  pl(let α := alloc(#1); {unifRw1dRec} #1 α)
 
 /-! ## `final_pos` and the RSM scaffold
 

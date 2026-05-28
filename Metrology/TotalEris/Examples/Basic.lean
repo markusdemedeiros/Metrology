@@ -189,16 +189,19 @@ Steps:
 --   ipure_intro; rfl
 example (E : CoPset) (v : Val rT) :
     ⊢@{IProp GF} tglWp E
-      (Exp.app (Exp.lam (Exp.load (Exp.bvar 0))) (Exp.alloc (Exp.ofVal v)))
+      (pl((fun x, !x) (alloc({Exp.ofVal v}))) : Exp rT)
       (fun w => iprop(⌜w = v⌝)) := by
   let K : Ectx rT := [EctxItem.appR (Exp.lam (Exp.load (Exp.bvar 0)))]
   show ⊢@{IProp GF} tglWp E (K.fill (Exp.alloc (Exp.ofVal v))) _
   iapply tglWp_bind
   iapply twp_alloc
   iintro %l Hl
-  simp only [K, Ectx.fill, List.foldl, flip, EctxItem.fillItem, Exp.ofVal]
+  -- Unfold the `pl(...)` lambda's `Exp.close` into bvar form so `PureExec`
+  -- on `app_lam` fires.
+  simp only [K, Ectx.fill, List.foldl, flip, EctxItem.fillItem, Exp.ofVal,
+    Exp.close, Exp.closeRec, ↓reduceIte]
   iapply (twp_pure_step_fupd (n := 1)
-    (e₁ := Exp.app (Exp.lam (Exp.load (Exp.bvar 0))) (Exp.lit (.loc l)))
+    (e₁ := Exp.app (Exp.lam (Exp.load (Exp.bvar 0))) (Exp.lit (.loc l) : Exp rT))
     (e₂ := Exp.open' (Exp.load (Exp.bvar 0)) (Exp.lit (.loc l)))
     (Exp.lit (.loc l) : Exp rT).isValue ⟨IsVal.lit⟩)
   simp only [Exp.open', Exp.openRec, ↓reduceIte]

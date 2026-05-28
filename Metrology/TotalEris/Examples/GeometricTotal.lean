@@ -49,15 +49,12 @@ variable {hlc : Bool} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
 Definition geometric : val :=
   rec: "geo" "n" :=
     if: rand #2 = #0 then #0 else "geo" "n" + #1.
-```
-Under locally-nameless: outer `fix` binds the recursive name (`bvar 1`
-inside the body); inner `lam` binds the argument (`bvar 0`). -/
+``` -/
 def geometric : Exp rT :=
-  Exp.fix <| Exp.lam <|
-    Exp.cond
-      (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))
-      (Exp.lit (.int 0))
-      (Exp.binop .plus (Exp.app (Exp.bvar 1) (Exp.bvar 0)) (Exp.lit (.int 1)))
+  pl(rec geo n :=
+      if rand(#2, #.unit) = #0
+        then #0
+        else (geo n) + #1)
 
 /-- The result-postcondition shared by all geometric specs: the sampler
 returns a non-negative integer. -/
@@ -78,9 +75,13 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   refine ec_ind_simpl_external (k := (3/2 : NNReal)) hε (by norm_num) ?_
   iintro ⟨IH, Herr⟩
   -- β-reduce `geometric ()` via two pure steps (`app_fix`, `app_lam`).
-  -- `unfold geometric` exposes the `fix`; let-bind the inner body so the
-  -- explicit `e₁`/`e₂` arguments to `twp_pure_step_fupd` match.
-  unfold geometric
+  -- Unfold `geometric` and reduce the `Exp.close` from `pl(...)` into the
+  -- raw `bvar` form so `twp_pure_step_fupd`'s explicit `e₁`/`e₂` match.
+  -- The `pl(rec geo n := …)` body wraps each binder in `Exp.close` over a
+  -- fresh atom; reduce all of these so the body becomes the explicit bvar
+  -- form that `twp_pure_step_fupd`'s `e₁`/`e₂` arguments expect.
+  simp only [geometric, Exp.close, Exp.closeRec, Nat.zero_add, Nat.reduceAdd,
+    Var.internal.injEq, ↓reduceIte, reduceCtorEq, Nat.reduceEqDiff]
   set innerBody : Exp rT :=
     Exp.cond
       (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))

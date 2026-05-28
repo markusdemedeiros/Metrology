@@ -230,7 +230,7 @@ meta partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
   | `(pl_exp|($e : $τ)) => do
       `(Exp.annotated pl_ty($τ) $(← elabPL env st e))
   | `(pl_exp|($e))         => elabPL env st e
-  | `(pl_exp|{$t})         => `(($t : Exp))
+  | `(pl_exp|{$t})         => `(($t))
   | `(pl_exp|# $n:num)     => `(Exp.lit (.int $n))
   | `(pl_exp|#true)        => `(Exp.lit (.bool true))
   | `(pl_exp|#false)       => `(Exp.lit (.bool false))
