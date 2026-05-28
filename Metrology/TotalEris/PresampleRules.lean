@@ -15,10 +15,8 @@ user *presample* a tape value before the program actually reads it,
 useful for amortizing error-credit bookkeeping across recursive calls
 (see `unif_rw_1d_terminate` in the random-walk example).
 
-**Status**: `twp_presample` fully proved. `twp_presample_adv_comp`
-stated with structural proof scaffold; three sub-sorries remaining
-(integral bound, Classical-choice witness equality, per-outcome
-continuation closure). -/
+**Status**: `twp_presample` and `twp_presample_adv_comp` both fully
+proved (no `sorry`). -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
   ProbLang.TotalEris.ErisWpGS
@@ -132,11 +130,13 @@ per-outcome continuation that receives `↯(ε₂ n)` together with the
 updated tape, the WP can advance by presampling — provided the expected
 per-outcome credit matches `ε₁` (the HSum side condition).
 
-**Status**: Per-outcome continuation closed; only the integral side
-condition `0 + ∫⁻ σ', (ε_now - ε₁) + ε₂(extracted) ∂(tapePresample σ₁ α)
-≤ ε_now` remains as `sorry`. That reduces to `HSum` via
-`tapePresample`'s unfolding through `tapeIndexUniform` + `Measure.bind`
-+ `lintegral_dirac` (~30 lines of measure-theoretic plumbing). -/
+**Status**: Fully proved. The integral side condition
+`0 + ∫⁻ σ', (ε_now - ε₁) + ε₂(extracted) ∂(tapePresample σ₁ α) ≤ ε_now`
+is discharged by reducing to `HSum`: `tapePresample_lintegral` unfolds
+the presample integral, `hPointwise` collapses the integrand to `ε₂ n`,
+`tapeIndexUniform_lintegral_eq_cfg_uniform` routes through the proven
+`Cfg.uniform` computation to a finite sum, and the HSum-image form is
+matched via `Finset.sum_image` + `Finset.sum_attach`. -/
 theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
     {Φ : Val → IProp GF} {t : Tape} (hN : 0 < t.bound)
     {ε₁ : ENNReal}
@@ -239,7 +239,83 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp} {α : Loc}
     --   5. Match the HSum-image form via `Finset.image_attach` reindexing.
     have hint_bound :
         ∫⁻ σ', presampleAdvCompX₂ σ₁ α N bs ε₂ σ' ∂(tapePresample σ₁ α) ≤ ε₁ := by
-      sorry
+      classical
+      -- Push the integral through `tapePresample`'s unfolding and collapse the
+      -- integrand pointwise to `ε₂ n` (via `hPointwise`).
+      rw [tapePresample_lintegral hlookup]
+      simp_rw [hPointwise]
+      -- Goal: `∫⁻ n, ε₂ n ∂tapeIndexUniform N ≤ ε₁`.
+      -- Common integrand `F : Int → ℝ≥0∞`, total via a `0` default off-bounds.
+      set F : Int → ℝ≥0∞ :=
+        (fun z => if hz : 0 ≤ z ∧ z < N then ε₂ ⟨z, hz⟩ else 0) with hF
+      have hNonempty : (Finset.Ico (0:Int) N).Nonempty :=
+        ⟨0, Finset.mem_Ico.mpr ⟨_root_.le_refl _, hN⟩⟩
+      have hCard : (Finset.Ico (0:Int) N).card = N.toNat := by
+        rw [Int.card_Ico, sub_zero]
+      -- `ε₂ n = F ↑n` (the membership-proof inside the subtype is irrelevant).
+      have hεF : ∀ n : { z : Int // 0 ≤ z ∧ z < N }, ε₂ n = F (↑n) := by
+        intro n; rw [hF]; simp only [dif_pos n.2]
+      -- Step A: compute the lintegral as `(∑ z ∈ Ico 0 N, F z) / N.toNat` by
+      -- routing through `Cfg.uniform` (reusing the proven uniform computation).
+      have hLI : ∫⁻ n : { z : Int // 0 ≤ z ∧ z < N }, ε₂ n ∂tapeIndexUniform N
+          = ∑ z ∈ Finset.Ico (0:Int) N, F z / (N.toNat : ℝ≥0∞) := by
+        have hf_eq : ∀ n : { z : Int // 0 ≤ z ∧ z < N },
+            ε₂ n = (fun ρ : Cfg => match ρ.expr with
+              | .lit (.int m) => F m | _ => 0) ⟨.lit (.int (↑n)), σ₁⟩ := by
+          intro n; rw [hεF n]
+        simp_rw [hf_eq]
+        rw [tapeIndexUniform_lintegral_eq_cfg_uniform hN σ₁ (fun ρ => match ρ.expr with
+              | .lit (.int m) => F m | _ => 0)]
+        -- Now over `Cfg.uniform N σ₁`; mirror the `ErrorRules` computation.
+        have hCfgUniform :
+            Cfg.uniform N σ₁ =
+              (PMF.uniformOfFinset (Finset.Ico (0:Int) N) hNonempty).toMeasure.map
+                (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg)) := by
+          unfold Cfg.uniform; simp only [Int.isPos, dif_pos hN]
+        rw [hCfgUniform, MeasureTheory.lintegral_map .of_discrete .of_discrete]
+        -- `∫⁻ z, F z ∂uniform = ∑ z ∈ Ico 0 N, F z / N.toNat`.
+        have hIndic : (fun z : Int => (match (⟨.lit (.int z), σ₁⟩ : Cfg).expr with
+              | .lit (.int m) => F m | _ => 0))
+            = ((Finset.Ico (0:Int) N) : Set Int).indicator F := by
+          funext z
+          by_cases hz : z ∈ Finset.Ico (0:Int) N
+          · rw [Set.indicator_of_mem hz]
+          · rw [Set.indicator_of_notMem hz]
+            simp only [Finset.mem_Ico, not_and, _root_.not_lt] at hz
+            show F z = 0
+            simp only [hF]
+            by_cases h0 : 0 ≤ z
+            · rw [dif_neg]; exact fun ⟨_, h⟩ => (_root_.not_lt.mpr (hz h0)) h
+            · rw [dif_neg]; exact fun ⟨h, _⟩ => h0 h
+        rw [hIndic, MeasureTheory.lintegral_indicator
+              ((Finset.Ico (0:Int) N).measurableSet),
+            MeasureTheory.lintegral_finset]
+        refine Finset.sum_congr rfl fun z hz => ?_
+        rw [PMF.toMeasure_apply_singleton _ _ (measurableSet_singleton z),
+            PMF.uniformOfFinset_apply, if_pos hz, hCard,
+            ENNReal.div_eq_inv_mul, mul_comm]
+      -- Step B: match the HSum numerator `∑ n ∈ image, ε₂ n = ∑ z ∈ Ico, F z`.
+      have hSumImage :
+          (∑ n ∈ (Finset.Ico (0:Int) N).attach.image
+              (fun x : { z : Int // z ∈ Finset.Ico (0:Int) N } =>
+                (⟨x.1, Finset.mem_Ico.mp x.2⟩ :
+                  { z : Int // 0 ≤ z ∧ z < N })), ε₂ n)
+            = ∑ z ∈ Finset.Ico (0:Int) N, F z := by
+        rw [Finset.sum_image
+              (by
+                intro x _ y _ hxy
+                apply Subtype.ext
+                have h := congrArg Subtype.val hxy
+                simpa using h)]
+        rw [← Finset.sum_attach (Finset.Ico (0:Int) N) F]
+        refine Finset.sum_congr rfl fun a _ => ?_
+        have hb := Finset.mem_Ico.mp a.2
+        simp only [hF, dif_pos hb]
+      have hdiv : ∑ z ∈ Finset.Ico (0:Int) N, F z / (N.toNat : ℝ≥0∞)
+          = (∑ z ∈ Finset.Ico (0:Int) N, F z) / (N.toNat : ℝ≥0∞) := by
+        simp_rw [div_eq_mul_inv]; rw [← Finset.sum_mul]
+      rw [hLI, hdiv, ← hSumImage]
+      exact HSum
     calc (ε_now - ε₁) + ∫⁻ σ', presampleAdvCompX₂ σ₁ α N bs ε₂ σ' ∂(tapePresample σ₁ α)
         ≤ (ε_now - ε₁) + ε₁ := by gcongr
       _ = ε_now := tsub_add_cancel_of_le hLe

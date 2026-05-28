@@ -224,7 +224,7 @@ example (E : CoPset) (ε : ENNReal) (Hε : ε ≤ 1) :
         Finset.sum_range_succ, Finset.sum_range_zero, zero_add,
         Nat.reduceEqDiff, ↓reduceIte, if_pos rfl]
       rw [show ((2 : ℕ) : ENNReal) = 1 + 1 from by norm_num, add_mul, one_mul]
-      exact le_add_left _ _)) $$ Hcr
+      exact le_self_add)) $$ Hcr
   iintro %n ⟨%Hn, _⟩
   iexists n
   ipure_intro
@@ -239,9 +239,7 @@ example (E : CoPset) (ε : ENNReal) :
   iintro Hε
   iapply (twp_rand_exp_nat (z := 1) (ε₁ := ε) (ε₂ := fun _ => 0)
     (Hz := by decide) (Hbd := fun _ => zero_le _)
-    (HSum := by
-      simp only [show (1 : Int).toNat = 1 from rfl, zero_div]
-      exact zero_le _)) $$ Hε
+    (HSum := by simp)) $$ Hε
   iintro %n ⟨%Hn, _⟩
   -- `0 ≤ n < 1` forces `n = 0`.
   obtain ⟨Hn₁, Hn₂⟩ := Hn
@@ -255,14 +253,14 @@ metalogic level, using the now-complete `twp_tgl` adequacy theorem. -/
 
 section AdequacySmokeTests
 
-variable {GF : BundledGFunctors}
+variable {GF : BundledGFunctors.{0,0,0}}
   [AppPreGS GF] [ECPreGS GF] [InvGpreS GF]
 
 /-- A value at zero error has `Tgl = 0` after adequacy. -/
 example (v : Val) (σ : State) (φ : Val → Prop) (hφ : φ v) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
   refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
-  intro _ _; iapply tglWp_value; ipure_intro; exact hφ
+  intro _; iintro _; iapply tglWp_value; ipure_intro; exact hφ
 
 /-- Mass at ε = 0 for a value: `1 ≤ limExec _ Set.univ`. -/
 example (v : Val) (σ : State) :
@@ -270,7 +268,7 @@ example (v : Val) (σ : State) :
   have h : Tgl (limExec ⟨Exp.ofVal v, σ⟩) (fun _ => True) 0 := by
     refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ)
       (φ := fun _ => True) ?_
-    intro _ _; iapply tglWp_value; ipure_intro; trivial
+    intro _; iintro _; iapply tglWp_value; ipure_intro; trivial
   have := Tgl.termination_ineq h
   rwa [tsub_zero] at this
 
@@ -279,7 +277,7 @@ example (v : Val) (σ : State) :
 example (v : Val) (σ : State) (φ : Val → Prop) (hφ : φ v) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
   refine twp_tgl_limit (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
-  intro _ _ _ _; iapply tglWp_value; ipure_intro; exact hφ
+  intro _ _ _; iintro _; iapply tglWp_value; ipure_intro; exact hφ
 
 /-- Pgl bound via adequacy: at ε = 0, the limit-exec measure of the
 non-value-or-`¬φ` set is `0`. -/

@@ -30,7 +30,7 @@ namespace ProbLang
 namespace TotalEris
 namespace Examples
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors.{0,0,0}} [ErisGS hlc GF]
 
 /-! ## The geometric sampler
 
@@ -326,7 +326,7 @@ def geoPredicate (v : Val) : Prop :=
 integer (Tgl-form). -/
 theorem geo_tgl [AppPreGS GF] [ECPreGS GF] [InvGpreS GF] (σ : State) :
     Tgl (limExec ⟨Exp.app geometric (Exp.lit .unit), σ⟩) geoPredicate 0 := by
-  refine twp_tgl (e := Exp.app geometric (Exp.lit .unit)) (σ := σ)
+  refine twp_tgl (GF := GF) (e := Exp.app geometric (Exp.lit .unit)) (σ := σ)
     (φ := geoPredicate) ?_
   intro _
   have hwp : ⊢@{IProp GF} tglWp ⊤ (Exp.app geometric (Exp.lit .unit))
@@ -338,7 +338,7 @@ theorem geo_tgl [AppPreGS GF] [ECPreGS GF] [InvGpreS GF] (σ : State) :
     ipure_intro
     exact ⟨m, Hm.1, Hm.2⟩
   iintro _
-  iexact hwp
+  iapply hwp
 
 /-- The geometric sampler almost-surely terminates. -/
 theorem geo_mass_one [AppPreGS GF] [ECPreGS GF] [InvGpreS GF] (σ : State) :
