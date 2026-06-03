@@ -34,9 +34,8 @@ distribution `μ` is rewritable at `ρ` when `limExec ρ = μ >>= limExec`.
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 open MeasureTheory Measure
 
@@ -51,9 +50,9 @@ def Erasable (μ : Measure (State rT)) (σ : State rT) : Prop :=
 
 /-- Two measures on `Cfg` are equal iff they agree on every singleton.
 Uses `⊤`-measurable space + countability of `Cfg` via `tsum` over
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 singletons. -/
-theorem Cfg.measure_ext_singletons {μ ν : Measure (Cfg rT)}
+theorem Cfg.measure_ext_singletons [Countable rT] [MeasurableSingletonClass rT]
+    {μ ν : Measure (Cfg rT)}
     (h : ∀ c : Cfg rT, μ {c} = ν {c}) : μ = ν := by
   refine Measure.ext fun S _ => ?_
   -- Decompose `S` as a countable disjoint union of singletons indexed
@@ -75,9 +74,9 @@ namespace Erasable
 
 /-- The dirac distribution at `σ` is erasable at `σ`. The bind collapses
 to a single evaluation at `σ`, after which the projection is trivially
-omit [Countable rT] [MeasurableSingletonClass rT] in
 equal. -/
-theorem dret (σ : State rT) : Erasable (Measure.dirac σ) σ := by
+theorem dret [Countable rT] [MeasurableSingletonClass rT]
+    (σ : State rT) : Erasable (Measure.dirac σ) σ := by
   intro e m
   rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) Measurable.of_discrete]
 
@@ -88,9 +87,9 @@ then `μ₁ >>= μ₂` is erasable at `σ`.
 Clutch's proof has a support-conditional hypothesis (`μ₁ σ' > 0`). For
 measures we strengthen it to an unconditional hypothesis; the
 conditional form follows because any kernel can be modified on a null
-omit [Countable rT] [MeasurableSingletonClass rT] in
 set without changing the bind. -/
-theorem dbind {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
+theorem dbind [Countable rT] [MeasurableSingletonClass rT]
+    {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
     (h₁ : Erasable μ₁ σ) (h₂ : ∀ σ', Erasable (μ₂ σ') σ') :
     Erasable (μ₁.bind μ₂) σ := by
   intro e m
@@ -124,7 +123,8 @@ applied at `{c}`, gives exactly what we need to collapse the outer
 `lintegral` to a constant `(execN n ⟨e, σ⟩) {c}`, and then `limExec_apply`
 reassembles the RHS. Monotone convergence (`lintegral_iSup`) handles the
 swap between `lintegral` and `iSup`. -/
-theorem lim_exec {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
+theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
+    {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
     μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
   refine Cfg.measure_ext_singletons fun c => ?_
   -- LHS: apply `bind_apply`, then unfold `limExec` at singleton via `limExec_apply`.
@@ -162,7 +162,8 @@ theorem dret_final {μ : Measure (State rT)} {σ : State rT} {e : Exp rT} (hv : 
     _ = Measure.dirac ⟨e, σ⟩ := hstep σ
 
 /-- Push an erasable distribution through `pexecN n` then `limExec`. -/
-theorem pexecN_lim_exec {μ : Measure (State rT)} {σ : State rT}
+theorem pexecN_lim_exec [Countable rT] [MeasurableSingletonClass rT]
+    {μ : Measure (State rT)} {σ : State rT}
     (h : Erasable μ σ) (n : Nat) (e : Exp rT) :
     (μ.bind (fun σ' => pexecN n ⟨e, σ'⟩)).bind limExec = limExec ⟨e, σ⟩ := by
   rw [Measure.bind_bind
@@ -176,7 +177,8 @@ theorem pexecN_lim_exec {μ : Measure (State rT)} {σ : State rT}
 
 /-- An erasable distribution has total mass 1, provided the language has at
 least one value (we use `.lit .unit`). -/
-theorem mass {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) :
+theorem mass [Countable rT] [MeasurableSingletonClass rT]
+    {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) :
     μ Set.univ = 1 := by
   -- Specialize `h` to the unit literal (always a value) and 1 step.
   have hv : IsVal (Exp.lit (rT := rT) .unit) := .lit
@@ -200,9 +202,9 @@ theorem mass {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) :
   exact hboth
 
 /-- A two-branch erasable combinator: dispatching on a measurable Boolean
-omit [Countable rT] [MeasurableSingletonClass rT] in
 function through a total distribution yields an erasable combination. -/
-theorem dbind_predicate {A : Type*} [MeasurableSpace A] [DiscreteMeasurableSpace A]
+theorem dbind_predicate [Countable rT] [MeasurableSingletonClass rT]
+    {A : Type*} [MeasurableSpace A] [DiscreteMeasurableSpace A]
     {μ : Measure A} {μ₁ μ₂ : Measure (State rT)} {σ : State rT} {f : A → Bool}
     (hμ : μ Set.univ = 1) (h₁ : Erasable μ₁ σ) (h₂ : Erasable μ₂ σ) :
     Erasable (μ.bind (fun a => if f a then μ₁ else μ₂)) σ := by
@@ -237,20 +239,22 @@ def Rewritable (ρ : Cfg rT) (μ : Measure (Cfg rT)) : Prop :=
 
 namespace Rewritable
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Dirac rewritability: `limExec ρ = dirac ρ >>= limExec`. -/
-theorem dret (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
+theorem dret [Countable rT] [MeasurableSingletonClass rT]
+    (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
   show limExec ρ = (Measure.dirac ρ).bind limExec
   rw [Measure.dirac_bind Measurable.of_discrete]
 
 /-- Every finite unfolding `pexecN m ρ` is rewritable at `ρ`. -/
-theorem ofPexecN (ρ : Cfg rT) (m : Nat) : Rewritable ρ (ProbLang.pexecN m ρ) :=
+theorem ofPexecN [Countable rT] [MeasurableSingletonClass rT]
+    (ρ : Cfg rT) (m : Nat) : Rewritable ρ (ProbLang.pexecN m ρ) :=
   limExec_pexecN m ρ
 
 /-- Erasability on the state component lifts to rewritability on the
 configuration: if `μ` is erasable at `ρ.state`, then binding `ρ.expr`
 onto samples from `μ` gives a rewritable `Cfg`-distribution. -/
-theorem of_erasable {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.state) :
+theorem of_erasable [Countable rT] [MeasurableSingletonClass rT]
+    {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.state) :
     Rewritable ρ (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))) := by
   show limExec ρ
       = (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))).bind limExec
@@ -265,7 +269,8 @@ theorem of_erasable {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.
 
 /-- Erasability combined with `pexecN`: push `μ` in on the state side,
 then unfold `pexecN m` inside. -/
-theorem of_erasable_pexecN {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
+theorem of_erasable_pexecN [Countable rT] [MeasurableSingletonClass rT]
+    {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
     (h : Erasable μ ρ.state) :
     Rewritable ρ (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)) := by
   show limExec ρ = (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)).bind limExec

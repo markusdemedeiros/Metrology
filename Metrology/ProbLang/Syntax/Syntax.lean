@@ -34,6 +34,30 @@ theorem Std.ExtTreeMap.fresh_get? (t : ExtTreeMap Int V) :
     have hle := ExtTreeMap.le_maxKey?_of_mem hmem (Option.get_of_eq_some (isSome_maxKey?_of_mem hmem) HM)
     simp [compare, compareOfLessAndEq] at hle
 
+/-- **Characterization of `maxKey? t = some n` in `getElem?` terms.**
+
+For an `Int`-keyed `ExtTreeMap`, the maximum key is `n` exactly when `n` is in the map and
+every strictly larger key is absent. This drops the `compare` interface in favor of plain `<`
+and is the form needed for measurability arguments about `maxKey?`. -/
+theorem Std.ExtTreeMap.maxKey?_eq_some_iff_getElem? (t : ExtTreeMap Int V) (n : Int) :
+    t.maxKey? = some n ↔ t[n]?.isSome ∧ ∀ k : Int, n < k → t[k]?.isNone := by
+  rw [maxKey?_eq_some_iff_mem_and_forall, mem_iff_isSome_getElem?]
+  refine and_congr_right fun _ => ⟨fun h k hlt => ?_, fun h k hkmem => ?_⟩
+  · -- Forward: if `n < k` and `k ∈ t`, then `k ≤ n` — contradiction. So `t[k]? = none`.
+    rcases hk : t[k]? with _ | v
+    · simp
+    · have hkmem : k ∈ t := mem_iff_isSome_getElem?.mpr (by rw [hk]; rfl)
+      have : k ≤ n := (Std.LawfulOrderOrd.isLE_compare k n).mp (h k hkmem)
+      omega
+  · -- Backward: `k ∈ t` forces `¬ n < k` (else `t[k]?` would be `none` and `some`).
+    rw [Std.LawfulOrderOrd.isLE_compare]
+    by_contra hgt
+    have hkNone := h k (lt_of_not_ge hgt)
+    have hkSome := mem_iff_isSome_getElem?.mp hkmem
+    rcases hk : t[k]? with _ | v
+    · rw [hk] at hkSome; simp at hkSome
+    · rw [hk] at hkNone; simp at hkNone
+
 -- TODO: PR back to mathlib
 instance instCountableChar : Countable Char where
   exists_injective_nat' := by

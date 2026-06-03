@@ -20,7 +20,6 @@ unchanged from Clutch — types were de-Bruijn already.
 namespace ProbLang
 open Cslib Exp
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLangℝ rT]
 

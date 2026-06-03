@@ -5,3 +5,5 @@ public import Metrology.ProbLang.CoreMeasures.Pat
 public import Metrology.ProbLang.CoreMeasures.Exp
 public import Metrology.ProbLang.CoreMeasures.Val
 public import Metrology.ProbLang.CoreMeasures.EctxItem
+public import Metrology.ProbLang.CoreMeasures.State
+public import Metrology.ProbLang.CoreMeasures.Cfg

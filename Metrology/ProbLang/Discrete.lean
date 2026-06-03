@@ -279,6 +279,62 @@ instance instMeasurableSingletonClass
 
 end EctxItem
 
+/-! ## Option, LocHeap, Tape, State, Cfg
+
+When the underlying real-type `rT` (or, for the parts of the state that store values, the
+type parameter `α`) is discrete, the heap- and configuration-level measure spaces are too.
+
+The chain is `Option α → LocHeap (Val α) → State α → Cfg α`, with `Tape` discrete on its
+own (no `α` dependence). -/
+
+instance _root_.Option.instMeasurableSingletonClass
+    {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α] :
+    MeasurableSingletonClass (Option α) where
+  measurableSet_singleton
+    | none => MeasurableSet.singleton_none
+    | some x => by
+        rw [show ({some x} : Set (Option α)) = (some : α → Option α) '' {x} by simp]
+        exact MeasurableSet.image_some (MeasurableSet.singleton x)
+
+instance LocHeap.instMeasurableSingletonClass
+    {V : Type _} [MeasurableSpace V] [MeasurableSingletonClass V] :
+    MeasurableSingletonClass (LocHeap V) where
+  measurableSet_singleton m := by
+    have hsing : ({m} : Set (LocHeap V))
+                  = (fun (n : LocHeap V) (ℓ : Loc) => n[ℓ]?) ⁻¹' {fun ℓ => m[ℓ]?} := by
+      ext n
+      refine ⟨fun h => h ▸ rfl, fun h => ?_⟩
+      apply Std.ExtTreeMap.ext_getElem?
+      intro k; exact congrFun h k
+    rw [hsing]
+    exact (Measurable.of_comap_le le_rfl) (MeasurableSet.singleton _)
+
+instance State.instMeasurableSingletonClass
+    {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α] :
+    MeasurableSingletonClass (State α) where
+  measurableSet_singleton σ := by
+    have hsing : ({σ} : Set (State α))
+                  = (fun τ : State α => (τ.heap, τ.tapes)) ⁻¹' {(σ.heap, σ.tapes)} := by
+      ext τ
+      refine ⟨fun h => h ▸ rfl, fun h => ?_⟩
+      obtain ⟨hh, ht⟩ := Prod.mk.inj h
+      cases σ; cases τ; congr
+    rw [hsing]
+    exact (Measurable.of_comap_le le_rfl) (MeasurableSet.singleton _)
+
+instance Cfg.instMeasurableSingletonClass
+    {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α] :
+    MeasurableSingletonClass (Cfg α) where
+  measurableSet_singleton c := by
+    have hsing : ({c} : Set (Cfg α))
+                  = (fun c' : Cfg α => (c'.expr, c'.state)) ⁻¹' {(c.expr, c.state)} := by
+      ext c'
+      refine ⟨fun h => h ▸ rfl, fun h => ?_⟩
+      obtain ⟨he, hs⟩ := Prod.mk.inj h
+      cases c; cases c'; congr
+    rw [hsing]
+    exact (Measurable.of_comap_le le_rfl) (MeasurableSet.singleton _)
+
 end ProbLang
 
 /-! ## Sanity check: `DiscreteMeasurableSpace` synthesizes -/
@@ -291,6 +347,10 @@ example : DiscreteMeasurableSpace (ProbLang.Pat rT)     := inferInstance
 example : DiscreteMeasurableSpace (ProbLang.Exp rT)     := inferInstance
 example : DiscreteMeasurableSpace (ProbLang.Val rT)     := inferInstance
 example : DiscreteMeasurableSpace (ProbLang.EctxItem rT) := inferInstance
+example : DiscreteMeasurableSpace (ProbLang.LocHeap (ProbLang.Val rT)) := inferInstance
+example : DiscreteMeasurableSpace (ProbLang.LocHeap ProbLang.Tape) := inferInstance
+example : DiscreteMeasurableSpace (ProbLang.State rT) := inferInstance
+example : DiscreteMeasurableSpace (ProbLang.Cfg rT)   := inferInstance
 end SynthCheck
 
 /-! ## Default `ProbLangℝ` instance on `Int`

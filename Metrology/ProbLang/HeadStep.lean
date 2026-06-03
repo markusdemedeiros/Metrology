@@ -1,6 +1,7 @@
 module
 
-public import Metrology.ProbLang.Syntax.Syntax
+public import Metrology.ProbLang.CoreMeasures
+public import Metrology.ProbLang.Discrete
 public import Mathlib.MeasureTheory.MeasurableSpace.Defs
 public import Mathlib.Probability.ProbabilityMassFunction.Basic
 public import Mathlib.Probability.Kernel.Defs
@@ -14,8 +15,7 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 def Option.unwrapM {α : Type _} [MeasurableSpace β] (f : α → Measure β) : Option α → Measure β
 | some v => f v
@@ -28,22 +28,20 @@ def Exp.asValM [MeasurableSpace T] (e : Exp rT) (f : Val rT → Measure T) : Mea
 def Exp.isValM [MeasurableSpace T] (e : Exp rT) (m : Measure T) : Measure T :=
   if e.isValue then m else 0
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 @[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp rT} {m : Measure T} (He : e.isValue) :
     e.isValM m = m := if_pos He
 
 theorem Exp.isValM_some' [MeasurableSpace T] {e : Exp rT} {m : Measure T} (w : IsVal e) :
     e.isValM m = m := isValM_some w.toIsValue
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 @[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp rT} {m : Measure T} (He : ¬ e.isValue) :
     e.isValM m = 0 := if_neg He
 
 def Int.isPos (z : Int) : Option { z : Int // 0 < z } :=
   if H : 0 < z then some ⟨z, H⟩ else none
 
-instance {rT : Type _} : MeasurableSpace (State rT) := ⊤
-instance {rT : Type _} : MeasurableSpace (Cfg rT) := ⊤
 
 /-- `Cfg.uniform z σ` is the measure putting uniform mass on configs
 `⟨.lit (.int n), σ⟩` for `n ∈ {0, 1, …, z−1}` (i.e. `Finset.Ico 0 z`),
@@ -233,16 +231,17 @@ macro "head_case" : tactic =>
       head_split_isValM beta.fix.redex beta.fix.no_redex
   ))
 
-def headStepKernel : Kernel (Cfg rT) (Cfg rT) where
+def headStepKernel [Countable rT] [MeasurableSingletonClass rT] :
+    Kernel (Cfg rT) (Cfg rT) where
   measurable' := .of_discrete
   toFun := headStep
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+
 theorem val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
     0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
   head_case <;> simp [Exp.isValue_iff_isValueR]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem Exp.toVal?_isValue {e : Exp rT} : e.toVal? = some v → e.isValue := by
   intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
@@ -359,16 +358,16 @@ inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
   Pat.tryMatch p e = none →
   HeadStepSupport ⟨.scrut e p, σ⟩ ⟨.inr (.lit .unit), σ⟩
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp]
-theorem dirac_singleton_pos {a b : Cfg rT} :
+theorem dirac_singleton_pos [Countable rT] [MeasurableSingletonClass rT]
+    {a b : Cfg rT} :
     0 < (dirac a) {b} ↔ a = b := by
   constructor
   · rw [dirac_apply' a .of_discrete, Set.indicator_singleton, Pi.single, Function.update]
     split <;> simp; trivial
   · simp_all [dirac_apply_of_mem (Set.mem_singleton _)]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 @[simp]
 theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp rT} {m : Measure T} {s : Set T} :
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
@@ -383,13 +382,14 @@ theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
   cases opt <;> simp [Option.unwrapM]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 @[simp]
 theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp rT} {f : Val rT → Measure T} :
     0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
   unfold Exp.asValM; cases e.toVal? <;> simp
 
-theorem Cfg.uniform_singleton_pos_inv {z : Int} {σ : State rT} {ρ : Cfg rT}
+theorem Cfg.uniform_singleton_pos_inv [Countable rT] [MeasurableSingletonClass rT]
+    {z : Int} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < Cfg.uniform z σ {ρ}) :
     ρ.state = σ ∧
     ((0 < z ∧ ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v < z) ∨
@@ -405,8 +405,8 @@ theorem Cfg.uniform_singleton_pos_inv {z : Int} {σ : State rT} {ρ : Cfg rT}
     have ⟨h1, h2⟩ := (Cfg.mk.injEq ..).mp h
     exact ⟨h2.symm, .inr ⟨Hz, h1.symm⟩⟩
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
-theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State rT}
+theorem Cfg.uniform_singleton_pos_of_mem [Countable rT] [MeasurableSingletonClass rT]
+    {z v : Int} {σ : State rT}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) :
     0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩} := by
   unfold Cfg.uniform Int.isPos
@@ -419,7 +419,8 @@ theorem Cfg.uniform_singleton_pos_of_mem {z v : Int} {σ : State rT}
     exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz, Set.mem_preimage]⟩
   · exact ENNReal.natCast_ne_top _
 
-theorem Cfg.uniform_singleton_nonpos {z : Int} {σ : State rT} (Hz : ¬ 0 < z) :
+theorem Cfg.uniform_singleton_nonpos [Countable rT] [MeasurableSingletonClass rT]
+    {z : Int} {σ : State rT} (Hz : ¬ 0 < z) :
     0 < Cfg.uniform z σ {⟨.lit (.int (-1)), σ⟩} := by
   unfold Cfg.uniform Int.isPos
   simp only [Hz, dite_false]
@@ -430,7 +431,8 @@ macro "cfg_dirac" h:ident : tactic =>
   `(tactic| (rw [dirac_singleton_pos] at $h:ident
              have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
 
-theorem headStep_support_iff (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
+theorem headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
+    (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
     0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
   · head_case
@@ -507,19 +509,19 @@ theorem headStep_support_iff (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
       rw [if_neg (Ne.symm hzN)]
       exact Cfg.uniform_singleton_nonpos Hz
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp rT} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
   rw [Exp.isValM, if_pos he]; infer_instance
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp rT} {f : Val rT → Measure T}
     {v : Val rT} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
     IsProbabilityMeasure (e.asValM f) := by
   simp [Exp.asValM, hv]; infer_instance
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
-theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
+theorem Cfg.uniform_isProbabilityMeasure [Countable rT] [MeasurableSingletonClass rT]
+    {z : Int} {σ : State rT} :
     IsProbabilityMeasure (Cfg.uniform z σ) := by
   unfold Cfg.uniform Int.isPos
   by_cases Hz : 0 < z
@@ -528,7 +530,8 @@ theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
       AEMeasurable.of_discrete
   · simp only [Hz, dite_false]; infer_instance
 
-theorem head_step_mass (e : Exp rT) (σ : State rT) :
+theorem head_step_mass [Countable rT] [MeasurableSingletonClass rT]
+    (e : Exp rT) (σ : State rT) :
     (∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
   head_case
   all_goals try (· simp)
@@ -547,7 +550,8 @@ theorem head_step_mass (e : Exp rT) (σ : State rT) :
 Case split on whether any singleton has positive mass: if so, `headStep ρ`
 is a probability measure (by `head_step_mass`); if not, it is the zero
 measure (since `Cfg` is countable, the total mass is a tsum of singletons). -/
-theorem headStep_univ_le_one (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
+theorem headStep_univ_le_one [Countable rT] [MeasurableSingletonClass rT]
+    (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
   by_cases hred : ∃ ρ' : Cfg rT, 0 < (headStep ρ) {ρ'}
   · obtain ⟨e, σ⟩ := ρ
     have := head_step_mass e σ hred

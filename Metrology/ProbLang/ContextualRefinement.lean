@@ -31,7 +31,6 @@ propagates here: `CTX_Fold` fills as the identity on its body, while
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 

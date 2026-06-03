@@ -29,9 +29,8 @@ the witness.
 
 namespace ProbLang
 
-set_option linter.unusedSectionVars false
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 open MeasureTheory Measure
 
@@ -69,7 +68,7 @@ noncomputable def tapeIndexUniform (N : Int) :
 the tapes that may be presampled at a given step. -/
 def getActive (σ : (State rT)) : List Loc := σ.tapes.keys
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem getActive_mem_iff {σ : (State rT)} {α : Loc} :
     α ∈ getActive σ ↔ α ∈ σ.tapes := by
   unfold getActive
@@ -102,7 +101,7 @@ theorem tapeIndexUniform_univ_eq_one {N : Int} (hN : 0 < N) :
   simp only [Set.preimage_univ, measure_univ]
 
 /-- `tapePresample σ α` is a probability measure when `α` is an existing
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 tape with positive bound. -/
 theorem tapePresample_univ_eq_one {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
@@ -149,7 +148,7 @@ We package this as an a.e. statement for use in the induction step. -/
 
 This is a case analysis on `headStep`, but cleaner than the full commutation
 because we only track the bound, not the full tape content. -/
-theorem primStep_tape_persists_support
+theorem primStep_tape_persists_support [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {αloc : Loc} {e : (Exp rT)} {t : Tape} {ρ : (Cfg rT)}
     (h : σ.tapes[αloc]? = some t)
     (hρ : 0 < primStep ⟨e, σ⟩ {ρ}) :
@@ -231,7 +230,7 @@ theorem primStep_tape_persists_support
 absent or has a different bound from `t` has measure 0 under `primStep ⟨e, σ⟩`.
 Derived from the support form via the fact that singletons outside the
 support have measure 0 (every discrete measure). -/
-theorem primStep_tape_persists
+theorem primStep_tape_persists [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {e : (Exp rT)} {t : Tape}
     (h : σ.tapes[α]? = some t) :
     ∀ᵐ ρ ∂(primStep ⟨e, σ⟩),
@@ -259,9 +258,10 @@ with `σ.tapes[α]? = some ⟨N, bs⟩` has the form
 `σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)` for some sampled `n`. Proving
 a property `P` holds a.e. on `tapePresample σ α` therefore reduces to
 checking it at every such update — bypassing the `bind`/`lintegral`/
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 `indicator` scaffolding. -/
-theorem tapePresample_ae {σ : (State rT)} {α : Loc} {N : Int}
+theorem tapePresample_ae [Countable rT] [MeasurableSingletonClass rT]
+    {σ : (State rT)} {α : Loc} {N : Int}
     {bs : List { z : Int // 0 ≤ z ∧ z < N }} (h : σ.tapes[α]? = some ⟨N, bs⟩)
     {P : (State rT) → Prop}
     (hP : ∀ n, P (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩))) :
@@ -281,7 +281,8 @@ theorem tapePresample_ae {σ : (State rT)} {α : Loc} {N : Int}
 
 /-- `tapePresample σ α` is heap-preserving: every state in its support has
 the same heap as `σ`. -/
-theorem tapePresample_heap_eq {σ : (State rT)} {α : Loc} :
+theorem tapePresample_heap_eq [Countable rT] [MeasurableSingletonClass rT]
+    {σ : (State rT)} {α : Loc} :
     ∀ᵐ σ' ∂(tapePresample σ α), σ'.heap = σ.heap := by
   cases hsome : σ.tapes[α]? with
   | none =>
@@ -293,7 +294,8 @@ theorem tapePresample_heap_eq {σ : (State rT)} {α : Loc} :
 
 /-- `tapePresample σ α` only touches tape `α`: for any other location
 `α_lbl ≠ α`, the lookup at `α_lbl` is a.e. unchanged. -/
-theorem tapePresample_tape_ne_ae {σ : (State rT)} {α α_lbl : Loc} {t : Tape}
+theorem tapePresample_tape_ne_ae [Countable rT] [MeasurableSingletonClass rT]
+    {σ : (State rT)} {α α_lbl : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hne : α_lbl ≠ α) :
     ∀ᵐ σ' ∂(tapePresample σ α), σ'.tapes[α_lbl]? = σ.tapes[α_lbl]? := by
   obtain ⟨N, bs⟩ := t
@@ -310,9 +312,8 @@ support has heap equal to `σ.heap`.
 Used to dispatch the heap-touching cases (load, store, alloc) of
 `headStep_tapePresample_comm` cleanly, without running into Lean's
 instance-resolution issues on `σ'.heap[ℓ]?` lookups inside anonymous
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 lambdas. -/
-theorem tapePresample_bind_pull_heap
+theorem tapePresample_bind_pull_heap [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc}
     (k : Std.ExtTreeMap Loc (Val rT) compare → (State rT) → Measure (Cfg rT)) :
     (tapePresample σ α).bind (fun σ' => k σ'.heap σ') =
@@ -344,9 +345,9 @@ theorem tapePresample_bind_pull_heap
     simp [State.update_tapes]
 
 /-- Heap updates commute with tape presampling. Specifically:
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 `tapePresample (σ.update_heap f) α = (tapePresample σ α).map (·.update_heap f)`. -/
-theorem tapePresample_update_heap_comm
+theorem tapePresample_update_heap_comm [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} (f : Std.ExtTreeMap Loc (Val rT) compare → Std.ExtTreeMap Loc (Val rT) compare) :
     tapePresample (σ.update_heap f) α =
       (tapePresample σ α).map (·.update_heap f) := by
@@ -375,7 +376,7 @@ theorem tapePresample_update_heap_comm
 `tapePresample (σ.update_tapes f) α = (tapePresample σ α).map (·.update_tapes f)`,
 provided `f` only modifies keys other than `α` in the sense that
 `(σ.update_tapes f).tapes[α]? = σ.tapes[α]?` and the update/insert commute. -/
-theorem tapePresample_update_tapes_ne_comm
+theorem tapePresample_update_tapes_ne_comm [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α β : Loc} {v : Tape} (hne : β ≠ α) :
     tapePresample (σ.update_tapes (·.insert β v)) α =
       (tapePresample σ α).map (·.update_tapes (·.insert β v)) := by
@@ -402,9 +403,9 @@ theorem tapePresample_update_tapes_ne_comm
 /-- Lintegral over `tapePresample σ α` unfolds to a lintegral over
 `tapeIndexUniform N` against the presampled-state integrand. Combines the
 unfolding of `tapePresample` with `lintegral_bind` + `lintegral_dirac'` so
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 call sites don't re-do the same 3-line scaffold. -/
-theorem tapePresample_lintegral
+theorem tapePresample_lintegral [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {N : Int}
     {bs : List { z : Int // 0 ≤ z ∧ z < N }}
     (h : σ.tapes[α]? = some ⟨N, bs⟩) (f : (State rT) → ENNReal) :
@@ -420,7 +421,7 @@ state-dependent integrand `f` against `tapePresample σ α` after a heap
 update is the same as integrating `f` against `tapePresample` on the
 updated state. Combines `lintegral_map` with `tapePresample_update_heap_comm`
 so call sites skip the intermediate `.map` form. -/
-theorem tapePresample_lintegral_update_heap
+theorem tapePresample_lintegral_update_heap [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc}
     (g : Std.ExtTreeMap Loc (Val rT) compare → Std.ExtTreeMap Loc (Val rT) compare)
     (f : (State rT) → ENNReal) :
@@ -430,7 +431,7 @@ theorem tapePresample_lintegral_update_heap
       lintegral_map Measurable.of_discrete Measurable.of_discrete]
 
 /-- Lintegral form of `tapePresample_update_tapes_ne_comm`. -/
-theorem tapePresample_lintegral_update_tapes_ne
+theorem tapePresample_lintegral_update_tapes_ne [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α β : Loc} {v : Tape} (hne : β ≠ α)
     (f : (State rT) → ENNReal) :
     ∫⁻ σ', f (σ'.update_tapes (·.insert β v)) ∂tapePresample σ α
@@ -438,7 +439,6 @@ theorem tapePresample_lintegral_update_tapes_ne
   rw [tapePresample_update_tapes_ne_comm hne,
       lintegral_map Measurable.of_discrete Measurable.of_discrete]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- `Cfg.uniform` as a bind over a PMF measure, with explicit state fiber. -/
 theorem Cfg.uniform_eq_bind {z : Int} {σ : (State rT)} (hz : 0 < z) :
     Cfg.uniform z σ =
@@ -456,7 +456,7 @@ that pulling `tapePresample` outside the `Cfg.uniform` bind (on the RHS
 as a per-post-state presample) gives back the original `tapePresample`-
 then-`Cfg.uniform` composition. This is the only non-trivial headStep
 case where the head-step result is a `Cfg.uniform` measure. -/
-theorem tapePresample_bind_cfgUniform_comm
+theorem tapePresample_bind_cfgUniform_comm [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} (z : Int) :
     (tapePresample σ α).bind (fun σ' => Cfg.uniform z σ') =
       (Cfg.uniform z σ).bind (fun ρ' =>
@@ -540,7 +540,7 @@ This is Clutch's `prim_coupl_upd_tapes_dom` almost verbatim: Clutch states
 it as an `Rcoupl` under `eq` on the `dmap (λ x, x.1)` projection, which is
 the same thing. -/
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Inserting the same tape value at an existing key is the identity on `(State rT)`. -/
 theorem State.update_tapes_insert_id {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) :
@@ -549,9 +549,9 @@ theorem State.update_tapes_insert_id {σ : (State rT)} {α : Loc} {t : Tape}
 
 /-- Mapping `tapeIndexUniform N` through the (Cfg rT) embedding `a ↦ ⟨lit (int ↑a), σ⟩`
 gives `Cfg.uniform N σ`. Both are the uniform distribution on
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 `{⟨lit (int n), σ⟩ | n ∈ [0, N)}`. -/
-theorem tapeIndexUniform_lintegral_eq_cfg_uniform
+theorem tapeIndexUniform_lintegral_eq_cfg_uniform [Countable rT] [MeasurableSingletonClass rT]
     {N : Int} (hN : 0 < N) (σ : (State rT))
     (f : (Cfg rT) → ENNReal) :
     ∫⁻ (a : { z : Int // 0 ≤ z ∧ z < N }),
@@ -607,9 +607,8 @@ localized here. -/
 
 /-- Helper for state-preserving dirac head-step cases: if
 `headStep ⟨e_h, σ'⟩ = dirac ⟨e', σ'⟩` for all `σ'`, the goal reduces to a
-omit [Countable rT] [MeasurableSingletonClass rT] in
 single `ih_fill` application. -/
-theorem erasure_det_close
+theorem erasure_det_close [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     (ih_fill : ∀ (e' : (Exp rT)) (σ' : (State rT)) (t' : Tape),
@@ -629,9 +628,8 @@ theorem erasure_det_close
 /-- Helper for state-preserving dirac head-step cases that hold ONLY a.e.
 on `tapePresample σ α` (rather than for all `σ'`). Used by the new
 nonpos-rand cases where headStep depends on tape state, which presample
-omit [Countable rT] [MeasurableSingletonClass rT] in
 preserves only on the support. -/
-theorem erasure_det_close_ae
+theorem erasure_det_close_ae [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     (ih_fill : ∀ (e' : (Exp rT)) (σ' : (State rT)) (t' : Tape),
@@ -665,7 +663,7 @@ theorem erasure_det_close_ae
 `σ` itself, the goal collapses via Fubini + `ih_fill` at each sampled
 omit [MeasurableSingletonClass rT] in
 index. -/
-theorem erasure_uniform_close
+theorem erasure_uniform_close [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     (ih_fill : ∀ (e' : (Exp rT)) (σ' : (State rT)) (t' : Tape),
@@ -725,7 +723,7 @@ abbrev ErasureIHFill (m : Nat) (K : (Ectx rT)) (S : Set (Exp rT)) (α : Loc) : P
 /-- `load ℓ` case. `headStep` only depends on `σ'.heap`, which
 `tapePresample` preserves a.e., so both sides reduce to a single
 `ih_fill` at the looked-up value. -/
-theorem erasure_load_close
+theorem erasure_load_close [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α ℓ : Loc} {t : Tape} {v : (Val rT)}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     (ih_fill : ErasureIHFill m K S α)
@@ -756,7 +754,7 @@ theorem erasure_load_close
 /-- `alloc ed` case. Heap-preservation under `tapePresample` gives
 `σ'.heap.fresh = σ.heap.fresh`, and then `tapePresample_update_heap_comm`
 pushes the fresh-cell insert through the presample. -/
-theorem erasure_alloc_close
+theorem erasure_alloc_close [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape} {ed : (Exp rT)}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     (ih_fill : ErasureIHFill m K S α) :
@@ -803,7 +801,7 @@ theorem erasure_alloc_close
 
 /-- `store ℓ ev` case. Dispatches on whether `ev` is a value and whether
 the heap lookup succeeds; the live branch mirrors `erasure_alloc_close`. -/
-theorem erasure_store_close
+theorem erasure_store_close [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α ℓ : Loc} {t : Tape} {ev : (Exp rT)}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     (ih_fill : ErasureIHFill m K S α) :
@@ -866,7 +864,7 @@ theorem erasure_store_close
 /-- `tape z` case. Presample never touches a fresh location, so
 `σ'.tapes.fresh = σ.tapes.fresh` a.e.; the fresh-tape insert then commutes
 with `tapePresample` via `tapePresample_update_tapes_ne_comm`. -/
-theorem erasure_tape_close
+theorem erasure_tape_close [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape} {z : Int}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     (ih_fill : ErasureIHFill m K S α) :
@@ -908,7 +906,7 @@ theorem erasure_tape_close
 /-- Zero-head-step case. `headStep ⟨e_red, σ⟩ = 0` propagates a.e. over
 `tapePresample σ α` via `State.head_step_dzero_upd_tapes`, collapsing both
 sides to `0`. -/
-theorem erasure_zero_close
+theorem erasure_zero_close [Countable rT] [MeasurableSingletonClass rT]
     {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape} {e_red : (Exp rT)}
     (h : σ.tapes[α]? = some t) (_hN : 0 < t.bound)
     (hzero : headStep ⟨e_red, σ⟩ = 0) :
@@ -938,7 +936,7 @@ that is unaffected by presampling onto tape `α`.
 The positivity hypothesis `0 < t.bound` is essential: `tapePresample σ α`
 is the zero measure when the tape bound is nonpositive, so without it
 the LHS would collapse to `0` while the RHS may be nonzero. -/
-theorem execN_tape_presample_expr_eq
+theorem execN_tape_presample_expr_eq [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {e : (Exp rT)} {m : Nat} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     asExpr ((tapePresample σ α).bind (fun σ' => execN m ⟨e, σ'⟩)) =
@@ -1304,7 +1302,8 @@ noncomputable def tapePresampleIter (α : Loc) (σ : (State rT)) : Nat → Measu
 
 /-- Tape-bound persistence under `tapePresampleIter`: every state in the
 support retains tape `α` with the same bound as the initial `σ`. -/
-theorem tapePresampleIter_tape_bound_ae {σ : (State rT)} {α : Loc} {t : Tape}
+theorem tapePresampleIter_tape_bound_ae [Countable rT] [MeasurableSingletonClass rT]
+    {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (n : Nat) :
     ∀ᵐ σ' ∂(tapePresampleIter α σ n),
       ∃ t' : Tape, σ'.tapes[α]? = some t' ∧ t'.bound = t.bound := by
@@ -1333,7 +1332,7 @@ theorem tapePresampleIter_tape_bound_ae {σ : (State rT)} {α : Loc} {t : Tape}
 /-- Iterated-presample variant of `execN_tape_presample_expr_eq`:
 `n`-fold presampling onto tape `α` is invisible to `execN m ⟨e, ·⟩` at the
 expression level, provided the initial tape exists and has positive bound. -/
-theorem execN_tapePresampleIter_expr_eq
+theorem execN_tapePresampleIter_expr_eq [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {e : (Exp rT)} {m : Nat} {t : Tape} (n : Nat)
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     asExpr ((tapePresampleIter α σ n).bind (fun σ' => execN m ⟨e, σ'⟩)) =
@@ -1376,7 +1375,7 @@ theorem execN_tapePresampleIter_expr_eq
           unfold asExpr at h_ih
           rw [h_ih, Measure.map_apply Measurable.of_discrete hS]
 
-theorem execN_iterM_tape_presample_expr_eq
+theorem execN_iterM_tape_presample_expr_eq [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {e : (Exp rT)} {m : Nat} {t : Tape} (n : Nat)
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     asExpr (((Nat.rec (motive := fun _ => Measure (State rT))
@@ -1399,7 +1398,7 @@ theorem execN_iterM_tape_presample_expr_eq
 Binding `tapePresample σ α` into `limExec ⟨e, ·⟩` is equal to `limExec ⟨e, σ⟩`
 at the expression level. Derived from `execN_tape_presample_expr_eq` by
 monotone convergence via `lintegral_limExec`. -/
-theorem limExec_tape_presample_expr_eq
+theorem limExec_tape_presample_expr_eq [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {t : Tape} {e : (Exp rT)}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     asExpr ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) =
@@ -1460,7 +1459,6 @@ def ErasableExpr (μ : Measure (State rT)) (σ : (State rT)) : Prop :=
 
 namespace ErasableExpr
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Strict `Erasable` implies `ErasableExpr`. -/
 theorem of_erasable {μ : Measure (State rT)} {σ : (State rT)} (h : Erasable μ σ) :
     ErasableExpr μ σ := by
@@ -1468,19 +1466,22 @@ theorem of_erasable {μ : Measure (State rT)} {σ : (State rT)} (h : Erasable μ
   rw [h e m]
 
 /-- Dirac distributions are `ErasableExpr`. -/
-theorem dret (σ : (State rT)) : ErasableExpr (Measure.dirac σ) σ :=
+theorem dret [Countable rT] [MeasurableSingletonClass rT]
+    (σ : (State rT)) : ErasableExpr (Measure.dirac σ) σ :=
   of_erasable (Erasable.dret σ)
 
 /-- `tapePresample σ α` is `ErasableExpr`. This is the main theorem
 `execN_tape_presample_expr_eq`, repackaged as an `ErasableExpr` witness. -/
-theorem tapePresample {σ : (State rT)} {α : Loc} {t : Tape}
+theorem tapePresample [Countable rT] [MeasurableSingletonClass rT]
+    {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     ErasableExpr (tapePresample σ α) σ := by
   intro e m
   exact execN_tape_presample_expr_eq h hN
 
 /-- `ErasableExpr` is closed under `bind`. -/
-theorem dbind {μ₁ : Measure (State rT)} {μ₂ : (State rT) → Measure (State rT)} {σ : (State rT)}
+theorem dbind [Countable rT] [MeasurableSingletonClass rT]
+    {μ₁ : Measure (State rT)} {μ₂ : (State rT) → Measure (State rT)} {σ : (State rT)}
     (h₁ : ErasableExpr μ₁ σ) (h₂ : ∀ σ', ErasableExpr (μ₂ σ') σ') :
     ErasableExpr (μ₁.bind μ₂) σ := by
   intro e m
@@ -1518,7 +1519,8 @@ level. This is the load-bearing corollary for the adequacy wrappers.
 Proof via `lintegral_limExec`: we test both sides against the indicator of
 `(·.expr) ⁻¹' S`, use the integral-vs-iSup equation `lintegral_limExec`,
 and apply the `ErasableExpr` hypothesis pointwise at each `n`. -/
-theorem lim_exec {μ : Measure (State rT)} {σ : (State rT)} (h : ErasableExpr μ σ)
+theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
+    {μ : Measure (State rT)} {σ : (State rT)} (h : ErasableExpr μ σ)
     (e : (Exp rT)) :
     asExpr (μ.bind (fun σ' => limExec ⟨e, σ'⟩)) =
       limExecV ⟨e, σ⟩ := by
@@ -1592,7 +1594,7 @@ Given an additive coupling between `ErasableExpr` distributions `μ₁` and
 `(Exp rT) × (Exp rT)` relation, we lift to a coupling on
 `(execN n ⟨e₁, σ₁⟩).map (·.expr) / (limExec ⟨e₁', σ₁'⟩).map (·.expr)`.
 The error slacks add. -/
-theorem AddCoupl_erasure_erasable
+theorem AddCoupl_erasure_erasable [Countable rT] [MeasurableSingletonClass rT]
     {e₁ e₁' : (Exp rT)} {σ₁ σ₁' : (State rT)}
     {μ₁ μ₂ : Measure (State rT)} {R : Set ((State rT) × (State rT))}
     {Φexp : Set ((Exp rT) × (Exp rT))}
@@ -1634,7 +1636,7 @@ theorem AddCoupl_erasure_erasable
 /-- **Clutch `ARcoupl_erasure_erasable_exp_rhs`, reformulated (projected form).**
 RHS expected-value variant (advanced composition). The continuation's
 slack `E₂` depends on the RHS sample, paid as additional slack on the LHS. -/
-theorem AddCoupl_erasure_erasable_exp_rhs
+theorem AddCoupl_erasure_erasable_exp_rhs [Countable rT] [MeasurableSingletonClass rT]
     {e₁ e₁' : (Exp rT)} {σ₁ σ₁' : (State rT)}
     {μ₁ μ₁' : Measure (State rT)} {R : Set ((State rT) × (Cfg rT))}
     {Φexp : Set ((Exp rT) × (Exp rT))}
@@ -1698,7 +1700,7 @@ theorem AddCoupl_erasure_erasable_exp_rhs
 
 /-- **Clutch `ARcoupl_erasure_erasable_exp_lhs`, reformulated (projected form).**
 LHS expected-value variant. Symmetric to `AddCoupl_erasure_erasable_exp_rhs`. -/
-theorem AddCoupl_erasure_erasable_exp_lhs
+theorem AddCoupl_erasure_erasable_exp_lhs [Countable rT] [MeasurableSingletonClass rT]
     {e₁ e₁' : (Exp rT)} {σ₁ σ₁' : (State rT)}
     {μ₁' : Measure (State rT)} {R : Set ((Cfg rT) × (State rT))}
     {Φexp : Set ((Exp rT) × (Exp rT))}
@@ -1750,7 +1752,7 @@ test-function expectation-bound hypothesis (`hExp`): for every pair of
 The conclusion operates on the LHS *after* one `primStep` bind — i.e. on
 `(primStep ⟨e₁,σ₁⟩ >>= execN n).map (·.expr)` — matching `execN (n+1)` for
 non-value `e₁` via `execN_succ_not_isValue`. -/
-theorem AddCoupl_erasure_erasable_exp_lhs_kanto
+theorem AddCoupl_erasure_erasable_exp_lhs_kanto [Countable rT] [MeasurableSingletonClass rT]
     {e₁ e₁' : (Exp rT)} {σ₁ σ₁' : (State rT)}
     {μ₁' : Measure (State rT)} {Φexp : Set ((Exp rT) × (Exp rT))}
     {ε : ENNReal} {E₂ : (Cfg rT) → (Cfg rT) → ENNReal}

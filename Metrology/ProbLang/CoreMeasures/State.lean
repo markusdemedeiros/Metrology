@@ -1,0 +1,108 @@
+module
+
+public import Metrology.ProbLang.Measure
+public import Metrology.ProbLang.Syntax.Syntax
+
+@[expose] public section
+
+noncomputable section
+open Classical MeasureTheory
+
+namespace ProbLang
+
+instance instMeasurableSpaceLocHeap {V : Type _} [MeasurableSpace V] :
+    MeasurableSpace (LocHeap V) :=
+  MeasurableSpace.comap (fun (m : LocHeap V) (ℓ : Loc) => m[ℓ]?) inferInstance
+
+@[fun_prop]
+theorem LocHeap.measurable_getElem? {V : Type _} [MeasurableSpace V] (ℓ : Loc) :
+    Measurable (fun (m : LocHeap V) => m[ℓ]?) :=
+  (measurable_pi_apply ℓ).comp (Measurable.of_comap_le le_rfl)
+
+theorem LocHeap.measurable_iff {X V : Type _} [MeasurableSpace X] [MeasurableSpace V]
+    {f : X → LocHeap V} :
+    Measurable f ↔ ∀ ℓ : Loc, Measurable (fun x => (f x)[ℓ]?) :=
+  ⟨fun hf ℓ => (LocHeap.measurable_getElem? ℓ).comp hf,
+   fun h => (measurable_comap_iff (g := fun (m : LocHeap V) ℓ => m[ℓ]?)).mpr
+              (measurable_pi_iff.mpr h)⟩
+
+theorem LocHeap.measurableSet_mem {V : Type _} [MeasurableSpace V] (ℓ : Loc) :
+    MeasurableSet {m : LocHeap V | ℓ ∈ m} := by
+  have hset : {m : LocHeap V | ℓ ∈ m}
+              = (fun m => m[ℓ]?) ⁻¹' (({none} : Set (Option V))ᶜ) := by
+    ext m
+    simp only [Set.mem_setOf_eq, Std.ExtTreeMap.mem_iff_isSome_getElem?,
+      Set.mem_preimage, Set.mem_compl_iff, Set.mem_singleton_iff]
+    cases (m[ℓ]? : Option V) <;> simp
+  rw [hset]
+  exact (LocHeap.measurable_getElem? ℓ) MeasurableSet.singleton_none.compl
+
+theorem LocHeap.measurableSet_notMem {V : Type _} [MeasurableSpace V] (ℓ : Loc) :
+    MeasurableSet {m : LocHeap V | ℓ ∉ m} :=
+  (LocHeap.measurableSet_mem ℓ).compl
+
+@[fun_prop]
+theorem Measurable.locHeap_insert {V : Type _} [MeasurableSpace V] (ℓ : Loc) :
+    Measurable (fun (p : LocHeap V × V) => p.1.insert ℓ p.2) := by
+  rw [LocHeap.measurable_iff]
+  intro k
+  have hrw : (fun (p : LocHeap V × V) => (p.1.insert ℓ p.2)[k]?)
+              = fun p => if compare ℓ k = .eq then some p.2 else p.1[k]? := by
+    funext p; exact Std.ExtTreeMap.getElem?_insert
+  rw [hrw]
+  split_ifs
+  · exact measurable_some.comp measurable_snd
+  · exact (LocHeap.measurable_getElem? k).comp measurable_fst
+
+theorem LocHeap.maxKey?_preimage_none {V : Type _} :
+    (fun m : LocHeap V => m.maxKey?) ⁻¹' ({none} : Set (Option Loc))
+      = {m | ∀ k : Loc, k ∉ m} := by
+  ext m
+  simp only [Set.mem_preimage, Set.mem_singleton_iff, Set.mem_setOf_eq,
+    Std.ExtTreeMap.maxKey?_eq_none_iff]
+  exact ⟨fun h k => h ▸ Std.ExtTreeMap.not_mem_empty,
+    fun h => Std.ExtTreeMap.ext_getElem? fun k => by
+      rcases hk : m[k]? with _ | v
+      · simp
+      · exact absurd (Std.ExtTreeMap.mem_iff_isSome_getElem?.mpr (by rw [hk]; rfl)) (h k)⟩
+
+theorem LocHeap.maxKey?_preimage_some {V : Type _} (S : Set Loc) :
+    (fun m : LocHeap V => m.maxKey?) ⁻¹' (some '' S)
+      = ⋃ n ∈ S, {m : LocHeap V | n ∈ m} ∩ ⋂ k ∈ {k : Loc | n < k}, {m | k ∉ m} := by
+  ext m
+  simp only [Set.mem_preimage, Set.mem_image, Set.mem_iUnion, exists_prop,
+    Set.mem_inter_iff, Set.mem_setOf_eq, Set.mem_iInter]
+  refine exists_congr fun n => and_congr_right fun _ => ?_
+  rw [eq_comm, Std.ExtTreeMap.maxKey?_eq_some_iff_getElem?,
+      ← Std.ExtTreeMap.mem_iff_isSome_getElem?]
+  refine and_congr_right fun _ => forall_congr' fun k => forall_congr' fun _ => ?_
+  rw [Std.ExtTreeMap.mem_iff_isSome_getElem?]
+  cases m[k]? <;> simp
+
+@[fun_prop]
+theorem LocHeap.measurable_maxKey? {V : Type _} [MeasurableSpace V] :
+    Measurable (fun (m : LocHeap V) => m.maxKey?) := by
+  refine Measurable.option_of_cov (cov := {m : LocHeap V | ∃ k : Loc, k ∈ m}) ?_ ?_ ?_
+  · rw [show {m : LocHeap V | ∃ k : Loc, k ∈ m} = ⋃ k : Loc, {m | k ∈ m} from
+      Set.ext fun m => by simp]
+    exact .iUnion (LocHeap.measurableSet_mem)
+  · rw [LocHeap.maxKey?_preimage_none]
+    exact Set.ext fun m => by simp
+  · intro S _
+    rw [LocHeap.maxKey?_preimage_some]
+    exact .biUnion (Set.to_countable S) fun n _ =>
+      (LocHeap.measurableSet_mem n).inter <|
+        .biInter (Set.to_countable _) fun k _ => LocHeap.measurableSet_notMem k
+
+@[fun_prop]
+theorem LocHeap.measurable_fresh {V : Type _} [MeasurableSpace V] :
+    Measurable (fun (m : LocHeap V) => m.fresh) := by
+  have hrw : (fun (m : LocHeap V) => m.fresh)
+              = fun m => (m.maxKey?).getD 0 + 1 := by
+    funext m
+    show (match m.maxKey? with | none => (1 : Loc) | some v => v + 1) = (m.maxKey?).getD 0 + 1
+    rcases m.maxKey? with _ | _ <;> rfl
+  rw [hrw]
+  exact (Option.measurable_getD 0 |>.comp LocHeap.measurable_maxKey?).add_const 1
+
+end ProbLang

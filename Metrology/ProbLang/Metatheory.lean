@@ -9,9 +9,8 @@ public import Metrology.ProbLang.Syntax.LocallyClosed
 namespace ProbLang
 open Cslib Exp
 
-set_option linter.unusedSectionVars false
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 /-! ## Group A — Closed contexts and the `isClosed` predicate
 
@@ -46,12 +45,12 @@ end ClosedCtx
 /-- `Exp.isClosed X e` : `e` is locally closed and every free variable of `e` is in `X`. -/
 def Exp.isClosed (X : ClosedCtx) (e : Exp rT) : Prop := e.IsLocallyClosed ∧ e.fv ⊆ X
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem Exp.isClosed_weaken {X Y : ClosedCtx} (hXY : X.subset Y)
     {e : Exp rT} (h : e.isClosed X) : e.isClosed Y :=
   ⟨h.1, fun _ hz => hXY (h.2 hz)⟩
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem Exp.isClosed_weaken_empty {X : ClosedCtx} {e : Exp rT}
     (h : e.isClosed .empty) : e.isClosed X := by
   refine ⟨h.1, fun z hz => ?_⟩
@@ -97,21 +96,18 @@ end SubstMap
 def Exp.substMap (vs : SubstMap rT) (e : Exp rT) : Exp rT :=
   vs.foldr (fun p acc => Exp.subst acc p.1 p.2) e
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.substMap_empty (e : Exp rT) : e.substMap .empty = e := rfl
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.substMap_insert (vs : SubstMap rT) (x : Var) (v e : Exp rT) :
     e.substMap (vs.insert x v) = Exp.subst (e.substMap vs) x v := rfl
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- A substitution that substitutes a single variable. -/
 theorem Exp.substMap_singleton (x : Var) (v e : Exp rT) :
     e.substMap [(x, v)] = Exp.subst e x v := rfl
 
 /-! ### Substitution and closedness -/
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Substitution of a value with no free variables in `X` preserves closedness in `X`. -/
 theorem Exp.subst_isClosed {X : ClosedCtx} {e v : Exp rT} {x : Var}
     (he : e.isClosed (X.insert x)) (hv : v.isClosed X) :
@@ -141,7 +137,7 @@ theorem Exp.subst_is_closed_empty {e : Exp rT} {x : Var} {v : Exp rT}
 
 /-! ### Commutation of substitutions -/
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Substitutions at different variables commute when `v'` has no `x` free. -/
 theorem Exp.subst_subst {e v v' : Exp rT} {x : Var} {y : Var}
     (hne : x ≠ y) (hv' : x ∉ v'.fv) (_hv'_lc : v'.IsLocallyClosed) :
@@ -187,7 +183,7 @@ commutation `Exp.substMap_subst_fvar_comm` lives further down (after
 
 /-- Two-step substitution where the bridge is a fresh atom: `e[x ↦ y][y ↦ w] = e[x ↦ w]`
 when `y` doesn't already appear free in `e` (so the only `y` introduced by the
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 first step is the one at `x`'s position). -/
 theorem Exp.subst_subst_fvar_id (e w : Exp rT) (x y : Var) (hyv : y ∉ e.fv) :
     Exp.subst (Exp.subst e x (.fvar y)) y w = Exp.subst e x w := by
@@ -233,11 +229,9 @@ values. Under that invariant, `substMap` reduces to repeated `subst`. -/
 def SubstMap.AllClosed (vs : SubstMap rT) : Prop :=
   ∀ p ∈ vs, p.2.isClosed .empty
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem SubstMap.AllClosed_nil : SubstMap.AllClosed ([] : SubstMap rT) := by
   intro p hp; cases hp
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem SubstMap.AllClosed_cons {x : Var} {v : Exp rT} {vs : SubstMap rT} :
     SubstMap.AllClosed ((x, v) :: vs) ↔ v.isClosed .empty ∧ SubstMap.AllClosed vs := by
   constructor
@@ -248,7 +242,6 @@ theorem SubstMap.AllClosed_cons {x : Var} {v : Exp rT} {vs : SubstMap rT} :
     · exact hv
     · exact hvs p hpm
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem SubstMap.AllClosed_delete {vs : SubstMap rT} (x : Var)
     (h : SubstMap.AllClosed vs) : SubstMap.AllClosed (vs.delete x) := by
   intro p hp
@@ -256,7 +249,6 @@ theorem SubstMap.AllClosed_delete {vs : SubstMap rT} (x : Var)
     have := List.mem_filter.mp hp; exact this.1
   exact h p hmem
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- A filter on an AllClosed substMap is still AllClosed. -/
 theorem SubstMap.AllClosed_filter (vs : SubstMap rT) (P : Var × Exp rT → Bool)
     (h : SubstMap.AllClosed vs) :
@@ -265,7 +257,6 @@ theorem SubstMap.AllClosed_filter (vs : SubstMap rT) (P : Var × Exp rT → Bool
   have hmem : p ∈ vs := (List.mem_filter.mp hp).1
   exact h p hmem
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Filter on a domain-disjoint atom is the identity. -/
 theorem SubstMap.filter_notMem_dom (vs : SubstMap rT) {y : Var}
     (h : y ∉ (vs.map (·.1)).toFinset) :
@@ -284,7 +275,6 @@ theorem SubstMap.filter_notMem_dom (vs : SubstMap rT) {y : Var}
     congr 1
     exact ih hyRest
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- The pair returned by `lookup` is the rightmost matching member. -/
 theorem SubstMap.mem_of_lookup_eq_some {vs : SubstMap rT} {y : Var} {w : Exp rT}
     (h : vs.lookup y = some w) : (y, w) ∈ vs := by
@@ -307,7 +297,6 @@ theorem SubstMap.mem_of_lookup_eq_some {vs : SubstMap rT} {y : Var} {w : Exp rT}
         subst h
         exact List.mem_cons.mpr (.inl rfl)
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- If `y ∈ vs.dom`, then `vs.lookup y` is some. -/
 theorem SubstMap.lookup_isSome_of_mem_dom {vs : SubstMap rT} {y : Var}
     (h : y ∈ (vs.map (·.1)).toFinset) : (vs.lookup y).isSome := by
@@ -380,7 +369,6 @@ theorem Exp.substMap_subst_fvar_comm
     rw [← hsw]
 
 /-- `substMap` through a closed expression is a no-op (Clutch's
-omit [Countable rT] [MeasurableSingletonClass rT] in
 `Exp.substMap_isClosed` for the empty `X = ∅` case). -/
 theorem Exp.substMap_isClosed_empty {e : Exp rT} (vs : SubstMap rT)
     (he : e.isClosed .empty) : e.substMap vs = e := by
@@ -398,7 +386,6 @@ theorem Exp.substMap_isClosed_empty {e : Exp rT} (vs : SubstMap rT)
       simp [ClosedCtx.empty] at this
 
 /-- General version: if `e` is closed in `X` and `vs` only assigns variables
-omit [Countable rT] [MeasurableSingletonClass rT] in
 NOT in `X`, then `substMap vs e = e`. (Clutch's `substMap_isClosed`.) -/
 theorem Exp.substMap_isClosed {X : ClosedCtx} {e : Exp rT} (vs : SubstMap rT)
     (he : e.isClosed X)
@@ -425,7 +412,6 @@ deleted environment. The proof is much simpler under LN — `insert` is just
 `cons`, so `substMap (cons p vs) e = subst (substMap vs e) p.1 p.2`
 holds definitionally. -/
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.substMap_cons (p : Var × Exp rT) (vs : SubstMap rT) (e : Exp rT) :
     e.substMap (p :: vs) = Exp.subst (e.substMap vs) p.1 p.2 := rfl
 
@@ -1014,7 +1000,6 @@ def isDetHeadStep (e : Exp rT) (σ : State rT) : Bool :=
   | .scrut e _ => decide e.isValue
   | _ => false
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Values don't take head steps. -/
 theorem val_not_HeadStepPred {e : Exp rT} {σ : State rT}
     (hv : e.isValue) : ¬ HeadStepPred e σ := by
@@ -1023,7 +1008,6 @@ theorem val_not_HeadStepPred {e : Exp rT} {σ : State rT}
   · cases hdet <;> simp [Exp.isValueR] at hv
   · cases hprob <;> simp [Exp.isValueR] at hv
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- `isDetHeadStep ↔ DetHeadStepPred`. -/
 theorem isDetHeadStep_iff_pred (e : Exp rT) (σ : State rT) :
     isDetHeadStep e σ = true ↔ DetHeadStepPred e σ := by
@@ -1157,7 +1141,8 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
     | RandTapeNonposEmptyS hz htape hzN => exact .inr (.randTapeNonposEmpty hz htape hzN)
     | RandTapeNonposOtherS hz htape hzN => exact .inr (.randTapeNonposOther hz htape hzN)
 
-theorem not_HeadStepPred_iff_zero (e : Exp rT) (σ : State rT) :
+theorem not_HeadStepPred_iff_zero [Countable rT] [MeasurableSingletonClass rT]
+    (e : Exp rT) (σ : State rT) :
     ¬ HeadStepPred e σ ↔ headStep ⟨e, σ⟩ = 0 := by
   rw [HeadStepPred_iff_exists_support]
   constructor
@@ -1184,7 +1169,8 @@ theorem not_HeadStepPred_iff_zero (e : Exp rT) (σ : State rT) :
     rw [h0] at this
     simp at this
 
-theorem det_or_prob_or_zero (e : Exp rT) (σ : State rT) :
+theorem det_or_prob_or_zero [Countable rT] [MeasurableSingletonClass rT]
+    (e : Exp rT) (σ : State rT) :
     DetHeadStepPred e σ ∨ ProbHeadStepPred e σ ∨ headStep ⟨e, σ⟩ = 0 := by
   by_cases hpred : HeadStepPred e σ
   · rcases hpred with hdet | hprob
@@ -1194,12 +1180,12 @@ theorem det_or_prob_or_zero (e : Exp rT) (σ : State rT) :
 
 /-! ## Group E — Tape and fresh-location update lemmas -/
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem State.upd_tape_some (σ : State rT) (α : Loc) (t : Tape) :
     (σ.update_tapes (·.insert α t)).tapes[α]? = some t := by
   simp [State.update_tapes]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem State.upd_diff_tape_comm {σ : State rT} {α β : Loc} {bs bs' : Tape}
     (hne : α ≠ β) :
     ((σ.update_tapes (·.insert β bs)).update_tapes (·.insert α bs'))
@@ -1218,7 +1204,7 @@ theorem State.upd_diff_tape_comm {σ : State rT} {α β : Loc} {bs bs' : Tape}
       simp [hαk]
     · simp [hαk, hβk]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem State.upd_diff_tape_tot {σ : State rT} {α β : Loc} {bs : Tape}
     (hne : α ≠ β) :
     (σ.update_tapes (·.insert β bs)).tapes[α]? = σ.tapes[α]? := by
@@ -1261,7 +1247,7 @@ theorem Std.ExtTreeMap.fresh_insert_of_mem
       simp [hcmp, Ordering.isLE]
   rw [hkeys]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem State.fresh_loc_upd_some {σ : State rT} {α : Loc} {bs bs' : Tape}
     (h : σ.tapes[α]? = some bs) :
     (σ.tapes.insert α bs').fresh = σ.tapes.fresh :=
@@ -1294,7 +1280,7 @@ theorem State.fresh_loc_upd_swap {σ : State rT} {α : Loc} {bs bs' : Tape} {t :
       simp [hαk]
     · simp [hαk, hfk]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem State.fresh_loc_lookup {σ : State rT} {α : Loc} {bs : Tape} {t : Tape}
     (h : σ.tapes[α]? = some bs) :
     (σ.tapes.insert σ.tapes.fresh t)[α]? = some bs := by
@@ -1305,22 +1291,23 @@ theorem State.fresh_loc_lookup {σ : State rT} {α : Loc} {bs : Tape} {t : Tape}
     split <;> simp_all
   simp [hcmp, h]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem Cfg.uniform_nonpos_eq {z : Int} {σ : State rT} (hz : ¬ 0 < z) :
     Cfg.uniform z σ = MeasureTheory.Measure.dirac ⟨.lit (.int (-1)), σ⟩ := by
   unfold Cfg.uniform Int.isPos
   rw [dif_neg hz]
 
-theorem Cfg.uniform_ne_zero (z : Int) (σ : State rT) : Cfg.uniform z σ ≠ 0 := by
+theorem Cfg.uniform_ne_zero [Countable rT] [MeasurableSingletonClass rT]
+    (z : Int) (σ : State rT) : Cfg.uniform z σ ≠ 0 := by
   intro heq
   have hp : MeasureTheory.IsProbabilityMeasure (Cfg.uniform z σ) :=
     Cfg.uniform_isProbabilityMeasure
   have := hp.measure_univ; rw [heq] at this; simp at this
 
 /-- Integrate a function over `Cfg.uniform z σ`: the result is the uniform
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 average over `n ∈ Ico 0 z` of `φ ⟨#n, σ⟩`. -/
-theorem Cfg.lintegral_uniform {z : Int} (Hz : 0 < z) (σ : State rT) (φ : Cfg rT → ENNReal) :
+theorem Cfg.lintegral_uniform [Countable rT] [MeasurableSingletonClass rT]
+    {z : Int} (Hz : 0 < z) (σ : State rT) (φ : Cfg rT → ENNReal) :
     ∫⁻ c, φ c ∂(Cfg.uniform z σ) =
       ((z.toNat : ENNReal)⁻¹) * ∑ n ∈ Finset.Ico (0 : Int) z,
         φ (⟨.lit (.int n), σ⟩ : Cfg rT) := by
@@ -1364,8 +1351,8 @@ theorem Cfg.lintegral_uniform {z : Int} (Hz : 0 < z) (σ : State rT) (φ : Cfg r
   refine Finset.sum_congr rfl fun n _ => ?_
   ring
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
-theorem Cfg.uniform_one_eq_dirac (σ : State rT) :
+theorem Cfg.uniform_one_eq_dirac [Countable rT] [MeasurableSingletonClass rT]
+    (σ : State rT) :
     Cfg.uniform 1 σ = MeasureTheory.Measure.dirac (⟨.lit (.int 0), σ⟩ : Cfg rT) := by
   classical
   unfold Cfg.uniform Int.isPos
@@ -1391,7 +1378,8 @@ theorem Cfg.uniform_one_eq_dirac (σ : State rT) :
       simp [Finset.filter_singleton, hmem]
     rw [hfilt]; simp
 
-theorem Cfg.uniform_singleton_ne_one {z : Int} {σ : State rT} {ρ : Cfg rT}
+theorem Cfg.uniform_singleton_ne_one [Countable rT] [MeasurableSingletonClass rT]
+    {z : Int} {σ : State rT} {ρ : Cfg rT}
     (Hz : 1 < z) : Cfg.uniform z σ {ρ} ≠ 1 := by
   intro h1
   have Hz0 : 0 < z := by omega
@@ -1438,7 +1426,7 @@ theorem Cfg.uniform_singleton_ne_one {z : Int} {σ : State rT} {ρ : Cfg rT}
     exact absurd (lt_of_lt_of_le hpos0 this) (lt_irrefl _)
 
 set_option linter.unnecessarySimpa false in
-theorem State.head_step_dzero_upd_tapes
+theorem State.head_step_dzero_upd_tapes [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {α : Loc} {bs bs' : Tape}
     (hmem : σ.tapes[α]? = some bs)
     (h0 : ProbLang.headStep ⟨e, σ⟩ = 0) :
@@ -1488,7 +1476,6 @@ theorem State.head_step_dzero_upd_tapes
   case rand.tape.empty =>
     exact absurd h0 (Cfg.uniform_ne_zero _ _)
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem State.det_head_step_upd_tapes
     {e : Exp rT} {σ : State rT} {α : Loc} {bs' : Tape}
     (hdet : ProbLang.DetHeadStepPred e σ) :
@@ -1511,7 +1498,7 @@ theorem State.det_head_step_upd_tapes
   | scrutSuccess hv hm => exact .scrutSuccess hv hm
   | scrutFailure hv hm => exact .scrutFailure hv hm
 
-theorem State.prim_step_empty_tape
+theorem State.prim_step_empty_tape [Countable rT] [MeasurableSingletonClass rT]
     {K : ProbLang.Ectx rT} {σ : State rT} {α : Loc} {z : Int} {N : Int}
     (_hmem : σ.tapes[α]? = some ⟨N, []⟩) :
     ProbLang.primStep ⟨K.fill (.rand (.lit (.int z)) (.lit (.lbl α))), σ⟩
