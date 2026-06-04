@@ -520,8 +520,15 @@ inductive IsVal : Exp rT → Type
   | inl  : IsVal e → IsVal (.inl e)
   | inr  : IsVal e → IsVal (.inr e)
 
-/-- A value is an expression paired with a Type-valued witness. -/
-@[expose] def Val (α : Type _) := (e : Exp α) × IsVal e
+/-- A value is an expression paired with a Type-valued witness.
+
+We use a `structure` rather than `(e : Exp α) × IsVal e` so that `Val α` does
+NOT reduce to `Sigma`. This is required for the measurable-space instance on
+`Val α` (see `CoreMeasures/Val.lean`) to use the comap of `Val.fst` rather
+than the (much coarser) `Sigma.instMeasurableSpace`. -/
+structure Val (α : Type _) where
+  fst : Exp α
+  snd : IsVal fst
 
 namespace IsVal
 
@@ -599,15 +606,21 @@ instance Exp.decIsValue (e : Exp α) : Decidable e.isValue :=
   | some w => isTrue ⟨w⟩
   | none => isFalse (IsVal.not_isValue_of_check?_none hc)
 
-@[simp] theorem Val.isValue (v : @Val α) : v.1.isValue := ⟨v.2⟩
+@[simp] theorem Val.isValue (v : @Val α) : v.fst.isValue := ⟨v.snd⟩
 
-@[ext]
-theorem Val.ext {v1 v2 : Val α} (h : v1.1 = v2.1) : v1 = v2 := by
+/-- Two values are equal iff their expressions are equal (the `IsVal` witnesses
+are determined by `IsVal.subsingleton`). -/
+theorem Val.ext {v1 v2 : Val α} (h : v1.fst = v2.fst) : v1 = v2 := by
   obtain ⟨e1, w1⟩ := v1; obtain ⟨e2, w2⟩ := v2
   simp at h; subst h; congr 1; exact IsVal.subsingleton w1 w2
 
+theorem Val.ext_iff {v1 v2 : Val α} : v1 = v2 ↔ v1.fst = v2.fst :=
+  ⟨congrArg _, Val.ext⟩
+
 instance [Countable α] : Countable (Val α) := by
-  unfold Val; exact instCountableSigma
+  -- Countable Val α via the injection Val.fst : Val α → Exp α (an embedding).
+  refine Function.Injective.countable (f := Val.fst) ?_
+  intro v1 v2 h; exact Val.ext h
 
 instance instCountableExtTreeMapLoc {V : Type _} [Countable V] :
     Countable (ExtTreeMap Loc V compare) := by
@@ -669,7 +682,7 @@ theorem Exp.toVal?_ofVal (v : Val α) : (Exp.ofVal v).toVal? = some v := by
 theorem Exp.ofVal_of_toVal_some {e : Exp α} {v : Val α} (h : e.toVal? = some v) : Exp.ofVal v = e := by
   simp only [toVal?] at h
   split at h
-  · simp at h; exact congrArg Sigma.fst h.symm
+  · simp at h; exact congrArg Val.fst h.symm
   · simp at h
 
 theorem Exp.ofVal_injective : Function.Injective (@Exp.ofVal α) :=

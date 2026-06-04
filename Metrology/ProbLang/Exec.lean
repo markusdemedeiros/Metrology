@@ -119,6 +119,59 @@ def asExpr (μ : Measure (Cfg rT)) : Measure (Exp rT) := μ.map (·.expr)
 /-- Limiting distribution of an execution, over return values -/
 def limExecV (ρ : Cfg rT) : Measure (Exp rT) := asExpr <| limExec ρ
 
+/-! ### Measurability for arbitrary measurable `rT`.
+
+These are the non-discrete analogues of the `.of_discrete`-shortcutted lemmas
+scattered through this file. Each follows by routine kernel algebra (bind, iSup,
+map) once `primStep.measurable` lands. -/
+
+/-- `execN n` is measurable as a function `Cfg rT → Measure (Cfg rT)`.
+
+Induction on `n`. Base: constant `0`. Step: `Measurable.ite` with
+`isValueR.measurable ∘ Cfg.measurable_expr`, true branch `measurable_dirac`,
+false branch `measurable_bind'` (taking the IH as the kernel) composed with
+the (stubbed) `primStep.measurable`. -/
+theorem execN.measurable [Inhabited rT] (n : Nat) :
+    Measurable (execN n : Cfg rT → Measure (Cfg rT)) := by
+  induction n with
+  | zero => exact measurable_const
+  | succ n ih =>
+    -- execN (n+1) ρ = if ρ.expr.isValue then dirac ρ else (primStep ρ).bind (execN n)
+    have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
+      have : {ρ : Cfg rT | ρ.expr.isValue} = {ρ : Cfg rT | ρ.expr.isValueR} := by
+        ext ρ; exact Exp.isValue_iff_isValueR
+      rw [this]
+      exact (Exp.isValueR.measurable.comp Cfg.measurable_expr).setOf
+    refine Measurable.ite hpred measurable_dirac ?_
+    -- False branch: (primStep ρ).bind (execN n)
+    exact (Measure.measurable_bind' ih).comp primStep.measurable
+
+/-- `execExactN N` is measurable as a function `Cfg rT → Measure (Cfg rT)`.
+Same shape as `execN.measurable`: induction + ite. -/
+theorem execExactN.measurable [Inhabited rT] (N : Nat) :
+    Measurable (execExactN N : Cfg rT → Measure (Cfg rT)) := by
+  have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
+    have : {ρ : Cfg rT | ρ.expr.isValue} = {ρ : Cfg rT | ρ.expr.isValueR} := by
+      ext ρ; exact Exp.isValue_iff_isValueR
+    rw [this]
+    exact (Exp.isValueR.measurable.comp Cfg.measurable_expr).setOf
+  induction N with
+  | zero =>
+    -- execExactN 0 ρ = if ρ.expr.isValue then dirac ρ else 0
+    exact Measurable.ite hpred measurable_dirac measurable_const
+  | succ N ih =>
+    -- execExactN (N+1) ρ = if ρ.expr.isValue then 0 else (primStep ρ).bind (execExactN N)
+    refine Measurable.ite hpred measurable_const ?_
+    exact (Measure.measurable_bind' ih).comp primStep.measurable
+
+/-- `asExpr : Measure (Cfg rT) → Measure (Exp rT)` is measurable in its argument. -/
+theorem asExpr.measurable :
+    Measurable (asExpr : Measure (Cfg rT) → Measure (Exp rT)) :=
+  Measure.measurable_map _ Cfg.measurable_expr
+
+-- (`limExec.measurable` / `limExecV.measurable` appear below, after
+-- `execN_mono` is in scope.)
+
 /-! ## `execN` / `limExec` metatheory — ported from Rocq `theories/prob/markov.v`.
 
 We do not port the `markov` structure itself. Rocq's `step_or_final`, `pexec n`
@@ -224,6 +277,21 @@ theorem stepOrFinal_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) :
     stepOrFinal ρ = primStep ρ := by
   simp [stepOrFinal, hv]
 
+/-- `stepOrFinal : Cfg rT → Measure (Cfg rT)` is measurable.
+
+`stepOrFinal ρ = if ρ.expr.isValue then dirac ρ else primStep ρ`. Use
+`Measurable.ite` with predicate `isValue` (measurable via `isValueR.measurable`),
+`measurable_dirac` for the true branch, and the (stubbed) `primStep.measurable`
+for the false branch. -/
+theorem stepOrFinal.measurable [Inhabited rT] :
+    Measurable (stepOrFinal : Cfg rT → Measure (Cfg rT)) := by
+  have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
+    have : {ρ : Cfg rT | ρ.expr.isValue} = {ρ : Cfg rT | ρ.expr.isValueR} := by
+      ext ρ; exact Exp.isValue_iff_isValueR
+    rw [this]
+    exact (Exp.isValueR.measurable.comp Cfg.measurable_expr).setOf
+  exact Measurable.ite hpred measurable_dirac primStep.measurable
+
 /-! ### Monotonicity (ported from `SampCert/SLang.lean`) -/
 
 -- Rocq: exec_mono / exec_mono'
@@ -239,6 +307,22 @@ theorem execN_mono_singleton [Countable rT] [MeasurableSingletonClass rT]
     {n m : ℕ} (h : n ≤ m) (ρ : Cfg rT) (c : Cfg rT) :
     execN n ρ {c} ≤ execN m ρ {c} :=
   execN_mono h ρ {c}
+
+/-- `limExec : Cfg rT → Measure (Cfg rT)` is measurable.
+
+`limExec ρ = ⨆ n, execN n ρ`. Apply the keystone
+`Measure.measurable_iSup_countable` with each `execN n` measurable and the
+family monotone in `n` (`execN_mono`). The discreteness hypotheses come from
+`execN_mono`'s dependence on `Measure.bind_mono_right`. -/
+theorem limExec.measurable [Inhabited rT] [Countable rT] [MeasurableSingletonClass rT] :
+    Measurable (limExec : Cfg rT → Measure (Cfg rT)) :=
+  Measure.measurable_iSup_countable (fun n => execN.measurable n)
+    (fun ρ _ _ h => execN_mono h ρ)
+
+/-- `limExecV : Cfg rT → Measure (Exp rT)` is measurable, given `limExec.measurable`. -/
+theorem limExecV.measurable [Inhabited rT] [Countable rT] [MeasurableSingletonClass rT] :
+    Measurable (limExecV : Cfg rT → Measure (Exp rT)) :=
+  asExpr.measurable.comp limExec.measurable
 
 /-! ### Sub-probability -/
 

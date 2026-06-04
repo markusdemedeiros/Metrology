@@ -362,10 +362,10 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         ipure_intro
         refine ⟨fun h => ?_, fun h => ?_⟩
         · exfalso; apply h_l1_r1
-          have := congrArg Sigma.fst h; rw [he1, he2] at this
+          have := congrArg Val.fst h; rw [he1, he2] at this
           injection this with this; injection this
         · exfalso; apply h_l2_r2
-          have := congrArg Sigma.fst h; rw [he1', he2'] at this
+          have := congrArg Val.fst h; rw [he1', he2'] at this
           injection this with this; injection this
   · -- TTape case.
     unfold interp
@@ -434,10 +434,10 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         ipure_intro
         refine ⟨fun h => ?_, fun h => ?_⟩
         · exfalso; apply h_α1_β1
-          have := congrArg Sigma.fst h; rw [he1, he2] at this
+          have := congrArg Val.fst h; rw [he1, he2] at this
           injection this with this; injection this
         · exfalso; apply h_α2_β2
-          have := congrArg Sigma.fst h; rw [he1', he2'] at this
+          have := congrArg Val.fst h; rw [he1', he2'] at this
           injection this with this; injection this
 
 end interp_sound

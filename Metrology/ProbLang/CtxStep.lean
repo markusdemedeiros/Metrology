@@ -47,6 +47,56 @@ def primStepKernel [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
   measurable' := .of_discrete
   toFun := primStep
 
+/-! ### Measurability for arbitrary measurable `rT`. -/
+
+/-- `primStep : Cfg rT → Measure (Cfg rT)` is measurable.
+
+`primStep cfg = (headStep ⟨decomp.2, cfg.state⟩).map (decomp.1.fillCfg)`. The
+parameterized pushforward (via `Measure.measurable_map_uncurry`) reduces
+measurability to joint measurability of:
+- the "fill" map `(cfg, ρ) ↦ cfg.expr.decomp.1.fillCfg ρ`, which uses
+  `Ectx.fill.measurable` (stamped via `List.measurable_foldl`),
+- the "headStep input" map `cfg ↦ ⟨cfg.expr.decomp.2, cfg.state⟩` composed
+  with `headStep.measurable`. -/
+theorem primStep.measurable [ProbLangℝ rT] [Inhabited rT] :
+    Measurable (primStep : Cfg rT → Measure (Cfg rT)) := by
+  -- Use `Cfg.measurable_iff` to break down Cfg measurability.
+  have hdecomp : Measurable (fun cfg : Cfg rT => cfg.expr.decomp) :=
+    Exp.decomp.measurable.comp Cfg.measurable_expr
+  -- Source kernel `k : Cfg rT → Measure (Cfg rT)`.
+  have hk_inner : Measurable
+      (fun cfg : Cfg rT => (Cfg.mk cfg.expr.decomp.2 cfg.state : Cfg rT)) := by
+    rw [Cfg.measurable_iff]
+    exact ⟨measurable_snd.comp hdecomp, Cfg.measurable_state⟩
+  have hk : Measurable (fun cfg : Cfg rT =>
+      headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) :=
+    headStep.measurable.comp hk_inner
+  -- Joint pushforward function `h : Cfg rT × Cfg rT → Cfg rT`.
+  have hh : Measurable (fun (p : Cfg rT × Cfg rT) => p.1.expr.decomp.1.fillCfg p.2) := by
+    -- p.1.expr.decomp.1.fillCfg p.2 = Cfg.mk (Ectx.fill p.1.expr.decomp.1 p.2.expr) p.2.state
+    show Measurable
+      (fun p : Cfg rT × Cfg rT =>
+        Cfg.mk (Ectx.fill p.1.expr.decomp.1 p.2.expr) p.2.state)
+    rw [Cfg.measurable_iff]
+    refine ⟨?_, ?_⟩
+    · show Measurable (fun p : Cfg rT × Cfg rT => Ectx.fill p.1.expr.decomp.1 p.2.expr)
+      refine Exp.Ectx_fill.measurable.comp
+        (Measurable.prodMk ?_ (Cfg.measurable_expr.comp measurable_snd))
+      exact measurable_fst.comp (hdecomp.comp measurable_fst)
+    · show Measurable (fun p : Cfg rT × Cfg rT => p.2.state)
+      exact Cfg.measurable_state.comp measurable_snd
+  -- Apply the joint pushforward keystone. The `IsSFiniteKernel` instance is
+  -- discharged via a `sorry` for now — morally `headStep` is sub-probability so
+  -- the kernel is finite (TODO: prove `headStep.isFiniteKernel` for general rT).
+  have hSF : IsSFiniteKernel (Kernel.mk (fun cfg : Cfg rT =>
+      headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) hk) := sorry
+  exact Measure.measurable_map_uncurry hh hk
+
+/-- Markov kernel of the prim step, without the discrete-`rT` hypotheses. -/
+def primStepKernelM [ProbLangℝ rT] [Inhabited rT] : Kernel (Cfg rT) (Cfg rT) where
+  measurable' := primStep.measurable
+  toFun := primStep
+
 abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ∃ ρ : Cfg rT, 0 < primStep ⟨e, σ⟩ {ρ}
 

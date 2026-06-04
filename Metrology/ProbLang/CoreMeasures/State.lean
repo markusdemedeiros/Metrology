@@ -54,6 +54,25 @@ theorem Measurable.locHeap_insert {V : Type _} [MeasurableSpace V] (ℓ : Loc) :
   · exact measurable_some.comp measurable_snd
   · exact (LocHeap.measurable_getElem? k).comp measurable_fst
 
+/-- Parameterized `LocHeap.insert`: measurable jointly in `(m, ℓ, v)`. Uses
+the fact that `Loc = Int` is countable with discrete σ-algebra. -/
+@[fun_prop]
+theorem Measurable.locHeap_insert_param {V : Type _} [MeasurableSpace V] :
+    Measurable (fun (q : LocHeap V × Loc × V) => q.1.insert q.2.1 q.2.2) := by
+  -- Reshape `(m, ℓ, v) ↦ (ℓ, m, v)` to put `ℓ` (countable Loc) in the left
+  -- factor; apply `measurable_from_prod_countable_right` from
+  -- (Loc) × (LocHeap V × V) → LocHeap V.
+  have hreshape : Measurable
+      (fun q : LocHeap V × Loc × V => (q.2.1, q.1, q.2.2) : LocHeap V × Loc × V → Loc × LocHeap V × V) :=
+    (measurable_fst.comp measurable_snd).prodMk
+      (measurable_fst.prodMk (measurable_snd.comp measurable_snd))
+  have hflat : Measurable
+      (fun q : Loc × LocHeap V × V => q.2.1.insert q.1 q.2.2) := by
+    apply measurable_from_prod_countable_right
+    intro ℓ
+    exact Measurable.locHeap_insert ℓ
+  exact hflat.comp hreshape
+
 theorem LocHeap.maxKey?_preimage_none {V : Type _} :
     (fun m : LocHeap V => m.maxKey?) ⁻¹' ({none} : Set (Option Loc))
       = {m | ∀ k : Loc, k ∉ m} := by

@@ -1606,12 +1606,12 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   have hdec : decide (l1 = l2) = decide (l1' = l2') :=
     have h1 : v1 = v2 ↔ (l1 : BaseLit rT) = l2 := by
       refine ⟨fun h => ?_, fun h => Val.ext (by rw [hv1eq, hv2eq, h])⟩
-      have hp : v1.1 = v2.1 := congrArg Sigma.fst h
+      have hp : v1.1 = v2.1 := congrArg Val.fst h
       rw [hv1eq, hv2eq] at hp
       exact Exp.lit.inj hp
     have h2 : v1' = v2' ↔ (l1' : BaseLit rT) = l2' := by
       refine ⟨fun h => ?_, fun h => Val.ext (by rw [hv1'eq, hv2'eq, h])⟩
-      have hp : v1'.1 = v2'.1 := congrArg Sigma.fst h
+      have hp : v1'.1 = v2'.1 := congrArg Val.fst h
       rw [hv1'eq, hv2'eq] at hp
       exact Exp.lit.inj hp
     have hdecIff : (l1 = l2) ↔ (l1' = l2') := h1.symm.trans (heqIff.trans h2)

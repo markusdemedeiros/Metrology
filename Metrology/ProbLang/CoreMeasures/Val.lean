@@ -38,10 +38,47 @@ namespace ProbLang
 
 instance instMeasurableSpaceIsVal {α : Type _} {e : Exp α} : MeasurableSpace (IsVal e) := ⊤
 
-instance instMeasurableSpaceVal {α : Type _} [MeasurableSpace α] : MeasurableSpace (Val α) :=
-  Sigma.instMeasurableSpace
+/-- The σ-algebra on `Val α` is the **subtype σ-algebra** pulled back through
+`Val.fst : Val α → Exp α`. Equivalently: a set `T ⊆ Val α` is measurable iff
+`T = Val.fst ⁻¹' U` for some measurable `U ⊆ Exp α`.
+
+We do NOT use `Sigma.instMeasurableSpace` here because, with `IsVal e := ⊤`,
+that σ-algebra collapses to the discrete (`⊤`) σ-algebra on `Val α` (every set
+becomes measurable), which would break `Exp.toVal?.measurable`: arbitrary sets
+in `Val α` would have arbitrary (non-measurable) preimages in `Exp α`. The
+comap σ-alg via `Val.fst` is the strictly finer "morally correct" choice and
+keeps `Val α` faithfully embedded in `Exp α` as a measurable space.
+
+For this instance to actually be the one picked by TC resolution (rather than
+`Sigma.instMeasurableSpace`), `Val α` is defined as a `structure` (not a `def`
+that reduces to `Sigma`). See `Metrology/ProbLang/Syntax/Syntax.lean`. -/
+instance (priority := 10000) instMeasurableSpaceVal {α : Type _} [MeasurableSpace α] :
+    MeasurableSpace (Val α) :=
+  MeasurableSpace.comap Val.fst inferInstance
 
 namespace Val
+
+/-! ### Constructor / projection measurability. -/
+
+/-- The first projection `Val α → Exp α` is measurable.
+Immediate from the definition of the comap σ-algebra. -/
+theorem fst.measurable {α : Type _} [MeasurableSpace α] :
+    Measurable (Val.fst : Val α → Exp α) :=
+  fun _ hS => MeasurableSpace.measurableSet_comap.mpr ⟨_, hS, rfl⟩
+
+/-- The dependent constructor `Val.mk e w : Val α` (from `e : Exp α` and
+`w : IsVal e`) is measurable in the Sigma-typed input. Reduces to measurability
+of `Sigma.fst : (Σ e, IsVal e) → Exp α` in the standard Sigma σ-alg on the source. -/
+theorem mk.measurable {α : Type _} [MeasurableSpace α] :
+    Measurable (fun (p : Σ e : Exp α, IsVal e) => (Val.mk p.1 p.2 : Val α)) := by
+  intro T hT
+  obtain ⟨U, hU, hUeq⟩ : ∃ U : Set (Exp α), MeasurableSet U ∧ Val.fst ⁻¹' U = T :=
+    MeasurableSpace.measurableSet_comap.mp hT
+  subst hUeq
+  apply MeasurableSpace.measurableSet_iInf.mpr
+  intro e
+  show MeasurableSet[⊤] _
+  trivial
 
 end Val
 end ProbLang

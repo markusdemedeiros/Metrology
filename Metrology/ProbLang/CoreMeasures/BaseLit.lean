@@ -461,6 +461,70 @@ theorem measurable_rec
   · exact lbl.measurableEmbedding.measurableSet_image'   .of_discrete
   · exact real.measurableEmbedding.measurableSet_image'  (h_real hS)
 
+set_option maxHeartbeats 1000000 in
+/-- Joint preimage decomposition for `BaseLit.casesOn` with a `β` parameter. -/
+theorem casesOn_preimage_decomp_param
+    {rT : Type _} {α β : Type _} (S : Set α)
+    (f_int  : β × Int  → α) (f_bool : β × Bool → α) (f_unit : β × Unit → α)
+    (f_loc  : β × Loc  → α) (f_lbl  : β × Lbl  → α) (f_real : β × rT → α) :
+    (fun p : BaseLit rT × β => BaseLit.casesOn (motive := fun _ => α) p.1
+        (fun z => f_int (p.2, z)) (fun b => f_bool (p.2, b))
+        (f_unit (p.2, ()))
+        (fun l => f_loc (p.2, l)) (fun l => f_lbl (p.2, l))
+        (fun r => f_real (p.2, r))) ⁻¹' S
+      = ((fun q : β × Int => (BaseLit.int q.2, q.1))  '' (f_int  ⁻¹' S))
+      ∪ ((fun q : β × Bool => (BaseLit.bool q.2, q.1)) '' (f_bool ⁻¹' S))
+      ∪ ((fun q : β × Unit => (BaseLit.unit, q.1))     '' (f_unit ⁻¹' S))
+      ∪ ((fun q : β × Loc => (BaseLit.loc q.2, q.1))   '' (f_loc  ⁻¹' S))
+      ∪ ((fun q : β × Lbl => (BaseLit.lbl q.2, q.1))   '' (f_lbl  ⁻¹' S))
+      ∪ ((fun q : β × rT => (BaseLit.real q.2, q.1))   '' (f_real ⁻¹' S)) := by
+  ext ⟨b, x⟩
+  simp only [Set.mem_preimage, Set.mem_union, Set.mem_image, Prod.mk.injEq]
+  cases b with
+  | int z => exact ⟨fun h => .inl (.inl (.inl (.inl (.inl ⟨(x, z), h, rfl, rfl⟩)))),
+              by rintro ((((((⟨⟨a, b⟩, h, _, _⟩) | _) | _) | _) | _) | _) <;> aesop⟩
+  | bool b' => exact ⟨fun h => .inl (.inl (.inl (.inl (.inr ⟨(x, b'), h, rfl, rfl⟩)))),
+                by rintro ((((((_) | ⟨⟨a, b⟩, h, _, _⟩) | _) | _) | _) | _) <;> aesop⟩
+  | unit => exact ⟨fun h => .inl (.inl (.inl (.inr ⟨(x, ()), h, rfl, rfl⟩))),
+              by rintro ((((((_) | _) | ⟨_, h, _, _⟩) | _) | _) | _) <;> aesop⟩
+  | loc ℓ => exact ⟨fun h => .inl (.inl (.inr ⟨(x, ℓ), h, rfl, rfl⟩)),
+              by rintro ((((((_) | _) | _) | ⟨_, h, _, _⟩) | _) | _) <;> aesop⟩
+  | lbl l => exact ⟨fun h => .inl (.inr ⟨(x, l), h, rfl, rfl⟩),
+              by rintro ((((((_) | _) | _) | _) | ⟨_, h, _, _⟩) | _) <;> aesop⟩
+  | real r => exact ⟨fun h => .inr ⟨(x, r), h, rfl, rfl⟩,
+              by rintro ((((((_) | _) | _) | _) | _) | ⟨_, h, _, _⟩) <;> aesop⟩
+
+/-- Joint param version of `BaseLit.measurable_rec`. -/
+@[fun_prop]
+theorem measurable_rec_param
+    {rT : Type _} [MeasurableSpace rT] [Inhabited rT]
+    {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
+    (c_int  : β × Int  → α) (c_bool : β × Bool → α) (c_unit : β × Unit → α)
+    (c_loc  : β × Loc  → α) (c_lbl  : β × Lbl  → α) (c_real : β × rT → α)
+    (h_int : Measurable c_int) (h_bool : Measurable c_bool) (h_unit : Measurable c_unit)
+    (h_loc : Measurable c_loc) (h_lbl : Measurable c_lbl) (h_real : Measurable c_real) :
+    Measurable (fun p : BaseLit rT × β =>
+      BaseLit.casesOn (motive := fun _ => α) p.1
+        (fun z => c_int (p.2, z)) (fun b => c_bool (p.2, b))
+        (c_unit (p.2, ()))
+        (fun l => c_loc (p.2, l)) (fun l => c_lbl (p.2, l))
+        (fun r => c_real (p.2, r))) := by
+  intro S hS
+  rw [casesOn_preimage_decomp_param]
+  iterate 5 refine .union ?_ ?_
+  · exact ((int.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_int hS)
+  · exact ((bool.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_bool hS)
+  · exact ((unit.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_unit hS)
+  · exact ((loc.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_loc hS)
+  · exact ((lbl.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_lbl hS)
+  · exact ((real.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_real hS)
+
 /-! ### Synthetic tests of `measurable_rec`. -/
 
 example [MeasurableSpace rT] [Inhabited rT] (g : rT → Int) (hg : Measurable g) :

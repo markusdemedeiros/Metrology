@@ -3,6 +3,7 @@ module
 public import Mathlib.MeasureTheory.MeasurableSpace.Defs
 public import Mathlib.Probability.ProbabilityMassFunction.Basic
 public import Mathlib.Probability.Kernel.Defs
+public import Mathlib.Probability.Kernel.MeasurableLIntegral
 public import Mathlib.Probability.Distributions.Uniform
 
 @[expose] public section
@@ -1189,6 +1190,117 @@ theorem cell_binary_param
       ext ⟨b, p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
+/-! ### Binder-shifting variants.
+
+`cell_unary_param_shift` is `cell_unary_param` but with the recursive call's
+parameter **transformed** by a measurable map `t : β → β`. This supports
+recursion through binders (`lam`, `fix`) where the parameter changes at the
+binder boundary. -/
+
+/-- **Unary recursive cell (param + shift)**: like `cell_unary_param` but the
+recursive call uses `g (t b) p'` instead of `g b p'`, with `t : β → β` measurable. -/
+theorem cell_unary_param_shift {ctor : T → T} {s s' : Sh}
+    {c : β → α → α} {t : β → β} {U : Set α}
+    (h_emb : MeasurableEmbedding ctor)
+    (h_shape : ∀ p : T, shape p = s ↔ ∃ p', p = ctor p' ∧ shape p' = s')
+    (h_eq : ∀ b p, g b (ctor p) = c b (g (t b) p))
+    (h_c : Measurable (Function.uncurry c))
+    (h_t : Measurable t)
+    (ih : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {q : β × T | shape q.2 = s' ∧ Function.uncurry g q ∈ U'})
+    (hU : MeasurableSet U)
+    [h_inhab : Inhabited β] :
+    MeasurableSet {q : β × T | shape q.2 = s ∧ Function.uncurry g q ∈ U} := by
+  have heq : {q : β × T | shape q.2 = s ∧ Function.uncurry g q ∈ U}
+      = (Prod.map id ctor) ''
+        {q : β × T | shape q.2 = s' ∧
+          Function.uncurry c (q.1, Function.uncurry g (t q.1, q.2)) ∈ U} := by
+    ext ⟨b, p⟩
+    constructor
+    · rintro ⟨hs, hp⟩
+      obtain ⟨p', rfl, hs'⟩ := (h_shape p).mp hs
+      refine ⟨(b, p'), ⟨hs', ?_⟩, rfl⟩
+      simp only [Set.mem_setOf_eq, Function.uncurry] at hp ⊢
+      rw [h_eq] at hp; exact hp
+    · rintro ⟨⟨b', p'⟩, ⟨hs', hp'⟩, heq⟩
+      have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
+      have hpeq : ctor p' = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
+      subst hbeq hpeq
+      refine ⟨(h_shape _).mpr ⟨p', rfl, hs'⟩, ?_⟩
+      simp only [Set.mem_setOf_eq, Function.uncurry] at hp' ⊢
+      rw [h_eq]; exact hp'
+  rw [heq]
+  refine (MeasurableEmbedding.id.prodMap h_emb).measurableSet_image' ?_
+  -- Goal: MeasurableSet {q | shape q.2 = s' ∧ Function.uncurry c (q.1, g (t q.1) q.2) ∈ U}
+  set Joint : Set (β × α) → Set (β × T) :=
+    fun V => {q : β × T | shape q.2 = s' ∧ (q.1, Function.uncurry g (t q.1, q.2)) ∈ V}
+    with hJoint
+  suffices h : ∀ V, MeasurableSet V → MeasurableSet (Joint V) by
+    have hV : MeasurableSet (Function.uncurry c ⁻¹' U) := h_c hU
+    convert h _ hV
+  intro V hV
+  have hgen : (Prod.instMeasurableSpace : MeasurableSpace (β × α))
+      = .generateFrom (Set.image2 (· ×ˢ ·) {S : Set β | MeasurableSet S}
+                                            {S : Set α | MeasurableSet S}) :=
+    generateFrom_prod.symm
+  have hpi : IsPiSystem
+      (Set.image2 (· ×ˢ ·) {S : Set β | MeasurableSet S} {S : Set α | MeasurableSet S}) :=
+    MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+  refine MeasurableSpace.induction_on_inter
+    (C := fun V _ => MeasurableSet (Joint V)) hgen hpi ?_ ?_ ?_ ?_ V hV
+  · show MeasurableSet (Joint ∅); convert MeasurableSet.empty; ext ⟨_, _⟩; simp [hJoint]
+  · rintro _ ⟨B, hB, A, hA, rfl⟩
+    show MeasurableSet (Joint (B ×ˢ A))
+    -- Joint (B ×ˢ A) = B ×ˢ univ ∩ (change-of-vars to apply IH at (t q.1, q.2))
+    have : Joint (B ×ˢ A)
+        = (B ×ˢ Set.univ) ∩
+          (fun q : β × T => (t q.1, q.2)) ⁻¹'
+            {q : β × T | shape q.2 = s' ∧ Function.uncurry g q ∈ A} := by
+      ext ⟨b, p⟩; simp [hJoint]; tauto
+    rw [this]
+    refine MeasurableSet.inter ?_ ?_
+    · exact hB.prod MeasurableSet.univ
+    · refine MeasurableSet.preimage (ih hA) ?_
+      exact (h_t.comp measurable_fst).prodMk measurable_snd
+  · intro V' _ IH
+    show MeasurableSet (Joint V'ᶜ)
+    have : Joint V'ᶜ = {q : β × T | shape q.2 = s'} \ Joint V' := by
+      ext ⟨b, p⟩; simp [hJoint]; tauto
+    rw [this]
+    refine MeasurableSet.diff ?_ IH
+    -- {q | shape q.2 = s'} measurable: from ih with U' = univ, slice over b.
+    have h := ih (MeasurableSet.univ (α := α))
+    have hslice : {q : β × T | shape q.2 = s'}
+        = (fun q : β × T => q.2) ⁻¹' (Prod.snd '' {q : β × T | shape q.2 = s' ∧ Function.uncurry g q ∈ Set.univ}) := by
+      ext ⟨b, p⟩
+      simp only [Set.mem_setOf_eq, Set.mem_preimage, Set.mem_image]
+      constructor
+      · intro hs; exact ⟨(b, p), ⟨hs, by simp [Function.uncurry]⟩, rfl⟩
+      · rintro ⟨⟨b', p'⟩, ⟨hs', _⟩, rfl⟩; exact hs'
+    -- Simpler: shape q.2 = s' is just preimage of {shape = s'} under snd.
+    have hshape : {q : β × T | shape q.2 = s'}
+        = (fun q : β × T => q.2) ⁻¹' {p : T | shape p = s'} := by
+      ext ⟨_, _⟩; simp
+    rw [hshape]
+    -- {p : T | shape p = s'} measurable: from ih with U' = univ, slice at default b.
+    have h' : MeasurableSet {p : T | shape p = s'} := by
+      have hihU := ih (MeasurableSet.univ (α := α))
+      have hreduce : {q : β × T | shape q.2 = s' ∧ Function.uncurry g q ∈ (Set.univ : Set α)}
+          = {q : β × T | shape q.2 = s'} := by
+        ext ⟨_, _⟩; simp
+      rw [hreduce] at hihU
+      have hslice : {p : T | shape p = s'}
+          = (fun p : T => (h_inhab.default, p)) ⁻¹' {q : β × T | shape q.2 = s'} := by
+        ext p; simp
+      rw [hslice]
+      exact MeasurableSet.preimage hihU (by fun_prop)
+    exact MeasurableSet.preimage h' measurable_snd
+  · intro F _ _ IH
+    show MeasurableSet (Joint (⋃ i, F i))
+    have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
+      ext ⟨b, p⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+    rw [this]; exact MeasurableSet.iUnion IH
+
 /-- **Ternary recursive cell (param)**: e.g. `cond ec et ef`. Three children share `b`. -/
 theorem cell_ternary_param
     {ctor : T → T → T → T} {s s1 s2 s3 : Sh}
@@ -1862,3 +1974,116 @@ instance List.instMeasurableSpace {X : Type _} [MeasurableSpace X] :
 theorem List.measurable_toSigma {X : Type _} [MeasurableSpace X] :
     Measurable (List.toSigma : List X → Σ n, Fin n → X) :=
   fun _ hS => ⟨_, hS, rfl⟩
+
+/-- Sigma-fiber measurability: a function `f : (Σ a, β a) → γ` is measurable iff
+its restriction to each fiber `fun b : β a => f ⟨a, b⟩` is measurable.
+
+The Sigma σ-algebra is `⨅ a, (m a).map (Sigma.mk a)`, so this is direct from the
+definition. Symmetric to `Sigma.instMeasurableSpace` being the coinduced σ-alg. -/
+theorem measurable_sigma_iff {α : Type _} {β : α → Type _}
+    [∀ a, MeasurableSpace (β a)] {γ : Type _} [MeasurableSpace γ]
+    {f : (Σ a, β a) → γ} : Measurable f ↔ ∀ a, Measurable (fun b => f ⟨a, b⟩) := by
+  refine ⟨fun hf a => hf.comp ?_, fun h S hS => MeasurableSpace.measurableSet_iInf.mpr fun a => h a hS⟩
+  -- `Sigma.mk a` is measurable: target is `⨅ a', _.map (Sigma.mk a')`; under this,
+  -- preimage of any set `S` under `Sigma.mk a` is required to be measurable.
+  intro S hS
+  exact MeasurableSpace.measurableSet_iInf.mp hS a
+
+/-- **`List.foldl` is measurable** in `(list, init)` whenever the binary operation
+`f` is jointly measurable.
+
+Decomposition via `List.toSigma`: a function out of `List β` factors through the
+per-length fibers `(Fin n → β) × α → α`, each of which is a finite composition
+of `n` applications of `f`. Sigma-fiber measurability glues these together. -/
+theorem List.measurable_foldl {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
+    {f : α → β → α} (hf : Measurable (Function.uncurry f)) :
+    Measurable (fun (p : List β × α) => p.1.foldl f p.2) := by
+  sorry
+
+/-- **Joint parameterized pushforward**. Given a jointly measurable function
+`h : α × β → γ` and a kernel-valued source `k : α → Measure β` measurable that
+is moreover an s-finite kernel, the parameterized pushforward
+`fun a => (k a).map (fun b => h (a, b))` is measurable.
+
+Proof: via `measurable_of_measurable_coe`, each `S`-evaluation reduces to
+`fun a => k a (Prod.mk a ⁻¹' (h ⁻¹' S))`, which is exactly the section-measure
+lemma `Kernel.measurable_kernel_prodMk_left` applied to the kernel `Kernel.mk k hk`.
+The `IsSFiniteKernel` assumption ensures the section-measure machinery applies. -/
+theorem Measure.measurable_map_uncurry {α β γ : Type _}
+    [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
+    {h : α × β → γ} (hh : Measurable h)
+    {k : α → Measure β} (hk : Measurable k)
+    [hSF : ProbabilityTheory.IsSFiniteKernel (ProbabilityTheory.Kernel.mk k hk)] :
+    Measurable (fun a : α => (k a).map (fun b => h (a, b))) := by
+  refine Measure.measurable_of_measurable_coe _ ?_
+  intro S hS
+  have hpre : ∀ a, Measurable (fun b : β => h (a, b)) := fun a =>
+    hh.comp (measurable_const.prodMk measurable_id)
+  simp_rw [fun a => Measure.map_apply (hpre a) hS]
+  set T := h ⁻¹' S with hT_def
+  have hT : MeasurableSet T := hh hS
+  have hrw : ∀ a, (fun b => h (a, b)) ⁻¹' S = Prod.mk a ⁻¹' T := fun _ => rfl
+  simp_rw [hrw]
+  show Measurable (fun a => k a (Prod.mk a ⁻¹' T))
+  have hker_eq : ∀ a, k a = (ProbabilityTheory.Kernel.mk k hk) a :=
+    fun _ => by rw [ProbabilityTheory.Kernel.coe_mk]
+  simp_rw [hker_eq]
+  exact ProbabilityTheory.Kernel.measurable_kernel_prodMk_left hT
+
+/-- Candidate measure built pointwise from a `ℕ`-monotone family of measures.
+
+For a monotone family `μ : ℕ → Measure α`, define `myν` via `Measure.ofMeasurable`
+with `myν s := ⨆ i, μ i s` (for measurable `s`). The σ-additivity reduces to
+swapping `⨆` past `∑'` on monotone ENNReal data. -/
+noncomputable def Measure.monotoneSupNat {α : Type _} [MeasurableSpace α]
+    (μ : ℕ → Measure α) (hmono : Monotone μ) : Measure α :=
+  Measure.ofMeasurable (fun s _ => ⨆ i, μ i s)
+    (by simp)
+    (fun f hf hd => by
+      have h1 : ∀ i, μ i (⋃ k, f k) = ∑' k, μ i (f k) :=
+        fun i => measure_iUnion hd hf
+      have hmono' : ∀ k, Monotone (fun i => μ i (f k)) :=
+        fun k i j hij => hmono hij (f k)
+      simp_rw [h1, ENNReal.tsum_eq_iSup_sum]
+      rw [iSup_comm]
+      refine iSup_congr fun s => ?_
+      exact (ENNReal.finsetSum_iSup_of_monotone
+        (s := s) (f := fun k i => μ i (f k)) hmono').symm)
+
+theorem Measure.monotoneSupNat_apply {α : Type _} [MeasurableSpace α]
+    (μ : ℕ → Measure α) (hmono : Monotone μ)
+    {s : Set α} (hs : MeasurableSet s) :
+    Measure.monotoneSupNat μ hmono s = ⨆ i, μ i s :=
+  Measure.ofMeasurable_apply _ hs
+
+/-- For a `ℕ`-monotone family of measures, the pointwise sup `(⨆ i, μ i) s` on
+measurable sets `s` equals the sup of values `⨆ i, μ i s`. -/
+theorem Measure.iSup_apply_of_monotone {α : Type _} [MeasurableSpace α]
+    (μ : ℕ → Measure α) (hmono : Monotone μ)
+    {s : Set α} (hs : MeasurableSet s) :
+    (⨆ i, μ i) s = ⨆ i, μ i s := by
+  have h : Measure.monotoneSupNat μ hmono = ⨆ i, μ i := by
+    apply le_antisymm
+    · rw [Measure.le_iff]; intro t ht
+      rw [Measure.monotoneSupNat_apply _ _ ht]
+      exact iSup_le fun i => Measure.le_iff.mp (le_iSup μ i) t ht
+    · refine iSup_le fun i => ?_
+      rw [Measure.le_iff]; intro t ht
+      rw [Measure.monotoneSupNat_apply _ _ ht]
+      exact le_iSup (fun j => μ j t) i
+  rw [← h, Measure.monotoneSupNat_apply _ _ hs]
+
+/-- **Pointwise `ℕ`-monotone sup of measure-valued functions is measurable**.
+
+For a family `μ : ℕ → α → Measure β` of measurable maps, the pointwise
+supremum `fun a => ⨆ i, μ i a` is measurable into `Measure β`, provided that at
+every `a`, the family is monotone in `i`. -/
+theorem Measure.measurable_iSup_countable {α β : Type _}
+    [MeasurableSpace α] [MeasurableSpace β]
+    {μ : ℕ → α → Measure β} (hμ : ∀ i, Measurable (μ i))
+    (hmono : ∀ a, Monotone (fun i => μ i a)) :
+    Measurable (fun a : α => ⨆ i, μ i a) := by
+  refine Measure.measurable_of_measurable_coe _ ?_
+  intro s hs
+  simp_rw [fun a => Measure.iSup_apply_of_monotone (μ · a) (hmono a) hs]
+  exact Measurable.iSup fun i => (Measure.measurable_coe hs).comp (hμ i)

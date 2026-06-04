@@ -277,20 +277,163 @@ theorem Cylinder.flatten_disjoint_of_shape_ne {α : Type _} {c₁ c₂ : Cylinde
   intro h₁ h₂
   exact h ((Cylinder.shape_of_mem_flatten h₁).symm.trans (Cylinder.shape_of_mem_flatten h₂))
 
-/-- The cylinder flatten of the intersection equals the intersection of the flattens. -/
+set_option maxHeartbeats 1000000 in
+/-- The cylinder flatten of the intersection equals the intersection of the
+flattens. Mirrors `BaseLit.Cylinder.flatten_inter`. -/
 theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
     Cylinder.flatten c₁ ∩ Cylinder.flatten c₂
-      = (Cylinder.inter? c₁ c₂).elim ∅ Cylinder.flatten := sorry
+      = (Cylinder.inter? c₁ c₂).elim ∅ Cylinder.flatten := by
+  induction c₁ with
+  | appL S =>
+    cases c₂
+    case appL S' =>
+      show (EctxItem.appL '' S) ∩ (EctxItem.appL '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | appR S =>
+    cases c₂
+    case appR S' =>
+      show (EctxItem.appR '' S) ∩ (EctxItem.appR '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | unop u =>
+    cases c₂
+    case unop u' =>
+      simp only [Cylinder.inter?, Cylinder.flatten]
+      by_cases h : u = u'
+      · subst h; simp
+      · simp only [if_neg h]
+        ext K; simp only [Set.mem_inter_iff, Set.mem_singleton_iff, Option.elim_none,
+          Set.mem_empty_iff_false, iff_false, not_and]
+        rintro rfl heq; injection heq with heq; exact h heq
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | binopL op S =>
+    cases c₂
+    case binopL op' S' =>
+      simp only [Cylinder.inter?, Cylinder.flatten]
+      by_cases hb : op = op'
+      · subst hb
+        simp only [↓reduceIte, Option.elim_some, Cylinder.flatten]
+        rw [← Set.image_inter (fun _ _ h => by injection h)]
+      · simp only [if_neg hb, Option.elim_none]
+        ext K; simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false,
+          not_and]
+        rintro ⟨a, _, rfl⟩ ⟨a', _, hh⟩; injection hh with hb_eq _; exact hb hb_eq.symm
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | binopR op S =>
+    cases c₂
+    case binopR op' S' =>
+      simp only [Cylinder.inter?, Cylinder.flatten]
+      by_cases hb : op = op'
+      · subst hb
+        simp only [↓reduceIte, Option.elim_some, Cylinder.flatten]
+        rw [← Set.image_inter (fun _ _ h => by injection h)]
+      · simp only [if_neg hb, Option.elim_none]
+        ext K; simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false,
+          not_and]
+        rintro ⟨a, _, rfl⟩ ⟨a', _, hh⟩; injection hh with hb_eq _; exact hb hb_eq.symm
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | condC S1 S2 =>
+    cases c₂
+    case condC S1' S2' =>
+      show ((fun p => EctxItem.condC p.1 p.2) '' (S1 ×ˢ S2)) ∩
+           ((fun p => EctxItem.condC p.1 p.2) '' (S1' ×ˢ S2')) = _
+      rw [← Set.image_inter
+        (by rintro ⟨_, _⟩ ⟨_, _⟩ h; injection h with h1 h2; exact Prod.ext h1 h2),
+        Set.prod_inter_prod]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | pairL S =>
+    cases c₂
+    case pairL S' =>
+      show (EctxItem.pairL '' S) ∩ (EctxItem.pairL '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | pairR S =>
+    cases c₂
+    case pairR S' =>
+      show (EctxItem.pairR '' S) ∩ (EctxItem.pairR '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | fst =>
+    cases c₂
+    case fst => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | snd =>
+    cases c₂
+    case snd => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | inl =>
+    cases c₂
+    case inl => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | inr =>
+    cases c₂
+    case inr => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | case S1 S2 =>
+    cases c₂
+    case case S1' S2' =>
+      show ((fun p => EctxItem.case p.1 p.2) '' (S1 ×ˢ S2)) ∩
+           ((fun p => EctxItem.case p.1 p.2) '' (S1' ×ˢ S2')) = _
+      rw [← Set.image_inter
+        (by rintro ⟨_, _⟩ ⟨_, _⟩ h; injection h with h1 h2; exact Prod.ext h1 h2),
+        Set.prod_inter_prod]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | alloc =>
+    cases c₂
+    case alloc => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | load =>
+    cases c₂
+    case load => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | storeL S =>
+    cases c₂
+    case storeL S' =>
+      show (EctxItem.storeL '' S) ∩ (EctxItem.storeL '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | storeR S =>
+    cases c₂
+    case storeR S' =>
+      show (EctxItem.storeR '' S) ∩ (EctxItem.storeR '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | tape =>
+    cases c₂
+    case tape => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | randL S =>
+    cases c₂
+    case randL S' =>
+      show (EctxItem.randL '' S) ∩ (EctxItem.randL '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | randR S =>
+    cases c₂
+    case randR S' =>
+      show (EctxItem.randR '' S) ∩ (EctxItem.randR '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | scrut S =>
+    cases c₂
+    case scrut S' =>
+      show (EctxItem.scrut '' S) ∩ (EctxItem.scrut '' S') = _
+      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
 
 theorem Cylinder.flatten_inter_some {α : Type _} {c₁ c₂ c : Cylinder α}
     (h : Cylinder.inter? c₁ c₂ = some c) :
     Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ := by
   rw [Cylinder.flatten_inter, h]; rfl
 
+set_option maxHeartbeats 1000000 in
 theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace α]
     {c₁ c₂ c : Cylinder α}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
-    (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := sorry
+    (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
+  cases h₁ <;> cases h₂ <;>
+    simp_all [Cylinder.inter?] <;> grind [HasMeasurableLeaves, MeasurableSet.inter]
 
 /-! ### Per-constructor covers. -/
 
@@ -345,9 +488,11 @@ theorem Shape.cylinder_hasMeasurableLeaves [MeasurableSpace α] (s : Shape) :
     (s.cylinder (α := α)).HasMeasurableLeaves := by
   cases s <;> constructor <;> measurability
 
+set_option maxHeartbeats 1000000 in
 /-- Flattening a cylinder of a shape equals set of terms with a given shape. -/
 @[simp] theorem Shape.cylinder_preimage_shape (s : Shape) :
-    (s.cylinder (α := α)).flatten = EctxItem.shape ⁻¹' {s} := sorry
+    (s.cylinder (α := α)).flatten = EctxItem.shape ⁻¹' {s} := by
+  ext K; cases K <;> cases s <;> simp_all <;> tauto
 
 /-- Flattening a cylinder gives a measurable set. -/
 @[measurability]
@@ -1125,6 +1270,160 @@ theorem measurable_rec
   · exact randR.measurableEmbedding.measurableSet_image'  (h_randR hS)
   · exact scrut.measurableEmbedding.measurableSet_image'  (h_scrut hS)
 
-end EctxItem
-end ProbLang
-end ProbLangMeasures
+/-! ### Param-threaded one-level dispatch.
+
+`measurable_rec_param` is the joint analogue of `measurable_rec`: continuations
+take both the constructor payload AND an external `β` parameter, and the result
+is joint-measurable in `(K, b) : EctxItem α × β`. Built directly from
+`casesOn_preimage_decomp_param` via `Prod.map`-style embeddings.
+
+This is the analogue of `Exp.measurable_rec_param`; the only difference is the
+21-way constructor list of `EctxItem`. -/
+
+set_option maxHeartbeats 2000000 in
+/-- Joint preimage decomposition for `EctxItem.casesOn` with a `β` parameter. -/
+theorem casesOn_preimage_decomp_param
+    {α : Type _} {β γ : Type _} (S : Set γ)
+    (f_appL : β × Val α → γ) (f_appR : β × Exp α → γ) (f_unop : β × UnOp → γ)
+    (f_binopL : β × BinOp × Val α → γ) (f_binopR : β × BinOp × Exp α → γ)
+    (f_condC : β × Exp α × Exp α → γ)
+    (f_pairL : β × Val α → γ) (f_pairR : β × Exp α → γ)
+    (f_fst : β × Unit → γ) (f_snd : β × Unit → γ)
+    (f_inl : β × Unit → γ) (f_inr : β × Unit → γ)
+    (f_case : β × Exp α × Exp α → γ)
+    (f_alloc : β × Unit → γ) (f_load : β × Unit → γ)
+    (f_storeL : β × Val α → γ) (f_storeR : β × Exp α → γ)
+    (f_tape : β × Unit → γ)
+    (f_randL : β × Val α → γ) (f_randR : β × Exp α → γ)
+    (f_scrut : β × Pat α → γ) :
+    (fun p : EctxItem α × β => EctxItem.casesOn (motive := fun _ => γ) p.1
+        (fun v => f_appL (p.2, v)) (fun e => f_appR (p.2, e))
+        (fun u => f_unop (p.2, u))
+        (fun op v => f_binopL (p.2, op, v))
+        (fun op e => f_binopR (p.2, op, e))
+        (fun e₁ e₂ => f_condC (p.2, e₁, e₂))
+        (fun v => f_pairL (p.2, v)) (fun e => f_pairR (p.2, e))
+        (f_fst (p.2, ())) (f_snd (p.2, ()))
+        (f_inl (p.2, ())) (f_inr (p.2, ()))
+        (fun e₁ e₂ => f_case (p.2, e₁, e₂))
+        (f_alloc (p.2, ())) (f_load (p.2, ()))
+        (fun v => f_storeL (p.2, v)) (fun e => f_storeR (p.2, e))
+        (f_tape (p.2, ()))
+        (fun v => f_randL (p.2, v)) (fun e => f_randR (p.2, e))
+        (fun pat => f_scrut (p.2, pat))) ⁻¹' S
+      = ((fun q : β × Val α => (EctxItem.appL q.2, q.1))   '' (f_appL   ⁻¹' S))
+      ∪ ((fun q : β × Exp α => (EctxItem.appR q.2, q.1))   '' (f_appR   ⁻¹' S))
+      ∪ ((fun q : β × UnOp => (EctxItem.unop q.2, q.1))    '' (f_unop   ⁻¹' S))
+      ∪ ((fun q : β × BinOp × Val α => (EctxItem.binopL q.2.1 q.2.2, q.1)) '' (f_binopL ⁻¹' S))
+      ∪ ((fun q : β × BinOp × Exp α => (EctxItem.binopR q.2.1 q.2.2, q.1)) '' (f_binopR ⁻¹' S))
+      ∪ ((fun q : β × Exp α × Exp α => (EctxItem.condC q.2.1 q.2.2, q.1))  '' (f_condC  ⁻¹' S))
+      ∪ ((fun q : β × Val α => (EctxItem.pairL q.2, q.1))  '' (f_pairL  ⁻¹' S))
+      ∪ ((fun q : β × Exp α => (EctxItem.pairR q.2, q.1))  '' (f_pairR  ⁻¹' S))
+      ∪ ((fun q : β × Unit => (EctxItem.fst, q.1))         '' (f_fst    ⁻¹' S))
+      ∪ ((fun q : β × Unit => (EctxItem.snd, q.1))         '' (f_snd    ⁻¹' S))
+      ∪ ((fun q : β × Unit => (EctxItem.inl, q.1))         '' (f_inl    ⁻¹' S))
+      ∪ ((fun q : β × Unit => (EctxItem.inr, q.1))         '' (f_inr    ⁻¹' S))
+      ∪ ((fun q : β × Exp α × Exp α => (EctxItem.case q.2.1 q.2.2, q.1))   '' (f_case   ⁻¹' S))
+      ∪ ((fun q : β × Unit => (EctxItem.alloc, q.1))       '' (f_alloc  ⁻¹' S))
+      ∪ ((fun q : β × Unit => (EctxItem.load, q.1))        '' (f_load   ⁻¹' S))
+      ∪ ((fun q : β × Val α => (EctxItem.storeL q.2, q.1)) '' (f_storeL ⁻¹' S))
+      ∪ ((fun q : β × Exp α => (EctxItem.storeR q.2, q.1)) '' (f_storeR ⁻¹' S))
+      ∪ ((fun q : β × Unit => (EctxItem.tape, q.1))        '' (f_tape   ⁻¹' S))
+      ∪ ((fun q : β × Val α => (EctxItem.randL q.2, q.1))  '' (f_randL  ⁻¹' S))
+      ∪ ((fun q : β × Exp α => (EctxItem.randR q.2, q.1))  '' (f_randR  ⁻¹' S))
+      ∪ ((fun q : β × Pat α => (EctxItem.scrut q.2, q.1))  '' (f_scrut  ⁻¹' S)) := by
+  ext ⟨K, x⟩
+  cases K <;> simp <;> aesop
+
+/-- Joint param version of `EctxItem.measurable_rec`. -/
+@[fun_prop]
+theorem measurable_rec_param
+    {α : Type _} [MeasurableSpace α]
+    {β : Type _} [MeasurableSpace β]
+    {γ : Type _} [MeasurableSpace γ]
+    (f_appL : β × Val α → γ) (f_appR : β × Exp α → γ) (f_unop : β × UnOp → γ)
+    (f_binopL : β × BinOp × Val α → γ) (f_binopR : β × BinOp × Exp α → γ)
+    (f_condC : β × Exp α × Exp α → γ)
+    (f_pairL : β × Val α → γ) (f_pairR : β × Exp α → γ)
+    (f_fst : β × Unit → γ) (f_snd : β × Unit → γ)
+    (f_inl : β × Unit → γ) (f_inr : β × Unit → γ)
+    (f_case : β × Exp α × Exp α → γ)
+    (f_alloc : β × Unit → γ) (f_load : β × Unit → γ)
+    (f_storeL : β × Val α → γ) (f_storeR : β × Exp α → γ)
+    (f_tape : β × Unit → γ)
+    (f_randL : β × Val α → γ) (f_randR : β × Exp α → γ)
+    (f_scrut : β × Pat α → γ)
+    (h_appL : Measurable f_appL) (h_appR : Measurable f_appR)
+    (h_unop : Measurable f_unop)
+    (h_binopL : Measurable f_binopL) (h_binopR : Measurable f_binopR)
+    (h_condC : Measurable f_condC)
+    (h_pairL : Measurable f_pairL) (h_pairR : Measurable f_pairR)
+    (h_fst : Measurable f_fst) (h_snd : Measurable f_snd)
+    (h_inl : Measurable f_inl) (h_inr : Measurable f_inr)
+    (h_case : Measurable f_case)
+    (h_alloc : Measurable f_alloc) (h_load : Measurable f_load)
+    (h_storeL : Measurable f_storeL) (h_storeR : Measurable f_storeR)
+    (h_tape : Measurable f_tape)
+    (h_randL : Measurable f_randL) (h_randR : Measurable f_randR)
+    (h_scrut : Measurable f_scrut) :
+    Measurable (fun p : EctxItem α × β => EctxItem.casesOn (motive := fun _ => γ) p.1
+        (fun v => f_appL (p.2, v)) (fun e => f_appR (p.2, e))
+        (fun u => f_unop (p.2, u))
+        (fun op v => f_binopL (p.2, op, v))
+        (fun op e => f_binopR (p.2, op, e))
+        (fun e₁ e₂ => f_condC (p.2, e₁, e₂))
+        (fun v => f_pairL (p.2, v)) (fun e => f_pairR (p.2, e))
+        (f_fst (p.2, ())) (f_snd (p.2, ()))
+        (f_inl (p.2, ())) (f_inr (p.2, ()))
+        (fun e₁ e₂ => f_case (p.2, e₁, e₂))
+        (f_alloc (p.2, ())) (f_load (p.2, ()))
+        (fun v => f_storeL (p.2, v)) (fun e => f_storeR (p.2, e))
+        (f_tape (p.2, ()))
+        (fun v => f_randL (p.2, v)) (fun e => f_randR (p.2, e))
+        (fun pat => f_scrut (p.2, pat))) := by
+  intro S hS
+  rw [casesOn_preimage_decomp_param]
+  iterate 20 refine .union ?_ ?_
+  · exact ((appL.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_appL hS)
+  · exact ((appR.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_appR hS)
+  · exact ((unop.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_unop hS)
+  · exact ((binopL.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_binopL hS)
+  · exact ((binopR.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_binopR hS)
+  · exact ((condC.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_condC hS)
+  · exact ((pairL.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_pairL hS)
+  · exact ((pairR.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_pairR hS)
+  · exact ((fst.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_fst hS)
+  · exact ((snd.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_snd hS)
+  · exact ((inl.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_inl hS)
+  · exact ((inr.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_inr hS)
+  · exact ((case.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_case hS)
+  · exact ((alloc.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_alloc hS)
+  · exact ((load.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_load hS)
+  · exact ((storeL.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_storeL hS)
+  · exact ((storeR.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_storeR hS)
+  · exact ((tape.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_tape hS)
+  · exact ((randL.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_randL hS)
+  · exact ((randR.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_randR hS)
+  · exact ((scrut.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_scrut hS)
+

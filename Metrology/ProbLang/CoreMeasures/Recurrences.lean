@@ -222,9 +222,121 @@ constructor but ALSO on the inner `BaseLit` constructor (e.g., `neg (Exp.lit
 The composition isn't quite mechanical because the inner `measurable_rec` lives
 under a constructor-projection. Doable but real work; left as stub. -/
 
-theorem UnOp_eval.measurable [MeasurableSpace rT] :
+/-- Top σ-algebra trivially has measurable singletons. -/
+instance instMeasurableSingletonClassUnOp : MeasurableSingletonClass UnOp where
+  measurableSet_singleton _ := trivial
+
+/-- Top σ-algebra trivially has measurable singletons. -/
+instance instMeasurableSingletonClassBinOp : MeasurableSingletonClass BinOp where
+  measurableSet_singleton _ := trivial
+
+/-- For each fixed `op : UnOp`, the function `v ↦ UnOp.eval op v` is measurable.
+This is a nested two-level pattern match: outer on `v : Exp rT` via
+`Exp.measurable_rec`, inner on `BaseLit rT` (in the `.lit` branch) via
+`BaseLit.measurable_rec`. -/
+theorem UnOp.eval_op_measurable [MeasurableSpace rT] [Inhabited rT] (op : UnOp) :
+    Measurable (fun v : Exp rT => UnOp.eval op v) := by
+  -- Unfold `UnOp.eval op` into `Exp.casesOn` form, then apply `measurable_rec`.
+  -- The only non-constant branches are `.lit`, which inner-recurses on `BaseLit`.
+  cases op with
+  | neg =>
+    have heq : (fun v : Exp rT => UnOp.eval .neg v) = fun v : Exp rT =>
+        Exp.casesOn (motive := fun _ => Option (Exp rT)) v
+          (fun _ => none) (fun _ => none)
+          (fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+            (fun _ => none) (fun b => some (.lit (.bool ¬b))) none
+            (fun _ => none) (fun _ => none) (fun _ => none))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun u e => (fun _ : UnOp × Exp rT => none) (u, e))
+          (fun b e1 e2 => (fun _ : BinOp × Exp rT × Exp rT => none) (b, e1, e2))
+          (fun ec et ef => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, et, ef))
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+          (fun ec el er => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, el, er))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          ((fun _ : Unit => none) ())
+          (fun e p => (fun _ : Exp rT × Pat rT => none) (e, p)) := by
+      funext v
+      cases v <;> simp [UnOp.eval]
+      rename_i b; cases b <;> simp [UnOp.eval]
+    rw [heq]
+    apply Exp.measurable_rec (rT := rT)
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none)
+      (f_lit := fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+        (fun _ => none) (fun b => some (Exp.lit (.bool ¬b))) none
+        (fun _ => none) (fun _ => none) (fun _ => none))
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none) (f_pair := fun _ => none)
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun _ => none) (f_inr := fun _ => none)
+      (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none)
+      (f_fail := fun _ => none) (f_scrut := fun _ => none)
+    · apply BaseLit.measurable_rec
+        (f_int := fun _ => none) (f_bool := fun b => some (Exp.lit (.bool ¬b)))
+        (f_unit := fun _ => none) (f_loc := fun _ => none) (f_lbl := fun _ => none)
+        (f_real := fun _ => none)
+      exact measurable_const
+    all_goals exact measurable_const
+  | minus =>
+    have heq : (fun v : Exp rT => UnOp.eval .minus v) = fun v : Exp rT =>
+        Exp.casesOn (motive := fun _ => Option (Exp rT)) v
+          (fun _ => none) (fun _ => none)
+          (fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+            (fun z => some (.lit (.int z.neg))) (fun _ => none) none
+            (fun _ => none) (fun _ => none) (fun _ => none))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun u e => (fun _ : UnOp × Exp rT => none) (u, e))
+          (fun b e1 e2 => (fun _ : BinOp × Exp rT × Exp rT => none) (b, e1, e2))
+          (fun ec et ef => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, et, ef))
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+          (fun ec el er => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, el, er))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          ((fun _ : Unit => none) ())
+          (fun e p => (fun _ : Exp rT × Pat rT => none) (e, p)) := by
+      funext v
+      cases v <;> simp [UnOp.eval]
+      rename_i b; cases b <;> simp [UnOp.eval]
+    rw [heq]
+    apply Exp.measurable_rec (rT := rT)
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none)
+      (f_lit := fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+        (fun z => some (Exp.lit (.int z.neg))) (fun _ => none) none
+        (fun _ => none) (fun _ => none) (fun _ => none))
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none) (f_pair := fun _ => none)
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun _ => none) (f_inr := fun _ => none)
+      (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none)
+      (f_fail := fun _ => none) (f_scrut := fun _ => none)
+    · apply BaseLit.measurable_rec
+        (f_int := fun z => some (Exp.lit (.int z.neg))) (f_bool := fun _ => none)
+        (f_unit := fun _ => none) (f_loc := fun _ => none) (f_lbl := fun _ => none)
+        (f_real := fun _ => none)
+      exact measurable_const
+    all_goals exact measurable_const
+
+theorem UnOp_eval.measurable [MeasurableSpace rT] [Inhabited rT] :
     Measurable (Function.uncurry (UnOp.eval (α := rT))) := by
-  sorry
+  -- `UnOp × Exp rT → Option (Exp rT)`. `UnOp` is Countable + has `⊤` σ-alg
+  -- (hence `MeasurableSingletonClass`). Split over it via `_right` form.
+  apply measurable_from_prod_countable_right
+  intro op
+  exact UnOp.eval_op_measurable op
 
 theorem BinOp_eval.measurable [ProbLangℝ rT] :
     Measurable (fun (q : BinOp × Exp rT × Exp rT) => BinOp.eval q.1 q.2.1 q.2.2) := by
@@ -244,7 +356,109 @@ using `cell_*_param` helpers from `Measure.lean` directly on `EctxItem.shape`). 
 
 theorem fillItem.measurable [MeasurableSpace rT] :
     Measurable (fun (q : EctxItem rT × Exp rT) => q.1.fillItem q.2) := by
-  sorry
+  -- Apply the joint param keystone with `β := Exp rT`, parameter = `q.2`.
+  -- Each `f_<ctor>` is built from measurable Exp constructors + `Val.fst`/`Exp.ofVal`.
+  -- First rewrite `fillItem` as the explicit `casesOn` form expected by the keystone.
+  have heq : (fun q : EctxItem rT × Exp rT => q.1.fillItem q.2) = fun p : EctxItem rT × Exp rT =>
+      EctxItem.casesOn (motive := fun _ => Exp rT) p.1
+        (fun v => (fun pp : Exp rT × Val rT => Exp.app pp.1 (Exp.ofVal pp.2)) (p.2, v))
+        (fun e => (fun pp : Exp rT × Exp rT => Exp.app pp.2 pp.1) (p.2, e))
+        (fun u => (fun pp : Exp rT × UnOp => Exp.unop pp.2 pp.1) (p.2, u))
+        (fun op v => (fun pp : Exp rT × BinOp × Val rT => Exp.binop pp.2.1 pp.1 (Exp.ofVal pp.2.2)) (p.2, op, v))
+        (fun op e => (fun pp : Exp rT × BinOp × Exp rT => Exp.binop pp.2.1 pp.2.2 pp.1) (p.2, op, e))
+        (fun e₁ e₂ => (fun pp : Exp rT × Exp rT × Exp rT => Exp.cond pp.1 pp.2.1 pp.2.2) (p.2, e₁, e₂))
+        (fun v => (fun pp : Exp rT × Val rT => Exp.pair pp.1 (Exp.ofVal pp.2)) (p.2, v))
+        (fun e => (fun pp : Exp rT × Exp rT => Exp.pair pp.2 pp.1) (p.2, e))
+        ((fun pp : Exp rT × Unit => Exp.fst pp.1) (p.2, ()))
+        ((fun pp : Exp rT × Unit => Exp.snd pp.1) (p.2, ()))
+        ((fun pp : Exp rT × Unit => Exp.inl pp.1) (p.2, ()))
+        ((fun pp : Exp rT × Unit => Exp.inr pp.1) (p.2, ()))
+        (fun e₁ e₂ => (fun pp : Exp rT × Exp rT × Exp rT => Exp.case pp.1 pp.2.1 pp.2.2) (p.2, e₁, e₂))
+        ((fun pp : Exp rT × Unit => Exp.alloc pp.1) (p.2, ()))
+        ((fun pp : Exp rT × Unit => Exp.load pp.1) (p.2, ()))
+        (fun v => (fun pp : Exp rT × Val rT => Exp.store pp.1 (Exp.ofVal pp.2)) (p.2, v))
+        (fun e => (fun pp : Exp rT × Exp rT => Exp.store pp.2 pp.1) (p.2, e))
+        ((fun pp : Exp rT × Unit => Exp.tape pp.1) (p.2, ()))
+        (fun v => (fun pp : Exp rT × Val rT => Exp.rand pp.1 (Exp.ofVal pp.2)) (p.2, v))
+        (fun e => (fun pp : Exp rT × Exp rT => Exp.rand pp.2 pp.1) (p.2, e))
+        (fun pat => (fun pp : Exp rT × Pat rT => Exp.scrut pp.1 pp.2) (p.2, pat)) := by
+    funext q
+    cases q.1 <;> simp [EctxItem.fillItem]
+  rw [heq]
+  refine EctxItem.measurable_rec_param (α := rT) (β := Exp rT) (γ := Exp rT)
+    (f_appL := fun p => Exp.app p.1 (Exp.ofVal p.2))
+    (f_appR := fun p => Exp.app p.2 p.1)
+    (f_unop := fun p => Exp.unop p.2 p.1)
+    (f_binopL := fun p => Exp.binop p.2.1 p.1 (Exp.ofVal p.2.2))
+    (f_binopR := fun p => Exp.binop p.2.1 p.2.2 p.1)
+    (f_condC := fun p => Exp.cond p.1 p.2.1 p.2.2)
+    (f_pairL := fun p => Exp.pair p.1 (Exp.ofVal p.2))
+    (f_pairR := fun p => Exp.pair p.2 p.1)
+    (f_fst := fun p => Exp.fst p.1)
+    (f_snd := fun p => Exp.snd p.1)
+    (f_inl := fun p => Exp.inl p.1)
+    (f_inr := fun p => Exp.inr p.1)
+    (f_case := fun p => Exp.case p.1 p.2.1 p.2.2)
+    (f_alloc := fun p => Exp.alloc p.1)
+    (f_load := fun p => Exp.load p.1)
+    (f_storeL := fun p => Exp.store p.1 (Exp.ofVal p.2))
+    (f_storeR := fun p => Exp.store p.2 p.1)
+    (f_tape := fun p => Exp.tape p.1)
+    (f_randL := fun p => Exp.rand p.1 (Exp.ofVal p.2))
+    (f_randR := fun p => Exp.rand p.2 p.1)
+    (f_scrut := fun p => Exp.scrut p.1 p.2)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  -- appL
+  · show Measurable (fun p : Exp rT × Val rT => Function.uncurry Exp.app (p.1, Exp.ofVal p.2))
+    refine Exp.app.measurable.comp ?_
+    exact measurable_fst.prodMk <| Val.fst.measurable.comp measurable_snd
+  -- appR
+  · fun_prop
+  -- unop
+  · fun_prop
+  -- binopL
+  · show Measurable (fun p : Exp rT × BinOp × Val rT =>
+        (fun (q : BinOp × Exp rT × Exp rT) => Exp.binop q.1 q.2.1 q.2.2)
+          (p.2.1, p.1, Exp.ofVal p.2.2))
+    refine Exp.binop.measurable.comp ?_
+    refine (measurable_fst.comp measurable_snd).prodMk ?_
+    exact measurable_fst.prodMk <| Val.fst.measurable.comp <| measurable_snd.comp measurable_snd
+  -- binopR
+  · fun_prop
+  -- condC
+  · fun_prop
+  -- pairL
+  · show Measurable (fun p : Exp rT × Val rT => Function.uncurry Exp.pair (p.1, Exp.ofVal p.2))
+    refine Exp.pair.measurable.comp ?_
+    exact measurable_fst.prodMk <| Val.fst.measurable.comp measurable_snd
+  -- pairR
+  · fun_prop
+  -- fst, snd, inl, inr (all Unit-typed)
+  · fun_prop
+  · fun_prop
+  · fun_prop
+  · fun_prop
+  -- case
+  · fun_prop
+  -- alloc, load
+  · fun_prop
+  · fun_prop
+  -- storeL
+  · show Measurable (fun p : Exp rT × Val rT => Function.uncurry Exp.store (p.1, Exp.ofVal p.2))
+    refine Exp.store.measurable.comp ?_
+    exact measurable_fst.prodMk <| Val.fst.measurable.comp measurable_snd
+  -- storeR
+  · fun_prop
+  -- tape
+  · fun_prop
+  -- randL
+  · show Measurable (fun p : Exp rT × Val rT => Function.uncurry Exp.rand (p.1, Exp.ofVal p.2))
+    refine Exp.rand.measurable.comp ?_
+    exact measurable_fst.prodMk <| Val.fst.measurable.comp measurable_snd
+  -- randR
+  · fun_prop
+  -- scrut
+  · fun_prop
 
 /-! ### `Ectx.fill` — `List.foldl` over `EctxItem.fillItem`.
 
@@ -253,7 +467,17 @@ measurability argument; mechanical extension once the input is measurable. -/
 
 theorem Ectx_fill.measurable [MeasurableSpace rT] :
     Measurable (fun (q : Ectx rT × Exp rT) => Ectx.fill q.1 q.2) := by
-  sorry
+  -- `Ectx.fill K e = K.foldl (flip EctxItem.fillItem) e`.
+  -- Apply the generic `List.measurable_foldl` keystone (stubbed in Measure.lean)
+  -- with `f := flip EctxItem.fillItem`. Joint measurability of `f` reduces to
+  -- the stubbed `fillItem.measurable` composed with `Prod.swap`.
+  have hflip : Measurable (Function.uncurry (flip (EctxItem.fillItem (α := rT)))) := by
+    -- Function.uncurry (flip fillItem) (e, Ki) = Ki.fillItem e = Function.uncurry fillItem (Ki, e)
+    have hrw : Function.uncurry (flip (EctxItem.fillItem (α := rT)))
+        = (fun q : EctxItem rT × Exp rT => q.1.fillItem q.2) ∘ Prod.swap := rfl
+    rw [hrw]
+    exact Exp.fillItem.measurable.comp measurable_swap
+  exact List.measurable_foldl hflip
 
 /-! ### `Exp.openRec` — binder-shifting recursion.
 
@@ -270,22 +494,123 @@ current keystone with one extra `t_X b`-precomposition at each constructor.
 
 theorem openRec.measurable [MeasurableSpace rT] :
     Measurable (fun (q : (Nat × Exp rT) × Exp rT) => Exp.openRec q.1.1 q.1.2 q.2) := by
-  sorry
+  -- Apply `measurable_struct_rec_param_shift` with β = (Nat × Exp rT) and shift
+  -- `t_lam = t_fix = fun b => (b.1 + 1, b.2)` for binders. All other ctors are
+  -- rebuild-only (ignore b in the combinator) except c_bvar which uses b for the
+  -- if-then-else substitution.
+  apply measurable_struct_rec_param_shift
+    (g := fun (b : Nat × Exp rT) (e : Exp rT) => Exp.openRec b.1 b.2 e)
+    (c_bvar  := fun b j => if b.1 = j then b.2 else (Exp.bvar j : Exp rT))
+    (c_fvar  := fun _ x => Exp.fvar x)
+    (c_lit   := fun _ l => Exp.lit l)
+    (c_lam   := fun _ e' => Exp.lam e')
+    (c_fix   := fun _ e' => Exp.fix e')
+    (c_app   := fun _ e1' e2' => Exp.app e1' e2')
+    (c_unop  := fun _ op e' => Exp.unop op e')
+    (c_binop := fun _ op e1' e2' => Exp.binop op e1' e2')
+    (c_cond  := fun _ ec' et' ef' => Exp.cond ec' et' ef')
+    (c_pair  := fun _ e1' e2' => Exp.pair e1' e2')
+    (c_fst   := fun _ e' => Exp.fst e')
+    (c_snd   := fun _ e' => Exp.snd e')
+    (c_inl   := fun _ e' => Exp.inl e')
+    (c_inr   := fun _ e' => Exp.inr e')
+    (c_case  := fun _ ec' el' er' => Exp.case ec' el' er')
+    (c_alloc := fun _ e' => Exp.alloc e')
+    (c_load  := fun _ e' => Exp.load e')
+    (c_store := fun _ e1' e2' => Exp.store e1' e2')
+    (c_tape  := fun _ e' => Exp.tape e')
+    (c_rand  := fun _ e1' e2' => Exp.rand e1' e2')
+    (c_fail  := fun _ => Exp.fail)
+    (c_scrut := fun _ e' p => Exp.scrut e' p)
+    (t_lam   := fun b => (b.1 + 1, b.2))
+    (t_fix   := fun b => (b.1 + 1, b.2))
+  -- All 22 equations close by rfl (openRec's defining equations).
+  -- c_bvar has the Nat-dependent if; discharge manually via measurable_from_prod_countable_right.
+  case h_bvar =>
+    have hrw : Function.uncurry (fun (b : Nat × Exp rT) (j : Nat) =>
+              if b.1 = j then b.2 else (Exp.bvar j : Exp rT))
+        = (fun (q : (Nat × Nat) × Exp rT) =>
+              if q.1.1 = q.1.2 then q.2 else Exp.bvar q.1.2)
+            ∘ (fun (p : (Nat × Exp rT) × Nat) => ((p.1.1, p.2), p.1.2)) := by
+      funext ⟨⟨i, sub⟩, j⟩; rfl
+    rw [hrw]
+    have h1 : Measurable (fun (q : (Nat × Nat) × Exp rT) =>
+                if q.1.1 = q.1.2 then q.2 else (Exp.bvar q.1.2 : Exp rT)) := by
+      apply measurable_from_prod_countable_right
+      intro ij
+      by_cases h : ij.1 = ij.2
+      · simp only [h, if_true]; exact measurable_id
+      · simp only [h, if_false]; exact measurable_const
+    exact h1.comp (by fun_prop : Measurable
+      (fun (p : (Nat × Exp rT) × Nat) => ((p.1.1, p.2), p.1.2)))
+  case h_t_lam => fun_prop
+  case h_t_fix => fun_prop
+  all_goals first | (intros; rfl) | fun_prop
 
 theorem open'.measurable [MeasurableSpace rT] :
     Measurable (fun (q : Exp rT × Exp rT) => Exp.open' q.1 q.2) := by
-  -- open' e sub = openRec 0 sub e. Trivial composition once openRec.measurable lands.
-  sorry
+  -- `open' e sub = openRec 0 sub e`. Compose with the (stubbed) keystone
+  -- `openRec.measurable` via the packaging map `q ↦ ((0, q.2), q.1)`.
+  have hpack : Measurable (fun q : Exp rT × Exp rT => ((0, q.2), q.1)) := by fun_prop
+  exact Exp.openRec.measurable (rT := rT) |>.comp hpack
 
 theorem closeRec.measurable [MeasurableSpace rT] :
     Measurable (fun (q : (Nat × Var) × Exp rT) => Exp.closeRec q.1.1 q.1.2 q.2) := by
-  -- Same shape as openRec: binder-shifting param thread.
-  sorry
+  -- Same shape as openRec but with c_fvar carrying the if-then-else instead of c_bvar.
+  apply measurable_struct_rec_param_shift
+    (g := fun (b : Nat × Var) (e : Exp rT) => Exp.closeRec b.1 b.2 e)
+    (c_bvar  := fun _ j => Exp.bvar j)
+    (c_fvar  := fun b y => if b.2 = y then (Exp.bvar b.1 : Exp rT) else Exp.fvar y)
+    (c_lit   := fun _ l => Exp.lit l)
+    (c_lam   := fun _ e' => Exp.lam e')
+    (c_fix   := fun _ e' => Exp.fix e')
+    (c_app   := fun _ e1' e2' => Exp.app e1' e2')
+    (c_unop  := fun _ op e' => Exp.unop op e')
+    (c_binop := fun _ op e1' e2' => Exp.binop op e1' e2')
+    (c_cond  := fun _ ec' et' ef' => Exp.cond ec' et' ef')
+    (c_pair  := fun _ e1' e2' => Exp.pair e1' e2')
+    (c_fst   := fun _ e' => Exp.fst e')
+    (c_snd   := fun _ e' => Exp.snd e')
+    (c_inl   := fun _ e' => Exp.inl e')
+    (c_inr   := fun _ e' => Exp.inr e')
+    (c_case  := fun _ ec' el' er' => Exp.case ec' el' er')
+    (c_alloc := fun _ e' => Exp.alloc e')
+    (c_load  := fun _ e' => Exp.load e')
+    (c_store := fun _ e1' e2' => Exp.store e1' e2')
+    (c_tape  := fun _ e' => Exp.tape e')
+    (c_rand  := fun _ e1' e2' => Exp.rand e1' e2')
+    (c_fail  := fun _ => Exp.fail)
+    (c_scrut := fun _ e' p => Exp.scrut e' p)
+    (t_lam   := fun b => (b.1 + 1, b.2))
+    (t_fix   := fun b => (b.1 + 1, b.2))
+  -- c_fvar has the Var-dependent if; discharge manually.
+  case h_fvar =>
+    have hrw : Function.uncurry (fun (b : Nat × Var) (y : Var) =>
+              if b.2 = y then (Exp.bvar b.1 : Exp rT) else Exp.fvar y)
+        = (fun (q : (Var × Var) × Nat) =>
+              if q.1.1 = q.1.2 then (Exp.bvar q.2 : Exp rT) else Exp.fvar q.1.2)
+            ∘ (fun (p : (Nat × Var) × Var) => ((p.1.2, p.2), p.1.1)) := by
+      funext ⟨⟨i, x⟩, y⟩; rfl
+    rw [hrw]
+    have h1 : Measurable (fun (q : (Var × Var) × Nat) =>
+                if q.1.1 = q.1.2 then (Exp.bvar q.2 : Exp rT) else Exp.fvar q.1.2) := by
+      apply measurable_from_prod_countable_right
+      intro xy
+      by_cases h : xy.1 = xy.2
+      · simp only [h, if_true]; exact Exp.bvar.measurable
+      · simp only [h, if_false]; exact measurable_const
+    exact h1.comp (by fun_prop : Measurable
+      (fun (p : (Nat × Var) × Var) => ((p.1.2, p.2), p.1.1)))
+  case h_t_lam => fun_prop
+  case h_t_fix => fun_prop
+  all_goals first | (intros; rfl) | fun_prop
 
 theorem close.measurable [MeasurableSpace rT] :
     Measurable (fun (q : Exp rT × Var) => Exp.close q.1 q.2) := by
-  -- close e x = closeRec 0 x e. Trivial composition once closeRec.measurable lands.
-  sorry
+  -- `close e x = closeRec 0 x e`. Compose with the (stubbed) keystone
+  -- `closeRec.measurable` via the packaging map `q ↦ ((0, q.2), q.1)`.
+  have hpack : Measurable (fun q : Exp rT × Var => ((0, q.2), q.1)) := by fun_prop
+  exact Exp.closeRec.measurable (rT := rT) |>.comp hpack
 
 -- Local instances for stub statements (these likely already exist downstream;
 -- duplicated here to make the stub theorems type-check).
@@ -317,16 +642,334 @@ which would fit the keystone — but the existing definition routes through
 theorem toVal_question.measurable [MeasurableSpace rT] :
     let _ : MeasurableSpace (Option (Val rT)) := instLocalOption
     Measurable (Exp.toVal? : Exp rT → Option (Val rT)) := by
-  intro _; sorry
+  intro mOpt
+  -- Step 1: rewrite `toVal?` as a `dite`.
+  have hrw : (Exp.toVal? : Exp rT → Option (Val rT)) =
+      fun e => if h : e.isValue then some (Val.mk e (Classical.choice h)) else none := by
+    funext e
+    by_cases h : e.isValue
+    · simp only [Exp.toVal?, dif_pos h]
+      cases hc : IsVal.check? e with
+      | none => exact absurd (IsVal.not_isValue_of_check?_none hc) (not_not.mpr h)
+      | some w => exact congrArg some (Val.ext rfl)
+    · have hnone : Exp.toVal? e = none := Exp.toVal?_eq_none.mpr h
+      simp only [hnone, dif_neg h]
+  rw [hrw]
+  intro S hS
+  -- Step 2: decompose S via `optionEquivSumPUnit`. `S` is measurable in `instLocalOption`
+  -- iff `S = (optionEquivSumPUnit) ⁻¹' Ssum` for some sum-measurable `Ssum`. Extract
+  -- `Tval : Set (Val rT)` (measurable) and `Tnone : Set PUnit` from `Ssum`.
+  obtain ⟨Ssum, hSsum, hSeq⟩ := hS
+  -- `Ssum : Set (Val rT ⊕ PUnit)`; measurable iff inl/inr preimages are.
+  have hTval_meas : MeasurableSet (Sum.inl ⁻¹' Ssum : Set (Val rT)) :=
+    measurable_inl hSsum
+  -- Pull back to `Exp rT` via `Val.fst`.
+  obtain ⟨Uval, hUval, hUval_eq⟩ : ∃ U : Set (Exp rT), MeasurableSet U ∧
+      Val.fst ⁻¹' U = (Sum.inl ⁻¹' Ssum : Set (Val rT)) :=
+    MeasurableSpace.measurableSet_comap.mp hTval_meas
+  -- Now compute the preimage.
+  -- For value `e` (so `h : e.isValue`): the map sends `e` to `some ⟨e, (Classical.choice h)⟩`,
+  -- and `some v ∈ S` iff `optionEquivSumPUnit (some v) = .inl v ∈ Ssum` iff
+  -- `v ∈ Sum.inl ⁻¹' Ssum = Val.fst ⁻¹' Uval` iff `v.fst ∈ Uval`.
+  -- So for value `e`: `e ∈ preimage` iff `e ∈ Uval`.
+  -- For non-value `e`: the map sends `e` to `none`; `none ∈ S` iff
+  -- `optionEquivSumPUnit none = .inr () ∈ Ssum` iff `() ∈ Sum.inr ⁻¹' Ssum`.
+  -- That's a constant boolean depending on `Ssum`, so either `univ` or `∅` for non-values.
+  have hMset : MeasurableSet {e : Exp rT | e.isValue} := by
+    have heq : {e : Exp rT | e.isValue} = {e | e.isValueR} := by
+      ext e; simp [Exp.isValue_iff_isValueR]
+    rw [heq]; exact isValueR.measurable.setOf
+  set noneIn : Prop := ((⟨⟩ : PUnit) ∈ (Sum.inr ⁻¹' Ssum : Set PUnit)) with hNoneIn
+  classical
+  have hpreimage_eq :
+      (fun e : Exp rT => if h : e.isValue then some (Val.mk e (Classical.choice h)) else none) ⁻¹' S =
+        ({e | e.isValue} ∩ Uval) ∪ (if noneIn then {e | ¬e.isValue} else ∅) := by
+    ext e
+    simp only [Set.mem_preimage, Set.mem_union, Set.mem_inter_iff, Set.mem_setOf_eq]
+    by_cases hv : e.isValue
+    · simp only [dif_pos hv]
+      rw [← hSeq]
+      simp only [Set.mem_preimage]
+      have heqv : Equiv.optionEquivSumPUnit (Val rT) (some (Val.mk e (Classical.choice hv))) =
+          .inl (Val.mk e (Classical.choice hv)) := by
+        simp [Equiv.optionEquivSumPUnit]
+      rw [heqv]
+      have hmem_iff : (Sum.inl (Val.mk e (Classical.choice hv)) : Val rT ⊕ PUnit) ∈ Ssum ↔
+          (Val.mk e (Classical.choice hv) : Val rT) ∈ (Sum.inl ⁻¹' Ssum : Set (Val rT)) := Iff.rfl
+      rw [hmem_iff, ← hUval_eq]
+      have hfeq : (Val.mk e (Classical.choice hv) : Val rT).fst = e := rfl
+      simp only [Set.mem_preimage, hfeq]
+      constructor
+      · intro hUe
+        left; exact ⟨hv, hUe⟩
+      · rintro (⟨_, hUe⟩ | hcontra)
+        · exact hUe
+        · split_ifs at hcontra with hni
+          · exact absurd hv hcontra
+          · exact absurd hcontra (Set.notMem_empty _)
+    · simp only [dif_neg hv]
+      rw [← hSeq]
+      simp only [Set.mem_preimage]
+      have heqv : Equiv.optionEquivSumPUnit (Val rT) none = .inr ⟨⟩ := by
+        simp [Equiv.optionEquivSumPUnit]
+      rw [heqv]
+      have hmem_iff : (Sum.inr ⟨⟩ : Val rT ⊕ PUnit) ∈ Ssum ↔ noneIn := Iff.rfl
+      rw [hmem_iff]
+      constructor
+      · intro hni
+        right; rw [if_pos hni]; exact hv
+      · rintro (⟨hcontra, _⟩ | hcase)
+        · exact absurd hcontra hv
+        · split_ifs at hcase with hni
+          · exact hni
+          · exact absurd hcase (Set.notMem_empty _)
+  rw [hpreimage_eq]
+  refine MeasurableSet.union (hMset.inter hUval) ?_
+  split_ifs
+  · exact hMset.compl
+  · exact MeasurableSet.empty
 
 /-! ### `Exp.decompItem` — depends on `Exp.toVal?`. -/
+
+/-- **Helper: measurability of `Option.elim`-form decomposition.**
+For measurable `f : α → Option β` (under `instLocalOption` on the codomain),
+measurable `default : α → γ` and `some_branch : α × β → γ`:
+`(a ↦ (f a).elim (default a) (fun b => some_branch (a, b)))` is measurable. -/
+theorem _root_.Option.measurable_elim_param
+    {α β γ : Type _} [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
+    {f : α → Option β} (hf : @Measurable _ _ _ instLocalOption f)
+    {default : α → γ} (hdef : Measurable default)
+    {some_branch : α × β → γ} (hsome : Measurable some_branch) :
+    Measurable (fun a => Option.casesOn (motive := fun _ => γ) (f a) (default a) (fun b => some_branch (a, b))) := by
+  intro S hS
+  have hpre : (fun a => Option.casesOn (motive := fun _ => γ) (f a) (default a) (fun b => some_branch (a, b))) ⁻¹' S
+      = ({a | f a = none} ∩ default ⁻¹' S)
+      ∪ (fun a => (a, f a)) ⁻¹'
+          ((fun q : α × β => (q.1, (some q.2 : Option β))) ''
+            ((fun q : α × β => some_branch q) ⁻¹' S)) := by
+    ext a
+    rcases hfa : f a with _ | b
+    · simp [hfa]
+    · simp only [hfa, Set.mem_preimage, Set.mem_union, Set.mem_inter_iff,
+        Set.mem_setOf_eq, Set.mem_image, Prod.mk.injEq]
+      constructor
+      · intro h; right; exact ⟨(a, b), h, rfl, rfl⟩
+      · rintro (⟨hcontra, _⟩ | ⟨⟨a', b'⟩, hab, haeq, hbeq⟩)
+        · simp_all
+        · subst haeq; exact Option.some_injective _ hbeq ▸ hab
+  rw [hpre]
+  refine MeasurableSet.union ?_ ?_
+  · refine MeasurableSet.inter ?_ (hdef hS)
+    have : {a | f a = none} = f ⁻¹' {none} := by ext a; simp
+    rw [this]; exact hf MeasurableSet.singleton_none
+  · refine MeasurableSet.preimage ?_ (measurable_id.prodMk hf)
+    refine MeasurableEmbedding.measurableSet_image' ?_ (hsome hS)
+    have heq : (fun q : α × β => (q.1, (some q.2 : Option β)))
+        = Prod.map (id : α → α) (some : β → Option β) := rfl
+    rw [heq]
+    exact MeasurableEmbedding.id.prodMap MeasurableEmbedding.some_mk
 
 theorem decompItem.measurable [MeasurableSpace rT] :
     let _ : MeasurableSpace (Option (EctxItem rT × Exp rT)) := instLocalOption
     Measurable (Exp.decompItem : Exp rT → Option (EctxItem rT × Exp rT)) := by
-  -- One-level `casesOn` on Exp, but each branch uses `toVal?` on the children.
-  -- Measurable once `toVal?.measurable` is established.
-  intro _; sorry
+  intro mOpt
+  -- Rewrite `decompItem` as a `casesOn` form and apply `Exp.measurable_rec`.
+  have hrw : (Exp.decompItem : Exp rT → Option (EctxItem rT × Exp rT)) = fun e =>
+      Exp.casesOn (motive := fun _ => Option (EctxItem rT × Exp rT)) e
+        (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+        (fun e1 e2 =>
+          e2.toVal?.casesOn (some (.appR e1, e2)) fun v2 =>
+          e1.toVal?.casesOn (some (.appL v2, e1)) fun _ => none)
+        (fun op e1 =>
+          e1.toVal?.casesOn (some (.unop op, e1)) fun _ => none)
+        (fun op e1 e2 =>
+          e2.toVal?.casesOn (some (.binopR op e1, e2)) fun v2 =>
+          e1.toVal?.casesOn (some (.binopL op v2, e1)) fun _ => none)
+        (fun ec et ef =>
+          ec.toVal?.casesOn (some (.condC et ef, ec)) fun _ => none)
+        (fun e1 e2 =>
+          e2.toVal?.casesOn (some (.pairR e1, e2)) fun v2 =>
+          e1.toVal?.casesOn (some (.pairL v2, e1)) fun _ => none)
+        (fun e1 => e1.toVal?.casesOn (some (.fst, e1)) fun _ => none)
+        (fun e1 => e1.toVal?.casesOn (some (.snd, e1)) fun _ => none)
+        (fun e1 => e1.toVal?.casesOn (some (.inl, e1)) fun _ => none)
+        (fun e1 => e1.toVal?.casesOn (some (.inr, e1)) fun _ => none)
+        (fun ec el er =>
+          ec.toVal?.casesOn (some (.case el er, ec)) fun _ => none)
+        (fun e1 => e1.toVal?.casesOn (some (.alloc, e1)) fun _ => none)
+        (fun e1 => e1.toVal?.casesOn (some (.load, e1)) fun _ => none)
+        (fun e1 e2 =>
+          e2.toVal?.casesOn (some (.storeR e1, e2)) fun v2 =>
+          e1.toVal?.casesOn (some (.storeL v2, e1)) fun _ => none)
+        (fun e1 => e1.toVal?.casesOn (some (.tape, e1)) fun _ => none)
+        (fun e1 e2 =>
+          e2.toVal?.casesOn (some (.randR e1, e2)) fun v2 =>
+          e1.toVal?.casesOn (some (.randL v2, e1)) fun _ => none)
+        none
+        (fun e1 p => e1.toVal?.casesOn (some (.scrut p, e1)) fun _ => none) := by
+    funext e; cases e <;> rfl
+  rw [hrw]
+  have htv : @Measurable (Exp rT) (Option (Val rT)) _ instLocalOption Exp.toVal? :=
+    toVal_question.measurable
+  -- Unary helper: for `(b : β)` projecting an Exp rT, the focus-or-none pattern.
+  have hunary : ∀ {β : Type _} [MeasurableSpace β] (K : β → EctxItem rT) (proj : β → Exp rT),
+      Measurable K → Measurable proj →
+      @Measurable β (Option (EctxItem rT × Exp rT)) _ instLocalOption
+        (fun b : β => Option.casesOn (motive := fun _ => Option (EctxItem rT × Exp rT))
+          (proj b).toVal? (some (K b, proj b)) fun _ => none) := by
+    intro β _ K proj hK hproj
+    exact Option.measurable_elim_param (f := fun b => (proj b).toVal?)
+      (htv.comp hproj)
+      (MeasurableEmbedding.some_mk.measurable.comp (hK.prodMk hproj))
+      measurable_const
+  have hbinary : ∀ {β : Type _} [MeasurableSpace β]
+      (KR : β → EctxItem rT) (KL : β × Val rT → EctxItem rT)
+      (projL : β → Exp rT) (projR : β → Exp rT),
+      Measurable KR → Measurable KL → Measurable projL → Measurable projR →
+      @Measurable β (Option (EctxItem rT × Exp rT)) _ instLocalOption
+        (fun b : β => Option.casesOn (motive := fun _ => Option (EctxItem rT × Exp rT))
+          (projR b).toVal? (some (KR b, projR b)) fun v2 =>
+          Option.casesOn (motive := fun _ => Option (EctxItem rT × Exp rT))
+            (projL b).toVal? (some (KL (b, v2), projL b)) fun _ => none) := by
+    intro β _ KR KL projL projR hKR hKL hprojL hprojR
+    have h_default : Measurable (fun b : β => (some (KR b, projR b) : Option (EctxItem rT × Exp rT))) := by
+      have : Measurable (fun b : β => ((KR b, projR b) : EctxItem rT × Exp rT)) :=
+        hKR.prodMk hprojR
+      exact MeasurableEmbedding.some_mk.measurable.comp this
+    have h_some_branch : Measurable
+        (fun bv : β × Val rT =>
+          Option.casesOn (motive := fun _ => Option (EctxItem rT × Exp rT))
+            (projL bv.1).toVal? (some (KL bv, projL bv.1)) fun _ => none) := by
+      have h_default' : Measurable
+          (fun bv : β × Val rT => (some (KL bv, projL bv.1) : Option (EctxItem rT × Exp rT))) := by
+        have : Measurable (fun bv : β × Val rT => ((KL bv, projL bv.1) : EctxItem rT × Exp rT)) :=
+          hKL.prodMk (hprojL.comp measurable_fst)
+        exact MeasurableEmbedding.some_mk.measurable.comp this
+      exact Option.measurable_elim_param
+        (f := fun bv : β × Val rT => (projL bv.1).toVal?)
+        (htv.comp (hprojL.comp measurable_fst))
+        h_default' measurable_const
+    exact Option.measurable_elim_param (f := fun b => (projR b).toVal?)
+      (htv.comp hprojR) h_default h_some_branch
+  refine Exp.measurable_rec
+    (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun _ => none)
+    (f_lam := fun _ => none) (f_fix := fun _ => none)
+    (f_app := fun (q : Exp rT × Exp rT) =>
+      q.2.toVal?.casesOn (some (EctxItem.appR q.1, q.2)) fun v2 =>
+      q.1.toVal?.casesOn (some (EctxItem.appL v2, q.1)) fun _ => none)
+    (f_unop := fun (q : UnOp × Exp rT) =>
+      q.2.toVal?.casesOn (some (EctxItem.unop q.1, q.2)) fun _ => none)
+    (f_binop := fun (q : BinOp × Exp rT × Exp rT) =>
+      q.2.2.toVal?.casesOn (some (EctxItem.binopR q.1 q.2.1, q.2.2)) fun v2 =>
+      q.2.1.toVal?.casesOn (some (EctxItem.binopL q.1 v2, q.2.1)) fun _ => none)
+    (f_cond := fun (q : Exp rT × Exp rT × Exp rT) =>
+      q.1.toVal?.casesOn (some (EctxItem.condC q.2.1 q.2.2, q.1)) fun _ => none)
+    (f_pair := fun (q : Exp rT × Exp rT) =>
+      q.2.toVal?.casesOn (some (EctxItem.pairR q.1, q.2)) fun v2 =>
+      q.1.toVal?.casesOn (some (EctxItem.pairL v2, q.1)) fun _ => none)
+    (f_fst := fun e1 => e1.toVal?.casesOn (some (EctxItem.fst, e1)) fun _ => none)
+    (f_snd := fun e1 => e1.toVal?.casesOn (some (EctxItem.snd, e1)) fun _ => none)
+    (f_inl := fun e1 => e1.toVal?.casesOn (some (EctxItem.inl, e1)) fun _ => none)
+    (f_inr := fun e1 => e1.toVal?.casesOn (some (EctxItem.inr, e1)) fun _ => none)
+    (f_case := fun (q : Exp rT × Exp rT × Exp rT) =>
+      q.1.toVal?.casesOn (some (EctxItem.case q.2.1 q.2.2, q.1)) fun _ => none)
+    (f_alloc := fun e1 => e1.toVal?.casesOn (some (EctxItem.alloc, e1)) fun _ => none)
+    (f_load := fun e1 => e1.toVal?.casesOn (some (EctxItem.load, e1)) fun _ => none)
+    (f_store := fun (q : Exp rT × Exp rT) =>
+      q.2.toVal?.casesOn (some (EctxItem.storeR q.1, q.2)) fun v2 =>
+      q.1.toVal?.casesOn (some (EctxItem.storeL v2, q.1)) fun _ => none)
+    (f_tape := fun e1 => e1.toVal?.casesOn (some (EctxItem.tape, e1)) fun _ => none)
+    (f_rand := fun (q : Exp rT × Exp rT) =>
+      q.2.toVal?.casesOn (some (EctxItem.randR q.1, q.2)) fun v2 =>
+      q.1.toVal?.casesOn (some (EctxItem.randL v2, q.1)) fun _ => none)
+    (f_fail := fun _ => none)
+    (f_scrut := fun (q : Exp rT × Pat rT) =>
+      q.1.toVal?.casesOn (some (EctxItem.scrut q.2, q.1)) fun _ => none)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  · exact measurable_const  -- h_lit
+  · exact measurable_const  -- h_lam
+  · exact measurable_const  -- h_fix
+  · -- h_app
+    exact hbinary
+      (KR := fun q : Exp rT × Exp rT => EctxItem.appR q.1)
+      (KL := fun (q : (Exp rT × Exp rT) × Val rT) => EctxItem.appL q.2)
+      (projL := fun q => q.1) (projR := fun q => q.2)
+      (EctxItem.appR.ι.measurable.comp measurable_fst)
+      (EctxItem.appL.ι.measurable.comp measurable_snd)
+      measurable_fst measurable_snd
+  · -- h_unop
+    exact hunary (β := UnOp × Exp rT)
+      (K := fun q => EctxItem.unop q.1) (proj := fun q => q.2)
+      (EctxItem.unop.ι.measurable.comp measurable_fst) measurable_snd
+  · -- h_binop
+    exact hbinary
+      (KR := fun q : BinOp × Exp rT × Exp rT => EctxItem.binopR q.1 q.2.1)
+      (KL := fun (q : (BinOp × Exp rT × Exp rT) × Val rT) => EctxItem.binopL q.1.1 q.2)
+      (projL := fun q => q.2.1) (projR := fun q => q.2.2)
+      (EctxItem.binopR.ι.measurable.comp (measurable_fst.prodMk (measurable_fst.comp measurable_snd)))
+      (EctxItem.binopL.ι.measurable.comp ((measurable_fst.comp measurable_fst).prodMk measurable_snd))
+      (measurable_fst.comp measurable_snd) (measurable_snd.comp measurable_snd)
+  · -- h_cond
+    exact hunary (β := Exp rT × Exp rT × Exp rT)
+      (K := fun q => EctxItem.condC q.2.1 q.2.2)
+      (proj := fun q => q.1)
+      (EctxItem.condC.ι.measurable.comp ((measurable_fst.comp measurable_snd).prodMk (measurable_snd.comp measurable_snd)))
+      measurable_fst
+  · -- h_pair
+    exact hbinary
+      (KR := fun q : Exp rT × Exp rT => EctxItem.pairR q.1)
+      (KL := fun (q : (Exp rT × Exp rT) × Val rT) => EctxItem.pairL q.2)
+      (projL := fun q => q.1) (projR := fun q => q.2)
+      (EctxItem.pairR.ι.measurable.comp measurable_fst)
+      (EctxItem.pairL.ι.measurable.comp measurable_snd)
+      measurable_fst measurable_snd
+  · -- h_fst
+    exact hunary (β := Exp rT) (K := fun _ => EctxItem.fst) (proj := id)
+      measurable_const measurable_id
+  · -- h_snd
+    exact hunary (β := Exp rT) (K := fun _ => EctxItem.snd) (proj := id)
+      measurable_const measurable_id
+  · -- h_inl
+    exact hunary (β := Exp rT) (K := fun _ => EctxItem.inl) (proj := id)
+      measurable_const measurable_id
+  · -- h_inr
+    exact hunary (β := Exp rT) (K := fun _ => EctxItem.inr) (proj := id)
+      measurable_const measurable_id
+  · -- h_case
+    exact hunary (β := Exp rT × Exp rT × Exp rT)
+      (K := fun q => EctxItem.case q.2.1 q.2.2) (proj := fun q => q.1)
+      (EctxItem.case.ι.measurable.comp ((measurable_fst.comp measurable_snd).prodMk (measurable_snd.comp measurable_snd)))
+      measurable_fst
+  · -- h_alloc
+    exact hunary (β := Exp rT) (K := fun _ => EctxItem.alloc) (proj := id)
+      measurable_const measurable_id
+  · -- h_load
+    exact hunary (β := Exp rT) (K := fun _ => EctxItem.load) (proj := id)
+      measurable_const measurable_id
+  · -- h_store
+    exact hbinary
+      (KR := fun q : Exp rT × Exp rT => EctxItem.storeR q.1)
+      (KL := fun (q : (Exp rT × Exp rT) × Val rT) => EctxItem.storeL q.2)
+      (projL := fun q => q.1) (projR := fun q => q.2)
+      (EctxItem.storeR.ι.measurable.comp measurable_fst)
+      (EctxItem.storeL.ι.measurable.comp measurable_snd)
+      measurable_fst measurable_snd
+  · -- h_tape
+    exact hunary (β := Exp rT) (K := fun _ => EctxItem.tape) (proj := id)
+      measurable_const measurable_id
+  · -- h_rand
+    exact hbinary
+      (KR := fun q : Exp rT × Exp rT => EctxItem.randR q.1)
+      (KL := fun (q : (Exp rT × Exp rT) × Val rT) => EctxItem.randL q.2)
+      (projL := fun q => q.1) (projR := fun q => q.2)
+      (EctxItem.randR.ι.measurable.comp measurable_fst)
+      (EctxItem.randL.ι.measurable.comp measurable_snd)
+      measurable_fst measurable_snd
+  · -- h_scrut
+    exact hunary (β := Exp rT × Pat rT)
+      (K := fun q => EctxItem.scrut q.2) (proj := fun q => q.1)
+      (EctxItem.scrut.ι.measurable.comp measurable_snd)
+      measurable_fst
 
 /-! ### `Exp.decomp` — well-founded recursion.
 
@@ -338,6 +981,11 @@ take a union over `n`.
 
 theorem decomp.measurable [MeasurableSpace rT] :
     Measurable (Exp.decomp : Exp rT → Ectx rT × Exp rT) := by
+  -- Blocked on the same `List`/`Ectx` measurability infrastructure as `List.measurable_foldl`
+  -- (which the user said they'd handle by hand). Outline of proof: define `decompN n` as
+  -- iterated `decompItem`, prove `decompN n` measurable by induction on `n` (with the
+  -- step case needing `List.cons`-style measurability on `Ectx rT × EctxItem rT → Ectx rT`),
+  -- then `decomp e = decompN e.height e` and dispatch via `measurable_from_prod_countable_right`.
   sorry
 
 /-! ### `Pat.tryMatch` — 2D joint recursion.
@@ -353,8 +1001,175 @@ simultaneously, so this would need restating.
 
 **Status**: stubbed pending the restatement or a joint-recursion keystone. -/
 
+/-! #### Exp-shape extraction helpers for `tryMatch.measurable`.
+
+`tryMatch` recurses on `p : Pat rT` and at each `pair`/`inl`/`inr`/`lit` case
+extracts subterms or a literal from `e : Exp rT`. We need measurability of
+these extractions as `Option`-valued maps into `instLocalOption`. -/
+
+/-- Extract the literal from `e = .lit b`, else `none`. -/
+def Exp.litExtract (e : Exp rT) : Option (BaseLit rT) :=
+  match e with | .lit b => some b | _ => none
+
+/-- Extract the two children from `e = .pair e1 e2`, else `none`. -/
+def Exp.pairExtract (e : Exp rT) : Option (Exp rT × Exp rT) :=
+  match e with | .pair e1 e2 => some (e1, e2) | _ => none
+
+/-- Extract the child from `e = .inl e'`, else `none`. -/
+def Exp.inlExtract (e : Exp rT) : Option (Exp rT) :=
+  match e with | .inl e' => some e' | _ => none
+
+/-- Extract the child from `e = .inr e'`, else `none`. -/
+def Exp.inrExtract (e : Exp rT) : Option (Exp rT) :=
+  match e with | .inr e' => some e' | _ => none
+
+theorem litExtract.measurable [MeasurableSpace rT] :
+    let _ : MeasurableSpace (Option (BaseLit rT)) := instLocalOption
+    Measurable (Exp.litExtract : Exp rT → Option (BaseLit rT)) := by
+  intro _
+  have hrw : Exp.litExtract (rT := rT) = fun e =>
+      Exp.casesOn (motive := fun _ => Option (BaseLit rT)) e
+        (fun _ => none) (fun _ => none) (fun b => some b)
+        (fun _ => none) (fun _ => none) (fun _ _ => none)
+        (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+        (fun _ _ => none) (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+        (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+        (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+    funext e; cases e <;> rfl
+  rw [hrw]
+  refine Exp.measurable_rec
+    (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun b => some b)
+    (f_lam := fun _ => none) (f_fix := fun _ => none) (f_app := fun _ => none)
+    (f_unop := fun _ => none) (f_binop := fun _ => none) (f_cond := fun _ => none)
+    (f_pair := fun _ => none) (f_fst := fun _ => none) (f_snd := fun _ => none)
+    (f_inl := fun _ => none) (f_inr := fun _ => none) (f_case := fun _ => none)
+    (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+    (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+    (f_scrut := fun _ => none)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  · exact MeasurableEmbedding.some_mk.measurable
+  all_goals exact measurable_const
+
+theorem pairExtract.measurable [MeasurableSpace rT] :
+    let _ : MeasurableSpace (Option (Exp rT × Exp rT)) := instLocalOption
+    Measurable (Exp.pairExtract : Exp rT → Option (Exp rT × Exp rT)) := by
+  intro _
+  have hrw : Exp.pairExtract (rT := rT) = fun e =>
+      Exp.casesOn (motive := fun _ => Option (Exp rT × Exp rT)) e
+        (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+        (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+        (fun e1 e2 => some (e1, e2))
+        (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+        (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+        (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+    funext e; cases e <;> rfl
+  rw [hrw]
+  refine Exp.measurable_rec
+    (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun _ => none)
+    (f_lam := fun _ => none) (f_fix := fun _ => none) (f_app := fun _ => none)
+    (f_unop := fun _ => none) (f_binop := fun _ => none) (f_cond := fun _ => none)
+    (f_pair := fun q => some q) (f_fst := fun _ => none) (f_snd := fun _ => none)
+    (f_inl := fun _ => none) (f_inr := fun _ => none) (f_case := fun _ => none)
+    (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+    (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+    (f_scrut := fun _ => none)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  · exact measurable_const  -- h_lit
+  · exact measurable_const  -- h_lam
+  · exact measurable_const  -- h_fix
+  · exact measurable_const  -- h_app
+  · exact measurable_const  -- h_unop
+  · exact measurable_const  -- h_binop
+  · exact measurable_const  -- h_cond
+  · exact MeasurableEmbedding.some_mk.measurable  -- h_pair
+  all_goals exact measurable_const
+
+theorem inlExtract.measurable [MeasurableSpace rT] :
+    let _ : MeasurableSpace (Option (Exp rT)) := instLocalOption
+    Measurable (Exp.inlExtract : Exp rT → Option (Exp rT)) := by
+  intro _
+  have hrw : Exp.inlExtract (rT := rT) = fun e =>
+      Exp.casesOn (motive := fun _ => Option (Exp rT)) e
+        (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+        (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+        (fun _ _ => none) (fun _ => none) (fun _ => none)
+        (fun e' => some e') (fun _ => none) (fun _ _ _ => none)
+        (fun _ => none) (fun _ => none) (fun _ _ => none) (fun _ => none) (fun _ _ => none)
+        none (fun _ _ => none) := by
+    funext e; cases e <;> rfl
+  rw [hrw]
+  refine Exp.measurable_rec
+    (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun _ => none)
+    (f_lam := fun _ => none) (f_fix := fun _ => none) (f_app := fun _ => none)
+    (f_unop := fun _ => none) (f_binop := fun _ => none) (f_cond := fun _ => none)
+    (f_pair := fun _ => none) (f_fst := fun _ => none) (f_snd := fun _ => none)
+    (f_inl := fun e' => some e') (f_inr := fun _ => none) (f_case := fun _ => none)
+    (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+    (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+    (f_scrut := fun _ => none)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  · exact measurable_const  -- h_lit
+  · exact measurable_const  -- h_lam
+  · exact measurable_const  -- h_fix
+  · exact measurable_const  -- h_app
+  · exact measurable_const  -- h_unop
+  · exact measurable_const  -- h_binop
+  · exact measurable_const  -- h_cond
+  · exact measurable_const  -- h_pair
+  · exact measurable_const  -- h_fst
+  · exact measurable_const  -- h_snd
+  · exact MeasurableEmbedding.some_mk.measurable  -- h_inl
+  all_goals exact measurable_const
+
+theorem inrExtract.measurable [MeasurableSpace rT] :
+    let _ : MeasurableSpace (Option (Exp rT)) := instLocalOption
+    Measurable (Exp.inrExtract : Exp rT → Option (Exp rT)) := by
+  intro _
+  have hrw : Exp.inrExtract (rT := rT) = fun e =>
+      Exp.casesOn (motive := fun _ => Option (Exp rT)) e
+        (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+        (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+        (fun _ _ => none) (fun _ => none) (fun _ => none)
+        (fun _ => none) (fun e' => some e') (fun _ _ _ => none)
+        (fun _ => none) (fun _ => none) (fun _ _ => none) (fun _ => none) (fun _ _ => none)
+        none (fun _ _ => none) := by
+    funext e; cases e <;> rfl
+  rw [hrw]
+  refine Exp.measurable_rec
+    (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun _ => none)
+    (f_lam := fun _ => none) (f_fix := fun _ => none) (f_app := fun _ => none)
+    (f_unop := fun _ => none) (f_binop := fun _ => none) (f_cond := fun _ => none)
+    (f_pair := fun _ => none) (f_fst := fun _ => none) (f_snd := fun _ => none)
+    (f_inl := fun _ => none) (f_inr := fun e' => some e') (f_case := fun _ => none)
+    (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+    (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+    (f_scrut := fun _ => none)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  · exact measurable_const  -- h_lit
+  · exact measurable_const  -- h_lam
+  · exact measurable_const  -- h_fix
+  · exact measurable_const  -- h_app
+  · exact measurable_const  -- h_unop
+  · exact measurable_const  -- h_binop
+  · exact measurable_const  -- h_cond
+  · exact measurable_const  -- h_pair
+  · exact measurable_const  -- h_fst
+  · exact measurable_const  -- h_snd
+  · exact measurable_const  -- h_inl
+  · exact MeasurableEmbedding.some_mk.measurable  -- h_inr
+  all_goals exact measurable_const
+
 theorem tryMatch.measurable [ProbLangℝ rT] :
     Measurable (fun (q : Pat rT × Exp rT) => Pat.tryMatch q.1 q.2) := by
+  -- Bounded-iteration approach attempted. `Pat.tryMatchN` (bounded recurse-at-most-n version)
+  -- and its measurability are designed; the extraction helpers `litExtract`, `pairExtract`,
+  -- `inlExtract`, `inrExtract` are proven (see above). What remains:
+  -- (1) `tryMatchN_eq_tryMatch` (n > patDepth p → tryMatchN n = tryMatch) — tactical friction
+  --     on the `Pat.lit` case (rfl claims types differ but goal is X = X syntactically).
+  -- (2) `tryMatchN.measurable` (induction on n, using Pat.measurable_struct_rec_param with
+  --     β = Exp rT and each branch built from extraction + Option.measurable_elim_param + ih).
+  -- (3) Conclude via `measurable_from_prod_countable_right` over Nat.
+  -- Deferred.
   sorry
 
 end Exp

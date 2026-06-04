@@ -560,11 +560,19 @@ theorem Cylinder.flatten_inter_some {rT : Type _} {c₁ c₂ c : Cylinder rT}
     Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ := by
   rw [Cylinder.flatten_inter, h]; rfl
 
+set_option maxHeartbeats 1000000 in
+/-- Inheritance of `HasMeasurableLeaves` under `Cylinder.inter?`.
+
+Same one-liner as for `BaseLit`/`Pat` (compare `BaseLit.lean:171`,
+`Pat.lean:194`); the heartbeat bump is purely to absorb the 22×22 case-split
+blow-up of `induction h₁ <;> cases h₂` over `Exp`'s constructor count.
+The proof itself is structurally identical to the smaller-arity versions. -/
 theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     {c₁ c₂ c : Cylinder rT}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
-  sorry
+  induction h₁ generalizing c₂ c <;> cases h₂ <;>
+    simp_all [Cylinder.inter?] <;> grind [HasMeasurableLeaves, MeasurableSet.inter]
 
 /-! ### Per-constructor covers. -/
 
@@ -639,10 +647,11 @@ theorem Shape.cylinder_hasMeasurableLeaves [MeasurableSpace rT] (s : Shape) :
     (s.cylinder (rT := rT)).HasMeasurableLeaves := by
   induction s <;> constructor <;> measurability
 
+set_option maxHeartbeats 1000000 in
 /-- Flattening a cylinder of a shape equals set of terms with a given shape. -/
 @[simp] theorem Shape.cylinder_preimage_shape (s : Shape) :
     (s.cylinder (rT := rT)).flatten = Exp.shape ⁻¹' {s} := by
-  sorry
+  ext p; induction p generalizing s <;> cases s <;> simp_all <;> tauto
 
 /-- Flattening a cylinder gives a measurable set. -/
 @[measurability]
@@ -1577,6 +1586,183 @@ theorem measurable_rec
   · exact fail.measurableEmbedding.measurableSet_image'  .of_discrete
   · exact scrut.measurableEmbedding.measurableSet_image' (h_scrut hS)
 
+/-! ### Param-threaded one-level dispatch (no recursion).
+
+`measurable_rec_param` is the joint analogue of `measurable_rec`: continuations
+take both the constructor payload AND an external `β` parameter, and the result
+is joint-measurable in `(e, b) : Exp rT × β`. Built directly from
+`casesOn_preimage_decomp` via `Prod.map`-style embeddings. -/
+
+set_option maxHeartbeats 2000000 in
+/-- Joint preimage decomposition for `Exp.casesOn` with a `β` parameter. -/
+theorem casesOn_preimage_decomp_param
+    {rT : Type _} {α β : Type _} (S : Set α)
+    (f_bvar : β × Nat → α) (f_fvar : β × Var → α) (f_lit : β × BaseLit rT → α)
+    (f_lam : β × Exp rT → α) (f_fix : β × Exp rT → α)
+    (f_app : β × Exp rT × Exp rT → α)
+    (f_unop : β × UnOp × Exp rT → α) (f_binop : β × BinOp × Exp rT × Exp rT → α)
+    (f_cond : β × Exp rT × Exp rT × Exp rT → α)
+    (f_pair : β × Exp rT × Exp rT → α)
+    (f_fst : β × Exp rT → α) (f_snd : β × Exp rT → α)
+    (f_inl : β × Exp rT → α) (f_inr : β × Exp rT → α)
+    (f_case : β × Exp rT × Exp rT × Exp rT → α)
+    (f_alloc : β × Exp rT → α) (f_load : β × Exp rT → α)
+    (f_store : β × Exp rT × Exp rT → α)
+    (f_tape : β × Exp rT → α) (f_rand : β × Exp rT × Exp rT → α)
+    (f_fail : β × Unit → α) (f_scrut : β × Exp rT × Pat rT → α) :
+    (fun p : Exp rT × β => Exp.casesOn (motive := fun _ => α) p.1
+        (fun n => f_bvar (p.2, n)) (fun x => f_fvar (p.2, x))
+        (fun l => f_lit (p.2, l))
+        (fun e => f_lam (p.2, e)) (fun e => f_fix (p.2, e))
+        (fun e1 e2 => f_app (p.2, e1, e2))
+        (fun u e => f_unop (p.2, u, e))
+        (fun b e1 e2 => f_binop (p.2, b, e1, e2))
+        (fun ec et ef => f_cond (p.2, ec, et, ef))
+        (fun e1 e2 => f_pair (p.2, e1, e2))
+        (fun e => f_fst (p.2, e)) (fun e => f_snd (p.2, e))
+        (fun e => f_inl (p.2, e)) (fun e => f_inr (p.2, e))
+        (fun ec el er => f_case (p.2, ec, el, er))
+        (fun e => f_alloc (p.2, e)) (fun e => f_load (p.2, e))
+        (fun e1 e2 => f_store (p.2, e1, e2))
+        (fun e => f_tape (p.2, e))
+        (fun e1 e2 => f_rand (p.2, e1, e2))
+        (f_fail (p.2, ()))
+        (fun e pat => f_scrut (p.2, e, pat))) ⁻¹' S
+      = ((fun q : β × Nat => (Exp.bvar q.2, q.1))   '' (f_bvar  ⁻¹' S))
+      ∪ ((fun q : β × Var => (Exp.fvar q.2, q.1))   '' (f_fvar  ⁻¹' S))
+      ∪ ((fun q : β × BaseLit rT => (Exp.lit q.2, q.1))   '' (f_lit ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.lam q.2, q.1))   '' (f_lam   ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.fix q.2, q.1))   '' (f_fix   ⁻¹' S))
+      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.app q.2.1 q.2.2, q.1))
+            '' (f_app  ⁻¹' S))
+      ∪ ((fun q : β × UnOp × Exp rT => (Exp.unop q.2.1 q.2.2, q.1))
+            '' (f_unop ⁻¹' S))
+      ∪ ((fun q : β × BinOp × Exp rT × Exp rT =>
+            (Exp.binop q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_binop ⁻¹' S))
+      ∪ ((fun q : β × Exp rT × Exp rT × Exp rT =>
+            (Exp.cond q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_cond ⁻¹' S))
+      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.pair q.2.1 q.2.2, q.1))
+            '' (f_pair ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.fst q.2, q.1)) '' (f_fst ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.snd q.2, q.1)) '' (f_snd ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.inl q.2, q.1)) '' (f_inl ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.inr q.2, q.1)) '' (f_inr ⁻¹' S))
+      ∪ ((fun q : β × Exp rT × Exp rT × Exp rT =>
+            (Exp.case q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_case ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.alloc q.2, q.1)) '' (f_alloc ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.load q.2, q.1)) '' (f_load ⁻¹' S))
+      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.store q.2.1 q.2.2, q.1))
+            '' (f_store ⁻¹' S))
+      ∪ ((fun q : β × Exp rT => (Exp.tape q.2, q.1)) '' (f_tape ⁻¹' S))
+      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.rand q.2.1 q.2.2, q.1))
+            '' (f_rand ⁻¹' S))
+      ∪ ((fun q : β × Unit => (Exp.fail, q.1)) '' (f_fail ⁻¹' S))
+      ∪ ((fun q : β × Exp rT × Pat rT => (Exp.scrut q.2.1 q.2.2, q.1))
+            '' (f_scrut ⁻¹' S)) := by
+  ext ⟨e, b⟩; cases e <;> aesop
+
+/-- One-level `Exp.casesOn` with a `β` parameter threaded.
+
+Joint-measurable analogue of `measurable_rec`: each continuation `c_X` takes
+`β × Payload → α`. Each branch of `casesOn` is the image of a measurable
+embedding `(b, payload) ↦ (ctor payload, b)`, lifted via `MeasurableEmbedding.prodMap`. -/
+theorem measurable_rec_param
+    {rT : Type _} [MeasurableSpace rT]
+    {α : Type _} [MeasurableSpace α]
+    {β : Type _} [MeasurableSpace β]
+    (c_bvar : β × Nat → α) (c_fvar : β × Var → α) (c_lit : β × BaseLit rT → α)
+    (c_lam : β × Exp rT → α) (c_fix : β × Exp rT → α)
+    (c_app : β × Exp rT × Exp rT → α)
+    (c_unop : β × UnOp × Exp rT → α) (c_binop : β × BinOp × Exp rT × Exp rT → α)
+    (c_cond : β × Exp rT × Exp rT × Exp rT → α)
+    (c_pair : β × Exp rT × Exp rT → α)
+    (c_fst : β × Exp rT → α) (c_snd : β × Exp rT → α)
+    (c_inl : β × Exp rT → α) (c_inr : β × Exp rT → α)
+    (c_case : β × Exp rT × Exp rT × Exp rT → α)
+    (c_alloc : β × Exp rT → α) (c_load : β × Exp rT → α)
+    (c_store : β × Exp rT × Exp rT → α)
+    (c_tape : β × Exp rT → α) (c_rand : β × Exp rT × Exp rT → α)
+    (c_fail : β × Unit → α) (c_scrut : β × Exp rT × Pat rT → α)
+    (h_bvar : Measurable c_bvar) (h_fvar : Measurable c_fvar)
+    (h_lit : Measurable c_lit)
+    (h_lam : Measurable c_lam) (h_fix : Measurable c_fix)
+    (h_app : Measurable c_app) (h_unop : Measurable c_unop)
+    (h_binop : Measurable c_binop) (h_cond : Measurable c_cond)
+    (h_pair : Measurable c_pair) (h_fst : Measurable c_fst) (h_snd : Measurable c_snd)
+    (h_inl : Measurable c_inl) (h_inr : Measurable c_inr)
+    (h_case : Measurable c_case)
+    (h_alloc : Measurable c_alloc) (h_load : Measurable c_load)
+    (h_store : Measurable c_store)
+    (h_tape : Measurable c_tape) (h_rand : Measurable c_rand)
+    (h_fail : Measurable c_fail) (h_scrut : Measurable c_scrut) :
+    Measurable (fun p : Exp rT × β => Exp.casesOn (motive := fun _ => α) p.1
+        (fun n => c_bvar (p.2, n)) (fun x => c_fvar (p.2, x))
+        (fun l => c_lit (p.2, l))
+        (fun e => c_lam (p.2, e)) (fun e => c_fix (p.2, e))
+        (fun e1 e2 => c_app (p.2, e1, e2))
+        (fun u e => c_unop (p.2, u, e))
+        (fun b e1 e2 => c_binop (p.2, b, e1, e2))
+        (fun ec et ef => c_cond (p.2, ec, et, ef))
+        (fun e1 e2 => c_pair (p.2, e1, e2))
+        (fun e => c_fst (p.2, e)) (fun e => c_snd (p.2, e))
+        (fun e => c_inl (p.2, e)) (fun e => c_inr (p.2, e))
+        (fun ec el er => c_case (p.2, ec, el, er))
+        (fun e => c_alloc (p.2, e)) (fun e => c_load (p.2, e))
+        (fun e1 e2 => c_store (p.2, e1, e2))
+        (fun e => c_tape (p.2, e))
+        (fun e1 e2 => c_rand (p.2, e1, e2))
+        (c_fail (p.2, ()))
+        (fun e pat => c_scrut (p.2, e, pat))) := by
+  intro S hS
+  rw [casesOn_preimage_decomp_param]
+  -- Each piece: `(fun q => (ctor q.2, q.1)) '' (c_X ⁻¹' S)`. The cover map is
+  -- `Prod.map ctor.ι id ∘ Prod.swap`, a composition of measurable embeddings.
+  iterate 21 refine .union ?_ ?_
+  · exact ((bvar.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_bvar hS)
+  · exact ((fvar.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_fvar hS)
+  · exact ((lit.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_lit hS)
+  · exact ((lam.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_lam hS)
+  · exact ((fix.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_fix hS)
+  · exact ((app.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_app hS)
+  · exact ((unop.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_unop hS)
+  · exact ((binop.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_binop hS)
+  · exact ((cond.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_cond hS)
+  · exact ((pair.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_pair hS)
+  · exact ((fst.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_fst hS)
+  · exact ((snd.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_snd hS)
+  · exact ((inl.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_inl hS)
+  · exact ((inr.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_inr hS)
+  · exact ((case.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_case hS)
+  · exact ((alloc.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_alloc hS)
+  · exact ((load.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_load hS)
+  · exact ((store.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_store hS)
+  · exact ((tape.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_tape hS)
+  · exact ((rand.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_rand hS)
+  · exact ((fail.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_fail hS)
+  · exact ((scrut.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_scrut hS)
+
 /-! ### Recursive measurability principle.
 
 Same shape as `Pat.measurable_struct_rec`: one hypothesis per constructor (combinator
@@ -2017,6 +2203,246 @@ theorem measurable_struct_rec_param : Measurable (Function.uncurry g) := by
       @ih hU
 
 end StructRecParam
+
+/-! ### Binder-shifting recursive measurability principle.
+
+Same shape as `measurable_struct_rec_param`, but the `lam` and `fix` constructor
+recurrences thread the parameter through transformers `t_lam, t_fix : β → β`
+(typically `(i, sub) ↦ (i+1, sub)` for de-Bruijn-style recursion). All other
+ctors use the unchanged `b`.
+
+This is needed for `openRec`, `closeRec` (binder-shifting depth thread), and
+similar functions where the parameter changes at binder boundaries. -/
+
+section StructRecParamShift
+
+variable {rT α β : Type _} [MeasurableSpace rT] [MeasurableSpace α] [MeasurableSpace β]
+variable [Inhabited β]
+variable {g : β → Exp rT → α}
+
+-- Per-constructor combinators (each takes β as extra arg)
+variable {c_bvar : β → Nat → α} {c_fvar : β → Var → α} {c_lit : β → BaseLit rT → α}
+variable {c_lam : β → α → α} {c_fix : β → α → α}
+variable {c_app : β → α → α → α}
+variable {c_unop : β → UnOp → α → α}
+variable {c_binop : β → BinOp → α → α → α}
+variable {c_cond : β → α → α → α → α}
+variable {c_pair : β → α → α → α} {c_fst : β → α → α} {c_snd : β → α → α}
+variable {c_inl : β → α → α} {c_inr : β → α → α}
+variable {c_case : β → α → α → α → α}
+variable {c_alloc : β → α → α} {c_load : β → α → α} {c_store : β → α → α → α}
+variable {c_tape : β → α → α} {c_rand : β → α → α → α}
+variable {c_fail : β → α}
+variable {c_scrut : β → α → Pat rT → α}
+
+-- Binder param transformers (only for lam and fix; identity for all other ctors).
+variable {t_lam : β → β} {t_fix : β → β}
+
+-- Equations (binder ones use shifted param).
+variable (eq_bvar  : ∀ b n,        g b (.bvar n)        = c_bvar b n)
+variable (eq_fvar  : ∀ b x,        g b (.fvar x)        = c_fvar b x)
+variable (eq_lit   : ∀ b l,        g b (.lit l)         = c_lit b l)
+variable (eq_lam   : ∀ b e,        g b (.lam e)         = c_lam b (g (t_lam b) e))
+variable (eq_fix   : ∀ b e,        g b (.fix e)         = c_fix b (g (t_fix b) e))
+variable (eq_app   : ∀ b e1 e2,    g b (.app e1 e2)     = c_app b (g b e1) (g b e2))
+variable (eq_unop  : ∀ b u e,      g b (.unop u e)      = c_unop b u (g b e))
+variable (eq_binop : ∀ b op e1 e2, g b (.binop op e1 e2) = c_binop b op (g b e1) (g b e2))
+variable (eq_cond  : ∀ b ec et ef, g b (.cond ec et ef) = c_cond b (g b ec) (g b et) (g b ef))
+variable (eq_pair  : ∀ b e1 e2,    g b (.pair e1 e2)    = c_pair b (g b e1) (g b e2))
+variable (eq_fst   : ∀ b e,        g b (.fst e)         = c_fst b (g b e))
+variable (eq_snd   : ∀ b e,        g b (.snd e)         = c_snd b (g b e))
+variable (eq_inl   : ∀ b e,        g b (.inl e)         = c_inl b (g b e))
+variable (eq_inr   : ∀ b e,        g b (.inr e)         = c_inr b (g b e))
+variable (eq_case  : ∀ b ec el er, g b (.case ec el er) = c_case b (g b ec) (g b el) (g b er))
+variable (eq_alloc : ∀ b e,        g b (.alloc e)       = c_alloc b (g b e))
+variable (eq_load  : ∀ b e,        g b (.load e)        = c_load b (g b e))
+variable (eq_store : ∀ b e1 e2,    g b (.store e1 e2)   = c_store b (g b e1) (g b e2))
+variable (eq_tape  : ∀ b e,        g b (.tape e)        = c_tape b (g b e))
+variable (eq_rand  : ∀ b e1 e2,    g b (.rand e1 e2)    = c_rand b (g b e1) (g b e2))
+variable (eq_fail  : ∀ b,          g b .fail            = c_fail b)
+variable (eq_scrut : ∀ b e p,      g b (.scrut e p)     = c_scrut b (g b e) p)
+
+-- Combinator measurability (same as non-shift version).
+variable (h_bvar  : Measurable (Function.uncurry c_bvar))
+variable (h_fvar  : Measurable (Function.uncurry c_fvar))
+variable (h_lit   : Measurable (Function.uncurry c_lit))
+variable (h_lam   : Measurable (Function.uncurry c_lam))
+variable (h_fix   : Measurable (Function.uncurry c_fix))
+variable (h_app   : Measurable (fun (q : β × α × α) => c_app q.1 q.2.1 q.2.2))
+variable (h_unop  : Measurable (fun (q : β × UnOp × α) => c_unop q.1 q.2.1 q.2.2))
+variable (h_binop : Measurable (fun (q : β × BinOp × α × α) => c_binop q.1 q.2.1 q.2.2.1 q.2.2.2))
+variable (h_cond  : Measurable (fun (q : β × α × α × α) => c_cond q.1 q.2.1 q.2.2.1 q.2.2.2))
+variable (h_pair  : Measurable (fun (q : β × α × α) => c_pair q.1 q.2.1 q.2.2))
+variable (h_fst   : Measurable (Function.uncurry c_fst))
+variable (h_snd   : Measurable (Function.uncurry c_snd))
+variable (h_inl   : Measurable (Function.uncurry c_inl))
+variable (h_inr   : Measurable (Function.uncurry c_inr))
+variable (h_case  : Measurable (fun (q : β × α × α × α) => c_case q.1 q.2.1 q.2.2.1 q.2.2.2))
+variable (h_alloc : Measurable (Function.uncurry c_alloc))
+variable (h_load  : Measurable (Function.uncurry c_load))
+variable (h_store : Measurable (fun (q : β × α × α) => c_store q.1 q.2.1 q.2.2))
+variable (h_tape  : Measurable (Function.uncurry c_tape))
+variable (h_rand  : Measurable (fun (q : β × α × α) => c_rand q.1 q.2.1 q.2.2))
+variable (h_fail  : Measurable c_fail)
+variable (h_scrut : Measurable (fun (q : β × α × Pat rT) => c_scrut q.1 q.2.1 q.2.2))
+
+-- Transformer measurability.
+variable (h_t_lam : Measurable t_lam)
+variable (h_t_fix : Measurable t_fix)
+
+include eq_bvar eq_fvar eq_lit eq_lam eq_fix eq_app eq_unop eq_binop eq_cond
+        eq_pair eq_fst eq_snd eq_inl eq_inr eq_case eq_alloc eq_load eq_store
+        eq_tape eq_rand eq_fail eq_scrut
+        h_bvar h_fvar h_lit h_lam h_fix h_app h_unop h_binop h_cond
+        h_pair h_fst h_snd h_inl h_inr h_case
+        h_alloc h_load h_store h_tape h_rand h_fail h_scrut
+        h_t_lam h_t_fix in
+/-- **Param-threaded keystone with binder-shifting for `lam` and `fix`.** -/
+theorem measurable_struct_rec_param_shift : Measurable (Function.uncurry g) := by
+  apply _root_.StructRec.measurable_of_cells_param Exp.shape; intro s
+  induction s with
+  | bvar n =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .bvar n)
+      (fun p => by cases p <;> simp) (fun b => eq_bvar b n)
+      (h_bvar.comp (by fun_prop : Measurable (fun b : β => (b, n))))
+      hU (flatten_measurable .bvar)
+  | fvar x =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .fvar x)
+      (fun p => by cases p <;> simp) (fun b => eq_fvar b x)
+      (h_fvar.comp (by fun_prop : Measurable (fun b : β => (b, x))))
+      hU (flatten_measurable .fvar)
+  | lit =>
+    intro U hU
+    exact _root_.StructRec.cell_dataLeaf_param Exp.shape lit.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_lit h_lit hU
+  | lam _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param_shift Exp.shape lam.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_lam h_lam h_t_lam @ih hU
+  | fix _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param_shift Exp.shape fix.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_fix h_fix h_t_fix @ih hU
+  | app _ _ ih1 ih2 =>
+    intro U hU
+    exact _root_.StructRec.cell_binary_param Exp.shape (ctor := Exp.app)
+      app.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_app h_app @ih1 @ih2 hU
+  | pair _ _ ih1 ih2 =>
+    intro U hU
+    exact _root_.StructRec.cell_binary_param Exp.shape (ctor := Exp.pair)
+      pair.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_pair h_pair @ih1 @ih2 hU
+  | fst _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Exp.shape fst.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_fst h_fst @ih hU
+  | snd _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Exp.shape snd.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_snd h_snd @ih hU
+  | inl _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Exp.shape inl.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_inl h_inl @ih hU
+  | inr _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Exp.shape inr.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_inr h_inr @ih hU
+  | alloc _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Exp.shape alloc.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_alloc h_alloc @ih hU
+  | load _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Exp.shape load.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_load h_load @ih hU
+  | store _ _ ih1 ih2 =>
+    intro U hU
+    exact _root_.StructRec.cell_binary_param Exp.shape (ctor := Exp.store)
+      store.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_store h_store @ih1 @ih2 hU
+  | tape _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Exp.shape tape.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_tape h_tape @ih hU
+  | rand _ _ ih1 ih2 =>
+    intro U hU
+    exact _root_.StructRec.cell_binary_param Exp.shape (ctor := Exp.rand)
+      rand.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_rand h_rand @ih1 @ih2 hU
+  | fail =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .fail)
+      (fun p => by cases p <;> simp) eq_fail h_fail hU (flatten_measurable .fail)
+  | unop u _ ih =>
+    intro U hU
+    have h_emb_u : MeasurableEmbedding (Exp.unop u : Exp rT → Exp rT) := by
+      refine ⟨?_, ?_, ?_⟩
+      · intro x y hxy
+        have hxy' : Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, x)
+                  = Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, y) := by
+          simpa [Function.uncurry] using hxy
+        have := unop.measurableEmbedding.injective hxy'
+        exact (Prod.mk.injEq .. |>.mp this).2
+      · exact unop.ι.measurable.comp (by fun_prop : Measurable (fun x : Exp rT => (u, x)))
+      · intro V hV
+        have heq2 : (Exp.unop u : Exp rT → Exp rT) '' V
+            = (Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT)) '' (({u} : Set UnOp) ×ˢ V) := by
+          ext y; simp [Function.uncurry]
+        rw [heq2]
+        exact unop.measurableEmbedding.measurableSet_image'
+          ((MeasurableSet.singleton u).prod hV)
+    have h_c_u : Measurable (Function.uncurry (fun (b : β) (a : α) => c_unop b u a)) :=
+      h_unop.comp (by fun_prop : Measurable (fun q : β × α => (q.1, u, q.2)))
+    exact _root_.StructRec.cell_unary_param Exp.shape (ctor := (Exp.unop u : Exp rT → Exp rT))
+      h_emb_u (fun p => by cases p <;> simp)
+      (fun b p => eq_unop b u p) h_c_u @ih hU
+  | binop o _ _ ih1 ih2 =>
+    intro U hU
+    have h_emb_o : MeasurableEmbedding
+        (Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT)) := by
+      refine ⟨?_, ?_, ?_⟩
+      · intro x y hxy
+        simp [Function.uncurry] at hxy
+        ext
+        · exact hxy.1
+        · exact hxy.2
+      · exact (binop.measurableEmbedding.measurable).comp
+          (by fun_prop : Measurable (fun p : Exp rT × Exp rT => (o, p.1, p.2)))
+      · intro V hV
+        have heq2 : Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT) '' V
+            = (fun (p : BinOp × Exp rT × Exp rT) => Exp.binop p.1 p.2.1 p.2.2)
+                '' (({o} : Set BinOp) ×ˢ V) := by
+          ext y; simp [Function.uncurry]
+        rw [heq2]
+        exact binop.measurableEmbedding.measurableSet_image'
+          ((MeasurableSet.singleton o).prod hV)
+    have h_c_o : Measurable (fun (q : β × α × α) => c_binop q.1 o q.2.1 q.2.2) :=
+      h_binop.comp (by fun_prop : Measurable (fun q : β × α × α => (q.1, o, q.2.1, q.2.2)))
+    exact _root_.StructRec.cell_binary_param Exp.shape
+      (ctor := (Exp.binop o : Exp rT → Exp rT → Exp rT))
+      h_emb_o (fun p => by cases p <;> simp)
+      (fun b p1 p2 => eq_binop b o p1 p2) h_c_o @ih1 @ih2 hU
+  | cond _ _ _ ih1 ih2 ih3 =>
+    intro U hU
+    exact _root_.StructRec.cell_ternary_param Exp.shape (ctor := Exp.cond)
+      cond.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_cond h_cond @ih1 @ih2 @ih3 hU
+  | case _ _ _ ih1 ih2 ih3 =>
+    intro U hU
+    exact _root_.StructRec.cell_ternary_param Exp.shape (ctor := Exp.case)
+      case.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_case h_case @ih1 @ih2 @ih3 hU
+  | scrut _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_scrutLike_param Exp.shape (ctor := Exp.scrut)
+      scrut.measurableEmbedding (fun p => by cases p <;> simp) eq_scrut h_scrut
+      @ih hU
+
+end StructRecParamShift
 
 end Exp
 end ProbLang

@@ -384,6 +384,10 @@ on `.ι` as the head symbol, so they don't fire when the user writes the raw
 constructor `Pat.lit`, `Pat.pair`, etc. We re-tag for the raw form too. -/
 
 @[fun_prop]
+theorem wildcard.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (fun _ : Unit => (Pat.wildcard : Pat rT)) := wildcard.ι.measurable
+
+@[fun_prop]
 theorem lit.measurable {rT : Type _} [MeasurableSpace rT] :
     Measurable (Pat.lit : BaseLit rT → Pat rT) := lit.ι.measurable
 

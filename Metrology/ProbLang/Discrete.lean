@@ -200,15 +200,25 @@ end Exp
 
 /-! ## Val
 
-`Val α = Σ e : Exp α, IsVal e` with the Sigma σ-algebra. `IsVal` carries `⊤`, so every set is
-measurable there; combined with discreteness of `Exp α`, singletons of `Val α` are measurable. -/
+`Val α` is a `structure` with fields `fst : Exp α` and `snd : IsVal fst`. Its σ-algebra
+is the comap of `Val.fst : Val α → Exp α` (see `CoreMeasures/Val.lean`). A singleton
+`{v} ⊆ Val α` equals `Val.fst ⁻¹' {v.fst}` because `Val.fst` is injective (the witness
+field is determined by `IsVal.subsingleton`), so singletons are measurable whenever
+singletons in `Exp α` are. -/
 
 namespace Val
 
 instance instMeasurableSingletonClass
     {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α] :
     MeasurableSingletonClass (Val α) where
-  measurableSet_singleton := fun _ => by sorry
+  measurableSet_singleton v := by
+    -- `{v} = Val.fst ⁻¹' {v.fst}` since `Val.fst` is injective.
+    have heq : ({v} : Set (Val α)) = Val.fst ⁻¹' {v.fst} := by
+      ext v'
+      simp only [Set.mem_singleton_iff, Set.mem_preimage]
+      exact ⟨fun h => by rw [h], fun h => Val.ext h⟩
+    rw [heq]
+    exact Val.fst.measurable (MeasurableSet.singleton v.fst)
 
 end Val
 
