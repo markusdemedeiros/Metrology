@@ -377,6 +377,28 @@ theorem inr.ι.measurable [MeasurableSpace rT] :
     ext p; simp
   | _ => convert MeasurableSet.empty; ext p; simp
 
+/-! ### Raw-constructor `fun_prop` lemmas.
+
+`.ι` is the η-expanded form. The `fun_prop`-tagged measurability lemmas above match
+on `.ι` as the head symbol, so they don't fire when the user writes the raw
+constructor `Pat.lit`, `Pat.pair`, etc. We re-tag for the raw form too. -/
+
+@[fun_prop]
+theorem lit.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (Pat.lit : BaseLit rT → Pat rT) := lit.ι.measurable
+
+@[fun_prop]
+theorem pair.measurable [MeasurableSpace rT] :
+    Measurable (Function.uncurry (Pat.pair : Pat rT → Pat rT → Pat rT)) := pair.ι.measurable
+
+@[fun_prop]
+theorem inl.measurable [MeasurableSpace rT] :
+    Measurable (Pat.inl : Pat rT → Pat rT) := inl.ι.measurable
+
+@[fun_prop]
+theorem inr.measurable [MeasurableSpace rT] :
+    Measurable (Pat.inr : Pat rT → Pat rT) := inr.ι.measurable
+
 /-- Solves `MeasurableEmbedding f` for a discrete-leaf constructor `f`. -/
 macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
   (refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
@@ -461,6 +483,183 @@ theorem measurable_rec
   · exact pair.measurableEmbedding.measurableSet_image'     (h_pair hS)
   · exact inl.measurableEmbedding.measurableSet_image'      (h_inl hS)
   · exact inr.measurableEmbedding.measurableSet_image'      (h_inr hS)
+
+/-! ### Recursive measurability principle (Direction B).
+
+A structurally-recursive function `f : Pat rT → α` is measurable when each branch
+factors as a measurable combinator applied to the *already-folded* children's
+α-values. The combinators are unification variables — the user supplies equation
+hypotheses, Lean infers the combinators, then the user discharges their
+measurability with `fun_prop`. -/
+
+/-! ### Per-arity cell helpers come from `_root_.StructRec` (generic). -/
+
+section StructRec
+
+variable {rT α : Type _} [MeasurableSpace rT] [MeasurableSpace α]
+variable {f : Pat rT → α}
+
+variable {c_wildcard : α}
+variable {c_lit  : BaseLit rT → α}
+variable {c_pair : α → α → α}
+variable {c_inl  : α → α}
+variable {c_inr  : α → α}
+variable (eq_wildcard : f .wildcard = c_wildcard)
+variable (eq_lit  : ∀ b,      f (.lit b) = c_lit b)
+variable (eq_pair : ∀ p1 p2,  f (.pair p1 p2) = c_pair (f p1) (f p2))
+variable (eq_inl  : ∀ p,      f (.inl p) = c_inl (f p))
+variable (eq_inr  : ∀ p,      f (.inr p) = c_inr (f p))
+variable (h_lit   : Measurable c_lit)
+variable (h_pair  : Measurable (Function.uncurry c_pair))
+variable (h_inl   : Measurable c_inl)
+variable (h_inr   : Measurable c_inr)
+
+include eq_wildcard eq_lit eq_pair eq_inl eq_inr h_lit h_pair h_inl h_inr in
+/-- **The keystone**: `Pat.measurable_struct_rec`. Stamped from the per-arity helpers
+above; one line per constructor pattern. -/
+theorem measurable_struct_rec : Measurable f := by
+  apply _root_.StructRec.measurable_of_cells Pat.shape; intro s
+  induction s with
+  | wildcard =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary Pat.shape (ctor := .wildcard)
+      (fun p => by cases p <;> simp) eq_wildcard (flatten_measurable .wildcard)
+  | lit =>
+    intro U hU
+    exact _root_.StructRec.cell_dataLeaf Pat.shape lit.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_lit h_lit hU
+  | inl _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary Pat.shape inl.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_inl h_inl @ih hU
+  | inr _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary Pat.shape inr.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_inr h_inr @ih hU
+  | pair _ _ ih1 ih2 =>
+    intro U hU
+    exact _root_.StructRec.cell_binary Pat.shape (ctor := Pat.pair)
+      pair.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_pair h_pair @ih1 @ih2 hU
+
+end StructRec
+
+/-! ### Param-threaded keystone.
+
+Same as `Exp.measurable_struct_rec_param`: `g : β → Pat rT → α` with `β` carried
+unchanged through every recursive call. -/
+
+section StructRecParam
+
+variable {rT α β : Type _} [MeasurableSpace rT] [MeasurableSpace α] [MeasurableSpace β]
+variable [Inhabited β]
+variable {g : β → Pat rT → α}
+
+variable {c_wildcard : β → α}
+variable {c_lit  : β → BaseLit rT → α}
+variable {c_pair : β → α → α → α}
+variable {c_inl  : β → α → α}
+variable {c_inr  : β → α → α}
+
+variable (eq_wildcard : ∀ b, g b .wildcard = c_wildcard b)
+variable (eq_lit  : ∀ b l,       g b (.lit l)       = c_lit b l)
+variable (eq_pair : ∀ b p1 p2,   g b (.pair p1 p2)  = c_pair b (g b p1) (g b p2))
+variable (eq_inl  : ∀ b p,       g b (.inl p)       = c_inl b (g b p))
+variable (eq_inr  : ∀ b p,       g b (.inr p)       = c_inr b (g b p))
+
+variable (h_wildcard : Measurable c_wildcard)
+variable (h_lit  : Measurable (Function.uncurry c_lit))
+variable (h_pair : Measurable (fun (q : β × α × α) => c_pair q.1 q.2.1 q.2.2))
+variable (h_inl  : Measurable (Function.uncurry c_inl))
+variable (h_inr  : Measurable (Function.uncurry c_inr))
+
+include eq_wildcard eq_lit eq_pair eq_inl eq_inr
+        h_wildcard h_lit h_pair h_inl h_inr in
+/-- **Param-threaded keystone for Pat.** -/
+theorem measurable_struct_rec_param : Measurable (Function.uncurry g) := by
+  apply _root_.StructRec.measurable_of_cells_param Pat.shape; intro s
+  induction s with
+  | wildcard =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary_param Pat.shape (ctor := .wildcard)
+      (fun p => by cases p <;> simp) eq_wildcard h_wildcard hU
+      (flatten_measurable .wildcard)
+  | lit =>
+    intro U hU
+    exact _root_.StructRec.cell_dataLeaf_param Pat.shape lit.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_lit h_lit hU
+  | inl _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Pat.shape inl.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_inl h_inl @ih hU
+  | inr _ ih =>
+    intro U hU
+    exact _root_.StructRec.cell_unary_param Pat.shape inr.measurableEmbedding
+      (fun p => by cases p <;> simp) eq_inr h_inr @ih hU
+  | pair _ _ ih1 ih2 =>
+    intro U hU
+    exact _root_.StructRec.cell_binary_param Pat.shape (ctor := Pat.pair)
+      pair.measurableEmbedding (fun p => by cases p <;> simp)
+      eq_pair h_pair @ih1 @ih2 hU
+
+end StructRecParam
+
+/-! ### Synthetic test 1: `patDepth`. Discrete codomain. -/
+
+@[simp] def patDepth : Pat rT → Nat
+  | .wildcard   => 0
+  | .lit _      => 0
+  | .pair p1 p2 => max (patDepth p1) (patDepth p2) + 1
+  | .inl p      => patDepth p + 1
+  | .inr p      => patDepth p + 1
+
+theorem patDepth.measurable [MeasurableSpace rT] :
+    Measurable (patDepth : Pat rT → Nat) := by
+  apply measurable_struct_rec (f := patDepth)
+    (c_wildcard := 0)
+    (c_lit := fun _ => 0)
+    (c_pair := fun n1 n2 => max n1 n2 + 1)
+    (c_inl := (· + 1))
+    (c_inr := (· + 1))
+  all_goals first | (intros; rfl) | fun_prop
+
+/-! ### Synthetic test 2: `countLits`. Data-leaf dependent. -/
+
+@[simp] def countLits : Pat rT → Nat
+  | .wildcard   => 0
+  | .lit _      => 1
+  | .pair p1 p2 => countLits p1 + countLits p2
+  | .inl p      => countLits p
+  | .inr p      => countLits p
+
+theorem countLits.measurable [MeasurableSpace rT] :
+    Measurable (countLits : Pat rT → Nat) := by
+  apply measurable_struct_rec (f := countLits)
+    (c_wildcard := 0)
+    (c_lit := fun _ => 1)
+    (c_pair := (· + ·))
+    (c_inl := id)
+    (c_inr := id)
+  all_goals first | (intros; rfl) | fun_prop
+
+/-! ### Synthetic test 3: `Pat rT → Pat rT`. Non-discrete codomain. -/
+
+@[simp] def doubleWrap : Pat rT → Pat rT
+  | .wildcard   => .wildcard
+  | .lit b      => .lit b
+  | .pair p1 p2 => .pair (doubleWrap p1) (doubleWrap p2)
+  | .inl p      => .inl (.inl (doubleWrap p))
+  | .inr p      => .inr (.inr (doubleWrap p))
+
+theorem doubleWrap.measurable [MeasurableSpace rT] :
+    Measurable (doubleWrap : Pat rT → Pat rT) := by
+  apply measurable_struct_rec (f := doubleWrap)
+    (c_wildcard := .wildcard)
+    (c_lit := Pat.lit)
+    (c_pair := fun p1 p2 => .pair p1 p2)
+    (c_inl := fun p => .inl (.inl p))
+    (c_inr := fun p => .inr (.inr p))
+  all_goals first | (intros; rfl) | fun_prop
 
 end Pat
 end ProbLang

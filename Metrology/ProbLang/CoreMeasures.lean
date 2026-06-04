@@ -7,3 +7,4 @@ public import Metrology.ProbLang.CoreMeasures.Val
 public import Metrology.ProbLang.CoreMeasures.EctxItem
 public import Metrology.ProbLang.CoreMeasures.State
 public import Metrology.ProbLang.CoreMeasures.Cfg
+public import Metrology.ProbLang.CoreMeasures.Recurrences

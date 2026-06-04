@@ -742,6 +742,69 @@ theorem case.ι.measurable [MeasurableSpace α] :
     ext ⟨_, _⟩; simp
   | _ => convert MeasurableSet.empty; ext ⟨_, _⟩; simp
 
+/-! ### Raw-constructor `fun_prop` lemmas. Nullary ctors are constants and don't
+need lemmas; arity-1 ctors get a `Measurable f` form; arity-2 get `Function.uncurry`. -/
+
+@[fun_prop]
+theorem unop.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.unop : UnOp → EctxItem α) := unop.ι.measurable
+
+@[fun_prop]
+theorem appL.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.appL : Val α → EctxItem α) := appL.ι.measurable
+
+@[fun_prop]
+theorem appR.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.appR : Exp α → EctxItem α) := appR.ι.measurable
+
+@[fun_prop]
+theorem pairL.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.pairL : Val α → EctxItem α) := pairL.ι.measurable
+
+@[fun_prop]
+theorem pairR.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.pairR : Exp α → EctxItem α) := pairR.ι.measurable
+
+@[fun_prop]
+theorem storeL.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.storeL : Val α → EctxItem α) := storeL.ι.measurable
+
+@[fun_prop]
+theorem storeR.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.storeR : Exp α → EctxItem α) := storeR.ι.measurable
+
+@[fun_prop]
+theorem randL.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.randL : Val α → EctxItem α) := randL.ι.measurable
+
+@[fun_prop]
+theorem randR.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.randR : Exp α → EctxItem α) := randR.ι.measurable
+
+@[fun_prop]
+theorem scrut.measurable [MeasurableSpace α] :
+    Measurable (EctxItem.scrut : Pat α → EctxItem α) := scrut.ι.measurable
+
+@[fun_prop]
+theorem binopL.measurable [MeasurableSpace α] :
+    Measurable (Function.uncurry (EctxItem.binopL : BinOp → Val α → EctxItem α)) :=
+  binopL.ι.measurable
+
+@[fun_prop]
+theorem binopR.measurable [MeasurableSpace α] :
+    Measurable (Function.uncurry (EctxItem.binopR : BinOp → Exp α → EctxItem α)) :=
+  binopR.ι.measurable
+
+@[fun_prop]
+theorem condC.measurable [MeasurableSpace α] :
+    Measurable (Function.uncurry (EctxItem.condC : Exp α → Exp α → EctxItem α)) :=
+  condC.ι.measurable
+
+@[fun_prop]
+theorem case.measurable [MeasurableSpace α] :
+    Measurable (Function.uncurry (EctxItem.case : Exp α → Exp α → EctxItem α)) :=
+  case.ι.measurable
+
 /-! ### Measurable embeddings. -/
 
 macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|

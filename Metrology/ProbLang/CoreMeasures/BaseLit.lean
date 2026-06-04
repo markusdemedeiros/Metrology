@@ -367,6 +367,28 @@ theorem real.ι.measurable {rT : Type _} [MeasurableSpace rT] :
     ext r; simp
   | _ => convert MeasurableSet.empty; ext r; simp
 
+/-! ### Raw-constructor `fun_prop` lemmas. -/
+
+@[fun_prop]
+theorem int.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (BaseLit.int : Int → BaseLit rT) := int.ι.measurable
+
+@[fun_prop]
+theorem bool.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (BaseLit.bool : Bool → BaseLit rT) := bool.ι.measurable
+
+@[fun_prop]
+theorem loc.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (BaseLit.loc : Loc → BaseLit rT) := loc.ι.measurable
+
+@[fun_prop]
+theorem lbl.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (BaseLit.lbl : Lbl → BaseLit rT) := lbl.ι.measurable
+
+@[fun_prop]
+theorem real.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (BaseLit.real : rT → BaseLit rT) := real.ι.measurable
+
 /-- Solves `MeasurableEmbedding f` for a discrete-leaf constructor `f`, given the cover's
 `_eq_image` lemma and `.measurable` lemma. -/
 macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
@@ -438,6 +460,28 @@ theorem measurable_rec
   · exact loc.measurableEmbedding.measurableSet_image'   .of_discrete
   · exact lbl.measurableEmbedding.measurableSet_image'   .of_discrete
   · exact real.measurableEmbedding.measurableSet_image'  (h_real hS)
+
+/-! ### Synthetic tests of `measurable_rec`. -/
+
+example [MeasurableSpace rT] [Inhabited rT] (g : rT → Int) (hg : Measurable g) :
+    Measurable (fun b : BaseLit rT => match b with
+      | .real r     => g r
+      | .int n      => n
+      | _           => 0) := by
+  have heq : (fun b : BaseLit rT => match b with
+      | .real r     => g r
+      | .int n      => n
+      | _           => 0)
+    = (fun b : BaseLit rT =>
+        BaseLit.casesOn (motive := fun _ => Int) b
+          (fun n => n) (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) g) := by
+    funext b; cases b <;> rfl
+  rw [heq]
+  apply measurable_rec
+    (f_int := fun n => n) (f_bool := fun _ => 0)
+    (f_unit := fun _ => 0) (f_loc := fun _ => 0) (f_lbl := fun _ => 0)
+    (f_real := g)
+  exact hg
 
 end BaseLit
 end ProbLang
