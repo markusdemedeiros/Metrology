@@ -338,9 +338,8 @@ theorem UnOp_eval.measurable [MeasurableSpace rT] [Inhabited rT] :
   intro op
   exact UnOp.eval_op_measurable op
 
-theorem BinOp_eval.measurable [ProbLangℝ rT] :
-    Measurable (fun (q : BinOp × Exp rT × Exp rT) => BinOp.eval q.1 q.2.1 q.2.2) := by
-  sorry
+/-! (`BinOp_eval.measurable` is proved below in this file, after the
+`liftII`/`liftBB`/`liftIB`/`liftEq` family is in scope.) -/
 
 /-! ### `EctxItem.fillItem` — joint measurability over `EctxItem × Exp`.
 
@@ -769,6 +768,26 @@ theorem _root_.Option.measurable_elim_param
     rw [heq]
     exact MeasurableEmbedding.id.prodMap MeasurableEmbedding.some_mk
 
+/-- **Bind-form variant** of `Option.measurable_elim_param`.
+For measurable `f : α → Option β` (under `instLocalOption`) and measurable
+`some_branch : α × β → Option γ` (under `instLocalOption`),
+`(a ↦ (f a).bind (fun b => some_branch (a, b)))` is measurable.
+
+Use this when the lifter naturally reads as a `bind` chain — avoids the
+per-call `funext; cases o <;> rfl` rewrite from `bind` to `casesOn`. -/
+theorem _root_.Option.measurable_bind_param
+    {α β γ : Type _} [MeasurableSpace α] [MeasurableSpace β]
+    [_mγ : MeasurableSpace (Option γ)]
+    {f : α → Option β} (hf : @Measurable _ _ _ instLocalOption f)
+    {some_branch : α × β → Option γ} (hsome : Measurable some_branch) :
+    Measurable (fun a => (f a).bind (fun b => some_branch (a, b))) := by
+  have hrw : (fun a => (f a).bind (fun b => some_branch (a, b)))
+      = fun a => Option.casesOn (motive := fun _ => Option γ) (f a)
+          none (fun b => some_branch (a, b)) := by
+    funext a; cases f a <;> rfl
+  rw [hrw]
+  exact Option.measurable_elim_param hf measurable_const hsome
+
 theorem decompItem.measurable [MeasurableSpace rT] :
     let _ : MeasurableSpace (Option (EctxItem rT × Exp rT)) := instLocalOption
     Measurable (Exp.decompItem : Exp rT → Option (EctxItem rT × Exp rT)) := by
@@ -1158,6 +1177,685 @@ theorem inrExtract.measurable [MeasurableSpace rT] :
   · exact measurable_const  -- h_inl
   · exact MeasurableEmbedding.some_mk.measurable  -- h_inr
   all_goals exact measurable_const
+
+/-! ### `BaseLit` extractors for `liftXY`-style measurability.
+
+Direct analogues of `Exp.litExtract` etc.: project an `Int` (resp. `Bool`) out of
+`BaseLit.int` (resp. `.bool`), returning `none` on any other constructor. -/
+
+/-- Extract the `Int` from `.int z`, else `none`. -/
+def _root_.ProbLang.BaseLit.intExtract (l : BaseLit rT) : Option Int :=
+  match l with | .int z => some z | _ => none
+
+/-- Extract the `Bool` from `.bool b`, else `none`. -/
+def _root_.ProbLang.BaseLit.boolExtract (l : BaseLit rT) : Option Bool :=
+  match l with | .bool b => some b | _ => none
+
+theorem _root_.ProbLang.BaseLit.intExtract.measurable
+    [MeasurableSpace rT] [Inhabited rT] :
+    let _ : MeasurableSpace (Option Int) := instLocalOption
+    Measurable (BaseLit.intExtract : BaseLit rT → Option Int) := by
+  intro _
+  have hrw : BaseLit.intExtract (rT := rT) = fun l =>
+      BaseLit.casesOn (motive := fun _ => Option Int) l
+        (fun z => some z) (fun _ => none) none (fun _ => none) (fun _ => none) (fun _ => none) := by
+    funext l; cases l <;> rfl
+  rw [hrw]
+  refine BaseLit.measurable_rec (rT := rT)
+    (f_int := fun z => some z) (f_bool := fun _ => none) (f_unit := fun _ => none)
+    (f_loc := fun _ => none) (f_lbl := fun _ => none) (f_real := fun _ => none)
+    ?_
+  exact measurable_const
+
+theorem _root_.ProbLang.BaseLit.boolExtract.measurable
+    [MeasurableSpace rT] [Inhabited rT] :
+    let _ : MeasurableSpace (Option Bool) := instLocalOption
+    Measurable (BaseLit.boolExtract : BaseLit rT → Option Bool) := by
+  intro _
+  have hrw : BaseLit.boolExtract (rT := rT) = fun l =>
+      BaseLit.casesOn (motive := fun _ => Option Bool) l
+        (fun _ => none) (fun b => some b) none (fun _ => none) (fun _ => none) (fun _ => none) := by
+    funext l; cases l <;> rfl
+  rw [hrw]
+  refine BaseLit.measurable_rec (rT := rT)
+    (f_int := fun _ => none) (f_bool := fun b => some b) (f_unit := fun _ => none)
+    (f_loc := fun _ => none) (f_lbl := fun _ => none) (f_real := fun _ => none)
+    ?_
+  exact measurable_const
+
+/-! ### `liftBin` — generic homogeneous binary lifter.
+
+Most `BinOp.eval` arms have the same shape: extract a literal from each side,
+extract a payload via a discrete extractor (`intExtract` or `boolExtract`), and
+wrap the result as a `BaseLit`. We capture this once and instantiate per op. -/
+
+/-- Lift a binary op on a discrete payload (`Int` or `Bool`) to operate on a
+pair of `Exp` values via literal extraction. -/
+def liftBin {β : Type _} (extr : BaseLit rT → Option β)
+    (mkResult : β → β → BaseLit rT) (p : Exp rT × Exp rT) : Option (Exp rT) :=
+  ((Exp.litExtract p.1).bind extr).bind fun x1 =>
+    ((Exp.litExtract p.2).bind extr).bind fun x2 =>
+      some (Exp.lit (mkResult x1 x2))
+
+theorem liftBin.measurable [MeasurableSpace rT] [Inhabited rT]
+    {β : Type _} [MeasurableSpace β]
+    (extr : BaseLit rT → Option β) (mkResult : β → β → BaseLit rT)
+    (hextr : @Measurable _ _ _ instLocalOption extr)
+    (hmk : Measurable (Function.uncurry mkResult)) :
+    Measurable (liftBin (rT := rT) extr mkResult) := by
+  let _ : MeasurableSpace (Option β) := instLocalOption
+  let _ : MeasurableSpace (Option (BaseLit rT)) := instLocalOption
+  let _ : MeasurableSpace (Option (Exp rT)) := instLocalOption
+  unfold liftBin
+  refine Option.measurable_bind_param (β := β) (γ := Exp rT)
+    (f := fun p : Exp rT × Exp rT => (Exp.litExtract p.1).bind extr)
+    (some_branch := fun q : (Exp rT × Exp rT) × β =>
+      (Exp.litExtract q.1.2).bind extr |>.bind fun x2 =>
+        some (Exp.lit (mkResult q.2 x2))) ?_ ?_
+  · refine Option.measurable_bind_param (β := BaseLit rT) (γ := β)
+      (f := fun p : Exp rT × Exp rT => Exp.litExtract p.1)
+      (some_branch := fun q : (Exp rT × Exp rT) × BaseLit rT => extr q.2) ?_ ?_
+    · exact litExtract.measurable.comp measurable_fst
+    · exact hextr.comp measurable_snd
+  · refine Option.measurable_bind_param (β := β) (γ := Exp rT)
+      (f := fun q : (Exp rT × Exp rT) × β => (Exp.litExtract q.1.2).bind extr)
+      (some_branch := fun r : ((Exp rT × Exp rT) × β) × β =>
+        some (Exp.lit (mkResult r.1.2 r.2))) ?_ ?_
+    · refine Option.measurable_bind_param (β := BaseLit rT) (γ := β)
+        (f := fun q : (Exp rT × Exp rT) × β => Exp.litExtract q.1.2)
+        (some_branch := fun r : ((Exp rT × Exp rT) × β) × BaseLit rT => extr r.2)
+        ?_ ?_
+      · exact litExtract.measurable.comp (measurable_snd.comp measurable_fst)
+      · exact hextr.comp measurable_snd
+    · show Measurable fun r : ((Exp rT × Exp rT) × β) × β =>
+        (some (Exp.lit (mkResult r.1.2 r.2)) : Option (Exp rT))
+      refine MeasurableEmbedding.some_mk.measurable.comp ?_
+      refine Exp.lit.measurable.comp ?_
+      exact hmk.comp ((measurable_snd.comp measurable_fst).prodMk measurable_snd)
+
+/-- Lift `Int → Int → Int` ops (`plus`, `minus`, …): both inputs integer literals,
+output integer literal. -/
+@[reducible] def liftII (f : Int → Int → Int) : Exp rT × Exp rT → Option (Exp rT) :=
+  liftBin BaseLit.intExtract (fun z1 z2 => .int (f z1 z2))
+
+/-- Lift `Bool → Bool → Bool` ops (`and`, `or`, `xor`): both inputs boolean
+literals, output boolean literal. -/
+@[reducible] def liftBB (f : Bool → Bool → Bool) : Exp rT × Exp rT → Option (Exp rT) :=
+  liftBin BaseLit.boolExtract (fun b1 b2 => .bool (f b1 b2))
+
+/-- Lift `Int → Int → Bool` ops (`lt`, `le`): both inputs integer literals,
+output boolean literal. -/
+@[reducible] def liftIB (f : Int → Int → Bool) : Exp rT × Exp rT → Option (Exp rT) :=
+  liftBin BaseLit.intExtract (fun z1 z2 => .bool (f z1 z2))
+
+theorem liftII.measurable [MeasurableSpace rT] [Inhabited rT] (f : Int → Int → Int) :
+    Measurable (liftII (rT := rT) f) :=
+  liftBin.measurable _ _ BaseLit.intExtract.measurable
+    (Measurable.of_discrete.comp (Measurable.of_discrete (α := Int × Int) (β := Int)
+      (f := Function.uncurry f)))
+
+theorem liftBB.measurable [MeasurableSpace rT] [Inhabited rT] (f : Bool → Bool → Bool) :
+    Measurable (liftBB (rT := rT) f) :=
+  liftBin.measurable _ _ BaseLit.boolExtract.measurable
+    (Measurable.of_discrete.comp (Measurable.of_discrete (α := Bool × Bool) (β := Bool)
+      (f := Function.uncurry f)))
+
+theorem liftIB.measurable [MeasurableSpace rT] [Inhabited rT] (f : Int → Int → Bool) :
+    Measurable (liftIB (rT := rT) f) :=
+  liftBin.measurable _ _ BaseLit.intExtract.measurable
+    (Measurable.of_discrete.comp (Measurable.of_discrete (α := Int × Int) (β := Bool)
+      (f := Function.uncurry f)))
+
+/-! ### `liftEq` — bespoke lifter for `.eq` (5 patterns). -/
+
+/-- The `eq` op fires on five `(v1, v2)` shapes: `(lit, lit)`, `(inl-lit, inl-lit)`,
+`(inr-lit, inr-lit)`, `(inl-lit, inr-lit)`, `(inr-lit, inl-lit)`. We decompose
+via `litExtract` directly, then `inlExtract`/`inrExtract` chained with
+`litExtract` on each side. -/
+def liftEq (p : Exp rT × Exp rT) : Option (Exp rT) :=
+  match p.1, p.2 with
+  | .lit l1, .lit l2 => some (Exp.lit (.bool (decide (l1 = l2))))
+  | .inl (.lit l1), .inl (.lit l2) => some (Exp.lit (.bool (decide (l1 = l2))))
+  | .inr (.lit l1), .inr (.lit l2) => some (Exp.lit (.bool (decide (l1 = l2))))
+  | .inl (.lit _), .inr (.lit _) => some (Exp.lit (.bool false))
+  | .inr (.lit _), .inl (.lit _) => some (Exp.lit (.bool false))
+  | _, _ => none
+
+/-! ### `liftEq.measurable` infrastructure.
+
+`liftEq` has 5 live patterns; raw `cases` explosion is infeasible. We decompose
+via three helpers (one per live outer shape: `lit`, `inl (lit _)`, `inr (lit _)`)
+that consume `(l1 : BaseLit, v2 : Exp)` and emit `Option Exp`, then prove
+`liftEq` measurable as a single `Exp.measurable_rec_param` with `v2` as the param. -/
+
+/-- For `v1 = .lit l1`, `liftEq` is `match v2 with | .lit l2 => some (.bool (l1=l2)) | _ => none`.
+We expose this as a function of `(v2, l1) : Exp × BaseLit` for joint measurability. -/
+def liftEq_litK [DecidableEq (BaseLit rT)] (p : Exp rT × BaseLit rT) : Option (Exp rT) :=
+  match p.1 with
+  | .lit l2 => some (Exp.lit (.bool (decide (p.2 = l2))))
+  | _ => none
+
+/-- For `v1 = .inl e1'`, `liftEq` is `match e1', v2 with | .lit l1, .lit l2 => ... | .lit _, .inr (.lit _) => false | _ => none`.
+Treat as a function of `(e1', v2)` and split on `e1'`'s `.lit` shape via `litExtract`. -/
+def liftEq_inlK [DecidableEq (BaseLit rT)] (p : Exp rT × Exp rT) : Option (Exp rT) :=
+  match p.1, p.2 with
+  | .lit l1, .inl (.lit l2) => some (Exp.lit (.bool (decide (l1 = l2))))
+  | .lit _, .inr (.lit _) => some (Exp.lit (.bool false))
+  | _, _ => none
+
+def liftEq_inrK [DecidableEq (BaseLit rT)] (p : Exp rT × Exp rT) : Option (Exp rT) :=
+  match p.1, p.2 with
+  | .lit l1, .inr (.lit l2) => some (Exp.lit (.bool (decide (l1 = l2))))
+  | .lit _, .inl (.lit _) => some (Exp.lit (.bool false))
+  | _, _ => none
+
+/-- Instance: `MeasurableEq (BaseLit rT)` lifted from `MeasurableEq rT`.
+
+`MeasurableEq α` is the typeclass `MeasurableSet (Set.diagonal α)` — the diagonal
+`{(a,a) | a : α}` is measurable in `α × α`. It's the natural condition under
+which `decide`-equality `α × α → Bool` is measurable.
+
+`BaseLit rT`'s diagonal is a disjoint union of 6 pieces, one per constructor:
+the `.int`/`.bool`/`.unit`/`.loc`/`.lbl` pieces use discrete σ-algebras
+(singletons measurable; diagonal trivially measurable), and the `.real` piece
+needs `MeasurableEq rT`. So the BaseLit-diagonal is measurable iff
+`MeasurableEq rT` holds.
+
+This instance lets us prove `BinOp_eval.measurable` (which has a `.eq` arm
+doing literal-equality on BaseLits) without requiring discrete `rT`. -/
+instance _root_.ProbLang.BaseLit.instMeasurableEq
+    {rT : Type _} [MeasurableSpace rT] [Inhabited rT] [MeasurableEq rT] :
+    MeasurableEq (BaseLit rT) := by
+  refine MeasurableEq.mk ?_
+  -- The diagonal is `{(b, b) | b : BaseLit rT}`. Decompose by constructor: each
+  -- piece `Pᵢ = {(ctor x, ctor x) | x : Xᵢ}` is the image of the `Xᵢ`-diagonal under
+  -- a product of `ctor` embeddings. Union of 6 measurable sets is measurable.
+  let Pi (z : Int) : BaseLit rT × BaseLit rT := (.int z, .int z)
+  let Pb (b : Bool) : BaseLit rT × BaseLit rT := (.bool b, .bool b)
+  let Pl (l : Loc) : BaseLit rT × BaseLit rT := (.loc l, .loc l)
+  let Pll (l : Lbl) : BaseLit rT × BaseLit rT := (.lbl l, .lbl l)
+  let Pr (r : rT) : BaseLit rT × BaseLit rT := (.real r, .real r)
+  have hdecomp : Set.diagonal (BaseLit rT)
+      = Set.range Pi ∪ Set.range Pb ∪ {(BaseLit.unit, BaseLit.unit)}
+      ∪ Set.range Pl ∪ Set.range Pll ∪ Set.range Pr := by
+    ext ⟨a, b⟩
+    simp only [Set.mem_diagonal_iff, Set.mem_union, Set.mem_range, Set.mem_singleton_iff,
+      Pi, Pb, Pl, Pll, Pr]
+    constructor
+    · rintro rfl
+      cases a with
+      | int z => exact .inl (.inl (.inl (.inl (.inl ⟨z, rfl⟩))))
+      | bool b => exact .inl (.inl (.inl (.inl (.inr ⟨b, rfl⟩))))
+      | unit => exact .inl (.inl (.inl (.inr rfl)))
+      | loc l => exact .inl (.inl (.inr ⟨l, rfl⟩))
+      | lbl l => exact .inl (.inr ⟨l, rfl⟩)
+      | real r => exact .inr ⟨r, rfl⟩
+    · rintro ((((((⟨_, h⟩) | ⟨_, h⟩) | h) | ⟨_, h⟩) | ⟨_, h⟩) | ⟨_, h⟩) <;> cases h <;> rfl
+  rw [hdecomp]
+  -- Each `Set.range Pᵢ` is the image of `Set.diagonal Xᵢ` under a product-of-ctors map.
+  -- Per-arm: each `Set.range fun x => (ι x, ι x)` rewrites to `Prod.map ι ι '' Set.diagonal X`,
+  -- then is measurable as the image of a measurable set under a measurable embedding.
+  have hrw_int : Set.range Pi = (Prod.map BaseLit.int BaseLit.int) '' Set.diagonal Int := by
+    ext ⟨a, b⟩; constructor
+    · rintro ⟨x, hx⟩; refine ⟨(x, x), rfl, ?_⟩; simp only [Prod.map_apply, ← hx, Pi]
+    · rintro ⟨⟨x1, x2⟩, hdiag, himg⟩
+      simp only [Set.mem_diagonal_iff] at hdiag
+      simp only [Prod.map_apply, Prod.mk.injEq] at himg
+      refine ⟨x1, ?_⟩; simp only [Pi]; simp only [← himg.1, ← himg.2, hdiag]
+  have hrw_bool : Set.range Pb = (Prod.map BaseLit.bool BaseLit.bool) '' Set.diagonal Bool := by
+    ext ⟨a, b⟩; constructor
+    · rintro ⟨x, hx⟩; refine ⟨(x, x), rfl, ?_⟩; simp only [Prod.map_apply, ← hx, Pb]
+    · rintro ⟨⟨x1, x2⟩, hdiag, himg⟩
+      simp only [Set.mem_diagonal_iff] at hdiag
+      simp only [Prod.map_apply, Prod.mk.injEq] at himg
+      refine ⟨x1, ?_⟩; simp only [Pb]; simp only [← himg.1, ← himg.2, hdiag]
+  have hrw_loc : Set.range Pl = (Prod.map BaseLit.loc BaseLit.loc) '' Set.diagonal Loc := by
+    ext ⟨a, b⟩; constructor
+    · rintro ⟨x, hx⟩; refine ⟨(x, x), rfl, ?_⟩; simp only [Prod.map_apply, ← hx, Pl]
+    · rintro ⟨⟨x1, x2⟩, hdiag, himg⟩
+      simp only [Set.mem_diagonal_iff] at hdiag
+      simp only [Prod.map_apply, Prod.mk.injEq] at himg
+      refine ⟨x1, ?_⟩; simp only [Pl]; simp only [← himg.1, ← himg.2, hdiag]
+  have hrw_lbl : Set.range Pll = (Prod.map BaseLit.lbl BaseLit.lbl) '' Set.diagonal Lbl := by
+    ext ⟨a, b⟩; constructor
+    · rintro ⟨x, hx⟩; refine ⟨(x, x), rfl, ?_⟩; simp only [Prod.map_apply, ← hx, Pll]
+    · rintro ⟨⟨x1, x2⟩, hdiag, himg⟩
+      simp only [Set.mem_diagonal_iff] at hdiag
+      simp only [Prod.map_apply, Prod.mk.injEq] at himg
+      refine ⟨x1, ?_⟩; simp only [Pll]; simp only [← himg.1, ← himg.2, hdiag]
+  have hrw_real : Set.range Pr = (Prod.map BaseLit.real BaseLit.real) '' Set.diagonal rT := by
+    ext ⟨a, b⟩; constructor
+    · rintro ⟨x, hx⟩; refine ⟨(x, x), rfl, ?_⟩; simp only [Prod.map_apply, ← hx, Pr]
+    · rintro ⟨⟨x1, x2⟩, hdiag, himg⟩
+      simp only [Set.mem_diagonal_iff] at hdiag
+      simp only [Prod.map_apply, Prod.mk.injEq] at himg
+      refine ⟨x1, ?_⟩; simp only [Pr]; simp only [← himg.1, ← himg.2, hdiag]
+  refine ((((MeasurableSet.union ?_ ?_).union ?_).union ?_).union ?_).union ?_
+  · rw [hrw_int]; exact (BaseLit.int.measurableEmbedding.prodMap
+      BaseLit.int.measurableEmbedding).measurableSet_image'
+      MeasurableEq.measurableSet_diagonal
+  · rw [hrw_bool]; exact (BaseLit.bool.measurableEmbedding.prodMap
+      BaseLit.bool.measurableEmbedding).measurableSet_image'
+      MeasurableEq.measurableSet_diagonal
+  · exact MeasurableSet.singleton _
+  · rw [hrw_loc]; exact (BaseLit.loc.measurableEmbedding.prodMap
+      BaseLit.loc.measurableEmbedding).measurableSet_image'
+      MeasurableEq.measurableSet_diagonal
+  · rw [hrw_lbl]; exact (BaseLit.lbl.measurableEmbedding.prodMap
+      BaseLit.lbl.measurableEmbedding).measurableSet_image'
+      MeasurableEq.measurableSet_diagonal
+  · rw [hrw_real]; exact (BaseLit.real.measurableEmbedding.prodMap
+      BaseLit.real.measurableEmbedding).measurableSet_image'
+      MeasurableEq.measurableSet_diagonal
+
+/-- Measurability of `decide`-equality on `BaseLit rT` under `[MeasurableEq rT]`.
+Follows directly from `MeasurableEq (BaseLit rT)` (derived above) and the
+general `Measurable.eq` lemma. -/
+private theorem decide_eq_BaseLit_measurable
+    [MeasurableSpace rT] [Inhabited rT] [DecidableEq (BaseLit rT)]
+    [MeasurableEq rT] :
+    Measurable (fun p : BaseLit rT × BaseLit rT => decide (p.1 = p.2)) := by
+  refine measurable_to_bool ?_
+  have hpre : (fun p : BaseLit rT × BaseLit rT => decide (p.1 = p.2)) ⁻¹' {true}
+      = Set.diagonal (BaseLit rT) := by ext p; simp [Set.diagonal]
+  rw [hpre]
+  exact MeasurableEq.measurableSet_diagonal
+
+/-- `liftEq_litK.measurable` — outer split on `p.1` (the `v2`); only `.lit` live.
+Requires `[MeasurableEq rT]` because the innermost
+`decide (l1 = l2)` over `BaseLit rT` factors through the diagonal of `rT × rT`. -/
+theorem liftEq_litK.measurable [MeasurableSpace rT] [Inhabited rT]
+    [DecidableEq (BaseLit rT)] [MeasurableEq rT] :
+    Measurable (liftEq_litK (rT := rT)) := by
+  let _ : MeasurableSpace (Option Int) := instLocalOption
+  let _ : MeasurableSpace (Option (BaseLit rT)) := instLocalOption
+  let _ : MeasurableSpace (Option (Exp rT)) := instLocalOption
+  -- Reshape: liftEq_litK p = (Exp.litExtract p.1).bind (fun l2 => some (Exp.lit (.bool (decide (p.2 = l2)))))
+  have hrw : liftEq_litK (rT := rT) = fun p : Exp rT × BaseLit rT =>
+      (Exp.litExtract p.1).bind fun l2 => some (Exp.lit (.bool (decide (p.2 = l2)))) := by
+    funext p; obtain ⟨v2, l1⟩ := p
+    cases v2 <;> simp [liftEq_litK, Exp.litExtract, Option.bind]
+  rw [hrw]
+  refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
+    (f := fun p : Exp rT × BaseLit rT => Exp.litExtract p.1)
+    (some_branch := fun r : (Exp rT × BaseLit rT) × BaseLit rT =>
+      some (Exp.lit (BaseLit.bool (decide (r.1.2 = r.2))))) ?_ ?_
+  · exact litExtract.measurable.comp measurable_fst
+  · -- `r ↦ some (.lit (.bool (decide (r.1.2 = r.2))))`.
+    refine MeasurableEmbedding.some_mk.measurable.comp ?_
+    refine Exp.lit.measurable.comp ?_
+    refine BaseLit.bool.measurable.comp ?_
+    -- Show through explicit composition.
+    have : (fun r : (Exp rT × BaseLit rT) × BaseLit rT => decide (r.1.2 = r.2))
+         = (fun p : BaseLit rT × BaseLit rT => decide (p.1 = p.2)) ∘
+           (fun r : (Exp rT × BaseLit rT) × BaseLit rT => (r.1.2, r.2)) := rfl
+    rw [this]
+    exact (decide_eq_BaseLit_measurable (rT := rT)).comp
+      ((measurable_snd.comp measurable_fst).prodMk measurable_snd)
+
+/-- `liftEq_inlK.measurable` — joint over `(e1', v2)`; live shapes: `(lit l1, inl (lit l2))`
+and `(lit _, inr (lit _))`. Reshape via `Exp.litExtract` on `e1'` first, then a
+2-arm decision on `v2`. -/
+theorem liftEq_inlK.measurable [MeasurableSpace rT] [Inhabited rT]
+    [DecidableEq (BaseLit rT)] [MeasurableEq rT] :
+    Measurable (liftEq_inlK (rT := rT)) := by
+  let _ : MeasurableSpace (Option (BaseLit rT)) := instLocalOption
+  let _ : MeasurableSpace (Option (Exp rT)) := instLocalOption
+  -- liftEq_inlK p = (litExtract p.1).bind (fun l1 =>
+  --   match p.2 with
+  --   | .inl (.lit l2) => some (.bool (l1 = l2))
+  --   | .inr (.lit _)  => some (.bool false)
+  --   | _ => none)
+  -- The inner function of `(l1, p.2)` factors as: `inlExtract p.2 >>= litExtract >>= λ l2 => some...`
+  --                                              ∪ `inrExtract p.2 >>= litExtract >>= λ _ => some false`
+  -- Both branches are measurable bind chains; their `union via first-some` is what `match` does.
+  -- We rewrite directly to a unified bind form.
+  have hrw : liftEq_inlK (rT := rT) = fun p : Exp rT × Exp rT =>
+      (Exp.litExtract p.1).bind fun l1 =>
+        (Exp.inlExtract p.2).casesOn
+          ((Exp.inrExtract p.2).casesOn none (fun e2 => (Exp.litExtract e2).bind fun _ =>
+            some (Exp.lit (.bool false))))
+          (fun e1 => (Exp.litExtract e1).bind fun l2 =>
+            some (Exp.lit (.bool (decide (l1 = l2))))) := by
+    funext p; obtain ⟨v1, v2⟩ := p
+    cases v1 <;> simp [liftEq_inlK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
+      cases v2 <;> simp [liftEq_inlK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
+      rename_i e2 <;> cases e2 <;>
+      simp [liftEq_inlK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind]
+  rw [hrw]
+  refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
+    (f := fun p : Exp rT × Exp rT => Exp.litExtract p.1)
+    (some_branch := fun r : (Exp rT × Exp rT) × BaseLit rT =>
+      (Exp.inlExtract r.1.2).casesOn
+        ((Exp.inrExtract r.1.2).casesOn none (fun e2 => (Exp.litExtract e2).bind fun _ =>
+          some (Exp.lit (BaseLit.bool false))))
+        (fun e1 => (Exp.litExtract e1).bind fun l2 =>
+          some (Exp.lit (BaseLit.bool (decide (r.2 = l2)))))) ?_ ?_
+  · exact litExtract.measurable.comp measurable_fst
+  · -- Inner: split on `inlExtract r.1.2`.
+    apply Option.measurable_elim_param (β := Exp rT) (γ := Option (Exp rT))
+      (f := fun r : (Exp rT × Exp rT) × BaseLit rT => Exp.inlExtract r.1.2)
+      (default := fun r : (Exp rT × Exp rT) × BaseLit rT =>
+        (Exp.inrExtract r.1.2).casesOn none (fun e2 =>
+          (Exp.litExtract e2).bind fun _ => some (Exp.lit (BaseLit.bool false))))
+      (some_branch := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT =>
+        (Exp.litExtract s.2).bind fun l2 =>
+          some (Exp.lit (BaseLit.bool (decide (s.1.2 = l2)))))
+    · exact inlExtract.measurable.comp (measurable_snd.comp measurable_fst)
+    · -- default: split on `inrExtract r.1.2`.
+      apply Option.measurable_elim_param (β := Exp rT) (γ := Option (Exp rT))
+        (f := fun r : (Exp rT × Exp rT) × BaseLit rT => Exp.inrExtract r.1.2)
+        (default := fun _ => none)
+        (some_branch := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT =>
+          (Exp.litExtract s.2).bind fun _ => some (Exp.lit (BaseLit.bool false)))
+      · exact inrExtract.measurable.comp (measurable_snd.comp measurable_fst)
+      · exact measurable_const
+      · refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
+          (f := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT => Exp.litExtract s.2)
+          (some_branch := fun _ : (((Exp rT × Exp rT) × BaseLit rT) × Exp rT) × BaseLit rT =>
+            some (Exp.lit (BaseLit.bool false))) ?_ ?_
+        · exact litExtract.measurable.comp measurable_snd
+        · exact measurable_const
+    · -- some-branch on `(s, e1)`: `(litExtract e1).bind (λ l2 => some (.bool (decide (s.1.2 = l2))))`.
+      refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
+        (f := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT => Exp.litExtract s.2)
+        (some_branch := fun t : (((Exp rT × Exp rT) × BaseLit rT) × Exp rT) × BaseLit rT =>
+          some (Exp.lit (BaseLit.bool (decide (t.1.1.2 = t.2))))) ?_ ?_
+      · exact litExtract.measurable.comp measurable_snd
+      · refine MeasurableEmbedding.some_mk.measurable.comp ?_
+        refine Exp.lit.measurable.comp ?_
+        refine BaseLit.bool.measurable.comp ?_
+        exact decide_eq_BaseLit_measurable.comp
+          ((measurable_snd.comp (measurable_fst.comp measurable_fst)).prodMk measurable_snd)
+
+/-- `liftEq_inrK.measurable` — symmetric to `inlK`. -/
+theorem liftEq_inrK.measurable [MeasurableSpace rT] [Inhabited rT]
+    [DecidableEq (BaseLit rT)] [MeasurableEq rT] :
+    Measurable (liftEq_inrK (rT := rT)) := by
+  let _ : MeasurableSpace (Option (BaseLit rT)) := instLocalOption
+  let _ : MeasurableSpace (Option (Exp rT)) := instLocalOption
+  have hrw : liftEq_inrK (rT := rT) = fun p : Exp rT × Exp rT =>
+      (Exp.litExtract p.1).bind fun l1 =>
+        (Exp.inrExtract p.2).casesOn
+          ((Exp.inlExtract p.2).casesOn none (fun e2 => (Exp.litExtract e2).bind fun _ =>
+            some (Exp.lit (.bool false))))
+          (fun e1 => (Exp.litExtract e1).bind fun l2 =>
+            some (Exp.lit (.bool (decide (l1 = l2))))) := by
+    funext p; obtain ⟨v1, v2⟩ := p
+    cases v1 <;> simp [liftEq_inrK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
+      cases v2 <;> simp [liftEq_inrK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
+      rename_i e2 <;> cases e2 <;>
+      simp [liftEq_inrK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind]
+  rw [hrw]
+  refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
+    (f := fun p : Exp rT × Exp rT => Exp.litExtract p.1)
+    (some_branch := fun r : (Exp rT × Exp rT) × BaseLit rT =>
+      (Exp.inrExtract r.1.2).casesOn
+        ((Exp.inlExtract r.1.2).casesOn none (fun e2 => (Exp.litExtract e2).bind fun _ =>
+          some (Exp.lit (BaseLit.bool false))))
+        (fun e1 => (Exp.litExtract e1).bind fun l2 =>
+          some (Exp.lit (BaseLit.bool (decide (r.2 = l2)))))) ?_ ?_
+  · exact litExtract.measurable.comp measurable_fst
+  · apply Option.measurable_elim_param (β := Exp rT) (γ := Option (Exp rT))
+      (f := fun r : (Exp rT × Exp rT) × BaseLit rT => Exp.inrExtract r.1.2)
+      (default := fun r : (Exp rT × Exp rT) × BaseLit rT =>
+        (Exp.inlExtract r.1.2).casesOn none (fun e2 =>
+          (Exp.litExtract e2).bind fun _ => some (Exp.lit (BaseLit.bool false))))
+      (some_branch := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT =>
+        (Exp.litExtract s.2).bind fun l2 =>
+          some (Exp.lit (BaseLit.bool (decide (s.1.2 = l2)))))
+    · exact inrExtract.measurable.comp (measurable_snd.comp measurable_fst)
+    · apply Option.measurable_elim_param (β := Exp rT) (γ := Option (Exp rT))
+        (f := fun r : (Exp rT × Exp rT) × BaseLit rT => Exp.inlExtract r.1.2)
+        (default := fun _ => none)
+        (some_branch := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT =>
+          (Exp.litExtract s.2).bind fun _ => some (Exp.lit (BaseLit.bool false)))
+      · exact inlExtract.measurable.comp (measurable_snd.comp measurable_fst)
+      · exact measurable_const
+      · refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
+          (f := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT => Exp.litExtract s.2)
+          (some_branch := fun _ : (((Exp rT × Exp rT) × BaseLit rT) × Exp rT) × BaseLit rT =>
+            some (Exp.lit (BaseLit.bool false))) ?_ ?_
+        · exact litExtract.measurable.comp measurable_snd
+        · exact measurable_const
+    · refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
+        (f := fun s : ((Exp rT × Exp rT) × BaseLit rT) × Exp rT => Exp.litExtract s.2)
+        (some_branch := fun t : (((Exp rT × Exp rT) × BaseLit rT) × Exp rT) × BaseLit rT =>
+          some (Exp.lit (BaseLit.bool (decide (t.1.1.2 = t.2))))) ?_ ?_
+      · exact litExtract.measurable.comp measurable_snd
+      · refine MeasurableEmbedding.some_mk.measurable.comp ?_
+        refine Exp.lit.measurable.comp ?_
+        refine BaseLit.bool.measurable.comp ?_
+        exact decide_eq_BaseLit_measurable.comp
+          ((measurable_snd.comp (measurable_fst.comp measurable_fst)).prodMk measurable_snd)
+
+/-- Helper for `liftEq.measurable`: `liftEq` dispatched through per-shape helpers
+on the outer Exp constructor. Separate lemma so its proof time is bounded. -/
+private theorem liftEq_dispatch [MeasurableSpace rT] [Inhabited rT]
+    [DecidableEq (BaseLit rT)] (p : Exp rT × Exp rT) :
+    liftEq p =
+      Exp.casesOn (motive := fun _ => Option (Exp rT)) p.1
+        (fun _ => none) (fun _ => none)
+        (fun l1 => liftEq_litK (p.2, l1))
+        (fun _ => none) (fun _ => none)
+        (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+        (fun _ _ => none) (fun _ => none) (fun _ => none)
+        (fun e1' => liftEq_inlK (e1', p.2))
+        (fun e1' => liftEq_inrK (e1', p.2))
+        (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+        (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+  obtain ⟨v1, v2⟩ := p
+  cases v1 with
+  | lit l1 =>
+    show liftEq (.lit l1, v2) = liftEq_litK (v2, l1)
+    cases v2 <;> simp [liftEq, liftEq_litK]
+  | inl e1' =>
+    show liftEq (.inl e1', v2) = liftEq_inlK (e1', v2)
+    cases e1' <;> cases v2 <;> simp [liftEq, liftEq_inlK] <;>
+      (rename_i e2'; cases e2' <;> simp [liftEq, liftEq_inlK])
+  | inr e1' =>
+    show liftEq (.inr e1', v2) = liftEq_inrK (e1', v2)
+    cases e1' <;> cases v2 <;> simp [liftEq, liftEq_inrK] <;>
+      (rename_i e2'; cases e2' <;> simp [liftEq, liftEq_inrK])
+  | _ => rfl
+
+/-- `liftEq.measurable` — bespoke 5-pattern lifter for `BinOp.eval .eq`. Decomposed via
+three per-shape helpers: `litK` (when `v1 = .lit _`), `inlK` (when `v1 = .inl _`),
+`inrK` (when `v1 = .inr _`). The outer split on `v1` uses `Exp.measurable_rec`. -/
+theorem liftEq.measurable [MeasurableSpace rT] [Inhabited rT]
+    [DecidableEq (BaseLit rT)] [MeasurableEq rT] :
+    Measurable (liftEq (rT := rT)) := by
+  have hrw : liftEq (rT := rT) = fun p : Exp rT × Exp rT =>
+      Exp.casesOn (motive := fun _ => Option (Exp rT)) p.1
+        (fun _ => none) (fun _ => none)
+        (fun l1 => liftEq_litK (p.2, l1))
+        (fun _ => none) (fun _ => none)
+        (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+        (fun _ _ => none) (fun _ => none) (fun _ => none)
+        (fun e1' => liftEq_inlK (e1', p.2))
+        (fun e1' => liftEq_inrK (e1', p.2))
+        (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+        (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+    funext p; exact liftEq_dispatch p
+  rw [hrw]
+  -- Joint `Exp.measurable_rec_param` over (p.1, p.2): split on p.1, with p.2 as param.
+  refine Exp.measurable_rec_param (rT := rT) (α := Option (Exp rT)) (β := Exp rT)
+    (c_bvar := fun _ => none) (c_fvar := fun _ => none)
+    (c_lit := fun q : Exp rT × BaseLit rT => liftEq_litK q)
+    (c_lam := fun _ => none) (c_fix := fun _ => none)
+    (c_app := fun _ => none) (c_unop := fun _ => none) (c_binop := fun _ => none)
+    (c_cond := fun _ => none) (c_pair := fun _ => none)
+    (c_fst := fun _ => none) (c_snd := fun _ => none)
+    (c_inl := fun q : Exp rT × Exp rT => liftEq_inlK (q.2, q.1))
+    (c_inr := fun q : Exp rT × Exp rT => liftEq_inrK (q.2, q.1))
+    (c_case := fun _ => none) (c_alloc := fun _ => none) (c_load := fun _ => none)
+    (c_store := fun _ => none) (c_tape := fun _ => none) (c_rand := fun _ => none)
+    (c_fail := fun _ => none) (c_scrut := fun _ => none)
+    ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
+  -- 22 measurability obligations, only 3 nontrivial.
+  · exact measurable_const  -- c_bvar
+  · exact measurable_const  -- c_fvar
+  · -- c_lit: `q ↦ liftEq_litK q`. Just apply the helper.
+    exact liftEq_litK.measurable
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · -- c_inl: `q ↦ liftEq_inlK (q.2, q.1)`. Swap then apply.
+    show Measurable fun q : Exp rT × Exp rT => liftEq_inlK (q.2, q.1)
+    exact liftEq_inlK.measurable.comp (measurable_snd.prodMk measurable_fst)
+  · show Measurable fun q : Exp rT × Exp rT => liftEq_inrK (q.2, q.1)
+    exact liftEq_inrK.measurable.comp (measurable_snd.prodMk measurable_fst)
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+  · exact measurable_const
+
+/-! ### `BinOp.eval` rewritten as lifter dispatch + measurability assembly. -/
+
+/-- Helper: `liftII f (v1, v2)` matches the structural pattern of `BinOp.eval`'s
+int-int arms — only int-literal-pairs produce `some`, anything else `none`. -/
+private theorem liftII_def_eq (f : Int → Int → Int) (v1 v2 : Exp rT) :
+    liftII f (v1, v2) =
+      (match v1, v2 with
+       | .lit (.int z1), .lit (.int z2) => some (Exp.lit (.int (f z1 z2)))
+       | _, _ => none) := by
+  unfold liftII liftBin
+  cases v1 <;> simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
+  rename_i l1
+  cases l1 <;> simp [BaseLit.intExtract, Option.bind] <;> cases v2 <;>
+    simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
+  rename_i l2
+  cases l2 <;> simp [BaseLit.intExtract, Option.bind]
+
+private theorem liftBB_def_eq (f : Bool → Bool → Bool) (v1 v2 : Exp rT) :
+    liftBB f (v1, v2) =
+      (match v1, v2 with
+       | .lit (.bool b1), .lit (.bool b2) => some (Exp.lit (.bool (f b1 b2)))
+       | _, _ => none) := by
+  unfold liftBB liftBin
+  cases v1 <;> simp [Exp.litExtract, BaseLit.boolExtract, Option.bind]
+  rename_i l1
+  cases l1 <;> simp [BaseLit.boolExtract, Option.bind] <;> cases v2 <;>
+    simp [Exp.litExtract, BaseLit.boolExtract, Option.bind]
+  rename_i l2
+  cases l2 <;> simp [BaseLit.boolExtract, Option.bind]
+
+private theorem liftIB_def_eq (f : Int → Int → Bool) (v1 v2 : Exp rT) :
+    liftIB f (v1, v2) =
+      (match v1, v2 with
+       | .lit (.int z1), .lit (.int z2) => some (Exp.lit (.bool (f z1 z2)))
+       | _, _ => none) := by
+  unfold liftIB liftBin
+  cases v1 <;> simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
+  rename_i l1
+  cases l1 <;> simp [BaseLit.intExtract, Option.bind] <;> cases v2 <;>
+    simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
+  rename_i l2
+  cases l2 <;> simp [BaseLit.intExtract, Option.bind]
+
+/-- Helper for the `eq` arm of `BinOp.eval_eq_lift`: `BinOp.eval .eq v1 v2 = liftEq (v1, v2)`.
+Split as a separate lemma so its proof time is bounded and doesn't blow the
+parent's heartbeat budget. -/
+private theorem BinOp.eval_eq_eq_liftEq [ProbLangℝ rT] (v1 v2 : Exp rT) :
+    BinOp.eval .eq v1 v2 = liftEq (v1, v2) := by
+  cases v1 <;> cases v2 <;> (try simp [BinOp.eval, liftEq]) <;>
+    -- For `.inl _, .inl _`, `.inl _, .inr _`, `.inr _, .inl _`, `.inr _, .inr _`:
+    -- inner Exp may or may not be a `.lit`; recurse one more level.
+    (rename_i ein1 ein2; cases ein1 <;> cases ein2 <;> simp [BinOp.eval, liftEq])
+
+/-- `BinOp.eval` is equal to a per-op dispatch through `liftII`/`liftBB`/`liftIB`/`liftEq`.
+The proof is per-op: discrete `cases op` then unfold each side to the same
+nested-`match` form via the `liftXY_def_eq` helpers (`rfl` for `liftEq`). -/
+theorem BinOp.eval_eq_lift [ProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
+    BinOp.eval op v1 v2 =
+      (match op with
+       | .plus  => liftII (· + ·)
+       | .minus => liftII (· - ·)
+       | .mult  => liftII (· * ·)
+       | .div   => liftII (· / ·)
+       | .mod   => liftII (· % ·)
+       | .shl   => liftII (fun z1 z2 => z1 * 2 ^ z2.toNat)
+       | .shr   => liftII (fun z1 z2 => z1 / 2 ^ z2.toNat)
+       | .and   => liftBB (· && ·)
+       | .or    => liftBB (· || ·)
+       | .xor   => liftBB (· ^^ ·)
+       | .lt    => liftIB (decide <| · < ·)
+       | .le    => liftIB (decide <| · ≤ ·)
+       | .eq    => liftEq) (v1, v2) := by
+  cases op
+  all_goals
+    dsimp only []
+    first
+      | (rw [liftII_def_eq]; cases v1 <;> first
+          | rfl
+          | (rename_i l1; cases l1 <;> first
+              | rfl
+              | (cases v2 <;> first
+                  | rfl
+                  | (rename_i l2; cases l2 <;> rfl))))
+      | (rw [liftBB_def_eq]; cases v1 <;> first
+          | rfl
+          | (rename_i l1; cases l1 <;> first
+              | rfl
+              | (cases v2 <;> first
+                  | rfl
+                  | (rename_i l2; cases l2 <;> rfl))))
+      | (rw [liftIB_def_eq]; cases v1 <;> first
+          | rfl
+          | (rename_i l1; cases l1 <;> first
+              | rfl
+              | (cases v2 <;> first
+                  | rfl
+                  | (rename_i l2; cases l2 <;> rfl))))
+      | exact BinOp.eval_eq_eq_liftEq v1 v2
+
+theorem BinOp_eval.measurable [ProbLangℝ rT] :
+    Measurable (fun (q : BinOp × Exp rT × Exp rT) => BinOp.eval q.1 q.2.1 q.2.2) := by
+  have hrw : (fun (q : BinOp × Exp rT × Exp rT) => BinOp.eval q.1 q.2.1 q.2.2)
+      = fun q : BinOp × Exp rT × Exp rT =>
+          (match q.1 with
+           | .plus  => liftII (· + ·)
+           | .minus => liftII (· - ·)
+           | .mult  => liftII (· * ·)
+           | .div   => liftII (· / ·)
+           | .mod   => liftII (· % ·)
+           | .shl   => liftII (fun z1 z2 => z1 * 2 ^ z2.toNat)
+           | .shr   => liftII (fun z1 z2 => z1 / 2 ^ z2.toNat)
+           | .and   => liftBB (· && ·)
+           | .or    => liftBB (· || ·)
+           | .xor   => liftBB (· ^^ ·)
+           | .lt    => liftIB (decide <| · < ·)
+           | .le    => liftIB (decide <| · ≤ ·)
+           | .eq    => liftEq) (q.2.1, q.2.2) := by
+    funext q; exact BinOp.eval_eq_lift q.1 q.2.1 q.2.2
+  rw [hrw]
+  apply measurable_from_prod_countable_right
+  intro op
+  cases op
+  all_goals dsimp only
+  · exact liftII.measurable _
+  · exact liftII.measurable _
+  · exact liftII.measurable _
+  · exact liftII.measurable _
+  · exact liftII.measurable _
+  · exact liftBB.measurable _
+  · exact liftBB.measurable _
+  · exact liftBB.measurable _
+  · exact liftEq.measurable
+  · exact liftIB.measurable _
+  · exact liftIB.measurable _
+  · exact liftII.measurable _
+  · exact liftII.measurable _
 
 theorem tryMatch.measurable [ProbLangℝ rT] :
     Measurable (fun (q : Pat rT × Exp rT) => Pat.tryMatch q.1 q.2) := by

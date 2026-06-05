@@ -110,7 +110,8 @@ ProbLang is parameterized by this type, and the type of expressions is discrete
 when the type of reals is also discrete.
 
 This allows us to gradually port the development to use a continuous semantics. -/
-class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T where
+class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, Inhabited T,
+    MeasurableEq T where
   instDecidableEq : DecidableEq T
 
 attribute [reducible, instance] ProbLangℝ.instDecidableEq

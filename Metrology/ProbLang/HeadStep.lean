@@ -850,7 +850,7 @@ theorem headStep.c_binop.measurable [ProbLangℝ rT] :
   exact Exp.isValM.measurable_param he1 hinner
 
 @[fun_prop]
-theorem headStep.measurable [Inhabited rT] :
+theorem headStep.measurable :
     Measurable (headStep : Cfg rT → Measure (Cfg rT)) := by
   -- Strategy: reduce to a joint `Exp rT × State rT → Measure (Cfg rT)` and apply
   -- `Exp.measurable_rec_param` with `β := State rT`. The continuations
@@ -1069,7 +1069,7 @@ theorem headStep.measurable [Inhabited rT] :
   · exact headStep.c_scrut.measurable
 
 /-- Markov kernel of the head step, without the discrete-`rT` hypotheses. -/
-def headStepKernelM [Inhabited rT] : Kernel (Cfg rT) (Cfg rT) where
+def headStepKernelM : Kernel (Cfg rT) (Cfg rT) where
   measurable' := headStep.measurable
   toFun := headStep
 

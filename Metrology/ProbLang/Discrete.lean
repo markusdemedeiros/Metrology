@@ -23,49 +23,12 @@ open Classical MeasureTheory ProbabilityTheory ProbLang
 
 namespace ProbLang
 
-/-! ## BaseLit -/
+/-! ## BaseLit
 
-namespace BaseLit
-
-/-- Cylinder over `b` that singletons every `real` leaf. -/
-@[simp] def singletonCyl {rT : Type _} : BaseLit rT → Cylinder rT
-  | .int z      => .int z
-  | .bool b     => .bool b
-  | .unit       => .unit
-  | .loc l      => .loc l
-  | .lbl l      => .lbl l
-  | .real r     => .real {r}
-
-theorem singletonCyl_flatten {rT : Type _} (b : BaseLit rT) :
-    (singletonCyl b).flatten = {b} := by
-  induction b with
-  | int z => simp
-  | bool b => simp
-  | unit => simp
-  | loc l => simp
-  | lbl l => simp
-  | real r => simp
-
-theorem singletonCyl_hasMeasurableLeaves
-    {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] (b : BaseLit rT) :
-    (singletonCyl b).HasMeasurableLeaves := by
-  induction b with
-  | int z => exact .int
-  | bool b => exact .bool
-  | unit => exact .unit
-  | loc l => exact .loc
-  | lbl l => exact .lbl
-  | real r => exact .real _ (MeasurableSet.singleton r)
-
-instance instMeasurableSingletonClass
-    {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] :
-    MeasurableSingletonClass (BaseLit rT) where
-  measurableSet_singleton b := by
-    rw [← singletonCyl_flatten b]
-    exact MeasurableSpace.measurableSet_generateFrom
-      ⟨singletonCyl b, singletonCyl_hasMeasurableLeaves b, rfl⟩
-
-end BaseLit
+The `MeasurableSingletonClass (BaseLit rT)` instance and supporting cylinder
+helpers (`singletonCyl`, `singletonCyl_flatten`, `singletonCyl_hasMeasurableLeaves`)
+were moved to `CoreMeasures/BaseLit.lean` so that `Recurrences.lean`'s
+`liftEq.measurable` can use them directly. -/
 
 /-! ## Pat -/
 
