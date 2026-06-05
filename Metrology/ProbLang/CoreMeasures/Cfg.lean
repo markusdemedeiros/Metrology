@@ -43,6 +43,15 @@ theorem State.measurable_mk {α : Type _} [MeasurableSpace α] :
     Measurable (fun (p : LocHeap (Val α) × LocHeap Tape) => State.mk p.1 p.2) :=
   State.measurable_iff.mpr ⟨measurable_fst, measurable_snd⟩
 
+/-- Stamping helper: `State.mk` parameterized over `γ`. Given measurable
+heap and tape extractors, the resulting `State` is measurable. Concise alternative
+to `rw [State.measurable_iff]; refine ⟨he, ht⟩`. -/
+theorem State.measurable_mk_param {α γ : Type _} [MeasurableSpace α] [MeasurableSpace γ]
+    {fh : γ → LocHeap (Val α)} (hh : Measurable fh)
+    {ft : γ → LocHeap Tape} (ht : Measurable ft) :
+    Measurable (fun q : γ => State.mk (fh q) (ft q)) :=
+  State.measurable_iff.mpr ⟨hh, ht⟩
+
 instance instMeasurableSpaceCfg {α : Type _} [MeasurableSpace α] :
     MeasurableSpace (Cfg α) :=
   MeasurableSpace.comap (fun c : Cfg α => (c.expr, c.state)) inferInstance

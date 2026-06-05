@@ -768,6 +768,18 @@ theorem _root_.Option.measurable_elim_param
     rw [heq]
     exact MeasurableEmbedding.id.prodMap MeasurableEmbedding.some_mk
 
+/-- **Zero-default variant** of `Option.measurable_elim_param`.
+For measurable `f : α → Option β` and measurable `some_branch : α × β → γ` where
+`γ` has a `Zero`, `(a ↦ (f a).elim 0 (some_branch (a, ·)))` is measurable.
+The default is automatically `fun _ => 0`. -/
+theorem _root_.Option.measurable_elim_param_zero
+    {α β γ : Type _} [MeasurableSpace α] [MeasurableSpace β]
+    [Zero γ] [MeasurableSpace γ]
+    {f : α → Option β} (hf : @Measurable _ _ _ instLocalOption f)
+    {some_branch : α × β → γ} (hsome : Measurable some_branch) :
+    Measurable (fun a => Option.casesOn (motive := fun _ => γ) (f a) 0 (fun b => some_branch (a, b))) :=
+  Option.measurable_elim_param hf measurable_const hsome
+
 /-- **Bind-form variant** of `Option.measurable_elim_param`.
 For measurable `f : α → Option β` (under `instLocalOption`) and measurable
 `some_branch : α × β → Option γ` (under `instLocalOption`),
@@ -787,6 +799,274 @@ theorem _root_.Option.measurable_bind_param
     funext a; cases f a <;> rfl
   rw [hrw]
   exact Option.measurable_elim_param hf measurable_const hsome
+
+/-! ### Default-`Zero` `Exp.measurable_rec_param` for stamping `headStep` continuations.
+
+All `headStep.c_*` proofs share the same shape:
+- α := `Measure (Cfg rT)` (has `Zero`).
+- The reshape is `Exp.casesOn` on the inner Exp with all-but-a-few branches → `0`.
+- The non-trivial branches use the threaded `β` parameter (State, possibly with more).
+
+`Exp.measurable_rec_param_zero` defaults every continuation to `fun _ => 0` and every
+measurability obligation to `measurable_const`. Stamps the boilerplate. -/
+theorem _root_.ProbLang.Exp.measurable_rec_param_zero
+    {rT : Type _} [MeasurableSpace rT]
+    {α : Type _} [Zero α] [MeasurableSpace α]
+    {β : Type _} [MeasurableSpace β]
+    (c_bvar : β × Nat → α := fun _ => 0) (c_fvar : β × Var → α := fun _ => 0)
+    (c_lit : β × BaseLit rT → α := fun _ => 0)
+    (c_lam : β × Exp rT → α := fun _ => 0) (c_fix : β × Exp rT → α := fun _ => 0)
+    (c_app : β × Exp rT × Exp rT → α := fun _ => 0)
+    (c_unop : β × UnOp × Exp rT → α := fun _ => 0)
+    (c_binop : β × BinOp × Exp rT × Exp rT → α := fun _ => 0)
+    (c_cond : β × Exp rT × Exp rT × Exp rT → α := fun _ => 0)
+    (c_pair : β × Exp rT × Exp rT → α := fun _ => 0)
+    (c_fst : β × Exp rT → α := fun _ => 0) (c_snd : β × Exp rT → α := fun _ => 0)
+    (c_inl : β × Exp rT → α := fun _ => 0) (c_inr : β × Exp rT → α := fun _ => 0)
+    (c_case : β × Exp rT × Exp rT × Exp rT → α := fun _ => 0)
+    (c_alloc : β × Exp rT → α := fun _ => 0)
+    (c_load : β × Exp rT → α := fun _ => 0)
+    (c_store : β × Exp rT × Exp rT → α := fun _ => 0)
+    (c_tape : β × Exp rT → α := fun _ => 0)
+    (c_rand : β × Exp rT × Exp rT → α := fun _ => 0)
+    (c_fail : β × Unit → α := fun _ => 0)
+    (c_scrut : β × Exp rT × Pat rT → α := fun _ => 0)
+    (h_bvar : Measurable c_bvar := by exact measurable_const)
+    (h_fvar : Measurable c_fvar := by exact measurable_const)
+    (h_lit : Measurable c_lit := by exact measurable_const)
+    (h_lam : Measurable c_lam := by exact measurable_const)
+    (h_fix : Measurable c_fix := by exact measurable_const)
+    (h_app : Measurable c_app := by exact measurable_const)
+    (h_unop : Measurable c_unop := by exact measurable_const)
+    (h_binop : Measurable c_binop := by exact measurable_const)
+    (h_cond : Measurable c_cond := by exact measurable_const)
+    (h_pair : Measurable c_pair := by exact measurable_const)
+    (h_fst : Measurable c_fst := by exact measurable_const)
+    (h_snd : Measurable c_snd := by exact measurable_const)
+    (h_inl : Measurable c_inl := by exact measurable_const)
+    (h_inr : Measurable c_inr := by exact measurable_const)
+    (h_case : Measurable c_case := by exact measurable_const)
+    (h_alloc : Measurable c_alloc := by exact measurable_const)
+    (h_load : Measurable c_load := by exact measurable_const)
+    (h_store : Measurable c_store := by exact measurable_const)
+    (h_tape : Measurable c_tape := by exact measurable_const)
+    (h_rand : Measurable c_rand := by exact measurable_const)
+    (h_fail : Measurable c_fail := by exact measurable_const)
+    (h_scrut : Measurable c_scrut := by exact measurable_const) :
+    Measurable (fun p : Exp rT × β => Exp.casesOn (motive := fun _ => α) p.1
+        (fun n => c_bvar (p.2, n)) (fun x => c_fvar (p.2, x))
+        (fun l => c_lit (p.2, l))
+        (fun e => c_lam (p.2, e)) (fun e => c_fix (p.2, e))
+        (fun e1 e2 => c_app (p.2, e1, e2))
+        (fun u e => c_unop (p.2, u, e))
+        (fun b e1 e2 => c_binop (p.2, b, e1, e2))
+        (fun ec et ef => c_cond (p.2, ec, et, ef))
+        (fun e1 e2 => c_pair (p.2, e1, e2))
+        (fun e => c_fst (p.2, e)) (fun e => c_snd (p.2, e))
+        (fun e => c_inl (p.2, e)) (fun e => c_inr (p.2, e))
+        (fun ec el er => c_case (p.2, ec, el, er))
+        (fun e => c_alloc (p.2, e)) (fun e => c_load (p.2, e))
+        (fun e1 e2 => c_store (p.2, e1, e2))
+        (fun e => c_tape (p.2, e))
+        (fun e1 e2 => c_rand (p.2, e1, e2))
+        (c_fail (p.2, ()))
+        (fun e pat => c_scrut (p.2, e, pat))) :=
+  Exp.measurable_rec_param
+    c_bvar c_fvar c_lit c_lam c_fix c_app c_unop c_binop c_cond c_pair c_fst c_snd
+    c_inl c_inr c_case c_alloc c_load c_store c_tape c_rand c_fail c_scrut
+    h_bvar h_fvar h_lit h_lam h_fix h_app h_unop h_binop h_cond h_pair h_fst h_snd
+    h_inl h_inr h_case h_alloc h_load h_store h_tape h_rand h_fail h_scrut
+
+/-- BaseLit analogue: defaults each continuation to `fun _ => 0` and discharges
+its measurability via `measurable_const`. -/
+theorem _root_.ProbLang.BaseLit.measurable_rec_param_zero
+    {rT : Type _} [MeasurableSpace rT] [Inhabited rT]
+    {α : Type _} [Zero α] [MeasurableSpace α]
+    {β : Type _} [MeasurableSpace β]
+    (c_int : β × Int → α := fun _ => 0) (c_bool : β × Bool → α := fun _ => 0)
+    (c_unit : β × Unit → α := fun _ => 0)
+    (c_loc : β × Loc → α := fun _ => 0) (c_lbl : β × Lbl → α := fun _ => 0)
+    (c_real : β × rT → α := fun _ => 0)
+    (h_int : Measurable c_int := by exact measurable_const)
+    (h_bool : Measurable c_bool := by exact measurable_const)
+    (h_unit : Measurable c_unit := by exact measurable_const)
+    (h_loc : Measurable c_loc := by exact measurable_const)
+    (h_lbl : Measurable c_lbl := by exact measurable_const)
+    (h_real : Measurable c_real := by exact measurable_const) :
+    Measurable (fun p : BaseLit rT × β =>
+      BaseLit.casesOn (motive := fun _ => α) p.1
+        (fun z => c_int (p.2, z)) (fun b => c_bool (p.2, b))
+        (c_unit (p.2, ()))
+        (fun l => c_loc (p.2, l)) (fun l => c_lbl (p.2, l))
+        (fun r => c_real (p.2, r))) :=
+  BaseLit.measurable_rec_param c_int c_bool c_unit c_loc c_lbl c_real
+    h_int h_bool h_unit h_loc h_lbl h_real
+
+/-! ### Stamping macros for `headStep.c_*.measurable` proofs.
+
+The `_zero` theorems above use Lean's `:= default` mechanism, which times out
+inside `HeadStep.lean` because the elaborator iterates through 21 `Measure 0`
+default substitutions in section context. The following **macros** sidestep
+that by emitting the explicit form at the call site — purely syntactic
+substitution, no elaborator overhead.
+
+Each macro covers a specific "which constructor is live" pattern. The user
+supplies the live continuations and their measurability proofs; the macro
+fills in `fun _ => 0` and `exact measurable_const` for the rest.
+
+Patterns covered (matching `headStep` continuations):
+- `exp_zero_lit_apply` — `.lit` live (used by `c_load`, `c_tape`'s outer).
+- `exp_zero_pair_apply` — `.pair` live (used by `c_fst`, `c_snd`).
+- `exp_zero_app_apply` — `.lam` + `.fix` live (used by `c_app`).
+- `exp_zero_case_apply` — `.inl` + `.inr` live (used by `c_case`).
+- `baseLit_zero_int_apply` — `.int` live (used by `c_tape`'s inner).
+- `baseLit_zero_loc_apply` — `.loc` live (used by `c_load`'s inner).
+
+All macros take the live continuation expression and its measurability proof. -/
+
+/-- Stamp for "only `.lit` arm live" Exp dispatch. Takes the live continuation
+and its measurability positionally. -/
+macro "exp_zero_lit_apply " ct:term ", " ht:term : tactic =>
+  `(tactic|
+    exact Exp.measurable_rec_param
+        (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := $ct)
+        (c_lam := fun _ => 0) (c_fix := fun _ => 0)
+        (c_app := fun _ => 0) (c_unop := fun _ => 0) (c_binop := fun _ => 0)
+        (c_cond := fun _ => 0) (c_pair := fun _ => 0)
+        (c_fst := fun _ => 0) (c_snd := fun _ => 0)
+        (c_inl := fun _ => 0) (c_inr := fun _ => 0) (c_case := fun _ => 0)
+        (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ => 0)
+        (c_tape := fun _ => 0) (c_rand := fun _ => 0)
+        (c_fail := fun _ => 0) (c_scrut := fun _ => 0)
+        (h_bvar := measurable_const) (h_fvar := measurable_const)
+        (h_lit := $ht)
+        (h_lam := measurable_const) (h_fix := measurable_const)
+        (h_app := measurable_const) (h_unop := measurable_const) (h_binop := measurable_const)
+        (h_cond := measurable_const) (h_pair := measurable_const)
+        (h_fst := measurable_const) (h_snd := measurable_const)
+        (h_inl := measurable_const) (h_inr := measurable_const) (h_case := measurable_const)
+        (h_alloc := measurable_const) (h_load := measurable_const) (h_store := measurable_const)
+        (h_tape := measurable_const) (h_rand := measurable_const)
+        (h_fail := measurable_const) (h_scrut := measurable_const))
+
+/-- Stamp for "only `.pair` arm live" Exp dispatch. -/
+macro "exp_zero_pair_apply " ct:term ", " ht:term : tactic =>
+  `(tactic|
+    exact Exp.measurable_rec_param
+        (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := fun _ => 0)
+        (c_lam := fun _ => 0) (c_fix := fun _ => 0)
+        (c_app := fun _ => 0) (c_unop := fun _ => 0) (c_binop := fun _ => 0)
+        (c_cond := fun _ => 0) (c_pair := $ct)
+        (c_fst := fun _ => 0) (c_snd := fun _ => 0)
+        (c_inl := fun _ => 0) (c_inr := fun _ => 0) (c_case := fun _ => 0)
+        (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ => 0)
+        (c_tape := fun _ => 0) (c_rand := fun _ => 0)
+        (c_fail := fun _ => 0) (c_scrut := fun _ => 0)
+        (h_bvar := measurable_const) (h_fvar := measurable_const)
+        (h_lit := measurable_const)
+        (h_lam := measurable_const) (h_fix := measurable_const)
+        (h_app := measurable_const) (h_unop := measurable_const) (h_binop := measurable_const)
+        (h_cond := measurable_const)
+        (h_pair := $ht)
+        (h_fst := measurable_const) (h_snd := measurable_const)
+        (h_inl := measurable_const) (h_inr := measurable_const) (h_case := measurable_const)
+        (h_alloc := measurable_const) (h_load := measurable_const) (h_store := measurable_const)
+        (h_tape := measurable_const) (h_rand := measurable_const)
+        (h_fail := measurable_const) (h_scrut := measurable_const))
+
+/-- Stamp for "`.lam` and `.fix` arms live" Exp dispatch (c_app pattern). -/
+macro "exp_zero_app_apply "
+    clamt:term ", " hlamt:term ", " cfixt:term ", " hfixt:term : tactic =>
+  `(tactic|
+    exact Exp.measurable_rec_param
+        (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := fun _ => 0)
+        (c_lam := $clamt) (c_fix := $cfixt)
+        (c_app := fun _ => 0) (c_unop := fun _ => 0) (c_binop := fun _ => 0)
+        (c_cond := fun _ => 0) (c_pair := fun _ => 0)
+        (c_fst := fun _ => 0) (c_snd := fun _ => 0)
+        (c_inl := fun _ => 0) (c_inr := fun _ => 0) (c_case := fun _ => 0)
+        (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ => 0)
+        (c_tape := fun _ => 0) (c_rand := fun _ => 0)
+        (c_fail := fun _ => 0) (c_scrut := fun _ => 0)
+        (h_bvar := measurable_const) (h_fvar := measurable_const)
+        (h_lit := measurable_const)
+        (h_lam := $hlamt) (h_fix := $hfixt)
+        (h_app := measurable_const) (h_unop := measurable_const) (h_binop := measurable_const)
+        (h_cond := measurable_const) (h_pair := measurable_const)
+        (h_fst := measurable_const) (h_snd := measurable_const)
+        (h_inl := measurable_const) (h_inr := measurable_const) (h_case := measurable_const)
+        (h_alloc := measurable_const) (h_load := measurable_const) (h_store := measurable_const)
+        (h_tape := measurable_const) (h_rand := measurable_const)
+        (h_fail := measurable_const) (h_scrut := measurable_const))
+
+/-- Stamp for "`.inl` and `.inr` arms live" Exp dispatch (c_case pattern). -/
+macro "exp_zero_case_apply "
+    cinlt:term ", " hinlt:term ", " cinrt:term ", " hinrt:term : tactic =>
+  `(tactic|
+    exact Exp.measurable_rec_param
+        (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := fun _ => 0)
+        (c_lam := fun _ => 0) (c_fix := fun _ => 0)
+        (c_app := fun _ => 0) (c_unop := fun _ => 0) (c_binop := fun _ => 0)
+        (c_cond := fun _ => 0) (c_pair := fun _ => 0)
+        (c_fst := fun _ => 0) (c_snd := fun _ => 0)
+        (c_inl := $cinlt) (c_inr := $cinrt) (c_case := fun _ => 0)
+        (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ => 0)
+        (c_tape := fun _ => 0) (c_rand := fun _ => 0)
+        (c_fail := fun _ => 0) (c_scrut := fun _ => 0)
+        (h_bvar := measurable_const) (h_fvar := measurable_const)
+        (h_lit := measurable_const)
+        (h_lam := measurable_const) (h_fix := measurable_const)
+        (h_app := measurable_const) (h_unop := measurable_const) (h_binop := measurable_const)
+        (h_cond := measurable_const) (h_pair := measurable_const)
+        (h_fst := measurable_const) (h_snd := measurable_const)
+        (h_inl := $hinlt) (h_inr := $hinrt) (h_case := measurable_const)
+        (h_alloc := measurable_const) (h_load := measurable_const) (h_store := measurable_const)
+        (h_tape := measurable_const) (h_rand := measurable_const)
+        (h_fail := measurable_const) (h_scrut := measurable_const))
+
+/-- Stamp for "only `.int` arm live" BaseLit dispatch. -/
+macro "baseLit_zero_int_apply " ct:term ", " ht:term : tactic =>
+  `(tactic|
+    apply BaseLit.measurable_rec_param
+        (c_int := $ct) (c_bool := fun _ => 0) (c_unit := fun _ => 0)
+        (c_loc := fun _ => 0) (c_lbl := fun _ => 0) (c_real := fun _ => 0)
+        (h_int := $ht) (h_bool := measurable_const)
+        (h_unit := measurable_const) (h_loc := measurable_const)
+        (h_lbl := measurable_const) (h_real := measurable_const))
+
+/-- Stamp for "only `.loc` arm live" BaseLit dispatch. -/
+macro "baseLit_zero_loc_apply " ct:term ", " ht:term : tactic =>
+  `(tactic|
+    apply BaseLit.measurable_rec_param
+        (c_int := fun _ => 0) (c_bool := fun _ => 0) (c_unit := fun _ => 0)
+        (c_loc := $ct) (c_lbl := fun _ => 0) (c_real := fun _ => 0)
+        (h_int := measurable_const) (h_bool := measurable_const)
+        (h_unit := measurable_const) (h_loc := $ht)
+        (h_lbl := measurable_const) (h_real := measurable_const))
+
+/-- Stamp for "only `.bool` arm live" BaseLit dispatch (c_cond pattern). -/
+macro "baseLit_zero_bool_apply " ct:term ", " ht:term : tactic =>
+  `(tactic|
+    apply BaseLit.measurable_rec_param
+        (c_int := fun _ => 0) (c_bool := $ct) (c_unit := fun _ => 0)
+        (c_loc := fun _ => 0) (c_lbl := fun _ => 0) (c_real := fun _ => 0)
+        (h_int := measurable_const) (h_bool := $ht)
+        (h_unit := measurable_const) (h_loc := measurable_const)
+        (h_lbl := measurable_const) (h_real := measurable_const))
+
+/-! ### Swap helper for `(β × BaseLit)` ↔ `(BaseLit × β)` dispatch.
+
+`BaseLit.measurable_rec_param`'s conclusion is `Measurable (fun p : BaseLit × β => ...)`,
+but in many `headStep.c_*` proofs the caller has `(β × BaseLit)`-shaped continuations
+(because outer `Exp.measurable_rec_param` calls `c_lit` with `(β, BaseLit)` argument
+order). This helper does the swap. -/
+theorem _root_.ProbLang.BaseLit.measurable_param_swap
+    {rT : Type _} [MeasurableSpace rT] [Inhabited rT]
+    {α : Type _} [MeasurableSpace α]
+    {β : Type _} [MeasurableSpace β]
+    {f : BaseLit rT × β → α} (hf : Measurable f) :
+    Measurable (fun q : β × BaseLit rT => f (q.2, q.1)) :=
+  hf.comp (measurable_snd.prodMk measurable_fst)
 
 theorem decompItem.measurable [MeasurableSpace rT] :
     let _ : MeasurableSpace (Option (EctxItem rT × Exp rT)) := instLocalOption
