@@ -400,13 +400,47 @@ theorem Exp.asValM.measurable {T γ : Type _} [MeasurableSpace T] [MeasurableSpa
 /-- `Cfg.uniform` is measurable jointly in `(z, σ)`. -/
 theorem Cfg.uniform.measurable :
     Measurable (fun (p : Int × State rT) => Cfg.uniform p.1 p.2) := by
-  -- Strategy: outer split on `z : Int` (countable + ⊤) via
-  -- `measurable_from_prod_countable_right`. The `z ≤ 0` branch reduces to
-  -- dirac-measurability in `σ`; the `z > 0` branch needs measurability of
-  -- the parameterized pushforward `σ ↦ pmf.toMeasure.map (.lit (.int ·), σ)`.
-  -- Latter requires a Mathlib lemma about parameterized `Measure.map`; left
-  -- as `sorry` pending that.
-  sorry
+  -- Outer split on `z : Int` (countable + ⊤). For each fixed `z`, the σ-fiber
+  -- splits on `z.isPos`: positive → `(PMF z).toMeasure.map (.lit (.int n), σ)`;
+  -- non-positive → `dirac ⟨.lit (.int -1), σ⟩`.
+  apply measurable_from_prod_countable_right
+  intro z
+  show Measurable (fun σ : State rT => Cfg.uniform z σ)
+  unfold Cfg.uniform
+  cases hzp : z.isPos with
+  | none =>
+    -- σ ↦ dirac ⟨.lit (.int -1), σ⟩
+    exact Cfg.measurable_dirac_mk measurable_const measurable_id
+  | some w =>
+    -- σ ↦ (PMF.uniformOfFinset (Ico 0 w.val) _).toMeasure.map (fun n => ⟨.lit (.int n), σ⟩)
+    -- Apply `Measure.measurable_map_uncurry` with:
+    --   α := State rT, β := Int, γ := Cfg rT
+    --   h (σ, n) := Cfg.mk (.lit (.int n)) σ
+    --   k σ := (PMF.uniformOfFinset _ _).toMeasure  -- constant in σ
+    obtain ⟨w, hw⟩ := w
+    set μ : Measure Int := (PMF.uniformOfFinset (Finset.Ico 0 w)
+      (Finset.nonempty_Ico.mpr hw)).toMeasure with hμ_def
+    have hμ_prob : IsProbabilityMeasure μ := by
+      rw [hμ_def]; infer_instance
+    have hk_const : Measurable (fun _ : State rT => μ) := measurable_const
+    have hker_sfinite : ProbabilityTheory.IsSFiniteKernel
+        (ProbabilityTheory.Kernel.mk (fun _ : State rT => μ) hk_const) := by
+      -- The kernel `Kernel.mk (fun _ => μ) _` is the constant kernel, which is
+      -- SFinite when μ is sfinite (here it's a probability measure, hence sfinite).
+      have hSF : MeasureTheory.SFinite μ := inferInstance
+      -- Kernel.mk vs Kernel.const should be the same thing up to defeq.
+      have : ProbabilityTheory.Kernel.mk (fun _ : State rT => μ) hk_const
+          = ProbabilityTheory.Kernel.const (State rT) μ := rfl
+      rw [this]; infer_instance
+    have hh : Measurable (fun p : State rT × Int => Cfg.mk (.lit (.int p.2)) p.1) := by
+      rw [Cfg.measurable_iff]
+      refine ⟨?_, ?_⟩
+      · -- expr: .lit (.int p.2)
+        exact Exp.lit.measurable.comp (BaseLit.int.measurable.comp measurable_snd)
+      · -- state: p.1
+        exact measurable_fst
+    exact @Measure.measurable_map_uncurry (State rT) Int (Cfg rT) _ _ _
+      _ hh (fun _ => μ) hk_const hker_sfinite
 
 /-! ### `headStep` per-branch continuations.
 
@@ -972,9 +1006,225 @@ theorem headStep.c_tape.measurable [Inhabited rT] :
 
 theorem headStep.c_rand.measurable [Inhabited rT] :
     Measurable (headStep.c_rand (rT := rT)) := by
-  -- Doubly-nested rec on (e1, e2). Most complex of the 13 branches; uses
-  -- Cfg.uniform.measurable (stub) + LocHeap lookup.
-  sorry
+  -- Structure: outer Exp dispatch (e1) → BaseLit dispatch (l1, only .int live) →
+  -- inner Exp dispatch (e2) → BaseLit dispatch (l2, .unit AND .lbl live).
+  -- The .lbl arm dispatches on `σ.tapes[α]?` (an Option Tape), and the some-branch
+  -- further dispatches on the tape contents. Since Tape has Top σ-alg and is
+  -- Countable, we factor out the discrete (α, z, optTape) and reduce to
+  -- σ-measurability of three primitive arms (0, Cfg.uniform, dirac).
+
+  -- Innermost: the function of (σ, z, α, optTape) returning Measure (Cfg rT).
+  -- This is the body of the `.lbl α` arm. Lbl × Int × Option Tape are all
+  -- countable + discrete, so we use `measurable_from_prod_countable_*`.
+  let c_lbl_leaf : State rT × Int × Lbl × Option Tape → Measure (Cfg rT) :=
+    fun ⟨σ, z, α, optTape⟩ =>
+      match optTape with
+      | none => 0
+      | some ⟨M, ns⟩ =>
+        if M = z then
+          match ns with
+          | [] => Cfg.uniform z σ
+          | n :: ns' => dirac ⟨.lit (.int n), σ.update_tapes (·.insert α ⟨M, ns'⟩)⟩
+        else Cfg.uniform z σ
+  -- c_lbl_leaf is measurable in σ for each fixed (z, α, optTape) — factor as
+  -- countable_right over (z, α, optTape).
+  have hc_lbl_leaf : Measurable c_lbl_leaf := by
+    -- Reshape (σ, z, α, optTape) ↦ ((z, α, optTape), σ).
+    show Measurable c_lbl_leaf
+    have hflat : Measurable
+        (fun p : (Int × Lbl × Option Tape) × State rT =>
+          c_lbl_leaf (p.2, p.1.1, p.1.2.1, p.1.2.2)) := by
+      apply measurable_from_prod_countable_right
+      intro ⟨z, α, optTape⟩
+      -- Per fixed (z, α, optTape): function σ ↦ <body>.
+      show Measurable (fun σ : State rT => c_lbl_leaf (σ, z, α, optTape))
+      simp only [c_lbl_leaf]
+      match optTape with
+      | none => exact measurable_const  -- 0
+      | some ⟨M, ns⟩ =>
+        by_cases hMz : M = z
+        · subst hMz
+          simp only [↓reduceIte]
+          match ns with
+          | [] =>
+            exact (Cfg.uniform.measurable (rT := rT)).comp
+              (measurable_const.prodMk measurable_id)
+          | n :: ns' =>
+            -- dirac ⟨.lit (.int n), σ.update_tapes (·.insert α ⟨M, ns'⟩)⟩.
+            refine Cfg.measurable_dirac_mk measurable_const ?_
+            -- state: σ.update_tapes (·.insert α ⟨M, ns'⟩) — σ is the only varying part.
+            show Measurable (fun σ : State rT =>
+              σ.update_tapes (·.insert α ⟨M, ns'⟩))
+            refine State.measurable_mk_param State.measurable_heap ?_
+            show Measurable (fun σ : State rT => σ.tapes.insert α ⟨M, ns'⟩)
+            -- insert with both ℓ and v constant in σ.
+            have hpair : Measurable
+                (fun σ : State rT => (σ.tapes, α, (⟨M, ns'⟩ : Tape))) :=
+              State.measurable_tapes.prodMk (measurable_const.prodMk measurable_const)
+            exact Measurable.locHeap_insert_param.comp hpair
+        · -- M ≠ z: result is Cfg.uniform z σ.
+          simp only [hMz, ↓reduceIte]
+          exact (Cfg.uniform.measurable (rT := rT)).comp
+            (measurable_const.prodMk measurable_id)
+    -- hflat says (p : (Int × Lbl × Option Tape) × State) ↦ c_lbl_leaf (p.2, ...) is meas.
+    -- We want (σ, z, α, optTape) ↦ c_lbl_leaf (σ, z, α, optTape).
+    have hreshape : Measurable (fun q : State rT × Int × Lbl × Option Tape =>
+        ((q.2.1, q.2.2.1, q.2.2.2), q.1) :
+        State rT × Int × Lbl × Option Tape → (Int × Lbl × Option Tape) × State rT) :=
+      ((measurable_fst.comp measurable_snd).prodMk
+        ((measurable_fst.comp (measurable_snd.comp measurable_snd)).prodMk
+          (measurable_snd.comp (measurable_snd.comp measurable_snd)))).prodMk measurable_fst
+    exact hflat.comp hreshape
+  -- The `.lbl` arm wraps `c_lbl_leaf` by supplying σ.tapes[α]? for the optTape slot.
+  -- Function of (σ, z, α : Lbl).
+  let c_lbl_arm : State rT × Int × Lbl → Measure (Cfg rT) :=
+    fun ⟨σ, z, α⟩ => c_lbl_leaf (σ, z, α, σ.tapes[α]?)
+  have hc_lbl_arm : Measurable c_lbl_arm := by
+    show Measurable c_lbl_arm
+    -- Factor: c_lbl_arm = c_lbl_leaf ∘ (σ, z, α) ↦ (σ, z, α, σ.tapes[α]?).
+    have hproj : Measurable
+        (fun q : State rT × Int × Lbl =>
+          (q.1, q.2.1, q.2.2, q.1.tapes[q.2.2]?)) := by
+      refine measurable_fst.prodMk ((measurable_fst.comp measurable_snd).prodMk
+        ((measurable_snd.comp measurable_snd).prodMk ?_))
+      -- (σ, α) ↦ σ.tapes[α]? — split on countable Lbl.
+      have hlookup : Measurable
+          (fun q : State rT × Int × Lbl => q.1.tapes[q.2.2]?) := by
+        have hflat : Measurable (fun p : Lbl × State rT => p.2.tapes[p.1]?) := by
+          apply measurable_from_prod_countable_right
+          intro α
+          exact (LocHeap.measurable_getElem? α).comp State.measurable_tapes
+        exact hflat.comp ((measurable_snd.comp measurable_snd).prodMk measurable_fst)
+      exact hlookup
+    exact hc_lbl_leaf.comp hproj
+  -- The `.unit` arm of l2 (with z extracted from outer .lit .int):
+  -- function of (σ, z, _ : Unit) returning Cfg.uniform z σ. Independent of the Unit.
+  let c_unit_arm : State rT × Int × Unit → Measure (Cfg rT) :=
+    fun ⟨σ, z, _⟩ => Cfg.uniform z σ
+  have hc_unit_arm : Measurable c_unit_arm :=
+    (Cfg.uniform.measurable (rT := rT)).comp
+      ((measurable_fst.comp measurable_snd).prodMk measurable_fst)
+  -- l2 BaseLit dispatch: takes (σ, z, l2) — only .unit and .lbl live.
+  let c_l2_dispatch : (State rT × Int) × BaseLit rT → Measure (Cfg rT) :=
+    fun ⟨⟨σ, z⟩, l2⟩ =>
+      BaseLit.casesOn (motive := fun _ => Measure (Cfg rT)) l2
+        (fun _ => 0) (fun _ => 0)
+        (c_unit_arm (σ, z, ()))
+        (fun _ => 0)
+        (fun α => c_lbl_arm (σ, z, α))
+        (fun _ => 0)
+  have hc_l2 : Measurable c_l2_dispatch := by
+    -- BaseLit dispatch, two live arms (.unit, .lbl). No existing macro for two-arm
+    -- BaseLit; do it manually with `apply BaseLit.measurable_rec_param`.
+    have hswap : Measurable
+        (fun q : (State rT × Int) × BaseLit rT => (q.2, q.1)) :=
+      measurable_snd.prodMk measurable_fst
+    have hbase : Measurable (fun p : BaseLit rT × (State rT × Int) =>
+        BaseLit.casesOn (motive := fun _ => Measure (Cfg rT)) p.1
+          (fun _ => 0) (fun _ => 0)
+          (c_unit_arm (p.2.1, p.2.2, ()))
+          (fun _ => 0)
+          (fun α => c_lbl_arm (p.2.1, p.2.2, α))
+          (fun _ => 0)) := by
+      apply BaseLit.measurable_rec_param
+        (c_int := fun _ => 0) (c_bool := fun _ => 0)
+        (c_unit := fun q : (State rT × Int) × Unit => c_unit_arm (q.1.1, q.1.2, q.2))
+        (c_loc := fun _ => 0)
+        (c_lbl := fun q : (State rT × Int) × Lbl => c_lbl_arm (q.1.1, q.1.2, q.2))
+        (c_real := fun _ => 0)
+        (h_int := measurable_const) (h_bool := measurable_const)
+        (h_unit := hc_unit_arm.comp
+          ((measurable_fst.comp measurable_fst).prodMk
+            ((measurable_snd.comp measurable_fst).prodMk measurable_snd)))
+        (h_loc := measurable_const)
+        (h_lbl := hc_lbl_arm.comp
+          ((measurable_fst.comp measurable_fst).prodMk
+            ((measurable_snd.comp measurable_fst).prodMk measurable_snd)))
+        (h_real := measurable_const)
+    exact hbase.comp hswap
+  -- e2 Exp dispatch: only .lit live, feeding to c_l2_dispatch.
+  let c_e2_dispatch : (State rT × Int) × Exp rT → Measure (Cfg rT) :=
+    fun ⟨⟨σ, z⟩, e2⟩ =>
+      Exp.casesOn (motive := fun _ => Measure (Cfg rT)) e2
+        (fun _ => 0) (fun _ => 0)
+        (fun l2 => c_l2_dispatch ((σ, z), l2))
+        (fun _ => 0) (fun _ => 0)
+        (fun _ _ => 0) (fun _ _ => 0) (fun _ _ _ => 0) (fun _ _ _ => 0)
+        (fun _ _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => 0)
+        (fun _ _ _ => 0) (fun _ => 0) (fun _ => 0) (fun _ _ => 0)
+        (fun _ => 0) (fun _ _ => 0) 0 (fun _ _ => 0)
+  have hc_e2 : Measurable c_e2_dispatch := by
+    -- The macro produces `Measurable (fun p : Exp × β => casesOn p.1 ...)` but
+    -- c_e2_dispatch is `(β × Exp) → ...`. Swap via composition.
+    have hswap : Measurable (fun q : (State rT × Int) × Exp rT => (q.2, q.1)) :=
+      measurable_snd.prodMk measurable_fst
+    have hbase : Measurable (fun p : Exp rT × (State rT × Int) =>
+        Exp.casesOn (motive := fun _ => Measure (Cfg rT)) p.1
+          (fun _ => 0) (fun _ => 0)
+          (fun l => c_l2_dispatch (p.2, l))
+          (fun _ => 0) (fun _ => 0)
+          (fun _ _ => 0) (fun _ _ => 0) (fun _ _ _ => 0) (fun _ _ _ => 0)
+          (fun _ _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => 0)
+          (fun _ _ _ => 0) (fun _ => 0) (fun _ => 0) (fun _ _ => 0)
+          (fun _ => 0) (fun _ _ => 0) 0 (fun _ _ => 0)) := by
+      exp_zero_lit_apply (fun q : (State rT × Int) × BaseLit rT => c_l2_dispatch q), hc_l2
+    exact hbase.comp hswap
+  -- l1 BaseLit dispatch: only .int live, extracting z and threading e2.
+  -- β here is (State × Exp) carrying (σ, e2). Continuation takes (β, Int) i.e. (σ, e2, z).
+  let c_l1_dispatch : (State rT × Exp rT) × BaseLit rT → Measure (Cfg rT) :=
+    fun ⟨⟨σ, e2⟩, l1⟩ =>
+      BaseLit.casesOn (motive := fun _ => Measure (Cfg rT)) l1
+        (fun z => c_e2_dispatch ((σ, z), e2)) (fun _ => 0) 0 (fun _ => 0)
+        (fun _ => 0) (fun _ => 0)
+  have hc_l1 : Measurable c_l1_dispatch := by
+    have hswap : Measurable
+        (fun q : (State rT × Exp rT) × BaseLit rT => (q.2, q.1)) :=
+      measurable_snd.prodMk measurable_fst
+    have hbase : Measurable (fun p : BaseLit rT × (State rT × Exp rT) =>
+        BaseLit.casesOn (motive := fun _ => Measure (Cfg rT)) p.1
+          (fun z => c_e2_dispatch ((p.2.1, z), p.2.2)) (fun _ => 0) 0
+          (fun _ => 0) (fun _ => 0) (fun _ => 0)) := by
+      apply BaseLit.measurable_rec_param
+        (c_int := fun q : (State rT × Exp rT) × Int =>
+          c_e2_dispatch ((q.1.1, q.2), q.1.2))
+        (c_bool := fun _ => 0) (c_unit := fun _ => 0)
+        (c_loc := fun _ => 0) (c_lbl := fun _ => 0) (c_real := fun _ => 0)
+        (h_int := hc_e2.comp
+          (((measurable_fst.comp measurable_fst).prodMk measurable_snd).prodMk
+            (measurable_snd.comp measurable_fst)))
+        (h_bool := measurable_const) (h_unit := measurable_const)
+        (h_loc := measurable_const) (h_lbl := measurable_const)
+        (h_real := measurable_const)
+    exact hbase.comp hswap
+  -- Outer e1 Exp dispatch: only .lit live, with β = State × Exp carrying (σ, e2).
+  -- Reshape c_rand to Exp.casesOn form composed with swap.
+  have hrw : (headStep.c_rand (rT := rT))
+      = (fun q : Exp rT × State rT × Exp rT =>
+          Exp.casesOn (motive := fun _ => Measure (Cfg rT)) q.1
+            (fun _ => 0) (fun _ => 0)
+            (fun l1 => c_l1_dispatch ((q.2.1, q.2.2), l1))
+            (fun _ => 0) (fun _ => 0)
+            (fun _ _ => 0) (fun _ _ => 0) (fun _ _ _ => 0) (fun _ _ _ => 0)
+            (fun _ _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => 0) (fun _ => 0)
+            (fun _ _ _ => 0) (fun _ => 0) (fun _ => 0) (fun _ _ => 0)
+            (fun _ => 0) (fun _ _ => 0) 0 (fun _ _ => 0))
+        ∘ (fun p : State rT × Exp rT × Exp rT => (p.2.1, p.1, p.2.2)) := by
+    funext ⟨σ, e1, e2⟩
+    show headStep.c_rand _ = _
+    unfold headStep.c_rand
+    -- The `match p.2.1, p.2.2 with` simultaneous match unfolds via cases.
+    cases e1 <;> (try rfl) <;>
+      rename_i l1 <;>
+      cases l1 <;> (try rfl) <;>
+      rename_i z <;>
+      cases e2 <;> (try rfl) <;>
+      rename_i l2 <;>
+      cases l2 <;> (try rfl)
+  rw [hrw]
+  refine Measurable.comp ?_
+    ((measurable_fst.comp measurable_snd).prodMk
+      (measurable_fst.prodMk (measurable_snd.comp measurable_snd)))
+  exp_zero_lit_apply (fun q : (State rT × Exp rT) × BaseLit rT => c_l1_dispatch q), hc_l1
 
 /-- `scrut` branch: `e.isValM` of dispatch on `Pat.tryMatch p e`. -/
 @[simp] def headStep.c_scrut (p : State rT × Exp rT × Pat rT) : Measure (Cfg rT) :=
@@ -985,7 +1235,11 @@ theorem headStep.c_rand.measurable [Inhabited rT] :
 
 theorem headStep.c_scrut.measurable [ProbLangℝ rT] :
     Measurable (headStep.c_scrut (rT := rT)) := by
-  -- isValM_param + Option.unwrapM_param-style + tryMatch.measurable (stub).
+  -- Blocked: the joint `tryMatch.measurable` proven in Recurrences.lean requires
+  -- `[Countable rT] [MeasurableSingletonClass rT]` (splits on Pat factor via
+  -- countable rT lifting). The headStep keystone forbids those typeclasses, so
+  -- this proof needs a different `tryMatch` measurability that doesn't require
+  -- discrete rT — likely via Pi-type measurability on `Pat → (Exp → Option Exp)`.
   sorry
 
 /-- `fst (pair e1 e2)` branch: nested rec on subterm. -/
@@ -1344,15 +1598,14 @@ omit [ProbLangℝ rT] in
 theorem Exp.toVal?_isValue {e : Exp rT} : e.toVal? = some v → e.isValue := by
   intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
+set_option maxHeartbeats 4000000 in
 theorem head_ctx_step_val {e : Exp rT} {σ : State rT} {ρ : Cfg rT} {Ki : EctxItem rT} :
     0 < headStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
-  -- Original (times out at `whnf` after rT parameterization; revisit):
-  -- have Hzero : (0 < (0 : Measure (Cfg rT)) {ρ}) → False := by simp
-  -- head_case
-  -- all_goals try (exact fun H => (Hzero H).elim)
-  -- all_goals cases Ki <;> (intro _; simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR])
-  -- all_goals exact (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue ‹_›))
-  sorry
+  have Hzero : (0 < (0 : Measure (Cfg rT)) {ρ}) → False := by simp
+  head_case
+  all_goals try (exact fun H => (Hzero H).elim)
+  all_goals cases Ki <;> (intro _; simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR])
+  all_goals exact (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue ‹_›))
 
 inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
 | BetaLamS :

@@ -2137,18 +2137,210 @@ theorem BinOp_eval.measurable [ProbLangℝ rT] :
   · exact liftII.measurable _
   · exact liftII.measurable _
 
-theorem tryMatch.measurable [ProbLangℝ rT] :
+/-- For each fixed `p : Pat rT`, `e ↦ Pat.tryMatch p e` is measurable. Proved
+by structural induction on `p`; each arm uses `Exp.measurable_rec` to dispatch
+on the shape of `e`. -/
+theorem tryMatch_fixed.measurable [ProbLangℝ rT] (p : Pat rT) :
+    Measurable (fun e : Exp rT => Pat.tryMatch p e) := by
+  induction p with
+  | wildcard =>
+    have hrw : (fun e : Exp rT => Pat.tryMatch .wildcard e)
+             = (fun e => (some e : Option (Exp rT))) := by
+      funext e; rfl
+    rw [hrw]
+    exact MeasurableEmbedding.some_mk.measurable
+  | lit l =>
+    -- Reshape to Exp.casesOn with only `.lit` live.
+    have hrw : (fun e : Exp rT => Pat.tryMatch (.lit l) e)
+        = fun e => Exp.casesOn (motive := fun _ => Option (Exp rT)) e
+            (fun _ => none) (fun _ => none)
+            (fun l' => if (l == l') = true then some (.lit .unit) else none)
+            (fun _ => none) (fun _ => none)
+            (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+            (fun _ _ => none) (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+            (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+            (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+      funext e
+      cases e <;> rfl
+    rw [hrw]
+    apply Exp.measurable_rec
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none)
+      (f_lit := fun l' : BaseLit rT =>
+        if (l == l') = true then some (Exp.lit BaseLit.unit) else none)
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none) (f_pair := fun _ => none)
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun _ => none) (f_inr := fun _ => none) (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+      (f_scrut := fun _ => none)
+    · -- h_lit: `Measurable (fun l' : BaseLit rT => if (l == l') = true then some (.lit .unit) else none)`.
+      -- Factor: the function equals `some (.lit .unit)` if l' = l, else `none`. The set
+      -- {l} is measurable (BaseLit has MeasurableSingletonClass from our MeasurableEq lift).
+      -- Use that `(l == l') = true ↔ l = l'` under LawfulBEq.
+      intro S hS
+      have hrw : (fun l' : BaseLit rT =>
+          if (l == l') = true then (some (Exp.lit BaseLit.unit) : Option (Exp rT)) else none) ⁻¹' S
+          = (if (some (Exp.lit BaseLit.unit) : Option (Exp rT)) ∈ S then {l} else ∅)
+            ∪ (if (none : Option (Exp rT)) ∈ S then ({l}ᶜ : Set (BaseLit rT)) else ∅) := by
+        ext l'
+        by_cases hll : l = l'
+        · subst hll
+          simp [BaseLit.beq_self_true]
+        · have hne : (l == l') ≠ true := fun h => hll (LawfulBEq.eq_of_beq h)
+          have hne' : ¬ l' = l := fun h => hll h.symm
+          simp [hne, hll, hne']
+      rw [hrw]
+      refine MeasurableSet.union ?_ ?_
+      · split_ifs
+        · exact MeasurableSet.singleton l
+        · exact MeasurableSet.empty
+      · split_ifs
+        · exact (MeasurableSet.singleton l).compl
+        · exact MeasurableSet.empty
+    all_goals exact measurable_const
+  | pair p1 p2 ih1 ih2 =>
+    -- `Pat.tryMatch (.pair p1 p2) e = match e with | .pair e1 e2 => ih1(e1) >>= ... | _ => none`.
+    have hrw : (fun e : Exp rT => Pat.tryMatch (.pair p1 p2) e)
+        = fun e => Exp.casesOn (motive := fun _ => Option (Exp rT)) e
+            (fun _ => none) (fun _ => none) (fun _ => none)
+            (fun _ => none) (fun _ => none)
+            (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+            (fun e1 e2 =>
+              (Pat.tryMatch p1 e1).bind fun b1 =>
+              (Pat.tryMatch p2 e2).bind fun b2 =>
+              some (.pair b1 b2))
+            (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+            (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+            (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+      funext e; cases e <;> rfl
+    rw [hrw]
+    apply Exp.measurable_rec
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun _ => none)
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none)
+      (f_pair := fun q : Exp rT × Exp rT =>
+        (Pat.tryMatch p1 q.1).bind fun b1 =>
+        (Pat.tryMatch p2 q.2).bind fun b2 =>
+        some (Exp.pair b1 b2))
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun _ => none) (f_inr := fun _ => none) (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+      (f_scrut := fun _ => none)
+    · -- h_lit (the index of c_lit; obviated)
+      exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · -- h_pair: the bind chain.
+      let _ : MeasurableSpace (Option (Exp rT)) := instLocalOption
+      refine Option.measurable_bind_param (β := Exp rT) (γ := Exp rT)
+        (f := fun q : Exp rT × Exp rT => Pat.tryMatch p1 q.1)
+        (some_branch := fun s : (Exp rT × Exp rT) × Exp rT =>
+          (Pat.tryMatch p2 s.1.2).bind fun b2 =>
+          some (Exp.pair s.2 b2)) ?_ ?_
+      · exact ih1.comp measurable_fst
+      · refine Option.measurable_bind_param (β := Exp rT) (γ := Exp rT)
+          (f := fun s : (Exp rT × Exp rT) × Exp rT => Pat.tryMatch p2 s.1.2)
+          (some_branch := fun r : ((Exp rT × Exp rT) × Exp rT) × Exp rT =>
+            (some (Exp.pair r.1.2 r.2) : Option (Exp rT))) ?_ ?_
+        · exact ih2.comp (measurable_snd.comp measurable_fst)
+        · have hp : Measurable
+              (fun r : ((Exp rT × Exp rT) × Exp rT) × Exp rT => (r.1.2, r.2)) :=
+            (measurable_snd.comp measurable_fst).prodMk measurable_snd
+          exact MeasurableEmbedding.some_mk.measurable.comp (Exp.pair.measurable.comp hp)
+    all_goals exact measurable_const
+  | inl p ih =>
+    -- `Pat.tryMatch (.inl p) e = match e with | .inl e' => ih(e') | _ => none`.
+    have hrw : (fun e : Exp rT => Pat.tryMatch (.inl p) e)
+        = fun e => Exp.casesOn (motive := fun _ => Option (Exp rT)) e
+            (fun _ => none) (fun _ => none) (fun _ => none)
+            (fun _ => none) (fun _ => none)
+            (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+            (fun _ _ => none) (fun _ => none) (fun _ => none)
+            (fun e' => Pat.tryMatch p e')
+            (fun _ => none)
+            (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+            (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+      funext e; cases e <;> rfl
+    rw [hrw]
+    apply Exp.measurable_rec
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun _ => none)
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none) (f_pair := fun _ => none)
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun e' : Exp rT => Pat.tryMatch p e')
+      (f_inr := fun _ => none) (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+      (f_scrut := fun _ => none)
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · -- h_inl
+      exact ih
+    all_goals exact measurable_const
+  | inr p ih =>
+    have hrw : (fun e : Exp rT => Pat.tryMatch (.inr p) e)
+        = fun e => Exp.casesOn (motive := fun _ => Option (Exp rT)) e
+            (fun _ => none) (fun _ => none) (fun _ => none)
+            (fun _ => none) (fun _ => none)
+            (fun _ _ => none) (fun _ _ => none) (fun _ _ _ => none) (fun _ _ _ => none)
+            (fun _ _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+            (fun e' => Pat.tryMatch p e')
+            (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
+            (fun _ => none) (fun _ _ => none) none (fun _ _ => none) := by
+      funext e; cases e <;> rfl
+    rw [hrw]
+    apply Exp.measurable_rec
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none) (f_lit := fun _ => none)
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none) (f_pair := fun _ => none)
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun _ => none)
+      (f_inr := fun e' : Exp rT => Pat.tryMatch p e')
+      (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none) (f_fail := fun _ => none)
+      (f_scrut := fun _ => none)
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · exact measurable_const
+    · -- h_inr
+      exact ih
+    all_goals exact measurable_const
+
+theorem tryMatch.measurable [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
     Measurable (fun (q : Pat rT × Exp rT) => Pat.tryMatch q.1 q.2) := by
-  -- Bounded-iteration approach attempted. `Pat.tryMatchN` (bounded recurse-at-most-n version)
-  -- and its measurability are designed; the extraction helpers `litExtract`, `pairExtract`,
-  -- `inlExtract`, `inrExtract` are proven (see above). What remains:
-  -- (1) `tryMatchN_eq_tryMatch` (n > patDepth p → tryMatchN n = tryMatch) — tactical friction
-  --     on the `Pat.lit` case (rfl claims types differ but goal is X = X syntactically).
-  -- (2) `tryMatchN.measurable` (induction on n, using Pat.measurable_struct_rec_param with
-  --     β = Exp rT and each branch built from extraction + Option.measurable_elim_param + ih).
-  -- (3) Conclude via `measurable_from_prod_countable_right` over Nat.
-  -- Deferred.
-  sorry
+  -- Pat rT is Countable (from Pat's deriving + Countable rT) and MeasurableSingletonClass
+  -- (from CoreMeasures/Pat.lean). Split on the Pat factor (left position) via
+  -- `measurable_from_prod_countable_right` (which expects the LEFT factor to be discrete).
+  apply measurable_from_prod_countable_right
+  intro p
+  exact tryMatch_fixed.measurable p
 
 end Exp
 end ProbLang

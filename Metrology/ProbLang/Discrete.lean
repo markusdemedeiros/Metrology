@@ -30,45 +30,10 @@ helpers (`singletonCyl`, `singletonCyl_flatten`, `singletonCyl_hasMeasurableLeav
 were moved to `CoreMeasures/BaseLit.lean` so that `Recurrences.lean`'s
 `liftEq.measurable` can use them directly. -/
 
-/-! ## Pat -/
+/-! ## Pat
 
-namespace Pat
-
-@[simp] def singletonCyl {rT : Type _} : Pat rT → Cylinder rT
-  | .wildcard   => .wildcard
-  | .lit b      => .lit {b}
-  | .pair p1 p2 => .pair (singletonCyl p1) (singletonCyl p2)
-  | .inl p      => .inl (singletonCyl p)
-  | .inr p      => .inr (singletonCyl p)
-
-theorem singletonCyl_flatten {rT : Type _} (p : Pat rT) :
-    (singletonCyl p).flatten = {p} := by
-  induction p with
-  | wildcard => simp
-  | lit b => simp
-  | pair p1 p2 ih1 ih2 => simp [ih1, ih2]
-  | inl p ih => simp [ih]
-  | inr p ih => simp [ih]
-
-theorem singletonCyl_hasMeasurableLeaves
-    {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] (p : Pat rT) :
-    (singletonCyl p).HasMeasurableLeaves := by
-  induction p with
-  | wildcard => exact .wildcard
-  | lit b => exact .lit _ (MeasurableSet.singleton b)
-  | pair p1 p2 ih1 ih2 => exact .pair ih1 ih2
-  | inl p ih => exact .inl ih
-  | inr p ih => exact .inr ih
-
-instance instMeasurableSingletonClass
-    {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] :
-    MeasurableSingletonClass (Pat rT) where
-  measurableSet_singleton p := by
-    rw [← singletonCyl_flatten p]
-    exact MeasurableSpace.measurableSet_generateFrom
-      ⟨singletonCyl p, singletonCyl_hasMeasurableLeaves p, rfl⟩
-
-end Pat
+`MeasurableSingletonClass (Pat rT)` and supporting cylinder helpers were moved to
+`CoreMeasures/Pat.lean` so that `Recurrences.lean`'s `tryMatch.measurable` can use them. -/
 
 /-! ## Exp -/
 

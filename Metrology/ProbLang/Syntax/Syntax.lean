@@ -454,6 +454,17 @@ theorem BaseLit.beq_self_true (l : BaseLit rT) : (l == l) = true := by
     show (r == r) = true
     exact BEq.refl r
 
+/-- `LawfulBEq` for `BaseLit rT` lifted from `LawfulBEq rT`. The derived BEq is
+structural; equality of components implies equality. -/
+instance instLawfulBEqBaseLit [LawfulBEq rT] : LawfulBEq (BaseLit rT) where
+  eq_of_beq {l1 l2} h := by
+    cases l1 <;> cases l2 <;> simp_all <;>
+      first
+        | (exact (decide_eq_true_eq.mp h))
+        | (exact LawfulBEq.eq_of_beq h)
+        | rfl
+  rfl {l} := BaseLit.beq_self_true l
+
 /-- `tryMatch (.lit l) (.lit l) = some (.lit .unit)`. -/
 theorem Pat.tryMatch_lit_eq (l : BaseLit rT) :
     Pat.tryMatch (.lit l) (.lit l) = some (.lit .unit) := by
