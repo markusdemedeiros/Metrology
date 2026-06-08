@@ -80,8 +80,8 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   -- The `pl(rec geo n := …)` body wraps each binder in `Exp.close` over a
   -- fresh atom; reduce all of these so the body becomes the explicit bvar
   -- form that `twp_pure_step_fupd`'s `e₁`/`e₂` arguments expect.
-  simp only [geometric, Exp.close, Exp.closeRec, Nat.zero_add, Nat.reduceAdd,
-    Var.internal.injEq, ↓reduceIte, reduceCtorEq, Nat.reduceEqDiff]
+  simp only [geometric, Exp.close, Exp.closeRec, Nat.zero_add,
+    Var.internal.injEq, ↓reduceIte, reduceCtorEq]
   set innerBody : Exp rT :=
     Exp.cond
       (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))

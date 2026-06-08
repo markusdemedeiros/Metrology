@@ -262,7 +262,7 @@ theorem UnOp.eval_op_measurable [MeasurableSpace rT] [Inhabited rT] (op : UnOp) 
           (fun e p => (fun _ : Exp rT × Pat rT => none) (e, p)) := by
       funext v
       cases v <;> simp [UnOp.eval]
-      rename_i b; cases b <;> simp [UnOp.eval]
+      rename_i b; cases b <;> simp
     rw [heq]
     apply Exp.measurable_rec (rT := rT)
       (f_bvar := fun _ => none) (f_fvar := fun _ => none)
@@ -307,7 +307,7 @@ theorem UnOp.eval_op_measurable [MeasurableSpace rT] [Inhabited rT] (op : UnOp) 
           (fun e p => (fun _ : Exp rT × Pat rT => none) (e, p)) := by
       funext v
       cases v <;> simp [UnOp.eval]
-      rename_i b; cases b <;> simp [UnOp.eval]
+      rename_i b; cases b <;> simp
     rw [heq]
     apply Exp.measurable_rec (rT := rT)
       (f_bvar := fun _ => none) (f_fvar := fun _ => none)
@@ -464,6 +464,7 @@ theorem fillItem.measurable [MeasurableSpace rT] :
 Measurable once `EctxItem.fillItem`'s joint version is. Standard `List.foldl`
 measurability argument; mechanical extension once the input is measurable. -/
 
+@[measurability]
 theorem Ectx_fill.measurable [MeasurableSpace rT] :
     Measurable (fun (q : Ectx rT × Exp rT) => Ectx.fill q.1 q.2) := by
   -- `Ectx.fill K e = K.foldl (flip EctxItem.fillItem) e`.
@@ -491,6 +492,7 @@ current keystone with one extra `t_X b`-precomposition at each constructor.
 
 **Status**: stubbed pending the binder-transforming variant. -/
 
+@[measurability]
 theorem openRec.measurable [MeasurableSpace rT] :
     Measurable (fun (q : (Nat × Exp rT) × Exp rT) => Exp.openRec q.1.1 q.1.2 q.2) := by
   -- Apply `measurable_struct_rec_param_shift` with β = (Nat × Exp rT) and shift
@@ -697,7 +699,7 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
           (Val.mk e (Classical.choice hv) : Val rT) ∈ (Sum.inl ⁻¹' Ssum : Set (Val rT)) := Iff.rfl
       rw [hmem_iff, ← hUval_eq]
       have hfeq : (Val.mk e (Classical.choice hv) : Val rT).fst = e := rfl
-      simp only [Set.mem_preimage, hfeq]
+      simp only [Set.mem_preimage]
       constructor
       · intro hUe
         left; exact ⟨hv, hUe⟩
@@ -1278,6 +1280,7 @@ take a union over `n`.
 
 **Status**: stubbed pending a well-founded-recursion measurability lemma. -/
 
+@[measurability]
 theorem decomp.measurable [MeasurableSpace rT] :
     Measurable (Exp.decomp : Exp rT → Ectx rT × Exp rT) := by
   -- Blocked on the same `List`/`Ectx` measurability infrastructure as `List.measurable_foldl`
@@ -1307,19 +1310,19 @@ extracts subterms or a literal from `e : Exp rT`. We need measurability of
 these extractions as `Option`-valued maps into `instLocalOption`. -/
 
 /-- Extract the literal from `e = .lit b`, else `none`. -/
-def Exp.litExtract (e : Exp rT) : Option (BaseLit rT) :=
+def litExtract (e : Exp rT) : Option (BaseLit rT) :=
   match e with | .lit b => some b | _ => none
 
 /-- Extract the two children from `e = .pair e1 e2`, else `none`. -/
-def Exp.pairExtract (e : Exp rT) : Option (Exp rT × Exp rT) :=
+def pairExtract (e : Exp rT) : Option (Exp rT × Exp rT) :=
   match e with | .pair e1 e2 => some (e1, e2) | _ => none
 
 /-- Extract the child from `e = .inl e'`, else `none`. -/
-def Exp.inlExtract (e : Exp rT) : Option (Exp rT) :=
+def inlExtract (e : Exp rT) : Option (Exp rT) :=
   match e with | .inl e' => some e' | _ => none
 
 /-- Extract the child from `e = .inr e'`, else `none`. -/
-def Exp.inrExtract (e : Exp rT) : Option (Exp rT) :=
+def inrExtract (e : Exp rT) : Option (Exp rT) :=
   match e with | .inr e' => some e' | _ => none
 
 theorem litExtract.measurable [MeasurableSpace rT] :
@@ -1798,10 +1801,10 @@ theorem liftEq_inlK.measurable [MeasurableSpace rT] [Inhabited rT]
           (fun e1 => (Exp.litExtract e1).bind fun l2 =>
             some (Exp.lit (.bool (decide (l1 = l2))))) := by
     funext p; obtain ⟨v1, v2⟩ := p
-    cases v1 <;> simp [liftEq_inlK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
-      cases v2 <;> simp [liftEq_inlK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
+    cases v1 <;> simp [liftEq_inlK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind];
+      cases v2 <;> simp <;>
       rename_i e2 <;> cases e2 <;>
-      simp [liftEq_inlK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind]
+      simp
   rw [hrw]
   refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
     (f := fun p : Exp rT × Exp rT => Exp.litExtract p.1)
@@ -1862,10 +1865,10 @@ theorem liftEq_inrK.measurable [MeasurableSpace rT] [Inhabited rT]
           (fun e1 => (Exp.litExtract e1).bind fun l2 =>
             some (Exp.lit (.bool (decide (l1 = l2))))) := by
     funext p; obtain ⟨v1, v2⟩ := p
-    cases v1 <;> simp [liftEq_inrK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
-      cases v2 <;> simp [liftEq_inrK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind] <;>
+    cases v1 <;> simp [liftEq_inrK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind];
+      cases v2 <;> simp  <;>
       rename_i e2 <;> cases e2 <;>
-      simp [liftEq_inrK, Exp.litExtract, Exp.inlExtract, Exp.inrExtract, Option.bind]
+      simp
   rw [hrw]
   refine Option.measurable_bind_param (β := BaseLit rT) (γ := Exp rT)
     (f := fun p : Exp rT × Exp rT => Exp.litExtract p.1)
@@ -1932,11 +1935,11 @@ private theorem liftEq_dispatch [MeasurableSpace rT] [Inhabited rT]
   | inl e1' =>
     show liftEq (.inl e1', v2) = liftEq_inlK (e1', v2)
     cases e1' <;> cases v2 <;> simp [liftEq, liftEq_inlK] <;>
-      (rename_i e2'; cases e2' <;> simp [liftEq, liftEq_inlK])
+      (rename_i e2'; cases e2' <;> simp)
   | inr e1' =>
     show liftEq (.inr e1', v2) = liftEq_inrK (e1', v2)
     cases e1' <;> cases v2 <;> simp [liftEq, liftEq_inrK] <;>
-      (rename_i e2'; cases e2' <;> simp [liftEq, liftEq_inrK])
+      (rename_i e2'; cases e2' <;> simp)
   | _ => rfl
 
 /-- `liftEq.measurable` — bespoke 5-pattern lifter for `BinOp.eval .eq`. Decomposed via
@@ -2012,10 +2015,9 @@ private theorem liftII_def_eq (f : Int → Int → Int) (v1 v2 : Exp rT) :
   unfold liftII liftBin
   cases v1 <;> simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
   rename_i l1
-  cases l1 <;> simp [BaseLit.intExtract, Option.bind] <;> cases v2 <;>
-    simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
+  cases l1 <;> simp; cases v2 <;> simp [BaseLit.intExtract]
   rename_i l2
-  cases l2 <;> simp [BaseLit.intExtract, Option.bind]
+  cases l2 <;> simp
 
 private theorem liftBB_def_eq (f : Bool → Bool → Bool) (v1 v2 : Exp rT) :
     liftBB f (v1, v2) =
@@ -2025,10 +2027,10 @@ private theorem liftBB_def_eq (f : Bool → Bool → Bool) (v1 v2 : Exp rT) :
   unfold liftBB liftBin
   cases v1 <;> simp [Exp.litExtract, BaseLit.boolExtract, Option.bind]
   rename_i l1
-  cases l1 <;> simp [BaseLit.boolExtract, Option.bind] <;> cases v2 <;>
-    simp [Exp.litExtract, BaseLit.boolExtract, Option.bind]
+  cases l1 <;> simp; cases v2 <;>
+    simp [BaseLit.boolExtract]
   rename_i l2
-  cases l2 <;> simp [BaseLit.boolExtract, Option.bind]
+  cases l2 <;> simp
 
 private theorem liftIB_def_eq (f : Int → Int → Bool) (v1 v2 : Exp rT) :
     liftIB f (v1, v2) =
@@ -2038,10 +2040,10 @@ private theorem liftIB_def_eq (f : Int → Int → Bool) (v1 v2 : Exp rT) :
   unfold liftIB liftBin
   cases v1 <;> simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
   rename_i l1
-  cases l1 <;> simp [BaseLit.intExtract, Option.bind] <;> cases v2 <;>
-    simp [Exp.litExtract, BaseLit.intExtract, Option.bind]
+  cases l1 <;> simp; cases v2 <;>
+    simp [BaseLit.intExtract]
   rename_i l2
-  cases l2 <;> simp [BaseLit.intExtract, Option.bind]
+  cases l2 <;> simp
 
 /-- Helper for the `eq` arm of `BinOp.eval_eq_lift`: `BinOp.eval .eq v1 v2 = liftEq (v1, v2)`.
 Split as a separate lemma so its proof time is bounded and doesn't blow the
@@ -2051,7 +2053,7 @@ private theorem BinOp.eval_eq_eq_liftEq [ProbLangℝ rT] (v1 v2 : Exp rT) :
   cases v1 <;> cases v2 <;> (try simp [BinOp.eval, liftEq]) <;>
     -- For `.inl _, .inl _`, `.inl _, .inr _`, `.inr _, .inl _`, `.inr _, .inr _`:
     -- inner Exp may or may not be a `.lit`; recurse one more level.
-    (rename_i ein1 ein2; cases ein1 <;> cases ein2 <;> simp [BinOp.eval, liftEq])
+    (rename_i ein1 ein2; cases ein1 <;> cases ein2 <;> simp)
 
 /-- `BinOp.eval` is equal to a per-op dispatch through `liftII`/`liftBB`/`liftIB`/`liftEq`.
 The proof is per-op: discrete `cases op` then unfold each side to the same
@@ -2187,10 +2189,10 @@ theorem tryMatch_fixed.measurable [ProbLangℝ rT] (p : Pat rT) :
         ext l'
         by_cases hll : l = l'
         · subst hll
-          simp [BaseLit.beq_self_true]
+          simp
         · have hne : (l == l') ≠ true := fun h => hll (LawfulBEq.eq_of_beq h)
           have hne' : ¬ l' = l := fun h => hll h.symm
-          simp [hne, hll, hne']
+          simp [hll, hne']
       rw [hrw]
       refine MeasurableSet.union ?_ ?_
       · split_ifs

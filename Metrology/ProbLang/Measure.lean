@@ -264,15 +264,17 @@ theorem Measure.bind_map {α β γ : Type} [MeasurableSpace α] [MeasurableSpace
 /-- `.map` distributes through `.bind`: mapping over a bind is a bind of maps. -/
 theorem Measure.bind_map_comm {α β γ : Type*}
     [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
-    [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β]
-    [DiscreteMeasurableSpace γ]
-    (μ : Measure α) (k : α → Measure β) (f : β → γ) :
+    (μ : Measure α) (k : α → Measure β) (f : β → γ) (Hf : Measurable f) (Hae : AEMeasurable k μ):
     (μ.bind k).map f = μ.bind (fun a => (k a).map f) := by
   refine Measure.ext fun S hS => ?_
-  rw [Measure.map_apply .of_discrete hS,
-      Measure.bind_apply (by exact .of_discrete) Measurable.of_discrete.aemeasurable,
-      Measure.bind_apply hS Measurable.of_discrete.aemeasurable]
-  simp_rw [Measure.map_apply .of_discrete hS]
+  have H1 : MeasurableSet (f ⁻¹' S) := MeasurableSet.preimage hS Hf
+  have H2 : AEMeasurable (fun a ↦ map f (k a)) μ := by
+    refine Measurable.comp_aemeasurable' ?_ Hae
+    exact measurable_map f Hf
+  rw [Measure.map_apply Hf hS,
+      Measure.bind_apply H1 Hae,
+      Measure.bind_apply hS H2]
+  simp_rw [Measure.map_apply Hf hS]
 
 abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDensity f
 
@@ -987,14 +989,14 @@ theorem cell_unary_param {ctor : T → T} {s s' : Sh}
     · rintro ⟨hs, hp⟩
       obtain ⟨p', rfl, hs'⟩ := (h_shape p).mp hs
       refine ⟨(b, p'), ⟨hs', ?_⟩, rfl⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry] at hp ⊢
+      simp only [Function.uncurry] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', p'⟩, ⟨hs', hp'⟩, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor p' = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨(h_shape _).mpr ⟨p', rfl, hs'⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry] at hp' ⊢
+      simp only [Function.uncurry] at hp' ⊢
       rw [h_eq]; exact hp'
   rw [heq]
   refine (MeasurableEmbedding.id.prodMap h_emb).measurableSet_image' ?_
@@ -1065,14 +1067,14 @@ theorem cell_binary_param
     · rintro ⟨hs, hp⟩
       obtain ⟨p1, p2, rfl, hs1, hs2⟩ := (h_shape p).mp hs
       refine ⟨(b, p1, p2), ⟨hs1, hs2, ?_⟩, rfl⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at hp ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', p1, p2⟩, ⟨hs1, hs2, h⟩, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor p1 p2 = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨(h_shape _).mpr ⟨p1, p2, rfl, hs1, hs2⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at h ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at h ⊢
       rw [h_eq]; exact h
   rw [heq]
   have h_emb_outer : MeasurableEmbedding
@@ -1220,14 +1222,14 @@ theorem cell_unary_param_shift {ctor : T → T} {s s' : Sh}
     · rintro ⟨hs, hp⟩
       obtain ⟨p', rfl, hs'⟩ := (h_shape p).mp hs
       refine ⟨(b, p'), ⟨hs', ?_⟩, rfl⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry] at hp ⊢
+      simp only [Function.uncurry] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', p'⟩, ⟨hs', hp'⟩, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor p' = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨(h_shape _).mpr ⟨p', rfl, hs'⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry] at hp' ⊢
+      simp only [Function.uncurry] at hp' ⊢
       rw [h_eq]; exact hp'
   rw [heq]
   refine (MeasurableEmbedding.id.prodMap h_emb).measurableSet_image' ?_
@@ -1330,14 +1332,14 @@ theorem cell_ternary_param
     · rintro ⟨hs, hp⟩
       obtain ⟨p1, p2, p3, rfl, hs1, hs2, hs3⟩ := (h_shape p).mp hs
       refine ⟨(b, p1, p2, p3), ⟨hs1, hs2, hs3, ?_⟩, rfl⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at hp ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', p1, p2, p3⟩, ⟨hs1, hs2, hs3, h⟩, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor p1 p2 p3 = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨(h_shape _).mpr ⟨p1, p2, p3, rfl, hs1, hs2, hs3⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at h ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at h ⊢
       rw [h_eq]; exact h
   rw [heq]
   have h_emb_outer : MeasurableEmbedding
@@ -1552,14 +1554,14 @@ theorem cell_unaryMixed_param {γ : Type _} [MeasurableSpace γ]
     constructor
     · rintro ⟨⟨p', rfl, hs'⟩, hp⟩
       refine ⟨(b, p'), ⟨hs', ?_⟩, rfl⟩
-      simp only [Set.mem_setOf_eq, Set.mem_preimage, Function.uncurry] at hp ⊢
+      simp only [Set.mem_preimage, Function.uncurry] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', p'⟩, ⟨hs', hp'⟩, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor d p' = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨⟨p', rfl, hs'⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Set.mem_preimage, Function.uncurry] at hp' ⊢
+      simp only [Set.mem_preimage, Function.uncurry] at hp' ⊢
       rw [h_eq]; exact hp'
   rw [hfiber]
   -- Image under (b, p') ↦ (b, ctor d p') = Prod.map id (ctor d).
@@ -1671,14 +1673,14 @@ theorem cell_binaryMixed_param {γ : Type _} [MeasurableSpace γ]
     constructor
     · rintro ⟨⟨p1, p2, rfl, hs1, hs2⟩, hp⟩
       refine ⟨(b, p1, p2), ⟨hs1, hs2, ?_⟩, rfl⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at hp ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', p1, p2⟩, ⟨hs1, hs2, h⟩, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor d p1 p2 = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨⟨p1, p2, rfl, hs1, hs2⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at h ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at h ⊢
       rw [h_eq]; exact h
   rw [hfiber]
   -- Same machinery as cell_binary_param body, with ctor d and c · d · ·.
@@ -1823,14 +1825,14 @@ theorem cell_scrutLike_param {γ : Type _} [MeasurableSpace γ]
     · rintro ⟨hs, hp⟩
       obtain ⟨p', d, rfl, hs'⟩ := (h_shape p).mp hs
       refine ⟨(b, p', d), ⟨hs', ?_⟩, rfl⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at hp ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', p', d⟩, ⟨hs', h⟩, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor p' d = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨(h_shape _).mpr ⟨p', d, rfl, hs'⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_preimage] at h ⊢
+      simp only [Function.uncurry, Set.mem_preimage] at h ⊢
       rw [h_eq]; exact h
   rw [heq]
   have h_emb_outer : MeasurableEmbedding (fun (q : β × T × γ) => (q.1, ctor q.2.1 q.2.2)) := by

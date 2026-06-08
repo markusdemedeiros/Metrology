@@ -42,10 +42,6 @@ def primStep [ProbLangℝ rT] (cfg : Cfg rT) : Measure (Cfg rT) :=
   let (K, e') := cfg.expr.decomp
   (headStep ⟨e', cfg.state⟩).map K.fillCfg
 
-def primStepKernel [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
-    Kernel (Cfg rT) (Cfg rT) where
-  measurable' := .of_discrete
-  toFun := primStep
 
 /-! ### Measurability for arbitrary measurable `rT`. -/
 
@@ -58,33 +54,25 @@ measurability to joint measurability of:
   `Ectx.fill.measurable` (stamped via `List.measurable_foldl`),
 - the "headStep input" map `cfg ↦ ⟨cfg.expr.decomp.2, cfg.state⟩` composed
   with `headStep.measurable`. -/
-theorem primStep.measurable [ProbLangℝ rT] [Inhabited rT] :
-    Measurable (primStep : Cfg rT → Measure (Cfg rT)) := by
-  -- Use `Cfg.measurable_iff` to break down Cfg measurability.
-  have hdecomp : Measurable (fun cfg : Cfg rT => cfg.expr.decomp) :=
-    Exp.decomp.measurable.comp Cfg.measurable_expr
+theorem primStep.measurable [ProbLangℝ rT] : Measurable (primStep : Cfg rT → Measure (Cfg rT)) := by
   -- Source kernel `k : Cfg rT → Measure (Cfg rT)`.
   have hk_inner : Measurable
       (fun cfg : Cfg rT => (Cfg.mk cfg.expr.decomp.2 cfg.state : Cfg rT)) := by
-    rw [Cfg.measurable_iff]
-    exact ⟨measurable_snd.comp hdecomp, Cfg.measurable_state⟩
+    measurability
   have hk : Measurable (fun cfg : Cfg rT =>
       headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) :=
     headStep.measurable.comp hk_inner
   -- Joint pushforward function `h : Cfg rT × Cfg rT → Cfg rT`.
   have hh : Measurable (fun (p : Cfg rT × Cfg rT) => p.1.expr.decomp.1.fillCfg p.2) := by
     -- p.1.expr.decomp.1.fillCfg p.2 = Cfg.mk (Ectx.fill p.1.expr.decomp.1 p.2.expr) p.2.state
-    show Measurable
-      (fun p : Cfg rT × Cfg rT =>
-        Cfg.mk (Ectx.fill p.1.expr.decomp.1 p.2.expr) p.2.state)
+    show Measurable (fun p : Cfg rT × Cfg rT => Cfg.mk (Ectx.fill p.1.expr.decomp.1 p.2.expr) p.2.state)
     rw [Cfg.measurable_iff]
     refine ⟨?_, ?_⟩
     · show Measurable (fun p : Cfg rT × Cfg rT => Ectx.fill p.1.expr.decomp.1 p.2.expr)
-      refine Exp.Ectx_fill.measurable.comp
-        (Measurable.prodMk ?_ (Cfg.measurable_expr.comp measurable_snd))
-      exact measurable_fst.comp (hdecomp.comp measurable_fst)
-    · show Measurable (fun p : Cfg rT × Cfg rT => p.2.state)
-      exact Cfg.measurable_state.comp measurable_snd
+      refine Exp.Ectx_fill.measurable.comp (Measurable.prodMk ?_ ?_)
+      · measurability
+      · measurability
+    · measurability
   -- Apply the joint pushforward keystone. The `IsSFiniteKernel` instance is
   -- discharged via a `sorry` for now — morally `headStep` is sub-probability so
   -- the kernel is finite (TODO: prove `headStep.isFiniteKernel` for general rT).
@@ -92,17 +80,22 @@ theorem primStep.measurable [ProbLangℝ rT] [Inhabited rT] :
       headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) hk) := sorry
   exact Measure.measurable_map_uncurry hh hk
 
-/-- Markov kernel of the prim step, without the discrete-`rT` hypotheses. -/
-def primStepKernelM [ProbLangℝ rT] [Inhabited rT] : Kernel (Cfg rT) (Cfg rT) where
+def primStepKernel [ProbLangℝ rT] : Kernel (Cfg rT) (Cfg rT) where
   measurable' := primStep.measurable
   toFun := primStep
 
+@[deprecated "Generalized as primStepKernel" (since := "2026/06/08")]
+abbrev primStepKernelM {α : Type} [ProbLangℝ α] := primStepKernel (rT := α)
+
+-- TODO: Make ReducibleM be "no equivalent to zero measure", make Reducible abbrev this
 abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ∃ ρ : Cfg rT, 0 < primStep ⟨e, σ⟩ {ρ}
 
+
+
 /-! ## Values can't step -/
 
-theorem val_stuck [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+theorem val_stuck [ProbLangℝ rT] [Countable rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < primStep ⟨e, σ⟩ {ρ}) : ¬e.isValue := by
   simp only [primStep] at h
@@ -116,15 +109,14 @@ theorem primStep_univ_le_one [ProbLangℝ rT] [Countable rT] [MeasurableSingleto
     (ρ : Cfg rT) : (primStep ρ) Set.univ ≤ 1 := by
   obtain ⟨e, σ⟩ := ρ
   simp only [primStep]
-  rw [Measure.map_apply .of_discrete MeasurableSet.univ]
+  have Hmeas : Measurable e.decomp.1.fillCfg := by measurability
+  rw [Measure.map_apply Hmeas MeasurableSet.univ]
   simpa using headStep_univ_le_one ⟨e.decomp.2, σ⟩
 
 /-! ## Bridge: headStep ↔ primStep -/
 
-theorem primStep_eq_headStep [ProbLangℝ rT]
-    {e : Exp rT} {σ : State rT}
-    (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) :
-    primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
+theorem primStep_eq_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) : primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
   suffices hd : e.decomp = ([], e) by
     simp only [primStep, hd, Ectx.fillCfg_empty, Measure.map_id]
   rw [e.decomp_unfold]
@@ -135,8 +127,7 @@ theorem primStep_eq_headStep [ProbLangℝ rT]
     rw [← hfill] at hρ
     exact (hne (head_ctx_step_val hρ)).elim
 
-theorem primStep_pos_of_headStep [ProbLangℝ rT]
-    {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
+theorem primStep_pos_of_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) : 0 < primStep ⟨e, σ⟩ {ρ} :=
   primStep_eq_headStep ⟨ρ, h⟩ ▸ h
 
@@ -149,7 +140,9 @@ theorem primStep_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass 
   set d := e.decomp with hd
   obtain ⟨K', e''⟩ := d
   simp only [Exp.decomp_fill_comp hv hd.symm]
-  rw [Measure.map_map .of_discrete .of_discrete]
+  rw [Measure.map_map ?G1 ?G2]
+  case G1 => exact Measurable.of_discrete
+  case G2 => exact Measurable.of_discrete
   congr 1
   funext ⟨e', σ'⟩
   simp [Function.comp, fill_app]

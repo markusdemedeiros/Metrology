@@ -11,7 +11,7 @@ open Classical MeasureTheory ProbabilityTheory Measure
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
   | 0,   a, b => a = b
@@ -31,7 +31,8 @@ structure PureHeadStep (e1 e2 : Exp rT) : Prop where
 theorem PureHeadStep.toPureStep {e1 e2 : Exp rT} (h : PureHeadStep e1 e2) : PureStep e1 e2 :=
   ⟨fun σ => Reducible.of_head (h.safe σ), fun σ => primStep_eq_headStep (h.safe σ) ▸ h.det σ⟩
 
-theorem PureStep.fill (K : Ectx rT) {e1 e2 : Exp rT} (h : PureStep e1 e2) :
+theorem PureStep.fill [Countable rT] [MeasurableSingletonClass rT]
+  (K : Ectx rT) {e1 e2 : Exp rT} (h : PureStep e1 e2) :
     PureStep (K.fill e1) (K.fill e2) := by
   constructor
   · intro σ
@@ -41,7 +42,8 @@ theorem PureStep.fill (K : Ectx rT) {e1 e2 : Exp rT} (h : PureStep e1 e2) :
     rw [← primStep_fill_singleton (val_stuck (h.safe σ).choose_spec)]
     exact h.det σ
 
-theorem PureStep.fill_nsteps (K : Ectx rT) {n : ℕ} {e1 e2 : Exp rT}
+theorem PureStep.fill_nsteps [Countable rT] [MeasurableSingletonClass rT]
+  (K : Ectx rT) {n : ℕ} {e1 e2 : Exp rT}
     (h : nsteps PureStep n e1 e2) :
     nsteps PureStep n (K.fill e1) (K.fill e2) := by
   induction n generalizing e1 e2 with
@@ -50,25 +52,25 @@ theorem PureStep.fill_nsteps (K : Ectx rT) {n : ℕ} {e1 e2 : Exp rT}
     obtain ⟨c, hstep, hrest⟩ := h
     exact ⟨K.fill c, hstep.fill K, ih hrest⟩
 
-theorem PureExec.fill (K : Ectx rT) {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
+theorem PureExec.fill [Countable rT] [MeasurableSingletonClass rT]
+  (K : Ectx rT) {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     [h : PureExec φ n e1 e2] : PureExec φ n (K.fill e1) (K.fill e2) where
   pure_exec hφ := PureStep.fill_nsteps K (h.pure_exec hφ)
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem PureExec.reducible {σ : State rT} {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     Reducible e1 σ := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   exact hstep.safe σ
 
-theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
+theorem PureExec.not_val [Countable rT] [MeasurableSingletonClass rT] {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     ¬e1.isValue := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   obtain ⟨ρ, hρ⟩ := hstep.safe default
   exact val_stuck hρ
 
-theorem rtc_pure_step_val {n : ℕ} {v : Val rT} {e : Exp rT}
+theorem rtc_pure_step_val [Countable rT] [MeasurableSingletonClass rT] {n : ℕ} {v : Val rT} {e : Exp rT}
     (h : nsteps PureStep n v.1 e) :
     e.toVal? = some v := by
   induction n generalizing e with
@@ -81,8 +83,7 @@ theorem rtc_pure_step_val {n : ℕ} {v : Val rT} {e : Exp rT}
     obtain ⟨ρ, hρ⟩ := hstep.safe default
     exact absurd v.2.toIsValue (val_stuck hρ)
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
-theorem as_val_isSome {e : Exp rT} (h : ∃ v : Val rT, v.1 = e) : e.isValue := by
+theorem as_val_isSome {e : Exp α} (h : ∃ v : Val α, v.1 = e) : e.isValue := by
   obtain ⟨⟨_, hv⟩, rfl⟩ := h
   exact hv.toIsValue
 
@@ -108,11 +109,9 @@ structure DetHeadStep (cfg1 cfg2 : Cfg rT) : Prop where
   safe : ∃ ρ : Cfg rT, 0 < headStep cfg1 {ρ}
   det  : headStep cfg1 {cfg2} = 1
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetHeadStep.pos {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) : 0 < headStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetHeadStep.of_det (cfg1 cfg2 : Cfg rT)
     (hdet : headStep cfg1 {cfg2} = 1) : DetHeadStep cfg1 cfg2 :=
   ⟨⟨cfg2, hdet ▸ one_pos⟩, hdet⟩
@@ -122,7 +121,6 @@ structure DetStep (cfg1 cfg2 : Cfg rT) : Prop where
   safe : Reducible cfg1.expr cfg1.state
   det  : primStep cfg1 {cfg2} = 1
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetStep.pos {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) : 0 < primStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
@@ -133,7 +131,6 @@ theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) :
 class DetExec (n : ℕ) (cfg1 cfg2 : Cfg rT) : Prop where
   det_exec : nsteps DetStep n cfg1 cfg2
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetExec.succ {cfg1 cfg2 cfg3 : Cfg rT} {n : ℕ}
     (hstep : DetStep cfg1 cfg2) [hrest : DetExec n cfg2 cfg3] :
     DetExec (n + 1) cfg1 cfg3 where
@@ -317,16 +314,15 @@ theorem DetHeadStep.store {ℓ : Loc} {e : Exp rT} {v_old v_new : Val rT}
     DetHeadStep ⟨.store (.lit (.loc ℓ)) e, σ⟩ ⟨.lit .unit, σ.update_heap (·.insert ℓ v_new)⟩ :=
   .of_det _ _ (by simp [headStep, Exp.asValM, hnew, hlookup])
 
-theorem DetStep.fill (K : Ectx rT) {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) :
+theorem DetStep.fill [Countable rT] [MeasurableSingletonClass rT]
+    (K : Ectx rT) {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) :
     DetStep ⟨K.fill cfg1.expr, cfg1.state⟩ ⟨K.fill cfg2.expr, cfg2.state⟩ where
   safe := h.safe.fill K
   det := by rw [← primStep_fill_singleton (val_stuck h.pos)]; exact h.det
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetExec.refl (cfg : Cfg rT) : DetExec 0 cfg cfg where
   det_exec := rfl
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 theorem DetExec.cons {cfg1 cfg2 cfg3 : Cfg rT} {n : ℕ}
     (hstep : DetStep cfg1 cfg2) (hrest : DetExec n cfg2 cfg3) :
     DetExec (n + 1) cfg1 cfg3 where

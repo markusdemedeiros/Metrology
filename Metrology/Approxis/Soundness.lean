@@ -164,6 +164,8 @@ theorem bin_log_related_close_cofinite
   rw [Exp.open_close_subst_lc x y _ hKe_lc, Exp.open_close_subst_lc x y _ hKe'_lc]
   exact BIBase.Entails.trans Hbody hRename
 
+
+omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- An element of `(Ke.close x).fv` came from `Γrc'.dom`, not from `{x}`
 (closing erases `x`). The `hKe_fv` hypothesis bounds `Ke.fv` by
 `((x, _) :: Γrc').dom = Γrc'.dom ∪ {x}`. -/

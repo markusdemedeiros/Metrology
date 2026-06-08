@@ -45,13 +45,11 @@ end ClosedCtx
 /-- `Exp.isClosed X e` : `e` is locally closed and every free variable of `e` is in `X`. -/
 def Exp.isClosed (X : ClosedCtx) (e : Exp rT) : Prop := e.IsLocallyClosed ∧ e.fv ⊆ X
 
-omit [ProbLangℝ rT] in
 theorem Exp.isClosed_weaken {X Y : ClosedCtx} (hXY : X.subset Y)
-    {e : Exp rT} (h : e.isClosed X) : e.isClosed Y :=
+    {e : Exp α} (h : e.isClosed X) : e.isClosed Y :=
   ⟨h.1, fun _ hz => hXY (h.2 hz)⟩
 
-omit [ProbLangℝ rT] in
-theorem Exp.isClosed_weaken_empty {X : ClosedCtx} {e : Exp rT}
+theorem Exp.isClosed_weaken_empty {X : ClosedCtx} {e : Exp α}
     (h : e.isClosed .empty) : e.isClosed X := by
   refine ⟨h.1, fun z hz => ?_⟩
   have := h.2 hz
@@ -107,9 +105,8 @@ theorem Exp.substMap_singleton (x : Var) (v e : Exp rT) :
 
 /-! ### Substitution and closedness -/
 
-omit [ProbLangℝ rT] in
 /-- Substitution of a value with no free variables in `X` preserves closedness in `X`. -/
-theorem Exp.subst_isClosed {X : ClosedCtx} {e v : Exp rT} {x : Var}
+theorem Exp.subst_isClosed {X : ClosedCtx} {e v : Exp α} {x : Var}
     (he : e.isClosed (X.insert x)) (hv : v.isClosed X) :
     (Exp.subst e x v).isClosed X := by
   refine ⟨Exp.subst_lc he.1 hv.1, ?_⟩
@@ -124,22 +121,21 @@ theorem Exp.subst_isClosed {X : ClosedCtx} {e v : Exp rT} {x : Var}
   · exact hv.2 h
 
 /-- Substitution of a closed-in-`X` value into a closed-in-`X.insert x` term is closed in `X`. -/
-theorem Exp.subst_is_closed {e : Exp rT} {x : Var} {v : Exp rT} {X : ClosedCtx}
+theorem Exp.subst_is_closed {e : Exp α} {x : Var} {v : Exp α} {X : ClosedCtx}
     (he : e.isClosed (X.insert x)) (hv : v.isClosed X) :
     (Exp.subst e x v).isClosed X :=
   Exp.subst_isClosed he hv
 
 /-- Substitution of a fully closed value. -/
-theorem Exp.subst_is_closed_empty {e : Exp rT} {x : Var} {v : Exp rT}
+theorem Exp.subst_is_closed_empty {e : Exp α} {x : Var} {v : Exp α}
     (he : e.isClosed (ClosedCtx.empty.insert x)) (hv : v.isClosed .empty) :
     (Exp.subst e x v).isClosed .empty :=
   Exp.subst_is_closed he hv
 
 /-! ### Commutation of substitutions -/
 
-omit [ProbLangℝ rT] in
 /-- Substitutions at different variables commute when `v'` has no `x` free. -/
-theorem Exp.subst_subst {e v v' : Exp rT} {x : Var} {y : Var}
+theorem Exp.subst_subst {e v v' : Exp α} {x : Var} {y : Var}
     (hne : x ≠ y) (hv' : x ∉ v'.fv) (_hv'_lc : v'.IsLocallyClosed) :
     Exp.subst (Exp.subst e x v) y v'
       = Exp.subst (Exp.subst e y v') x (Exp.subst v y v') := by
@@ -165,7 +161,7 @@ theorem Exp.subst_subst {e v v' : Exp rT} {x : Var} {y : Var}
       simp [Exp.subst, ih0, ih1, ih2]
 
 /-- Independence of substitutions at distinct, mutually-fresh variables. -/
-theorem Exp.subst_subst_ne {e v v' : Exp rT} {x y : Var}
+theorem Exp.subst_subst_ne {e v v' : Exp α} {x y : Var}
     (hne : x ≠ y) (hxv' : x ∉ v'.fv) (hyv : y ∉ v.fv)
     (_hv_lc : v.IsLocallyClosed) (hv'_lc : v'.IsLocallyClosed) :
     Exp.subst (Exp.subst e x v) y v' = Exp.subst (Exp.subst e y v') x v := by
@@ -183,9 +179,8 @@ commutation `Exp.substMap_subst_fvar_comm` lives further down (after
 
 /-- Two-step substitution where the bridge is a fresh atom: `e[x ↦ y][y ↦ w] = e[x ↦ w]`
 when `y` doesn't already appear free in `e` (so the only `y` introduced by the
-omit [ProbLangℝ rT] in
 first step is the one at `x`'s position). -/
-theorem Exp.subst_subst_fvar_id (e w : Exp rT) (x y : Var) (hyv : y ∉ e.fv) :
+theorem Exp.subst_subst_fvar_id (e w : Exp α) (x y : Var) (hyv : y ∉ e.fv) :
     Exp.subst (Exp.subst e x (.fvar y)) y w = Exp.subst e x w := by
   induction e with
   | fvar z =>
@@ -1180,13 +1175,11 @@ theorem det_or_prob_or_zero [Countable rT] [MeasurableSingletonClass rT]
 
 /-! ## Group E — Tape and fresh-location update lemmas -/
 
-omit [ProbLangℝ rT] in
-theorem State.upd_tape_some (σ : State rT) (α : Loc) (t : Tape) :
+theorem State.upd_tape_some (σ : State α) (α : Loc) (t : Tape) :
     (σ.update_tapes (·.insert α t)).tapes[α]? = some t := by
   simp [State.update_tapes]
 
-omit [ProbLangℝ rT] in
-theorem State.upd_diff_tape_comm {σ : State rT} {α β : Loc} {bs bs' : Tape}
+theorem State.upd_diff_tape_comm {σ : State α} {α β : Loc} {bs bs' : Tape}
     (hne : α ≠ β) :
     ((σ.update_tapes (·.insert β bs)).update_tapes (·.insert α bs'))
       = ((σ.update_tapes (·.insert α bs')).update_tapes (·.insert β bs)) := by
@@ -1204,8 +1197,7 @@ theorem State.upd_diff_tape_comm {σ : State rT} {α β : Loc} {bs bs' : Tape}
       simp [hαk]
     · simp [hαk, hβk]
 
-omit [ProbLangℝ rT] in
-theorem State.upd_diff_tape_tot {σ : State rT} {α β : Loc} {bs : Tape}
+theorem State.upd_diff_tape_tot {σ : State α} {α β : Loc} {bs : Tape}
     (hne : α ≠ β) :
     (σ.update_tapes (·.insert β bs)).tapes[α]? = σ.tapes[α]? := by
   simp [State.update_tapes, Std.ExtTreeMap.getElem?_insert, Ne.symm hne]
@@ -1247,8 +1239,7 @@ theorem Std.ExtTreeMap.fresh_insert_of_mem
       simp [hcmp, Ordering.isLE]
   rw [hkeys]
 
-omit [ProbLangℝ rT] in
-theorem State.fresh_loc_upd_some {σ : State rT} {α : Loc} {bs bs' : Tape}
+theorem State.fresh_loc_upd_some {σ : State α} {α : Loc} {bs bs' : Tape}
     (h : σ.tapes[α]? = some bs) :
     (σ.tapes.insert α bs').fresh = σ.tapes.fresh :=
   Std.ExtTreeMap.fresh_insert_of_mem σ.tapes h
@@ -1262,7 +1253,7 @@ theorem Std.ExtTreeMap.elem_fresh_ne
   rw [hfresh] at h
   simp at h
 
-theorem State.fresh_loc_upd_swap {σ : State rT} {α : Loc} {bs bs' : Tape} {t : Tape}
+theorem State.fresh_loc_upd_swap {σ : State β} {α : Loc} {bs bs' : Tape} {t : Tape}
     (h : σ.tapes[α]? = some bs) :
     ((σ.tapes.insert α bs').insert (σ.tapes.insert α bs').fresh t)
       = ((σ.tapes.insert σ.tapes.fresh t).insert α bs') := by
@@ -1280,8 +1271,7 @@ theorem State.fresh_loc_upd_swap {σ : State rT} {α : Loc} {bs bs' : Tape} {t :
       simp [hαk]
     · simp [hαk, hfk]
 
-omit [ProbLangℝ rT] in
-theorem State.fresh_loc_lookup {σ : State rT} {α : Loc} {bs : Tape} {t : Tape}
+theorem State.fresh_loc_lookup {σ : State α} {α : Loc} {bs : Tape} {t : Tape}
     (h : σ.tapes[α]? = some bs) :
     (σ.tapes.insert σ.tapes.fresh t)[α]? = some bs := by
   have hne : σ.tapes.fresh ≠ α := Std.ExtTreeMap.elem_fresh_ne h
@@ -1304,7 +1294,6 @@ theorem Cfg.uniform_ne_zero [Countable rT] [MeasurableSingletonClass rT]
   have := hp.measure_univ; rw [heq] at this; simp at this
 
 /-- Integrate a function over `Cfg.uniform z σ`: the result is the uniform
-omit [ProbLangℝ rT] in
 average over `n ∈ Ico 0 z` of `φ ⟨#n, σ⟩`. -/
 theorem Cfg.lintegral_uniform [Countable rT] [MeasurableSingletonClass rT]
     {z : Int} (Hz : 0 < z) (σ : State rT) (φ : Cfg rT → ENNReal) :

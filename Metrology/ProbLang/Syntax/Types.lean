@@ -851,7 +851,7 @@ theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
       simp only [Exp.fv] at hy
       exact .scrut (ih x y τ_x Γ rfl hy) hp
 
-theorem Typed.rename {Γ : Tctx} {e : Exp rT} {τ τ_x : Ty}
+theorem Typed.rename {Γ : Tctx} {e : Exp α} {τ τ_x : Ty}
     (x y : Var) (h : Typed (Γ.insert x τ_x) e τ) (hy : y ∉ e.fv ∪ {x}) :
     Typed (Γ.insert y τ_x) (Exp.subst e x (Exp.fvar y)) τ :=
   Typed.rename_aux h x y τ_x Γ rfl hy
@@ -866,7 +866,7 @@ when only a single-atom typing is in hand. Proofs are non-trivial standard
 LN renaming theory; deferred. -/
 
 /-- Cofinite α-rename: a typing at one fresh atom can be lifted to all fresh atoms. -/
-theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp rT} {τ τ' : Ty}
+theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp α} {τ τ' : Ty}
     (_hx : x ∉ e.fv) (he : Typed (Γ.insert x τ) e τ') :
     ∀ y ∉ insert x e.fv,
       Typed (Γ.insert y τ) (Exp.open' (Exp.close e x) (Exp.fvar y)) τ' := by
@@ -884,7 +884,7 @@ theorem Typed.rename_lam {Γ : Tctx} {x : Var} {e : Exp rT} {τ τ' : Ty}
     · exact hyx (Finset.mem_singleton.mp h)
   exact Typed.rename x y he hyu
 
-theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp rT} {τ τ' : Ty}
+theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp α} {τ τ' : Ty}
     (_hf : f ∉ e.fv) (he : Typed (Γ.insert f (.arrow τ τ')) e (.arrow τ τ')) :
     ∀ g ∉ insert f e.fv,
       Typed (Γ.insert g (.arrow τ τ'))
@@ -901,7 +901,7 @@ theorem Typed.rename_fix {Γ : Tctx} {f : Var} {e : Exp rT} {τ τ' : Ty}
     · exact hgf (Finset.mem_singleton.mp h)
   exact Typed.rename f g he hgu
 
-theorem Typed.rename_unpack {Γ : Tctx} {x : Var} {e2 : Exp rT} {τ τ2 : Ty}
+theorem Typed.rename_unpack {Γ : Tctx} {x : Var} {e2 : Exp α} {τ τ2 : Ty}
     (_hx : x ∉ e2.fv)
     (he2 : Typed ((Γ.shift).insert x τ) e2 τ2.shift) :
     ∀ y ∉ insert x e2.fv,

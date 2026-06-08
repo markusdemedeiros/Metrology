@@ -28,27 +28,21 @@ def Exp.asValM [MeasurableSpace T] (e : Exp rT) (f : Val rT → Measure T) : Mea
 def Exp.isValM [MeasurableSpace T] (e : Exp rT) (m : Measure T) : Measure T :=
   if e.isValue then m else 0
 
-omit [ProbLangℝ rT] in
-@[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp rT} {m : Measure T} (He : e.isValue) :
+@[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp α} {m : Measure T} (He : e.isValue) :
     e.isValM m = m := if_pos He
 
-theorem Exp.isValM_some' [MeasurableSpace T] {e : Exp rT} {m : Measure T} (w : IsVal e) :
+theorem Exp.isValM_some' [MeasurableSpace T] {e : Exp α} {m : Measure T} (w : IsVal e) :
     e.isValM m = m := isValM_some w.toIsValue
 
-omit [ProbLangℝ rT] in
-@[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp rT} {m : Measure T} (He : ¬ e.isValue) :
+@[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp α} {m : Measure T} (He : ¬ e.isValue) :
     e.isValM m = 0 := if_neg He
 
 def Int.isPos (z : Int) : Option { z : Int // 0 < z } :=
   if H : 0 < z then some ⟨z, H⟩ else none
 
 
-/-- `Cfg.uniform z σ` is the measure putting uniform mass on configs
-`⟨.lit (.int n), σ⟩` for `n ∈ {0, 1, …, z−1}` (i.e. `Finset.Ico 0 z`),
-matching the semantics of `rand z` sampling from `{0, …, z−1}`. The
-state fiber is constant at `σ`. If `z ≤ 0`, the measure is the dirac
-on `⟨.lit (.int (-1)), σ⟩` — `rand` on a non-positive bound is total
-and returns the sentinel value `-1`. -/
+/-- Uniform distribution over `⟨.lit (.int n), σ⟩` for `n ∈ {0, 1, …, z−1}` when `0 < z`.
+Constant sentinel value -1 when `z ≤ 0` -/
 def Cfg.uniform (z : Int) (σ : State rT) : Measure (Cfg rT) :=
   match z.isPos with
   | some ⟨z, Hz⟩ =>
@@ -56,7 +50,6 @@ def Cfg.uniform (z : Int) (σ : State rT) : Measure (Cfg rT) :=
       |>.toMeasure.map (⟨.lit <| .int ·, σ⟩)
   | none => dirac ⟨.lit (.int (-1)), σ⟩
 
--- TODO: What if we change Cfg to Option (Exp × State)?
 -- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
 -- order, should be governed by the reduction context.
 def headStep : Cfg rT → Measure (Cfg rT)
@@ -230,11 +223,6 @@ macro "head_case" : tactic =>
       head_subst
       head_split_isValM beta.fix.redex beta.fix.no_redex
   ))
-
-def headStepKernel [Countable rT] [MeasurableSingletonClass rT] :
-    Kernel (Cfg rT) (Cfg rT) where
-  measurable' := .of_discrete
-  toFun := headStep
 
 /-! ### Measurability for arbitrary measurable `rT`.
 
@@ -769,7 +757,7 @@ theorem headStep.c_load.measurable [Inhabited rT] :
     funext ⟨σ, e⟩
     show headStep.c_load _ = _
     unfold headStep.c_load
-    cases e <;> (try rfl) <;>
+    cases e <;> (try rfl);
       (rename_i l; cases l <;> (try rfl))
     -- The remaining case is `.loc ℓ`: heap lookup.
     rename_i ℓ
@@ -1213,12 +1201,12 @@ theorem headStep.c_rand.measurable [Inhabited rT] :
     show headStep.c_rand _ = _
     unfold headStep.c_rand
     -- The `match p.2.1, p.2.2 with` simultaneous match unfolds via cases.
-    cases e1 <;> (try rfl) <;>
-      rename_i l1 <;>
-      cases l1 <;> (try rfl) <;>
-      rename_i z <;>
-      cases e2 <;> (try rfl) <;>
-      rename_i l2 <;>
+    cases e1 <;> (try rfl);
+      rename_i l1;
+      cases l1 <;> (try rfl);
+      rename_i z;
+      cases e2 <;> (try rfl);
+      rename_i l2;
       cases l2 <;> (try rfl)
   rw [hrw]
   refine Measurable.comp ?_
@@ -1339,8 +1327,7 @@ theorem headStep.c_snd.measurable :
   p.2.2.1.isValM (p.2.2.2.isValM
     ((p.2.1.eval p.2.2.1 p.2.2.2).unwrapM (fun e' => dirac ⟨e', p.1⟩)))
 
-theorem headStep.c_binop.measurable [ProbLangℝ rT] :
-    Measurable (headStep.c_binop (rT := rT)) := by
+theorem headStep.c_binop.measurable : Measurable (headStep.c_binop (rT := rT)) := by
   -- Same shape as c_unop, with one extra inner `isValM`.
   have hoe : Measurable
       (fun p : State rT × BinOp × Exp rT × Exp rT => p.2.1.eval p.2.2.1 p.2.2.2) :=
@@ -1584,18 +1571,19 @@ theorem headStep.measurable :
   -- c_scrut: isValM + tryMatch.
   · exact headStep.c_scrut.measurable
 
-/-- Markov kernel of the head step, without the discrete-`rT` hypotheses. -/
-def headStepKernelM : Kernel (Cfg rT) (Cfg rT) where
+def headStepKernel : Kernel (Cfg rT) (Cfg rT) where
   measurable' := headStep.measurable
   toFun := headStep
+
+@[deprecated "use headStepKernel" (since := "2026/06/08")]
+abbrev headStepKernelM : Kernel (Cfg rT) (Cfg rT) := headStepKernel
 
 
 theorem val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
     0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
   head_case <;> simp [Exp.isValue_iff_isValueR]
 
-omit [ProbLangℝ rT] in
-theorem Exp.toVal?_isValue {e : Exp rT} : e.toVal? = some v → e.isValue := by
+theorem Exp.toVal?_isValue {e : Exp α} : e.toVal? = some v → e.isValue := by
   intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
 set_option maxHeartbeats 4000000 in
@@ -1719,9 +1707,8 @@ theorem dirac_singleton_pos [Countable rT] [MeasurableSingletonClass rT]
     split <;> simp; trivial
   · simp_all [dirac_apply_of_mem (Set.mem_singleton _)]
 
-omit [ProbLangℝ rT] in
 @[simp]
-theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp rT} {m : Measure T} {s : Set T} :
+theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp α} {m : Measure T} {s : Set T} :
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
   simp only [Exp.isValM]
   by_cases He : e.isValue
@@ -1734,9 +1721,8 @@ theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
   cases opt <;> simp [Option.unwrapM]
 
-omit [ProbLangℝ rT] in
 @[simp]
-theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp rT} {f : Val rT → Measure T} :
+theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp α} {f : Val α → Measure T} :
     0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
   unfold Exp.asValM; cases e.toVal? <;> simp
 
@@ -1861,19 +1847,16 @@ theorem headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
       rw [if_neg (Ne.symm hzN)]
       exact Cfg.uniform_singleton_nonpos Hz
 
-omit [ProbLangℝ rT] in
-theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp rT} {m : Measure T}
+theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
   rw [Exp.isValM, if_pos he]; infer_instance
 
-omit [ProbLangℝ rT] in
-theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp rT} {f : Val rT → Measure T}
-    {v : Val rT} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
+theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {f : Val α → Measure T}
+    {v : Val α} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
     IsProbabilityMeasure (e.asValM f) := by
   simp [Exp.asValM, hv]; infer_instance
 
-theorem Cfg.uniform_isProbabilityMeasure [Countable rT] [MeasurableSingletonClass rT]
-    {z : Int} {σ : State rT} :
+theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
     IsProbabilityMeasure (Cfg.uniform z σ) := by
   unfold Cfg.uniform Int.isPos
   by_cases Hz : 0 < z

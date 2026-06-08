@@ -198,8 +198,7 @@ example (E : CoPset) (v : Val rT) :
   iintro %l Hl
   -- Unfold the `pl(...)` lambda's `Exp.close` into bvar form so `PureExec`
   -- on `app_lam` fires.
-  simp only [K, Ectx.fill, List.foldl, flip, EctxItem.fillItem, Exp.ofVal,
-    Exp.close, Exp.closeRec, ↓reduceIte]
+  simp only [K, Ectx.fill, List.foldl, flip, EctxItem.fillItem, Exp.ofVal]
   iapply (twp_pure_step_fupd (n := 1)
     (e₁ := Exp.app (Exp.lam (Exp.load (Exp.bvar 0))) (Exp.lit (.loc l) : Exp rT))
     (e₂ := Exp.open' (Exp.load (Exp.bvar 0)) (Exp.lit (.loc l)))
