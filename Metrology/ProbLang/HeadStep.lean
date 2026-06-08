@@ -1579,8 +1579,12 @@ def headStepKernel : Kernel (Cfg rT) (Cfg rT) where
 abbrev headStepKernelM : Kernel (Cfg rT) (Cfg rT) := headStepKernel
 
 
+@[deprecated "use val_head_stuckM" (since := "2026/06/08")]
 theorem val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
     0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
+  head_case <;> simp [Exp.isValue_iff_isValueR]
+
+theorem val_head_stuckM {e : Exp rT} {σ : State rT} : headStep ⟨e, σ⟩ ≠ 0 → ¬e.isValue := by
   head_case <;> simp [Exp.isValue_iff_isValueR]
 
 theorem Exp.toVal?_isValue {e : Exp α} : e.toVal? = some v → e.isValue := by

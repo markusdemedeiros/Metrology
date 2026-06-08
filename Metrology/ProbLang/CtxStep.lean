@@ -87,21 +87,60 @@ def primStepKernel [ProbLangℝ rT] : Kernel (Cfg rT) (Cfg rT) where
 @[deprecated "Generalized as primStepKernel" (since := "2026/06/08")]
 abbrev primStepKernelM {α : Type} [ProbLangℝ α] := primStepKernel (rT := α)
 
--- TODO: Make ReducibleM be "no equivalent to zero measure", make Reducible abbrev this
+@[deprecated "Use ReducibleM" (since := "2026/06/08")]
 abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ∃ ρ : Cfg rT, 0 < primStep ⟨e, σ⟩ {ρ}
 
+-- TODO: Rename me once the name Reducible is free
+abbrev ReducibleM [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+  primStep ⟨e, σ⟩ ≠ 0
 
+@[deprecated "Discrete bridge lemma" (since := "2026/06/08")]
+theorem primStep_discrete_iff {e : Exp rT} {σ : State rT}
+    [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
+    (∃ ρ, 0 < (primStep { expr := e, state := σ }) {ρ}) ↔ primStep { expr := e, state := σ } ≠ 0 := by
+  refine ⟨fun ⟨ρ, Hρ⟩ Hz => by simp [Hz] at Hρ, ?_⟩
+  by_contra!
+  rcases this with ⟨Hnz, H⟩
+  refine Hnz <| ext_of_singleton fun ρ => ?_
+  simp [nonpos_iff_eq_zero.mp (H ρ)]
+
+set_option linter.deprecated false in
+@[deprecated "Discrete bridge lemma" (since := "2026/06/08")]
+theorem Reducible_ReducibleM_iff {e : Exp rT} {σ : State rT}
+    [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
+    Reducible e σ ↔ ReducibleM e σ := by
+  unfold Reducible ReducibleM
+  exact primStep_discrete_iff
 
 /-! ## Values can't step -/
 
-theorem val_stuck [ProbLangℝ rT] [Countable rT]
-    {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
-    (h : 0 < primStep ⟨e, σ⟩ {ρ}) : ¬e.isValue := by
+theorem val_stuckM [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (h : primStep ⟨e, σ⟩ ≠ 0) : ¬e.isValue := by
   simp only [primStep] at h
   set d := e.decomp with hd
   rw [← Exp.decomp_fill hd.symm]
-  exact Ectx.fill_noVal (val_head_stuck (map_singleton_pos h).choose_spec.2)
+  refine Ectx.fill_noVal ?_
+  refine val_head_stuckM (σ := σ) ?_
+
+  -- Need a continuous version of map_singleton_pos
+
+  -- simp only [primStep] at h
+  -- set d := e.decomp with hd
+  -- rw [← Exp.decomp_fill hd.symm]
+  -- exact Ectx.fill_noVal (val_head_stuck (map_singleton_pos h).choose_spec.2)
+  sorry
+
+-- TODO One attribute to indicate that a lemma is an ephemeral discreteness helper,
+-- and also disable the linter warnings inside it
+set_option linter.deprecated false in
+@[deprecated "Use val_stuckM" (since := "2026/06/08")]
+theorem val_stuck [ProbLangℝ rT] [Countable rT]
+    {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
+    (h : 0 < primStep ⟨e, σ⟩ {ρ}) : ¬e.isValue := by
+  refine val_stuckM (σ := σ) ?_
+  refine primStep_discrete_iff.mp ?_
+  exists ρ
 
 /-- `primStep` is a sub-probability measure: total mass is at most 1.
 Follows from `headStep_univ_le_one` via `Measure.map` preserving total mass. -/
