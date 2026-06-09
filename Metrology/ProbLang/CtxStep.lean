@@ -73,11 +73,12 @@ theorem primStep.measurable [ProbLangℝ rT] : Measurable (primStep : Cfg rT →
       · measurability
       · measurability
     · measurability
-  -- Apply the joint pushforward keystone. The `IsSFiniteKernel` instance is
-  -- discharged via a `sorry` for now — morally `headStep` is sub-probability so
-  -- the kernel is finite (TODO: prove `headStep.isFiniteKernel` for general rT).
-  have hSF : IsSFiniteKernel (Kernel.mk (fun cfg : Cfg rT =>
-      headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) hk) := sorry
+  -- Uniform mass bound ≤ 1 gives IsFiniteKernel, hence IsSFiniteKernel.
+  have hFin : ProbabilityTheory.IsFiniteKernel (ProbabilityTheory.Kernel.mk (fun cfg : Cfg rT =>
+      headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) hk) :=
+    ⟨1, ENNReal.one_lt_top, fun cfg => headStep_univ_le_one' _⟩
+  have hSF : ProbabilityTheory.IsSFiniteKernel (ProbabilityTheory.Kernel.mk (fun cfg : Cfg rT =>
+      headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) hk) := inferInstance
   exact Measure.measurable_map_uncurry hh hk
 
 def primStepKernel [ProbLangℝ rT] : Kernel (Cfg rT) (Cfg rT) where
@@ -129,7 +130,7 @@ theorem val_stuckM [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
   -- set d := e.decomp with hd
   -- rw [← Exp.decomp_fill hd.symm]
   -- exact Ectx.fill_noVal (val_head_stuck (map_singleton_pos h).choose_spec.2)
-  sorry
+  intro hz; rw [hz] at h; simp at h
 
 -- TODO One attribute to indicate that a lemma is an ephemeral discreteness helper,
 -- and also disable the linter warnings inside it

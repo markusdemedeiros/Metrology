@@ -1993,6 +1993,77 @@ theorem measurable_sigma_iff {α : Type _} {β : α → Type _}
   intro S hS
   exact MeasurableSpace.measurableSet_iInf.mp hS a
 
+/-- Iterated application of `f` indexed by `Fin n`. Equals `(List.ofFn g).foldl f a`. -/
+def List.foldlOfFn {α β : Type _} (f : α → β → α) : ∀ (n : ℕ), α → (Fin n → β) → α
+  | 0, a, _ => a
+  | n+1, a, g => List.foldlOfFn f n (f a (g 0)) (fun i => g i.succ)
+
+theorem List.foldlOfFn_eq_foldl_ofFn {α β : Type _} (f : α → β → α) :
+    ∀ (n : ℕ) (a : α) (g : Fin n → β), List.foldlOfFn f n a g = (List.ofFn g).foldl f a := by
+  intro n
+  induction n with
+  | zero => intros; rfl
+  | succ n ih =>
+    intro a g
+    show List.foldlOfFn f n (f a (g 0)) (fun i => g i.succ)
+        = (List.ofFn g).foldl f a
+    rw [ih]
+    rw [List.ofFn_succ, List.foldl_cons]
+
+theorem List.measurable_foldlOfFn {α β : Type _}
+    [MeasurableSpace α] [MeasurableSpace β]
+    {f : α → β → α} (hf : Measurable (Function.uncurry f)) :
+    ∀ n, Measurable (fun (p : (Fin n → β) × α) => List.foldlOfFn f n p.2 p.1) := by
+  intro n
+  induction n with
+  | zero =>
+    show Measurable (fun (p : (Fin 0 → β) × α) => p.2)
+    exact measurable_snd
+  | succ n ih =>
+    have h0 : Measurable (fun p : (Fin (n+1) → β) × α => p.1 0) :=
+      (measurable_pi_apply 0).comp measurable_fst
+    have hsucc : Measurable
+        (fun p : (Fin (n+1) → β) × α => (fun i : Fin n => p.1 i.succ)) := by
+      refine measurable_pi_lambda _ ?_
+      intro i
+      exact (measurable_pi_apply _).comp measurable_fst
+    have hfa : Measurable (fun p : (Fin (n+1) → β) × α => f p.2 (p.1 0)) := by
+      have hrw : (fun p : (Fin (n+1) → β) × α => f p.2 (p.1 0))
+          = Function.uncurry f ∘ (fun p => (p.2, p.1 0)) := rfl
+      rw [hrw]; exact hf.comp (measurable_snd.prodMk h0)
+    have hcomp : Measurable
+        (fun p : (Fin (n+1) → β) × α =>
+          (((fun i : Fin n => p.1 i.succ) : Fin n → β), f p.2 (p.1 0))) :=
+      hsucc.prodMk hfa
+    exact ih.comp hcomp
+
+/-- `Sigma.mk i` is a measurable embedding for the standard Σ σ-algebra. -/
+theorem MeasurableEmbedding.sigmaMk {ι : Type _} {β : ι → Type _}
+    [∀ i, MeasurableSpace (β i)] (i : ι) :
+    MeasurableEmbedding (Sigma.mk i : β i → Σ j, β j) := by
+  refine ⟨?_, ?_, ?_⟩
+  · -- Injective
+    intro x y h; exact eq_of_heq (Sigma.mk.inj h).2
+  · -- Measurable
+    intro V hV
+    exact MeasurableSpace.measurableSet_iInf.mp hV i
+  · -- Image of measurable is measurable
+    intro s hs
+    refine MeasurableSpace.measurableSet_iInf.mpr fun j => ?_
+    by_cases hj : j = i
+    · subst hj
+      show MeasurableSet ((Sigma.mk j) ⁻¹' (Sigma.mk j '' s))
+      convert hs
+      ext x
+      refine ⟨?_, fun hx => ⟨x, hx, rfl⟩⟩
+      rintro ⟨y, hy, h⟩
+      exact eq_of_heq (Sigma.mk.inj h).2 ▸ hy
+    · show MeasurableSet ((Sigma.mk j) ⁻¹' (Sigma.mk i '' s))
+      convert MeasurableSet.empty
+      ext x; simp only [Set.mem_preimage, Set.mem_image, Set.mem_empty_iff_false, iff_false]
+      rintro ⟨y, _, h⟩
+      exact (hj (Sigma.mk.inj h).1.symm).elim
+
 /-- **`List.foldl` is measurable** in `(list, init)` whenever the binary operation
 `f` is jointly measurable.
 
@@ -2002,7 +2073,156 @@ of `n` applications of `f`. Sigma-fiber measurability glues these together. -/
 theorem List.measurable_foldl {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
     {f : α → β → α} (hf : Measurable (Function.uncurry f)) :
     Measurable (fun (p : List β × α) => p.1.foldl f p.2) := by
-  sorry
+  -- Factor: foldl = H ∘ swap ∘ (toSigma × id), where
+  --   H : Σ n, (Fin n → β) × α → α,   H ⟨n, (g, a)⟩ := List.foldlOfFn f n a g
+  --   swap : (Σ n, Fin n → β) × α → Σ n, (Fin n → β) × α,
+  --          swap ((⟨n, g⟩), a) := ⟨n, (g, a)⟩
+  set H : (Σ n : ℕ, (Fin n → β) × α) → α :=
+    fun s => List.foldlOfFn f s.1 s.2.2 s.2.1
+  have hH : Measurable H := by
+    rw [measurable_sigma_iff]
+    intro n; exact List.measurable_foldlOfFn hf n
+  -- Identity: foldl p = H (swap (toSigma p.1, p.2))
+  have hgoal_eq : (fun p : List β × α => p.1.foldl f p.2)
+      = H ∘ (fun q : (Σ k : ℕ, Fin k → β) × α =>
+          (⟨q.1.1, (q.1.2, q.2)⟩ : Σ k : ℕ, (Fin k → β) × α))
+        ∘ (fun p : List β × α => (List.toSigma p.1, p.2)) := by
+    funext p
+    show p.1.foldl f p.2 = List.foldlOfFn f (List.toSigma p.1).1 p.2 (List.toSigma p.1).2
+    rw [List.foldlOfFn_eq_foldl_ofFn]
+    show p.1.foldl f p.2 = (List.ofFn p.1.get).foldl f p.2
+    rw [List.ofFn_get]
+  rw [hgoal_eq]
+  -- Compose measurabilities.
+  refine hH.comp ?_
+  refine Measurable.comp ?_
+    ((List.measurable_toSigma).comp measurable_fst |>.prodMk measurable_snd)
+  -- Prove `swap` measurable.
+  intro U hU
+  -- For each k₀, `Sigma.mk k₀ ⁻¹' U` is measurable in (Fin k₀ → β) × α.
+  have hUfib : ∀ k₀, MeasurableSet
+      ((@Sigma.mk ℕ (fun k => (Fin k → β) × α) k₀) ⁻¹' U) := by
+    intro k₀
+    exact MeasurableSpace.measurableSet_iInf.mp hU k₀
+  -- swap ⁻¹' U = ⋃ k₀, (Sigma.mk k₀ × id) '' (Sigma.mk k₀ ⁻¹' U).
+  have hrw : (fun q : (Σ k : ℕ, Fin k → β) × α =>
+        (⟨q.1.1, (q.1.2, q.2)⟩ : Σ k : ℕ, (Fin k → β) × α)) ⁻¹' U
+      = ⋃ k₀ : ℕ, (Prod.map (@Sigma.mk ℕ (fun k => Fin k → β) k₀) (id : α → α))
+          '' ((@Sigma.mk ℕ (fun k => (Fin k → β) × α) k₀) ⁻¹' U) := by
+    ext q
+    obtain ⟨⟨k, g⟩, a⟩ := q
+    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_image, Prod.map_apply, id_eq]
+    constructor
+    · intro h
+      exact ⟨k, (g, a), h, rfl⟩
+    · rintro ⟨k₀, ⟨g₀, a₀⟩, hga, hq⟩
+      -- hq : (Sigma.mk k₀ g₀, a₀) = (⟨k, g⟩, a)
+      rw [Prod.mk.injEq, Sigma.mk.injEq] at hq
+      obtain ⟨⟨hk, hg⟩, ha⟩ := hq
+      subst hk
+      cases hg
+      subst ha
+      exact hga
+  rw [hrw]
+  refine MeasurableSet.iUnion fun k₀ => ?_
+  -- Image of measurable under product of measurable embeddings.
+  have hEmb : MeasurableEmbedding
+      (Prod.map (@Sigma.mk ℕ (fun k => Fin k → β) k₀) (id : α → α)) :=
+    (MeasurableEmbedding.sigmaMk k₀).prodMap MeasurableEmbedding.id
+  exact hEmb.measurableSet_image' (hUfib k₀)
+
+/-- Per-`n`, `Fin.snoc` is jointly measurable in `(g, b)`. -/
+theorem Fin.measurable_snoc {n : ℕ} {β : Type _} [MeasurableSpace β] :
+    Measurable (fun (p : (Fin n → β) × β) => (@Fin.snoc n (fun _ => β) p.1 p.2) : (Fin n → β) × β → (Fin (n+1) → β)) := by
+  refine measurable_pi_lambda _ fun i => ?_
+  by_cases h : i.val < n
+  · have heq : ∀ p : (Fin n → β) × β,
+        ((@Fin.snoc n (fun _ => β) p.1 p.2) i : β) = p.1 ⟨i.val, h⟩ := by
+      intro p
+      simp [Fin.snoc, h, Fin.castLT]
+    rw [show (fun p : (Fin n → β) × β => ((@Fin.snoc n (fun _ => β) p.1 p.2) i : β))
+          = fun p => p.1 ⟨i.val, h⟩ from funext heq]
+    exact (measurable_pi_apply _).comp measurable_fst
+  · push_neg at h
+    have hi : i = Fin.last n := Fin.ext (le_antisymm (Nat.lt_succ_iff.mp i.isLt) h)
+    have heq : ∀ p : (Fin n → β) × β, ((@Fin.snoc n (fun _ => β) p.1 p.2) i : β) = p.2 := by
+      intro p; rw [hi, Fin.snoc_last]
+    rw [show (fun p : (Fin n → β) × β => ((@Fin.snoc n (fun _ => β) p.1 p.2) i : β))
+          = fun p => p.2 from funext heq]
+    exact measurable_snd
+
+/-- The "snoc into Σ" function: `((⟨k, g⟩), b) ↦ ⟨k+1, Fin.snoc g b⟩`. Measurable. -/
+theorem measurable_sigma_snoc {β : Type _} [MeasurableSpace β] :
+    Measurable (fun (q : (Σ k : ℕ, Fin k → β) × β) =>
+      (⟨q.1.1 + 1, Fin.snoc q.1.2 q.2⟩ : Σ k : ℕ, Fin k → β)) := by
+  intro U hU
+  -- Strategy mirrors swap measurability in List.measurable_foldl.
+  have hUfib : ∀ k₀, MeasurableSet
+      ((@Sigma.mk ℕ (fun k => Fin k → β) k₀) ⁻¹' U) := by
+    intro k₀
+    exact MeasurableSpace.measurableSet_iInf.mp hU k₀
+  -- Preimage decomposes by q.1.1 = k₀:
+  have hrw : (fun q : (Σ k : ℕ, Fin k → β) × β =>
+        (⟨q.1.1 + 1, Fin.snoc q.1.2 q.2⟩ : Σ k : ℕ, Fin k → β)) ⁻¹' U
+      = ⋃ k₀ : ℕ, (Prod.map (@Sigma.mk ℕ (fun k => Fin k → β) k₀) (id : β → β))
+          '' ((fun p : (Fin k₀ → β) × β => (@Fin.snoc k₀ (fun _ => β) p.1 p.2))
+              ⁻¹' ((@Sigma.mk ℕ (fun k => Fin k → β) (k₀ + 1)) ⁻¹' U)) := by
+    ext q
+    obtain ⟨⟨k, g⟩, b⟩ := q
+    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_image, Prod.map_apply, id_eq]
+    constructor
+    · intro h
+      exact ⟨k, (g, b), h, rfl⟩
+    · rintro ⟨k₀, ⟨g₀, b₀⟩, hsnoc, hq⟩
+      rw [Prod.mk.injEq, Sigma.mk.injEq] at hq
+      obtain ⟨⟨hk, hg⟩, hb⟩ := hq
+      subst hk
+      cases hg
+      subst hb
+      exact hsnoc
+  rw [hrw]
+  refine MeasurableSet.iUnion fun k₀ => ?_
+  have hEmb : MeasurableEmbedding
+      (Prod.map (@Sigma.mk ℕ (fun k => Fin k → β) k₀) (id : β → β)) :=
+    (MeasurableEmbedding.sigmaMk k₀).prodMap MeasurableEmbedding.id
+  refine hEmb.measurableSet_image' ?_
+  exact Fin.measurable_snoc (hUfib (k₀ + 1))
+
+/-- **`(L, x) ↦ L ++ [x]`** is measurable. -/
+theorem List.measurable_append_singleton {β : Type _} [MeasurableSpace β] :
+    Measurable (fun (p : List β × β) => p.1 ++ [p.2]) := by
+  rw [measurable_comap_iff (g := (List.toSigma : List β → Σ k, Fin k → β))]
+  -- Goal: Measurable (toSigma ∘ (fun p => p.1 ++ [p.2])).
+  -- Show equal to `measurable_sigma_snoc.fn ∘ (toSigma × id)`, which is measurable.
+  have hrw : (List.toSigma : List β → Σ k, Fin k → β) ∘ (fun p : List β × β => p.1 ++ [p.2])
+      = (fun q : (Σ k, Fin k → β) × β =>
+          (⟨q.1.1 + 1, Fin.snoc q.1.2 q.2⟩ : Σ k, Fin k → β))
+        ∘ (fun p : List β × β => (List.toSigma p.1, p.2)) := by
+    funext p
+    obtain ⟨L, x⟩ := p
+    show (@Sigma.mk ℕ (fun k => Fin k → β) (L ++ [x]).length (L ++ [x]).get)
+        = ⟨L.length + 1, @Fin.snoc L.length (fun _ => β) L.get x⟩
+    have hlen : (L ++ [x]).length = L.length + 1 := by simp
+    refine Sigma.ext hlen ?_
+    refine (Fin.heq_fun_iff hlen).mpr ?_
+    intro i
+    have hlt : i.val < L.length + 1 := hlen ▸ i.isLt
+    show (L ++ [x]).get i = (@Fin.snoc L.length (fun _ => β) L.get x) ⟨i.val, hlt⟩
+    by_cases hi : i.val < L.length
+    · have hcast : (⟨i.val, hlt⟩ : Fin (L.length + 1))
+          = ((⟨i.val, hi⟩ : Fin L.length).castSucc) := Fin.ext rfl
+      rw [hcast, Fin.snoc_castSucc]
+      simp [List.getElem_append, hi]
+    · push_neg at hi
+      have hival : i.val = L.length := by omega
+      have hcast : ((⟨i.val, hlt⟩ : Fin (L.length + 1)))
+          = Fin.last L.length := Fin.ext hival
+      rw [hcast, Fin.snoc_last]
+      have hi' : ¬ i.val < L.length := Nat.not_lt.mpr hi
+      simp [List.getElem_append, hi', hival]
+  rw [hrw]
+  exact measurable_sigma_snoc.comp
+    ((List.measurable_toSigma).comp measurable_fst |>.prodMk measurable_snd)
 
 /-- **Joint parameterized pushforward**. Given a jointly measurable function
 `h : α × β → γ` and a kernel-valued source `k : α → Measure β` measurable that

@@ -1223,12 +1223,39 @@ theorem headStep.c_rand.measurable [Inhabited rT] :
 
 theorem headStep.c_scrut.measurable [ProbLangℝ rT] :
     Measurable (headStep.c_scrut (rT := rT)) := by
-  -- Blocked: the joint `tryMatch.measurable` proven in Recurrences.lean requires
-  -- `[Countable rT] [MeasurableSingletonClass rT]` (splits on Pat factor via
-  -- countable rT lifting). The headStep keystone forbids those typeclasses, so
-  -- this proof needs a different `tryMatch` measurability that doesn't require
-  -- discrete rT — likely via Pi-type measurability on `Pat → (Exp → Option Exp)`.
-  sorry
+  -- Use the non-Countable joint tryMatch measurability + Option.measurable_elim_param.
+  -- First rewrite c_scrut into Option.casesOn form (the match → casesOn step).
+  have hrw : (headStep.c_scrut (rT := rT))
+      = fun p : State rT × Exp rT × Pat rT =>
+        p.2.1.isValM
+          (Option.casesOn (motive := fun _ => Measure (Cfg rT)) (Pat.tryMatch p.2.2 p.2.1)
+            (Measure.dirac (⟨.inr (.lit .unit), p.1⟩ : Cfg rT))
+            (fun b => Measure.dirac (⟨.inl b, p.1⟩ : Cfg rT))) := by
+    funext p
+    show headStep.c_scrut p = _
+    unfold headStep.c_scrut
+    cases hp : Pat.tryMatch p.2.2 p.2.1 <;> rfl
+  rw [hrw]
+  apply Exp.isValM.measurable_param
+  · exact measurable_fst.comp measurable_snd
+  · -- Inner measure measurable via Option.measurable_elim_param.
+    refine Option.measurable_elim_param
+      (f := fun p : State rT × Exp rT × Pat rT => Pat.tryMatch p.2.2 p.2.1)
+      (default := fun p : State rT × Exp rT × Pat rT =>
+        Measure.dirac (⟨.inr (.lit .unit), p.1⟩ : Cfg rT))
+      (some_branch := fun s : (State rT × Exp rT × Pat rT) × Exp rT =>
+        Measure.dirac (⟨.inl s.2, s.1.1⟩ : Cfg rT)) ?_ ?_ ?_
+    · have : (fun p : State rT × Exp rT × Pat rT => Pat.tryMatch p.2.2 p.2.1)
+          = (Function.uncurry (fun (p : Pat rT) (e : Exp rT) => Pat.tryMatch p e)) ∘
+            (fun p : State rT × Exp rT × Pat rT => (p.2.2, p.2.1)) := by
+        funext _; rfl
+      rw [this]
+      exact ProbLang.Exp.tryMatch.measurable_joint.comp
+        ((measurable_snd.comp measurable_snd).prodMk (measurable_fst.comp measurable_snd))
+    · refine Cfg.measurable_dirac_mk measurable_const measurable_fst
+    · refine Cfg.measurable_dirac_mk
+        (Exp.inl.measurable.comp measurable_snd)
+        (measurable_fst.comp measurable_fst)
 
 /-- `fst (pair e1 e2)` branch: nested rec on subterm. -/
 @[simp] def headStep.c_fst (p : State rT × Exp rT) : Measure (Cfg rT) :=
@@ -1884,6 +1911,81 @@ theorem head_step_mass [Countable rT] [MeasurableSingletonClass rT]
     obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
   case rand.plain | rand.tape | rand.tape.mismatch =>
     intro _; exact Cfg.uniform_isProbabilityMeasure
+
+/-- `headStep` is a sub-probability measure for arbitrary `rT`: by case analysis,
+each branch returns either `0`, a `dirac`, or a probability measure (gated by
+`isValM`/`asValM`/`unwrapM` which only ever shrink mass). -/
+theorem headStep_univ_le_one' (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
+  -- Helper: isValM-univ shrinks mass.
+  have hisValM_le : ∀ {T : Type _} [MeasurableSpace T] (e : Exp rT) (m : Measure T),
+      m Set.univ ≤ 1 → (e.isValM m) Set.univ ≤ 1 := by
+    intro T _ e m hm
+    by_cases hv : e.isValue
+    · rw [Exp.isValM_some hv]; exact hm
+    · rw [Exp.isValM_none hv]; simp
+  have hasValM_le : ∀ {T : Type _} [MeasurableSpace T] (e : Exp rT) (f : Val rT → Measure T),
+      (∀ v, (f v) Set.univ ≤ 1) → (e.asValM f) Set.univ ≤ 1 := by
+    intro T _ e f hf
+    unfold Exp.asValM
+    rcases hv : e.toVal? with _ | v
+    · simp
+    · exact hf v
+  have hunwrapM_le : ∀ {α T : Type _} [MeasurableSpace T] (o : Option α) (f : α → Measure T),
+      (∀ a, (f a) Set.univ ≤ 1) → (o.unwrapM f) Set.univ ≤ 1 := by
+    intro α T _ o f hf
+    cases o
+    · simp [Option.unwrapM]
+    · simp [Option.unwrapM]; exact hf _
+  have hdirac : ∀ {T : Type _} [MeasurableSpace T] (x : T), (Measure.dirac x) Set.univ ≤ 1 := by
+    intro T _ x
+    rw [Measure.dirac_apply' _ MeasurableSet.univ]; simp
+  have huniform : ∀ z (σ : State rT), (Cfg.uniform z σ) Set.univ ≤ 1 := by
+    intro z σ
+    have := @Cfg.uniform_isProbabilityMeasure rT _ z σ
+    exact this.measure_univ.le
+  obtain ⟨e, σ⟩ := ρ
+  set_option maxHeartbeats 1000000 in
+  show (headStep ⟨e, σ⟩) Set.univ ≤ 1
+  unfold headStep
+  split
+  case _ => -- app (.lam _) _
+    apply hisValM_le; apply hdirac
+  case _ => -- app (.fix _) _
+    apply hisValM_le; apply hdirac
+  case _ => -- unop
+    apply hisValM_le; apply hunwrapM_le; intro _; apply hdirac
+  case _ => -- binop
+    apply hisValM_le; apply hisValM_le; apply hunwrapM_le; intro _; apply hdirac
+  case _ => apply hdirac -- cond.true
+  case _ => apply hdirac -- cond.false
+  case _ => apply hisValM_le; apply hisValM_le; apply hdirac -- fst.pair
+  case _ => apply hisValM_le; apply hisValM_le; apply hdirac -- snd.pair
+  case _ => apply hisValM_le; apply hdirac -- case.inl
+  case _ => apply hisValM_le; apply hdirac -- case.inr
+  case _ => apply hasValM_le; intro _; apply hdirac -- alloc
+  case _ => -- load
+    split
+    · simp
+    · apply hdirac
+  case _ => -- store
+    apply hasValM_le; intro _
+    split
+    · simp
+    · apply hdirac
+  case _ => apply huniform -- rand.plain
+  case _ => apply hdirac -- tape
+  case _ => -- rand.tape
+    split
+    · simp
+    · split
+      · split
+        · apply huniform
+        · apply hdirac
+      · apply huniform
+  case _ => -- scrut
+    apply hisValM_le
+    split <;> apply hdirac
+  case _ => simp -- default
 
 /-- `headStep` is a sub-probability measure: total mass is at most 1.
 Case split on whether any singleton has positive mass: if so, `headStep ρ`
