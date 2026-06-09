@@ -542,8 +542,8 @@ theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace α] :
 
 macro "solve_cover_measurable" : tactic => `(tactic|
   first
-  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable (by measurability)
-  | exact flatten_measurable (by measurability))
+  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable ((by measurability))
+  | exact flatten_measurable ((by measurability)))
 
 @[measurability]
 theorem cover.appL.measurable [MeasurableSpace α] {S : Set (Val α)} (hS : MeasurableSet S) :
@@ -710,35 +710,35 @@ theorem cover.scrut_eq_image (S : Set (Pat α)) :
 
 @[fun_prop]
 theorem unop.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.unop.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.unop.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem fst.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.fst.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.fst.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem snd.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.snd.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.snd.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem inl.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.inl.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.inl.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem inr.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.inr.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.inr.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem alloc.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.alloc.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.alloc.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem load.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.load.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.load.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem tape.ι.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (EctxItem.tape.ι (α := α)) := Measurable.of_discrete
+    Measurable (EctxItem.tape.ι (α := α)) := (by measurability)
 
 @[fun_prop]
 theorem appL.ι.measurable [MeasurableSpace α] :
@@ -953,7 +953,7 @@ theorem case.measurable [MeasurableSpace α] :
 /-! ### Measurable embeddings. -/
 
 macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  (refine ⟨fun _ _ h => by injection h, (by measurability), fun S _ => ?_⟩
    rw [← $eq_image S]
    exact $meas S))
 
@@ -1250,22 +1250,22 @@ theorem measurable_rec
   iterate 20 refine .union ?_ ?_
   · exact appL.measurableEmbedding.measurableSet_image'   (h_appL hS)
   · exact appR.measurableEmbedding.measurableSet_image'   (h_appR hS)
-  · exact unop.measurableEmbedding.measurableSet_image'   .of_discrete
+  · exact unop.measurableEmbedding.measurableSet_image'   (by measurability)
   · exact binopL.measurableEmbedding.measurableSet_image' (h_binopL hS)
   · exact binopR.measurableEmbedding.measurableSet_image' (h_binopR hS)
   · exact condC.measurableEmbedding.measurableSet_image'  (h_condC hS)
   · exact pairL.measurableEmbedding.measurableSet_image'  (h_pairL hS)
   · exact pairR.measurableEmbedding.measurableSet_image'  (h_pairR hS)
-  · exact fst.measurableEmbedding.measurableSet_image'    .of_discrete
-  · exact snd.measurableEmbedding.measurableSet_image'    .of_discrete
-  · exact inl.measurableEmbedding.measurableSet_image'    .of_discrete
-  · exact inr.measurableEmbedding.measurableSet_image'    .of_discrete
+  · exact fst.measurableEmbedding.measurableSet_image'    (by measurability)
+  · exact snd.measurableEmbedding.measurableSet_image'    (by measurability)
+  · exact inl.measurableEmbedding.measurableSet_image'    (by measurability)
+  · exact inr.measurableEmbedding.measurableSet_image'    (by measurability)
   · exact case.measurableEmbedding.measurableSet_image'   (h_case hS)
-  · exact alloc.measurableEmbedding.measurableSet_image'  .of_discrete
-  · exact load.measurableEmbedding.measurableSet_image'   .of_discrete
+  · exact alloc.measurableEmbedding.measurableSet_image'  (by measurability)
+  · exact load.measurableEmbedding.measurableSet_image'   (by measurability)
   · exact storeL.measurableEmbedding.measurableSet_image' (h_storeL hS)
   · exact storeR.measurableEmbedding.measurableSet_image' (h_storeR hS)
-  · exact tape.measurableEmbedding.measurableSet_image'   .of_discrete
+  · exact tape.measurableEmbedding.measurableSet_image'   (by measurability)
   · exact randL.measurableEmbedding.measurableSet_image'  (h_randL hS)
   · exact randR.measurableEmbedding.measurableSet_image'  (h_randR hS)
   · exact scrut.measurableEmbedding.measurableSet_image'  (h_scrut hS)

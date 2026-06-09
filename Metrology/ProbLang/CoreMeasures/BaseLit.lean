@@ -272,8 +272,8 @@ theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace rT] :
 
 macro "solve_cover_measurable" : tactic => `(tactic|
   first
-  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable (by measurability)
-  | exact flatten_measurable (by measurability))
+  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable ((by measurability))
+  | exact flatten_measurable ((by measurability)))
 
 @[measurability]
 theorem cover.int.measurable [MeasurableSpace rT] (S : Set Int) :
@@ -338,23 +338,23 @@ theorem cover.real_eq_image (S : Set rT) :
 
 @[fun_prop]
 theorem int.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (BaseLit.int.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (BaseLit.int.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem bool.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (BaseLit.bool.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (BaseLit.bool.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem unit.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (BaseLit.unit.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (BaseLit.unit.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem loc.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (BaseLit.loc.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (BaseLit.loc.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem lbl.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (BaseLit.lbl.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (BaseLit.lbl.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem real.ι.measurable {rT : Type _} [MeasurableSpace rT] :
@@ -392,7 +392,7 @@ theorem real.measurable {rT : Type _} [MeasurableSpace rT] :
 /-- Solves `MeasurableEmbedding f` for a discrete-leaf constructor `f`, given the cover's
 `_eq_image` lemma and `.measurable` lemma. -/
 macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  (refine ⟨fun _ _ h => by injection h, (by measurability), fun S _ => ?_⟩
    rw [← $eq_image S]
    exact $meas S))
 
@@ -454,11 +454,11 @@ theorem measurable_rec
   intro S hS
   rw [BaseLit.casesOn_preimage_decomp]
   iterate 5 refine .union ?_ ?_
-  · exact int.measurableEmbedding.measurableSet_image'   .of_discrete
-  · exact bool.measurableEmbedding.measurableSet_image'  .of_discrete
-  · exact unit.measurableEmbedding.measurableSet_image'  .of_discrete
-  · exact loc.measurableEmbedding.measurableSet_image'   .of_discrete
-  · exact lbl.measurableEmbedding.measurableSet_image'   .of_discrete
+  · exact int.measurableEmbedding.measurableSet_image'   (by measurability)
+  · exact bool.measurableEmbedding.measurableSet_image'  (by measurability)
+  · exact unit.measurableEmbedding.measurableSet_image'  (by measurability)
+  · exact loc.measurableEmbedding.measurableSet_image'   (by measurability)
+  · exact lbl.measurableEmbedding.measurableSet_image'   (by measurability)
   · exact real.measurableEmbedding.measurableSet_image'  (h_real hS)
 
 set_option maxHeartbeats 1000000 in

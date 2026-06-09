@@ -701,8 +701,8 @@ theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace rT] :
 
 macro "solve_cover_measurable" : tactic => `(tactic|
   first
-  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable (by measurability)
-  | exact flatten_measurable (by measurability))
+  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable ((by measurability))
+  | exact flatten_measurable ((by measurability)))
 
 @[measurability]
 theorem cover.bvar.measurable [MeasurableSpace rT] (S : Set Nat) :
@@ -888,15 +888,15 @@ theorem cover.scrut_univ_eq_range :
 
 @[fun_prop]
 theorem bvar.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (Exp.bvar.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (Exp.bvar.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem fvar.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (Exp.fvar.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (Exp.fvar.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem fail.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (Exp.fail.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (Exp.fail.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem lit.ι.measurable {rT : Type _} [MeasurableSpace rT] :
@@ -1224,7 +1224,7 @@ theorem scrut.measurable [MeasurableSpace rT] :
 /-! ### Measurable embeddings. -/
 
 macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  (refine ⟨fun _ _ h => by injection h, (by measurability), fun S _ => ?_⟩
    rw [← $eq_image S]
    exact $meas S))
 
@@ -1563,8 +1563,8 @@ theorem measurable_rec
   intro S hS
   rw [Exp.casesOn_preimage_decomp]
   iterate 21 refine .union ?_ ?_
-  · exact bvar.measurableEmbedding.measurableSet_image'  .of_discrete
-  · exact fvar.measurableEmbedding.measurableSet_image'  .of_discrete
+  · exact bvar.measurableEmbedding.measurableSet_image'  (by measurability)
+  · exact fvar.measurableEmbedding.measurableSet_image'  (by measurability)
   · exact lit.measurableEmbedding.measurableSet_image'   (h_lit hS)
   · exact lam.measurableEmbedding.measurableSet_image'   (h_lam hS)
   · exact fix.measurableEmbedding.measurableSet_image'   (h_fix hS)
@@ -1583,7 +1583,7 @@ theorem measurable_rec
   · exact store.measurableEmbedding.measurableSet_image' (h_store hS)
   · exact tape.measurableEmbedding.measurableSet_image'  (h_tape hS)
   · exact rand.measurableEmbedding.measurableSet_image'  (h_rand hS)
-  · exact fail.measurableEmbedding.measurableSet_image'  .of_discrete
+  · exact fail.measurableEmbedding.measurableSet_image'  (by measurability)
   · exact scrut.measurableEmbedding.measurableSet_image' (h_scrut hS)
 
 /-! ### Param-threaded one-level dispatch (no recursion).

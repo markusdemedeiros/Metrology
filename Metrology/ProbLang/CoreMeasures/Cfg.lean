@@ -46,6 +46,7 @@ theorem State.measurable_mk {α : Type _} [MeasurableSpace α] :
 /-- Stamping helper: `State.mk` parameterized over `γ`. Given measurable
 heap and tape extractors, the resulting `State` is measurable. Concise alternative
 to `rw [State.measurable_iff]; refine ⟨he, ht⟩`. -/
+@[fun_prop]
 theorem State.measurable_mk_param {α γ : Type _} [MeasurableSpace α] [MeasurableSpace γ]
     {fh : γ → LocHeap (Val α)} (hh : Measurable fh)
     {ft : γ → LocHeap Tape} (ht : Measurable ft) :

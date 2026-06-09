@@ -273,8 +273,8 @@ theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace rT] :
 
 macro "solve_cover_measurable" : tactic => `(tactic|
   first
-  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable (by measurability)
-  | exact flatten_measurable (by measurability))
+  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable ((by measurability))
+  | exact flatten_measurable ((by measurability)))
 
 @[measurability]
 theorem cover.wildcard.measurable [MeasurableSpace rT] (S : Set Unit) :
@@ -328,7 +328,7 @@ theorem cover.inr_univ_eq_range :
 
 @[fun_prop]
 theorem wildcard.ι.measurable {rT : Type _} [MeasurableSpace rT] :
-    Measurable (Pat.wildcard.ι (rT := rT)) := Measurable.of_discrete
+    Measurable (Pat.wildcard.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem lit.ι.measurable {rT : Type _} [MeasurableSpace rT] :
@@ -405,7 +405,7 @@ theorem inr.measurable [MeasurableSpace rT] :
 
 /-- Solves `MeasurableEmbedding f` for a discrete-leaf constructor `f`. -/
 macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (refine ⟨fun _ _ h => by injection h, Measurable.of_discrete, fun S _ => ?_⟩
+  (refine ⟨fun _ _ h => by injection h, (by measurability), fun S _ => ?_⟩
    rw [← $eq_image S]
    exact $meas S))
 
@@ -482,7 +482,7 @@ theorem measurable_rec
   intro S hS
   rw [Pat.casesOn_preimage_decomp]
   iterate 4 refine .union ?_ ?_
-  · exact wildcard.measurableEmbedding.measurableSet_image' .of_discrete
+  · exact wildcard.measurableEmbedding.measurableSet_image' (by measurability)
   · exact lit.measurableEmbedding.measurableSet_image'      (h_lit hS)
   · exact pair.measurableEmbedding.measurableSet_image'     (h_pair hS)
   · exact inl.measurableEmbedding.measurableSet_image'      (h_inl hS)

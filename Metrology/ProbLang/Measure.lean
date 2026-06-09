@@ -251,7 +251,7 @@ theorem map_singleton_pos {α β : Type _}
     {f : α → β} {μ : Measure α} {b : β}
     (h : 0 < (μ.map f) {b}) :
     ∃ a, f a = b ∧ 0 < μ {a} := by
-  rw [Measure.map_apply .of_discrete .of_discrete] at h
+  rw [Measure.map_apply (by measurability) (by measurability)] at h
   obtain ⟨a, ha, hpos⟩ := measure_pos_of_singleton_pos μ _ h
   simp [Set.mem_preimage, Set.mem_singleton_iff] at ha
   exact ⟨a, ha, hpos⟩
@@ -1975,6 +1975,7 @@ instance List.instMeasurableSpace {X : Type _} [MeasurableSpace X] :
     MeasurableSpace (List X) :=
   MeasurableSpace.comap List.toSigma inferInstance
 
+@[fun_prop]
 theorem List.measurable_toSigma {X : Type _} [MeasurableSpace X] :
     Measurable (List.toSigma : List X → Σ n, Fin n → X) :=
   fun _ hS => ⟨_, hS, rfl⟩
@@ -2070,6 +2071,7 @@ theorem MeasurableEmbedding.sigmaMk {ι : Type _} {β : ι → Type _}
 Decomposition via `List.toSigma`: a function out of `List β` factors through the
 per-length fibers `(Fin n → β) × α → α`, each of which is a finite composition
 of `n` applications of `f`. Sigma-fiber measurability glues these together. -/
+@[fun_prop]
 theorem List.measurable_foldl {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
     {f : α → β → α} (hf : Measurable (Function.uncurry f)) :
     Measurable (fun (p : List β × α) => p.1.foldl f p.2) := by
@@ -2132,6 +2134,7 @@ theorem List.measurable_foldl {α β : Type _} [MeasurableSpace α] [MeasurableS
   exact hEmb.measurableSet_image' (hUfib k₀)
 
 /-- Per-`n`, `Fin.snoc` is jointly measurable in `(g, b)`. -/
+@[fun_prop]
 theorem Fin.measurable_snoc {n : ℕ} {β : Type _} [MeasurableSpace β] :
     Measurable (fun (p : (Fin n → β) × β) => (@Fin.snoc n (fun _ => β) p.1 p.2) : (Fin n → β) × β → (Fin (n+1) → β)) := by
   refine measurable_pi_lambda _ fun i => ?_
@@ -2152,6 +2155,7 @@ theorem Fin.measurable_snoc {n : ℕ} {β : Type _} [MeasurableSpace β] :
     exact measurable_snd
 
 /-- The "snoc into Σ" function: `((⟨k, g⟩), b) ↦ ⟨k+1, Fin.snoc g b⟩`. Measurable. -/
+@[fun_prop]
 theorem measurable_sigma_snoc {β : Type _} [MeasurableSpace β] :
     Measurable (fun (q : (Σ k : ℕ, Fin k → β) × β) =>
       (⟨q.1.1 + 1, Fin.snoc q.1.2 q.2⟩ : Σ k : ℕ, Fin k → β)) := by
@@ -2189,6 +2193,7 @@ theorem measurable_sigma_snoc {β : Type _} [MeasurableSpace β] :
   exact Fin.measurable_snoc (hUfib (k₀ + 1))
 
 /-- **`(L, x) ↦ L ++ [x]`** is measurable. -/
+@[fun_prop]
 theorem List.measurable_append_singleton {β : Type _} [MeasurableSpace β] :
     Measurable (fun (p : List β × β) => p.1 ++ [p.2]) := by
   rw [measurable_comap_iff (g := (List.toSigma : List β → Σ k, Fin k → β))]

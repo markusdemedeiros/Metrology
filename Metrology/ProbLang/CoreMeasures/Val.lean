@@ -62,13 +62,21 @@ namespace Val
 
 /-- The first projection `Val α → Exp α` is measurable.
 Immediate from the definition of the comap σ-algebra. -/
+@[fun_prop]
 theorem fst.measurable {α : Type _} [MeasurableSpace α] :
     Measurable (Val.fst : Val α → Exp α) :=
   fun _ hS => MeasurableSpace.measurableSet_comap.mpr ⟨_, hS, rfl⟩
 
+/-- `Exp.ofVal = Val.fst` (definitional). Tagged for `fun_prop`. -/
+@[fun_prop]
+theorem _root_.ProbLang.Exp.ofVal.measurable {α : Type _} [MeasurableSpace α] :
+    Measurable (Exp.ofVal : Val α → Exp α) :=
+  Val.fst.measurable
+
 /-- The dependent constructor `Val.mk e w : Val α` (from `e : Exp α` and
 `w : IsVal e`) is measurable in the Sigma-typed input. Reduces to measurability
 of `Sigma.fst : (Σ e, IsVal e) → Exp α` in the standard Sigma σ-alg on the source. -/
+@[fun_prop]
 theorem mk.measurable {α : Type _} [MeasurableSpace α] :
     Measurable (fun (p : Σ e : Exp α, IsVal e) => (Val.mk p.1 p.2 : Val α)) := by
   intro T hT
