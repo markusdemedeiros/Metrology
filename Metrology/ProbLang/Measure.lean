@@ -714,6 +714,171 @@ theorem cell_ternary
       ext ⟨p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
+/-- **Quaternary joint-recursive cell** (arity-extension appendix, §21): copied from
+`cell_ternary` with one extra child `s4`/`ih4`. The codomain `α × α × α × α` is treated
+as `α × (α × α × α)`: the last three factors reuse the ternary inner-joint machinery,
+then combine with `s1`. -/
+theorem cell_quaternary
+    {ctor : T → T → T → T → T} {s s1 s2 s3 s4 : Sh}
+    {c : α → α → α → α → α} {U : Set α}
+    (h_emb : MeasurableEmbedding (fun (p : T × T × T × T) => ctor p.1 p.2.1 p.2.2.1 p.2.2.2))
+    (h_shape : ∀ p : T, shape p = s ↔
+      ∃ p1 p2 p3 p4, p = ctor p1 p2 p3 p4 ∧
+        shape p1 = s1 ∧ shape p2 = s2 ∧ shape p3 = s3 ∧ shape p4 = s4)
+    (h_eq : ∀ p1 p2 p3 p4, f (ctor p1 p2 p3 p4) = c (f p1) (f p2) (f p3) (f p4))
+    (h_c : Measurable (fun (q : α × α × α × α) => c q.1 q.2.1 q.2.2.1 q.2.2.2))
+    (ih1 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {p : T | shape p = s1 ∧ f p ∈ U'})
+    (ih2 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {p : T | shape p = s2 ∧ f p ∈ U'})
+    (ih3 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {p : T | shape p = s3 ∧ f p ∈ U'})
+    (ih4 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {p : T | shape p = s4 ∧ f p ∈ U'})
+    (hU : MeasurableSet U) :
+    MeasurableSet {p : T | shape p = s ∧ f p ∈ U} := by
+  have heq : {p : T | shape p = s ∧ f p ∈ U}
+      = (fun (p : T × T × T × T) => ctor p.1 p.2.1 p.2.2.1 p.2.2.2) ''
+        {q : T × T × T × T | shape q.1 = s1 ∧ shape q.2.1 = s2 ∧ shape q.2.2.1 = s3 ∧
+          shape q.2.2.2 = s4 ∧ c (f q.1) (f q.2.1) (f q.2.2.1) (f q.2.2.2) ∈ U} := by
+    ext p
+    constructor
+    · rintro ⟨hs, hp⟩
+      obtain ⟨p1, p2, p3, p4, rfl, hs1, hs2, hs3, hs4⟩ := (h_shape p).mp hs
+      exact ⟨(p1, p2, p3, p4), ⟨hs1, hs2, hs3, hs4, by rw [h_eq] at hp; exact hp⟩, rfl⟩
+    · rintro ⟨⟨p1, p2, p3, p4⟩, ⟨hs1, hs2, hs3, hs4, h⟩, rfl⟩
+      exact ⟨(h_shape _).mpr ⟨p1, p2, p3, p4, rfl, hs1, hs2, hs3, hs4⟩, by rw [h_eq]; exact h⟩
+  rw [heq]
+  refine h_emb.measurableSet_image' ?_
+  set Joint : Set (α × α × α × α) → Set (T × T × T × T) :=
+    fun S => {q : T × T × T × T | shape q.1 = s1 ∧ shape q.2.1 = s2 ∧ shape q.2.2.1 = s3 ∧
+      shape q.2.2.2 = s4 ∧ (f q.1, f q.2.1, f q.2.2.1, f q.2.2.2) ∈ S} with hJoint
+  suffices h : ∀ S, MeasurableSet S → MeasurableSet (Joint S) by
+    have hS : MeasurableSet ((fun (q : α × α × α × α) => c q.1 q.2.1 q.2.2.1 q.2.2.2) ⁻¹' U) :=
+      h_c hU
+    convert h _ hS
+  intro S hS
+  -- π-system on α × (α × α × α): rectangles V × W where W ⊆ α × α × α measurable.
+  have hgen : (Prod.instMeasurableSpace : MeasurableSpace (α × α × α × α))
+      = .generateFrom (Set.image2 (· ×ˢ ·) {V : Set α | MeasurableSet V}
+                                            {W : Set (α × α × α) | MeasurableSet W}) :=
+    generateFrom_prod.symm
+  have hpi : IsPiSystem (Set.image2 (· ×ˢ ·) {V : Set α | MeasurableSet V}
+                                              {W : Set (α × α × α) | MeasurableSet W}) :=
+    MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+  -- Inner ternary joint cell on (s2, s3, s4): measurability over all measurable W ⊆ α × α × α.
+  have hjoint234 : ∀ W : Set (α × α × α), MeasurableSet W →
+      MeasurableSet {q : T × T × T | shape q.1 = s2 ∧ shape q.2.1 = s3 ∧ shape q.2.2 = s4 ∧
+        (f q.1, f q.2.1, f q.2.2) ∈ W} := by
+    intro W hW
+    set J234 : Set (α × α × α) → Set (T × T × T) :=
+      fun W' => {q : T × T × T | shape q.1 = s2 ∧ shape q.2.1 = s3 ∧ shape q.2.2 = s4 ∧
+        (f q.1, f q.2.1, f q.2.2) ∈ W'} with hJ234
+    suffices ∀ W', MeasurableSet W' → MeasurableSet (J234 W') by exact this _ hW
+    intro W' hW'
+    have hgen' : (Prod.instMeasurableSpace : MeasurableSpace (α × α × α))
+        = .generateFrom (Set.image2 (· ×ˢ ·) {V : Set α | MeasurableSet V}
+                                              {W : Set (α × α) | MeasurableSet W}) :=
+      generateFrom_prod.symm
+    have hpi' : IsPiSystem (Set.image2 (· ×ˢ ·) {V : Set α | MeasurableSet V}
+                                                {W : Set (α × α) | MeasurableSet W}) :=
+      MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+    -- Inner-inner helper for (s3, s4) on α × α.
+    have hjoint34 : ∀ W : Set (α × α), MeasurableSet W →
+        MeasurableSet {q : T × T | shape q.1 = s3 ∧ shape q.2 = s4 ∧ (f q.1, f q.2) ∈ W} := by
+      intro W hW
+      set J34 : Set (α × α) → Set (T × T) :=
+        fun W' => {q : T × T | shape q.1 = s3 ∧ shape q.2 = s4 ∧ (f q.1, f q.2) ∈ W'} with hJ34
+      suffices ∀ W', MeasurableSet W' → MeasurableSet (J34 W') by exact this _ hW
+      intro W' hW'
+      have hgen'' : (Prod.instMeasurableSpace : MeasurableSpace (α × α))
+          = .generateFrom (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S}
+                                                {S : Set α | MeasurableSet S}) :=
+        generateFrom_prod.symm
+      have hpi'' : IsPiSystem
+          (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S} {S : Set α | MeasurableSet S}) :=
+        MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+      refine MeasurableSpace.induction_on_inter
+        (C := fun W'' _ => MeasurableSet (J34 W'')) hgen'' hpi'' ?_ ?_ ?_ ?_ W' hW'
+      · show MeasurableSet (J34 ∅); convert MeasurableSet.empty; ext ⟨_, _⟩; simp [hJ34]
+      · rintro _ ⟨V₃, hV₃, V₄, hV₄, rfl⟩
+        show MeasurableSet (J34 (V₃ ×ˢ V₄))
+        have : J34 (V₃ ×ˢ V₄)
+            = {p : T | shape p = s3 ∧ f p ∈ V₃} ×ˢ {p : T | shape p = s4 ∧ f p ∈ V₄} := by
+          ext ⟨p3, p4⟩; simp [hJ34]; tauto
+        rw [this]; exact (ih3 hV₃).prod (ih4 hV₄)
+      · intro W'' _ IH
+        show MeasurableSet (J34 W''ᶜ)
+        have : J34 W''ᶜ = (({p | shape p = s3} ×ˢ {p | shape p = s4}) \ J34 W'') := by
+          ext ⟨p3, p4⟩; simp [hJ34]; tauto
+        rw [this]
+        refine MeasurableSet.diff ?_ IH
+        refine MeasurableSet.prod ?_ ?_
+        · simpa using ih3 MeasurableSet.univ
+        · simpa using ih4 MeasurableSet.univ
+      · intro F _ _ IH
+        show MeasurableSet (J34 (⋃ i, F i))
+        have : J34 (⋃ i, F i) = ⋃ i, J34 (F i) := by
+          ext ⟨p3, p4⟩; simp only [hJ34, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        rw [this]; exact MeasurableSet.iUnion IH
+    refine MeasurableSpace.induction_on_inter
+      (C := fun W'' _ => MeasurableSet (J234 W'')) hgen' hpi' ?_ ?_ ?_ ?_ W' hW'
+    · show MeasurableSet (J234 ∅); convert MeasurableSet.empty; ext ⟨_, _, _⟩; simp [hJ234]
+    · rintro _ ⟨V₂, hV₂, W34, hW34, rfl⟩
+      show MeasurableSet (J234 (V₂ ×ˢ W34))
+      have : J234 (V₂ ×ˢ W34)
+          = {p : T | shape p = s2 ∧ f p ∈ V₂} ×ˢ
+            {q : T × T | shape q.1 = s3 ∧ shape q.2 = s4 ∧ (f q.1, f q.2) ∈ W34} := by
+        ext ⟨p2, p3, p4⟩; simp [hJ234]; tauto
+      rw [this]; exact (ih2 hV₂).prod (hjoint34 W34 hW34)
+    · intro W'' _ IH
+      show MeasurableSet (J234 W''ᶜ)
+      have : J234 W''ᶜ
+          = ({p | shape p = s2} ×ˢ {q : T × T | shape q.1 = s3 ∧ shape q.2 = s4}) \ J234 W'' := by
+        ext ⟨p2, p3, p4⟩; simp [hJ234]; tauto
+      rw [this]
+      refine MeasurableSet.diff ?_ IH
+      refine MeasurableSet.prod ?_ ?_
+      · simpa using ih2 MeasurableSet.univ
+      · have := hjoint34 Set.univ MeasurableSet.univ
+        convert this using 1
+        ext ⟨p3, p4⟩; simp
+    · intro F _ _ IH
+      show MeasurableSet (J234 (⋃ i, F i))
+      have : J234 (⋃ i, F i) = ⋃ i, J234 (F i) := by
+        ext ⟨p2, p3, p4⟩; simp only [hJ234, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      rw [this]; exact MeasurableSet.iUnion IH
+  -- Outer induction on S using rectangles V × W in α × (α × α × α).
+  refine MeasurableSpace.induction_on_inter
+    (C := fun S _ => MeasurableSet (Joint S)) hgen hpi ?_ ?_ ?_ ?_ S hS
+  · show MeasurableSet (Joint ∅); convert MeasurableSet.empty; ext ⟨_, _, _, _⟩; simp [hJoint]
+  · rintro _ ⟨V, hV, W, hW, rfl⟩
+    show MeasurableSet (Joint (V ×ˢ W))
+    have : Joint (V ×ˢ W)
+        = {p : T | shape p = s1 ∧ f p ∈ V} ×ˢ
+          {q : T × T × T | shape q.1 = s2 ∧ shape q.2.1 = s3 ∧ shape q.2.2 = s4 ∧
+            (f q.1, f q.2.1, f q.2.2) ∈ W} := by
+      ext ⟨p1, p2, p3, p4⟩; simp [hJoint]; tauto
+    rw [this]; exact (ih1 hV).prod (hjoint234 W hW)
+  · intro S' _ IH
+    show MeasurableSet (Joint S'ᶜ)
+    have : Joint S'ᶜ
+        = ({p | shape p = s1} ×ˢ
+            {q : T × T × T | shape q.1 = s2 ∧ shape q.2.1 = s3 ∧ shape q.2.2 = s4}) \ Joint S' := by
+      ext ⟨p1, p2, p3, p4⟩; simp [hJoint]; tauto
+    rw [this]
+    refine MeasurableSet.diff ?_ IH
+    refine MeasurableSet.prod ?_ ?_
+    · simpa using ih1 MeasurableSet.univ
+    · have := hjoint234 Set.univ MeasurableSet.univ
+      convert this using 1
+      ext ⟨p2, p3, p4⟩; simp
+  · intro F _ _ IH
+    show MeasurableSet (Joint (⋃ i, F i))
+    have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
+      ext ⟨p1, p2, p3, p4⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+    rw [this]; exact MeasurableSet.iUnion IH
+
 /-- **Mixed unary (discrete + recursive)**: e.g. `unop (op : UnOp) (e : Exp)`.
 The discrete arg is passed through; behaves like `cell_unary` parameterized over `β`. -/
 theorem cell_unaryMixed {β : Type _} [MeasurableSpace β]
@@ -1516,6 +1681,288 @@ theorem cell_ternary_param
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
       ext ⟨b, p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+    rw [this]; exact MeasurableSet.iUnion IH
+
+set_option maxHeartbeats 1000000 in
+/-- **Quaternary joint-recursive cell (param)** (arity-extension appendix, §21): copied
+from `cell_ternary_param` with one extra child `s4`/`ih4`. Codomain `α × α × α × α`
+treated as `α × (α × α × α)`. Needs `[Inhabited β]`.
+
+The triple-nested π-system induction (Jouter ⊇ hjoint234 ⊇ hjoint34) makes this the
+single largest cell in the file; its cumulative elaboration exceeds the default
+heartbeat budget, hence the local `set_option`. This is a generic-infra bump, not a
+per-type-file one — the per-type keystone arm that *calls* this cell is a single
+`exact` and needs no bump. -/
+theorem cell_quaternary_param
+    {ctor : T → T → T → T → T} {s s1 s2 s3 s4 : Sh}
+    {c : β → α → α → α → α → α} {U : Set α}
+    (h_emb : MeasurableEmbedding (fun (p : T × T × T × T) => ctor p.1 p.2.1 p.2.2.1 p.2.2.2))
+    (h_shape : ∀ p : T, shape p = s ↔
+      ∃ p1 p2 p3 p4, p = ctor p1 p2 p3 p4 ∧
+        shape p1 = s1 ∧ shape p2 = s2 ∧ shape p3 = s3 ∧ shape p4 = s4)
+    (h_eq : ∀ b p1 p2 p3 p4,
+      g b (ctor p1 p2 p3 p4) = c b (g b p1) (g b p2) (g b p3) (g b p4))
+    (h_c : Measurable (fun (q : β × α × α × α × α) => c q.1 q.2.1 q.2.2.1 q.2.2.2.1 q.2.2.2.2))
+    (ih1 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {q : β × T | shape q.2 = s1 ∧ Function.uncurry g q ∈ U'})
+    (ih2 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {q : β × T | shape q.2 = s2 ∧ Function.uncurry g q ∈ U'})
+    (ih3 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {q : β × T | shape q.2 = s3 ∧ Function.uncurry g q ∈ U'})
+    (ih4 : ∀ {U' : Set α}, MeasurableSet U' →
+      MeasurableSet {q : β × T | shape q.2 = s4 ∧ Function.uncurry g q ∈ U'})
+    (hU : MeasurableSet U)
+    [h_inhab : Inhabited β] :
+    MeasurableSet {q : β × T | shape q.2 = s ∧ Function.uncurry g q ∈ U} := by
+  have heq : {q : β × T | shape q.2 = s ∧ Function.uncurry g q ∈ U}
+      = (fun (q : β × T × T × T × T) => (q.1, ctor q.2.1 q.2.2.1 q.2.2.2.1 q.2.2.2.2)) ''
+        {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+          shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+          (q.1, g q.1 q.2.1, g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈
+            ((fun (r : β × α × α × α × α) => c r.1 r.2.1 r.2.2.1 r.2.2.2.1 r.2.2.2.2) ⁻¹' U)} := by
+    ext ⟨b, p⟩
+    constructor
+    · rintro ⟨hs, hp⟩
+      obtain ⟨p1, p2, p3, p4, rfl, hs1, hs2, hs3, hs4⟩ := (h_shape p).mp hs
+      refine ⟨(b, p1, p2, p3, p4), ⟨hs1, hs2, hs3, hs4, ?_⟩, rfl⟩
+      simp only [Function.uncurry, Set.mem_preimage] at hp ⊢
+      rw [h_eq] at hp; exact hp
+    · rintro ⟨⟨b', p1, p2, p3, p4⟩, ⟨hs1, hs2, hs3, hs4, h⟩, heq⟩
+      have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
+      have hpeq : ctor p1 p2 p3 p4 = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
+      subst hbeq hpeq
+      refine ⟨(h_shape _).mpr ⟨p1, p2, p3, p4, rfl, hs1, hs2, hs3, hs4⟩, ?_⟩
+      simp only [Function.uncurry, Set.mem_preimage] at h ⊢
+      rw [h_eq]; exact h
+  rw [heq]
+  have h_emb_outer : MeasurableEmbedding
+      (fun (q : β × T × T × T × T) => (q.1, ctor q.2.1 q.2.2.1 q.2.2.2.1 q.2.2.2.2)) := by
+    have : (fun (q : β × T × T × T × T) => (q.1, ctor q.2.1 q.2.2.1 q.2.2.2.1 q.2.2.2.2))
+        = Prod.map id (fun (p : T × T × T × T) => ctor p.1 p.2.1 p.2.2.1 p.2.2.2) := by
+      ext ⟨_, _, _, _, _⟩ <;> rfl
+    rw [this]
+    exact MeasurableEmbedding.id.prodMap h_emb
+  refine h_emb_outer.measurableSet_image' ?_
+  have h_target : MeasurableSet
+      ((fun (r : β × α × α × α × α) => c r.1 r.2.1 r.2.2.1 r.2.2.2.1 r.2.2.2.2) ⁻¹' U) := h_c hU
+  set Joint : Set (β × α × α × α × α) → Set (β × T × T × T × T) :=
+    fun W => {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+      shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+      (q.1, g q.1 q.2.1, g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ W}
+    with hJoint
+  suffices h : ∀ W, MeasurableSet W → MeasurableSet (Joint W) by exact h _ h_target
+  intro W hW
+  -- π-system on β × α × α × α × α: rectangles B × R where R ⊆ α × α × α × α.
+  have hgen : (Prod.instMeasurableSpace : MeasurableSpace (β × α × α × α × α))
+      = .generateFrom (Set.image2 (· ×ˢ ·) {B : Set β | MeasurableSet B}
+                                            {R : Set (α × α × α × α) | MeasurableSet R}) :=
+    generateFrom_prod.symm
+  have hpi : IsPiSystem (Set.image2 (· ×ˢ ·) {B : Set β | MeasurableSet B}
+                                              {R : Set (α × α × α × α) | MeasurableSet R}) :=
+    MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+  have hsm : ∀ (sᵢ : Sh),
+      (∀ {U' : Set α}, MeasurableSet U' →
+        MeasurableSet {q : β × T | shape q.2 = sᵢ ∧ Function.uncurry g q ∈ U'}) →
+      MeasurableSet {p : T | shape p = sᵢ} := by
+    intro sᵢ ihᵢ
+    have h1 := ihᵢ (MeasurableSet.univ (α := α))
+    have hpreimg : (fun p : T => (h_inhab.default, p)) ⁻¹'
+        {q : β × T | shape q.2 = sᵢ ∧ Function.uncurry g q ∈ Set.univ}
+        = {p : T | shape p = sᵢ} := by ext p; simp
+    rw [← hpreimg]
+    exact MeasurableSet.preimage h1 (by fun_prop)
+  have hs1m := hsm s1 ih1
+  have hs2m := hsm s2 ih2
+  have hs3m := hsm s3 ih3
+  have hs4m := hsm s4 ih4
+  -- Inner quaternary joint for all four children, over α × α × α × α.
+  have hjoint1234 : ∀ R : Set (α × α × α × α), MeasurableSet R →
+      MeasurableSet {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+        shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+        (g q.1 q.2.1, g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ R} := by
+    intro R hR
+    set Jouter : Set (α × α × α × α) → Set (β × T × T × T × T) :=
+      fun R' => {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+        shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+        (g q.1 q.2.1, g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ R'}
+      with hJouter
+    suffices ∀ R', MeasurableSet R' → MeasurableSet (Jouter R') from this _ hR
+    intro Rₒ hRₒ
+    have hgenₒ : (Prod.instMeasurableSpace : MeasurableSpace (α × α × α × α))
+        = .generateFrom (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S}
+                                              {W : Set (α × α × α) | MeasurableSet W}) :=
+      generateFrom_prod.symm
+    have hpiₒ : IsPiSystem (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S}
+                                                {W : Set (α × α × α) | MeasurableSet W}) :=
+      MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+    -- Inner ternary joint for children (s2, s3, s4), over α × α × α.
+    have hjoint234 : ∀ R : Set (α × α × α), MeasurableSet R →
+        MeasurableSet {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+          shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+          (g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ R} := by
+      intro R hR
+      set J : Set (α × α × α) → Set (β × T × T × T × T) :=
+        fun R' => {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+          shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+          (g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ R'}
+        with hJ
+      suffices ∀ R', MeasurableSet R' → MeasurableSet (J R') from this _ hR
+      intro R' hR'
+      have hgen' : (Prod.instMeasurableSpace : MeasurableSpace (α × α × α))
+          = .generateFrom (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S}
+                                                {W : Set (α × α) | MeasurableSet W}) :=
+        generateFrom_prod.symm
+      have hpi' : IsPiSystem (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S}
+                                                  {W : Set (α × α) | MeasurableSet W}) :=
+        MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+      -- Inner-inner helper for the last two children (s3, s4) over α × α.
+      have hjoint34 : ∀ W : Set (α × α), MeasurableSet W →
+          MeasurableSet {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+            shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+            (g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ W} := by
+        intro W hW
+        set K : Set (α × α) → Set (β × T × T × T × T) :=
+          fun W' => {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+            shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+            (g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ W'}
+          with hK
+        suffices ∀ W', MeasurableSet W' → MeasurableSet (K W') from this _ hW
+        intro W' hW'
+        have hgen'' : (Prod.instMeasurableSpace : MeasurableSpace (α × α))
+            = .generateFrom (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S}
+                                                  {S : Set α | MeasurableSet S}) :=
+          generateFrom_prod.symm
+        have hpi'' : IsPiSystem (Set.image2 (· ×ˢ ·) {S : Set α | MeasurableSet S}
+                                                    {S : Set α | MeasurableSet S}) :=
+          MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
+        refine MeasurableSpace.induction_on_inter
+          (C := fun W'' _ => MeasurableSet (K W'')) hgen'' hpi'' ?_ ?_ ?_ ?_ W' hW'
+        · show MeasurableSet (K ∅); convert MeasurableSet.empty
+          ext ⟨_, _, _, _, _⟩; simp [hK]
+        · rintro _ ⟨V3, hV3, V4, hV4, rfl⟩
+          show MeasurableSet (K (V3 ×ˢ V4))
+          have : K (V3 ×ˢ V4)
+              = ((fun (q : β × T × T × T × T) => q.2.1) ⁻¹' {p : T | shape p = s1})
+                ∩ ((fun (q : β × T × T × T × T) => q.2.2.1) ⁻¹' {p : T | shape p = s2})
+                ∩ ((fun (q : β × T × T × T × T) => (q.1, q.2.2.2.1)) ⁻¹'
+                   {q : β × T | shape q.2 = s3 ∧ Function.uncurry g q ∈ V3})
+                ∩ ((fun (q : β × T × T × T × T) => (q.1, q.2.2.2.2)) ⁻¹'
+                   {q : β × T | shape q.2 = s4 ∧ Function.uncurry g q ∈ V4}) := by
+            ext ⟨b, p1, p2, p3, p4⟩; simp [hK, Function.uncurry]; tauto
+          rw [this]
+          refine MeasurableSet.inter (MeasurableSet.inter (MeasurableSet.inter ?_ ?_) ?_) ?_
+          · exact hs1m.preimage (by fun_prop)
+          · exact hs2m.preimage (by fun_prop)
+          · exact (ih3 hV3).preimage (by fun_prop)
+          · exact (ih4 hV4).preimage (by fun_prop)
+        · intro W'' _ IH
+          show MeasurableSet (K W''ᶜ)
+          have : K W''ᶜ
+              = ((Set.univ : Set β) ×ˢ ({p : T | shape p = s1} ×ˢ {p : T | shape p = s2} ×ˢ
+                 {p : T | shape p = s3} ×ˢ {p : T | shape p = s4})) \ K W'' := by
+            ext ⟨b, p1, p2, p3, p4⟩; simp [hK]; tauto
+          rw [this]
+          refine MeasurableSet.diff ?_ IH
+          exact MeasurableSet.univ.prod (hs1m.prod (hs2m.prod (hs3m.prod hs4m)))
+        · intro F _ _ IH
+          show MeasurableSet (K (⋃ i, F i))
+          have : K (⋃ i, F i) = ⋃ i, K (F i) := by
+            ext ⟨b, p1, p2, p3, p4⟩; simp only [hK, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+          rw [this]; exact MeasurableSet.iUnion IH
+      refine MeasurableSpace.induction_on_inter
+        (C := fun R'' _ => MeasurableSet (J R'')) hgen' hpi' ?_ ?_ ?_ ?_ R' hR'
+      · show MeasurableSet (J ∅); convert MeasurableSet.empty
+        ext ⟨_, _, _, _, _⟩; simp [hJ]
+      · rintro _ ⟨V2, hV2, W34, hW34, rfl⟩
+        show MeasurableSet (J (V2 ×ˢ W34))
+        have : J (V2 ×ˢ W34)
+            = ((fun (q : β × T × T × T × T) => (q.1, q.2.2.1)) ⁻¹'
+               {q : β × T | shape q.2 = s2 ∧ Function.uncurry g q ∈ V2})
+              ∩ {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+                  shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+                  (g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ W34} := by
+          ext ⟨b, p1, p2, p3, p4⟩; simp [hJ, Function.uncurry]; tauto
+        rw [this]
+        refine MeasurableSet.inter ?_ ?_
+        · exact (ih2 hV2).preimage (by fun_prop)
+        · exact hjoint34 W34 hW34
+      · intro R'' _ IH
+        show MeasurableSet (J R''ᶜ)
+        have : J R''ᶜ
+            = ((Set.univ : Set β) ×ˢ ({p : T | shape p = s1} ×ˢ {p : T | shape p = s2} ×ˢ
+               {p : T | shape p = s3} ×ˢ {p : T | shape p = s4})) \ J R'' := by
+          ext ⟨b, p1, p2, p3, p4⟩; simp [hJ]; tauto
+        rw [this]
+        refine MeasurableSet.diff ?_ IH
+        exact MeasurableSet.univ.prod (hs1m.prod (hs2m.prod (hs3m.prod hs4m)))
+      · intro F _ _ IH
+        show MeasurableSet (J (⋃ i, F i))
+        have : J (⋃ i, F i) = ⋃ i, J (F i) := by
+          ext ⟨b, p1, p2, p3, p4⟩; simp only [hJ, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        rw [this]; exact MeasurableSet.iUnion IH
+    -- outer induction (over Rₒ ⊆ α × α × α × α) for hjoint1234, factoring s1.
+    refine MeasurableSpace.induction_on_inter
+      (C := fun Rₒ' _ => MeasurableSet (Jouter Rₒ')) hgenₒ hpiₒ ?_ ?_ ?_ ?_ Rₒ hRₒ
+    · show MeasurableSet (Jouter ∅); convert MeasurableSet.empty
+      ext ⟨_, _, _, _, _⟩; simp [hJouter]
+    · rintro _ ⟨V1, hV1, W234, hW234, rfl⟩
+      show MeasurableSet (Jouter (V1 ×ˢ W234))
+      have : Jouter (V1 ×ˢ W234)
+          = ((fun (q : β × T × T × T × T) => (q.1, q.2.1)) ⁻¹'
+             {q : β × T | shape q.2 = s1 ∧ Function.uncurry g q ∈ V1})
+            ∩ {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+                shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+                (g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ W234} := by
+        ext ⟨b, p1, p2, p3, p4⟩; simp [hJouter, Function.uncurry]; tauto
+      rw [this]
+      refine MeasurableSet.inter ?_ ?_
+      · exact (ih1 hV1).preimage (by fun_prop)
+      · exact hjoint234 W234 hW234
+    · intro Rₒ' _ IH
+      show MeasurableSet (Jouter Rₒ'ᶜ)
+      have : Jouter Rₒ'ᶜ
+          = ((Set.univ : Set β) ×ˢ ({p : T | shape p = s1} ×ˢ {p : T | shape p = s2} ×ˢ
+             {p : T | shape p = s3} ×ˢ {p : T | shape p = s4})) \ Jouter Rₒ' := by
+        ext ⟨b, p1, p2, p3, p4⟩; simp [hJouter]; tauto
+      rw [this]
+      refine MeasurableSet.diff ?_ IH
+      exact MeasurableSet.univ.prod (hs1m.prod (hs2m.prod (hs3m.prod hs4m)))
+    · intro F _ _ IH
+      show MeasurableSet (Jouter (⋃ i, F i))
+      have : Jouter (⋃ i, F i) = ⋃ i, Jouter (F i) := by
+        rw [hJouter]; ext ⟨b, p1, p2, p3, p4⟩; simp only [Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      rw [this]; exact MeasurableSet.iUnion IH
+  refine MeasurableSpace.induction_on_inter
+    (C := fun W _ => MeasurableSet (Joint W)) hgen hpi ?_ ?_ ?_ ?_ W hW
+  · show MeasurableSet (Joint ∅); convert MeasurableSet.empty
+    rw [hJoint]; ext ⟨_, _, _, _, _⟩; simp
+  · rintro _ ⟨B, hB, R, hR, rfl⟩
+    show MeasurableSet (Joint (B ×ˢ R))
+    have : Joint (B ×ˢ R)
+        = (B ×ˢ (Set.univ : Set T) ×ˢ (Set.univ : Set T) ×ˢ (Set.univ : Set T) ×ˢ
+            (Set.univ : Set T))
+          ∩ {q : β × T × T × T × T | shape q.2.1 = s1 ∧ shape q.2.2.1 = s2 ∧
+              shape q.2.2.2.1 = s3 ∧ shape q.2.2.2.2 = s4 ∧
+              (g q.1 q.2.1, g q.1 q.2.2.1, g q.1 q.2.2.2.1, g q.1 q.2.2.2.2) ∈ R} := by
+      rw [hJoint]; ext ⟨b, p1, p2, p3, p4⟩; simp; tauto
+    rw [this]
+    refine MeasurableSet.inter ?_ ?_
+    · exact hB.prod (MeasurableSet.univ.prod (MeasurableSet.univ.prod
+        (MeasurableSet.univ.prod MeasurableSet.univ)))
+    · exact hjoint1234 R hR
+  · intro W' _ IH
+    show MeasurableSet (Joint W'ᶜ)
+    have : Joint W'ᶜ
+        = ((Set.univ : Set β) ×ˢ ({p : T | shape p = s1} ×ˢ {p : T | shape p = s2} ×ˢ
+           {p : T | shape p = s3} ×ˢ {p : T | shape p = s4})) \ Joint W' := by
+      rw [hJoint]; ext ⟨b, p1, p2, p3, p4⟩; simp; tauto
+    rw [this]
+    refine MeasurableSet.diff ?_ IH
+    exact MeasurableSet.univ.prod (hs1m.prod (hs2m.prod (hs3m.prod hs4m)))
+  · intro F _ _ IH
+    show MeasurableSet (Joint (⋃ i, F i))
+    have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
+      rw [hJoint]; ext ⟨b, p1, p2, p3, p4⟩; simp only [Set.mem_iUnion, Set.mem_setOf_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Mixed unary (param)**: e.g. `unop (op : UnOp) (e : T)`. Discrete `γ` arg + recursion. -/

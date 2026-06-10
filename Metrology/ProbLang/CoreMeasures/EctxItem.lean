@@ -4,6 +4,7 @@ import all Mathlib.Tactic.DeriveCountable
 public import Metrology.ProbLang.Measure
 public import Metrology.ProbLang.Syntax.Syntax
 public import Metrology.ProbLang.CoreMeasures.Val
+public import Metrology.ProbLang.CoreMeasures.Stamp
 
 meta import Metrology.Meta
 
@@ -29,13 +30,6 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 /-# Measure space on evaluation-context items. -/
 
 namespace ProbLang.EctxItem
-
-macro "solve_ι_inj" : tactic => `(tactic|
-  (intro a b h;
-   first
-   | (cases h; rfl)
-   | (obtain ⟨_, _⟩ := a; obtain ⟨_, _⟩ := b; cases h; rfl)
-   | (obtain ⟨_, _, _⟩ := a; obtain ⟨_, _, _⟩ := b; cases h; rfl)))
 
 theorem appL.ι.inj   {α : Type _} : Function.Injective (@EctxItem.appL.ι   α) := by solve_ι_inj
 theorem appR.ι.inj   {α : Type _} : Function.Injective (@EctxItem.appR.ι   α) := by solve_ι_inj
@@ -110,7 +104,7 @@ inductive Shape
   deriving Countable
 
 /-- Interpret a cylinder as the set of `EctxItem α` it describes. -/
-@[simp] def Cylinder.flatten {α : Type _} : Cylinder α → Set (EctxItem α)
+@[simp, stamp_simp] def Cylinder.flatten {α : Type _} : Cylinder α → Set (EctxItem α)
   | .appL S         => EctxItem.appL '' S
   | .appR S         => EctxItem.appR '' S
   | .unop u         => {EctxItem.unop u}
@@ -161,7 +155,7 @@ inductive Cylinder.HasMeasurableLeaves {α : Type _} [MeasurableSpace α] :
 instance instMeasurableSpaceEctxItem [MeasurableSpace α] : MeasurableSpace (EctxItem α) :=
   .generateFrom <| Cylinder.flatten '' { c : Cylinder α | c.HasMeasurableLeaves }
 
-@[simp] def shape : EctxItem α → Shape
+@[simp, stamp_simp] def shape : EctxItem α → Shape
   | .appL _       => .appL
   | .appR _       => .appR
   | .unop u       => .unop u
@@ -185,7 +179,7 @@ instance instMeasurableSpaceEctxItem [MeasurableSpace α] : MeasurableSpace (Ect
   | .scrut _      => .scrut
 
 /-- Shape of a cylinder (forgets data leaves). -/
-@[simp] def Cylinder.shape {α : Type _} : Cylinder α → Shape
+@[simp, stamp_simp] def Cylinder.shape {α : Type _} : Cylinder α → Shape
   | .appL _       => .appL
   | .appR _       => .appR
   | .unop u       => .unop u
@@ -209,7 +203,7 @@ instance instMeasurableSpaceEctxItem [MeasurableSpace α] : MeasurableSpace (Ect
   | .scrut _      => .scrut
 
 /-- The "universe cylinder" for a given shape: `univ` at every data leaf, same skeleton. -/
-@[simp] def Shape.cylinder {α : Type _} : Shape → Cylinder α
+@[simp, stamp_simp] def Shape.cylinder {α : Type _} : Shape → Cylinder α
   | .appL         => .appL Set.univ
   | .appR         => .appR Set.univ
   | .unop u       => .unop u
@@ -271,13 +265,10 @@ theorem Cylinder.shape_of_mem_flatten {α : Type _} {c : Cylinder α} {K : EctxI
 
 /-- Flattens of cylinders with different shapes are disjoint. -/
 theorem Cylinder.flatten_disjoint_of_shape_ne {α : Type _} {c₁ c₂ : Cylinder α}
-    (h : Cylinder.shape c₁ ≠ Cylinder.shape c₂) : Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ = ∅ := by
-  ext K
-  simp only [Set.mem_inter_iff, Set.mem_empty_iff_false, iff_false, not_and]
-  intro h₁ h₂
-  exact h ((Cylinder.shape_of_mem_flatten h₁).symm.trans (Cylinder.shape_of_mem_flatten h₂))
+    (h : Cylinder.shape c₁ ≠ Cylinder.shape c₂) : Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ = ∅ :=
+  Stamp.flatten_disjoint_of_shape_ne (cShape := Cylinder.shape)
+    (fun {_ _} h => Cylinder.shape_of_mem_flatten h) h
 
-set_option maxHeartbeats 1000000 in
 /-- The cylinder flatten of the intersection equals the intersection of the
 flattens. Mirrors `BaseLit.Cylinder.flatten_inter`. -/
 theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
@@ -287,72 +278,56 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
   | appL S =>
     cases c₂
     case appL S' =>
-      show (EctxItem.appL '' S) ∩ (EctxItem.appL '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.appL.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | appR S =>
     cases c₂
     case appR S' =>
-      show (EctxItem.appR '' S) ∩ (EctxItem.appR '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.appR.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | unop u =>
     cases c₂
     case unop u' =>
-      simp only [Cylinder.inter?, Cylinder.flatten]
-      by_cases h : u = u'
-      · subst h; simp
-      · simp only [if_neg h]
-        ext K; simp only [Set.mem_inter_iff, Set.mem_singleton_iff, Option.elim_none,
-          Set.mem_empty_iff_false, iff_false, not_and]
-        rintro rfl heq; injection heq with heq; exact h heq
+      simp only [Cylinder.flatten]
+      refine Stamp.flatten_inter_leaf (flatten := Cylinder.flatten) (ctor := EctxItem.unop)
+        (fun _ _ h => by injection h) Cylinder.unop (fun _ => rfl) ?_
+      simp only [Cylinder.inter?]
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | binopL op S =>
     cases c₂
     case binopL op' S' =>
-      simp only [Cylinder.inter?, Cylinder.flatten]
-      by_cases hb : op = op'
-      · subst hb
-        simp only [↓reduceIte, Option.elim_some, Cylinder.flatten]
-        rw [← Set.image_inter (fun _ _ h => by injection h)]
-      · simp only [if_neg hb, Option.elim_none]
-        ext K; simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false,
-          not_and]
-        rintro ⟨a, _, rfl⟩ ⟨a', _, hh⟩; injection hh with hb_eq _; exact hb hb_eq.symm
+      simp only [Cylinder.flatten]
+      refine Stamp.flatten_inter_mixed_data (flatten := Cylinder.flatten) (ctor := EctxItem.binopL)
+        (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopL (fun _ _ => rfl) ?_
+      simp only [Cylinder.inter?]
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | binopR op S =>
     cases c₂
     case binopR op' S' =>
-      simp only [Cylinder.inter?, Cylinder.flatten]
-      by_cases hb : op = op'
-      · subst hb
-        simp only [↓reduceIte, Option.elim_some, Cylinder.flatten]
-        rw [← Set.image_inter (fun _ _ h => by injection h)]
-      · simp only [if_neg hb, Option.elim_none]
-        ext K; simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false,
-          not_and]
-        rintro ⟨a, _, rfl⟩ ⟨a', _, hh⟩; injection hh with hb_eq _; exact hb hb_eq.symm
+      simp only [Cylinder.flatten]
+      refine Stamp.flatten_inter_mixed_data (flatten := Cylinder.flatten) (ctor := EctxItem.binopR)
+        (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopR (fun _ _ => rfl) ?_
+      simp only [Cylinder.inter?]
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | condC S1 S2 =>
     cases c₂
     case condC S1' S2' =>
-      show ((fun p => EctxItem.condC p.1 p.2) '' (S1 ×ˢ S2)) ∩
-           ((fun p => EctxItem.condC p.1 p.2) '' (S1' ×ˢ S2')) = _
-      rw [← Set.image_inter
-        (by rintro ⟨_, _⟩ ⟨_, _⟩ h; injection h with h1 h2; exact Prod.ext h1 h2),
-        Set.prod_inter_prod]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_prod EctxItem.condC.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | pairL S =>
     cases c₂
     case pairL S' =>
-      show (EctxItem.pairL '' S) ∩ (EctxItem.pairL '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.pairL.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | pairR S =>
     cases c₂
     case pairR S' =>
-      show (EctxItem.pairR '' S) ∩ (EctxItem.pairR '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.pairR.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | fst =>
     cases c₂
@@ -373,11 +348,8 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
   | case S1 S2 =>
     cases c₂
     case case S1' S2' =>
-      show ((fun p => EctxItem.case p.1 p.2) '' (S1 ×ˢ S2)) ∩
-           ((fun p => EctxItem.case p.1 p.2) '' (S1' ×ˢ S2')) = _
-      rw [← Set.image_inter
-        (by rintro ⟨_, _⟩ ⟨_, _⟩ h; injection h with h1 h2; exact Prod.ext h1 h2),
-        Set.prod_inter_prod]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_prod EctxItem.case.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | alloc =>
     cases c₂
@@ -390,14 +362,14 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
   | storeL S =>
     cases c₂
     case storeL S' =>
-      show (EctxItem.storeL '' S) ∩ (EctxItem.storeL '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.storeL.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | storeR S =>
     cases c₂
     case storeR S' =>
-      show (EctxItem.storeR '' S) ∩ (EctxItem.storeR '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.storeR.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | tape =>
     cases c₂
@@ -406,99 +378,117 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
   | randL S =>
     cases c₂
     case randL S' =>
-      show (EctxItem.randL '' S) ∩ (EctxItem.randL '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.randL.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | randR S =>
     cases c₂
     case randR S' =>
-      show (EctxItem.randR '' S) ∩ (EctxItem.randR '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.randR.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | scrut S =>
     cases c₂
     case scrut S' =>
-      show (EctxItem.scrut '' S) ∩ (EctxItem.scrut '' S') = _
-      rw [← Set.image_inter (fun _ _ h => by injection h)]; rfl
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data EctxItem.scrut.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
 
 theorem Cylinder.flatten_inter_some {α : Type _} {c₁ c₂ c : Cylinder α}
     (h : Cylinder.inter? c₁ c₂ = some c) :
-    Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ := by
-  rw [Cylinder.flatten_inter, h]; rfl
+    Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ :=
+  Stamp.flatten_inter_some Cylinder.flatten_inter h
 
-set_option maxHeartbeats 1000000 in
+/-- Inheritance of `HasMeasurableLeaves` under `Cylinder.inter?`. Per-constructor and
+linear in constructor count (no `grind`, no heartbeat bump): `cases c₁`, then `cases c₂`
+(off-diagonal dies on `inter? = none ≠ some c`), and the diagonal reduces the `inter?`
+`some`/`if` and rebuilds the constructor with `MeasurableSet.inter` of the leaf sets. -/
 theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace α]
     {c₁ c₂ c : Cylinder α}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
-  cases h₁ <;> cases h₂ <;>
-    simp_all [Cylinder.inter?] <;> grind [HasMeasurableLeaves, MeasurableSet.inter]
+  cases c₁ <;> cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+  all_goals first
+    | (cases h₁; cases h₂; injection h with h; subst h
+       first
+       | exact .appL _ (MeasurableSet.inter ‹_› ‹_›) | exact .appR _ (MeasurableSet.inter ‹_› ‹_›)
+       | exact .pairL _ (MeasurableSet.inter ‹_› ‹_›) | exact .pairR _ (MeasurableSet.inter ‹_› ‹_›)
+       | exact .storeL _ (MeasurableSet.inter ‹_› ‹_›) | exact .storeR _ (MeasurableSet.inter ‹_› ‹_›)
+       | exact .randL _ (MeasurableSet.inter ‹_› ‹_›) | exact .randR _ (MeasurableSet.inter ‹_› ‹_›)
+       | exact .scrut _ (MeasurableSet.inter ‹_› ‹_›)
+       | exact .condC _ _ (MeasurableSet.inter ‹_› ‹_›) (MeasurableSet.inter ‹_› ‹_›)
+       | exact .case _ _ (MeasurableSet.inter ‹_› ‹_›) (MeasurableSet.inter ‹_› ‹_›)
+       | constructor)
+    | (revert h; split <;> rintro ⟨rfl⟩ <;> cases h₁ <;> cases h₂
+       first
+       | exact .unop | exact .binopL _ (MeasurableSet.inter ‹_› ‹_›) | exact .binopR _ (MeasurableSet.inter ‹_› ‹_›))
 
 /-! ### Per-constructor covers. -/
 
-def cover.appL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.appL S)
-def cover.appR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.appR S)
+@[stamp_simp] def cover.appL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.appL S)
+@[stamp_simp] def cover.appR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.appR S)
 
-def cover.unop (S : Set UnOp) : Set (EctxItem α) :=
+@[stamp_simp] def cover.unop (S : Set UnOp) : Set (EctxItem α) :=
   ⋃ u ∈ S, Cylinder.flatten (Cylinder.unop u : Cylinder α)
 
-def cover.binopL (S : Set BinOp) : Set (EctxItem α) :=
+@[stamp_simp] def cover.binopL (S : Set BinOp) : Set (EctxItem α) :=
   ⋃ op ∈ S, Cylinder.flatten (.binopL op Set.univ)
 
-def cover.binopR (S : Set BinOp) : Set (EctxItem α) :=
+@[stamp_simp] def cover.binopR (S : Set BinOp) : Set (EctxItem α) :=
   ⋃ op ∈ S, Cylinder.flatten (.binopR op Set.univ)
 
-def cover.condC (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.condC (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (.condC (Set.univ : Set (Exp α)) Set.univ)
 
-def cover.pairL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.pairL S)
-def cover.pairR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.pairR S)
+@[stamp_simp] def cover.pairL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.pairL S)
+@[stamp_simp] def cover.pairR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.pairR S)
 
-def cover.fst (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.fst (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.fst : Cylinder α)
-def cover.snd (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.snd (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.snd : Cylinder α)
-def cover.inl (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.inl (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.inl : Cylinder α)
-def cover.inr (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.inr (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.inr : Cylinder α)
 
-def cover.case (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.case (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (.case (Set.univ : Set (Exp α)) Set.univ)
 
-def cover.alloc (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.alloc (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.alloc : Cylinder α)
-def cover.load (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.load (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.load : Cylinder α)
 
-def cover.storeL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.storeL S)
-def cover.storeR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.storeR S)
+@[stamp_simp] def cover.storeL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.storeL S)
+@[stamp_simp] def cover.storeR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.storeR S)
 
-def cover.tape (S : Set Unit) : Set (EctxItem α) :=
+@[stamp_simp] def cover.tape (S : Set Unit) : Set (EctxItem α) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.tape : Cylinder α)
 
-def cover.randL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.randL S)
-def cover.randR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.randR S)
+@[stamp_simp] def cover.randL (S : Set (Val α)) : Set (EctxItem α) := Cylinder.flatten (.randL S)
+@[stamp_simp] def cover.randR (S : Set (Exp α)) : Set (EctxItem α) := Cylinder.flatten (.randR S)
 
-def cover.scrut (S : Set (Pat α)) : Set (EctxItem α) := Cylinder.flatten (.scrut S)
+@[stamp_simp] def cover.scrut (S : Set (Pat α)) : Set (EctxItem α) := Cylinder.flatten (.scrut S)
 
 /-- Cylinder of a given shape has measurable leaves. -/
 theorem Shape.cylinder_hasMeasurableLeaves [MeasurableSpace α] (s : Shape) :
     (s.cylinder (α := α)).HasMeasurableLeaves := by
   cases s <;> constructor <;> measurability
 
-set_option maxHeartbeats 1000000 in
 /-- Flattening a cylinder of a shape equals set of terms with a given shape. -/
 @[simp] theorem Shape.cylinder_preimage_shape (s : Shape) :
-    (s.cylinder (α := α)).flatten = EctxItem.shape ⁻¹' {s} := by
-  ext K; cases K <;> cases s <;> simp_all <;> tauto
+    (s.cylinder (α := α)).flatten = EctxItem.shape ⁻¹' {s} :=
+  Stamp.cylinder_preimage_shape (cShape := Cylinder.shape)
+    (fun {_ _} h => Cylinder.shape_of_mem_flatten h)
+    (fun s => by cases s <;> simp_all)
+    (fun K => by cases K <;> simp_all) s
 
 /-- Flattening a cylinder gives a measurable set. -/
 @[measurability]
 theorem flatten_measurable [MeasurableSpace α] {c : Cylinder α}
     (hc : c.HasMeasurableLeaves) : MeasurableSet c.flatten :=
-  MeasurableSpace.measurableSet_generateFrom ⟨c, hc, rfl⟩
+  Stamp.flatten_measurable rfl hc
 
 attribute [aesop safe constructors (rule_sets := [Measurable])]
   ProbLang.EctxItem.Cylinder.HasMeasurableLeaves
@@ -510,40 +500,17 @@ attribute [aesop safe apply (rule_sets := [Measurable])]
 
 theorem Cylinder.flatten_isPiSystem [MeasurableSpace α] :
     IsPiSystem
-      ({S : Set (EctxItem α) | ∃ c : Cylinder α, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
-  rintro _ ⟨c₁, hc₁, rfl⟩ _ ⟨c₂, hc₂, rfl⟩ hne
-  have hi : Cylinder.inter? c₁ c₂ ≠ none := by
-    intro h
-    have : c₁.flatten ∩ c₂.flatten = ∅ := by rw [Cylinder.flatten_inter, h]; rfl
-    exact hne.ne_empty this
-  obtain ⟨c, hc⟩ : ∃ c, Cylinder.inter? c₁ c₂ = some c := Option.ne_none_iff_exists'.mp hi
-  exact ⟨c, Cylinder.hasMeasurableLeaves_inter hc₁ hc₂ hc, Cylinder.flatten_inter_some hc⟩
+      ({S : Set (EctxItem α) | ∃ c : Cylinder α, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+  Stamp.flatten_isPiSystem Cylinder.flatten_inter
+    (fun {_ _ _} => Cylinder.hasMeasurableLeaves_inter)
 
 theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace α] :
     IsCountablySpanning
-      ({S : Set (EctxItem α) | ∃ c : Cylinder α, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
-  obtain ⟨enc⟩ := nonempty_encodable Shape
-  refine ⟨fun n =>
-    match enc.decode n with
-    | some s => Cylinder.flatten (Shape.cylinder s : Cylinder α)
-    | none => Cylinder.flatten (.fst : Cylinder α), ?_, ?_⟩
-  · intro n
-    cases h : enc.decode n with
-    | none => exact ⟨.fst, .fst, by simp [h]⟩
-    | some s => exact ⟨Shape.cylinder s, Shape.cylinder_hasMeasurableLeaves s, by simp [h]⟩
-  · ext K
-    simp only [Set.mem_iUnion, Set.mem_univ, iff_true]
-    refine ⟨enc.encode (EctxItem.shape K), ?_⟩
-    have hd : enc.decode (enc.encode (EctxItem.shape K)) = some (EctxItem.shape K) := enc.encodek _
-    rw [hd]
-    cases K <;> simp
+      ({S : Set (EctxItem α) | ∃ c : Cylinder α, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+  Stamp.flatten_isCountablySpanning Shape.cylinder_hasMeasurableLeaves
+    Shape.cylinder_preimage_shape .fst .fst
 
 /-! ### Measurability of the per-constructor covers. -/
-
-macro "solve_cover_measurable" : tactic => `(tactic|
-  first
-  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable ((by measurability))
-  | exact flatten_measurable ((by measurability)))
 
 @[measurability]
 theorem cover.appL.measurable [MeasurableSpace α] {S : Set (Val α)} (hS : MeasurableSet S) :
@@ -628,9 +595,6 @@ theorem cover.randR.measurable [MeasurableSpace α] {S : Set (Exp α)} (hS : Mea
 @[measurability]
 theorem cover.scrut.measurable [MeasurableSpace α] {S : Set (Pat α)} (hS : MeasurableSet S) :
     MeasurableSet (scrut (α := α) S) := flatten_measurable (.scrut _ hS)
-
-macro "solve_cover_eq_image" ctor:ident : tactic => `(tactic|
-  (ext K; cases K <;> simp [$ctor:ident]))
 
 theorem cover.appL_eq_image (S : Set (Val α)) :
     cover.appL (α := α) S = EctxItem.appL '' S := by solve_cover_eq_image cover.appL
@@ -951,19 +915,6 @@ theorem case.measurable [MeasurableSpace α] :
   case.ι.measurable
 
 /-! ### Measurable embeddings. -/
-
-macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (refine ⟨fun _ _ h => by injection h, (by measurability), fun S _ => ?_⟩
-   rw [← $eq_image S]
-   exact $meas S))
-
-macro "solve_nullary_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-   · exact measurable_const
-   · rw [show Set.range _ = _ from by rw [← $eq_image Set.univ]; ext; simp]
-     exact $meas _
-   · exact measurable_const
-   · intro; rfl))
 
 theorem unop.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (EctxItem.unop : UnOp → EctxItem α) := by

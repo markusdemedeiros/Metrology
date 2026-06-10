@@ -4,6 +4,7 @@ import all Mathlib.Tactic.DeriveCountable
 public import Metrology.ProbLang.Measure
 public import Metrology.ProbLang.Syntax.Syntax
 public import Metrology.ProbLang.CoreMeasures.Pat
+public import Metrology.ProbLang.CoreMeasures.Stamp
 
 meta import Metrology.Meta
 
@@ -29,13 +30,6 @@ Follows the same `BaseLit`/`Pat` template. `Exp` has:
 -/
 
 namespace ProbLang.Exp
-
-macro "solve_ι_inj" : tactic => `(tactic|
-  (intro a b h;
-   first
-   | (cases h; rfl)
-   | (obtain ⟨_, _⟩ := a; obtain ⟨_, _⟩ := b; cases h; rfl)
-   | (obtain ⟨_, _, _⟩ := a; obtain ⟨_, _, _⟩ := b; cases h; rfl)))
 
 theorem bvar.ι.inj  {rT : Type _} : Function.Injective (@Exp.bvar.ι  rT) := by solve_ι_inj
 theorem fvar.ι.inj  {rT : Type _} : Function.Injective (@Exp.fvar.ι  rT) := by solve_ι_inj
@@ -113,7 +107,7 @@ inductive Shape
   deriving Countable
 
 /-- Interpret a cylinder as the set of `Exp rT` it describes. -/
-@[simp] def Cylinder.flatten {rT : Type _} : Cylinder rT → Set (Exp rT)
+@[simp, stamp_simp] def Cylinder.flatten {rT : Type _} : Cylinder rT → Set (Exp rT)
   | .bvar n        => {Exp.bvar n}
   | .fvar x        => {Exp.fvar x}
   | .lit S         => Exp.lit '' S
@@ -172,7 +166,7 @@ inductive Cylinder.HasMeasurableLeaves {rT : Type _} [MeasurableSpace rT] :
 instance instMeasurableSpaceExp [MeasurableSpace rT] : MeasurableSpace (Exp rT) :=
   .generateFrom <| Cylinder.flatten '' { c : Cylinder rT | c.HasMeasurableLeaves }
 
-@[simp] def shape : Exp rT → Shape
+@[simp, stamp_simp] def shape : Exp rT → Shape
   | .bvar n        => .bvar n
   | .fvar x        => .fvar x
   | .lit _         => .lit
@@ -197,7 +191,7 @@ instance instMeasurableSpaceExp [MeasurableSpace rT] : MeasurableSpace (Exp rT) 
   | .scrut e _     => .scrut (shape e)
 
 /-- Shape of a cylinder (forgets data leaves). -/
-@[simp] def Cylinder.shape {rT : Type _} : Cylinder rT → Shape
+@[simp, stamp_simp] def Cylinder.shape {rT : Type _} : Cylinder rT → Shape
   | .bvar n        => .bvar n
   | .fvar x        => .fvar x
   | .lit _         => .lit
@@ -222,7 +216,7 @@ instance instMeasurableSpaceExp [MeasurableSpace rT] : MeasurableSpace (Exp rT) 
   | .scrut c _     => .scrut (shape c)
 
 /-- The "universe cylinder" for a given shape: `univ` at every data leaf, same skeleton. -/
-@[simp] def Shape.cylinder {rT : Type _} : Shape → Cylinder rT
+@[simp, stamp_simp] def Shape.cylinder {rT : Type _} : Shape → Cylinder rT
   | .bvar n        => .bvar n
   | .fvar x        => .fvar x
   | .lit           => .lit Set.univ
@@ -360,11 +354,9 @@ theorem Cylinder.shape_of_mem_flatten {rT : Type _} {c : Cylinder rT} {e : Exp r
 
 /-- Flattens of cylinders with different shapes are disjoint. -/
 theorem Cylinder.flatten_disjoint_of_shape_ne {rT : Type _} {c₁ c₂ : Cylinder rT}
-    (h : Cylinder.shape c₁ ≠ Cylinder.shape c₂) : Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ = ∅ := by
-  ext e
-  simp only [Set.mem_inter_iff, Set.mem_empty_iff_false, iff_false, not_and]
-  intro he₁ he₂
-  exact h ((Cylinder.shape_of_mem_flatten he₁).symm.trans (Cylinder.shape_of_mem_flatten he₂))
+    (h : Cylinder.shape c₁ ≠ Cylinder.shape c₂) : Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ = ∅ :=
+  Stamp.flatten_disjoint_of_shape_ne (cShape := Cylinder.shape)
+    (fun {_ _} h => Cylinder.shape_of_mem_flatten h) h
 
 /-- The cylinder flatten of the intersection equals the intersection of the flattens. -/
 theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
@@ -381,167 +373,135 @@ theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | lit S₁ =>
     cases c₂
-    case lit S₂ => simp [Cylinder.inter?]; ext e; cases e <;> simp
+    case lit S₂ =>
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data Exp.lit.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | lam c ih =>
     cases c₂
     case lam c' =>
-      show (Exp.lam.ι '' Cylinder.flatten c) ∩ (Exp.lam.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.lam.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.lam.ι.inj Cylinder.lam (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | fix c ih =>
     cases c₂
     case fix c' =>
-      show (Exp.fix.ι '' Cylinder.flatten c) ∩ (Exp.fix.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.fix.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.fix.ι.inj Cylinder.fix (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | app a b ih₁ ih₂ =>
     cases c₂
     case app a' b' =>
-      show (Exp.app.ι '' (Cylinder.flatten a ×ˢ Cylinder.flatten b)) ∩
-           (Exp.app.ι '' (Cylinder.flatten a' ×ˢ Cylinder.flatten b')) = _
-      rw [← Set.image_inter Exp.app.ι.inj, Set.prod_inter_prod, ih₁, ih₂]
-      cases hr₁ : Cylinder.inter? a a' <;> cases hr₂ : Cylinder.inter? b b' <;>
-        simp [Cylinder.inter?, hr₁, hr₂]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₂ Exp.app.ι.inj Cylinder.app (fun _ _ => rfl) (ih₁ a') (ih₂ b')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? a a' <;> cases Cylinder.inter? b b' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | unop u c ih =>
     cases c₂
     case unop u' c' =>
-      show (Exp.unop u '' Cylinder.flatten c) ∩ (Exp.unop u' '' Cylinder.flatten c') = _
-      by_cases hu : u = u'
-      · subst hu
-        rw [← Set.image_inter (fun _ _ h => by injection h), ih]
-        cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
-      · have hinter : Cylinder.inter? (Cylinder.unop u c) (Cylinder.unop u' c') = none := by
-          simp [Cylinder.inter?, hu]
-        rw [hinter]
-        ext e
-        simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false,
-          Option.elim_none, not_and]
-        rintro ⟨a, _, rfl⟩ ⟨a', _, hh⟩
-        injection hh with hu_eq _
-        exact hu hu_eq.symm
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_mixed₁ (fun _ _ _ h => by injection h)
+        (fun h => by injection h) Cylinder.unop (fun _ _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; split <;> [cases Cylinder.inter? c c'; skip] <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | binop b a₁ a₂ ih₁ ih₂ =>
     cases c₂
     case binop b' a₁' a₂' =>
-      show ((fun p => Exp.binop b p.1 p.2) '' (Cylinder.flatten a₁ ×ˢ Cylinder.flatten a₂)) ∩
-           ((fun p => Exp.binop b' p.1 p.2) '' (Cylinder.flatten a₁' ×ˢ Cylinder.flatten a₂')) = _
-      by_cases hb : b = b'
-      · subst hb
-        rw [← Set.image_inter (fun _ _ h => by injection h with _ h1 h2; exact Prod.ext h1 h2),
-            Set.prod_inter_prod, ih₁, ih₂]
-        cases hr₁ : Cylinder.inter? a₁ a₁' <;> cases hr₂ : Cylinder.inter? a₂ a₂' <;>
-          simp [Cylinder.inter?, hr₁, hr₂]
-      · have hinter : Cylinder.inter? (Cylinder.binop b a₁ a₂) (Cylinder.binop b' a₁' a₂') = none := by
-          simp [Cylinder.inter?, hb]
-        rw [hinter]
-        ext e
-        simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false,
-          Option.elim_none, not_and]
-        rintro ⟨a, _, rfl⟩ ⟨a', _, hh⟩
-        injection hh with hb_eq _ _
-        exact hb hb_eq.symm
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_mixed₂ (fun _ _ _ h => by injection h with _ h1 h2; exact Prod.ext h1 h2)
+        (fun h => by injection h) Cylinder.binop (fun _ _ _ => rfl) (ih₁ a₁') (ih₂ a₂')
+        (by rw [Cylinder.inter?]; split <;>
+          [cases Cylinder.inter? a₁ a₁' <;> cases Cylinder.inter? a₂ a₂'; skip] <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | cond cc ct cf ihc iht ihf =>
     cases c₂
     case cond cc' ct' cf' =>
-      show (Exp.cond.ι '' (Cylinder.flatten cc ×ˢ Cylinder.flatten ct ×ˢ Cylinder.flatten cf)) ∩
-           (Exp.cond.ι '' (Cylinder.flatten cc' ×ˢ Cylinder.flatten ct' ×ˢ Cylinder.flatten cf')) = _
-      rw [← Set.image_inter Exp.cond.ι.inj, Set.prod_inter_prod, Set.prod_inter_prod,
-          ihc, iht, ihf]
-      cases hrc : Cylinder.inter? cc cc' <;> cases hrt : Cylinder.inter? ct ct' <;>
-        cases hrf : Cylinder.inter? cf cf' <;>
-        simp [Cylinder.inter?, hrc, hrt, hrf]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₃ Exp.cond.ι.inj Cylinder.cond (fun _ _ _ => rfl)
+        (ihc cc') (iht ct') (ihf cf')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? cc cc' <;> cases Cylinder.inter? ct ct' <;>
+          cases Cylinder.inter? cf cf' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | pair a b ih₁ ih₂ =>
     cases c₂
     case pair a' b' =>
-      show (Exp.pair.ι '' (Cylinder.flatten a ×ˢ Cylinder.flatten b)) ∩
-           (Exp.pair.ι '' (Cylinder.flatten a' ×ˢ Cylinder.flatten b')) = _
-      rw [← Set.image_inter Exp.pair.ι.inj, Set.prod_inter_prod, ih₁, ih₂]
-      cases hr₁ : Cylinder.inter? a a' <;> cases hr₂ : Cylinder.inter? b b' <;>
-        simp [Cylinder.inter?, hr₁, hr₂]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₂ Exp.pair.ι.inj Cylinder.pair (fun _ _ => rfl) (ih₁ a') (ih₂ b')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? a a' <;> cases Cylinder.inter? b b' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | fst c ih =>
     cases c₂
     case fst c' =>
-      show (Exp.fst.ι '' Cylinder.flatten c) ∩ (Exp.fst.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.fst.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.fst.ι.inj Cylinder.fst (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | snd c ih =>
     cases c₂
     case snd c' =>
-      show (Exp.snd.ι '' Cylinder.flatten c) ∩ (Exp.snd.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.snd.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.snd.ι.inj Cylinder.snd (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | inl c ih =>
     cases c₂
     case inl c' =>
-      show (Exp.inl.ι '' Cylinder.flatten c) ∩ (Exp.inl.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.inl.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.inl.ι.inj Cylinder.inl (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | inr c ih =>
     cases c₂
     case inr c' =>
-      show (Exp.inr.ι '' Cylinder.flatten c) ∩ (Exp.inr.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.inr.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.inr.ι.inj Cylinder.inr (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | case cc cl cr ihc ihl ihr =>
     cases c₂
     case case cc' cl' cr' =>
-      show (Exp.case.ι '' (Cylinder.flatten cc ×ˢ Cylinder.flatten cl ×ˢ Cylinder.flatten cr)) ∩
-           (Exp.case.ι '' (Cylinder.flatten cc' ×ˢ Cylinder.flatten cl' ×ˢ Cylinder.flatten cr')) = _
-      rw [← Set.image_inter Exp.case.ι.inj, Set.prod_inter_prod, Set.prod_inter_prod,
-          ihc, ihl, ihr]
-      cases hrc : Cylinder.inter? cc cc' <;> cases hrl : Cylinder.inter? cl cl' <;>
-        cases hrr : Cylinder.inter? cr cr' <;>
-        simp [Cylinder.inter?, hrc, hrl, hrr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₃ Exp.case.ι.inj Cylinder.case (fun _ _ _ => rfl)
+        (ihc cc') (ihl cl') (ihr cr')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? cc cc' <;> cases Cylinder.inter? cl cl' <;>
+          cases Cylinder.inter? cr cr' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | alloc c ih =>
     cases c₂
     case alloc c' =>
-      show (Exp.alloc.ι '' Cylinder.flatten c) ∩ (Exp.alloc.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.alloc.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.alloc.ι.inj Cylinder.alloc (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | load c ih =>
     cases c₂
     case load c' =>
-      show (Exp.load.ι '' Cylinder.flatten c) ∩ (Exp.load.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.load.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.load.ι.inj Cylinder.load (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | store a b ih₁ ih₂ =>
     cases c₂
     case store a' b' =>
-      show (Exp.store.ι '' (Cylinder.flatten a ×ˢ Cylinder.flatten b)) ∩
-           (Exp.store.ι '' (Cylinder.flatten a' ×ˢ Cylinder.flatten b')) = _
-      rw [← Set.image_inter Exp.store.ι.inj, Set.prod_inter_prod, ih₁, ih₂]
-      cases hr₁ : Cylinder.inter? a a' <;> cases hr₂ : Cylinder.inter? b b' <;>
-        simp [Cylinder.inter?, hr₁, hr₂]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₂ Exp.store.ι.inj Cylinder.store (fun _ _ => rfl) (ih₁ a') (ih₂ b')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? a a' <;> cases Cylinder.inter? b b' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | tape c ih =>
     cases c₂
     case tape c' =>
-      show (Exp.tape.ι '' Cylinder.flatten c) ∩ (Exp.tape.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Exp.tape.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Exp.tape.ι.inj Cylinder.tape (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | rand a b ih₁ ih₂ =>
     cases c₂
     case rand a' b' =>
-      show (Exp.rand.ι '' (Cylinder.flatten a ×ˢ Cylinder.flatten b)) ∩
-           (Exp.rand.ι '' (Cylinder.flatten a' ×ˢ Cylinder.flatten b')) = _
-      rw [← Set.image_inter Exp.rand.ι.inj, Set.prod_inter_prod, ih₁, ih₂]
-      cases hr₁ : Cylinder.inter? a a' <;> cases hr₂ : Cylinder.inter? b b' <;>
-        simp [Cylinder.inter?, hr₁, hr₂]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₂ Exp.rand.ι.inj Cylinder.rand (fun _ _ => rfl) (ih₁ a') (ih₂ b')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? a a' <;> cases Cylinder.inter? b b' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | fail =>
     cases c₂
@@ -550,96 +510,144 @@ theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
   | scrut c S ih =>
     cases c₂
     case scrut c' S' =>
-      show (Exp.scrut.ι '' (Cylinder.flatten c ×ˢ S)) ∩ (Exp.scrut.ι '' (Cylinder.flatten c' ×ˢ S')) = _
-      rw [← Set.image_inter Exp.scrut.ι.inj, Set.prod_inter_prod, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_scrut Exp.scrut.ι.inj Cylinder.scrut (fun _ _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
 
 theorem Cylinder.flatten_inter_some {rT : Type _} {c₁ c₂ c : Cylinder rT}
     (h : Cylinder.inter? c₁ c₂ = some c) :
-    Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ := by
-  rw [Cylinder.flatten_inter, h]; rfl
+    Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ :=
+  Stamp.flatten_inter_some Cylinder.flatten_inter h
 
-set_option maxHeartbeats 1000000 in
 /-- Inheritance of `HasMeasurableLeaves` under `Cylinder.inter?`.
 
-Same one-liner as for `BaseLit`/`Pat` (compare `BaseLit.lean:171`,
-`Pat.lean:194`); the heartbeat bump is purely to absorb the 22×22 case-split
-blow-up of `induction h₁ <;> cases h₂` over `Exp`'s constructor count.
-The proof itself is structurally identical to the smaller-arity versions. -/
+Same per-constructor-linear shape as for `Pat` (`Pat.lean`): `induction h₁`, then for
+each constructor `cases c₂` (off-diagonal dies on `inter? = none ≠ some c`), and the
+diagonal `revert h; split <;> rintro ⟨rfl⟩` reduces the `inter?` `match`/`if` and
+applies the constructor with the children's leaves from the IHs. No `grind`, no
+heartbeat bump. -/
 theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     {c₁ c₂ c : Cylinder rT}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
-  induction h₁ generalizing c₂ c <;> cases h₂ <;>
-    simp_all [Cylinder.inter?] <;> grind [HasMeasurableLeaves, MeasurableSet.inter]
+  induction c₁ generalizing c₂ c with
+  | bvar | fvar | fail =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢ <;>
+      first | (split at h <;> simp_all) | simp_all
+  | lit S₁ =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂; injection h with h; subst h; exact .lit _ (MeasurableSet.inter ‹_› ‹_›)
+  | lam c ih | fix c ih | fst c ih | snd c ih | inl c ih | inr c ih
+  | alloc c ih | load c ih | tape c ih =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals (
+      cases h₁; cases h₂
+      revert h; split <;> rintro ⟨rfl⟩; rename_i ha
+      first
+      | exact .lam (ih ‹_› ‹_› ha) | exact .fix (ih ‹_› ‹_› ha) | exact .fst (ih ‹_› ‹_› ha)
+      | exact .snd (ih ‹_› ‹_› ha) | exact .inl (ih ‹_› ‹_› ha) | exact .inr (ih ‹_› ‹_› ha)
+      | exact .alloc (ih ‹_› ‹_› ha) | exact .load (ih ‹_› ‹_› ha) | exact .tape (ih ‹_› ‹_› ha))
+  | app a b iha ihb | pair a b iha ihb | store a b iha ihb | rand a b iha ihb =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals (
+      cases h₁; cases h₂
+      revert h; split <;> rintro ⟨rfl⟩; rename_i ha hb
+      first
+      | exact .app (iha ‹_› ‹_› ha) (ihb ‹_› ‹_› hb)
+      | exact .pair (iha ‹_› ‹_› ha) (ihb ‹_› ‹_› hb)
+      | exact .store (iha ‹_› ‹_› ha) (ihb ‹_› ‹_› hb)
+      | exact .rand (iha ‹_› ‹_› ha) (ihb ‹_› ‹_› hb))
+  | unop u c ih =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂
+    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩ <;> rename_i ha
+    exact .unop (ih ‹_› ‹_› ha)
+  | binop bo a b iha ihb =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂
+    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩ <;> rename_i ha hb
+    exact .binop (iha ‹_› ‹_› ha) (ihb ‹_› ‹_› hb)
+  | cond cc ct cf ihc iht ihf | case cc ct cf ihc iht ihf =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals (
+      cases h₁; cases h₂
+      revert h; split <;> rintro ⟨rfl⟩; rename_i hc ht hf
+      first
+      | exact .cond (ihc ‹_› ‹_› hc) (iht ‹_› ‹_› ht) (ihf ‹_› ‹_› hf)
+      | exact .case (ihc ‹_› ‹_› hc) (iht ‹_› ‹_› ht) (ihf ‹_› ‹_› hf))
+  | scrut c S ih =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂
+    revert h; split <;> rintro ⟨rfl⟩; rename_i ha
+    exact .scrut _ (ih ‹_› ‹_› ha) (MeasurableSet.inter ‹_› ‹_›)
 
 /-! ### Per-constructor covers. -/
 
-def cover.bvar (S : Set Nat) : Set (Exp rT) :=
+@[stamp_simp] def cover.bvar (S : Set Nat) : Set (Exp rT) :=
   ⋃ n ∈ S, Cylinder.flatten (.bvar n)
 
-def cover.fvar (S : Set Var) : Set (Exp rT) :=
+@[stamp_simp] def cover.fvar (S : Set Var) : Set (Exp rT) :=
   ⋃ x ∈ S, Cylinder.flatten (.fvar x)
 
-def cover.lit (S : Set (BaseLit rT)) : Set (Exp rT) :=
+@[stamp_simp] def cover.lit (S : Set (BaseLit rT)) : Set (Exp rT) :=
   Cylinder.flatten (.lit S)
 
-def cover.lam (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.lam (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.lam s.cylinder)
 
-def cover.fix (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.fix (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.fix s.cylinder)
 
-def cover.app (S : Set (Shape × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.app (S : Set (Shape × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.app p.1.cylinder p.2.cylinder)
 
-def cover.unop (S : Set (UnOp × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.unop (S : Set (UnOp × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.unop p.1 p.2.cylinder)
 
-def cover.binop (S : Set (BinOp × Shape × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.binop (S : Set (BinOp × Shape × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.binop p.1 p.2.1.cylinder p.2.2.cylinder)
 
-def cover.cond (S : Set (Shape × Shape × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.cond (S : Set (Shape × Shape × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.cond p.1.cylinder p.2.1.cylinder p.2.2.cylinder)
 
-def cover.pair (S : Set (Shape × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.pair (S : Set (Shape × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.pair p.1.cylinder p.2.cylinder)
 
-def cover.fst (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.fst (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.fst s.cylinder)
 
-def cover.snd (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.snd (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.snd s.cylinder)
 
-def cover.inl (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.inl (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.inl s.cylinder)
 
-def cover.inr (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.inr (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.inr s.cylinder)
 
-def cover.case (S : Set (Shape × Shape × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.case (S : Set (Shape × Shape × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.case p.1.cylinder p.2.1.cylinder p.2.2.cylinder)
 
-def cover.alloc (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.alloc (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.alloc s.cylinder)
 
-def cover.load (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.load (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.load s.cylinder)
 
-def cover.store (S : Set (Shape × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.store (S : Set (Shape × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.store p.1.cylinder p.2.cylinder)
 
-def cover.tape (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.tape (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.tape s.cylinder)
 
-def cover.rand (S : Set (Shape × Shape)) : Set (Exp rT) :=
+@[stamp_simp] def cover.rand (S : Set (Shape × Shape)) : Set (Exp rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.rand p.1.cylinder p.2.cylinder)
 
-def cover.fail (S : Set Unit) : Set (Exp rT) :=
+@[stamp_simp] def cover.fail (S : Set Unit) : Set (Exp rT) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.fail : Cylinder rT)
 
-def cover.scrut (S : Set Shape) : Set (Exp rT) :=
+@[stamp_simp] def cover.scrut (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.scrut s.cylinder Set.univ)
 
 /-- Cylinder of a given shape has measurable leaves. -/
@@ -647,17 +655,19 @@ theorem Shape.cylinder_hasMeasurableLeaves [MeasurableSpace rT] (s : Shape) :
     (s.cylinder (rT := rT)).HasMeasurableLeaves := by
   induction s <;> constructor <;> measurability
 
-set_option maxHeartbeats 1000000 in
 /-- Flattening a cylinder of a shape equals set of terms with a given shape. -/
 @[simp] theorem Shape.cylinder_preimage_shape (s : Shape) :
-    (s.cylinder (rT := rT)).flatten = Exp.shape ⁻¹' {s} := by
-  ext p; induction p generalizing s <;> cases s <;> simp_all <;> tauto
+    (s.cylinder (rT := rT)).flatten = Exp.shape ⁻¹' {s} :=
+  Stamp.cylinder_preimage_shape (cShape := Cylinder.shape)
+    (fun {_ _} h => Cylinder.shape_of_mem_flatten h)
+    (fun s => by induction s <;> simp_all)
+    (fun p => by induction p <;> simp_all) s
 
 /-- Flattening a cylinder gives a measurable set. -/
 @[measurability]
 theorem flatten_measurable [MeasurableSpace rT] {c : Cylinder rT}
     (hc : c.HasMeasurableLeaves) : MeasurableSet c.flatten :=
-  MeasurableSpace.measurableSet_generateFrom ⟨c, hc, rfl⟩
+  Stamp.flatten_measurable rfl hc
 
 attribute [aesop safe constructors (rule_sets := [Measurable])]
   ProbLang.Exp.Cylinder.HasMeasurableLeaves
@@ -669,40 +679,17 @@ attribute [aesop safe apply (rule_sets := [Measurable])]
 
 theorem Cylinder.flatten_isPiSystem [MeasurableSpace rT] :
     IsPiSystem
-      ({S : Set (Exp rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
-  rintro _ ⟨c₁, hc₁, rfl⟩ _ ⟨c₂, hc₂, rfl⟩ hne
-  have hi : Cylinder.inter? c₁ c₂ ≠ none := by
-    intro h
-    have : c₁.flatten ∩ c₂.flatten = ∅ := by rw [Cylinder.flatten_inter, h]; rfl
-    exact hne.ne_empty this
-  obtain ⟨c, hc⟩ : ∃ c, Cylinder.inter? c₁ c₂ = some c := Option.ne_none_iff_exists'.mp hi
-  exact ⟨c, Cylinder.hasMeasurableLeaves_inter hc₁ hc₂ hc, Cylinder.flatten_inter_some hc⟩
+      ({S : Set (Exp rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+  Stamp.flatten_isPiSystem Cylinder.flatten_inter
+    (fun {_ _ _} => Cylinder.hasMeasurableLeaves_inter)
 
 theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace rT] :
     IsCountablySpanning
-      ({S : Set (Exp rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
-  obtain ⟨enc⟩ := nonempty_encodable Shape
-  refine ⟨fun n =>
-    match enc.decode n with
-    | some s => Cylinder.flatten (Shape.cylinder s : Cylinder rT)
-    | none => Cylinder.flatten (.fail : Cylinder rT), ?_, ?_⟩
-  · intro n
-    cases h : enc.decode n with
-    | none => exact ⟨.fail, .fail, by simp [h]⟩
-    | some s => exact ⟨Shape.cylinder s, Shape.cylinder_hasMeasurableLeaves s, by simp [h]⟩
-  · ext e
-    simp only [Set.mem_iUnion, Set.mem_univ, iff_true]
-    refine ⟨enc.encode (Exp.shape e), ?_⟩
-    have hd : enc.decode (enc.encode (Exp.shape e)) = some (Exp.shape e) := enc.encodek _
-    rw [hd]
-    simp [Shape.cylinder_preimage_shape]
+      ({S : Set (Exp rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+  Stamp.flatten_isCountablySpanning Shape.cylinder_hasMeasurableLeaves
+    Shape.cylinder_preimage_shape .fail .fail
 
 /-! ### Measurability of the per-constructor covers. -/
-
-macro "solve_cover_measurable" : tactic => `(tactic|
-  first
-  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable ((by measurability))
-  | exact flatten_measurable ((by measurability)))
 
 @[measurability]
 theorem cover.bvar.measurable [MeasurableSpace rT] (S : Set Nat) :
@@ -792,9 +779,6 @@ theorem cover.fail.measurable [MeasurableSpace rT] (S : Set Unit) :
 @[measurability]
 theorem cover.scrut.measurable [MeasurableSpace rT] (S : Set Shape) :
     MeasurableSet (scrut (rT := rT) S) := by solve_cover_measurable
-
-macro "solve_cover_eq_image" ctor:ident : tactic => `(tactic|
-  (ext e; cases e <;> simp [$ctor:ident]))
 
 theorem cover.bvar_eq_image (S : Set Nat) :
     cover.bvar (rT := rT) S = Exp.bvar '' S := by solve_cover_eq_image cover.bvar
@@ -1222,11 +1206,6 @@ theorem scrut.measurable [MeasurableSpace rT] :
     Measurable (Function.uncurry (Exp.scrut : Exp rT → Pat rT → Exp rT)) := scrut.ι.measurable
 
 /-! ### Measurable embeddings. -/
-
-macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (refine ⟨fun _ _ h => by injection h, (by measurability), fun S _ => ?_⟩
-   rw [← $eq_image S]
-   exact $meas S))
 
 theorem bvar.measurableEmbedding [MeasurableSpace rT] :
     MeasurableEmbedding (Exp.bvar : Nat → Exp rT) := by
@@ -1866,46 +1845,20 @@ theorem measurable_struct_rec : Measurable f := by
       app.measurableEmbedding (fun p => by cases p <;> simp)
       eq_app h_app @ih1 @ih2 hU
   | unop u _ ih =>
+    -- Mixed (syntax-leaf × recursive): at this Shape arm the leaf `u` is fixed, so we
+    -- slice the uncurried embedding at `u` via `of_uncurry_fixed_left` and call
+    -- plain `cell_unary` with `ctor := Exp.unop u`.
     intro U hU
-    have h_emb_u : MeasurableEmbedding (Exp.unop u : Exp rT → Exp rT) := by
-      refine ⟨?_, ?_, ?_⟩
-      · intro x y hxy
-        have hxy' : Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, x)
-                  = Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, y) := by
-          simpa [Function.uncurry] using hxy
-        have := unop.measurableEmbedding.injective hxy'
-        exact (Prod.mk.injEq .. |>.mp this).2
-      · exact unop.ι.measurable.comp (by fun_prop : Measurable (fun x : Exp rT => (u, x)))
-      · intro V hV
-        have heq2 : (Exp.unop u : Exp rT → Exp rT) '' V
-            = (Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT)) '' (({u} : Set UnOp) ×ˢ V) := by
-          ext y; simp [Function.uncurry]
-        rw [heq2]
-        exact unop.measurableEmbedding.measurableSet_image'
-          ((MeasurableSet.singleton u).prod hV)
+    have h_emb_u : MeasurableEmbedding (Exp.unop u : Exp rT → Exp rT) :=
+      .of_uncurry_fixed_left unop.measurableEmbedding (MeasurableSet.singleton u)
     have h_c_u : Measurable (c_unop u) :=
       h_unop.comp (by fun_prop : Measurable (fun x : α => (u, x)))
     exact _root_.StructRec.cell_unary Exp.shape (ctor := (Exp.unop u : Exp rT → Exp rT))
       h_emb_u (fun p => by cases p <;> simp) (eq_unop u) h_c_u @ih hU
   | binop b _ _ ih1 ih2 =>
     intro U hU
-    have h_emb_b : MeasurableEmbedding (Function.uncurry (Exp.binop b : Exp rT → Exp rT → Exp rT)) := by
-      refine ⟨?_, ?_, ?_⟩
-      · intro x y hxy
-        simp [Function.uncurry] at hxy
-        ext
-        · exact hxy.1
-        · exact hxy.2
-      · exact (binop.measurableEmbedding.measurable).comp
-          (by fun_prop : Measurable (fun p : Exp rT × Exp rT => (b, p.1, p.2)))
-      · intro V hV
-        have heq2 : Function.uncurry (Exp.binop b : Exp rT → Exp rT → Exp rT) '' V
-            = (fun (p : BinOp × Exp rT × Exp rT) => Exp.binop p.1 p.2.1 p.2.2)
-                '' ({b} ×ˢ V) := by
-          ext y; simp [Function.uncurry]
-        rw [heq2]
-        refine binop.measurableEmbedding.measurableSet_image' ?_
-        exact (MeasurableSet.singleton b).prod hV
+    have h_emb_b : MeasurableEmbedding (Function.uncurry (Exp.binop b : Exp rT → Exp rT → Exp rT)) :=
+      .of_uncurry_fixed_left binop.measurableEmbedding (MeasurableSet.singleton b)
     have h_c_b : Measurable (Function.uncurry (c_binop b)) :=
       h_binop.comp (by fun_prop : Measurable (fun p : α × α => (b, p.1, p.2)))
     exact _root_.StructRec.cell_binary Exp.shape (ctor := Exp.binop b)
@@ -2136,25 +2089,11 @@ theorem measurable_struct_rec_param : Measurable (Function.uncurry g) := by
     exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .fail)
       (fun p => by cases p <;> simp) eq_fail h_fail hU (flatten_measurable .fail)
   | unop u _ ih =>
-    -- Partial-application approach: at shape (Shape.unop u s'), u is fixed.
-    -- Use cell_unary_param with ctor := Exp.unop u and combinator c_unop b u.
+    -- Mixed (syntax-leaf × recursive): at shape (Shape.unop u s'), `u` is fixed, so
+    -- slice the uncurried embedding at `u` and call `cell_unary_param`.
     intro U hU
-    have h_emb_u : MeasurableEmbedding (Exp.unop u : Exp rT → Exp rT) := by
-      refine ⟨?_, ?_, ?_⟩
-      · intro x y hxy
-        have hxy' : Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, x)
-                  = Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, y) := by
-          simpa [Function.uncurry] using hxy
-        have := unop.measurableEmbedding.injective hxy'
-        exact (Prod.mk.injEq .. |>.mp this).2
-      · exact unop.ι.measurable.comp (by fun_prop : Measurable (fun x : Exp rT => (u, x)))
-      · intro V hV
-        have heq2 : (Exp.unop u : Exp rT → Exp rT) '' V
-            = (Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT)) '' (({u} : Set UnOp) ×ˢ V) := by
-          ext y; simp [Function.uncurry]
-        rw [heq2]
-        exact unop.measurableEmbedding.measurableSet_image'
-          ((MeasurableSet.singleton u).prod hV)
+    have h_emb_u : MeasurableEmbedding (Exp.unop u : Exp rT → Exp rT) :=
+      .of_uncurry_fixed_left unop.measurableEmbedding (MeasurableSet.singleton u)
     have h_c_u : Measurable (Function.uncurry (fun (b : β) (a : α) => c_unop b u a)) :=
       h_unop.comp (by fun_prop : Measurable (fun q : β × α => (q.1, u, q.2)))
     exact _root_.StructRec.cell_unary_param Exp.shape (ctor := (Exp.unop u : Exp rT → Exp rT))
@@ -2163,23 +2102,8 @@ theorem measurable_struct_rec_param : Measurable (Function.uncurry g) := by
   | binop o _ _ ih1 ih2 =>
     intro U hU
     have h_emb_o : MeasurableEmbedding
-        (Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT)) := by
-      refine ⟨?_, ?_, ?_⟩
-      · intro x y hxy
-        simp [Function.uncurry] at hxy
-        ext
-        · exact hxy.1
-        · exact hxy.2
-      · exact (binop.measurableEmbedding.measurable).comp
-          (by fun_prop : Measurable (fun p : Exp rT × Exp rT => (o, p.1, p.2)))
-      · intro V hV
-        have heq2 : Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT) '' V
-            = (fun (p : BinOp × Exp rT × Exp rT) => Exp.binop p.1 p.2.1 p.2.2)
-                '' (({o} : Set BinOp) ×ˢ V) := by
-          ext y; simp [Function.uncurry]
-        rw [heq2]
-        exact binop.measurableEmbedding.measurableSet_image'
-          ((MeasurableSet.singleton o).prod hV)
+        (Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT)) :=
+      .of_uncurry_fixed_left binop.measurableEmbedding (MeasurableSet.singleton o)
     have h_c_o : Measurable (fun (q : β × α × α) => c_binop q.1 o q.2.1 q.2.2) :=
       h_binop.comp (by fun_prop : Measurable (fun q : β × α × α => (q.1, o, q.2.1, q.2.2)))
     exact _root_.StructRec.cell_binary_param Exp.shape
@@ -2378,23 +2302,11 @@ theorem measurable_struct_rec_param_shift : Measurable (Function.uncurry g) := b
     exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .fail)
       (fun p => by cases p <;> simp) eq_fail h_fail hU (flatten_measurable .fail)
   | unop u _ ih =>
+    -- Mixed (syntax-leaf × recursive): `unop` does not cross a binder, so the shift
+    -- keystone uses the same `cell_unary_param` as the param keystone. Leaf `u` fixed.
     intro U hU
-    have h_emb_u : MeasurableEmbedding (Exp.unop u : Exp rT → Exp rT) := by
-      refine ⟨?_, ?_, ?_⟩
-      · intro x y hxy
-        have hxy' : Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, x)
-                  = Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT) (u, y) := by
-          simpa [Function.uncurry] using hxy
-        have := unop.measurableEmbedding.injective hxy'
-        exact (Prod.mk.injEq .. |>.mp this).2
-      · exact unop.ι.measurable.comp (by fun_prop : Measurable (fun x : Exp rT => (u, x)))
-      · intro V hV
-        have heq2 : (Exp.unop u : Exp rT → Exp rT) '' V
-            = (Function.uncurry (Exp.unop : UnOp → Exp rT → Exp rT)) '' (({u} : Set UnOp) ×ˢ V) := by
-          ext y; simp [Function.uncurry]
-        rw [heq2]
-        exact unop.measurableEmbedding.measurableSet_image'
-          ((MeasurableSet.singleton u).prod hV)
+    have h_emb_u : MeasurableEmbedding (Exp.unop u : Exp rT → Exp rT) :=
+      .of_uncurry_fixed_left unop.measurableEmbedding (MeasurableSet.singleton u)
     have h_c_u : Measurable (Function.uncurry (fun (b : β) (a : α) => c_unop b u a)) :=
       h_unop.comp (by fun_prop : Measurable (fun q : β × α => (q.1, u, q.2)))
     exact _root_.StructRec.cell_unary_param Exp.shape (ctor := (Exp.unop u : Exp rT → Exp rT))
@@ -2403,23 +2315,8 @@ theorem measurable_struct_rec_param_shift : Measurable (Function.uncurry g) := b
   | binop o _ _ ih1 ih2 =>
     intro U hU
     have h_emb_o : MeasurableEmbedding
-        (Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT)) := by
-      refine ⟨?_, ?_, ?_⟩
-      · intro x y hxy
-        simp [Function.uncurry] at hxy
-        ext
-        · exact hxy.1
-        · exact hxy.2
-      · exact (binop.measurableEmbedding.measurable).comp
-          (by fun_prop : Measurable (fun p : Exp rT × Exp rT => (o, p.1, p.2)))
-      · intro V hV
-        have heq2 : Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT) '' V
-            = (fun (p : BinOp × Exp rT × Exp rT) => Exp.binop p.1 p.2.1 p.2.2)
-                '' (({o} : Set BinOp) ×ˢ V) := by
-          ext y; simp [Function.uncurry]
-        rw [heq2]
-        exact binop.measurableEmbedding.measurableSet_image'
-          ((MeasurableSet.singleton o).prod hV)
+        (Function.uncurry (Exp.binop o : Exp rT → Exp rT → Exp rT)) :=
+      .of_uncurry_fixed_left binop.measurableEmbedding (MeasurableSet.singleton o)
     have h_c_o : Measurable (fun (q : β × α × α) => c_binop q.1 o q.2.1 q.2.2) :=
       h_binop.comp (by fun_prop : Measurable (fun q : β × α × α => (q.1, o, q.2.1, q.2.2)))
     exact _root_.StructRec.cell_binary_param Exp.shape

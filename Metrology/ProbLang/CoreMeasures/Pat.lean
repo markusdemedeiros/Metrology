@@ -4,6 +4,7 @@ import all Mathlib.Tactic.DeriveCountable
 public import Metrology.ProbLang.Measure
 public import Metrology.ProbLang.Syntax.Syntax
 public import Metrology.ProbLang.CoreMeasures.BaseLit
+public import Metrology.ProbLang.CoreMeasures.Stamp
 
 meta import Metrology.Meta
 
@@ -24,12 +25,6 @@ Closely parallels the `BaseLit` construction above. `Pat` has:
 -/
 
 namespace ProbLang.Pat
-
-macro "solve_ι_inj" : tactic => `(tactic|
-  (intro a b h;
-   first
-   | (cases h; rfl)
-   | (obtain ⟨_, _⟩ := a; obtain ⟨_, _⟩ := b; cases h; rfl)))
 
 theorem wildcard.ι.inj {rT : Type _} : Function.Injective (@Pat.wildcard.ι rT) := by solve_ι_inj
 
@@ -60,7 +55,7 @@ inductive Shape
   deriving Countable
 
 /-- Interpret a cylinder as the set of `Pat rT` it describes. -/
-@[simp] def Cylinder.flatten {rT : Type _} : Cylinder rT → Set (Pat rT)
+@[simp, stamp_simp] def Cylinder.flatten {rT : Type _} : Cylinder rT → Set (Pat rT)
   | .wildcard     => {Pat.wildcard}
   | .lit S        => Pat.lit '' S
   | .pair c1 c2   => (fun p => Pat.pair p.1 p.2) '' (flatten c1 ×ˢ flatten c2)
@@ -79,7 +74,7 @@ inductive Cylinder.HasMeasurableLeaves {rT : Type _} [MeasurableSpace rT] :
 instance instMeasurableSpacePat [MeasurableSpace rT] : MeasurableSpace (Pat rT) :=
   .generateFrom <| Cylinder.flatten '' { c : Cylinder rT | c.HasMeasurableLeaves }
 
-@[simp] def shape : Pat rT → Shape
+@[simp, stamp_simp] def shape : Pat rT → Shape
   | .wildcard     => .wildcard
   | .lit _        => .lit
   | .pair p1 p2   => .pair (shape p1) (shape p2)
@@ -87,7 +82,7 @@ instance instMeasurableSpacePat [MeasurableSpace rT] : MeasurableSpace (Pat rT) 
   | .inr p        => .inr (shape p)
 
 /-- Shape of a cylinder (forgets data leaves). -/
-@[simp] def Cylinder.shape {rT : Type _} : Cylinder rT → Shape
+@[simp, stamp_simp] def Cylinder.shape {rT : Type _} : Cylinder rT → Shape
   | .wildcard     => .wildcard
   | .lit _        => .lit
   | .pair c1 c2   => .pair (shape c1) (shape c2)
@@ -95,7 +90,7 @@ instance instMeasurableSpacePat [MeasurableSpace rT] : MeasurableSpace (Pat rT) 
   | .inr c        => .inr (shape c)
 
 /-- The "universe cylinder" for a given shape: `univ` at every data leaf. -/
-@[simp] def Shape.cylinder {rT : Type _} : Shape → Cylinder rT
+@[simp, stamp_simp] def Shape.cylinder {rT : Type _} : Shape → Cylinder rT
   | .wildcard     => .wildcard
   | .lit          => .lit Set.univ
   | .pair s1 s2   => .pair (cylinder s1) (cylinder s2)
@@ -143,11 +138,9 @@ theorem Cylinder.shape_of_mem_flatten {rT : Type _} {c : Cylinder rT} {p : Pat r
 
 /-- Flattens of cylinders with different shapes are disjoint. -/
 theorem Cylinder.flatten_disjoint_of_shape_ne {rT : Type _} {c₁ c₂ : Cylinder rT}
-    (h : Cylinder.shape c₁ ≠ Cylinder.shape c₂) : Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ = ∅ := by
-  ext p
-  simp only [Set.mem_inter_iff, Set.mem_empty_iff_false, iff_false, not_and]
-  intro hp₁ hp₂
-  exact h ((Cylinder.shape_of_mem_flatten hp₁).symm.trans (Cylinder.shape_of_mem_flatten hp₂))
+    (h : Cylinder.shape c₁ ≠ Cylinder.shape c₂) : Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ = ∅ :=
+  Stamp.flatten_disjoint_of_shape_ne (cShape := Cylinder.shape)
+    (fun {_ _} h => Cylinder.shape_of_mem_flatten h) h
 
 /-- The cylinder flatten of the intersection equals the intersection of the flattens. -/
 theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
@@ -160,59 +153,76 @@ theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | lit S₁ =>
     cases c₂
-    case lit S₂ => simp [Cylinder.inter?]; ext p; cases p <;> simp
+    case lit S₂ =>
+      simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
+      exact Stamp.flatten_inter_data Pat.lit.ι.inj
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | pair a b ih₁ ih₂ =>
     cases c₂
     case pair a' b' =>
-      show (Pat.pair.ι '' (Cylinder.flatten a ×ˢ Cylinder.flatten b)) ∩
-           (Pat.pair.ι '' (Cylinder.flatten a' ×ˢ Cylinder.flatten b')) = _
-      rw [← Set.image_inter Pat.pair.ι.inj, Set.prod_inter_prod, ih₁, ih₂]
-      cases hr₁ : Cylinder.inter? a a' <;> cases hr₂ : Cylinder.inter? b b' <;>
-        simp [Cylinder.inter?, hr₁, hr₂]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₂ Pat.pair.ι.inj Cylinder.pair (fun _ _ => rfl)
+        (ih₁ a') (ih₂ b') (by rw [Cylinder.inter?]; cases Cylinder.inter? a a' <;>
+          cases Cylinder.inter? b b' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | inl c ih =>
     cases c₂
     case inl c' =>
-      show (Pat.inl.ι '' Cylinder.flatten c) ∩ (Pat.inl.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Pat.inl.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Pat.inl.ι.inj Cylinder.inl (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | inr c ih =>
     cases c₂
     case inr c' =>
-      show (Pat.inr.ι '' Cylinder.flatten c) ∩ (Pat.inr.ι '' Cylinder.flatten c') = _
-      rw [← Set.image_inter Pat.inr.ι.inj, ih]
-      cases hr : Cylinder.inter? c c' <;> simp [Cylinder.inter?, hr]
+      simp only [Cylinder.flatten]
+      exact Stamp.flatten_inter_image₁ Pat.inr.ι.inj Cylinder.inr (fun _ => rfl) (ih c')
+        (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
 
 theorem Cylinder.flatten_inter_some {rT : Type _} {c₁ c₂ c : Cylinder rT}
     (h : Cylinder.inter? c₁ c₂ = some c) :
-    Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ := by
-  rw [Cylinder.flatten_inter, h]; rfl
+    Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ :=
+  Stamp.flatten_inter_some Cylinder.flatten_inter h
 
 theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     {c₁ c₂ c : Cylinder rT}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
-  induction h₁ generalizing c₂ c <;> cases h₂ <;>
-    simp_all [Cylinder.inter?] <;> grind [HasMeasurableLeaves, MeasurableSet.inter]
+  induction h₁ generalizing c₂ c with
+  | wildcard => cases c₂ <;> simp_all [Cylinder.inter?]
+  | @lit S₁ hS₁ =>
+    cases h₂ <;> simp_all [Cylinder.inter?]
+    subst h; exact .lit _ (hS₁.inter ‹_›)
+  | @pair a b _ _ iha ihb =>
+    cases h₂ <;> simp_all [Cylinder.inter?]
+    revert h; split <;> rintro ⟨rfl⟩
+    rename_i ha hb
+    exact .pair (iha ‹_› ha) (ihb ‹_› hb)
+  | @inl a _ ih =>
+    cases h₂ <;> simp_all [Cylinder.inter?]
+    revert h; split <;> rintro ⟨rfl⟩
+    exact .inl (ih ‹_› ‹_›)
+  | @inr a _ ih =>
+    cases h₂ <;> simp_all [Cylinder.inter?]
+    revert h; split <;> rintro ⟨rfl⟩
+    exact .inr (ih ‹_› ‹_›)
 
 /-! ### Per-constructor covers. -/
 
-def cover.wildcard (S : Set Unit) : Set (Pat rT) :=
+@[stamp_simp] def cover.wildcard (S : Set Unit) : Set (Pat rT) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.wildcard : Cylinder rT)
 
-def cover.lit (S : Set (BaseLit rT)) : Set (Pat rT) :=
+@[stamp_simp] def cover.lit (S : Set (BaseLit rT)) : Set (Pat rT) :=
   Cylinder.flatten (.lit S)
 
-def cover.pair (S : Set (Shape × Shape)) : Set (Pat rT) :=
+@[stamp_simp] def cover.pair (S : Set (Shape × Shape)) : Set (Pat rT) :=
   ⋃ p ∈ S, Cylinder.flatten (.pair p.1.cylinder p.2.cylinder)
 
-def cover.inl (S : Set Shape) : Set (Pat rT) :=
+@[stamp_simp] def cover.inl (S : Set Shape) : Set (Pat rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.inl s.cylinder)
 
-def cover.inr (S : Set Shape) : Set (Pat rT) :=
+@[stamp_simp] def cover.inr (S : Set Shape) : Set (Pat rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.inr s.cylinder)
 
 /-- Cylinder of a given shape has measurable leaves. -/
@@ -222,14 +232,17 @@ theorem Shape.cylinder_hasMeasurableLeaves [MeasurableSpace rT] (s : Shape) :
 
 /-- Flattening a cylinder of a shape equals set of terms with a given shape. -/
 @[simp] theorem Shape.cylinder_preimage_shape (s : Shape) :
-    (s.cylinder (rT := rT)).flatten = shape ⁻¹' {s} := by
-  ext p; induction p generalizing s <;> cases s <;> simp_all
+    (s.cylinder (rT := rT)).flatten = shape ⁻¹' {s} :=
+  Stamp.cylinder_preimage_shape (cShape := Cylinder.shape)
+    (fun {_ _} h => Cylinder.shape_of_mem_flatten h)
+    (fun s => by induction s <;> simp_all)
+    (fun p => by induction p <;> simp_all) s
 
 /-- Flattening a cylinder gives a measurable set. -/
 @[measurability]
 theorem flatten_measurable [MeasurableSpace rT] {c : Cylinder rT}
     (hc : c.HasMeasurableLeaves) : MeasurableSet c.flatten :=
-  MeasurableSpace.measurableSet_generateFrom ⟨c, hc, rfl⟩
+  Stamp.flatten_measurable rfl hc
 
 attribute [aesop safe constructors (rule_sets := [Measurable])]
   ProbLang.Pat.Cylinder.HasMeasurableLeaves
@@ -241,40 +254,17 @@ attribute [aesop safe apply (rule_sets := [Measurable])]
 
 theorem Cylinder.flatten_isPiSystem [MeasurableSpace rT] :
     IsPiSystem
-      ({S : Set (Pat rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
-  rintro _ ⟨c₁, hc₁, rfl⟩ _ ⟨c₂, hc₂, rfl⟩ hne
-  have hi : Cylinder.inter? c₁ c₂ ≠ none := by
-    intro h
-    have : c₁.flatten ∩ c₂.flatten = ∅ := by rw [Cylinder.flatten_inter, h]; rfl
-    exact hne.ne_empty this
-  obtain ⟨c, hc⟩ : ∃ c, Cylinder.inter? c₁ c₂ = some c := Option.ne_none_iff_exists'.mp hi
-  exact ⟨c, Cylinder.hasMeasurableLeaves_inter hc₁ hc₂ hc, Cylinder.flatten_inter_some hc⟩
+      ({S : Set (Pat rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+  Stamp.flatten_isPiSystem Cylinder.flatten_inter
+    (fun {_ _ _} => Cylinder.hasMeasurableLeaves_inter)
 
 theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace rT] :
     IsCountablySpanning
-      ({S : Set (Pat rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) := by
-  obtain ⟨enc⟩ := nonempty_encodable Shape
-  refine ⟨fun n =>
-    match enc.decode n with
-    | some s => Cylinder.flatten (Shape.cylinder s : Cylinder rT)
-    | none => Cylinder.flatten (.wildcard : Cylinder rT), ?_, ?_⟩
-  · intro n
-    cases h : enc.decode n with
-    | none => exact ⟨.wildcard, .wildcard, by simp [h]⟩
-    | some s => exact ⟨Shape.cylinder s, Shape.cylinder_hasMeasurableLeaves s, by simp [h]⟩
-  · ext p
-    simp only [Set.mem_iUnion, Set.mem_univ, iff_true]
-    refine ⟨enc.encode (Pat.shape p), ?_⟩
-    have hd : enc.decode (enc.encode (Pat.shape p)) = some (Pat.shape p) := enc.encodek _
-    rw [hd]
-    simp [Shape.cylinder_preimage_shape]
+      ({S : Set (Pat rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+  Stamp.flatten_isCountablySpanning Shape.cylinder_hasMeasurableLeaves
+    Shape.cylinder_preimage_shape .wildcard .wildcard
 
 /-! ### Measurability of the per-constructor covers. -/
-
-macro "solve_cover_measurable" : tactic => `(tactic|
-  first
-  | exact .biUnion (Set.to_countable _) fun _ _ => flatten_measurable ((by measurability))
-  | exact flatten_measurable ((by measurability)))
 
 @[measurability]
 theorem cover.wildcard.measurable [MeasurableSpace rT] (S : Set Unit) :
@@ -300,9 +290,6 @@ theorem cover.inl.measurable [MeasurableSpace rT] (S : Set Shape) :
 theorem cover.inr.measurable [MeasurableSpace rT] (S : Set Shape) :
     MeasurableSet (inr (rT := rT) S) := by
   solve_cover_measurable
-
-macro "solve_cover_eq_image" ctor:ident : tactic => `(tactic|
-  (ext p; cases p <;> simp [$ctor:ident]))
 
 theorem cover.wildcard_eq_image (S : Set Unit) :
     cover.wildcard (rT := rT) S = (fun _ : Unit => (Pat.wildcard : Pat rT)) '' S := by
@@ -402,12 +389,6 @@ theorem inl.measurable [MeasurableSpace rT] :
 @[fun_prop]
 theorem inr.measurable [MeasurableSpace rT] :
     Measurable (Pat.inr : Pat rT → Pat rT) := inr.ι.measurable
-
-/-- Solves `MeasurableEmbedding f` for a discrete-leaf constructor `f`. -/
-macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
-  (refine ⟨fun _ _ h => by injection h, (by measurability), fun S _ => ?_⟩
-   rw [← $eq_image S]
-   exact $meas S))
 
 theorem wildcard.measurableEmbedding [MeasurableSpace rT] :
     MeasurableEmbedding (fun _ : Unit => (Pat.wildcard : Pat rT)) := by
@@ -701,10 +682,8 @@ theorem singletonCyl_hasMeasurableLeaves
 instance instMeasurableSingletonClass
     {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] :
     MeasurableSingletonClass (Pat rT) where
-  measurableSet_singleton p := by
-    rw [← singletonCyl_flatten p]
-    exact MeasurableSpace.measurableSet_generateFrom
-      ⟨singletonCyl p, singletonCyl_hasMeasurableLeaves p, rfl⟩
+  measurableSet_singleton :=
+    Stamp.measurableSet_singleton rfl singletonCyl_flatten singletonCyl_hasMeasurableLeaves
 
 end Pat
 end ProbLang
