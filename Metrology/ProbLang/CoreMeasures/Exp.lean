@@ -1543,7 +1543,7 @@ theorem casesOn_preimage_decomp
     · exact ⟨20, (), he, rfl⟩
     · exact ⟨21, ⟨_, _⟩, he, rfl⟩
   · rintro ⟨i, hi⟩; fin_cases i <;>
-      · obtain ⟨q, hq, he⟩ := hi; cases he; simpa using hq
+      · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
 @[fun_prop]
 theorem measurable_rec
@@ -1728,7 +1728,7 @@ theorem casesOn_preimage_decomp_param
     · exact ⟨20, (b, ()), he, rfl⟩
     · exact ⟨21, (b, _, _), he, rfl⟩
   · rintro ⟨i, hi⟩; fin_cases i <;>
-      · obtain ⟨q, hq, he⟩ := hi; cases he; simpa using hq
+      · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
 /-- One-level `Exp.casesOn` with a `β` parameter threaded.
 
@@ -2434,34 +2434,34 @@ end StructRecParamShift
 
 /-! ### Synthetic smoke-test battery -/
 
-/-- Test 1: discrete codomain (`expDepth : Exp rT → Nat`). -/
-@[simp] def expDepth : Exp rT → Nat
+/-- Test 1: discrete codomain (`tagDepth : Exp rT → Nat`). -/
+@[simp] def tagDepth : Exp rT → Nat
   | .bvar _        => 0
   | .fvar _        => 0
   | .lit _         => 0
-  | .lam e         => expDepth e + 1
-  | .fix e         => expDepth e + 1
-  | .app e1 e2     => max (expDepth e1) (expDepth e2) + 1
-  | .unop _ e      => expDepth e + 1
-  | .binop _ e1 e2 => max (expDepth e1) (expDepth e2) + 1
-  | .cond ec et ef => max (max (expDepth ec) (expDepth et)) (expDepth ef) + 1
-  | .pair e1 e2    => max (expDepth e1) (expDepth e2) + 1
-  | .fst e         => expDepth e + 1
-  | .snd e         => expDepth e + 1
-  | .inl e         => expDepth e + 1
-  | .inr e         => expDepth e + 1
-  | .case ec el er => max (max (expDepth ec) (expDepth el)) (expDepth er) + 1
-  | .alloc e       => expDepth e + 1
-  | .load e        => expDepth e + 1
-  | .store e1 e2   => max (expDepth e1) (expDepth e2) + 1
-  | .tape e        => expDepth e + 1
-  | .rand e1 e2    => max (expDepth e1) (expDepth e2) + 1
+  | .lam e         => tagDepth e + 1
+  | .fix e         => tagDepth e + 1
+  | .app e1 e2     => max (tagDepth e1) (tagDepth e2) + 1
+  | .unop _ e      => tagDepth e + 1
+  | .binop _ e1 e2 => max (tagDepth e1) (tagDepth e2) + 1
+  | .cond ec et ef => max (max (tagDepth ec) (tagDepth et)) (tagDepth ef) + 1
+  | .pair e1 e2    => max (tagDepth e1) (tagDepth e2) + 1
+  | .fst e         => tagDepth e + 1
+  | .snd e         => tagDepth e + 1
+  | .inl e         => tagDepth e + 1
+  | .inr e         => tagDepth e + 1
+  | .case ec el er => max (max (tagDepth ec) (tagDepth el)) (tagDepth er) + 1
+  | .alloc e       => tagDepth e + 1
+  | .load e        => tagDepth e + 1
+  | .store e1 e2   => max (tagDepth e1) (tagDepth e2) + 1
+  | .tape e        => tagDepth e + 1
+  | .rand e1 e2    => max (tagDepth e1) (tagDepth e2) + 1
   | .fail          => 0
-  | .scrut e _     => expDepth e + 1
+  | .scrut e _     => tagDepth e + 1
 
-theorem expDepth.measurable [MeasurableSpace rT] :
-    Measurable (expDepth : Exp rT → Nat) := by
-  apply measurable_struct_rec (f := expDepth)
+theorem tagDepth.measurable [MeasurableSpace rT] :
+    Measurable (tagDepth : Exp rT → Nat) := by
+  apply measurable_struct_rec (f := tagDepth)
     (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := fun _ => 0)
     (c_lam := (· + 1)) (c_fix := (· + 1))
     (c_app := fun n1 n2 => max n1 n2 + 1)
@@ -2477,35 +2477,35 @@ theorem expDepth.measurable [MeasurableSpace rT] :
     (c_scrut := fun n _ => n + 1)
   all_goals first | (intros; rfl) | fun_prop
 
-/-- Test 2: data-leaf dependent (`countLits : Exp rT → Nat`, counts `lit` and `scrut`
+/-- Test 2: data-leaf dependent (`countLeaves : Exp rT → Nat`, counts `lit` and `scrut`
 data leaves). -/
-@[simp] def countLits : Exp rT → Nat
+@[simp] def countLeaves : Exp rT → Nat
   | .bvar _        => 0
   | .fvar _        => 0
   | .lit _         => 1
-  | .lam e         => countLits e
-  | .fix e         => countLits e
-  | .app e1 e2     => countLits e1 + countLits e2
-  | .unop _ e      => countLits e
-  | .binop _ e1 e2 => countLits e1 + countLits e2
-  | .cond ec et ef => countLits ec + countLits et + countLits ef
-  | .pair e1 e2    => countLits e1 + countLits e2
-  | .fst e         => countLits e
-  | .snd e         => countLits e
-  | .inl e         => countLits e
-  | .inr e         => countLits e
-  | .case ec el er => countLits ec + countLits el + countLits er
-  | .alloc e       => countLits e
-  | .load e        => countLits e
-  | .store e1 e2   => countLits e1 + countLits e2
-  | .tape e        => countLits e
-  | .rand e1 e2    => countLits e1 + countLits e2
+  | .lam e         => countLeaves e
+  | .fix e         => countLeaves e
+  | .app e1 e2     => countLeaves e1 + countLeaves e2
+  | .unop _ e      => countLeaves e
+  | .binop _ e1 e2 => countLeaves e1 + countLeaves e2
+  | .cond ec et ef => countLeaves ec + countLeaves et + countLeaves ef
+  | .pair e1 e2    => countLeaves e1 + countLeaves e2
+  | .fst e         => countLeaves e
+  | .snd e         => countLeaves e
+  | .inl e         => countLeaves e
+  | .inr e         => countLeaves e
+  | .case ec el er => countLeaves ec + countLeaves el + countLeaves er
+  | .alloc e       => countLeaves e
+  | .load e        => countLeaves e
+  | .store e1 e2   => countLeaves e1 + countLeaves e2
+  | .tape e        => countLeaves e
+  | .rand e1 e2    => countLeaves e1 + countLeaves e2
   | .fail          => 0
-  | .scrut e _     => countLits e + 1
+  | .scrut e _     => countLeaves e + 1
 
-theorem countLits.measurable [MeasurableSpace rT] :
-    Measurable (countLits : Exp rT → Nat) := by
-  apply measurable_struct_rec (f := countLits)
+theorem countLeaves.measurable [MeasurableSpace rT] :
+    Measurable (countLeaves : Exp rT → Nat) := by
+  apply measurable_struct_rec (f := countLeaves)
     (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := fun _ => 1)
     (c_lam := id) (c_fix := id)
     (c_app := (· + ·))
@@ -2522,33 +2522,33 @@ theorem countLits.measurable [MeasurableSpace rT] :
   all_goals first | (intros; rfl) | fun_prop
 
 /-- Test 3: endo-map (`Exp rT → Exp rT`, non-discrete codomain). -/
-@[simp] def doubleLam : Exp rT → Exp rT
+@[simp] def endoMap : Exp rT → Exp rT
   | .bvar n        => .bvar n
   | .fvar x        => .fvar x
   | .lit b         => .lit b
-  | .lam e         => .lam (.lam (doubleLam e))
-  | .fix e         => .fix (doubleLam e)
-  | .app e1 e2     => .app (doubleLam e1) (doubleLam e2)
-  | .unop u e      => .unop u (doubleLam e)
-  | .binop b e1 e2 => .binop b (doubleLam e1) (doubleLam e2)
-  | .cond ec et ef => .cond (doubleLam ec) (doubleLam et) (doubleLam ef)
-  | .pair e1 e2    => .pair (doubleLam e1) (doubleLam e2)
-  | .fst e         => .fst (doubleLam e)
-  | .snd e         => .snd (doubleLam e)
-  | .inl e         => .inl (doubleLam e)
-  | .inr e         => .inr (doubleLam e)
-  | .case ec el er => .case (doubleLam ec) (doubleLam el) (doubleLam er)
-  | .alloc e       => .alloc (doubleLam e)
-  | .load e        => .load (doubleLam e)
-  | .store e1 e2   => .store (doubleLam e1) (doubleLam e2)
-  | .tape e        => .tape (doubleLam e)
-  | .rand e1 e2    => .rand (doubleLam e1) (doubleLam e2)
+  | .lam e         => .lam (.lam (endoMap e))
+  | .fix e         => .fix (endoMap e)
+  | .app e1 e2     => .app (endoMap e1) (endoMap e2)
+  | .unop u e      => .unop u (endoMap e)
+  | .binop b e1 e2 => .binop b (endoMap e1) (endoMap e2)
+  | .cond ec et ef => .cond (endoMap ec) (endoMap et) (endoMap ef)
+  | .pair e1 e2    => .pair (endoMap e1) (endoMap e2)
+  | .fst e         => .fst (endoMap e)
+  | .snd e         => .snd (endoMap e)
+  | .inl e         => .inl (endoMap e)
+  | .inr e         => .inr (endoMap e)
+  | .case ec el er => .case (endoMap ec) (endoMap el) (endoMap er)
+  | .alloc e       => .alloc (endoMap e)
+  | .load e        => .load (endoMap e)
+  | .store e1 e2   => .store (endoMap e1) (endoMap e2)
+  | .tape e        => .tape (endoMap e)
+  | .rand e1 e2    => .rand (endoMap e1) (endoMap e2)
   | .fail          => .fail
-  | .scrut e p     => .scrut (doubleLam e) p
+  | .scrut e p     => .scrut (endoMap e) p
 
-theorem doubleLam.measurable [MeasurableSpace rT] :
-    Measurable (doubleLam : Exp rT → Exp rT) := by
-  apply measurable_struct_rec (f := doubleLam)
+theorem endoMap.measurable [MeasurableSpace rT] :
+    Measurable (endoMap : Exp rT → Exp rT) := by
+  apply measurable_struct_rec (f := endoMap)
     (c_bvar := Exp.bvar) (c_fvar := Exp.fvar) (c_lit := Exp.lit)
     (c_lam := fun e => .lam (.lam e)) (c_fix := Exp.fix)
     (c_app := fun e1 e2 => .app e1 e2)
@@ -2609,6 +2609,96 @@ theorem addAcc.measurable [MeasurableSpace rT] :
     (c_fail := fun acc => acc)
     (c_scrut := fun _ n _ => n)
   all_goals first | (intros; rfl) | fun_prop
+
+/-! ### Singleton-class for `Exp rT` (lifted from `MeasurableSingletonClass rT`).
+
+Was previously in `Discrete.lean`; moved here so every stamped file carries its own
+singleton section (matching `BaseLit.lean`/`Pat.lean`). -/
+
+@[simp] def singletonCyl {rT : Type _} : Exp rT → Cylinder rT
+  | .bvar n        => .bvar n
+  | .fvar x        => .fvar x
+  | .lit b         => .lit {b}
+  | .lam e         => .lam (singletonCyl e)
+  | .fix e         => .fix (singletonCyl e)
+  | .app e1 e2     => .app (singletonCyl e1) (singletonCyl e2)
+  | .unop u e      => .unop u (singletonCyl e)
+  | .binop b e1 e2 => .binop b (singletonCyl e1) (singletonCyl e2)
+  | .cond ec et ef => .cond (singletonCyl ec) (singletonCyl et) (singletonCyl ef)
+  | .pair e1 e2    => .pair (singletonCyl e1) (singletonCyl e2)
+  | .fst e         => .fst (singletonCyl e)
+  | .snd e         => .snd (singletonCyl e)
+  | .inl e         => .inl (singletonCyl e)
+  | .inr e         => .inr (singletonCyl e)
+  | .case ec el er => .case (singletonCyl ec) (singletonCyl el) (singletonCyl er)
+  | .alloc e       => .alloc (singletonCyl e)
+  | .load e        => .load (singletonCyl e)
+  | .store e1 e2   => .store (singletonCyl e1) (singletonCyl e2)
+  | .tape e        => .tape (singletonCyl e)
+  | .rand e1 e2    => .rand (singletonCyl e1) (singletonCyl e2)
+  | .fail          => .fail
+  | .scrut e p     => .scrut (singletonCyl e) {p}
+
+theorem singletonCyl_flatten {rT : Type _} (e : Exp rT) :
+    (singletonCyl e).flatten = {e} := by
+  induction e with
+  | bvar n => simp
+  | fvar x => simp
+  | lit b => simp
+  | lam e ih => simp [ih]
+  | fix e ih => simp [ih]
+  | app e1 e2 ih1 ih2 => simp [ih1, ih2]
+  | unop u e ih => simp [ih]
+  | binop b e1 e2 ih1 ih2 => simp [ih1, ih2]
+  | cond ec et ef ihc iht ihf => simp [ihc, iht, ihf]
+  | pair e1 e2 ih1 ih2 => simp [ih1, ih2]
+  | fst e ih => simp [ih]
+  | snd e ih => simp [ih]
+  | inl e ih => simp [ih]
+  | inr e ih => simp [ih]
+  | case ec el er ihc ihl ihr => simp [ihc, ihl, ihr]
+  | alloc e ih => simp [ih]
+  | load e ih => simp [ih]
+  | store e1 e2 ih1 ih2 => simp [ih1, ih2]
+  | tape e ih => simp [ih]
+  | rand e1 e2 ih1 ih2 => simp [ih1, ih2]
+  | fail => simp
+  | scrut e p ih => simp [ih]
+
+theorem singletonCyl_hasMeasurableLeaves
+    {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] (e : Exp rT) :
+    (singletonCyl e).HasMeasurableLeaves := by
+  induction e with
+  | bvar n => exact .bvar
+  | fvar x => exact .fvar
+  | lit b => exact .lit _ (MeasurableSet.singleton b)
+  | lam e ih => exact .lam ih
+  | fix e ih => exact .fix ih
+  | app e1 e2 ih1 ih2 => exact .app ih1 ih2
+  | unop u e ih => exact .unop ih
+  | binop b e1 e2 ih1 ih2 => exact .binop ih1 ih2
+  | cond ec et ef ihc iht ihf => exact .cond ihc iht ihf
+  | pair e1 e2 ih1 ih2 => exact .pair ih1 ih2
+  | fst e ih => exact .fst ih
+  | snd e ih => exact .snd ih
+  | inl e ih => exact .inl ih
+  | inr e ih => exact .inr ih
+  | case ec el er ihc ihl ihr => exact .case ihc ihl ihr
+  | alloc e ih => exact .alloc ih
+  | load e ih => exact .load ih
+  | store e1 e2 ih1 ih2 => exact .store ih1 ih2
+  | tape e ih => exact .tape ih
+  | rand e1 e2 ih1 ih2 => exact .rand ih1 ih2
+  | fail => exact .fail
+  | scrut e p ih => exact .scrut _ ih (MeasurableSet.singleton p)
+
+instance instMeasurableSingletonClass
+    {rT : Type _} [MeasurableSpace rT] [MeasurableSingletonClass rT] :
+    MeasurableSingletonClass (Exp rT) where
+  measurableSet_singleton e := by
+    rw [← singletonCyl_flatten e]
+    exact MeasurableSpace.measurableSet_generateFrom
+      ⟨singletonCyl e, singletonCyl_hasMeasurableLeaves e, rfl⟩
 
 end Exp
 end ProbLang

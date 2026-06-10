@@ -431,7 +431,7 @@ theorem casesOn_preimage_decomp
     · exact ⟨4, _, hb, rfl⟩
     · exact ⟨5, _, hb, rfl⟩
   · rintro ⟨i, hi⟩; fin_cases i <;>
-      · obtain ⟨q, hq, hb⟩ := hi; cases hb; simpa using hq
+      · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
 @[fun_prop]
 theorem measurable_rec
@@ -489,7 +489,7 @@ theorem casesOn_preimage_decomp_param
     · exact ⟨4, (x, _), hb, rfl⟩
     · exact ⟨5, (x, _), hb, rfl⟩
   · rintro ⟨i, hi⟩; fin_cases i <;>
-      · obtain ⟨q, hq, hb⟩ := hi; cases hb; simpa using hq
+      · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
 /-- Joint param version of `BaseLit.measurable_rec`. -/
 @[fun_prop]
@@ -529,9 +529,9 @@ theorem measurable_rec_param
 phrased through the `casesOn` keystones `measurable_rec` / `measurable_rec_param`.
 Each test exercises every constructor slot. -/
 
-/-- Test 1: discrete codomain (`litTag : BaseLit rT → Nat`, one tag per constructor;
+/-- Test 1: discrete codomain (`tagDepth : BaseLit rT → Nat`, one tag per constructor;
 ignores all payloads, so `f_real` is constant). -/
-@[simp] def litTag : BaseLit rT → Nat
+@[simp] def tagDepth : BaseLit rT → Nat
   | .int _  => 0
   | .bool _ => 1
   | .unit   => 2
@@ -539,9 +539,9 @@ ignores all payloads, so `f_real` is constant). -/
   | .lbl _  => 4
   | .real _ => 5
 
-theorem litTag.measurable [MeasurableSpace rT] [Inhabited rT] :
-    Measurable (litTag : BaseLit rT → Nat) := by
-  have heq : (litTag : BaseLit rT → Nat)
+theorem tagDepth.measurable [MeasurableSpace rT] [Inhabited rT] :
+    Measurable (tagDepth : BaseLit rT → Nat) := by
+  have heq : (tagDepth : BaseLit rT → Nat)
     = (fun b : BaseLit rT =>
         BaseLit.casesOn (motive := fun _ => Nat) b
           (fun _ => 0) (fun _ => 1) 2 (fun _ => 3) (fun _ => 4) (fun _ => 5)) := by
@@ -553,18 +553,18 @@ theorem litTag.measurable [MeasurableSpace rT] [Inhabited rT] :
     (f_real := fun _ => 5)
   fun_prop
 
-/-- Test 2: data-leaf dependent (`realLeaf g`, the `real` payload is mapped through a
+/-- Test 2: data-leaf dependent (`countLeaves g`, the `real` payload is mapped through a
 measurable `g : rT → Int`; all other constructors return discrete tags). This is the
 named equivalent of the original anonymous `measurable_rec` smoke test. -/
-@[simp] def realLeaf (g : rT → Int) : BaseLit rT → Int
+@[simp] def countLeaves (g : rT → Int) : BaseLit rT → Int
   | .real r => g r
   | .int n  => n
   | _       => 0
 
-theorem realLeaf.measurable [MeasurableSpace rT] [Inhabited rT] (g : rT → Int)
+theorem countLeaves.measurable [MeasurableSpace rT] [Inhabited rT] (g : rT → Int)
     (hg : Measurable g) :
-    Measurable (realLeaf g : BaseLit rT → Int) := by
-  have heq : (realLeaf g : BaseLit rT → Int)
+    Measurable (countLeaves g : BaseLit rT → Int) := by
+  have heq : (countLeaves g : BaseLit rT → Int)
     = (fun b : BaseLit rT =>
         BaseLit.casesOn (motive := fun _ => Int) b
           (fun n => n) (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) g) := by
@@ -576,10 +576,10 @@ theorem realLeaf.measurable [MeasurableSpace rT] [Inhabited rT] (g : rT → Int)
     (f_real := g)
   exact hg
 
-/-- Test 3: endo-map (`litId : BaseLit rT → BaseLit rT`, non-discrete codomain). Since
+/-- Test 3: endo-map (`endoMap : BaseLit rT → BaseLit rT`, non-discrete codomain). Since
 `BaseLit` is non-recursive this is just a per-constructor relabel via `casesOn`; the
 `real` leaf is carried unchanged so the obligation closes through the `real` embedding. -/
-@[simp] def litId : BaseLit rT → BaseLit rT
+@[simp] def endoMap : BaseLit rT → BaseLit rT
   | .int z  => .int z
   | .bool b => .bool b
   | .unit   => .unit
@@ -587,9 +587,9 @@ theorem realLeaf.measurable [MeasurableSpace rT] [Inhabited rT] (g : rT → Int)
   | .lbl l  => .lbl l
   | .real r => .real r
 
-theorem litId.measurable [MeasurableSpace rT] [Inhabited rT] :
-    Measurable (litId : BaseLit rT → BaseLit rT) := by
-  have heq : (litId : BaseLit rT → BaseLit rT)
+theorem endoMap.measurable [MeasurableSpace rT] [Inhabited rT] :
+    Measurable (endoMap : BaseLit rT → BaseLit rT) := by
+  have heq : (endoMap : BaseLit rT → BaseLit rT)
     = (fun b : BaseLit rT =>
         BaseLit.casesOn (motive := fun _ => BaseLit rT) b
           BaseLit.int BaseLit.bool BaseLit.unit BaseLit.loc BaseLit.lbl BaseLit.real) := by

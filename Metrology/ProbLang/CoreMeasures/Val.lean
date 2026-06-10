@@ -88,6 +88,26 @@ theorem mk.measurable {α : Type _} [MeasurableSpace α] :
   show MeasurableSet[⊤] _
   trivial
 
+/-! ### Singleton-class for `Val α` (lifted from `MeasurableSingletonClass α`).
+
+Was previously in `Discrete.lean`; moved here so every stamped file carries its own
+singleton section. `Val` has no cylinder construction — its σ-algebra is the comap of
+`Val.fst : Val α → Exp α`, and a singleton `{v}` equals `Val.fst ⁻¹' {v.fst}` because
+`Val.fst` is injective (the witness field is determined by `IsVal.subsingleton`), so
+singletons are measurable whenever singletons in `Exp α` are. This is the comap-singleton
+prerequisite pattern (cf. `Exp.instMeasurableSingletonClass`). -/
+instance instMeasurableSingletonClass
+    {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α] :
+    MeasurableSingletonClass (Val α) where
+  measurableSet_singleton v := by
+    -- `{v} = Val.fst ⁻¹' {v.fst}` since `Val.fst` is injective.
+    have heq : ({v} : Set (Val α)) = Val.fst ⁻¹' {v.fst} := by
+      ext v'
+      simp only [Set.mem_singleton_iff, Set.mem_preimage]
+      exact ⟨fun h => by rw [h], fun h => Val.ext h⟩
+    rw [heq]
+    exact Val.fst.measurable (MeasurableSet.singleton v.fst)
+
 end Val
 end ProbLang
 end ProbLangMeasures

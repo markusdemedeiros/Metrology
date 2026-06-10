@@ -467,12 +467,12 @@ theorem cylinder_preimage_shape {sCyl : Shp → Cyl}
   · intro hp; rw [shape_of_mem hp, cShape_sCyl]
   · rintro rfl; exact mem_self p
 
-/-- Leaf-gated diagonal (syntax-leaf constructors and mixed syntax-leaf×recursive
-constructors): the intersection is nonempty only when the leaf values match. The
-per-type `inter?` is `if a = b then some … else none`. `lhs`/`rhs` are the two
-flatten sets; when the leaves differ the per-case `simp` discharges via shape
-disjointness, so this lemma only handles the matched (`a = b`) branch, supplied as
-the `Option.elim` equation directly. -/
+/-- Data-leaf diagonal (single data-leaf constructors): pushing the intersection
+through an injective leaf embedding `ι`. For an injective `ι`, the intersection of
+the two flatten images is the image of the intersection of the underlying sets,
+`ι '' S₁ ∩ ι '' S₂ = ι '' (S₁ ∩ S₂)` — the unconditional `Set.image_inter` fact.
+This is the matched diagonal the per-type `flatten_inter` invokes after exposing
+both sides with `simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]`. -/
 theorem flatten_inter_data {α : Type _} {S₁ S₂ : Set α} {ι : α → T}
     (hι : Function.Injective ι) :
     ι '' S₁ ∩ ι '' S₂ = ι '' (S₁ ∩ S₂) := (Set.image_inter hι).symm

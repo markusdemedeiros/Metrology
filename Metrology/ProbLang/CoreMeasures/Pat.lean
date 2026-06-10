@@ -611,17 +611,17 @@ end StructRecParam
 
 /-! ### Synthetic smoke-test battery -/
 
-/-- Test 1: discrete codomain (`patDepth : Pat rT → Nat`). -/
-@[simp] def patDepth : Pat rT → Nat
+/-- Test 1: discrete codomain (`tagDepth : Pat rT → Nat`). -/
+@[simp] def tagDepth : Pat rT → Nat
   | .wildcard   => 0
   | .lit _      => 0
-  | .pair p1 p2 => max (patDepth p1) (patDepth p2) + 1
-  | .inl p      => patDepth p + 1
-  | .inr p      => patDepth p + 1
+  | .pair p1 p2 => max (tagDepth p1) (tagDepth p2) + 1
+  | .inl p      => tagDepth p + 1
+  | .inr p      => tagDepth p + 1
 
-theorem patDepth.measurable [MeasurableSpace rT] :
-    Measurable (patDepth : Pat rT → Nat) := by
-  apply measurable_struct_rec (f := patDepth)
+theorem tagDepth.measurable [MeasurableSpace rT] :
+    Measurable (tagDepth : Pat rT → Nat) := by
+  apply measurable_struct_rec (f := tagDepth)
     (c_wildcard := 0)
     (c_lit := fun _ => 0)
     (c_pair := fun n1 n2 => max n1 n2 + 1)
@@ -629,17 +629,17 @@ theorem patDepth.measurable [MeasurableSpace rT] :
     (c_inr := (· + 1))
   all_goals first | (intros; rfl) | fun_prop
 
-/-- Test 2: data-leaf dependent (`countLits : Pat rT → Nat`). -/
-@[simp] def countLits : Pat rT → Nat
+/-- Test 2: data-leaf dependent (`countLeaves : Pat rT → Nat`). -/
+@[simp] def countLeaves : Pat rT → Nat
   | .wildcard   => 0
   | .lit _      => 1
-  | .pair p1 p2 => countLits p1 + countLits p2
-  | .inl p      => countLits p
-  | .inr p      => countLits p
+  | .pair p1 p2 => countLeaves p1 + countLeaves p2
+  | .inl p      => countLeaves p
+  | .inr p      => countLeaves p
 
-theorem countLits.measurable [MeasurableSpace rT] :
-    Measurable (countLits : Pat rT → Nat) := by
-  apply measurable_struct_rec (f := countLits)
+theorem countLeaves.measurable [MeasurableSpace rT] :
+    Measurable (countLeaves : Pat rT → Nat) := by
+  apply measurable_struct_rec (f := countLeaves)
     (c_wildcard := 0)
     (c_lit := fun _ => 1)
     (c_pair := (· + ·))
@@ -648,16 +648,16 @@ theorem countLits.measurable [MeasurableSpace rT] :
   all_goals first | (intros; rfl) | fun_prop
 
 /-- Test 3: endo-map (`Pat rT → Pat rT`, non-discrete codomain). -/
-@[simp] def doubleWrap : Pat rT → Pat rT
+@[simp] def endoMap : Pat rT → Pat rT
   | .wildcard   => .wildcard
   | .lit b      => .lit b
-  | .pair p1 p2 => .pair (doubleWrap p1) (doubleWrap p2)
-  | .inl p      => .inl (.inl (doubleWrap p))
-  | .inr p      => .inr (.inr (doubleWrap p))
+  | .pair p1 p2 => .pair (endoMap p1) (endoMap p2)
+  | .inl p      => .inl (.inl (endoMap p))
+  | .inr p      => .inr (.inr (endoMap p))
 
-theorem doubleWrap.measurable [MeasurableSpace rT] :
-    Measurable (doubleWrap : Pat rT → Pat rT) := by
-  apply measurable_struct_rec (f := doubleWrap)
+theorem endoMap.measurable [MeasurableSpace rT] :
+    Measurable (endoMap : Pat rT → Pat rT) := by
+  apply measurable_struct_rec (f := endoMap)
     (c_wildcard := .wildcard)
     (c_lit := Pat.lit)
     (c_pair := fun p1 p2 => .pair p1 p2)

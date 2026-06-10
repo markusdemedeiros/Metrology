@@ -1057,22 +1057,22 @@ end StructRecParam
 
 /-! ### §33 synthetic smoke-test battery -/
 
-/-- Test 1: discrete codomain (`probeDepth : Probe rT → Nat`). -/
-@[simp] def probeDepth : Probe rT → Nat
+/-- Test 1: discrete codomain (`tagDepth : Probe rT → Nat`). -/
+@[simp] def tagDepth : Probe rT → Nat
   | .nil          => 0
   | .tag _        => 0
   | .dat _        => 0
-  | .box p        => probeDepth p + 1
-  | .pr p1 p2     => max (probeDepth p1) (probeDepth p2) + 1
-  | .tri p1 p2 p3 => max (max (probeDepth p1) (probeDepth p2)) (probeDepth p3) + 1
-  | .mix _ p      => probeDepth p + 1
-  | .scr p _      => probeDepth p + 1
+  | .box p        => tagDepth p + 1
+  | .pr p1 p2     => max (tagDepth p1) (tagDepth p2) + 1
+  | .tri p1 p2 p3 => max (max (tagDepth p1) (tagDepth p2)) (tagDepth p3) + 1
+  | .mix _ p      => tagDepth p + 1
+  | .scr p _      => tagDepth p + 1
   | .quad p1 p2 p3 p4 =>
-      max (max (probeDepth p1) (probeDepth p2)) (max (probeDepth p3) (probeDepth p4)) + 1
+      max (max (tagDepth p1) (tagDepth p2)) (max (tagDepth p3) (tagDepth p4)) + 1
 
-theorem probeDepth.measurable [MeasurableSpace rT] :
-    Measurable (probeDepth : Probe rT → Nat) := by
-  apply measurable_struct_rec (f := probeDepth)
+theorem tagDepth.measurable [MeasurableSpace rT] :
+    Measurable (tagDepth : Probe rT → Nat) := by
+  apply measurable_struct_rec (f := tagDepth)
     (c_nil := 0) (c_tag := fun _ => 0) (c_dat := fun _ => 0)
     (c_box := (· + 1)) (c_pr := fun n1 n2 => max n1 n2 + 1)
     (c_tri := fun n1 n2 n3 => max (max n1 n2) n3 + 1)
@@ -1080,21 +1080,21 @@ theorem probeDepth.measurable [MeasurableSpace rT] :
     (c_quad := fun n1 n2 n3 n4 => max (max n1 n2) (max n3 n4) + 1)
   all_goals first | (intros; rfl) | fun_prop
 
-/-- Test 2: data-leaf dependent (`countDat : Probe rT → Nat`). -/
-@[simp] def countDat : Probe rT → Nat
+/-- Test 2: data-leaf dependent (`countLeaves : Probe rT → Nat`). -/
+@[simp] def countLeaves : Probe rT → Nat
   | .nil          => 0
   | .tag _        => 0
   | .dat _        => 1
-  | .box p        => countDat p
-  | .pr p1 p2     => countDat p1 + countDat p2
-  | .tri p1 p2 p3 => countDat p1 + countDat p2 + countDat p3
-  | .mix _ p      => countDat p
-  | .scr p _      => countDat p + 1
-  | .quad p1 p2 p3 p4 => countDat p1 + countDat p2 + countDat p3 + countDat p4
+  | .box p        => countLeaves p
+  | .pr p1 p2     => countLeaves p1 + countLeaves p2
+  | .tri p1 p2 p3 => countLeaves p1 + countLeaves p2 + countLeaves p3
+  | .mix _ p      => countLeaves p
+  | .scr p _      => countLeaves p + 1
+  | .quad p1 p2 p3 p4 => countLeaves p1 + countLeaves p2 + countLeaves p3 + countLeaves p4
 
-theorem countDat.measurable [MeasurableSpace rT] :
-    Measurable (countDat : Probe rT → Nat) := by
-  apply measurable_struct_rec (f := countDat)
+theorem countLeaves.measurable [MeasurableSpace rT] :
+    Measurable (countLeaves : Probe rT → Nat) := by
+  apply measurable_struct_rec (f := countLeaves)
     (c_nil := 0) (c_tag := fun _ => 0) (c_dat := fun _ => 1)
     (c_box := id) (c_pr := (· + ·))
     (c_tri := fun n1 n2 n3 => n1 + n2 + n3)
@@ -1103,20 +1103,20 @@ theorem countDat.measurable [MeasurableSpace rT] :
   all_goals first | (intros; rfl) | fun_prop
 
 /-- Test 3: endo-map (`Probe rT → Probe rT`, non-discrete codomain). -/
-@[simp] def doubleBox : Probe rT → Probe rT
+@[simp] def endoMap : Probe rT → Probe rT
   | .nil          => .nil
   | .tag n        => .tag n
   | .dat b        => .dat b
-  | .box p        => .box (.box (doubleBox p))
-  | .pr p1 p2     => .pr (doubleBox p1) (doubleBox p2)
-  | .tri p1 p2 p3 => .tri (doubleBox p1) (doubleBox p2) (doubleBox p3)
-  | .mix u p      => .mix u (doubleBox p)
-  | .scr p b      => .scr (doubleBox p) b
-  | .quad p1 p2 p3 p4 => .quad (doubleBox p1) (doubleBox p2) (doubleBox p3) (doubleBox p4)
+  | .box p        => .box (.box (endoMap p))
+  | .pr p1 p2     => .pr (endoMap p1) (endoMap p2)
+  | .tri p1 p2 p3 => .tri (endoMap p1) (endoMap p2) (endoMap p3)
+  | .mix u p      => .mix u (endoMap p)
+  | .scr p b      => .scr (endoMap p) b
+  | .quad p1 p2 p3 p4 => .quad (endoMap p1) (endoMap p2) (endoMap p3) (endoMap p4)
 
-theorem doubleBox.measurable [MeasurableSpace rT] :
-    Measurable (doubleBox : Probe rT → Probe rT) := by
-  apply measurable_struct_rec (f := doubleBox)
+theorem endoMap.measurable [MeasurableSpace rT] :
+    Measurable (endoMap : Probe rT → Probe rT) := by
+  apply measurable_struct_rec (f := endoMap)
     (c_nil := .nil) (c_tag := Probe.tag) (c_dat := Probe.dat)
     (c_box := fun p => .box (.box p)) (c_pr := fun p1 p2 => .pr p1 p2)
     (c_tri := fun p1 p2 p3 => .tri p1 p2 p3)
@@ -1124,22 +1124,22 @@ theorem doubleBox.measurable [MeasurableSpace rT] :
     (c_quad := fun p1 p2 p3 p4 => .quad p1 p2 p3 p4)
   all_goals first | (intros; rfl) | fun_prop
 
-/-- Test 4: param-threaded (`addTags : Nat → Probe rT → Nat`, the `β` is the running
+/-- Test 4: param-threaded (`addAcc : Nat → Probe rT → Nat`, the `β` is the running
 accumulator threaded unchanged into every recursive call). -/
-@[simp] def addTags : Nat → Probe rT → Nat
+@[simp] def addAcc : Nat → Probe rT → Nat
   | acc, .nil          => acc
   | acc, .tag n        => acc + n
   | acc, .dat _        => acc
-  | acc, .box p        => addTags acc p
-  | acc, .pr p1 p2     => addTags acc p1 + addTags acc p2
-  | acc, .tri p1 p2 p3 => addTags acc p1 + addTags acc p2 + addTags acc p3
-  | acc, .mix _ p      => addTags acc p
-  | acc, .scr p _      => addTags acc p
-  | acc, .quad p1 p2 p3 p4 => addTags acc p1 + addTags acc p2 + addTags acc p3 + addTags acc p4
+  | acc, .box p        => addAcc acc p
+  | acc, .pr p1 p2     => addAcc acc p1 + addAcc acc p2
+  | acc, .tri p1 p2 p3 => addAcc acc p1 + addAcc acc p2 + addAcc acc p3
+  | acc, .mix _ p      => addAcc acc p
+  | acc, .scr p _      => addAcc acc p
+  | acc, .quad p1 p2 p3 p4 => addAcc acc p1 + addAcc acc p2 + addAcc acc p3 + addAcc acc p4
 
-theorem addTags.measurable [MeasurableSpace rT] :
-    Measurable (Function.uncurry (addTags : Nat → Probe rT → Nat)) := by
-  apply measurable_struct_rec_param (g := addTags)
+theorem addAcc.measurable [MeasurableSpace rT] :
+    Measurable (Function.uncurry (addAcc : Nat → Probe rT → Nat)) := by
+  apply measurable_struct_rec_param (g := addAcc)
     (c_nil := fun acc => acc) (c_tag := fun acc n => acc + n) (c_dat := fun acc _ => acc)
     (c_box := fun _ n => n) (c_pr := fun _ n1 n2 => n1 + n2)
     (c_tri := fun _ n1 n2 n3 => n1 + n2 + n3)
