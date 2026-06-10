@@ -66,11 +66,16 @@ macro "solve_discrete_ME" eq_image:term ", " meas:term : tactic => `(tactic|
 
 /-- `MeasurableEmbedding` of a nullary (Unit-domain) constructor via the
 `of_measurable_inverse` route. Used when a type has ≥2 nullary constructors
-(`EctxItem`); single-nullary files may inline it instead. -/
-macro "solve_nullary_ME" eq_image:term ", " meas:term : tactic => `(tactic|
+(`EctxItem`); single-nullary files may inline it instead.
+
+Takes the per-constructor `cover` function, its `_eq_image` lemma, and its
+`.measurable` lemma (all sharing the constructor's namespace, so the three call-site
+arguments differ only in the constructor name). The cover application must be named
+explicitly (not a metavariable) so the forward `rw [eq_image]` finds its pattern. -/
+macro "solve_nullary_ME" cover:term ", " eq_image:term ", " meas:term : tactic => `(tactic|
   (apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
    · exact measurable_const
-   · rw [show Set.range _ = _ from by rw [← $eq_image Set.univ]; ext; simp]
+   · rw [show Set.range _ = $cover Set.univ from by rw [$eq_image:term]; ext; simp]
      exact $meas _
    · exact measurable_const
    · intro; rfl))

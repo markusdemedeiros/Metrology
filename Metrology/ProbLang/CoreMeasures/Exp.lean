@@ -522,7 +522,7 @@ theorem Cylinder.flatten_inter_some {rT : Type _} {c₁ c₂ c : Cylinder rT}
 
 /-- Inheritance of `HasMeasurableLeaves` under `Cylinder.inter?`.
 
-Same per-constructor-linear shape as for `Pat` (`Pat.lean`): `induction h₁`, then for
+Same per-constructor-linear shape as for `Pat` (`Pat.lean`): `induction c₁`, then for
 each constructor `cases c₂` (off-diagonal dies on `inter? = none ≠ some c`), and the
 diagonal `revert h; split <;> rintro ⟨rfl⟩` reduces the `inter?` `match`/`if` and
 applies the constructor with the children's leaves from the IHs. No `grind`, no
@@ -533,8 +533,8 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
   induction c₁ generalizing c₂ c with
   | bvar | fvar | fail =>
-    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢ <;>
-      first | (split at h <;> simp_all) | simp_all
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals first | (split at h <;> simp_all) | simp_all
   | lit S₁ =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
     cases h₁; cases h₂; injection h with h; subst h; exact .lit _ (MeasurableSet.inter ‹_› ‹_›)
@@ -561,12 +561,14 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
   | unop u c ih =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
     cases h₁; cases h₂
-    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩ <;> rename_i ha
+    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩
+    rename_i ha
     exact .unop (ih ‹_› ‹_› ha)
   | binop bo a b iha ihb =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
     cases h₁; cases h₂
-    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩ <;> rename_i ha hb
+    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩
+    rename_i ha hb
     exact .binop (iha ‹_› ‹_› ha) (ihb ‹_› ‹_› hb)
   | cond cc ct cf ihc iht ihf | case cc ct cf ihc iht ihf =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
@@ -1444,6 +1446,44 @@ theorem scrut.measurableEmbedding [MeasurableSpace rT] :
       exact flatten_measurable (.scrut _ hc hS))
     (h_cov_meas := cover.scrut.measurable _) (h_cov_range := cover.scrut_univ_eq_range)
 
+/-- Per-constructor cell family for the `casesOn` preimage decomposition. -/
+def decompCell
+    {rT : Type _} {α : Type _} (S : Set α)
+    (f_bvar : Nat → α) (f_fvar : Var → α) (f_lit : BaseLit rT → α)
+    (f_lam : Exp rT → α) (f_fix : Exp rT → α)
+    (f_app : Exp rT × Exp rT → α)
+    (f_unop : UnOp × Exp rT → α) (f_binop : BinOp × Exp rT × Exp rT → α)
+    (f_cond : Exp rT × Exp rT × Exp rT → α)
+    (f_pair : Exp rT × Exp rT → α)
+    (f_fst : Exp rT → α) (f_snd : Exp rT → α)
+    (f_inl : Exp rT → α) (f_inr : Exp rT → α)
+    (f_case : Exp rT × Exp rT × Exp rT → α)
+    (f_alloc : Exp rT → α) (f_load : Exp rT → α) (f_store : Exp rT × Exp rT → α)
+    (f_tape : Exp rT → α) (f_rand : Exp rT × Exp rT → α)
+    (f_fail : Unit → α) (f_scrut : Exp rT × Pat rT → α) : Fin 22 → Set (Exp rT) :=
+  ![ Exp.bvar.ι  '' (f_bvar  ⁻¹' S)
+   , Exp.fvar.ι  '' (f_fvar  ⁻¹' S)
+   , Exp.lit.ι   '' (f_lit   ⁻¹' S)
+   , Exp.lam.ι   '' (f_lam   ⁻¹' S)
+   , Exp.fix.ι   '' (f_fix   ⁻¹' S)
+   , Exp.app.ι   '' (f_app   ⁻¹' S)
+   , Exp.unop.ι  '' (f_unop  ⁻¹' S)
+   , Exp.binop.ι '' (f_binop ⁻¹' S)
+   , Exp.cond.ι  '' (f_cond  ⁻¹' S)
+   , Exp.pair.ι  '' (f_pair  ⁻¹' S)
+   , Exp.fst.ι   '' (f_fst   ⁻¹' S)
+   , Exp.snd.ι   '' (f_snd   ⁻¹' S)
+   , Exp.inl.ι   '' (f_inl   ⁻¹' S)
+   , Exp.inr.ι   '' (f_inr   ⁻¹' S)
+   , Exp.case.ι  '' (f_case  ⁻¹' S)
+   , Exp.alloc.ι '' (f_alloc ⁻¹' S)
+   , Exp.load.ι  '' (f_load  ⁻¹' S)
+   , Exp.store.ι '' (f_store ⁻¹' S)
+   , Exp.tape.ι  '' (f_tape  ⁻¹' S)
+   , Exp.rand.ι  '' (f_rand  ⁻¹' S)
+   , Exp.fail.ι  '' (f_fail  ⁻¹' S)
+   , Exp.scrut.ι '' (f_scrut ⁻¹' S) ]
+
 theorem casesOn_preimage_decomp
     {rT : Type _} {α : Type _} (S : Set α)
     (f_bvar : Nat → α) (f_fvar : Var → α) (f_lit : BaseLit rT → α)
@@ -1473,29 +1513,37 @@ theorem casesOn_preimage_decomp
         (fun e1 e2 => f_rand (e1, e2))
         (f_fail ())
         (fun e p => f_scrut (e, p))) ⁻¹' S
-      = (Exp.bvar.ι  '' (f_bvar  ⁻¹' S))
-      ∪ (Exp.fvar.ι  '' (f_fvar  ⁻¹' S))
-      ∪ (Exp.lit.ι   '' (f_lit   ⁻¹' S))
-      ∪ (Exp.lam.ι   '' (f_lam   ⁻¹' S))
-      ∪ (Exp.fix.ι   '' (f_fix   ⁻¹' S))
-      ∪ (Exp.app.ι   '' (f_app   ⁻¹' S))
-      ∪ (Exp.unop.ι  '' (f_unop  ⁻¹' S))
-      ∪ (Exp.binop.ι '' (f_binop ⁻¹' S))
-      ∪ (Exp.cond.ι  '' (f_cond  ⁻¹' S))
-      ∪ (Exp.pair.ι  '' (f_pair  ⁻¹' S))
-      ∪ (Exp.fst.ι   '' (f_fst   ⁻¹' S))
-      ∪ (Exp.snd.ι   '' (f_snd   ⁻¹' S))
-      ∪ (Exp.inl.ι   '' (f_inl   ⁻¹' S))
-      ∪ (Exp.inr.ι   '' (f_inr   ⁻¹' S))
-      ∪ (Exp.case.ι  '' (f_case  ⁻¹' S))
-      ∪ (Exp.alloc.ι '' (f_alloc ⁻¹' S))
-      ∪ (Exp.load.ι  '' (f_load  ⁻¹' S))
-      ∪ (Exp.store.ι '' (f_store ⁻¹' S))
-      ∪ (Exp.tape.ι  '' (f_tape  ⁻¹' S))
-      ∪ (Exp.rand.ι  '' (f_rand  ⁻¹' S))
-      ∪ (Exp.fail.ι  '' (f_fail  ⁻¹' S))
-      ∪ (Exp.scrut.ι '' (f_scrut ⁻¹' S)) := by
-  ext e; cases e <;> aesop
+      = ⋃ i, decompCell S f_bvar f_fvar f_lit f_lam f_fix f_app f_unop f_binop
+          f_cond f_pair f_fst f_snd f_inl f_inr f_case f_alloc f_load f_store
+          f_tape f_rand f_fail f_scrut i := by
+  ext e
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell]
+  constructor
+  · intro he; cases e
+    · exact ⟨0, _, he, rfl⟩
+    · exact ⟨1, _, he, rfl⟩
+    · exact ⟨2, _, he, rfl⟩
+    · exact ⟨3, _, he, rfl⟩
+    · exact ⟨4, _, he, rfl⟩
+    · exact ⟨5, ⟨_, _⟩, he, rfl⟩
+    · exact ⟨6, ⟨_, _⟩, he, rfl⟩
+    · exact ⟨7, ⟨_, _, _⟩, he, rfl⟩
+    · exact ⟨8, ⟨_, _, _⟩, he, rfl⟩
+    · exact ⟨9, ⟨_, _⟩, he, rfl⟩
+    · exact ⟨10, _, he, rfl⟩
+    · exact ⟨11, _, he, rfl⟩
+    · exact ⟨12, _, he, rfl⟩
+    · exact ⟨13, _, he, rfl⟩
+    · exact ⟨14, ⟨_, _, _⟩, he, rfl⟩
+    · exact ⟨15, _, he, rfl⟩
+    · exact ⟨16, _, he, rfl⟩
+    · exact ⟨17, ⟨_, _⟩, he, rfl⟩
+    · exact ⟨18, _, he, rfl⟩
+    · exact ⟨19, ⟨_, _⟩, he, rfl⟩
+    · exact ⟨20, (), he, rfl⟩
+    · exact ⟨21, ⟨_, _⟩, he, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, he⟩ := hi; cases he; simpa using hq
 
 @[fun_prop]
 theorem measurable_rec
@@ -1541,7 +1589,8 @@ theorem measurable_rec
         (fun e p => f_scrut (e, p))) := by
   intro S hS
   rw [Exp.casesOn_preimage_decomp]
-  iterate 21 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact bvar.measurableEmbedding.measurableSet_image'  (by measurability)
   · exact fvar.measurableEmbedding.measurableSet_image'  (by measurability)
   · exact lit.measurableEmbedding.measurableSet_image'   (h_lit hS)
@@ -1572,7 +1621,49 @@ take both the constructor payload AND an external `β` parameter, and the result
 is joint-measurable in `(e, b) : Exp rT × β`. Built directly from
 `casesOn_preimage_decomp` via `Prod.map`-style embeddings. -/
 
-set_option maxHeartbeats 2000000 in
+/-- Per-constructor cell family for the `β`-parameterised decomposition. -/
+def decompCell_param
+    {rT : Type _} {α β : Type _} (S : Set α)
+    (f_bvar : β × Nat → α) (f_fvar : β × Var → α) (f_lit : β × BaseLit rT → α)
+    (f_lam : β × Exp rT → α) (f_fix : β × Exp rT → α)
+    (f_app : β × Exp rT × Exp rT → α)
+    (f_unop : β × UnOp × Exp rT → α) (f_binop : β × BinOp × Exp rT × Exp rT → α)
+    (f_cond : β × Exp rT × Exp rT × Exp rT → α)
+    (f_pair : β × Exp rT × Exp rT → α)
+    (f_fst : β × Exp rT → α) (f_snd : β × Exp rT → α)
+    (f_inl : β × Exp rT → α) (f_inr : β × Exp rT → α)
+    (f_case : β × Exp rT × Exp rT × Exp rT → α)
+    (f_alloc : β × Exp rT → α) (f_load : β × Exp rT → α)
+    (f_store : β × Exp rT × Exp rT → α)
+    (f_tape : β × Exp rT → α) (f_rand : β × Exp rT × Exp rT → α)
+    (f_fail : β × Unit → α) (f_scrut : β × Exp rT × Pat rT → α) :
+    Fin 22 → Set (Exp rT × β) :=
+  ![ (fun q : β × Nat => (Exp.bvar q.2, q.1))   '' (f_bvar  ⁻¹' S)
+   , (fun q : β × Var => (Exp.fvar q.2, q.1))   '' (f_fvar  ⁻¹' S)
+   , (fun q : β × BaseLit rT => (Exp.lit q.2, q.1))   '' (f_lit ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.lam q.2, q.1))   '' (f_lam   ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.fix q.2, q.1))   '' (f_fix   ⁻¹' S)
+   , (fun q : β × Exp rT × Exp rT => (Exp.app q.2.1 q.2.2, q.1)) '' (f_app  ⁻¹' S)
+   , (fun q : β × UnOp × Exp rT => (Exp.unop q.2.1 q.2.2, q.1)) '' (f_unop ⁻¹' S)
+   , (fun q : β × BinOp × Exp rT × Exp rT =>
+        (Exp.binop q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_binop ⁻¹' S)
+   , (fun q : β × Exp rT × Exp rT × Exp rT =>
+        (Exp.cond q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_cond ⁻¹' S)
+   , (fun q : β × Exp rT × Exp rT => (Exp.pair q.2.1 q.2.2, q.1)) '' (f_pair ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.fst q.2, q.1)) '' (f_fst ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.snd q.2, q.1)) '' (f_snd ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.inl q.2, q.1)) '' (f_inl ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.inr q.2, q.1)) '' (f_inr ⁻¹' S)
+   , (fun q : β × Exp rT × Exp rT × Exp rT =>
+        (Exp.case q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_case ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.alloc q.2, q.1)) '' (f_alloc ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.load q.2, q.1)) '' (f_load ⁻¹' S)
+   , (fun q : β × Exp rT × Exp rT => (Exp.store q.2.1 q.2.2, q.1)) '' (f_store ⁻¹' S)
+   , (fun q : β × Exp rT => (Exp.tape q.2, q.1)) '' (f_tape ⁻¹' S)
+   , (fun q : β × Exp rT × Exp rT => (Exp.rand q.2.1 q.2.2, q.1)) '' (f_rand ⁻¹' S)
+   , (fun q : β × Unit => (Exp.fail, q.1)) '' (f_fail ⁻¹' S)
+   , (fun q : β × Exp rT × Pat rT => (Exp.scrut q.2.1 q.2.2, q.1)) '' (f_scrut ⁻¹' S) ]
+
 /-- Joint preimage decomposition for `Exp.casesOn` with a `β` parameter. -/
 theorem casesOn_preimage_decomp_param
     {rT : Type _} {α β : Type _} (S : Set α)
@@ -1607,38 +1698,37 @@ theorem casesOn_preimage_decomp_param
         (fun e1 e2 => f_rand (p.2, e1, e2))
         (f_fail (p.2, ()))
         (fun e pat => f_scrut (p.2, e, pat))) ⁻¹' S
-      = ((fun q : β × Nat => (Exp.bvar q.2, q.1))   '' (f_bvar  ⁻¹' S))
-      ∪ ((fun q : β × Var => (Exp.fvar q.2, q.1))   '' (f_fvar  ⁻¹' S))
-      ∪ ((fun q : β × BaseLit rT => (Exp.lit q.2, q.1))   '' (f_lit ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.lam q.2, q.1))   '' (f_lam   ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.fix q.2, q.1))   '' (f_fix   ⁻¹' S))
-      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.app q.2.1 q.2.2, q.1))
-            '' (f_app  ⁻¹' S))
-      ∪ ((fun q : β × UnOp × Exp rT => (Exp.unop q.2.1 q.2.2, q.1))
-            '' (f_unop ⁻¹' S))
-      ∪ ((fun q : β × BinOp × Exp rT × Exp rT =>
-            (Exp.binop q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_binop ⁻¹' S))
-      ∪ ((fun q : β × Exp rT × Exp rT × Exp rT =>
-            (Exp.cond q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_cond ⁻¹' S))
-      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.pair q.2.1 q.2.2, q.1))
-            '' (f_pair ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.fst q.2, q.1)) '' (f_fst ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.snd q.2, q.1)) '' (f_snd ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.inl q.2, q.1)) '' (f_inl ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.inr q.2, q.1)) '' (f_inr ⁻¹' S))
-      ∪ ((fun q : β × Exp rT × Exp rT × Exp rT =>
-            (Exp.case q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_case ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.alloc q.2, q.1)) '' (f_alloc ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.load q.2, q.1)) '' (f_load ⁻¹' S))
-      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.store q.2.1 q.2.2, q.1))
-            '' (f_store ⁻¹' S))
-      ∪ ((fun q : β × Exp rT => (Exp.tape q.2, q.1)) '' (f_tape ⁻¹' S))
-      ∪ ((fun q : β × Exp rT × Exp rT => (Exp.rand q.2.1 q.2.2, q.1))
-            '' (f_rand ⁻¹' S))
-      ∪ ((fun q : β × Unit => (Exp.fail, q.1)) '' (f_fail ⁻¹' S))
-      ∪ ((fun q : β × Exp rT × Pat rT => (Exp.scrut q.2.1 q.2.2, q.1))
-            '' (f_scrut ⁻¹' S)) := by
-  ext ⟨e, b⟩; cases e <;> aesop
+      = ⋃ i, decompCell_param S f_bvar f_fvar f_lit f_lam f_fix f_app f_unop f_binop
+          f_cond f_pair f_fst f_snd f_inl f_inr f_case f_alloc f_load f_store
+          f_tape f_rand f_fail f_scrut i := by
+  ext ⟨e, b⟩
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell_param]
+  constructor
+  · intro he; cases e
+    · exact ⟨0, (b, _), he, rfl⟩
+    · exact ⟨1, (b, _), he, rfl⟩
+    · exact ⟨2, (b, _), he, rfl⟩
+    · exact ⟨3, (b, _), he, rfl⟩
+    · exact ⟨4, (b, _), he, rfl⟩
+    · exact ⟨5, (b, _, _), he, rfl⟩
+    · exact ⟨6, (b, _, _), he, rfl⟩
+    · exact ⟨7, (b, _, _, _), he, rfl⟩
+    · exact ⟨8, (b, _, _, _), he, rfl⟩
+    · exact ⟨9, (b, _, _), he, rfl⟩
+    · exact ⟨10, (b, _), he, rfl⟩
+    · exact ⟨11, (b, _), he, rfl⟩
+    · exact ⟨12, (b, _), he, rfl⟩
+    · exact ⟨13, (b, _), he, rfl⟩
+    · exact ⟨14, (b, _, _, _), he, rfl⟩
+    · exact ⟨15, (b, _), he, rfl⟩
+    · exact ⟨16, (b, _), he, rfl⟩
+    · exact ⟨17, (b, _, _), he, rfl⟩
+    · exact ⟨18, (b, _), he, rfl⟩
+    · exact ⟨19, (b, _, _), he, rfl⟩
+    · exact ⟨20, (b, ()), he, rfl⟩
+    · exact ⟨21, (b, _, _), he, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, he⟩ := hi; cases he; simpa using hq
 
 /-- One-level `Exp.casesOn` with a `β` parameter threaded.
 
@@ -1696,7 +1786,8 @@ theorem measurable_rec_param
   rw [casesOn_preimage_decomp_param]
   -- Each piece: `(fun q => (ctor q.2, q.1)) '' (c_X ⁻¹' S)`. The cover map is
   -- `Prod.map ctor.ι id ∘ Prod.swap`, a composition of measurable embeddings.
-  iterate 21 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact ((bvar.measurableEmbedding.prodMap (.id (α := β))).comp
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_bvar hS)
   · exact ((fvar.measurableEmbedding.prodMap (.id (α := β))).comp
@@ -2340,6 +2431,184 @@ theorem measurable_struct_rec_param_shift : Measurable (Function.uncurry g) := b
       @ih hU
 
 end StructRecParamShift
+
+/-! ### Synthetic smoke-test battery -/
+
+/-- Test 1: discrete codomain (`expDepth : Exp rT → Nat`). -/
+@[simp] def expDepth : Exp rT → Nat
+  | .bvar _        => 0
+  | .fvar _        => 0
+  | .lit _         => 0
+  | .lam e         => expDepth e + 1
+  | .fix e         => expDepth e + 1
+  | .app e1 e2     => max (expDepth e1) (expDepth e2) + 1
+  | .unop _ e      => expDepth e + 1
+  | .binop _ e1 e2 => max (expDepth e1) (expDepth e2) + 1
+  | .cond ec et ef => max (max (expDepth ec) (expDepth et)) (expDepth ef) + 1
+  | .pair e1 e2    => max (expDepth e1) (expDepth e2) + 1
+  | .fst e         => expDepth e + 1
+  | .snd e         => expDepth e + 1
+  | .inl e         => expDepth e + 1
+  | .inr e         => expDepth e + 1
+  | .case ec el er => max (max (expDepth ec) (expDepth el)) (expDepth er) + 1
+  | .alloc e       => expDepth e + 1
+  | .load e        => expDepth e + 1
+  | .store e1 e2   => max (expDepth e1) (expDepth e2) + 1
+  | .tape e        => expDepth e + 1
+  | .rand e1 e2    => max (expDepth e1) (expDepth e2) + 1
+  | .fail          => 0
+  | .scrut e _     => expDepth e + 1
+
+theorem expDepth.measurable [MeasurableSpace rT] :
+    Measurable (expDepth : Exp rT → Nat) := by
+  apply measurable_struct_rec (f := expDepth)
+    (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := fun _ => 0)
+    (c_lam := (· + 1)) (c_fix := (· + 1))
+    (c_app := fun n1 n2 => max n1 n2 + 1)
+    (c_unop := fun _ n => n + 1)
+    (c_binop := fun _ n1 n2 => max n1 n2 + 1)
+    (c_cond := fun n1 n2 n3 => max (max n1 n2) n3 + 1)
+    (c_pair := fun n1 n2 => max n1 n2 + 1) (c_fst := (· + 1)) (c_snd := (· + 1))
+    (c_inl := (· + 1)) (c_inr := (· + 1))
+    (c_case := fun n1 n2 n3 => max (max n1 n2) n3 + 1)
+    (c_alloc := (· + 1)) (c_load := (· + 1)) (c_store := fun n1 n2 => max n1 n2 + 1)
+    (c_tape := (· + 1)) (c_rand := fun n1 n2 => max n1 n2 + 1)
+    (c_fail := 0)
+    (c_scrut := fun n _ => n + 1)
+  all_goals first | (intros; rfl) | fun_prop
+
+/-- Test 2: data-leaf dependent (`countLits : Exp rT → Nat`, counts `lit` and `scrut`
+data leaves). -/
+@[simp] def countLits : Exp rT → Nat
+  | .bvar _        => 0
+  | .fvar _        => 0
+  | .lit _         => 1
+  | .lam e         => countLits e
+  | .fix e         => countLits e
+  | .app e1 e2     => countLits e1 + countLits e2
+  | .unop _ e      => countLits e
+  | .binop _ e1 e2 => countLits e1 + countLits e2
+  | .cond ec et ef => countLits ec + countLits et + countLits ef
+  | .pair e1 e2    => countLits e1 + countLits e2
+  | .fst e         => countLits e
+  | .snd e         => countLits e
+  | .inl e         => countLits e
+  | .inr e         => countLits e
+  | .case ec el er => countLits ec + countLits el + countLits er
+  | .alloc e       => countLits e
+  | .load e        => countLits e
+  | .store e1 e2   => countLits e1 + countLits e2
+  | .tape e        => countLits e
+  | .rand e1 e2    => countLits e1 + countLits e2
+  | .fail          => 0
+  | .scrut e _     => countLits e + 1
+
+theorem countLits.measurable [MeasurableSpace rT] :
+    Measurable (countLits : Exp rT → Nat) := by
+  apply measurable_struct_rec (f := countLits)
+    (c_bvar := fun _ => 0) (c_fvar := fun _ => 0) (c_lit := fun _ => 1)
+    (c_lam := id) (c_fix := id)
+    (c_app := (· + ·))
+    (c_unop := fun _ n => n)
+    (c_binop := fun _ n1 n2 => n1 + n2)
+    (c_cond := fun n1 n2 n3 => n1 + n2 + n3)
+    (c_pair := (· + ·)) (c_fst := id) (c_snd := id)
+    (c_inl := id) (c_inr := id)
+    (c_case := fun n1 n2 n3 => n1 + n2 + n3)
+    (c_alloc := id) (c_load := id) (c_store := (· + ·))
+    (c_tape := id) (c_rand := (· + ·))
+    (c_fail := 0)
+    (c_scrut := fun n _ => n + 1)
+  all_goals first | (intros; rfl) | fun_prop
+
+/-- Test 3: endo-map (`Exp rT → Exp rT`, non-discrete codomain). -/
+@[simp] def doubleLam : Exp rT → Exp rT
+  | .bvar n        => .bvar n
+  | .fvar x        => .fvar x
+  | .lit b         => .lit b
+  | .lam e         => .lam (.lam (doubleLam e))
+  | .fix e         => .fix (doubleLam e)
+  | .app e1 e2     => .app (doubleLam e1) (doubleLam e2)
+  | .unop u e      => .unop u (doubleLam e)
+  | .binop b e1 e2 => .binop b (doubleLam e1) (doubleLam e2)
+  | .cond ec et ef => .cond (doubleLam ec) (doubleLam et) (doubleLam ef)
+  | .pair e1 e2    => .pair (doubleLam e1) (doubleLam e2)
+  | .fst e         => .fst (doubleLam e)
+  | .snd e         => .snd (doubleLam e)
+  | .inl e         => .inl (doubleLam e)
+  | .inr e         => .inr (doubleLam e)
+  | .case ec el er => .case (doubleLam ec) (doubleLam el) (doubleLam er)
+  | .alloc e       => .alloc (doubleLam e)
+  | .load e        => .load (doubleLam e)
+  | .store e1 e2   => .store (doubleLam e1) (doubleLam e2)
+  | .tape e        => .tape (doubleLam e)
+  | .rand e1 e2    => .rand (doubleLam e1) (doubleLam e2)
+  | .fail          => .fail
+  | .scrut e p     => .scrut (doubleLam e) p
+
+theorem doubleLam.measurable [MeasurableSpace rT] :
+    Measurable (doubleLam : Exp rT → Exp rT) := by
+  apply measurable_struct_rec (f := doubleLam)
+    (c_bvar := Exp.bvar) (c_fvar := Exp.fvar) (c_lit := Exp.lit)
+    (c_lam := fun e => .lam (.lam e)) (c_fix := Exp.fix)
+    (c_app := fun e1 e2 => .app e1 e2)
+    (c_unop := fun u e => .unop u e)
+    (c_binop := fun b e1 e2 => .binop b e1 e2)
+    (c_cond := fun ec et ef => .cond ec et ef)
+    (c_pair := fun e1 e2 => .pair e1 e2) (c_fst := Exp.fst) (c_snd := Exp.snd)
+    (c_inl := Exp.inl) (c_inr := Exp.inr)
+    (c_case := fun ec el er => .case ec el er)
+    (c_alloc := Exp.alloc) (c_load := Exp.load) (c_store := fun e1 e2 => .store e1 e2)
+    (c_tape := Exp.tape) (c_rand := fun e1 e2 => .rand e1 e2)
+    (c_fail := .fail)
+    (c_scrut := fun e p => .scrut e p)
+  all_goals first | (intros; rfl) | fun_prop
+
+/-- Test 4: param-threaded (`addAcc : Nat → Exp rT → Nat`, the `β` is the running
+accumulator threaded unchanged into every recursive call; the `bvar` leaf actually
+uses the accumulator). -/
+@[simp] def addAcc : Nat → Exp rT → Nat
+  | acc, .bvar n        => acc + n
+  | acc, .fvar _        => acc
+  | acc, .lit _         => acc
+  | acc, .lam e         => addAcc acc e
+  | acc, .fix e         => addAcc acc e
+  | acc, .app e1 e2     => addAcc acc e1 + addAcc acc e2
+  | acc, .unop _ e      => addAcc acc e
+  | acc, .binop _ e1 e2 => addAcc acc e1 + addAcc acc e2
+  | acc, .cond ec et ef => addAcc acc ec + addAcc acc et + addAcc acc ef
+  | acc, .pair e1 e2    => addAcc acc e1 + addAcc acc e2
+  | acc, .fst e         => addAcc acc e
+  | acc, .snd e         => addAcc acc e
+  | acc, .inl e         => addAcc acc e
+  | acc, .inr e         => addAcc acc e
+  | acc, .case ec el er => addAcc acc ec + addAcc acc el + addAcc acc er
+  | acc, .alloc e       => addAcc acc e
+  | acc, .load e        => addAcc acc e
+  | acc, .store e1 e2   => addAcc acc e1 + addAcc acc e2
+  | acc, .tape e        => addAcc acc e
+  | acc, .rand e1 e2    => addAcc acc e1 + addAcc acc e2
+  | acc, .fail          => acc
+  | acc, .scrut e _     => addAcc acc e
+
+theorem addAcc.measurable [MeasurableSpace rT] :
+    Measurable (Function.uncurry (addAcc : Nat → Exp rT → Nat)) := by
+  apply measurable_struct_rec_param (g := addAcc)
+    (c_bvar := fun acc n => acc + n) (c_fvar := fun acc _ => acc)
+    (c_lit := fun acc _ => acc)
+    (c_lam := fun _ n => n) (c_fix := fun _ n => n)
+    (c_app := fun _ n1 n2 => n1 + n2)
+    (c_unop := fun _ _ n => n)
+    (c_binop := fun _ _ n1 n2 => n1 + n2)
+    (c_cond := fun _ n1 n2 n3 => n1 + n2 + n3)
+    (c_pair := fun _ n1 n2 => n1 + n2) (c_fst := fun _ n => n) (c_snd := fun _ n => n)
+    (c_inl := fun _ n => n) (c_inr := fun _ n => n)
+    (c_case := fun _ n1 n2 n3 => n1 + n2 + n3)
+    (c_alloc := fun _ n => n) (c_load := fun _ n => n) (c_store := fun _ n1 n2 => n1 + n2)
+    (c_tape := fun _ n => n) (c_rand := fun _ n1 n2 => n1 + n2)
+    (c_fail := fun acc => acc)
+    (c_scrut := fun _ n _ => n)
+  all_goals first | (intros; rfl) | fun_prop
 
 end Exp
 end ProbLang

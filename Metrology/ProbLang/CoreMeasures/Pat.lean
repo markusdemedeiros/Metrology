@@ -189,24 +189,23 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     {c₁ c₂ c : Cylinder rT}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
-  induction h₁ generalizing c₂ c with
-  | wildcard => cases c₂ <;> simp_all [Cylinder.inter?]
-  | @lit S₁ hS₁ =>
-    cases h₂ <;> simp_all [Cylinder.inter?]
-    subst h; exact .lit _ (hS₁.inter ‹_›)
-  | @pair a b _ _ iha ihb =>
-    cases h₂ <;> simp_all [Cylinder.inter?]
-    revert h; split <;> rintro ⟨rfl⟩
-    rename_i ha hb
-    exact .pair (iha ‹_› ha) (ihb ‹_› hb)
-  | @inl a _ ih =>
-    cases h₂ <;> simp_all [Cylinder.inter?]
-    revert h; split <;> rintro ⟨rfl⟩
-    exact .inl (ih ‹_› ‹_›)
-  | @inr a _ ih =>
-    cases h₂ <;> simp_all [Cylinder.inter?]
-    revert h; split <;> rintro ⟨rfl⟩
-    exact .inr (ih ‹_› ‹_›)
+  induction c₁ generalizing c₂ c with
+  | wildcard =>
+    cases c₂ <;> simp_all [Cylinder.inter?]
+  | lit S₁ =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂; injection h with h; subst h; exact .lit _ (MeasurableSet.inter ‹_› ‹_›)
+  | pair a b iha ihb =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂
+    revert h; split <;> rintro ⟨rfl⟩; rename_i ha hb
+    exact .pair (iha ‹_› ‹_› ha) (ihb ‹_› ‹_› hb)
+  | inl c ih | inr c ih =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals (
+      cases h₁; cases h₂
+      revert h; split <;> rintro ⟨rfl⟩; rename_i ha
+      first | exact .inl (ih ‹_› ‹_› ha) | exact .inr (ih ‹_› ‹_› ha))
 
 /-! ### Per-constructor covers. -/
 
@@ -431,6 +430,20 @@ theorem inr.measurableEmbedding [MeasurableSpace rT] :
     (h_basic := by rintro _ ⟨c, hc, rfl⟩; exact flatten_measurable (.inr hc))
     (h_cov_meas := cover.inr.measurable _) (h_cov_range := cover.inr_univ_eq_range)
 
+/-- Per-constructor cell family for the `casesOn` preimage decomposition. Each
+index maps to `<ctor>.ι '' (f_<ctor> ⁻¹' S)`; the decomposition is the
+`Fin`-indexed union of these. -/
+def decompCell
+    {rT : Type _} {α : Type _} (S : Set α)
+    (f_wildcard : Unit → α) (f_lit : BaseLit rT → α)
+    (f_pair : Pat rT × Pat rT → α)
+    (f_inl  : Pat rT → α) (f_inr : Pat rT → α) : Fin 5 → Set (Pat rT) :=
+  ![ Pat.wildcard.ι '' (f_wildcard ⁻¹' S)
+   , Pat.lit.ι      '' (f_lit      ⁻¹' S)
+   , Pat.pair.ι     '' (f_pair     ⁻¹' S)
+   , Pat.inl.ι      '' (f_inl      ⁻¹' S)
+   , Pat.inr.ι      '' (f_inr      ⁻¹' S) ]
+
 theorem casesOn_preimage_decomp
     {rT : Type _} {α : Type _} (S : Set α)
     (f_wildcard : Unit → α) (f_lit : BaseLit rT → α)
@@ -439,12 +452,18 @@ theorem casesOn_preimage_decomp
     (fun p : Pat rT => Pat.casesOn (motive := fun _ => α) p
         (f_wildcard ()) f_lit
         (fun p1 p2 => f_pair (p1, p2)) f_inl f_inr) ⁻¹' S
-      = (Pat.wildcard.ι '' (f_wildcard ⁻¹' S))
-      ∪ (Pat.lit.ι      '' (f_lit      ⁻¹' S))
-      ∪ (Pat.pair.ι     '' (f_pair     ⁻¹' S))
-      ∪ (Pat.inl.ι      '' (f_inl      ⁻¹' S))
-      ∪ (Pat.inr.ι      '' (f_inr      ⁻¹' S)) := by
-  ext p; cases p <;> aesop
+      = ⋃ i, decompCell S f_wildcard f_lit f_pair f_inl f_inr i := by
+  ext p
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell]
+  constructor
+  · intro hp; cases p
+    · exact ⟨0, _, hp, rfl⟩
+    · exact ⟨1, _, hp, rfl⟩
+    · exact ⟨2, ⟨_, _⟩, hp, rfl⟩
+    · exact ⟨3, _, hp, rfl⟩
+    · exact ⟨4, _, hp, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
 @[fun_prop]
 theorem measurable_rec
@@ -462,7 +481,8 @@ theorem measurable_rec
         (fun p1 p2 => f_pair (p1, p2)) f_inl f_inr) := by
   intro S hS
   rw [Pat.casesOn_preimage_decomp]
-  iterate 4 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact wildcard.measurableEmbedding.measurableSet_image' (by measurability)
   · exact lit.measurableEmbedding.measurableSet_image'      (h_lit hS)
   · exact pair.measurableEmbedding.measurableSet_image'     (h_pair hS)
@@ -589,8 +609,9 @@ theorem measurable_struct_rec_param : Measurable (Function.uncurry g) := by
 
 end StructRecParam
 
-/-! ### Synthetic test 1: `patDepth`. Discrete codomain. -/
+/-! ### Synthetic smoke-test battery -/
 
+/-- Test 1: discrete codomain (`patDepth : Pat rT → Nat`). -/
 @[simp] def patDepth : Pat rT → Nat
   | .wildcard   => 0
   | .lit _      => 0
@@ -608,8 +629,7 @@ theorem patDepth.measurable [MeasurableSpace rT] :
     (c_inr := (· + 1))
   all_goals first | (intros; rfl) | fun_prop
 
-/-! ### Synthetic test 2: `countLits`. Data-leaf dependent. -/
-
+/-- Test 2: data-leaf dependent (`countLits : Pat rT → Nat`). -/
 @[simp] def countLits : Pat rT → Nat
   | .wildcard   => 0
   | .lit _      => 1
@@ -627,8 +647,7 @@ theorem countLits.measurable [MeasurableSpace rT] :
     (c_inr := id)
   all_goals first | (intros; rfl) | fun_prop
 
-/-! ### Synthetic test 3: `Pat rT → Pat rT`. Non-discrete codomain. -/
-
+/-- Test 3: endo-map (`Pat rT → Pat rT`, non-discrete codomain). -/
 @[simp] def doubleWrap : Pat rT → Pat rT
   | .wildcard   => .wildcard
   | .lit b      => .lit b
@@ -644,6 +663,25 @@ theorem doubleWrap.measurable [MeasurableSpace rT] :
     (c_pair := fun p1 p2 => .pair p1 p2)
     (c_inl := fun p => .inl (.inl p))
     (c_inr := fun p => .inr (.inr p))
+  all_goals first | (intros; rfl) | fun_prop
+
+/-- Test 4: param-threaded (`addAcc : Nat → Pat rT → Nat`, the `β` is the running
+accumulator threaded unchanged into every recursive call). -/
+@[simp] def addAcc : Nat → Pat rT → Nat
+  | acc, .wildcard   => acc
+  | acc, .lit _      => acc
+  | acc, .pair p1 p2 => addAcc acc p1 + addAcc acc p2
+  | acc, .inl p      => addAcc acc p
+  | acc, .inr p      => addAcc acc p
+
+theorem addAcc.measurable [MeasurableSpace rT] :
+    Measurable (Function.uncurry (addAcc : Nat → Pat rT → Nat)) := by
+  apply measurable_struct_rec_param (g := addAcc)
+    (c_wildcard := fun acc => acc)
+    (c_lit := fun acc _ => acc)
+    (c_pair := fun _ n1 n2 => n1 + n2)
+    (c_inl := fun _ n => n)
+    (c_inr := fun _ n => n)
   all_goals first | (intros; rfl) | fun_prop
 
 /-! ### Singleton-class for `Pat rT` (lifted from `MeasurableSingletonClass rT`).

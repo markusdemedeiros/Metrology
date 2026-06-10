@@ -407,21 +407,32 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace α]
     {c₁ c₂ c : Cylinder α}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
-  cases c₁ <;> cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
-  all_goals first
-    | (cases h₁; cases h₂; injection h with h; subst h
-       first
-       | exact .appL _ (MeasurableSet.inter ‹_› ‹_›) | exact .appR _ (MeasurableSet.inter ‹_› ‹_›)
-       | exact .pairL _ (MeasurableSet.inter ‹_› ‹_›) | exact .pairR _ (MeasurableSet.inter ‹_› ‹_›)
-       | exact .storeL _ (MeasurableSet.inter ‹_› ‹_›) | exact .storeR _ (MeasurableSet.inter ‹_› ‹_›)
-       | exact .randL _ (MeasurableSet.inter ‹_› ‹_›) | exact .randR _ (MeasurableSet.inter ‹_› ‹_›)
-       | exact .scrut _ (MeasurableSet.inter ‹_› ‹_›)
-       | exact .condC _ _ (MeasurableSet.inter ‹_› ‹_›) (MeasurableSet.inter ‹_› ‹_›)
-       | exact .case _ _ (MeasurableSet.inter ‹_› ‹_›) (MeasurableSet.inter ‹_› ‹_›)
-       | constructor)
-    | (revert h; split <;> rintro ⟨rfl⟩ <;> cases h₁ <;> cases h₂
-       first
-       | exact .unop | exact .binopL _ (MeasurableSet.inter ‹_› ‹_›) | exact .binopR _ (MeasurableSet.inter ‹_› ‹_›))
+  cases c₁ with
+  | fst | snd | inl | inr | alloc | load | tape =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals simp_all
+  | appL S₁ | appR S₁ | pairL S₁ | pairR S₁ | storeL S₁ | storeR S₁ | randL S₁ | randR S₁
+  | scrut S₁ =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals (
+      cases h₁; cases h₂; injection h with h; subst h
+      constructor; exact MeasurableSet.inter ‹_› ‹_›)
+  | condC S₁ S₂ | case S₁ S₂ =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals (
+      cases h₁; cases h₂; injection h with h; subst h
+      constructor <;> exact MeasurableSet.inter ‹_› ‹_›)
+  | unop u =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂
+    revert h; split <;> rintro ⟨rfl⟩
+    exact .unop
+  | binopL op S₁ | binopR op S₁ =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals (
+      cases h₁; cases h₂
+      revert h; split <;> rintro ⟨rfl⟩
+      constructor; exact MeasurableSet.inter ‹_› ‹_›)
 
 /-! ### Per-constructor covers. -/
 
@@ -922,73 +933,31 @@ theorem unop.measurableEmbedding [MeasurableSpace α] :
 
 theorem fst.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (fun _ : Unit => (EctxItem.fst : EctxItem α)) := by
-  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-  · exact measurable_const
-  · rw [show Set.range (fun _ : Unit => (EctxItem.fst : EctxItem α)) = cover.fst .univ from by
-             rw [cover.fst_eq_image]; ext; simp]
-    exact cover.fst.measurable _
-  · exact measurable_const
-  · intro; rfl
+  solve_nullary_ME cover.fst, cover.fst_eq_image, cover.fst.measurable
 
 theorem snd.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (fun _ : Unit => (EctxItem.snd : EctxItem α)) := by
-  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-  · exact measurable_const
-  · rw [show Set.range (fun _ : Unit => (EctxItem.snd : EctxItem α)) = cover.snd .univ from by
-             rw [cover.snd_eq_image]; ext; simp]
-    exact cover.snd.measurable _
-  · exact measurable_const
-  · intro; rfl
+  solve_nullary_ME cover.snd, cover.snd_eq_image, cover.snd.measurable
 
 theorem inl.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (fun _ : Unit => (EctxItem.inl : EctxItem α)) := by
-  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-  · exact measurable_const
-  · rw [show Set.range (fun _ : Unit => (EctxItem.inl : EctxItem α)) = cover.inl .univ from by
-             rw [cover.inl_eq_image]; ext; simp]
-    exact cover.inl.measurable _
-  · exact measurable_const
-  · intro; rfl
+  solve_nullary_ME cover.inl, cover.inl_eq_image, cover.inl.measurable
 
 theorem inr.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (fun _ : Unit => (EctxItem.inr : EctxItem α)) := by
-  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-  · exact measurable_const
-  · rw [show Set.range (fun _ : Unit => (EctxItem.inr : EctxItem α)) = cover.inr .univ from by
-             rw [cover.inr_eq_image]; ext; simp]
-    exact cover.inr.measurable _
-  · exact measurable_const
-  · intro; rfl
+  solve_nullary_ME cover.inr, cover.inr_eq_image, cover.inr.measurable
 
 theorem alloc.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (fun _ : Unit => (EctxItem.alloc : EctxItem α)) := by
-  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-  · exact measurable_const
-  · rw [show Set.range (fun _ : Unit => (EctxItem.alloc : EctxItem α)) = cover.alloc .univ from by
-             rw [cover.alloc_eq_image]; ext; simp]
-    exact cover.alloc.measurable _
-  · exact measurable_const
-  · intro; rfl
+  solve_nullary_ME cover.alloc, cover.alloc_eq_image, cover.alloc.measurable
 
 theorem load.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (fun _ : Unit => (EctxItem.load : EctxItem α)) := by
-  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-  · exact measurable_const
-  · rw [show Set.range (fun _ : Unit => (EctxItem.load : EctxItem α)) = cover.load .univ from by
-             rw [cover.load_eq_image]; ext; simp]
-    exact cover.load.measurable _
-  · exact measurable_const
-  · intro; rfl
+  solve_nullary_ME cover.load, cover.load_eq_image, cover.load.measurable
 
 theorem tape.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (fun _ : Unit => (EctxItem.tape : EctxItem α)) := by
-  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
-  · exact measurable_const
-  · rw [show Set.range (fun _ : Unit => (EctxItem.tape : EctxItem α)) = cover.tape .univ from by
-             rw [cover.tape_eq_image]; ext; simp]
-    exact cover.tape.measurable _
-  · exact measurable_const
-  · intro; rfl
+  solve_nullary_ME cover.tape, cover.tape_eq_image, cover.tape.measurable
 
 theorem appL.measurableEmbedding [MeasurableSpace α] :
     MeasurableEmbedding (EctxItem.appL : Val α → EctxItem α) :=
@@ -1111,6 +1080,42 @@ theorem case.measurableEmbedding [MeasurableSpace α] :
       exact flatten_measurable (.case _ _ hS₁ hS₂))
     (h_cov_meas := cover.case.measurable _) (h_cov_range := cover.case_univ_eq_range)
 
+/-- Per-constructor cell family for the `casesOn` preimage decomposition. -/
+def decompCell
+    {α : Type _} {β : Type _} (S : Set β)
+    (f_appL : Val α → β) (f_appR : Exp α → β) (f_unop : UnOp → β)
+    (f_binopL : BinOp × Val α → β) (f_binopR : BinOp × Exp α → β)
+    (f_condC : Exp α × Exp α → β)
+    (f_pairL : Val α → β) (f_pairR : Exp α → β)
+    (f_fst : Unit → β) (f_snd : Unit → β) (f_inl : Unit → β) (f_inr : Unit → β)
+    (f_case : Exp α × Exp α → β)
+    (f_alloc : Unit → β) (f_load : Unit → β)
+    (f_storeL : Val α → β) (f_storeR : Exp α → β)
+    (f_tape : Unit → β)
+    (f_randL : Val α → β) (f_randR : Exp α → β)
+    (f_scrut : Pat α → β) : Fin 21 → Set (EctxItem α) :=
+  ![ EctxItem.appL.ι   '' (f_appL   ⁻¹' S)
+   , EctxItem.appR.ι   '' (f_appR   ⁻¹' S)
+   , EctxItem.unop.ι   '' (f_unop   ⁻¹' S)
+   , EctxItem.binopL.ι '' (f_binopL ⁻¹' S)
+   , EctxItem.binopR.ι '' (f_binopR ⁻¹' S)
+   , EctxItem.condC.ι  '' (f_condC  ⁻¹' S)
+   , EctxItem.pairL.ι  '' (f_pairL  ⁻¹' S)
+   , EctxItem.pairR.ι  '' (f_pairR  ⁻¹' S)
+   , EctxItem.fst.ι    '' (f_fst    ⁻¹' S)
+   , EctxItem.snd.ι    '' (f_snd    ⁻¹' S)
+   , EctxItem.inl.ι    '' (f_inl    ⁻¹' S)
+   , EctxItem.inr.ι    '' (f_inr    ⁻¹' S)
+   , EctxItem.case.ι   '' (f_case   ⁻¹' S)
+   , EctxItem.alloc.ι  '' (f_alloc  ⁻¹' S)
+   , EctxItem.load.ι   '' (f_load   ⁻¹' S)
+   , EctxItem.storeL.ι '' (f_storeL ⁻¹' S)
+   , EctxItem.storeR.ι '' (f_storeR ⁻¹' S)
+   , EctxItem.tape.ι   '' (f_tape   ⁻¹' S)
+   , EctxItem.randL.ι  '' (f_randL  ⁻¹' S)
+   , EctxItem.randR.ι  '' (f_randR  ⁻¹' S)
+   , EctxItem.scrut.ι  '' (f_scrut  ⁻¹' S) ]
+
 theorem casesOn_preimage_decomp
     {α : Type _} {β : Type _} (S : Set β)
     (f_appL : Val α → β) (f_appR : Exp α → β) (f_unop : UnOp → β)
@@ -1137,28 +1142,36 @@ theorem casesOn_preimage_decomp
         (f_tape ())
         f_randL f_randR
         f_scrut) ⁻¹' S
-      = (EctxItem.appL.ι   '' (f_appL   ⁻¹' S))
-      ∪ (EctxItem.appR.ι   '' (f_appR   ⁻¹' S))
-      ∪ (EctxItem.unop.ι   '' (f_unop   ⁻¹' S))
-      ∪ (EctxItem.binopL.ι '' (f_binopL ⁻¹' S))
-      ∪ (EctxItem.binopR.ι '' (f_binopR ⁻¹' S))
-      ∪ (EctxItem.condC.ι  '' (f_condC  ⁻¹' S))
-      ∪ (EctxItem.pairL.ι  '' (f_pairL  ⁻¹' S))
-      ∪ (EctxItem.pairR.ι  '' (f_pairR  ⁻¹' S))
-      ∪ (EctxItem.fst.ι    '' (f_fst    ⁻¹' S))
-      ∪ (EctxItem.snd.ι    '' (f_snd    ⁻¹' S))
-      ∪ (EctxItem.inl.ι    '' (f_inl    ⁻¹' S))
-      ∪ (EctxItem.inr.ι    '' (f_inr    ⁻¹' S))
-      ∪ (EctxItem.case.ι   '' (f_case   ⁻¹' S))
-      ∪ (EctxItem.alloc.ι  '' (f_alloc  ⁻¹' S))
-      ∪ (EctxItem.load.ι   '' (f_load   ⁻¹' S))
-      ∪ (EctxItem.storeL.ι '' (f_storeL ⁻¹' S))
-      ∪ (EctxItem.storeR.ι '' (f_storeR ⁻¹' S))
-      ∪ (EctxItem.tape.ι   '' (f_tape   ⁻¹' S))
-      ∪ (EctxItem.randL.ι  '' (f_randL  ⁻¹' S))
-      ∪ (EctxItem.randR.ι  '' (f_randR  ⁻¹' S))
-      ∪ (EctxItem.scrut.ι  '' (f_scrut  ⁻¹' S)) := by
-  ext K; cases K <;> aesop
+      = ⋃ i, decompCell S f_appL f_appR f_unop f_binopL f_binopR f_condC
+          f_pairL f_pairR f_fst f_snd f_inl f_inr f_case f_alloc f_load
+          f_storeL f_storeR f_tape f_randL f_randR f_scrut i := by
+  ext K
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell]
+  constructor
+  · intro hK; cases K
+    · exact ⟨0, _, hK, rfl⟩
+    · exact ⟨1, _, hK, rfl⟩
+    · exact ⟨2, _, hK, rfl⟩
+    · exact ⟨3, ⟨_, _⟩, hK, rfl⟩
+    · exact ⟨4, ⟨_, _⟩, hK, rfl⟩
+    · exact ⟨5, ⟨_, _⟩, hK, rfl⟩
+    · exact ⟨6, _, hK, rfl⟩
+    · exact ⟨7, _, hK, rfl⟩
+    · exact ⟨8, (), hK, rfl⟩
+    · exact ⟨9, (), hK, rfl⟩
+    · exact ⟨10, (), hK, rfl⟩
+    · exact ⟨11, (), hK, rfl⟩
+    · exact ⟨12, ⟨_, _⟩, hK, rfl⟩
+    · exact ⟨13, (), hK, rfl⟩
+    · exact ⟨14, (), hK, rfl⟩
+    · exact ⟨15, _, hK, rfl⟩
+    · exact ⟨16, _, hK, rfl⟩
+    · exact ⟨17, (), hK, rfl⟩
+    · exact ⟨18, _, hK, rfl⟩
+    · exact ⟨19, _, hK, rfl⟩
+    · exact ⟨20, _, hK, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, hK⟩ := hi; cases hK; simpa using hq
 
 @[fun_prop]
 theorem measurable_rec
@@ -1198,7 +1211,8 @@ theorem measurable_rec
         f_scrut) := by
   intro S hS
   rw [EctxItem.casesOn_preimage_decomp]
-  iterate 20 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact appL.measurableEmbedding.measurableSet_image'   (h_appL hS)
   · exact appR.measurableEmbedding.measurableSet_image'   (h_appR hS)
   · exact unop.measurableEmbedding.measurableSet_image'   (by measurability)
@@ -1231,7 +1245,43 @@ is joint-measurable in `(K, b) : EctxItem α × β`. Built directly from
 This is the analogue of `Exp.measurable_rec_param`; the only difference is the
 21-way constructor list of `EctxItem`. -/
 
-set_option maxHeartbeats 2000000 in
+/-- Per-constructor cell family for the `β`-parameterised decomposition. -/
+def decompCell_param
+    {α : Type _} {β γ : Type _} (S : Set γ)
+    (f_appL : β × Val α → γ) (f_appR : β × Exp α → γ) (f_unop : β × UnOp → γ)
+    (f_binopL : β × BinOp × Val α → γ) (f_binopR : β × BinOp × Exp α → γ)
+    (f_condC : β × Exp α × Exp α → γ)
+    (f_pairL : β × Val α → γ) (f_pairR : β × Exp α → γ)
+    (f_fst : β × Unit → γ) (f_snd : β × Unit → γ)
+    (f_inl : β × Unit → γ) (f_inr : β × Unit → γ)
+    (f_case : β × Exp α × Exp α → γ)
+    (f_alloc : β × Unit → γ) (f_load : β × Unit → γ)
+    (f_storeL : β × Val α → γ) (f_storeR : β × Exp α → γ)
+    (f_tape : β × Unit → γ)
+    (f_randL : β × Val α → γ) (f_randR : β × Exp α → γ)
+    (f_scrut : β × Pat α → γ) : Fin 21 → Set (EctxItem α × β) :=
+  ![ (fun q : β × Val α => (EctxItem.appL q.2, q.1))   '' (f_appL   ⁻¹' S)
+   , (fun q : β × Exp α => (EctxItem.appR q.2, q.1))   '' (f_appR   ⁻¹' S)
+   , (fun q : β × UnOp => (EctxItem.unop q.2, q.1))    '' (f_unop   ⁻¹' S)
+   , (fun q : β × BinOp × Val α => (EctxItem.binopL q.2.1 q.2.2, q.1)) '' (f_binopL ⁻¹' S)
+   , (fun q : β × BinOp × Exp α => (EctxItem.binopR q.2.1 q.2.2, q.1)) '' (f_binopR ⁻¹' S)
+   , (fun q : β × Exp α × Exp α => (EctxItem.condC q.2.1 q.2.2, q.1))  '' (f_condC  ⁻¹' S)
+   , (fun q : β × Val α => (EctxItem.pairL q.2, q.1))  '' (f_pairL  ⁻¹' S)
+   , (fun q : β × Exp α => (EctxItem.pairR q.2, q.1))  '' (f_pairR  ⁻¹' S)
+   , (fun q : β × Unit => (EctxItem.fst, q.1))         '' (f_fst    ⁻¹' S)
+   , (fun q : β × Unit => (EctxItem.snd, q.1))         '' (f_snd    ⁻¹' S)
+   , (fun q : β × Unit => (EctxItem.inl, q.1))         '' (f_inl    ⁻¹' S)
+   , (fun q : β × Unit => (EctxItem.inr, q.1))         '' (f_inr    ⁻¹' S)
+   , (fun q : β × Exp α × Exp α => (EctxItem.case q.2.1 q.2.2, q.1))   '' (f_case   ⁻¹' S)
+   , (fun q : β × Unit => (EctxItem.alloc, q.1))       '' (f_alloc  ⁻¹' S)
+   , (fun q : β × Unit => (EctxItem.load, q.1))        '' (f_load   ⁻¹' S)
+   , (fun q : β × Val α => (EctxItem.storeL q.2, q.1)) '' (f_storeL ⁻¹' S)
+   , (fun q : β × Exp α => (EctxItem.storeR q.2, q.1)) '' (f_storeR ⁻¹' S)
+   , (fun q : β × Unit => (EctxItem.tape, q.1))        '' (f_tape   ⁻¹' S)
+   , (fun q : β × Val α => (EctxItem.randL q.2, q.1))  '' (f_randL  ⁻¹' S)
+   , (fun q : β × Exp α => (EctxItem.randR q.2, q.1))  '' (f_randR  ⁻¹' S)
+   , (fun q : β × Pat α => (EctxItem.scrut q.2, q.1))  '' (f_scrut  ⁻¹' S) ]
+
 /-- Joint preimage decomposition for `EctxItem.casesOn` with a `β` parameter. -/
 theorem casesOn_preimage_decomp_param
     {α : Type _} {β γ : Type _} (S : Set γ)
@@ -1262,29 +1312,36 @@ theorem casesOn_preimage_decomp_param
         (f_tape (p.2, ()))
         (fun v => f_randL (p.2, v)) (fun e => f_randR (p.2, e))
         (fun pat => f_scrut (p.2, pat))) ⁻¹' S
-      = ((fun q : β × Val α => (EctxItem.appL q.2, q.1))   '' (f_appL   ⁻¹' S))
-      ∪ ((fun q : β × Exp α => (EctxItem.appR q.2, q.1))   '' (f_appR   ⁻¹' S))
-      ∪ ((fun q : β × UnOp => (EctxItem.unop q.2, q.1))    '' (f_unop   ⁻¹' S))
-      ∪ ((fun q : β × BinOp × Val α => (EctxItem.binopL q.2.1 q.2.2, q.1)) '' (f_binopL ⁻¹' S))
-      ∪ ((fun q : β × BinOp × Exp α => (EctxItem.binopR q.2.1 q.2.2, q.1)) '' (f_binopR ⁻¹' S))
-      ∪ ((fun q : β × Exp α × Exp α => (EctxItem.condC q.2.1 q.2.2, q.1))  '' (f_condC  ⁻¹' S))
-      ∪ ((fun q : β × Val α => (EctxItem.pairL q.2, q.1))  '' (f_pairL  ⁻¹' S))
-      ∪ ((fun q : β × Exp α => (EctxItem.pairR q.2, q.1))  '' (f_pairR  ⁻¹' S))
-      ∪ ((fun q : β × Unit => (EctxItem.fst, q.1))         '' (f_fst    ⁻¹' S))
-      ∪ ((fun q : β × Unit => (EctxItem.snd, q.1))         '' (f_snd    ⁻¹' S))
-      ∪ ((fun q : β × Unit => (EctxItem.inl, q.1))         '' (f_inl    ⁻¹' S))
-      ∪ ((fun q : β × Unit => (EctxItem.inr, q.1))         '' (f_inr    ⁻¹' S))
-      ∪ ((fun q : β × Exp α × Exp α => (EctxItem.case q.2.1 q.2.2, q.1))   '' (f_case   ⁻¹' S))
-      ∪ ((fun q : β × Unit => (EctxItem.alloc, q.1))       '' (f_alloc  ⁻¹' S))
-      ∪ ((fun q : β × Unit => (EctxItem.load, q.1))        '' (f_load   ⁻¹' S))
-      ∪ ((fun q : β × Val α => (EctxItem.storeL q.2, q.1)) '' (f_storeL ⁻¹' S))
-      ∪ ((fun q : β × Exp α => (EctxItem.storeR q.2, q.1)) '' (f_storeR ⁻¹' S))
-      ∪ ((fun q : β × Unit => (EctxItem.tape, q.1))        '' (f_tape   ⁻¹' S))
-      ∪ ((fun q : β × Val α => (EctxItem.randL q.2, q.1))  '' (f_randL  ⁻¹' S))
-      ∪ ((fun q : β × Exp α => (EctxItem.randR q.2, q.1))  '' (f_randR  ⁻¹' S))
-      ∪ ((fun q : β × Pat α => (EctxItem.scrut q.2, q.1))  '' (f_scrut  ⁻¹' S)) := by
+      = ⋃ i, decompCell_param S f_appL f_appR f_unop f_binopL f_binopR f_condC
+          f_pairL f_pairR f_fst f_snd f_inl f_inr f_case f_alloc f_load
+          f_storeL f_storeR f_tape f_randL f_randR f_scrut i := by
   ext ⟨K, x⟩
-  cases K <;> simp <;> aesop
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell_param]
+  constructor
+  · intro hK; cases K
+    · exact ⟨0, (x, _), hK, rfl⟩
+    · exact ⟨1, (x, _), hK, rfl⟩
+    · exact ⟨2, (x, _), hK, rfl⟩
+    · exact ⟨3, (x, _, _), hK, rfl⟩
+    · exact ⟨4, (x, _, _), hK, rfl⟩
+    · exact ⟨5, (x, _, _), hK, rfl⟩
+    · exact ⟨6, (x, _), hK, rfl⟩
+    · exact ⟨7, (x, _), hK, rfl⟩
+    · exact ⟨8, (x, ()), hK, rfl⟩
+    · exact ⟨9, (x, ()), hK, rfl⟩
+    · exact ⟨10, (x, ()), hK, rfl⟩
+    · exact ⟨11, (x, ()), hK, rfl⟩
+    · exact ⟨12, (x, _, _), hK, rfl⟩
+    · exact ⟨13, (x, ()), hK, rfl⟩
+    · exact ⟨14, (x, ()), hK, rfl⟩
+    · exact ⟨15, (x, _), hK, rfl⟩
+    · exact ⟨16, (x, _), hK, rfl⟩
+    · exact ⟨17, (x, ()), hK, rfl⟩
+    · exact ⟨18, (x, _), hK, rfl⟩
+    · exact ⟨19, (x, _), hK, rfl⟩
+    · exact ⟨20, (x, _), hK, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, hK⟩ := hi; cases hK; simpa using hq
 
 /-- Joint param version of `EctxItem.measurable_rec`. -/
 @[fun_prop]
@@ -1334,7 +1391,8 @@ theorem measurable_rec_param
         (fun pat => f_scrut (p.2, pat))) := by
   intro S hS
   rw [casesOn_preimage_decomp_param]
-  iterate 20 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact ((appL.measurableEmbedding.prodMap (.id (α := β))).comp
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_appL hS)
   · exact ((appR.measurableEmbedding.prodMap (.id (α := β))).comp

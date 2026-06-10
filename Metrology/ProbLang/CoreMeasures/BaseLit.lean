@@ -171,11 +171,13 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     {c₁ c₂ c : Cylinder rT}
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
-  cases c₁ <;> cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
-  all_goals first
-    | (cases h₁; cases h₂; injection h with h; subst h; exact .real _ (MeasurableSet.inter ‹_› ‹_›))
-    | (revert h; split <;> rintro ⟨rfl⟩ <;> constructor)
-    | (cases h; constructor)
+  cases c₁ with
+  | int z | bool z | unit | loc z | lbl z =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals first | (split at h <;> simp_all) | simp_all
+  | real S₁ =>
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    cases h₁; cases h₂; injection h with h; subst h; exact .real _ (MeasurableSet.inter ‹_› ‹_›)
 
 
 /-! ### Per-constructor covers.
@@ -217,15 +219,15 @@ Nullary constructors get no arguments.
 /-- Cylinder of a given shape has measurable leaves -/
 theorem Shape.cylinder_hasMeasurableLeaves [MeasurableSpace rT] (s : Shape) :
     (s.cylinder (rT := rT)).HasMeasurableLeaves := by
-  induction s <;> constructor; measurability
+  induction s <;> (constructor <;> measurability)
 
 /-- Flattening a cylinder of a shape equals set of terms with a given shape -/
 @[simp] theorem Shape.cylinder_preimage_shape (s : Shape) :
     (s.cylinder (rT := rT)).flatten = shape ⁻¹' {s} :=
   Stamp.cylinder_preimage_shape (cShape := Cylinder.shape)
     (fun {_ _} h => Cylinder.shape_of_mem_flatten h)
-    (fun s => by cases s <;> simp_all)
-    (fun b => by cases b <;> simp_all) s
+    (fun s => by induction s <;> simp_all)
+    (fun b => by induction b <;> simp_all) s
 
 /-- Flattening a cylinder gives a measurable set -/
 @[measurability]
@@ -399,19 +401,37 @@ theorem real.measurableEmbedding [MeasurableSpace rT] :
   ⟨fun _ _ h => by injection h, BaseLit.real.ι.measurable,
     fun _ hS => flatten_measurable (.real _ hS)⟩
 
+/-- Per-constructor cell family for the `casesOn` preimage decomposition. -/
+def decompCell
+    {rT : Type _} {α : Type _} (S : Set α)
+    (f_int  : Int  → α) (f_bool : Bool → α) (f_unit : Unit → α)
+    (f_loc  : Loc  → α) (f_lbl  : Lbl  → α) (f_real : rT → α) : Fin 6 → Set (BaseLit rT) :=
+  ![ BaseLit.int.ι  '' (f_int  ⁻¹' S)
+   , BaseLit.bool.ι '' (f_bool ⁻¹' S)
+   , BaseLit.unit.ι '' (f_unit ⁻¹' S)
+   , BaseLit.loc.ι  '' (f_loc  ⁻¹' S)
+   , BaseLit.lbl.ι  '' (f_lbl  ⁻¹' S)
+   , BaseLit.real.ι '' (f_real ⁻¹' S) ]
+
 theorem casesOn_preimage_decomp
     {rT : Type _} {α : Type _} (S : Set α)
     (f_int  : Int  → α) (f_bool : Bool → α) (f_unit : Unit → α)
     (f_loc  : Loc  → α) (f_lbl  : Lbl  → α) (f_real : rT → α) :
     (fun b : BaseLit rT => BaseLit.casesOn (motive := fun _ => α) b
         f_int f_bool (f_unit ()) f_loc f_lbl f_real) ⁻¹' S
-      = (BaseLit.int.ι  '' (f_int  ⁻¹' S))
-      ∪ (BaseLit.bool.ι '' (f_bool ⁻¹' S))
-      ∪ (BaseLit.unit.ι '' (f_unit ⁻¹' S))
-      ∪ (BaseLit.loc.ι  '' (f_loc  ⁻¹' S))
-      ∪ (BaseLit.lbl.ι  '' (f_lbl  ⁻¹' S))
-      ∪ (BaseLit.real.ι '' (f_real ⁻¹' S)) := by
-  ext b; cases b <;> aesop
+      = ⋃ i, decompCell S f_int f_bool f_unit f_loc f_lbl f_real i := by
+  ext b
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell]
+  constructor
+  · intro hb; cases b
+    · exact ⟨0, _, hb, rfl⟩
+    · exact ⟨1, _, hb, rfl⟩
+    · exact ⟨2, (), hb, rfl⟩
+    · exact ⟨3, _, hb, rfl⟩
+    · exact ⟨4, _, hb, rfl⟩
+    · exact ⟨5, _, hb, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, hb⟩ := hi; cases hb; simpa using hq
 
 @[fun_prop]
 theorem measurable_rec
@@ -425,7 +445,8 @@ theorem measurable_rec
         f_int f_bool (f_unit ()) f_loc f_lbl f_real) := by
   intro S hS
   rw [BaseLit.casesOn_preimage_decomp]
-  iterate 5 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact int.measurableEmbedding.measurableSet_image'   (by measurability)
   · exact bool.measurableEmbedding.measurableSet_image'  (by measurability)
   · exact unit.measurableEmbedding.measurableSet_image'  (by measurability)
@@ -433,7 +454,19 @@ theorem measurable_rec
   · exact lbl.measurableEmbedding.measurableSet_image'   (by measurability)
   · exact real.measurableEmbedding.measurableSet_image'  (h_real hS)
 
-set_option maxHeartbeats 1000000 in
+/-- Per-constructor cell family for the `β`-parameterised decomposition. -/
+def decompCell_param
+    {rT : Type _} {α β : Type _} (S : Set α)
+    (f_int  : β × Int  → α) (f_bool : β × Bool → α) (f_unit : β × Unit → α)
+    (f_loc  : β × Loc  → α) (f_lbl  : β × Lbl  → α) (f_real : β × rT → α) :
+    Fin 6 → Set (BaseLit rT × β) :=
+  ![ (fun q : β × Int => (BaseLit.int q.2, q.1))  '' (f_int  ⁻¹' S)
+   , (fun q : β × Bool => (BaseLit.bool q.2, q.1)) '' (f_bool ⁻¹' S)
+   , (fun q : β × Unit => (BaseLit.unit, q.1))     '' (f_unit ⁻¹' S)
+   , (fun q : β × Loc => (BaseLit.loc q.2, q.1))   '' (f_loc  ⁻¹' S)
+   , (fun q : β × Lbl => (BaseLit.lbl q.2, q.1))   '' (f_lbl  ⁻¹' S)
+   , (fun q : β × rT => (BaseLit.real q.2, q.1))   '' (f_real ⁻¹' S) ]
+
 /-- Joint preimage decomposition for `BaseLit.casesOn` with a `β` parameter. -/
 theorem casesOn_preimage_decomp_param
     {rT : Type _} {α β : Type _} (S : Set α)
@@ -444,27 +477,19 @@ theorem casesOn_preimage_decomp_param
         (f_unit (p.2, ()))
         (fun l => f_loc (p.2, l)) (fun l => f_lbl (p.2, l))
         (fun r => f_real (p.2, r))) ⁻¹' S
-      = ((fun q : β × Int => (BaseLit.int q.2, q.1))  '' (f_int  ⁻¹' S))
-      ∪ ((fun q : β × Bool => (BaseLit.bool q.2, q.1)) '' (f_bool ⁻¹' S))
-      ∪ ((fun q : β × Unit => (BaseLit.unit, q.1))     '' (f_unit ⁻¹' S))
-      ∪ ((fun q : β × Loc => (BaseLit.loc q.2, q.1))   '' (f_loc  ⁻¹' S))
-      ∪ ((fun q : β × Lbl => (BaseLit.lbl q.2, q.1))   '' (f_lbl  ⁻¹' S))
-      ∪ ((fun q : β × rT => (BaseLit.real q.2, q.1))   '' (f_real ⁻¹' S)) := by
+      = ⋃ i, decompCell_param S f_int f_bool f_unit f_loc f_lbl f_real i := by
   ext ⟨b, x⟩
-  simp only [Set.mem_preimage, Set.mem_union, Set.mem_image, Prod.mk.injEq]
-  cases b with
-  | int z => exact ⟨fun h => .inl (.inl (.inl (.inl (.inl ⟨(x, z), h, rfl, rfl⟩)))),
-              by rintro ((((((⟨⟨a, b⟩, h, _, _⟩) | _) | _) | _) | _) | _) <;> aesop⟩
-  | bool b' => exact ⟨fun h => .inl (.inl (.inl (.inl (.inr ⟨(x, b'), h, rfl, rfl⟩)))),
-                by rintro ((((((_) | ⟨⟨a, b⟩, h, _, _⟩) | _) | _) | _) | _) <;> aesop⟩
-  | unit => exact ⟨fun h => .inl (.inl (.inl (.inr ⟨(x, ()), h, rfl, rfl⟩))),
-              by rintro ((((((_) | _) | ⟨_, h, _, _⟩) | _) | _) | _) <;> aesop⟩
-  | loc ℓ => exact ⟨fun h => .inl (.inl (.inr ⟨(x, ℓ), h, rfl, rfl⟩)),
-              by rintro ((((((_) | _) | _) | ⟨_, h, _, _⟩) | _) | _) <;> aesop⟩
-  | lbl l => exact ⟨fun h => .inl (.inr ⟨(x, l), h, rfl, rfl⟩),
-              by rintro ((((((_) | _) | _) | _) | ⟨_, h, _, _⟩) | _) <;> aesop⟩
-  | real r => exact ⟨fun h => .inr ⟨(x, r), h, rfl, rfl⟩,
-              by rintro ((((((_) | _) | _) | _) | _) | ⟨_, h, _, _⟩) <;> aesop⟩
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell_param]
+  constructor
+  · intro hb; cases b
+    · exact ⟨0, (x, _), hb, rfl⟩
+    · exact ⟨1, (x, _), hb, rfl⟩
+    · exact ⟨2, (x, ()), hb, rfl⟩
+    · exact ⟨3, (x, _), hb, rfl⟩
+    · exact ⟨4, (x, _), hb, rfl⟩
+    · exact ⟨5, (x, _), hb, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, hb⟩ := hi; cases hb; simpa using hq
 
 /-- Joint param version of `BaseLit.measurable_rec`. -/
 @[fun_prop]
@@ -483,7 +508,8 @@ theorem measurable_rec_param
         (fun r => c_real (p.2, r))) := by
   intro S hS
   rw [casesOn_preimage_decomp_param]
-  iterate 5 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact ((int.measurableEmbedding.prodMap (.id (α := β))).comp
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_int hS)
   · exact ((bool.measurableEmbedding.prodMap (.id (α := β))).comp
@@ -497,17 +523,48 @@ theorem measurable_rec_param
   · exact ((real.measurableEmbedding.prodMap (.id (α := β))).comp
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_real hS)
 
-/-! ### Synthetic tests of `measurable_rec`. -/
+/-! ### Synthetic smoke-test battery
 
-example [MeasurableSpace rT] [Inhabited rT] (g : rT → Int) (hg : Measurable g) :
-    Measurable (fun b : BaseLit rT => match b with
-      | .real r     => g r
-      | .int n      => n
-      | _           => 0) := by
-  have heq : (fun b : BaseLit rT => match b with
-      | .real r     => g r
-      | .int n      => n
-      | _           => 0)
+`BaseLit` is non-recursive, so there is no struct-rec keystone; the battery is
+phrased through the `casesOn` keystones `measurable_rec` / `measurable_rec_param`.
+Each test exercises every constructor slot. -/
+
+/-- Test 1: discrete codomain (`litTag : BaseLit rT → Nat`, one tag per constructor;
+ignores all payloads, so `f_real` is constant). -/
+@[simp] def litTag : BaseLit rT → Nat
+  | .int _  => 0
+  | .bool _ => 1
+  | .unit   => 2
+  | .loc _  => 3
+  | .lbl _  => 4
+  | .real _ => 5
+
+theorem litTag.measurable [MeasurableSpace rT] [Inhabited rT] :
+    Measurable (litTag : BaseLit rT → Nat) := by
+  have heq : (litTag : BaseLit rT → Nat)
+    = (fun b : BaseLit rT =>
+        BaseLit.casesOn (motive := fun _ => Nat) b
+          (fun _ => 0) (fun _ => 1) 2 (fun _ => 3) (fun _ => 4) (fun _ => 5)) := by
+    funext b; cases b <;> rfl
+  rw [heq]
+  apply measurable_rec
+    (f_int := fun _ => 0) (f_bool := fun _ => 1)
+    (f_unit := fun _ => 2) (f_loc := fun _ => 3) (f_lbl := fun _ => 4)
+    (f_real := fun _ => 5)
+  fun_prop
+
+/-- Test 2: data-leaf dependent (`realLeaf g`, the `real` payload is mapped through a
+measurable `g : rT → Int`; all other constructors return discrete tags). This is the
+named equivalent of the original anonymous `measurable_rec` smoke test. -/
+@[simp] def realLeaf (g : rT → Int) : BaseLit rT → Int
+  | .real r => g r
+  | .int n  => n
+  | _       => 0
+
+theorem realLeaf.measurable [MeasurableSpace rT] [Inhabited rT] (g : rT → Int)
+    (hg : Measurable g) :
+    Measurable (realLeaf g : BaseLit rT → Int) := by
+  have heq : (realLeaf g : BaseLit rT → Int)
     = (fun b : BaseLit rT =>
         BaseLit.casesOn (motive := fun _ => Int) b
           (fun n => n) (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) g) := by
@@ -518,6 +575,60 @@ example [MeasurableSpace rT] [Inhabited rT] (g : rT → Int) (hg : Measurable g)
     (f_unit := fun _ => 0) (f_loc := fun _ => 0) (f_lbl := fun _ => 0)
     (f_real := g)
   exact hg
+
+/-- Test 3: endo-map (`litId : BaseLit rT → BaseLit rT`, non-discrete codomain). Since
+`BaseLit` is non-recursive this is just a per-constructor relabel via `casesOn`; the
+`real` leaf is carried unchanged so the obligation closes through the `real` embedding. -/
+@[simp] def litId : BaseLit rT → BaseLit rT
+  | .int z  => .int z
+  | .bool b => .bool b
+  | .unit   => .unit
+  | .loc l  => .loc l
+  | .lbl l  => .lbl l
+  | .real r => .real r
+
+theorem litId.measurable [MeasurableSpace rT] [Inhabited rT] :
+    Measurable (litId : BaseLit rT → BaseLit rT) := by
+  have heq : (litId : BaseLit rT → BaseLit rT)
+    = (fun b : BaseLit rT =>
+        BaseLit.casesOn (motive := fun _ => BaseLit rT) b
+          BaseLit.int BaseLit.bool BaseLit.unit BaseLit.loc BaseLit.lbl BaseLit.real) := by
+    funext b; cases b <;> rfl
+  rw [heq]
+  apply measurable_rec
+    (f_int := BaseLit.int) (f_bool := BaseLit.bool)
+    (f_unit := fun _ => BaseLit.unit) (f_loc := BaseLit.loc) (f_lbl := BaseLit.lbl)
+    (f_real := BaseLit.real)
+  exact real.measurable
+
+/-- Test 4: param-threaded (`addAcc : Int → BaseLit rT → Int`, an `Int` accumulator
+carried alongside via `measurable_rec_param`; the `int` leaf actually uses both the
+payload and the accumulator). -/
+@[simp] def addAcc : Int → BaseLit rT → Int
+  | acc, .int n  => acc + n
+  | acc, _       => acc
+
+theorem addAcc.measurable [MeasurableSpace rT] [Inhabited rT] :
+    Measurable (fun p : BaseLit rT × Int => addAcc p.2 p.1) := by
+  have heq : (fun p : BaseLit rT × Int => addAcc p.2 p.1)
+    = (fun p : BaseLit rT × Int =>
+        BaseLit.casesOn (motive := fun _ => Int) p.1
+          (fun z => (fun q : Int × Int => q.1 + q.2) (p.2, z))
+          (fun b => (fun q : Int × Bool => q.1) (p.2, b))
+          ((fun q : Int × Unit => q.1) (p.2, ()))
+          (fun l => (fun q : Int × Loc => q.1) (p.2, l))
+          (fun l => (fun q : Int × Lbl => q.1) (p.2, l))
+          (fun r => (fun q : Int × rT => q.1) (p.2, r))) := by
+    funext p; obtain ⟨b, x⟩ := p; cases b <;> rfl
+  rw [heq]
+  apply measurable_rec_param
+    (c_int := fun q : Int × Int => q.1 + q.2)
+    (c_bool := fun q : Int × Bool => q.1)
+    (c_unit := fun q : Int × Unit => q.1)
+    (c_loc := fun q : Int × Loc => q.1)
+    (c_lbl := fun q : Int × Lbl => q.1)
+    (c_real := fun q : Int × rT => q.1)
+  all_goals fun_prop
 
 /-! ### Singleton-class for `BaseLit rT` (lifted from `MeasurableSingletonClass rT`).
 

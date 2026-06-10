@@ -304,8 +304,8 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
   induction c₁ generalizing c₂ c with
   | tag | nil =>
-    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢ <;>
-      first | (split at h <;> simp_all) | simp_all
+    cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
+    all_goals first | (split at h <;> simp_all) | simp_all
   | dat S₁ =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
     cases h₁; cases h₂; injection h with h; subst h; exact .dat _ (MeasurableSet.inter ‹_› ‹_›)
@@ -328,7 +328,8 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
   | mix u c ih =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
     cases h₁; cases h₂
-    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩ <;> rename_i ha
+    revert h; split <;> [split; skip] <;> rintro ⟨rfl⟩
+    rename_i ha
     exact .mix (ih ‹_› ‹_› ha)
   | scr c S ih =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
@@ -695,6 +696,24 @@ theorem quad.measurableEmbedding [MeasurableSpace rT] :
 
 /-! ### §26 casesOn_preimage_decomp -/
 
+/-- Per-constructor cell family for the `casesOn` preimage decomposition. -/
+def decompCell
+    {rT : Type _} {α : Type _} (S : Set α)
+    (f_nil : Unit → α) (f_tag : Nat → α) (f_dat : BaseLit rT → α)
+    (f_box : Probe rT → α) (f_pr : Probe rT × Probe rT → α)
+    (f_tri : Probe rT × Probe rT × Probe rT → α)
+    (f_mix : UnOp × Probe rT → α) (f_scr : Probe rT × BaseLit rT → α)
+    (f_quad : Probe rT × Probe rT × Probe rT × Probe rT → α) : Fin 9 → Set (Probe rT) :=
+  ![ Probe.nil.ι  '' (f_nil  ⁻¹' S)
+   , Probe.tag.ι  '' (f_tag  ⁻¹' S)
+   , Probe.dat.ι  '' (f_dat  ⁻¹' S)
+   , Probe.box.ι  '' (f_box  ⁻¹' S)
+   , Probe.pr.ι   '' (f_pr   ⁻¹' S)
+   , Probe.tri.ι  '' (f_tri  ⁻¹' S)
+   , Probe.mix.ι  '' (f_mix  ⁻¹' S)
+   , Probe.scr.ι  '' (f_scr  ⁻¹' S)
+   , Probe.quad.ι '' (f_quad ⁻¹' S) ]
+
 theorem casesOn_preimage_decomp
     {rT : Type _} {α : Type _} (S : Set α)
     (f_nil : Unit → α) (f_tag : Nat → α) (f_dat : BaseLit rT → α)
@@ -709,16 +728,22 @@ theorem casesOn_preimage_decomp
         (fun u p => f_mix (u, p))
         (fun p b => f_scr (p, b))
         (fun p1 p2 p3 p4 => f_quad (p1, p2, p3, p4))) ⁻¹' S
-      = (Probe.nil.ι  '' (f_nil  ⁻¹' S))
-      ∪ (Probe.tag.ι  '' (f_tag  ⁻¹' S))
-      ∪ (Probe.dat.ι  '' (f_dat  ⁻¹' S))
-      ∪ (Probe.box.ι  '' (f_box  ⁻¹' S))
-      ∪ (Probe.pr.ι   '' (f_pr   ⁻¹' S))
-      ∪ (Probe.tri.ι  '' (f_tri  ⁻¹' S))
-      ∪ (Probe.mix.ι  '' (f_mix  ⁻¹' S))
-      ∪ (Probe.scr.ι  '' (f_scr  ⁻¹' S))
-      ∪ (Probe.quad.ι '' (f_quad ⁻¹' S)) := by
-  ext p; cases p <;> aesop
+      = ⋃ i, decompCell S f_nil f_tag f_dat f_box f_pr f_tri f_mix f_scr f_quad i := by
+  ext p
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell]
+  constructor
+  · intro hp; cases p
+    · exact ⟨0, (), hp, rfl⟩
+    · exact ⟨1, _, hp, rfl⟩
+    · exact ⟨2, _, hp, rfl⟩
+    · exact ⟨3, _, hp, rfl⟩
+    · exact ⟨4, ⟨_, _⟩, hp, rfl⟩
+    · exact ⟨5, ⟨_, _, _⟩, hp, rfl⟩
+    · exact ⟨6, ⟨_, _⟩, hp, rfl⟩
+    · exact ⟨7, ⟨_, _⟩, hp, rfl⟩
+    · exact ⟨8, ⟨_, _, _, _⟩, hp, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
 /-! ### §27 measurable_rec -/
 
@@ -745,7 +770,8 @@ theorem measurable_rec
         (fun p1 p2 p3 p4 => f_quad (p1, p2, p3, p4))) := by
   intro S hS
   rw [StampTest.casesOn_preimage_decomp]
-  iterate 8 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact nil.measurableEmbedding.measurableSet_image'  (by measurability)
   · exact tag.measurableEmbedding.measurableSet_image'  (by measurability)
   · exact dat.measurableEmbedding.measurableSet_image'  (h_dat hS)
@@ -756,7 +782,28 @@ theorem measurable_rec
   · exact scr.measurableEmbedding.measurableSet_image'  (h_scr hS)
   · exact quad.measurableEmbedding.measurableSet_image' (h_quad hS)
 
-/-! ### §28 casesOn_preimage_decomp_param (wide type → Exp-style `ext;cases;aesop`) -/
+/-! ### §28 casesOn_preimage_decomp_param (Fin-indexed cells, uniform with the plain form) -/
+
+/-- Per-constructor cell family for the `β`-parameterised decomposition. -/
+def decompCell_param
+    {rT : Type _} {α β : Type _} (S : Set α)
+    (f_nil : β × Unit → α) (f_tag : β × Nat → α) (f_dat : β × BaseLit rT → α)
+    (f_box : β × Probe rT → α) (f_pr : β × Probe rT × Probe rT → α)
+    (f_tri : β × Probe rT × Probe rT × Probe rT → α)
+    (f_mix : β × UnOp × Probe rT → α) (f_scr : β × Probe rT × BaseLit rT → α)
+    (f_quad : β × Probe rT × Probe rT × Probe rT × Probe rT → α) :
+    Fin 9 → Set (Probe rT × β) :=
+  ![ (fun q : β × Unit => (Probe.nil, q.1))           '' (f_nil  ⁻¹' S)
+   , (fun q : β × Nat => (Probe.tag q.2, q.1))        '' (f_tag  ⁻¹' S)
+   , (fun q : β × BaseLit rT => (Probe.dat q.2, q.1)) '' (f_dat  ⁻¹' S)
+   , (fun q : β × Probe rT => (Probe.box q.2, q.1))   '' (f_box  ⁻¹' S)
+   , (fun q : β × Probe rT × Probe rT => (Probe.pr q.2.1 q.2.2, q.1)) '' (f_pr ⁻¹' S)
+   , (fun q : β × Probe rT × Probe rT × Probe rT =>
+        (Probe.tri q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_tri ⁻¹' S)
+   , (fun q : β × UnOp × Probe rT => (Probe.mix q.2.1 q.2.2, q.1)) '' (f_mix ⁻¹' S)
+   , (fun q : β × Probe rT × BaseLit rT => (Probe.scr q.2.1 q.2.2, q.1)) '' (f_scr ⁻¹' S)
+   , (fun q : β × Probe rT × Probe rT × Probe rT × Probe rT =>
+        (Probe.quad q.2.1 q.2.2.1 q.2.2.2.1 q.2.2.2.2, q.1)) '' (f_quad ⁻¹' S) ]
 
 theorem casesOn_preimage_decomp_param
     {rT : Type _} {α β : Type _} (S : Set α)
@@ -773,21 +820,22 @@ theorem casesOn_preimage_decomp_param
         (fun u e => f_mix (p.2, u, e))
         (fun e b => f_scr (p.2, e, b))
         (fun e1 e2 e3 e4 => f_quad (p.2, e1, e2, e3, e4))) ⁻¹' S
-      = ((fun q : β × Unit => (Probe.nil, q.1))           '' (f_nil  ⁻¹' S))
-      ∪ ((fun q : β × Nat => (Probe.tag q.2, q.1))        '' (f_tag  ⁻¹' S))
-      ∪ ((fun q : β × BaseLit rT => (Probe.dat q.2, q.1)) '' (f_dat  ⁻¹' S))
-      ∪ ((fun q : β × Probe rT => (Probe.box q.2, q.1))   '' (f_box  ⁻¹' S))
-      ∪ ((fun q : β × Probe rT × Probe rT => (Probe.pr q.2.1 q.2.2, q.1))
-            '' (f_pr ⁻¹' S))
-      ∪ ((fun q : β × Probe rT × Probe rT × Probe rT =>
-            (Probe.tri q.2.1 q.2.2.1 q.2.2.2, q.1)) '' (f_tri ⁻¹' S))
-      ∪ ((fun q : β × UnOp × Probe rT => (Probe.mix q.2.1 q.2.2, q.1))
-            '' (f_mix ⁻¹' S))
-      ∪ ((fun q : β × Probe rT × BaseLit rT => (Probe.scr q.2.1 q.2.2, q.1))
-            '' (f_scr ⁻¹' S))
-      ∪ ((fun q : β × Probe rT × Probe rT × Probe rT × Probe rT =>
-            (Probe.quad q.2.1 q.2.2.1 q.2.2.2.1 q.2.2.2.2, q.1)) '' (f_quad ⁻¹' S)) := by
-  ext ⟨e, b⟩; cases e <;> aesop
+      = ⋃ i, decompCell_param S f_nil f_tag f_dat f_box f_pr f_tri f_mix f_scr f_quad i := by
+  ext ⟨e, b⟩
+  simp only [Set.mem_preimage, Set.mem_iUnion, decompCell_param]
+  constructor
+  · intro he; cases e
+    · exact ⟨0, (b, ()), he, rfl⟩
+    · exact ⟨1, (b, _), he, rfl⟩
+    · exact ⟨2, (b, _), he, rfl⟩
+    · exact ⟨3, (b, _), he, rfl⟩
+    · exact ⟨4, (b, _, _), he, rfl⟩
+    · exact ⟨5, (b, _, _, _), he, rfl⟩
+    · exact ⟨6, (b, _, _), he, rfl⟩
+    · exact ⟨7, (b, _, _), he, rfl⟩
+    · exact ⟨8, (b, _, _, _, _), he, rfl⟩
+  · rintro ⟨i, hi⟩; fin_cases i <;>
+      · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
 /-! ### §29 measurable_rec_param -/
 
@@ -814,7 +862,8 @@ theorem measurable_rec_param
         (fun e1 e2 e3 e4 => c_quad (p.2, e1, e2, e3, e4))) := by
   intro S hS
   rw [casesOn_preimage_decomp_param]
-  iterate 8 refine .union ?_ ?_
+  refine .iUnion fun i => ?_
+  fin_cases i
   · exact ((nil.measurableEmbedding.prodMap (.id (α := β))).comp
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_nil hS)
   · exact ((tag.measurableEmbedding.prodMap (.id (α := β))).comp
