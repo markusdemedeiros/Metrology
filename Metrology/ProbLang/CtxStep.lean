@@ -219,22 +219,26 @@ theorem primStep_fill_inv [ProbLangℝ rT] [Countable rT] [MeasurableSingletonCl
 
 /-! ## Discrete.Reducible: fill interaction -/
 
+@[discrete]
 theorem Discrete.Reducible.fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hred : Discrete.Reducible e σ) : Discrete.Reducible (K.fill e) σ :=
   let ⟨⟨e2, σ2⟩, hρ⟩ := hred; ⟨⟨K.fill e2, σ2⟩, primStep_fill_pos hρ⟩
 
+@[discrete]
 theorem Discrete.Reducible.of_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hv : ¬e.isValue) (hred : Discrete.Reducible (K.fill e) σ) : Discrete.Reducible e σ :=
   let ⟨⟨_, σ2⟩, hρ⟩ := hred; let ⟨e2', _, hρ'⟩ := primStep_fill_inv hv hρ; ⟨⟨e2', σ2⟩, hρ'⟩
 
+@[discrete]
 theorem Discrete.Reducible.of_head [ProbLangℝ rT]
     {e : Exp rT} {σ : State rT}
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) :
     Discrete.Reducible e σ :=
   let ⟨ρ, hρ⟩ := hred; ⟨ρ, primStep_pos_of_headStep hρ⟩
 
+@[discrete]
 theorem Discrete.Reducible.of_head_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) :
@@ -253,6 +257,7 @@ theorem irreducible_fill_inv [ProbLangℝ rT] [Countable rT] [MeasurableSingleto
     (hirr : ¬ Discrete.Reducible (K.fill e) σ) : ¬ Discrete.Reducible e σ :=
   fun hred => hirr (hred.fill K)
 
+@[discrete]
 theorem Discrete.Reducible.headStep_zero [ProbLangℝ rT]
     {e : Exp rT} {σ : State rT}
     (hirr : ¬ Discrete.Reducible e σ) :
@@ -357,6 +362,7 @@ theorem prim_step_mass [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass
 
 /-! ## headStep ↔ primStep in context -/
 
+@[discrete]
 theorem Discrete.headStep_of_primStep_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e1 : Exp rT} {σ1 : State rT} {e2 : Exp rT} {σ2 : State rT}
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e1, σ1⟩ {ρ})

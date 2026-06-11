@@ -281,6 +281,7 @@ theorem Measure.bind_map_comm {α β γ : Type*}
 
 abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDensity f
 
+@[discrete]
 theorem Discrete.count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
     (f : T → ENNReal) (t : T) : count f {t} = f t := by simp
 

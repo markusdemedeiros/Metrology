@@ -63,6 +63,7 @@ theorem execExactN_mono [Countable rT] [MeasurableSingletonClass rT]
 
 /-- execN term decomposition lemma. Relates execN of K[e] with the execution of e.
 Note: the theorem is untrue when execExactN is replaced with execN. -/
+@[discrete]
 theorem Discrete.execN_fill_item_eq [Countable rT] [MeasurableSingletonClass rT]
     (Ki : EctxItem rT) (n : Nat) {ρ ρ'' : Cfg rT} :
     execN n (Ki.fillItemCfg ρ) {ρ''} =
@@ -188,6 +189,7 @@ theorem ENNReal.tsum_iSup_of_monotone [Countable rT] [MeasurableSingletonClass r
 /-- Apply an `iSup` of measures at a singleton of a discrete space (specialized
 to `Cfg`). Mathlib does not provide a `Measure.iSup_apply` for general sets;
 this is the specialized form we need. -/
+@[discrete]
 theorem Discrete.iSup_measure_apply [Countable rT] [MeasurableSingletonClass rT]
     {f : ℕ → Measure (Cfg rT)} {c : Cfg rT} :
     (⨆ i, f i) {c} = ⨆ i, f i {c} := by
@@ -473,6 +475,7 @@ theorem limExec_pexecN [Countable rT] [MeasurableSingletonClass rT]
 /-! ### `limExec` application and mass -/
 
 -- Apply `limExec` at a singleton — sup of finite unrollings
+@[discrete]
 theorem Discrete.limExec_apply [Countable rT] [MeasurableSingletonClass rT]
     (ρ : Cfg rT) (c : Cfg rT) :
     limExec ρ {c} = ⨆ n, (execN n ρ) {c} :=
@@ -495,6 +498,7 @@ theorem limExec_univ [Countable rT] [MeasurableSingletonClass rT]
 /-! ### Pointwise and mass bounds -/
 
 -- Rocq: lim_exec_leq
+@[discrete]
 theorem Discrete.limExec_leq_pointwise [Countable rT] [MeasurableSingletonClass rT]
     {ρ : Cfg rT} {c : Cfg rT} {r : ENNReal}
     (H : ∀ n, (execN n ρ) {c} ≤ r) : (limExec ρ) {c} ≤ r := by
@@ -536,6 +540,7 @@ theorem limExec_term [Countable rT] [MeasurableSingletonClass rT]
 /-! ### Deterministic trace -/
 
 -- Rocq: lim_exec_det_final (specialized: our return type is Cfg, so we phrase it at a value-Cfg)
+@[discrete]
 theorem Discrete.limExec_det_final [Countable rT] [MeasurableSingletonClass rT]
     {ρ ρ' : Cfg rT} {n : Nat}
     (_hv : ρ'.expr.isValue) (H : (execN n ρ) {ρ'} = 1) :

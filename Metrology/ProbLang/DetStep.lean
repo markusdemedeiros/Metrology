@@ -109,9 +109,11 @@ structure DetHeadStep (cfg1 cfg2 : Cfg rT) : Prop where
   safe : ∃ ρ : Cfg rT, 0 < headStep cfg1 {ρ}
   det  : headStep cfg1 {cfg2} = 1
 
+@[discrete]
 theorem DetHeadStep.pos_discrete {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) : 0 < headStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
+@[discrete]
 theorem DetHeadStep.of_det_discrete (cfg1 cfg2 : Cfg rT)
     (hdet : headStep cfg1 {cfg2} = 1) : DetHeadStep cfg1 cfg2 :=
   ⟨⟨cfg2, hdet ▸ one_pos⟩, hdet⟩
@@ -121,6 +123,7 @@ structure DetStep (cfg1 cfg2 : Cfg rT) : Prop where
   safe : Discrete.Reducible cfg1.expr cfg1.state
   det  : primStep cfg1 {cfg2} = 1
 
+@[discrete]
 theorem DetStep.pos_discrete {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) : 0 < primStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
