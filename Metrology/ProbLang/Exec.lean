@@ -21,13 +21,29 @@ def execN (n : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   | 0 => 0
   | n + 1 => if ρ.expr.isValue then dirac ρ else (primStep ρ).bind (execN n)
 
+@[measurability]
+theorem execN_measurable (n : Nat) : Measurable (execN (rT := rT) n) := by
+  induction n
+  · simp [execN]
+  · exact Measurable.ite (by measurability) (by measurability) (by measurability)
+
 /-- execN conditioned on terminating in exactly N steps -/
 def execExactN (N : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   match N with
   | 0 => if ρ.expr.isValue then dirac ρ else 0
   | N + 1 => if ρ.expr.isValue then 0 else (primStep ρ).bind (execExactN N)
 
+@[measurability]
+theorem execExactN_measurable (n : Nat) : Measurable (execExactN (rT := rT) n) := by
+  induction n
+  · simp only [execExactN]
+    exact Measurable.ite (by measurability) (by measurability) (by measurability)
+  · simp only [execExactN]
+    exact Measurable.ite (by measurability) (by measurability) (by measurability)
+
+-- execExactN_sum_continuous
 /-- execN is the sum of its conditional distributions -/
+@[discrete]
 theorem execExactN_sum [Countable rT] [MeasurableSingletonClass rT]
     {n : Nat} {ρ : Cfg rT} {S} :
     execN n ρ S = ∑'(N : Nat), if N < n then execExactN N ρ S else 0 := by
@@ -55,10 +71,52 @@ theorem execExactN_sum [Countable rT] [MeasurableSingletonClass rT]
         simp only [execExactN, hv, ↑reduceIte]
       · simp [hk]
 
+-- Pretty sure this is doable, WIP
+theorem execExactN_sum_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableSet S) :
+    execN n ρ S = ∑'(N : Nat), if N < n then execExactN N ρ S else 0 := by
+  induction n generalizing ρ with
+  | zero => simp [execN]
+  | succ n ih =>
+    simp only [execN]
+    by_cases hv : ρ.expr.isValue
+    · simp only [↓reduceIte, hv]
+      rw [tsum_eq_zero_add' ENNReal.summable]
+      simp only [Nat.zero_lt_succ, ↓reduceIte, execExactN, hv]
+      simp
+    · simp only [↓reduceIte, hv]
+      rw [tsum_eq_zero_add' ENNReal.summable]
+      have Hzero : (if 0 < n + 1 then (execExactN 0 ρ) S else 0) = 0 := by simp [execExactN, hv]
+      rw [Hzero, zero_add]; clear Hzero
+      rw [bind_apply HS (by measurability)]
+      simp_rw [ih]
+      rw [lintegral_tsum (fun k => ?G3)]
+      case G3 =>
+        refine Measurable.aemeasurable ?_
+        refine Measurable.ite (by measurability) ?_ (by measurability)
+        sorry
+      congr 1; ext k
+      by_cases hk : k < n
+      · have hk' : ∀ k, k + 1 < n + 1 ↔ k < n  := by omega
+        simp only [hk, hk', ↑reduceIte]
+        rw [← bind_apply HS ?G5]
+        case G5 =>
+          refine Measurable.aemeasurable ?_
+          measurability
+        simp only [execExactN, hv, ↑reduceIte]
+      · simp [hk]
+
+-- execExactN_mono_continuous
+@[discrete]
 theorem execExactN_mono [Countable rT] [MeasurableSingletonClass rT]
     {n : Nat} {ρ : Cfg rT} {S} : execExactN n ρ S ≤ execN (n + 1) ρ S := by
   have Hunfold : execExactN n ρ S = (if n < n + 1 then execExactN n ρ S else 0) := by simp
   rw [execExactN_sum, Hunfold]
+  exact ENNReal.le_tsum n
+
+theorem execExactN_mono_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableSet S) :
+    execExactN n ρ S ≤ execN (n + 1) ρ S := by
+  have Hunfold : execExactN n ρ S = (if n < n + 1 then execExactN n ρ S else 0) := by simp
+  rw [execExactN_sum_continuous HS, Hunfold]
   exact ENNReal.le_tsum n
 
 /-- execN term decomposition lemma. Relates execN of K[e] with the execution of e.
@@ -368,7 +426,6 @@ theorem limExec_of_isVal {e : Exp rT} {σ : State rT} (Hv : IsVal e) :
     | succ n => simp [execN, hv]
   · exact le_iSup_of_le 1 (by simp [execN, hv])
 
--- Rocq: lim_exec_not_final
 theorem limExec_not_final [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} (Hnv : ¬ e.isValue) :
     limExec ⟨e, σ⟩ = (primStep ⟨e, σ⟩).bind limExec := by

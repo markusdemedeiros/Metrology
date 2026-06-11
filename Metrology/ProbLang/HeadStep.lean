@@ -317,6 +317,22 @@ theorem Exp.isValM.measurable {T : Type _} [MeasurableSpace T] :
   · -- False branch: constant `0`.
     exact measurable_const
 
+/-- `fun a : Cfg rT => a.expr.isValue` is measurable: it is `isValueR ∘ expr`,
+both measurable (`isValueR` via the structural recursion, `expr` via
+`Cfg.measurable_expr`). -/
+@[measurability]
+theorem Cfg.isValue_measurable : Measurable (fun a : Cfg rT => a.expr.isValue) := by
+  have h : (fun a : Cfg rT => a.expr.isValue) = (fun e : Exp rT => e.isValueR) ∘ Cfg.expr := by
+    funext a; simp [Exp.isValue_iff_isValueR]
+  rw [h]
+  exact Exp.isValueR.measurable.comp Cfg.measurable_expr
+
+/-- The set of value configurations is measurable. This is the form consumed by
+`Measurable.ite` (e.g. in `execN`/`execExactN` measurability). -/
+@[measurability]
+theorem Cfg.isValue_measurableSet : MeasurableSet {a : Cfg rT | a.expr.isValue} :=
+  Cfg.isValue_measurable.setOf
+
 /-- **Per-callsite joint `Exp.isValM`**.
 
 Stamping convenience: given measurable extractors `he : γ → Exp rT` and

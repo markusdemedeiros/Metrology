@@ -63,6 +63,7 @@ measurability to joint measurability of:
   `Ectx.fill.measurable` (stamped via `List.measurable_foldl`),
 - the "headStep input" map `cfg ↦ ⟨cfg.expr.decomp.2, cfg.state⟩` composed
   with `headStep.measurable`. -/
+@[measurability]
 theorem primStep.measurable [ProbLangℝ rT] : Measurable (primStep : Cfg rT → Measure (Cfg rT)) := by
   -- Source kernel `k : Cfg rT → Measure (Cfg rT)`.
   have hk_inner : Measurable
