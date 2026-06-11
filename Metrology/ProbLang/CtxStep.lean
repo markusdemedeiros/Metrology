@@ -489,6 +489,7 @@ theorem prim_step_mass_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingl
 
 /-! ## headStep ↔ primStep in context -/
 
+-- TODO: Blocked
 @[discrete]
 theorem Discrete.headStep_of_primStep_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e1 : Exp rT} {σ1 : State rT} {e2 : Exp rT} {σ2 : State rT}
@@ -507,6 +508,7 @@ theorem Discrete.headStep_of_primStep_fill [ProbLangℝ rT] [Countable rT] [Meas
   · simp only [Ectx.fill, List.foldl_nil] at he1' hfill2
     exact ⟨e2', hfill2.symm, he1' ▸ hhs⟩
 
+-- TODO: Blocked
 @[discrete]
 theorem headStep_of_primStep_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
@@ -516,6 +518,7 @@ theorem headStep_of_primStep_discrete [ProbLangℝ rT] [Countable rT] [Measurabl
   obtain ⟨e2', hfill, hhs⟩ := Discrete.headStep_of_primStep_fill [] hred hstep
   simp [Ectx.fill] at hfill; exact hfill ▸ hhs
 
+-- TODO: Blocked
 @[discrete]
 theorem head_irreducible_zero_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
@@ -526,6 +529,7 @@ theorem head_irreducible_zero_discrete [ProbLangℝ rT] [Countable rT] [Measurab
   obtain ⟨x, _, hx⟩ := Discrete.measure_pos_of_singleton_pos _ S (bot_lt_iff_ne_bot.mpr hne)
   simp [hirr x] at hx
 
+-- TODO: Blocked
 @[discrete]
 theorem head_step_not_stuck_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
@@ -547,6 +551,7 @@ theorem ectxi_language_subRedexesAreValues [ProbLangℝ rT] {e : Exp rT}
   · simp only [Ectx.fill_snoc] at hfill
     exact absurd (Ectx.fill_isValue (h Ki _ hfill)) hv
 
+-- TODO: Blocked
 @[discrete]
 theorem prim_head_reducible_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
@@ -561,6 +566,7 @@ theorem prim_head_reducible_discrete [ProbLangℝ rT] [Countable rT] [Measurable
   subst hfill1
   exact ⟨_, hhs⟩
 
+-- TODO: Blocked
 @[discrete]
 theorem prim_head_irreducible_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
@@ -569,6 +575,7 @@ theorem prim_head_irreducible_discrete [ProbLangℝ rT] [Countable rT] [Measurab
     ¬ Discrete.Reducible e σ :=
   fun hred => not_head_reducible.mpr hirr (prim_head_reducible_discrete hred hsub)
 
+-- TODO: Blocked
 @[discrete]
 theorem head_stuck_stuck_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
@@ -579,10 +586,15 @@ theorem head_stuck_stuck_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSin
 
 /-! ## notStuck_discrete / stuck_discrete -/
 
+-- notStuck
 @[discrete]
 def notStuck_discrete [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   e.isValue ∨ Discrete.Reducible e σ
 
+def notStuck [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+  e.isValue ∨ Reducible e σ
+
+-- NotStuck.of_fill
 @[discrete]
 theorem NotStuck.of_fill_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
@@ -592,19 +604,42 @@ theorem NotStuck.of_fill_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSin
   · exact if hv : e.isValue then .inl hv
     else .inr (hred.of_fill K hv)
 
+theorem NotStuck.of_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+    (K : Ectx rT) {e : Exp rT} {σ : State rT}
+    (h : notStuck (K.fill e) σ) : notStuck e σ := by
+  rcases h with hv | hred
+  · exact .inl (Ectx.fill_isValue hv)
+  · exact if hv : e.isValue then .inl hv
+    else .inr (hred.of_fill K hv)
+
+-- stuck
 @[discrete]
 def stuck_discrete [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ¬ e.isValue ∧ ¬ Discrete.Reducible e σ
 
+def stuck [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+  ¬ e.isValue ∧ ¬ Reducible e σ
+
+-- stuck_iff_not_notStuck
 @[discrete]
 theorem stuck_iff_not_notStuck_discrete [ProbLangℝ rT] {e : Exp rT} {σ : State rT} :
     stuck_discrete e σ ↔ ¬ notStuck_discrete e σ := by
   simp [stuck_discrete, notStuck_discrete, not_or]
 
+theorem stuck_iff_not_notStuck [ProbLangℝ rT] {e : Exp rT} {σ : State rT} :
+    stuck e σ ↔ ¬ notStuck e σ := by simp [stuck, notStuck]
+
+-- Stuck.fill
 @[discrete]
 theorem Stuck.fill_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (h : stuck_discrete e σ) : stuck_discrete (K.fill e) σ :=
+  ⟨fun hv => h.1 (Ectx.fill_isValue hv),
+   fun hred => h.2 (hred.of_fill K h.1)⟩
+
+theorem Stuck.fill [ProbLangℝ rT] 
+    (K : Ectx rT) {e : Exp rT} {σ : State rT}
+    (h : stuck e σ) : stuck (K.fill e) σ :=
   ⟨fun hv => h.1 (Ectx.fill_isValue hv),
    fun hred => h.2 (hred.of_fill K h.1)⟩
 
