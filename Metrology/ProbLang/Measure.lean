@@ -1,5 +1,6 @@
 module
 
+public meta import Metrology.Meta.Discrete
 public import Mathlib.MeasureTheory.MeasurableSpace.Defs
 public import Mathlib.Probability.ProbabilityMassFunction.Basic
 public import Mathlib.Probability.Kernel.Defs
@@ -233,7 +234,7 @@ theorem MeasurableSet.cover_inter_preimage_of_subtype
   rw [← Set.inter_self cov, Set.inter_assoc, ← Subtype.image_preimage_coe]
   exact MeasurableSet.subtype_image hcov ((subtype_preimage_eq f G) ▸ h hG)
 
-@[deprecated "TODO: Generalize me!" (since := "2026/06/08")]
+@[discrete]
 theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     [Countable α] (μ : Measure α) (S : Set α) (hS : 0 < μ S) :
     ∃ x ∈ S, 0 < μ {x} := by
@@ -244,7 +245,7 @@ theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [Measura
   rw [Set.biUnion_of_singleton] at this
   exact absurd this (ne_of_gt hS)
 
-@[deprecated "TODO: Generalize me!" (since := "2026/06/08")]
+@[discrete]
 theorem map_singleton_pos {α β : Type _}
     [MeasurableSpace α] [MeasurableSpace β]
     [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β] [Countable α]

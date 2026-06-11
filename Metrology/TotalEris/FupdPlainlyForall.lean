@@ -1,5 +1,6 @@
 module
 
+public meta import Metrology.Meta.Discrete
 public import Iris
 public import Iris.Instances.Lib.FUpd
 

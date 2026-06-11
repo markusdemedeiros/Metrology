@@ -1,5 +1,6 @@
 module
 
+public meta import Metrology.Meta.Discrete
 public import Std
 public import Std.Data.ExtTreeMap.Lemmas
 public import Mathlib.Data.Countable.Basic

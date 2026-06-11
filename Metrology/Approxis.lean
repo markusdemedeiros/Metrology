@@ -1,5 +1,6 @@
 module
 
+public meta import Metrology.Meta.Discrete
 public import Metrology.Approxis.AppWeakestpre
 public import Metrology.Approxis.Lifting
 public import Metrology.Approxis.PrimitiveLaws

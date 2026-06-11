@@ -1,6 +1,7 @@
 module
 
 public import Metrology.ProbLang.CoreMeasures
+public meta import Metrology.Meta.Discrete
 public import Metrology.ProbLang.Discrete
 public import Mathlib.MeasureTheory.MeasurableSpace.Defs
 public import Mathlib.Probability.ProbabilityMassFunction.Basic
@@ -1602,11 +1603,11 @@ def headStepKernel : Kernel (Cfg rT) (Cfg rT) where
   measurable' := headStep.measurable
   toFun := headStep
 
-@[deprecated "use headStepKernel" (since := "2026/06/08")]
+@[discrete]
 abbrev headStepKernelM : Kernel (Cfg rT) (Cfg rT) := headStepKernel
 
 
-@[deprecated "use val_head_stuckM" (since := "2026/06/08")]
+@[discrete]
 theorem val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
     0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
   head_case <;> simp [Exp.isValue_iff_isValueR]

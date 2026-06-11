@@ -1,5 +1,6 @@
 module
 
+public meta import Metrology.Meta.Discrete
 public import Metrology.ProbLang.Measure
 public import Metrology.ProbLang.HeadStep
 public import Metrology.ProbLang.Discrete
@@ -85,10 +86,10 @@ def primStepKernel [ProbLangℝ rT] : Kernel (Cfg rT) (Cfg rT) where
   measurable' := primStep.measurable
   toFun := primStep
 
-@[deprecated "Generalized as primStepKernel" (since := "2026/06/08")]
+@[discrete]
 abbrev primStepKernelM {α : Type} [ProbLangℝ α] := primStepKernel (rT := α)
 
-@[deprecated "Use ReducibleM" (since := "2026/06/08")]
+@[discrete]
 abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ∃ ρ : Cfg rT, 0 < primStep ⟨e, σ⟩ {ρ}
 
@@ -96,7 +97,7 @@ abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
 abbrev ReducibleM [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   primStep ⟨e, σ⟩ ≠ 0
 
-@[deprecated "Discrete bridge lemma" (since := "2026/06/08")]
+@[discrete]
 theorem primStep_discrete_iff {e : Exp rT} {σ : State rT}
     [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
     (∃ ρ, 0 < (primStep { expr := e, state := σ }) {ρ}) ↔ primStep { expr := e, state := σ } ≠ 0 := by
@@ -106,8 +107,7 @@ theorem primStep_discrete_iff {e : Exp rT} {σ : State rT}
   refine Hnz <| ext_of_singleton fun ρ => ?_
   simp [nonpos_iff_eq_zero.mp (H ρ)]
 
-set_option linter.deprecated false in
-@[deprecated "Discrete bridge lemma" (since := "2026/06/08")]
+@[discrete]
 theorem Reducible_ReducibleM_iff {e : Exp rT} {σ : State rT}
     [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
     Reducible e σ ↔ ReducibleM e σ := by
@@ -134,8 +134,7 @@ theorem val_stuckM [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
 
 -- TODO One attribute to indicate that a lemma is an ephemeral discreteness helper,
 -- and also disable the linter warnings inside it
-set_option linter.deprecated false in
-@[deprecated "Use val_stuckM" (since := "2026/06/08")]
+@[discrete]
 theorem val_stuck [ProbLangℝ rT] [Countable rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < primStep ⟨e, σ⟩ {ρ}) : ¬e.isValue := by
