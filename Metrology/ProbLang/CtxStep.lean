@@ -419,7 +419,7 @@ theorem not_headReducible_iff [ProbLangℝ rT] {e : Exp rT} {σ : State rT} :
   push Not
   rfl
 
--- TODO: Not yet sure...
+-- head_redex_unique
 @[discrete]
 theorem head_redex_unique_discrete [ProbLangℝ rT]
     (K K' : Ectx rT) (e e' : Exp rT) (σ : State rT)
@@ -436,6 +436,18 @@ theorem head_redex_unique_discrete [ProbLangℝ rT]
   have he := Ectx.fill_injective K' hfill
   rcases head_ctx_step_val_ectx_discrete K'' e σ _ (he ▸ hρ') with hval | rfl
   · exact absurd hval (Discrete.val_head_stuck hρ)
+  · simp [Ectx.fill] at he
+    exact ⟨rfl, he⟩
+
+theorem head_redex_unique [ProbLangℝ rT] (K K' : Ectx rT) (e e' : Exp rT) (σ : State rT)
+    (hfill : K.fill e = K'.fill e') (hred  : HeadReducible e σ) (hred' : HeadReducible e' σ) :
+    -- FIXME: Make this just be K = K'
+    K = K'.comp [] ∧ e = e' := by
+  obtain ⟨K'', rfl⟩ := step_by_val K K' e e' σ hfill (val_head_stuck hred) hred'
+  rw [← Ectx.fill_comp] at hfill
+  have he := Ectx.fill_injective _ hfill
+  rcases @head_ctx_step_val_ectx rT _ K'' e' σ (he ▸ hred) with hval | rfl
+  · exact absurd hval (val_head_stuck hred')
   · simp [Ectx.fill] at he
     exact ⟨rfl, he⟩
 
