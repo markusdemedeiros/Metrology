@@ -1896,7 +1896,7 @@ theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {f : Val α
     IsProbabilityMeasure (e.asValM f) := by
   simp [Exp.asValM, hv]; infer_instance
 
-theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
+instance Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
     IsProbabilityMeasure (Cfg.uniform z σ) := by
   unfold Cfg.uniform Int.isPos
   by_cases Hz : 0 < z
@@ -1915,10 +1915,29 @@ theorem Discrete.head_step_mass [Countable rT] [MeasurableSingletonClass rT]
      | fst.redex | snd.redex | case.left.redex | case.right.redex
      | alloc.redex | load.redex | store.redex | tape
      | rand.tape.deterministic
-     | scrut_success | scrut_failure => intro _; infer_instance
+     | scrut_success | scrut_failure
+     | rand.plain | rand.tape | rand.tape.mismatch => intro _; infer_instance
   case unop.redex | binop.redex =>
     intro ⟨_, hρ⟩; rw [Discrete.unwrapM_singleton_pos] at hρ
     obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
+
+theorem head_step_mass {e : Exp rT} {σ : State rT} :
+    (headStep ⟨e, σ⟩ ≠ 0) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
+  head_case
+  all_goals try (· simp)
+  case beta.lam.redex | beta.fix.redex | cond.true | cond.false
+     | fst.redex | snd.redex | case.left.redex | case.right.redex
+     | alloc.redex | load.redex | store.redex | tape
+     | rand.tape.deterministic
+     | scrut_success | scrut_failure => intro _; infer_instance
+  case unop.redex ρ op e H =>
+    cases H : (op.eval e)
+    · simp [Option.unwrapM]
+    · simpa [Option.unwrapM] using dirac.isProbabilityMeasure
+  case binop.redex ρ op e1 e2 H1 H2=>
+    cases H : (op.eval e1 e2)
+    · simp [Option.unwrapM]
+    · simpa [Option.unwrapM] using dirac.isProbabilityMeasure
   case rand.plain | rand.tape | rand.tape.mismatch =>
     intro _; exact Cfg.uniform_isProbabilityMeasure
 
@@ -1997,6 +2016,7 @@ theorem headStep_univ_le_one' (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
     split <;> apply hdirac
   case _ => simp -- default
 
+set_option maxHeartbeats 400000
 /-- `headStep` is a sub-probability measure: total mass is at most 1.
 Case split on whether any singleton has positive mass: if so, `headStep ρ`
 is a probability measure (by `Discrete.head_step_mass`); if not, it is the zero
@@ -2017,5 +2037,15 @@ theorem Discrete.headStep_univ_le_one [Countable rT] [MeasurableSingletonClass r
           (fun _ => .of_discrete)]
       simp [hzero]
     rw [hunivzero]; exact zero_le_one
+
+-- TODO: This other theorem is proved, but I do think that the below commented out proof
+-- might let us delete it (the primed version is horrible)
+theorem headStep_univ_le_one (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 :=
+  headStep_univ_le_one' ρ
+
+  -- by_cases hred : (headStep ρ) = 0
+  -- · simp [hred]
+  -- · have X := head_step_mass hred
+  --   sorry
 
 end ProbLang
