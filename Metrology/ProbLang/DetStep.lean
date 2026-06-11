@@ -37,7 +37,7 @@ theorem PureStep.fill [Countable rT] [MeasurableSingletonClass rT]
   constructor
   · intro σ
     obtain ⟨⟨e2', σ2⟩, hρ⟩ := h.safe σ
-    exact ⟨⟨K.fill e2', σ2⟩, primStep_fill_pos hρ⟩
+    exact ⟨⟨K.fill e2', σ2⟩, primStep_fill_pos_discrete hρ⟩
   · intro σ
     rw [← primStep_fill_singleton (Discrete.val_stuck (h.safe σ).choose_spec)]
     exact h.det σ

@@ -29,6 +29,14 @@ theorem Ectx.fillCfg_injective [ProbLangℝ rT] (K : Ectx rT) :
   rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ h
   simpa [Cfg.mk.injEq, Ectx.fill_injective K |>.eq_iff] using h
 
+@[measurability]
+theorem Ectx.fillCfg.measurable [ProbLangℝ rT] (K : Ectx rT) :
+    Measurable K.fillCfg := by
+  show Measurable (fun ρ : Cfg rT => (Cfg.mk (Ectx.fill K ρ.expr) ρ.state : Cfg rT))
+  rw [Cfg.measurable_iff]
+  exact ⟨Exp.Ectx_fill.measurable.comp (measurable_const.prodMk Cfg.measurable_expr),
+    Cfg.measurable_state⟩
+
 @[simp] def EctxItem.fillItemCfg [ProbLangℝ rT] (K : EctxItem rT) (ρ : Cfg rT) : Cfg rT :=
   ⟨K.fillItem ρ.expr, ρ.state⟩
 
@@ -144,16 +152,18 @@ nonrec theorem Discrete.val_stuck [ProbLangℝ rT] [Countable rT]
 
 /-- `primStep` is a sub-probability measure: total mass is at most 1.
 Follows from `Discrete.headStep_univ_le_one` via `Measure.map` preserving total mass. -/
-theorem primStep_univ_le_one [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+theorem primStep_univ_le_one [ProbLangℝ rT]
     (ρ : Cfg rT) : (primStep ρ) Set.univ ≤ 1 := by
   obtain ⟨e, σ⟩ := ρ
   simp only [primStep]
   have Hmeas : Measurable e.decomp.1.fillCfg := by measurability
   rw [Measure.map_apply Hmeas MeasurableSet.univ]
-  simpa using Discrete.headStep_univ_le_one ⟨e.decomp.2, σ⟩
+  simpa using headStep_univ_le_one' ⟨e.decomp.2, σ⟩
 
 /-! ## Bridge: headStep ↔ primStep -/
 
+-- TODO Rename me
+@[discrete]
 theorem primStep_eq_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) : primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
   suffices hd : e.decomp = ([], e) by
@@ -166,6 +176,8 @@ theorem primStep_eq_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
     rw [← hfill] at hρ
     exact (hne (Discrete.head_ctx_step_val hρ)).elim
 
+-- TODO Rename me
+@[discrete]
 theorem primStep_pos_of_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) : 0 < primStep ⟨e, σ⟩ {ρ} :=
   primStep_eq_headStep ⟨ρ, h⟩ ▸ h
@@ -201,13 +213,17 @@ theorem primStep_fill_singleton [ProbLangℝ rT] [Countable rT] [MeasurableSingl
   ext ⟨e', σ'⟩
   simp [(Ectx.fill_injective K).eq_iff]
 
-theorem primStep_fill_pos [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+-- TODO Rename me
+@[discrete]
+theorem primStep_fill_pos_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (h : 0 < primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩}) :
     0 < primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
   rwa [← primStep_fill_singleton (Discrete.val_stuck h)]
 
-theorem primStep_fill_inv [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+-- TODO Rename me
+@[discrete]
+theorem primStep_fill_inv_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (hv : ¬e1.isValue)
     (h : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
@@ -223,13 +239,13 @@ theorem primStep_fill_inv [ProbLangℝ rT] [Countable rT] [MeasurableSingletonCl
 theorem Discrete.Reducible.fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hred : Discrete.Reducible e σ) : Discrete.Reducible (K.fill e) σ :=
-  let ⟨⟨e2, σ2⟩, hρ⟩ := hred; ⟨⟨K.fill e2, σ2⟩, primStep_fill_pos hρ⟩
+  let ⟨⟨e2, σ2⟩, hρ⟩ := hred; ⟨⟨K.fill e2, σ2⟩, primStep_fill_pos_discrete hρ⟩
 
 @[discrete]
 theorem Discrete.Reducible.of_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hv : ¬e.isValue) (hred : Discrete.Reducible (K.fill e) σ) : Discrete.Reducible e σ :=
-  let ⟨⟨_, σ2⟩, hρ⟩ := hred; let ⟨e2', _, hρ'⟩ := primStep_fill_inv hv hρ; ⟨⟨e2', σ2⟩, hρ'⟩
+  let ⟨⟨_, σ2⟩, hρ⟩ := hred; let ⟨e2', _, hρ'⟩ := primStep_fill_inv_discrete hv hρ; ⟨⟨e2', σ2⟩, hρ'⟩
 
 @[discrete]
 theorem Discrete.Reducible.of_head [ProbLangℝ rT]
@@ -247,12 +263,14 @@ theorem Discrete.Reducible.of_head_fill [ProbLangℝ rT] [Countable rT] [Measura
 
 /-! ## Irreducible: contrapositives -/
 
-theorem irreducible_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem irreducible_fill_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hv : ¬e.isValue) (hirr : ¬ Discrete.Reducible e σ) : ¬ Discrete.Reducible (K.fill e) σ :=
   fun hred => hirr (hred.of_fill K hv)
 
-theorem irreducible_fill_inv [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem irreducible_fill_inv_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hirr : ¬ Discrete.Reducible (K.fill e) σ) : ¬ Discrete.Reducible e σ :=
   fun hred => hirr (hred.fill K)
@@ -268,7 +286,8 @@ theorem Discrete.Reducible.headStep_zero [ProbLangℝ rT]
 
 /-! ## Context decomposition -/
 
-theorem head_ctx_step_val_ectx [ProbLangℝ rT]
+@[discrete]
+theorem head_ctx_step_val_ectx_discrete [ProbLangℝ rT]
     (K : Ectx rT) (e : Exp rT) (σ : State rT) (ρ : Cfg rT)
     (hstep : 0 < headStep ⟨K.fill e, σ⟩ {ρ}) :
     e.isValue ∨ K = [] := by
@@ -277,7 +296,8 @@ theorem head_ctx_step_val_ectx [ProbLangℝ rT]
   · simp only [Ectx.fill_snoc] at hstep
     exact .inl (Ectx.fill_isValue (Discrete.head_ctx_step_val hstep))
 
-theorem step_by_val [ProbLangℝ rT]
+@[discrete]
+theorem step_by_val_discrete [ProbLangℝ rT]
     (K' K_redex : Ectx rT) (e1' e1_redex : Exp rT) (σ : State rT) (ρ : Cfg rT)
     (hfill : K'.fill e1' = K_redex.fill e1_redex)
     (hv : ¬e1'.isValue)
@@ -302,7 +322,8 @@ theorem not_head_reducible [ProbLangℝ rT]
     (¬ ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) ↔ (∀ ρ : Cfg rT, headStep ⟨e, σ⟩ {ρ} = 0) := by
   push Not; exact forall_congr' fun _ => nonpos_iff_eq_zero
 
-theorem head_redex_unique [ProbLangℝ rT]
+@[discrete]
+theorem head_redex_unique_discrete [ProbLangℝ rT]
     (K K' : Ectx rT) (e e' : Exp rT) (σ : State rT)
     (hfill : K.fill e = K'.fill e')
     (hred  : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ})
@@ -310,18 +331,19 @@ theorem head_redex_unique [ProbLangℝ rT]
     K = K'.comp [] ∧ e = e' := by
   obtain ⟨⟨e2, σ2⟩, hρ⟩ := hred
   obtain ⟨⟨e2', σ2'⟩, hρ'⟩ := hred'
-  obtain ⟨K'', hK⟩ := step_by_val K' K e' e σ _ hfill.symm (Discrete.val_head_stuck hρ') hρ
+  obtain ⟨K'', hK⟩ := step_by_val_discrete K' K e' e σ _ hfill.symm (Discrete.val_head_stuck hρ') hρ
   subst hK
   rw [← Ectx.fill_comp] at hfill
   have he := Ectx.fill_injective K' hfill
-  rcases head_ctx_step_val_ectx K'' e σ _ (he ▸ hρ') with hval | rfl
+  rcases head_ctx_step_val_ectx_discrete K'' e σ _ (he ▸ hρ') with hval | rfl
   · exact absurd hval (Discrete.val_head_stuck hρ)
   · simp [Ectx.fill] at he
     exact ⟨rfl, he⟩
 
 /-! ## primStep characterization -/
 
-theorem prim_step_iff [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem prim_step_iff_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e1 e2 : Exp rT} {σ1 σ2 : State rT} :
     0 < primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔
     ∃ (K : Ectx rT) (e1' e2' : Exp rT),
@@ -339,23 +361,25 @@ theorem prim_step_iff [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass 
     rw [← primStep_fill_singleton (Discrete.val_head_stuck hhs)]
     exact primStep_pos_of_headStep hhs
 
-theorem prim_step_iff' [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem prim_step_iff'_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
     (hstep : Discrete.Reducible e σ) :
     ∃ (K : Ectx rT) (e' : Exp rT), K.fill e' = e ∧
       (∃ ρ : Cfg rT, 0 < headStep ⟨e', σ⟩ {ρ}) ∧
       primStep ⟨e, σ⟩ = (headStep ⟨e', σ⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩) := by
   obtain ⟨⟨e2, σ2⟩, h⟩ := hstep
-  rw [prim_step_iff] at h
+  rw [prim_step_iff_discrete] at h
   obtain ⟨K, e1', e2', hfill1, _, hhs⟩ := h
   exact ⟨K, e1', hfill1, ⟨_, hhs⟩, by
     rw [← hfill1, primStep_fill (Discrete.val_head_stuck hhs), primStep_eq_headStep ⟨_, hhs⟩]⟩
 
-theorem prim_step_mass [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem prim_step_mass_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (cfg : Cfg rT) :
     Discrete.Reducible cfg.expr cfg.state → IsProbabilityMeasure (primStep cfg) := by
   intro hred
-  obtain ⟨_, e'', _, hhead_red, hps_eq⟩ := prim_step_iff' hred
+  obtain ⟨_, e'', _, hhead_red, hps_eq⟩ := prim_step_iff'_discrete hred
   rw [hps_eq]
   haveI := Discrete.head_step_mass e'' cfg.state hhead_red
   exact Measure.isProbabilityMeasure_map .of_discrete
@@ -368,19 +392,20 @@ theorem Discrete.headStep_of_primStep_fill [ProbLangℝ rT] [Countable rT] [Meas
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e1, σ1⟩ {ρ})
     (hstep : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
     ∃ e2', e2 = K.fill e2' ∧ 0 < headStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} := by
-  rw [prim_step_iff] at hstep
+  rw [prim_step_iff_discrete] at hstep
   obtain ⟨K', e1', e2', hfill1, hfill2, hhs⟩ := hstep
   obtain ⟨ρ_red, hρ_red⟩ := hred
-  obtain ⟨K'', hK''⟩ := step_by_val K' K e1' e1 σ1 _ hfill1 (Discrete.val_head_stuck hhs) hρ_red
+  obtain ⟨K'', hK''⟩ := step_by_val_discrete K' K e1' e1 σ1 _ hfill1 (Discrete.val_head_stuck hhs) hρ_red
   subst hK''
   simp only [Ectx.comp, fill_app] at hfill1
   have he1' := Ectx.fill_injective K' hfill1
-  rcases head_ctx_step_val_ectx K'' e1 σ1 _ (he1' ▸ hhs) with hval | rfl
+  rcases head_ctx_step_val_ectx_discrete K'' e1 σ1 _ (he1' ▸ hhs) with hval | rfl
   · exact absurd hval (Discrete.val_head_stuck hρ_red)
   · simp only [Ectx.fill, List.foldl_nil] at he1' hfill2
     exact ⟨e2', hfill2.symm, he1' ▸ hhs⟩
 
-theorem headStep_of_primStep [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem headStep_of_primStep_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
     (hred : ∃ ρ' : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ'})
     (hstep : 0 < primStep ⟨e, σ⟩ {ρ}) : 0 < headStep ⟨e, σ⟩ {ρ} := by
@@ -388,7 +413,8 @@ theorem headStep_of_primStep [ProbLangℝ rT] [Countable rT] [MeasurableSingleto
   obtain ⟨e2', hfill, hhs⟩ := Discrete.headStep_of_primStep_fill [] hred hstep
   simp [Ectx.fill] at hfill; exact hfill ▸ hhs
 
-theorem head_irreducible_zero [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem head_irreducible_zero_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
     (hirr : ∀ ρ : Cfg rT, headStep ⟨e, σ⟩ {ρ} = 0) :
     headStep ⟨e, σ⟩ = 0 := by
@@ -397,7 +423,8 @@ theorem head_irreducible_zero [ProbLangℝ rT] [Countable rT] [MeasurableSinglet
   obtain ⟨x, _, hx⟩ := Discrete.measure_pos_of_singleton_pos _ S (bot_lt_iff_ne_bot.mpr hne)
   simp [hirr x] at hx
 
-theorem head_step_not_stuck [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem head_step_not_stuck_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) :
     ¬e.isValue ∧ Discrete.Reducible e σ :=
@@ -417,12 +444,13 @@ theorem ectxi_language_subRedexesAreValues [ProbLangℝ rT] {e : Exp rT}
   · simp only [Ectx.fill_snoc] at hfill
     exact absurd (Ectx.fill_isValue (h Ki _ hfill)) hv
 
-theorem prim_head_reducible [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem prim_head_reducible_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
     (hred : Discrete.Reducible e σ) (hsub : subRedexesAreValues e) :
     ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ} := by
   obtain ⟨⟨e2, σ2⟩, hstep⟩ := hred
-  rw [prim_step_iff] at hstep
+  rw [prim_step_iff_discrete] at hstep
   obtain ⟨K, e1', e2', hfill1, _, hhs⟩ := hstep
   have hK := hsub K e1' hfill1.symm (Discrete.val_head_stuck hhs)
   subst hK
@@ -430,43 +458,50 @@ theorem prim_head_reducible [ProbLangℝ rT] [Countable rT] [MeasurableSingleton
   subst hfill1
   exact ⟨_, hhs⟩
 
-theorem prim_head_irreducible [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem prim_head_irreducible_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
     (hirr : ∀ ρ : Cfg rT, headStep ⟨e, σ⟩ {ρ} = 0)
     (hsub : subRedexesAreValues e) :
     ¬ Discrete.Reducible e σ :=
-  fun hred => not_head_reducible.mpr hirr (prim_head_reducible hred hsub)
+  fun hred => not_head_reducible.mpr hirr (prim_head_reducible_discrete hred hsub)
 
-theorem head_stuck_stuck [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem head_stuck_stuck_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
     (hstuck : ¬e.isValue ∧ ∀ ρ : Cfg rT, headStep ⟨e, σ⟩ {ρ} = 0)
     (hsub : subRedexesAreValues e) :
     ¬e.isValue ∧ ¬ Discrete.Reducible e σ :=
-  ⟨hstuck.1, prim_head_irreducible hstuck.2 hsub⟩
+  ⟨hstuck.1, prim_head_irreducible_discrete hstuck.2 hsub⟩
 
-/-! ## notStuck / stuck -/
+/-! ## notStuck_discrete / stuck_discrete -/
 
-def notStuck [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+@[discrete]
+def notStuck_discrete [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   e.isValue ∨ Discrete.Reducible e σ
 
-theorem NotStuck.of_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem NotStuck.of_fill_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
-    (h : notStuck (K.fill e) σ) : notStuck e σ := by
+    (h : notStuck_discrete (K.fill e) σ) : notStuck_discrete e σ := by
   rcases h with hv | hred
   · exact .inl (Ectx.fill_isValue hv)
   · exact if hv : e.isValue then .inl hv
     else .inr (hred.of_fill K hv)
 
-def stuck [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+@[discrete]
+def stuck_discrete [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ¬ e.isValue ∧ ¬ Discrete.Reducible e σ
 
-theorem stuck_iff_not_notStuck [ProbLangℝ rT] {e : Exp rT} {σ : State rT} :
-    stuck e σ ↔ ¬ notStuck e σ := by
-  simp [stuck, notStuck, not_or]
+@[discrete]
+theorem stuck_iff_not_notStuck_discrete [ProbLangℝ rT] {e : Exp rT} {σ : State rT} :
+    stuck_discrete e σ ↔ ¬ notStuck_discrete e σ := by
+  simp [stuck_discrete, notStuck_discrete, not_or]
 
-theorem Stuck.fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+@[discrete]
+theorem Stuck.fill_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
-    (h : stuck e σ) : stuck (K.fill e) σ :=
+    (h : stuck_discrete e σ) : stuck_discrete (K.fill e) σ :=
   ⟨fun hv => h.1 (Ectx.fill_isValue hv),
    fun hred => h.2 (hred.of_fill K h.1)⟩
 

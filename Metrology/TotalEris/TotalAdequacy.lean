@@ -231,7 +231,7 @@ theorem tgl_prim_step [Countable rT] [MeasurableSingletonClass rT]
     (Hcont : ∀ ρ, R ρ → 1 - ε₂ ρ ≤ (limExec ρ) P) :
     1 - ε ≤ ∫⁻ ρ, (limExec ρ) P ∂primStep ⟨e, σ⟩ :=
   haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e, σ⟩) :=
-    prim_step_mass ⟨e, σ⟩ Hred
+    prim_step_mass_discrete ⟨e, σ⟩ Hred
   tgl_lift_prob (M := primStep ⟨e, σ⟩) (R := R) (ε₂ := ε₂)
     (k := fun ρ => (limExec ρ) P) Hpgl Hsum Hcont
 

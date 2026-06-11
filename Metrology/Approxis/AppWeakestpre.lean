@@ -884,7 +884,7 @@ theorem specCoupl_step {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ�
   have hprob_lhs : (MeasureTheory.Measure.dirac σ₁ : MeasureTheory.Measure (State rT)) .univ = 1 := by
     simp
   have hprob_rhs : (primStep ⟨e₁', σ₁'⟩) .univ = 1 := by
-    haveI := prim_step_mass ⟨e₁', σ₁'⟩ Hred
+    haveI := prim_step_mass_discrete ⟨e₁', σ₁'⟩ Hred
     exact MeasureTheory.IsProbabilityMeasure.measure_univ
   have Htrivial : AddCoupl 0 Set.univ (MeasureTheory.Measure.dirac σ₁) (primStep ⟨e₁', σ₁'⟩) :=
     RelCoupl.exact (RelCoupl.trivial hprob_lhs hprob_rhs)
@@ -1225,7 +1225,7 @@ theorem progCoupl_steps_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp
                 MeasureTheory.lintegral_const, mul_comm]
       _ ≤ (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε₂ * 1 + ε₁ := by
             gcongr
-            haveI := prim_step_mass ⟨e₁', σ₁'⟩ Hred'
+            haveI := prim_step_mass_discrete ⟨e₁', σ₁'⟩ Hred'
             exact MeasureTheory.IsProbabilityMeasure.measure_univ.le
       _ ≤ (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε := by
             rw [mul_one, add_assoc, add_comm ε₂ ε₁]
@@ -1299,7 +1299,7 @@ theorem progCoupl_steps {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)
                   MeasureTheory.lintegral_const, mul_comm]
         _ ≤ (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε₂ * 1 + ε₁ := by
               gcongr
-              haveI := prim_step_mass ⟨e₁', σ₁'⟩ Hred'
+              haveI := prim_step_mass_discrete ⟨e₁', σ₁'⟩ Hred'
               exact MeasureTheory.IsProbabilityMeasure.measure_univ.le
         _ ≤ (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε := by
               rw [mul_one, add_assoc, add_comm ε₂ ε₁]; gcongr
@@ -1541,7 +1541,7 @@ theorem progCoupl_step_l {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT
   -- Build AddCoupl 0 R (primStep ⟨e₁,σ₁⟩) (dirac σ₁') via pos_R, where
   -- R ρ₁ _ := 0 < primStep {ρ₁}.
   have hprob_lhs : (primStep ⟨e₁, σ₁⟩) .univ = 1 := by
-    haveI := prim_step_mass ⟨e₁, σ₁⟩ Hred
+    haveI := prim_step_mass_discrete ⟨e₁, σ₁⟩ Hred
     exact MeasureTheory.IsProbabilityMeasure.measure_univ
   have hprob_rhs : (MeasureTheory.Measure.dirac σ₁' : MeasureTheory.Measure (State rT)) .univ = 1 := by
     simp
@@ -2502,7 +2502,7 @@ theorem PureStep.prim_step_det {e₁ e₂ : (Exp rT)} (h : PureStep e₁ e₂)
     σ₂ = σ ∧ e₂' = e₂ := by
   classical
   haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e₁, σ⟩) :=
-    prim_step_mass _ ⟨⟨e₂, σ⟩, h.det σ ▸ zero_lt_one⟩
+    prim_step_mass_discrete _ ⟨⟨e₂, σ⟩, h.det σ ▸ zero_lt_one⟩
   have hmass := h.det σ
   -- {⟨e₂,σ⟩} has full mass 1, so its complement has mass 0.
   have h0 : (primStep ⟨e₁, σ⟩) ({⟨e₂, σ⟩}ᶜ : Set (Cfg rT)) = 0 := by

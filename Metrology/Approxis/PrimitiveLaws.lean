@@ -409,7 +409,7 @@ theorem wp_rand_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   iintro %e₂' %σ₂' %Hstep
   have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).isValue := by
     intro ⟨w⟩; nomatch w
-  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv_discrete Hv_rand Hstep
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ :=
@@ -498,7 +498,7 @@ theorem wp_rand_nonpos_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   iintro %e₂' %σ₂' %Hstep
   have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).isValue := by
     intro ⟨w⟩; nomatch w
-  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv_discrete Hv_rand Hstep
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ :=
@@ -547,7 +547,7 @@ theorem wp_rand_tape_empty_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z : Int} {e
   iintro %e₂' %σ₂' %Hstep
   have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).isValue := by
     intro ⟨w⟩; nomatch w
-  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv_discrete Hv_rand Hstep
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
@@ -606,7 +606,7 @@ theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z N : Int} 
   iintro %e₂' %σ₂' %Hstep
   have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).isValue := by
     intro ⟨w⟩; nomatch w
-  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv_discrete Hv_rand Hstep
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
@@ -706,7 +706,7 @@ theorem wp_rand_empty_r {E : CoPset} (K : (Ectx rT)) {z : Int} {l : Loc}
   iintro %e₂' %σ₂' %Hstep
   have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).isValue := by
     intro ⟨w⟩; nomatch w
-  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv_discrete Hv_rand Hstep
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
@@ -774,7 +774,7 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : (Ectx rT)) {z M : Int} {l : Loc}
   iintro %e₂' %σ₂' %Hstep
   have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).isValue := by
     intro ⟨w⟩; nomatch w
-  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv Hv_rand Hstep
+  obtain ⟨e', heq_e2', Hstep'⟩ := primStep_fill_inv_discrete Hv_rand Hstep
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
