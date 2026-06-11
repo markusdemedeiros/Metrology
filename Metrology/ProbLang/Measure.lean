@@ -666,15 +666,13 @@ theorem cell_ternary
       MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
     refine MeasurableSpace.induction_on_inter
       (C := fun W'' _ => MeasurableSet (J23 W'')) hgen' hpi' ?_ ?_ ?_ ?_ W' hW'
-    · show MeasurableSet (J23 ∅); convert MeasurableSet.empty; ext ⟨_, _⟩; simp [hJ23]
+    · convert MeasurableSet.empty; ext ⟨_, _⟩; simp [hJ23]
     · rintro _ ⟨V₂, hV₂, V₃, hV₃, rfl⟩
-      show MeasurableSet (J23 (V₂ ×ˢ V₃))
       have : J23 (V₂ ×ˢ V₃)
           = {p : T | shape p = s2 ∧ f p ∈ V₂} ×ˢ {p : T | shape p = s3 ∧ f p ∈ V₃} := by
         ext ⟨p2, p3⟩; simp [hJ23]; tauto
       rw [this]; exact (ih2 hV₂).prod (ih3 hV₃)
     · intro W'' _ IH
-      show MeasurableSet (J23 W''ᶜ)
       have : J23 W''ᶜ = (({p | shape p = s2} ×ˢ {p | shape p = s3}) \ J23 W'') := by
         ext ⟨p2, p3⟩; simp [hJ23]; tauto
       rw [this]
@@ -683,23 +681,20 @@ theorem cell_ternary
       · simpa using ih2 MeasurableSet.univ
       · simpa using ih3 MeasurableSet.univ
     · intro F _ _ IH
-      show MeasurableSet (J23 (⋃ i, F i))
       have : J23 (⋃ i, F i) = ⋃ i, J23 (F i) := by
         ext ⟨p2, p3⟩; simp only [hJ23, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   -- Now the outer induction on S using rectangles V × W in α × (α × α).
   refine MeasurableSpace.induction_on_inter
     (C := fun S _ => MeasurableSet (Joint S)) hgen hpi ?_ ?_ ?_ ?_ S hS
-  · show MeasurableSet (Joint ∅); convert MeasurableSet.empty; ext ⟨_, _, _⟩; simp [hJoint]
+  · convert MeasurableSet.empty; ext ⟨_, _, _⟩; simp [hJoint]
   · rintro _ ⟨V, hV, W, hW, rfl⟩
-    show MeasurableSet (Joint (V ×ˢ W))
     have : Joint (V ×ˢ W)
         = {p : T | shape p = s1 ∧ f p ∈ V} ×ˢ
           {q : T × T | shape q.1 = s2 ∧ shape q.2 = s3 ∧ (f q.1, f q.2) ∈ W} := by
       ext ⟨p1, p2, p3⟩; simp [hJoint]; tauto
     rw [this]; exact (ih1 hV).prod (hjoint23 W hW)
   · intro S' _ IH
-    show MeasurableSet (Joint S'ᶜ)
     have : Joint S'ᶜ
         = ({p | shape p = s1} ×ˢ {q : T × T | shape q.1 = s2 ∧ shape q.2 = s3}) \ Joint S' := by
       ext ⟨p1, p2, p3⟩; simp [hJoint]; tauto
@@ -711,7 +706,6 @@ theorem cell_ternary
       convert this using 1
       ext ⟨p2, p3⟩; simp
   · intro F _ _ IH
-    show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
       ext ⟨p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
@@ -802,15 +796,13 @@ theorem cell_quaternary
         MeasurableSpace.isPiSystem_measurableSet.prod MeasurableSpace.isPiSystem_measurableSet
       refine MeasurableSpace.induction_on_inter
         (C := fun W'' _ => MeasurableSet (J34 W'')) hgen'' hpi'' ?_ ?_ ?_ ?_ W' hW'
-      · show MeasurableSet (J34 ∅); convert MeasurableSet.empty; ext ⟨_, _⟩; simp [hJ34]
+      · convert MeasurableSet.empty; ext ⟨_, _⟩; simp [hJ34]
       · rintro _ ⟨V₃, hV₃, V₄, hV₄, rfl⟩
-        show MeasurableSet (J34 (V₃ ×ˢ V₄))
         have : J34 (V₃ ×ˢ V₄)
             = {p : T | shape p = s3 ∧ f p ∈ V₃} ×ˢ {p : T | shape p = s4 ∧ f p ∈ V₄} := by
           ext ⟨p3, p4⟩; simp [hJ34]; tauto
         rw [this]; exact (ih3 hV₃).prod (ih4 hV₄)
       · intro W'' _ IH
-        show MeasurableSet (J34 W''ᶜ)
         have : J34 W''ᶜ = (({p | shape p = s3} ×ˢ {p | shape p = s4}) \ J34 W'') := by
           ext ⟨p3, p4⟩; simp [hJ34]; tauto
         rw [this]
@@ -819,22 +811,20 @@ theorem cell_quaternary
         · simpa using ih3 MeasurableSet.univ
         · simpa using ih4 MeasurableSet.univ
       · intro F _ _ IH
-        show MeasurableSet (J34 (⋃ i, F i))
+
         have : J34 (⋃ i, F i) = ⋃ i, J34 (F i) := by
           ext ⟨p3, p4⟩; simp only [hJ34, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
         rw [this]; exact MeasurableSet.iUnion IH
     refine MeasurableSpace.induction_on_inter
       (C := fun W'' _ => MeasurableSet (J234 W'')) hgen' hpi' ?_ ?_ ?_ ?_ W' hW'
-    · show MeasurableSet (J234 ∅); convert MeasurableSet.empty; ext ⟨_, _, _⟩; simp [hJ234]
+    · convert MeasurableSet.empty; ext ⟨_, _, _⟩; simp [hJ234]
     · rintro _ ⟨V₂, hV₂, W34, hW34, rfl⟩
-      show MeasurableSet (J234 (V₂ ×ˢ W34))
       have : J234 (V₂ ×ˢ W34)
           = {p : T | shape p = s2 ∧ f p ∈ V₂} ×ˢ
             {q : T × T | shape q.1 = s3 ∧ shape q.2 = s4 ∧ (f q.1, f q.2) ∈ W34} := by
         ext ⟨p2, p3, p4⟩; simp [hJ234]; tauto
       rw [this]; exact (ih2 hV₂).prod (hjoint34 W34 hW34)
     · intro W'' _ IH
-      show MeasurableSet (J234 W''ᶜ)
       have : J234 W''ᶜ
           = ({p | shape p = s2} ×ˢ {q : T × T | shape q.1 = s3 ∧ shape q.2 = s4}) \ J234 W'' := by
         ext ⟨p2, p3, p4⟩; simp [hJ234]; tauto
@@ -846,16 +836,15 @@ theorem cell_quaternary
         convert this using 1
         ext ⟨p3, p4⟩; simp
     · intro F _ _ IH
-      show MeasurableSet (J234 (⋃ i, F i))
+
       have : J234 (⋃ i, F i) = ⋃ i, J234 (F i) := by
         ext ⟨p2, p3, p4⟩; simp only [hJ234, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   -- Outer induction on S using rectangles V × W in α × (α × α × α).
   refine MeasurableSpace.induction_on_inter
     (C := fun S _ => MeasurableSet (Joint S)) hgen hpi ?_ ?_ ?_ ?_ S hS
-  · show MeasurableSet (Joint ∅); convert MeasurableSet.empty; ext ⟨_, _, _, _⟩; simp [hJoint]
+  · convert MeasurableSet.empty; ext ⟨_, _, _, _⟩; simp [hJoint]
   · rintro _ ⟨V, hV, W, hW, rfl⟩
-    show MeasurableSet (Joint (V ×ˢ W))
     have : Joint (V ×ˢ W)
         = {p : T | shape p = s1 ∧ f p ∈ V} ×ˢ
           {q : T × T × T | shape q.1 = s2 ∧ shape q.2.1 = s3 ∧ shape q.2.2 = s4 ∧
@@ -863,7 +852,6 @@ theorem cell_quaternary
       ext ⟨p1, p2, p3, p4⟩; simp [hJoint]; tauto
     rw [this]; exact (ih1 hV).prod (hjoint234 W hW)
   · intro S' _ IH
-    show MeasurableSet (Joint S'ᶜ)
     have : Joint S'ᶜ
         = ({p | shape p = s1} ×ˢ
             {q : T × T × T | shape q.1 = s2 ∧ shape q.2.1 = s3 ∧ shape q.2.2 = s4}) \ Joint S' := by
@@ -876,7 +864,6 @@ theorem cell_quaternary
       convert this using 1
       ext ⟨p2, p3, p4⟩; simp
   · intro F _ _ IH
-    show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
       ext ⟨p1, p2, p3, p4⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH

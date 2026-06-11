@@ -32,7 +32,6 @@ theorem Ectx.fillCfg_injective [ProbLangℝ rT] (K : Ectx rT) :
 @[measurability]
 theorem Ectx.fillCfg.measurable [ProbLangℝ rT] (K : Ectx rT) :
     Measurable K.fillCfg := by
-  show Measurable (fun ρ : Cfg rT => (Cfg.mk (Ectx.fill K ρ.expr) ρ.state : Cfg rT))
   rw [Cfg.measurable_iff]
   exact ⟨Exp.Ectx_fill.measurable.comp (measurable_const.prodMk Cfg.measurable_expr),
     Cfg.measurable_state⟩
@@ -74,11 +73,9 @@ theorem primStep.measurable [ProbLangℝ rT] : Measurable (primStep : Cfg rT →
   -- Joint pushforward function `h : Cfg rT × Cfg rT → Cfg rT`.
   have hh : Measurable (fun (p : Cfg rT × Cfg rT) => p.1.expr.decomp.1.fillCfg p.2) := by
     -- p.1.expr.decomp.1.fillCfg p.2 = Cfg.mk (Ectx.fill p.1.expr.decomp.1 p.2.expr) p.2.state
-    show Measurable (fun p : Cfg rT × Cfg rT => Cfg.mk (Ectx.fill p.1.expr.decomp.1 p.2.expr) p.2.state)
     rw [Cfg.measurable_iff]
     refine ⟨?_, ?_⟩
-    · show Measurable (fun p : Cfg rT × Cfg rT => Ectx.fill p.1.expr.decomp.1 p.2.expr)
-      refine Exp.Ectx_fill.measurable.comp (Measurable.prodMk ?_ ?_)
+    · refine Exp.Ectx_fill.measurable.comp (Measurable.prodMk ?_ ?_)
       · measurability
       · measurability
     · measurability
