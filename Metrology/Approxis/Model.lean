@@ -8,6 +8,8 @@ public import Iris.Instances.Lib.Invariants
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-!
 # Semantic Model
 

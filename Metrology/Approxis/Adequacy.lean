@@ -6,6 +6,8 @@ public import Metrology.ProbLang.Erasure
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # Adequacy: WP entailments imply `AddCoupl` between execution distributions. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang

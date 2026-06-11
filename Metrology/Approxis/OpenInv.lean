@@ -5,6 +5,8 @@ public import Metrology.ProbLang.Atomic
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # `OpenInv e`: the logical-atomicity predicate enabling mask-shift around evaluating `e`. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS

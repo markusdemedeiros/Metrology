@@ -181,7 +181,7 @@ theorem limExec_beta {body v : Exp} {σ : State} (hv : IsVal v) :
 
 /-- `execN`-level version of a deterministic head step: `execN (n+1) ρ = execN n ρ'`. -/
 theorem execN_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
-    (h : DetHeadStep ρ ρ') (n : Nat) : execN (n+1) ρ = execN n ρ' := by
+    (h : DetHeadStep_discrete ρ ρ') (n : Nat) : execN (n+1) ρ = execN n ρ' := by
   rw [execN_succ_not_isValue hnv, primStep_eq_headStep ⟨ρ', h.pos⟩]
   -- headStep ρ = dirac ρ'
   have hother : ∀ c ≠ ρ', (headStep ρ) {c} = 0 := by
@@ -208,7 +208,7 @@ theorem execN_le_limExec (n : Nat) (ρ : Cfg) : execN n ρ ≤ limExec ρ :=
   le_iSup (fun i => execN i ρ) n
 
 /-- A deterministic step (under any ectx) preserves `limExec`. -/
-theorem limExec_detStep {ρ ρ' : Cfg} (h : DetStep ρ ρ') : limExec ρ = limExec ρ' := by
+theorem limExec_detStep {ρ ρ' : Cfg} (h : DetStep_discrete ρ ρ') : limExec ρ = limExec ρ' := by
   have hnv : ¬ ρ.expr.isValue := Discrete.val_stuck (h.det ▸ one_pos)
   rw [limExec_not_final hnv]
   -- primStep ρ = dirac ρ' since primStep ρ {ρ'} = 1 and total mass ≤ 1.
@@ -233,7 +233,7 @@ theorem limExec_detStep {ρ ρ' : Cfg} (h : DetStep ρ ρ') : limExec ρ = limEx
 
 /-- Generic one-step unfolding for `limExec` at a deterministic head redex. -/
 theorem limExec_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
-    (h : DetHeadStep ρ ρ') : limExec ρ = limExec ρ' := by
+    (h : DetHeadStep_discrete ρ ρ') : limExec ρ = limExec ρ' := by
   rw [limExec_not_final hnv, primStep_eq_headStep ⟨ρ', h.pos⟩]
   -- `headStep ρ = dirac ρ'`: mass 1 at ρ', total mass ≤ 1 ⇒ rest vanishes.
   have hother : ∀ c ≠ ρ', (headStep ρ) {c} = 0 := by
@@ -284,9 +284,9 @@ theorem limExec_app_fix_lam_close {f x : Var}
     exact Exp.subst_lc hloop_lc (.fvar _)
   -- Step A: app-fix.
   have hnv₁ : ¬ (Exp.app F u).isValue := by intro ⟨h⟩; cases h
-  have hstep₁ : DetHeadStep ⟨.app F u, σ⟩
+  have hstep₁ : DetHeadStep_discrete ⟨.app F u, σ⟩
       ⟨.app (Exp.open' (Exp.close (.lam (Exp.close body x)) f) F) u, σ⟩ :=
-    DetHeadStep.app_fix hu_val σ
+    DetHeadStep_discrete.app_fix hu_val σ
   rw [limExec_detHeadStep hnv₁ hstep₁]
   -- open' (close loop f) F = subst loop f F (both LC).
   rw [Exp.open_close_subst_lc_gen f (.lam (Exp.close body x)) F hloop_lc hF_lc]
@@ -295,10 +295,10 @@ theorem limExec_app_fix_lam_close {f x : Var}
   -- Step B: app-lam.
   have hnv₂ : ¬ (Exp.app (.lam (Exp.subst (Exp.close body x) f F)) u).isValue := by
     intro ⟨h⟩; cases h
-  have hstep₂ : DetHeadStep
+  have hstep₂ : DetHeadStep_discrete
       ⟨.app (.lam (Exp.subst (Exp.close body x) f F)) u, σ⟩
       ⟨Exp.open' (Exp.subst (Exp.close body x) f F) u, σ⟩ :=
-    DetHeadStep.app_lam hu_val σ
+    DetHeadStep_discrete.app_lam hu_val σ
   rw [limExec_detHeadStep hnv₂ hstep₂]
   -- open' (subst (close body x) f F) u
   --   = subst (open' (close body x) u) f F   [since f ∉ u.fv, F LC]
@@ -784,14 +784,14 @@ theorem limExec_probLangWhile_recurrence [SLangType T] [ProbLangEmbeddable T]
         = EctxItem.fillItem (.condC _ _) (Exp.app condE (as_expr t)) from rfl,
       limExec_fill_item, hcond t σ, Measure.dirac_bind Measurable.of_discrete]
   simp only [EctxItem.fillItem]
-  -- Step 3: split on cond t and apply DetHeadStep.cond_{true,false}.
+  -- Step 3: split on cond t and apply DetHeadStep_discrete.cond_{true,false}.
   by_cases hct : cond t = true
   · rw [hct]
     simp only [if_true]
     have hnv : ¬ (Exp.cond (.lit (.bool true))
         (Exp.app (.lam (Exp.close (Exp.app F (.fvar v)) v)) (Exp.app bodyE (as_expr t)))
         (as_expr t)).isValue := by intro ⟨h⟩; cases h
-    rw [limExec_detHeadStep hnv (DetHeadStep.cond_true _ _ σ)]
+    rw [limExec_detHeadStep hnv (DetHeadStep_discrete.cond_true _ _ σ)]
     -- Step 4: evaluate .app bodyE (as_expr t) via limExec_fill_item with Ki = .appR.
     rw [show (Exp.app (.lam (Exp.close (Exp.app F (.fvar v)) v)) (Exp.app bodyE (as_expr t)) : Exp)
           = EctxItem.fillItem (.appR _) (Exp.app bodyE (as_expr t)) from rfl,
@@ -827,7 +827,7 @@ theorem limExec_probLangWhile_recurrence [SLangType T] [ProbLangEmbeddable T]
     have hnv : ¬ (Exp.cond (.lit (.bool false))
         (Exp.app (.lam (Exp.close (Exp.app F (.fvar v)) v)) (Exp.app bodyE (as_expr t)))
         (as_expr t)).isValue := by intro ⟨h⟩; cases h
-    rw [limExec_detHeadStep hnv (DetHeadStep.cond_false _ _ σ)]
+    rw [limExec_detHeadStep hnv (DetHeadStep_discrete.cond_false _ _ σ)]
     exact limExec_of_isVal (as_expr_isVal t)
 
 /-- Forward direction: finite unrollings of `probWhile` are dominated pointwise
@@ -1251,11 +1251,11 @@ theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
             (.app (.lam (Exp.close (.app F (.fvar v)) v)) (.app bodyE (as_expr t')))
             (as_expr t') with hunfolded_def
     -- After 2 det primSteps (app-fix then app-lam), `app F (as_expr t)` reaches `unfolded t`.
-    have hstep1 : ∀ t' : T, DetHeadStep ⟨.app F (as_expr t'), σ⟩
+    have hstep1 : ∀ t' : T, DetHeadStep_discrete ⟨.app F (as_expr t'), σ⟩
         ⟨.app loopLamSubF (as_expr t'), σ⟩ := by
       intro t'
       have hF_unfold : F = .fix (Exp.close (.lam (Exp.close innerBody x)) f) := hF_def
-      have h := DetHeadStep.app_fix (as_expr_isVal t') σ
+      have h := DetHeadStep_discrete.app_fix (as_expr_isVal t') σ
         (body := Exp.close (.lam (Exp.close innerBody x)) f)
       have heq : Exp.open' (Exp.close (.lam (Exp.close innerBody x)) f)
             (.fix (Exp.close (.lam (Exp.close innerBody x)) f))
@@ -1264,11 +1264,11 @@ theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
         exact Exp.open_close_subst_lc_gen f (.lam (Exp.close innerBody x)) F hloopLam_lc hF_lc
       rw [heq, ← hF_unfold] at h
       exact h
-    have hstep2 : ∀ t' : T, DetHeadStep ⟨.app loopLamSubF (as_expr t'), σ⟩
+    have hstep2 : ∀ t' : T, DetHeadStep_discrete ⟨.app loopLamSubF (as_expr t'), σ⟩
         ⟨unfolded t', σ⟩ := by
       intro t'
       rw [hloopLamSubF_eq]
-      have h := DetHeadStep.app_lam (as_expr_isVal t') σ (body := Exp.subst (Exp.close innerBody x) f F)
+      have h := DetHeadStep_discrete.app_lam (as_expr_isVal t') σ (body := Exp.subst (Exp.close innerBody x) f F)
       -- h gives ⟨open' (subst ...) (as_expr t'), σ⟩ as the next step.
       -- Need open' (subst (close innerBody x) f F) (as_expr t') = unfolded t'.
       have hopen_subst : Exp.open' (Exp.subst (Exp.close innerBody x) f F) (as_expr t')
@@ -1362,7 +1362,7 @@ theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
           cases m with
           | zero => simp [execN]
           | succ k =>
-            rw [execN_detHeadStep hnv (DetHeadStep.cond_true _ _ _) k]
+            rw [execN_detHeadStep hnv (DetHeadStep_discrete.cond_true _ _ _) k]
             -- Goal: execN k ⟨BODY, σ⟩ {c} ≤ (count (body t)).bind (fun t' => ν t') {c}
             -- BODY = app (lam (close (app F (fvar v)) v)) (app bodyE (as_expr t))
             -- Use execN_fill_item_le with Ki = .appR (lam ...).
@@ -1470,10 +1470,10 @@ theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
             | zero => simp [execN]
             | succ j =>
               have hnv_la : ¬ (Exp.app lamApp (as_expr t')).isValue := by intro ⟨h⟩; cases h
-              have hstep_la : DetHeadStep ⟨Exp.app lamApp (as_expr t'), σ⟩
+              have hstep_la : DetHeadStep_discrete ⟨Exp.app lamApp (as_expr t'), σ⟩
                   ⟨.app F (as_expr t'), σ⟩ := by
                 rw [hlamApp_def]
-                have h := DetHeadStep.app_lam (as_expr_isVal t') σ
+                have h := DetHeadStep_discrete.app_lam (as_expr_isVal t') σ
                   (body := Exp.close (.app F (.fvar v)) v)
                 have hopen_eq : Exp.open' (Exp.close (.app F (.fvar v)) v) (as_expr t')
                     = .app F (as_expr t') := by
@@ -1498,7 +1498,7 @@ theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
           cases m with
           | zero => simp [execN]
           | succ k =>
-            rw [execN_detHeadStep hnv (DetHeadStep.cond_false _ _ _) k]
+            rw [execN_detHeadStep hnv (DetHeadStep_discrete.cond_false _ _ _) k]
             -- execN k ⟨as_expr t, σ⟩ {c}: as_expr t is a value.
             cases k with
             | zero => simp [execN]
@@ -2074,7 +2074,7 @@ theorem plProbNatRec_loopE_subst {a f x v xs ws w : Var}
 /-- `IsEmbedding` is invariant under any deterministic head step on the ProbLang side. -/
 theorem IsEmbedding.of_detHeadStep [SLangType T] [ProbLangEmbeddable T]
     {s : SLang T} {e e' : Exp}
-    (hstep : ∀ σ, ¬ e.isValue ∧ DetHeadStep ⟨e, σ⟩ ⟨e', σ⟩)
+    (hstep : ∀ σ, ¬ e.isValue ∧ DetHeadStep_discrete ⟨e, σ⟩ ⟨e', σ⟩)
     (h : IsEmbedding s e') : IsEmbedding s e := by
   intro σ
   obtain ⟨hnv, hd⟩ := hstep σ
@@ -2104,7 +2104,7 @@ theorem probLangApp_isEmbedding [SLangType T] [ProbLangEmbeddable T]
     (e' := Exp.subst body x (as_expr a))
     (fun σ => ⟨?_, ?_⟩) h
   · intro ⟨h⟩; cases h
-  · have hd := DetHeadStep.app_lam (as_expr_isVal a) σ
+  · have hd := DetHeadStep_discrete.app_lam (as_expr_isVal a) σ
       (body := Exp.close body x)
     rw [Exp.open_close_subst_lc_gen x _ _ hbody (as_expr_lc a)] at hd
     exact hd
@@ -2164,18 +2164,18 @@ theorem probLangApp2_isEmbedding [SLangType T] [ProbLangEmbeddable T]
   have hinner_lc : Exp.IsLocallyClosed (Exp.lam (Exp.close body y)) :=
     Exp.IsLocallyClosed.lamClose y hbody
   -- Step 1: peel outer λ x via det step under [appL (as_expr b)] ectx.
-  have hstep : ∀ σ, DetStep
+  have hstep : ∀ σ, DetStep_discrete
     ⟨.app (.app (.lam (.close (.lam (.close body y)) x)) (as_expr a)) (as_expr b), σ⟩
     ⟨.app (Exp.subst (Exp.lam (Exp.close body y)) x (as_expr a)) (as_expr b), σ⟩ := by
     intro σ
-    have hbase : DetHeadStep
+    have hbase : DetHeadStep_discrete
       ⟨.app (.lam (Exp.close (Exp.lam (Exp.close body y)) x)) (as_expr a), σ⟩
       ⟨Exp.subst (Exp.lam (Exp.close body y)) x (as_expr a), σ⟩ := by
-      have h := DetHeadStep.app_lam (as_expr_isVal a) σ
+      have h := DetHeadStep_discrete.app_lam (as_expr_isVal a) σ
         (body := Exp.close (Exp.lam (Exp.close body y)) x)
       rw [Exp.open_close_subst_lc_gen x _ _ hinner_lc (as_expr_lc a)] at h
       exact h
-    have hfill := DetStep.fill [.appL ⟨as_expr b, as_expr_isVal b⟩] hbase.toDetStep
+    have hfill := DetStep_discrete.fill [.appL ⟨as_expr b, as_expr_isVal b⟩] hbase.toDetStep
     simp only [Ectx.fill, List.foldl_cons, List.foldl_nil, flip,
                EctxItem.fillItem, Exp.ofVal] at hfill
     exact hfill
@@ -2201,69 +2201,69 @@ theorem probLangApp2_isEmbedding [SLangType T] [ProbLangEmbeddable T]
 /-! ### Det-step / `limExec` reduction toolkit
 
   Generic helpers that collapse the recurring pattern of
-    `DetHeadStep.binop ... + DetStep.fill K + simp [Ectx.fill, ...] + limExec_detStep`
+    `DetHeadStep_discrete.binop ... + DetStep_discrete.fill K + simp [Ectx.fill, ...] + limExec_detStep`
   into a single named call. -/
 
 /-- Lift a deterministic head step under a single ectx item to a `limExec`
     equality. The step source must not already be a value. -/
 theorem limExec_under_ectxItem (Ki : EctxItem) {e e' : Exp} {σ : State}
-    (hnv : ¬ e.isValue) (h : DetHeadStep ⟨e, σ⟩ ⟨e', σ⟩) :
+    (hnv : ¬ e.isValue) (h : DetHeadStep_discrete ⟨e, σ⟩ ⟨e', σ⟩) :
     limExec ⟨Ki.fillItem e, σ⟩ = limExec ⟨Ki.fillItem e', σ⟩ := by
-  have hd : DetStep ⟨Ki.fillItem e, σ⟩ ⟨Ki.fillItem e', σ⟩ :=
-    DetStep.fill [Ki] h.toDetStep
+  have hd : DetStep_discrete ⟨Ki.fillItem e, σ⟩ ⟨Ki.fillItem e', σ⟩ :=
+    DetStep_discrete.fill [Ki] h.toDetStep
   exact limExec_detStep hd
 
 /-- Lift a deterministic head step under a (composite) ectx to a `limExec` equality. -/
 theorem limExec_under_ectx (K : Ectx) {e e' : Exp} {σ : State}
-    (h : DetHeadStep ⟨e, σ⟩ ⟨e', σ⟩) :
+    (h : DetHeadStep_discrete ⟨e, σ⟩ ⟨e', σ⟩) :
     limExec ⟨K.fill e, σ⟩ = limExec ⟨K.fill e', σ⟩ :=
-  limExec_detStep (DetStep.fill K h.toDetStep)
+  limExec_detStep (DetStep_discrete.fill K h.toDetStep)
 
 /-! Concrete variants for the syntactic shapes that appear in goals (without
-    requiring `EctxItem.fillItem` sugar). Each takes an inner `DetStep` and lifts
+    requiring `EctxItem.fillItem` sugar). Each takes an inner `DetStep_discrete` and lifts
     it under one ectx-item layer. They compose: chain them by `rw` to reduce
     arbitrary contexts. -/
 
 theorem limExec_binopL_step {op : BinOp} {e e' : Exp} {v2 : Exp}
     (hv2 : IsVal v2) {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.binop op e v2, σ⟩ = limExec ⟨.binop op e' v2, σ'⟩ :=
-  limExec_detStep (DetStep.fill [.binopL op ⟨v2, hv2⟩] h)
+  limExec_detStep (DetStep_discrete.fill [.binopL op ⟨v2, hv2⟩] h)
 
 theorem limExec_binopR_step {op : BinOp} {e1 e e' : Exp} {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.binop op e1 e, σ⟩ = limExec ⟨.binop op e1 e', σ'⟩ :=
-  limExec_detStep (DetStep.fill [.binopR op e1] h)
+  limExec_detStep (DetStep_discrete.fill [.binopR op e1] h)
 
 theorem limExec_pairL_step {e e' v2 : Exp} (hv2 : IsVal v2) {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.pair e v2, σ⟩ = limExec ⟨.pair e' v2, σ'⟩ :=
-  limExec_detStep (DetStep.fill [.pairL ⟨v2, hv2⟩] h)
+  limExec_detStep (DetStep_discrete.fill [.pairL ⟨v2, hv2⟩] h)
 
 theorem limExec_pairR_step {e1 e e' : Exp} {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.pair e1 e, σ⟩ = limExec ⟨.pair e1 e', σ'⟩ :=
-  limExec_detStep (DetStep.fill [.pairR e1] h)
+  limExec_detStep (DetStep_discrete.fill [.pairR e1] h)
 
 theorem limExec_appL_step {e e' v2 : Exp} (hv2 : IsVal v2) {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.app e v2, σ⟩ = limExec ⟨.app e' v2, σ'⟩ :=
-  limExec_detStep (DetStep.fill [.appL ⟨v2, hv2⟩] h)
+  limExec_detStep (DetStep_discrete.fill [.appL ⟨v2, hv2⟩] h)
 
 theorem limExec_appR_step {ef e e' : Exp} {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.app ef e, σ⟩ = limExec ⟨.app ef e', σ'⟩ :=
-  limExec_detStep (DetStep.fill [.appR ef] h)
+  limExec_detStep (DetStep_discrete.fill [.appR ef] h)
 
 theorem limExec_fst_step {e e' : Exp} {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.fst e, σ⟩ = limExec ⟨.fst e', σ'⟩ :=
-  limExec_detStep (DetStep.fill [.fst] h)
+  limExec_detStep (DetStep_discrete.fill [.fst] h)
 
 theorem limExec_snd_step {e e' : Exp} {σ σ' : State}
-    (h : DetStep ⟨e, σ⟩ ⟨e', σ'⟩) :
+    (h : DetStep_discrete ⟨e, σ⟩ ⟨e', σ'⟩) :
     limExec ⟨.snd e, σ⟩ = limExec ⟨.snd e', σ'⟩ :=
-  limExec_detStep (DetStep.fill [.snd] h)
+  limExec_detStep (DetStep_discrete.fill [.snd] h)
 
 /-- Generic reducer for a binop on two literals: a single `BinOp.eval` evaluation
     is enough to obtain the `limExec` equation. Subsumes the old `limExec_*_lit_lit`
@@ -2272,7 +2272,7 @@ theorem limExec_binop_lit_lit (op : BinOp) {l1 l2 : BaseLit} {r : Exp} {σ : Sta
     (heval : BinOp.eval op (.lit l1) (.lit l2) = some r) :
     limExec ⟨.binop op (.lit l1) (.lit l2), σ⟩ = limExec ⟨r, σ⟩ := by
   have hnv : ¬ (Exp.binop op (.lit l1) (.lit l2)).isValue := by intro ⟨h⟩; cases h
-  exact limExec_detHeadStep hnv (DetHeadStep.binop .lit .lit heval σ)
+  exact limExec_detHeadStep hnv (DetHeadStep_discrete.binop .lit .lit heval σ)
 
 theorem limExec_plus_lit_lit (a b : Int) (σ : State) :
     limExec ⟨.binop .plus (.lit (.int a)) (.lit (.int b)), σ⟩
@@ -2313,13 +2313,13 @@ theorem limExec_lt_lit_lit (a b : Int) (σ : State) :
 theorem limExec_fst_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State) :
     limExec ⟨.fst (.pair e1 e2), σ⟩ = limExec ⟨e1, σ⟩ := by
   have hnv : ¬ (Exp.fst (.pair e1 e2)).isValue := by intro ⟨h⟩; cases h
-  exact limExec_detHeadStep hnv (DetHeadStep.fst_pair h1 h2 σ)
+  exact limExec_detHeadStep hnv (DetHeadStep_discrete.fst_pair h1 h2 σ)
 
 /-- Single-step reduction: `snd (pair v1 v2)` → `v2`. -/
 theorem limExec_snd_pair {e1 e2 : Exp} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State) :
     limExec ⟨.snd (.pair e1 e2), σ⟩ = limExec ⟨e2, σ⟩ := by
   have hnv : ¬ (Exp.snd (.pair e1 e2)).isValue := by intro ⟨h⟩; cases h
-  exact limExec_detHeadStep hnv (DetHeadStep.snd_pair h1 h2 σ)
+  exact limExec_detHeadStep hnv (DetHeadStep_discrete.snd_pair h1 h2 σ)
 
 /-- Cond reduction: applying `plProbNatRec_condE xs n` to `as_expr (idx, acc)`
     reduces to `lit (bool (decide (idx < n)))`. -/
@@ -2352,7 +2352,7 @@ theorem limExec_plProbNatRec_condE [ProbLangEmbeddable T]
   show limExec ⟨.binop .lt (.fst (.pair (.lit (.int idx)) (as_expr acc))) (.lit (.int n)), σ⟩ = _
   -- Reduce `fst pair → lit idx`, then the final binop, then collapse to dirac.
   rw [limExec_binopL_step .lit
-        (DetHeadStep.fst_pair .lit (as_expr_isVal acc) σ).toDetStep,
+        (DetHeadStep_discrete.fst_pair .lit (as_expr_isVal acc) σ).toDetStep,
       limExec_lt_lit_lit, limExec_of_isVal IsVal.lit]
 
 /-- Body-side embedding: `app bodyE (as_expr (idx, acc))` embeds `probNatRec_bodyUp step (idx, acc)`.
@@ -2404,8 +2404,8 @@ theorem plProbNatRec_bodyE_isEmbedding [SLangType T] [ProbLangEmbeddable T]
     (fun σ => ⟨?_, ?_⟩) ?_
   · -- ¬ isValue
     intro ⟨h⟩; cases h
-  · -- DetHeadStep
-    have h := DetHeadStep.app_lam hpair_isVal σ
+  · -- DetHeadStep_discrete
+    have h := DetHeadStep_discrete.app_lam hpair_isVal σ
       (body := Exp.close (probLangBind ws InnerArg PairExp) xs)
     rw [Exp.open_close_subst_lc_gen xs _ _ hBodyInner_lc hpair_lc] at h
     exact h
@@ -2441,13 +2441,13 @@ theorem plProbNatRec_bodyE_isEmbedding [SLangType T] [ProbLangEmbeddable T]
   · -- IsEmbedding of inner: app (app stepE (fst pair)) (snd pair).
     -- Reduce snd-pair → as_expr acc (under appR), then fst-pair → lit idx (under appR · appL).
     refine IsEmbedding.of_limExec_eq (fun σ => ?_) (hstep_emb idx acc)
-    have hstepFst : DetStep ⟨.app stepE (.fst pair_expr), σ⟩
+    have hstepFst : DetStep_discrete ⟨.app stepE (.fst pair_expr), σ⟩
                             ⟨.app stepE (.lit (.int idx)), σ⟩ := by
       rw [hpair_expr_def]
-      exact DetStep.fill [.appR stepE]
-        (DetHeadStep.fst_pair .lit (as_expr_isVal acc) σ).toDetStep
+      exact DetStep_discrete.fill [.appR stepE]
+        (DetHeadStep_discrete.fst_pair .lit (as_expr_isVal acc) σ).toDetStep
     rw [hpair_expr_def,
-        limExec_appR_step (DetHeadStep.snd_pair .lit (as_expr_isVal acc) σ).toDetStep,
+        limExec_appR_step (DetHeadStep_discrete.snd_pair .lit (as_expr_isVal acc) σ).toDetStep,
         ← hpair_expr_def,
         limExec_appL_step (as_expr_isVal acc) hstepFst]
     rfl
@@ -2473,18 +2473,18 @@ theorem plProbNatRec_bodyE_isEmbedding [SLangType T] [ProbLangEmbeddable T]
     -- Goal: limExec ⟨pair (binop plus (fst pair) (lit 1)) (as_expr acc'), σ⟩
     --     = limExec ⟨as_expr (idx+1, acc'), σ⟩, where as_expr (idx+1, acc') = pair (lit (idx+1)) (as_expr acc').
     rw [hpair_expr_def]
-    -- Step 1: build the `DetStep` for `binop plus (fst pair) (lit 1) → binop plus (lit idx) (lit 1)`.
-    have hFst : DetStep ⟨Exp.fst (.pair (.lit (.int idx)) (as_expr acc)), σ⟩
+    -- Step 1: build the `DetStep_discrete` for `binop plus (fst pair) (lit 1) → binop plus (lit idx) (lit 1)`.
+    have hFst : DetStep_discrete ⟨Exp.fst (.pair (.lit (.int idx)) (as_expr acc)), σ⟩
                         ⟨.lit (.int idx), σ⟩ :=
-      (DetHeadStep.fst_pair .lit (as_expr_isVal acc) σ).toDetStep
-    have hBinop : DetStep
+      (DetHeadStep_discrete.fst_pair .lit (as_expr_isVal acc) σ).toDetStep
+    have hBinop : DetStep_discrete
         ⟨.binop .plus (.fst (.pair (.lit (.int idx)) (as_expr acc))) (.lit (.int 1)), σ⟩
         ⟨.binop .plus (.lit (.int idx)) (.lit (.int 1)), σ⟩ :=
-      DetStep.fill [.binopL .plus ⟨.lit (.int 1), .lit⟩] hFst
+      DetStep_discrete.fill [.binopL .plus ⟨.lit (.int 1), .lit⟩] hFst
     rw [limExec_pairL_step (as_expr_isVal acc') hBinop]
     -- Step 2: binop plus → lit (idx+1), under pairL.
     rw [limExec_pairL_step (as_expr_isVal acc')
-          (DetHeadStep.binop (op := .plus) (e1 := .lit (.int idx)) (e2 := .lit (.int 1))
+          (DetHeadStep_discrete.binop (op := .plus) (e1 := .lit (.int idx)) (e2 := .lit (.int 1))
              .lit .lit rfl σ).toDetStep]
     -- Final: pair (lit (idx+1)) (as_expr acc') = as_expr (idx+1, acc') (defeq up to Int cast).
     have hidx_plus : (idx : Int) + 1 = ((idx + 1 : Nat) : Int) := by push_cast; ring
@@ -2661,7 +2661,7 @@ theorem probLangEq_uint8_isEmbedding (a b : UInt8) :
   have heval : BinOp.eval .eq (.lit (.int ↑a.toNat)) (.lit (.int ↑b.toNat)) = some result := by
     simp [BinOp.eval, result]
   have hred : ∃ ρ, 0 < headStep ⟨.binop .eq (.lit (.int ↑a.toNat)) (.lit (.int ↑b.toNat)), σ⟩ {ρ} :=
-    ⟨⟨result, σ⟩, (DetHeadStep.binop .lit .lit heval σ).pos⟩
+    ⟨⟨result, σ⟩, (DetHeadStep_discrete.binop .lit .lit heval σ).pos⟩
   rw [primStep_eq_headStep hred]
   show (headStep ⟨.binop .eq (.lit (.int ↑a.toNat)) (.lit (.int ↑b.toNat)), σ⟩).bind limExec = _
   simp only [headStep, Exp.isValM_some' IsVal.lit, heval, Option.unwrapM,

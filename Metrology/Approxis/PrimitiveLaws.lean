@@ -9,6 +9,8 @@ public import Metrology.Iris.ErrorCredits
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-!
 # Primitive Laws
 

@@ -16,7 +16,7 @@ namespace ProbLang
 
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
-/-! ## Bridge: `DetStep` ⇒ `pexecN 1 ρ = MeasureTheory.Measure.dirac ρ'` -/
+/-! ## Bridge: `DetStep_discrete` ⇒ `pexecN 1 ρ = MeasureTheory.Measure.dirac ρ'` -/
 
 /-- A sub-probability measure on a countable discrete space with singleton mass
 1 at `a` is the Dirac at `a`. -/
@@ -49,8 +49,8 @@ theorem Measure.eq_dirac_of_singleton_mass_one {α : Type _}
     intro x hx hxa
     exact ha (by simpa using hxa ▸ hx)
 
-/-- One-step deterministic advance: `DetStep ρ ρ'` gives `pexecN 1 ρ = dirac ρ'`. -/
-theorem pexecN_1_of_DetStep {ρ ρ' : Cfg rT} (h : DetStep ρ ρ') :
+/-- One-step deterministic advance: `DetStep_discrete ρ ρ'` gives `pexecN 1 ρ = dirac ρ'`. -/
+theorem pexecN_1_of_DetStep {ρ ρ' : Cfg rT} (h : DetStep_discrete ρ ρ') :
     pexecN 1 ρ = MeasureTheory.Measure.dirac ρ' := by
   rw [pexecN_one]
   have hnv : ¬ ρ.expr.isValue := by
@@ -60,8 +60,8 @@ theorem pexecN_1_of_DetStep {ρ ρ' : Cfg rT} (h : DetStep ρ ρ') :
   rw [stepOrFinal_not_isValue hnv]
   exact Measure.eq_dirac_of_singleton_mass_one h.det (primStep_univ_le_one ρ)
 
-/-- `n`-step version: `DetExec n ρ ρ'` gives `pexecN n ρ = dirac ρ'`. -/
-theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec n ρ ρ') :
+/-- `n`-step version: `DetExec_discrete n ρ ρ'` gives `pexecN n ρ = dirac ρ'`. -/
+theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec_discrete n ρ ρ') :
     pexecN n ρ = MeasureTheory.Measure.dirac ρ' := by
   induction n generalizing ρ with
   | zero =>
@@ -74,21 +74,21 @@ theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec n ρ ρ') :
         ih ⟨hrest⟩]
 
 omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- `nsteps PureStep n e1 e2` at a fixed state gives `DetExec n ⟨e1,σ⟩ ⟨e2,σ⟩`. -/
-theorem DetExec.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp rT} (σ : State rT)
-    (h : nsteps PureStep n e1 e2) :
-    DetExec n ⟨e1, σ⟩ ⟨e2, σ⟩ := by
+/-- `nsteps PureStep_discrete n e1 e2` at a fixed state gives `DetExec_discrete n ⟨e1,σ⟩ ⟨e2,σ⟩`. -/
+theorem DetExec_discrete.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp rT} (σ : State rT)
+    (h : nsteps PureStep_discrete n e1 e2) :
+    DetExec_discrete n ⟨e1, σ⟩ ⟨e2, σ⟩ := by
   induction n generalizing e1 with
   | zero => simp [nsteps] at h; subst h; exact ⟨rfl⟩
   | succ k ih =>
     obtain ⟨c, hstep, hrest⟩ := h
     exact (ih hrest).succ ⟨hstep.safe σ, hstep.det σ⟩
 
-/-- `PureExec φ n e1 e2 + φ` gives `pexecN n ⟨e1,σ⟩ = dirac ⟨e2,σ⟩`. -/
+/-- `PureExec_discrete φ n e1 e2 + φ` gives `pexecN n ⟨e1,σ⟩ = dirac ⟨e2,σ⟩`. -/
 theorem pexecN_of_PureExec {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
-    [h : PureExec φ n e1 e2] (σ : State rT) (hφ : φ) :
+    [h : PureExec_discrete φ n e1 e2] (σ : State rT) (hφ : φ) :
     pexecN n ⟨e1, σ⟩ = MeasureTheory.Measure.dirac ⟨e2, σ⟩ :=
-  pexecN_of_DetExec (DetExec.of_nsteps_PureStep σ (h.pure_exec hφ))
+  pexecN_of_DetExec (DetExec_discrete.of_nsteps_PureStep σ (h.pure_exec hφ))
 
 /-- Bridge: `ExtTreeMap.insert` and `PartialMap.insert` agree extensionally. -/
 theorem ExtTreeMap.insert_eq_PartialMap_insert {V : Type _}
@@ -98,16 +98,16 @@ theorem ExtTreeMap.insert_eq_PartialMap_insert {V : Type _}
     show (h.insert l v)[k]? = (h.alter l (fun _ => some v))[k]?
     simp [ExtTreeMap.getElem?_insert, ExtTreeMap.getElem?_alter]
 
-/-! ## Per-redex `DetHeadStep` lemmas (tape-flavored)
+/-! ## Per-redex `DetHeadStep_discrete` lemmas (tape-flavored)
 
-The heap variants `DetHeadStep.alloc`/`load`/`store` already live in `DetStep.lean`.
+The heap variants `DetHeadStep_discrete.alloc`/`load`/`store` already live in `DetStep_discrete.lean`.
 The two below are tape-specific and used by `step_alloctape` / `step_rand`. -/
 
 omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Tape allocation: `tape #z` deterministically allocates a fresh empty tape of
 bound `z`. -/
-theorem DetHeadStep.tape {z : Int} (σ : State rT) :
-    DetHeadStep ⟨.tape (.lit (.int z)), σ⟩
+theorem DetHeadStep_discrete.tape {z : Int} (σ : State rT) :
+    DetHeadStep_discrete ⟨.tape (.lit (.int z)), σ⟩
       ⟨.lit (.lbl σ.tapes.fresh),
        σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ :=
   .of_det_discrete _ _ (by simp [headStep])
@@ -115,10 +115,10 @@ theorem DetHeadStep.tape {z : Int} (σ : State rT) :
 omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Tape rand: with `σ.tapes[α] = some ⟨z, n :: ns⟩`, the random sample
 `rand z α` deterministically returns `n` and pops the head. -/
-theorem DetHeadStep.rand_tape {z : Int} (l : Loc)
+theorem DetHeadStep_discrete.rand_tape {z : Int} (l : Loc)
     (n : { k : Int // 0 ≤ k ∧ k < z }) (ns : List { k : Int // 0 ≤ k ∧ k < z })
     {σ : State rT} (htape : σ.tapes[l]? = some ⟨z, n :: ns⟩) :
-    DetHeadStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
+    DetHeadStep_discrete ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
       ⟨.lit (.int n), σ.update_tapes (·.insert l ⟨z, ns⟩)⟩ :=
   .of_det_discrete _ _ (by simp [headStep, htape])
 
@@ -130,9 +130,9 @@ variable {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [SpecGS rT GF]
 
 /-- Pure reduction under an evaluation context. -/
 theorem step_pure {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : ℕ}
-    (Hφ : φ) [Hex : PureExec φ n e e'] :
+    (Hφ : φ) [Hex : PureExec_discrete φ n e e'] :
     ⤇ (K.fill e) ⊢@{IProp GF} specUpdate rT E (⤇ (K.fill e')) := by
-  have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
+  have HexK : PureExec_discrete φ n (K.fill e) (K.fill e') := PureExec_discrete.fill K
   iintro HK
   unfold specUpdate
   iintro %ρ Hρ
@@ -172,7 +172,7 @@ theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
         σ.update_heap (·.insert σ.heap.fresh ⟨v, hv⟩) = σ' := by
       simp [hσ', State.update_heap, ExtTreeMap.insert_eq_PartialMap_insert, hl]
     rw [← hstate_eq]
-    exact ((DetHeadStep.alloc hv σ).toDetStep).fill K
+    exact ((DetHeadStep_discrete.alloc hv σ).toDetStep).fill K
   isplitl [HρFinal]
   · iassumption
   iexists σ.heap.fresh
@@ -194,7 +194,7 @@ theorem step_load {E : CoPset} (K : Ectx rT) {l : Loc} {v : Val rT} :
   iexists ⟨K.fill (Exp.ofVal v), σ⟩, 1
   isplitr
   · ipure_intro
-    exact pexecN_1_of_DetStep (((DetHeadStep.load σ Hlk).toDetStep).fill K)
+    exact pexecN_1_of_DetStep (((DetHeadStep_discrete.load σ Hlk).toDetStep).fill K)
   isplitl [HρNew]
   · iassumption
   isplitl [HKNew] <;> iassumption
@@ -225,7 +225,7 @@ theorem step_store {E : CoPset} (K : Ectx rT) {l : Loc} {e : Exp rT} {v_old v_ne
     have hstate_eq : σ.update_heap (·.insert l v_new) = σ' := by
       simp [hσ', State.update_heap, ExtTreeMap.insert_eq_PartialMap_insert]
     rw [← hstate_eq]
-    exact ((DetHeadStep.store hv σ Hlk hnew).toDetStep).fill K
+    exact ((DetHeadStep_discrete.store hv σ Hlk hnew).toDetStep).fill K
   isplitl [HρFinal]
   · iassumption
   isplitl [HKNew] <;> iassumption
@@ -257,7 +257,7 @@ theorem step_alloctape {E : CoPset} (K : Ectx rT) (z : Int) :
         σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z)) = σ' := by
       simp [hσ', State.update_tapes, ExtTreeMap.insert_eq_PartialMap_insert, hl]
     rw [← hstate_eq]
-    exact ((DetHeadStep.tape σ).toDetStep).fill K
+    exact ((DetHeadStep_discrete.tape σ).toDetStep).fill K
   isplitl [HρFinal]
   · iassumption
   iexists σ.tapes.fresh
@@ -290,7 +290,7 @@ theorem step_rand {E : CoPset} (K : Ectx rT) {z : Int} (l : Loc)
     have hstate_eq : σ.update_tapes (·.insert l ⟨z, ns⟩) = σ' := by
       simp [hσ', State.update_tapes, ExtTreeMap.insert_eq_PartialMap_insert]
     rw [← hstate_eq]
-    exact ((DetHeadStep.rand_tape l n ns Hlk).toDetStep).fill K
+    exact ((DetHeadStep_discrete.rand_tape l n ns Hlk).toDetStep).fill K
   isplitl [HρFinal]
   · iassumption
   isplitl [HKNew] <;> iassumption

@@ -13,6 +13,8 @@ public import Iris.ProofMode.InstancesUpdates
 
 @[expose] public section
 
+set_option linter.discrete false
+
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 
 namespace ProbLang
@@ -2494,9 +2496,9 @@ theorem wp_lift_pure_det_step {E E' : CoPset} {e₁ e₂ : (Exp rT)} {Φ : (Val 
 
 end ApproxisWpGS
 
-/-- Helper: if `PureStep e₁ e₂` and `0 < primStep ⟨e₁,σ⟩ {⟨e₂',σ₂⟩}`, then
+/-- Helper: if `PureStep_discrete e₁ e₂` and `0 < primStep ⟨e₁,σ⟩ {⟨e₂',σ₂⟩}`, then
 `σ₂ = σ ∧ e₂' = e₂`. -/
-theorem PureStep.prim_step_det {e₁ e₂ : (Exp rT)} (h : PureStep e₁ e₂)
+theorem PureStep_discrete.prim_step_det {e₁ e₂ : (Exp rT)} (h : PureStep_discrete e₁ e₂)
     {σ : (State rT)} {e₂' : (Exp rT)} {σ₂ : (State rT)}
     (hp : 0 < primStep ⟨e₁, σ⟩ {⟨e₂', σ₂⟩}) :
     σ₂ = σ ∧ e₂' = e₂ := by
@@ -2523,10 +2525,10 @@ theorem PureStep.prim_step_det {e₁ e₂ : (Exp rT)} (h : PureStep e₁ e₂)
 namespace ApproxisWpGS
 variable {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
 
-/-- `wp_pure_step_one` — single `PureStep` lifting. Single-step specialization of
+/-- `wp_pure_step_one` — single `PureStep_discrete` lifting. Single-step specialization of
 Rocq's `wp_pure_step_later` (with n = 1), directly consumable downstream. -/
 theorem wp_pure_step_one {E : CoPset} {e₁ e₂ : (Exp rT)} {Φ : (Val rT) → IProp GF}
-    (Hstep : PureStep e₁ e₂) :
+    (Hstep : PureStep_discrete e₁ e₂) :
     iprop(▷ wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
   iintro H
   have Hdet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂ :=
@@ -2534,13 +2536,13 @@ theorem wp_pure_step_one {E : CoPset} {e₁ e₂ : (Exp rT)} {Φ : (Val rT) → 
   iapply (wp_lift_pure_det_step (E' := E) (e₂ := e₂) Hstep.safe Hdet)
   imodintro; iintro !>; imodintro; iexact H
 
-/-- `wp_pure_step_fupd` — `PureExec` step lifting (n-step `step_fupd` form).
+/-- `wp_pure_step_fupd` — `PureExec_discrete` step lifting (n-step `step_fupd` form).
 
 The `Nat.repeat` is left as-is in the statement; callers unfold via
 `simp only [Nat.repeat]` after `iapply`. -/
 theorem wp_pure_step_fupd {E E' : CoPset} {e₁ e₂ : (Exp rT)} {φ : Prop} {n : Nat}
     {Φ : (Val rT) → IProp GF}
-    [Hex : PureExec φ n e₁ e₂] (Hφ : φ) :
+    [Hex : PureExec_discrete φ n e₁ e₂] (Hφ : φ) :
     iprop(|={E}[E']▷=>^[n] wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
   have Hsteps := Hex.pure_exec Hφ
   clear Hex
@@ -2561,13 +2563,13 @@ theorem wp_pure_step_fupd {E E' : CoPset} {e₁ e₂ : (Exp rT)} {φ : Prop} {n 
     iapply (IH Hrest)
     iexact H
 
-/-- `wp_pure_step_later` — `PureExec` step lifting (n-step `▷` form).
+/-- `wp_pure_step_later` — `PureExec_discrete` step lifting (n-step `▷` form).
 
 Proven via `wp_pure_step_fupd` by converting `▷^n` to `(|={E}[E]▷=>)^n` with
 a trivial mask-preserving step-fupd per layer. -/
 theorem wp_pure_step_later {E : CoPset} {e₁ e₂ : (Exp rT)} {φ : Prop} {n : Nat}
     {Φ : (Val rT) → IProp GF}
-    [Hex : PureExec φ n e₁ e₂] (Hφ : φ) :
+    [Hex : PureExec_discrete φ n e₁ e₂] (Hφ : φ) :
     Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (wp E e₂ Φ) ⊢@{IProp GF}
       wp E e₁ Φ := by
   refine BI.Entails.trans ?_ (wp_pure_step_fupd (E := E) (E' := E)

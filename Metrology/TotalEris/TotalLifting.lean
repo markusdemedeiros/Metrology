@@ -206,13 +206,13 @@ theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e�
   have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep (Hsafe σ)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)
 
-/-! ## `PureExec` integration -/
+/-! ## `PureExec_discrete` integration -/
 
-/-- From a single `PureStep e₁ e₂` (deterministic, state-preserving, safe),
+/-- From a single `PureStep_discrete e₁ e₂` (deterministic, state-preserving, safe),
 take one step. Used by the `n+1` case of `twp_pure_step_fupd`. -/
 theorem twp_lift_pure_det_step_of_pureStep
     {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
-    (h : PureStep e₁ e₂) :
+    (h : PureStep_discrete e₁ e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   -- The first reducibility witness gives us a non-value status.
   have hv : e₁.toVal? = none := by
@@ -246,7 +246,7 @@ theorem twp_lift_pure_det_step_of_pureStep
 /-- Take `n` pure-deterministic steps. Rocq: `twp_pure_step_fupd`. -/
 theorem twp_pure_step_fupd
     {E : CoPset} {Φ : Val rT → IProp GF} {n : ℕ} {e₁ e₂ : Exp rT}
-    (φ : Prop) [HEx : PureExec φ n e₁ e₂] (Hφ : φ) :
+    (φ : Prop) [HEx : PureExec_discrete φ n e₁ e₂] (Hφ : φ) :
     tglWp E e₂ Φ ⊢@{IProp GF} tglWp E e₁ Φ := by
   have Hex := HEx.pure_exec Hφ
   clear HEx

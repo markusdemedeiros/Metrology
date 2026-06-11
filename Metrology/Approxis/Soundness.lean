@@ -9,6 +9,8 @@ public import Metrology.ProbLang.ContextualRefinement
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # Soundness
 
 Soundness of the logical relation w.r.t. contextual refinement (precongruence + closed/open soundness theorems). -/

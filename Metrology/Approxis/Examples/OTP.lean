@@ -6,6 +6,8 @@ public import Metrology.Approxis.AdequacyRel
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # One-Time Pad refinement example, using modular addition as the combiner. -/
 
 namespace ProbLang
@@ -80,13 +82,13 @@ theorem otp_refines (m N : Int) (HN : 0 < N) :
   show ⊢@{IProp GF} iprop(refines ⊤
     (Ectx.fill ([] : Ectx) pl({Exp.lam (otpBody m N)} #(.int n)))
     pl(#(.int (addMod m N n))) lrel_int)
-  iapply (refines_pure_l (K := []) (Hex := pureExec_app_lam) IsVal.lit.toIsValue)
+  iapply (refines_pure_l (K := []) (Hex := pureExec_app_lam_discrete) IsVal.lit.toIsValue)
   simp only [Nat.repeat]
   iintro !>
   show ⊢@{IProp GF} iprop(refines ⊤
     (Kmod.fill pl(#(.int m) + #(.int n)))
     pl(#(.int (addMod m N n))) lrel_int)
-  iapply (refines_pure_l (K := Kmod) (Hex := pureExec_binop)
+  iapply (refines_pure_l (K := Kmod) (Hex := pureExec_binop_discrete)
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
   simp only [Nat.repeat]
   iintro !>
@@ -94,7 +96,7 @@ theorem otp_refines (m N : Int) (HN : 0 < N) :
     (Ectx.fill ([] : Ectx) pl(#(.int (m + n)) % #(.int N)))
     pl(#(.int (addMod m N n))) lrel_int)
   iapply (refines_pure_l (K := [])
-    (Hex := pureExec_binop)
+    (Hex := pureExec_binop_discrete)
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
   simp only [Nat.repeat]
   iintro !>
@@ -139,13 +141,13 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
     pl(#(.int n))
     (Ectx.fill ([] : Ectx) pl({Exp.lam (otpBody m N)} #(.int (addMod (-m) N n))))
     lrel_int)
-  iapply (refines_pure_r (K := ([] : Ectx)) (Hex := pureExec_app_lam) IsVal.lit.toIsValue)
+  iapply (refines_pure_r (K := ([] : Ectx)) (Hex := pureExec_app_lam_discrete) IsVal.lit.toIsValue)
   -- Step 2 (inner plus).
   show ⊢@{IProp GF} iprop(refines ⊤
     pl(#(.int n))
     (Kmod.fill pl(#(.int m) + #(.int (addMod (-m) N n))))
     lrel_int)
-  iapply (refines_pure_r (K := Kmod) (Hex := pureExec_binop)
+  iapply (refines_pure_r (K := Kmod) (Hex := pureExec_binop_discrete)
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
   -- Step 3 (outer mod).
   show ⊢@{IProp GF} iprop(refines ⊤
@@ -153,7 +155,7 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
     (Ectx.fill ([] : Ectx) pl(#(.int (m + addMod (-m) N n)) % #(.int N)))
     lrel_int)
   iapply (refines_pure_r (K := ([] : Ectx))
-    (Hex := pureExec_binop)
+    (Hex := pureExec_binop_discrete)
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
   -- The RHS-reduced value is `(m + (n + (-m)) % N) % N = n` by addMod_neg_inv.
   rw [show (m + addMod (-m) N n) % N = n from addMod_neg_inv m N n Hn0 HnN]

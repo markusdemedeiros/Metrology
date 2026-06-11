@@ -8,6 +8,8 @@ public import Metrology.Approxis.OpenInv
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # Relational Rules -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
@@ -32,10 +34,10 @@ theorem nat_repeat_later_eq_laterN (n : Nat) (P : IProp GF) :
 /-- `refines_pure_l` (app_rel_rules.v:27): if `e` pure-steps to `e'` in `n` steps,
 `▷^n (REL K[e'] << t : A) ⊢ REL K[e] << t : A`. -/
 theorem refines_pure_l {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
-    {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
+    {φ : Prop} {n : ℕ} [Hex : PureExec_discrete φ n e e'] (Hφ : φ) :
     Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (refines E (K.fill e') t A)
       ⊢@{IProp GF} refines E (K.fill e) t A := by
-  have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
+  have HexK : PureExec_discrete φ n (K.fill e) (K.fill e') := PureExec_discrete.fill K
   unfold refines
   iintro H
   iintro %K' %ε HK Hna Herr Hpos
@@ -70,7 +72,7 @@ theorem refines_pure_l {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT
 
 /-- `refines_pure_r` (app_rel_rules.v:73): RHS pure step. -/
 theorem refines_pure_r {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
-    {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
+    {φ : Prop} {n : ℕ} [Hex : PureExec_discrete φ n e e'] (Hφ : φ) :
     refines E t (K.fill e') A ⊢@{IProp GF} refines E t (K.fill e) A := by
   unfold refines
   iintro H

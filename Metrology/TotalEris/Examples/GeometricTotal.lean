@@ -185,7 +185,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
             (.lit (.int 1)))])
     iapply hBindCond0
     -- Step B: reduce `binop eq 0 0 → lit true` (pure step). `ofVal` is reducible;
-    -- normalise so the goal exposes the literal form before invoking `PureExec`.
+    -- normalise so the goal exposes the literal form before invoking `PureExec_discrete`.
     simp only [Exp.ofVal]
     iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
       (e₁ := (Exp.binop .eq (Exp.lit (.int 0)) (Exp.lit (.int 0)) : Exp rT))
@@ -199,12 +199,12 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     -- Step C: value collapse — `tglWp E (lit true) (fun v => P v) ⊢ P (lit true)`.
     iapply (ErisWpGS.tglWp_value_of_toVal
       (v := ⟨.lit (.bool true), IsVal.lit⟩) rfl)
-    -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true`.
+    -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true_discrete`.
     -- After C, the goal still has `cond (ofVal ⟨lit true, lit⟩) …`. The
-    -- `PureExec`/`iapply` unifier won't reduce `ofVal` even though defeq —
+    -- `PureExec_discrete`/`iapply` unifier won't reduce `ofVal` even though defeq —
     -- so `simp only [Exp.ofVal]` makes the literal form syntactic.
     simp only
-    -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true`.
+    -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true_discrete`.
     twp_pure_at
       (Exp.cond (.lit (.bool true)) (.lit (.int 0))
         (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
@@ -254,7 +254,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     iapply (ErisWpGS.tglWp_value_of_toVal
       (v := ⟨.lit (.bool false), IsVal.lit⟩) rfl)
     simp only
-    -- Step D: `cond (lit false) et ef → ef` via `pureExec_cond_false`.
+    -- Step D: `cond (lit false) et ef → ef` via `pureExec_cond_false_discrete`.
     twp_pure_at
       (Exp.cond (.lit (.bool false)) (.lit (.int 0))
         (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))

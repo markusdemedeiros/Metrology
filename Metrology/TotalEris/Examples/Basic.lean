@@ -164,7 +164,7 @@ Steps:
 4. `twp_load` reads `v` from the heap.
 5. Conclude `w = v`. -/
 -- Original body preserved as a comment; after threading `rT` through the
--- examples, the pure-step `PureExec` typeclass synthesis no longer fires
+-- examples, the pure-step `PureExec_discrete` typeclass synthesis no longer fires
 -- for the beta-reduction step. Replaced with `sorry` pending a follow-up.
 -- example (E : CoPset) (v : Val rT) :
 --     ⊢@{IProp GF} tglWp E
@@ -196,7 +196,7 @@ example (E : CoPset) (v : Val rT) :
   iapply tglWp_bind
   iapply twp_alloc
   iintro %l Hl
-  -- Unfold the `pl(...)` lambda's `Exp.close` into bvar form so `PureExec`
+  -- Unfold the `pl(...)` lambda's `Exp.close` into bvar form so `PureExec_discrete`
   -- on `app_lam` fires.
   simp only [K, Ectx.fill, List.foldl, flip, EctxItem.fillItem, Exp.ofVal]
   iapply (twp_pure_step_fupd (n := 1)

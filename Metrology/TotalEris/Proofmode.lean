@@ -33,7 +33,7 @@ macro_rules
 /-! ### Pure-step tactics
 
 `twp_pure` is the bare macro and works only when the typeclass search for
-the `PureExec` instance can fire without seeing metavariables. For the
+the `PureExec_discrete` instance can fire without seeing metavariables. For the
 common `(λ. _) v` beta-step pattern, this requires `v` to be syntactically
 present in the goal. If `twp_pure` fails (typically with "max recursion"
 or "Tactic `assumption` failed"), fall back to the explicit form:
@@ -43,7 +43,7 @@ iapply (ErisWpGS.twp_pure_step_fupd
   (n := 1) (e₁ := <full LHS>) (e₂ := <full RHS>) (φ := <isValue>) ⟨IsVal.lit⟩)
 ```
 
-— pinning enough arguments lets the relevant `PureExec` instance unify. -/
+— pinning enough arguments lets the relevant `PureExec_discrete` instance unify. -/
 
 syntax "twp_pure" : tactic
 macro_rules
@@ -56,19 +56,19 @@ macro_rules
     `(tactic| (try repeat twp_pure))
 
 /-- `twp_pure_at <e₁> ↦ <e₂>` — explicit pure-step with both endpoints
-pinned. Use when `twp_pure`'s implicit `PureExec` synthesis fails because
+pinned. Use when `twp_pure`'s implicit `PureExec_discrete` synthesis fails because
 typeclass search can't see through an opaque definition in the LHS. The
 precondition `φ` is left implicit (synthesized from the chosen
-`PureExec` instance) and `Hφ` is discharged via the `True.intro` term
-`trivial` — this works when the `PureExec` instance has `φ = True` (e.g.
-`pureExec_cond_true`, `pureExec_cond_false`). -/
+`PureExec_discrete` instance) and `Hφ` is discharged via the `True.intro` term
+`trivial` — this works when the `PureExec_discrete` instance has `φ = True` (e.g.
+`pureExec_cond_true_discrete`, `pureExec_cond_false_discrete`). -/
 macro "twp_pure_at " e1:term:max " ↦ " e2:term:max : tactic =>
   `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
       (n := 1) (e₁ := $e1) (e₂ := $e2) _ trivial))
 
 /-- `twp_pure_at <e₁> ↦ <e₂> by <hφ>` — variant with an explicit proof of
-the `PureExec` precondition (needed when `trivial` can't discharge it,
-e.g., for `pureExec_binop` whose `φ` is a value-and-equation conjunction). -/
+the `PureExec_discrete` precondition (needed when `trivial` can't discharge it,
+e.g., for `pureExec_binop_discrete` whose `φ` is a value-and-equation conjunction). -/
 macro "twp_pure_at " e1:term:max " ↦ " e2:term:max " by " h:term : tactic =>
   `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
       (n := 1) (e₁ := $e1) (e₂ := $e2) _ $h))

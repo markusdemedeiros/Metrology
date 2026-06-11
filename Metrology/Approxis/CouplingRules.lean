@@ -6,6 +6,8 @@ public import Metrology.ProbLang.Metatheory
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-!
 # Coupling Rules
 

@@ -11,6 +11,8 @@ public import Iris.Instances.Lib.FUpd
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # Relational adequacy: bridging parametric `refines` to an `AddCoupl` on `limExec`. -/
 
 namespace ProbLang

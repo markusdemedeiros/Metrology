@@ -4,6 +4,8 @@ public import Metrology.Approxis.AppWeakestpre
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # Lifting lemmas translating operational semantics rules into program-logic rules. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS

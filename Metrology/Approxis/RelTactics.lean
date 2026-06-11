@@ -6,6 +6,8 @@ public import Metrology.Approxis.AppRelRules
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-! # Relational tactics: macro wrappers around `refines_*` lemmas, mirroring Rocq's `rel_*`. -/
 
 namespace ProbLang

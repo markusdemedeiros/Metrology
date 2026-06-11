@@ -7,6 +7,8 @@ public import Metrology.ProbLang.Syntax.Types
 
 @[expose] public section
 
+set_option linter.discrete false
+
 /-!
 # Type Interpretation
 

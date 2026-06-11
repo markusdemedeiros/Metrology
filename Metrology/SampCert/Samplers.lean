@@ -68,10 +68,10 @@ theorem plProbUniformByteUpperBits_isEmbedding
   rw [hsubst2]
   refine IsEmbedding.of_limExec_eq (fun σ => ?_) probLangPure_isEmbedding
   -- Two det reductions: minus → lit (8 - i) under [binopR shr], then shr → lit ((b/2^(8-i)).
-  have hMinus : DetStep
+  have hMinus : DetStep_discrete
       ⟨.binop .minus (.lit (.int 8)) (.lit (.int i)), σ⟩
       ⟨.lit (.int ((8 : Int) - i)), σ⟩ :=
-    (DetHeadStep.binop .lit .lit (op := .minus) rfl σ).toDetStep
+    (DetHeadStep_discrete.binop .lit .lit (op := .minus) rfl σ).toDetStep
   rw [limExec_binopR_step (e1 := .lit (.int b.toNat)) hMinus, limExec_shr_lit_lit]
   -- Numeric equality: (b.toNat : Int) / 2^(8-i).toNat = b.toNat.shiftRight (8-i).
   show limExec ⟨.lit _, σ⟩ = limExec ⟨.lit _, σ⟩
@@ -345,10 +345,10 @@ theorem plProbUniformP2_step_isEmbedding {kV accV vV : Var}
   rw [hsubst3]
   refine IsEmbedding.of_limExec_eq (fun σ => ?_) probLangPure_isEmbedding
   -- Two det reductions: mult → lit (256*acc) under [binopL plus (lit b.toNat, val)], then plus → lit (256*acc+b.toNat).
-  have hMult : DetStep
+  have hMult : DetStep_discrete
       ⟨.binop .mult (.lit (.int UInt8.size)) (.lit (.int acc)), σ⟩
       ⟨.lit (.int (UInt8.size * acc)), σ⟩ :=
-    (DetHeadStep.binop .lit .lit (op := .mult) (by simp [BinOp.eval]) σ).toDetStep
+    (DetHeadStep_discrete.binop .lit .lit (op := .mult) (by simp [BinOp.eval]) σ).toDetStep
   rw [limExec_binopL_step .lit hMult, limExec_plus_lit_lit]
   rfl
 
