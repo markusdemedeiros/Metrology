@@ -68,9 +68,9 @@ theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.AllocS (Exp.toVal?_ofVal v) rfl rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | AllocS hvd hl hσ =>
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hl; subst hσ
@@ -97,9 +97,9 @@ theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} 
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.LoadS hlook rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | LoadS hlook' hofv =>
     rw [hlook] at hlook'; cases hlook'; subst hofv
@@ -124,9 +124,9 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
   · ipure_intro
     exact ⟨_, HeadStepSupport.StoreS (Exp.toVal?_ofVal v)
       (by rw [hlook]; exact Option.isSome_some) rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | StoreS hvd _ hσ =>
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hσ
@@ -154,9 +154,9 @@ theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | TapeS hl hσ =>
     subst hl; subst hσ
@@ -185,10 +185,10 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     exact .RandNoTapeS Hz (_root_.le_refl _) Hz
   iintro %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandNoTapeS _ Hv0 Hvz =>
     imodintro
@@ -218,9 +218,9 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int}
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.RandTapeS hlook rfl rfl rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandTapeS hlook' _ hv hσ =>
     rw [hlook] at hlook'
@@ -258,10 +258,10 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     exact .RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl
   iintro %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandTapeS hlook' _ _ _ =>
     rw [hlook] at hlook'; cases hlook'

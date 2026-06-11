@@ -235,7 +235,7 @@ theorem MeasurableSet.cover_inter_preimage_of_subtype
   exact MeasurableSet.subtype_image hcov ((subtype_preimage_eq f G) ▸ h hG)
 
 @[discrete]
-theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
+theorem Discrete.measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     [Countable α] (μ : Measure α) (S : Set α) (hS : 0 < μ S) :
     ∃ x ∈ S, 0 < μ {x} := by
   by_contra! h
@@ -246,14 +246,14 @@ theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [Measura
   exact absurd this (ne_of_gt hS)
 
 @[discrete]
-theorem map_singleton_pos {α β : Type _}
+theorem Discrete.map_singleton_pos {α β : Type _}
     [MeasurableSpace α] [MeasurableSpace β]
     [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β] [Countable α]
     {f : α → β} {μ : Measure α} {b : β}
     (h : 0 < (μ.map f) {b}) :
     ∃ a, f a = b ∧ 0 < μ {a} := by
   rw [Measure.map_apply (by measurability) (by measurability)] at h
-  obtain ⟨a, ha, hpos⟩ := measure_pos_of_singleton_pos μ _ h
+  obtain ⟨a, ha, hpos⟩ := Discrete.measure_pos_of_singleton_pos μ _ h
   simp [Set.mem_preimage, Set.mem_singleton_iff] at ha
   exact ⟨a, ha, hpos⟩
 
@@ -281,7 +281,7 @@ theorem Measure.bind_map_comm {α β γ : Type*}
 
 abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDensity f
 
-theorem count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
+theorem Discrete.count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
     (f : T → ENNReal) (t : T) : count f {t} = f t := by simp
 
 /-! ### Building `MeasurableEmbedding` from a π-system of rectangles.
@@ -2561,7 +2561,7 @@ theorem List.measurable_foldl {α β : Type _} [MeasurableSpace α] [MeasurableS
           '' ((@Sigma.mk ℕ (fun k => (Fin k → β) × α) k₀) ⁻¹' U) := by
     ext q
     obtain ⟨⟨k, g⟩, a⟩ := q
-    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_image, Prod.map_apply, id_eq]
+    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_image]
     constructor
     · intro h
       exact ⟨k, (g, a), h, rfl⟩
@@ -2594,7 +2594,7 @@ theorem Fin.measurable_snoc {n : ℕ} {β : Type _} [MeasurableSpace β] :
     rw [show (fun p : (Fin n → β) × β => ((@Fin.snoc n (fun _ => β) p.1 p.2) i : β))
           = fun p => p.1 ⟨i.val, h⟩ from funext heq]
     exact (measurable_pi_apply _).comp measurable_fst
-  · push_neg at h
+  · push Not at h
     have hi : i = Fin.last n := Fin.ext (le_antisymm (Nat.lt_succ_iff.mp i.isLt) h)
     have heq : ∀ p : (Fin n → β) × β, ((@Fin.snoc n (fun _ => β) p.1 p.2) i : β) = p.2 := by
       intro p; rw [hi, Fin.snoc_last]
@@ -2621,7 +2621,7 @@ theorem measurable_sigma_snoc {β : Type _} [MeasurableSpace β] :
               ⁻¹' ((@Sigma.mk ℕ (fun k => Fin k → β) (k₀ + 1)) ⁻¹' U)) := by
     ext q
     obtain ⟨⟨k, g⟩, b⟩ := q
-    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_image, Prod.map_apply, id_eq]
+    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_image]
     constructor
     · intro h
       exact ⟨k, (g, b), h, rfl⟩
@@ -2665,14 +2665,14 @@ theorem List.measurable_append_singleton {β : Type _} [MeasurableSpace β] :
     · have hcast : (⟨i.val, hlt⟩ : Fin (L.length + 1))
           = ((⟨i.val, hi⟩ : Fin L.length).castSucc) := Fin.ext rfl
       rw [hcast, Fin.snoc_castSucc]
-      simp [List.getElem_append, hi]
-    · push_neg at hi
+      simp [hi]
+    · push Not at hi
       have hival : i.val = L.length := by omega
       have hcast : ((⟨i.val, hlt⟩ : Fin (L.length + 1)))
           = Fin.last L.length := Fin.ext hival
       rw [hcast, Fin.snoc_last]
       have hi' : ¬ i.val < L.length := Nat.not_lt.mpr hi
-      simp [List.getElem_append, hi', hival]
+      simp [hival]
   rw [hrw]
   exact measurable_sigma_snoc.comp
     ((List.measurable_toSigma).comp measurable_fst |>.prodMk measurable_snd)

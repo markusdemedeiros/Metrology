@@ -109,7 +109,7 @@ singleton decomposition, using monotone convergence (`lintegral_iSup`) to
 swap the `iSup` in `limExec` with the outer `lintegral` from `bind_apply`.
 The trickiest step — that the `iSup` of measures agrees pointwise on sets
 with the pointwise `iSup` — is avoided by going through singletons
-(where `limExec_apply` already supplies the needed equation) and then
+(where `Discrete.limExec_apply` already supplies the needed equation) and then
 decomposing arbitrary sets via `⋃ c ∈ S, {c}`, mirroring `limExec_univ`.
 -/
 
@@ -118,18 +118,18 @@ through `limExec` on any expression `e`.
 
 Proof sketch: both sides of the equation are measures on `Cfg` determined
 by their values on singletons. On a singleton `{c}`, both reduce via
-`limExec_apply` to an iSup of `execN n _ {c}` values. The hypothesis `h e n`,
+`Discrete.limExec_apply` to an iSup of `execN n _ {c}` values. The hypothesis `h e n`,
 applied at `{c}`, gives exactly what we need to collapse the outer
-`lintegral` to a constant `(execN n ⟨e, σ⟩) {c}`, and then `limExec_apply`
+`lintegral` to a constant `(execN n ⟨e, σ⟩) {c}`, and then `Discrete.limExec_apply`
 reassembles the RHS. Monotone convergence (`lintegral_iSup`) handles the
 swap between `lintegral` and `iSup`. -/
 theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
     μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
   refine Cfg.measure_ext_singletons fun c => ?_
-  -- LHS: apply `bind_apply`, then unfold `limExec` at singleton via `limExec_apply`.
+  -- LHS: apply `bind_apply`, then unfold `limExec` at singleton via `Discrete.limExec_apply`.
   rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-  simp_rw [limExec_apply]
+  simp_rw [Discrete.limExec_apply]
   -- Swap `lintegral` with `iSup`: monotone convergence.
   rw [lintegral_iSup
         (fun _ => Measurable.of_discrete)
@@ -142,7 +142,7 @@ theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
     have hμ := congrArg (fun ν => ν ({c} : Set (Cfg rT))) (h e n)
     simpa [bind_apply MeasurableSet.of_discrete
              Measurable.of_discrete.aemeasurable] using hμ
-  simp only [hbind, ← limExec_apply]
+  simp only [hbind, ← Discrete.limExec_apply]
 
 /-- `dret v = μ >>= (λ _, dret v)` when `e` is already a value. This is
 the specialization of `Erasable.lim_exec` to the value case. -/

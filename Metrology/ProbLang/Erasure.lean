@@ -155,7 +155,7 @@ theorem primStep_tape_persists_support [Countable rT] [MeasurableSingletonClass 
     ∃ t' : Tape, ρ.state.tapes[αloc]? = some t' ∧ t'.bound = t.bound := by
   obtain ⟨e₂, σ₂⟩ := ρ
   obtain ⟨K, e₁', e₂', _hfill1, _hfill2, hhs⟩ := prim_step_iff.mp hρ
-  rw [headStep_support_iff] at hhs
+  rw [Discrete.headStep_support_iff] at hhs
   -- Case-split on the `HeadStepSupport` constructor; in each case,
   -- determine what happens to tape α.
   cases hhs with

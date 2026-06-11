@@ -24,8 +24,8 @@ theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val r
         |={E, ∅}=>
         ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
-          (⌜Reducible e₁ σ₁⌝) ∗
-          (⌜Reducible e₁' σ₁'⌝) ∗
+          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
+          (⌜Discrete.Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
           (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
@@ -65,8 +65,8 @@ theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val 
       (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε) -∗
         |={E, ∅}=>
         ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal),
-          (⌜Reducible e₁ σ₁⌝) ∗
-          (⌜Reducible e₁' σ₁'⌝) ∗
+          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
+          (⌜Discrete.Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
           (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
@@ -108,8 +108,8 @@ theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : (Exp rT)}
         |={E, ∅}=>
         ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
-          (⌜Reducible e₁ σ₁⌝) ∗
-          (⌜Reducible e₁' σ₁'⌝) ∗
+          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
+          (⌜Discrete.Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
           (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →

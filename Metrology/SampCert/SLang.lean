@@ -86,7 +86,7 @@ theorem iSup_mul_iSup_of_monotone {f g : ℕ → ENNReal} (hf : Monotone f) (hg 
 theorem execN_fill_item_le (Ki : EctxItem) (n : Nat) {e : Exp} {σ : State} {c : Cfg} :
     execN n (Ki.fillItemCfg ⟨e, σ⟩) {c} ≤
       ∑' a, execN n ⟨Ki.fillItem a.expr, a.state⟩ {c} * execN n ⟨e, σ⟩ {a} := by
-  rw [execN_fill_item_eq]
+  rw [Discrete.execN_fill_item_eq]
   rw [ENNReal.tsum_comm]
   apply ENNReal.tsum_le_tsum; intro a
   -- RHS per a: expand execN n {a} via execExactN_sum, distribute
@@ -103,7 +103,7 @@ theorem execN_fill_item_le (Ki : EctxItem) (n : Nat) {e : Exp} {σ : State} {c :
 theorem execN_fill_item_ge (Ki : EctxItem) (i j : Nat) {e : Exp} {σ : State} {c : Cfg} :
     ∑' a, execN i (Ki.fillItemCfg a) {c} * execN j ⟨e, σ⟩ {a} ≤
       execN (i + j) (Ki.fillItemCfg ⟨e, σ⟩) {c} := by
-  rw [execN_fill_item_eq]
+  rw [Discrete.execN_fill_item_eq]
   -- RHS = ∑' k a, execExactN k ... {a} * execN ((i+j)-k) ... {c}
   -- Bound: restrict to k < j terms, and use (i+j)-k ≥ i for k < j
   rw [ENNReal.tsum_comm]
@@ -132,7 +132,7 @@ theorem limExec_fill_item (Ki : EctxItem) {e : Exp} {σ : State} :
   unfold limExec
   -- Goal: (⨆ i, execN i ⟨Ki.fillItem e, σ⟩) {c} =
   --   ∑' a, (⨆ i, execN i ⟨Ki.fillItem a.expr, a.state⟩) {c} * (⨆ i, execN i ⟨e, σ⟩) {a}
-  simp only [iSup_measure_apply]
+  simp only [Discrete.iSup_measure_apply]
   -- Goal: ⨆ i, execN i ... {c} = ∑' a, (⨆ i, execN i ... {c}) * (⨆ i, execN i ... {a})
   apply le_antisymm
   · -- ≤: use execN_fill_item_le + monotonicity
@@ -191,7 +191,7 @@ theorem execN_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
     have hunion : (headStep ρ) ({ρ'} ∪ {c}) = (headStep ρ) {ρ'} + (headStep ρ) {c} :=
       measure_union hdisj (MeasurableSet.singleton c)
     have hsub : (headStep ρ) ({ρ'} ∪ {c}) ≤ 1 :=
-      (measure_mono (Set.subset_univ _)).trans (headStep_univ_le_one ρ)
+      (measure_mono (Set.subset_univ _)).trans (Discrete.headStep_univ_le_one ρ)
     rw [hunion, h.det] at hsub
     have : 1 + (headStep ρ) {c} ≤ 1 + 0 := by simpa using hsub
     have hfin : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
@@ -209,7 +209,7 @@ theorem execN_le_limExec (n : Nat) (ρ : Cfg) : execN n ρ ≤ limExec ρ :=
 
 /-- A deterministic step (under any ectx) preserves `limExec`. -/
 theorem limExec_detStep {ρ ρ' : Cfg} (h : DetStep ρ ρ') : limExec ρ = limExec ρ' := by
-  have hnv : ¬ ρ.expr.isValue := val_stuck (h.det ▸ one_pos)
+  have hnv : ¬ ρ.expr.isValue := Discrete.val_stuck (h.det ▸ one_pos)
   rw [limExec_not_final hnv]
   -- primStep ρ = dirac ρ' since primStep ρ {ρ'} = 1 and total mass ≤ 1.
   have hother : ∀ c ≠ ρ', (primStep ρ) {c} = 0 := by
@@ -243,7 +243,7 @@ theorem limExec_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
     have hunion : (headStep ρ) ({ρ'} ∪ {c}) = (headStep ρ) {ρ'} + (headStep ρ) {c} :=
       measure_union hdisj (MeasurableSet.singleton c)
     have hsub : (headStep ρ) ({ρ'} ∪ {c}) ≤ 1 :=
-      (measure_mono (Set.subset_univ _)).trans (headStep_univ_le_one ρ)
+      (measure_mono (Set.subset_univ _)).trans (Discrete.headStep_univ_le_one ρ)
     rw [hunion, h.det] at hsub
     have : 1 + (headStep ρ) {c} ≤ 1 + 0 := by simpa using hsub
     have hfin : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
@@ -454,7 +454,7 @@ theorem probLangUniformByte_isEmbedding :
   have hred : ∃ ρ, 0 < headStep ⟨probLangUniformByte, σ⟩ {ρ} := by
     rw [show probLangUniformByte = Exp.rand (.lit (.int 256)) (.lit .unit) from rfl]
     simp only [headStep]
-    exact ⟨_, Cfg.uniform_singleton_pos_of_mem (v := 0) (by norm_num) (by norm_num) (by norm_num)⟩
+    exact ⟨_, Discrete.Cfg.uniform_singleton_pos_of_mem (v := 0) (by norm_num) (by norm_num) (by norm_num)⟩
   rw [primStep_eq_headStep hred]
   show (headStep ⟨probLangUniformByte, σ⟩).bind limExec = _
   have hhead : headStep ⟨probLangUniformByte, σ⟩ = Cfg.uniform 256 σ := by
@@ -896,7 +896,7 @@ theorem SLang_spec_probWhileCut_le [SLangType T] [ProbLangEmbeddable T]
       -- count (probPure t) = dirac t
       have hc_eq : _root_.count (SLang.probPure t) = (dirac t : Measure T) := by
         refine Measure.ext_of_singleton fun u => ?_
-        rw [_root_.count_singleton]
+        rw [_root_.Discrete.count_singleton]
         unfold SLang.probPure
         rw [dirac_apply' _ (MeasurableSet.singleton u)]
         by_cases hut : u = t
@@ -967,7 +967,7 @@ theorem SLang.spec_iSup_of_monotone [SLangType T] [ProbLangEmbeddable T]
     {s : ℕ → SLang T} (hmono : ∀ t, Monotone (s · t)) (σ : State) :
     SLang.spec (fun t => ⨆ k, s k t) σ = ⨆ k, SLang.spec (s k) σ := by
   refine Measure.ext_of_singleton fun c => ?_
-  rw [SLang.spec_iSup_of_monotone_apply hmono σ c, iSup_measure_apply]
+  rw [SLang.spec_iSup_of_monotone_apply hmono σ c, Discrete.iSup_measure_apply]
 
 /-- The recurrence at the `SLang.spec` level: mirrors `limExec_probLangWhile_recurrence`.
     `SLang.spec (probWhile t)` is a fixed point of the same operator that `limExec ⟨.app F …⟩`
@@ -1026,7 +1026,7 @@ theorem SLang.spec_probWhile_recurrence [SLangType T] [ProbLangEmbeddable T]
       symm
       apply Measure.ext_of_singleton
       intro c
-      rw [iSup_measure_apply]
+      rw [Discrete.iSup_measure_apply]
       simp_rw [Measure.bind_apply (MeasurableSet.singleton c)
         Measurable.of_discrete.aemeasurable]
       -- Pointwise inside the integrals: spec (probWhile t') σ {c} = ⨆ k, spec (probWhileCut k t') σ {c}.
@@ -1085,7 +1085,7 @@ theorem SLang.spec_probWhile_recurrence [SLangType T] [ProbLangEmbeddable T]
         unfold SLang.spec
         have hc_eq : _root_.count (SLang.probPure t) = (dirac t : Measure T) := by
           refine Measure.ext_of_singleton fun u => ?_
-          rw [_root_.count_singleton]
+          rw [_root_.Discrete.count_singleton]
           unfold SLang.probPure
           rw [dirac_apply' _ (MeasurableSet.singleton u)]
           by_cases hut : u = t
@@ -1104,7 +1104,7 @@ theorem SLang.spec_probWhile_recurrence [SLangType T] [ProbLangEmbeddable T]
       unfold SLang.spec
       have hc_eq : _root_.count (SLang.probPure t) = (dirac t : Measure T) := by
         refine Measure.ext_of_singleton fun u => ?_
-        rw [_root_.count_singleton]
+        rw [_root_.Discrete.count_singleton]
         unfold SLang.probPure
         rw [dirac_apply' _ (MeasurableSet.singleton u)]
         by_cases hut : u = t
@@ -1183,7 +1183,7 @@ theorem probLangWhile_isEmbedding [SLangType T] [ProbLangEmbeddable T]
       -- Take iSup over n. limExec = iSup execN. ν is constant in n.
       have h_sing : ∀ c, limExec ⟨.app F (as_expr init), σ⟩ {c} ≤ ν init {c} := by
         intro c
-        rw [limExec_apply]
+        rw [Discrete.limExec_apply]
         exact iSup_le (fun n => hMain n c init)
       -- Now extend the singleton bound to all measurable sets.
       -- Use a simpler lemma: if μ {c} ≤ ν {c} for all c on a countable space, then μ ≤ ν.

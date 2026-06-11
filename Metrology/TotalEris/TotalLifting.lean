@@ -49,7 +49,7 @@ Rocq: `twp_lift_step_fupd`. -/
 theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗
         |={∅}=> |={∅, E}=>
@@ -90,7 +90,7 @@ of the stepped expression). Rocq: `twp_lift_atomic_step_fupd`. -/
 theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E₁}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E₁}=>
           stateInterp σ₂ ∗
@@ -125,7 +125,7 @@ theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e�
 Rocq: `twp_lift_pure_step`. -/
 theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none)
-    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (Hsafe : ∀ σ₁, Discrete.Reducible e₁ σ₁)
     (Hstep : ∀ σ₁ e₂ σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} → σ₂ = σ₁) :
     iprop(|={E}=>
       ∀ (e₂ : Exp rT) (σ : State rT),
@@ -151,7 +151,7 @@ theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
 /-- Single deterministic pure step. Rocq: `twp_lift_pure_det_step`. -/
 theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
-    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (Hsafe : ∀ σ₁, Discrete.Reducible e₁ σ₁)
     (Hpuredet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} →
       σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
@@ -189,7 +189,7 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   ispecialize H $$ %σ₁ Hσ
   imod H with ⟨%Hhred, HCont⟩
   imodintro
-  isplitr; · ipure_intro; exact Reducible.of_head Hhred
+  isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
   iintro %e₂ %σ₂ %Hpstep
   have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := heq ▸ Hpstep
@@ -201,7 +201,7 @@ theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e�
     (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
     (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
-  iapply twp_lift_pure_det_step hv (Hsafe := fun σ => Reducible.of_head (Hsafe σ))
+  iapply twp_lift_pure_det_step hv (Hsafe := fun σ => Discrete.Reducible.of_head (Hsafe σ))
   intros σ e₂' σ₂ hp
   have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep (Hsafe σ)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)
@@ -217,7 +217,7 @@ theorem twp_lift_pure_det_step_of_pureStep
   -- The first reducibility witness gives us a non-value status.
   have hv : e₁.toVal? = none := by
     obtain ⟨ρ, hρ⟩ := h.safe default
-    exact Exp.toVal?_eq_none.mpr (val_stuck hρ)
+    exact Exp.toVal?_eq_none.mpr (Discrete.val_stuck hρ)
   iapply twp_lift_pure_det_step hv h.safe
   intros σ e₂' σ₂ hp
   -- `h.det σ` says `primStep ⟨e₁,σ⟩ {⟨e₂,σ⟩} = 1`. Combined with total mass

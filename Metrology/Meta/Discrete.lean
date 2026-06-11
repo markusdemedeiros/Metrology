@@ -57,50 +57,55 @@ meta register_option linter.discrete : Bool := {
   descr    := "if true, warn when a `@[discrete]` declaration is referenced from a non-discrete declaration"
 }
 
-/-- Collect the names declared by command syntax `stx`, if any.
+/-- Collect the fully-qualified names *defined* by this command, by reading the
+`isBinder` constant occurrences from its `InfoTree`s.
 
-We look for a `declId` (the `name.{universes}` node following a declaration
-keyword) anywhere in the command and return the underlying identifier. This is
-deliberately tolerant: any command that declares a name we can recognize lets us
-ask "is the *client* discrete?". -/
-meta partial def declaredNames (stx : Syntax) : Array Name := Id.run do
-  let mut acc := #[]
-  if stx.getKind == ``Lean.Parser.Command.declId then
-    if let some id := stx[0].identComponents.head?.map (·.getId) then
-      acc := acc.push id
-    else if stx[0].isIdent then
-      acc := acc.push stx[0].getId
-  for arg in stx.getArgs do
-    acc := acc ++ declaredNames arg
-  return acc
+When a declaration is elaborated, its `declId` is recorded as a `TermInfo` whose
+`expr` is the defining `.const` (fully qualified) with `isBinder := true` (see
+`Lean.Elab.Declaration`). Reading these gives us the client's *resolved* name —
+unlike parsing the surface `declId`, which yields the unqualified name and so
+fails to match the fully-qualified names stored in `discreteExt`. -/
+meta def definedNames (trees : Array Elab.InfoTree) : IO NameSet := do
+  let acc : IO.Ref NameSet ← IO.mkRef {}
+  for tree in trees do
+    tree.visitM' (postNode := fun _ info _ => do
+      let .ofTermInfo ti := info | return
+      unless ti.isBinder do return
+      let .const declName _ := ti.expr | return
+      acc.modify (·.insert declName))
+  acc.get
 
 /-- The use-site linter: after each command, walk its `InfoTree`s for constant
 references and warn when a discrete constant is referenced from a non-discrete
 client. A reference is *fine* iff the enclosing declaration is itself discrete. -/
 meta def discreteUse : Linter where
-  run := fun cmdStx => do
+  run := fun _cmdStx => do
     unless Linter.getLinterValue linter.discrete (← Linter.getLinterOptions) do
       return
     let env ← getEnv
-    -- Is the client (this command's declaration) discrete?
-    let clientDiscrete := (declaredNames cmdStx).any (isDiscrete env ·)
-    if clientDiscrete then
-      return
-    -- Walk the InfoTree for constant references and warn on discrete ones.
     let trees := (← get).infoState.trees.toArray
+    -- The names this command defines (fully qualified). If any is discrete, the
+    -- client is discrete and every reference it makes is allowed.
+    let defined ← definedNames trees
+    if defined.any (isDiscrete env ·) then
+      return
+    -- Walk the InfoTree for constant *references* (non-binder occurrences) and
+    -- warn on discrete ones. Binders are the declaration's own defining
+    -- occurrences, so excluding them prevents a decl warning about itself.
     let warned : IO.Ref NameSet ← IO.mkRef {}
     for tree in trees do
       tree.visitM' (postNode := fun _ info _ => do
         let .ofTermInfo ti := info | return
+        if ti.isBinder then return
         let .const declName _ := ti.expr | return
         unless isDiscrete env declName do return
         let some _ := info.range? | return
         let .original .. := info.stx.getHeadInfo | return
         if (← warned.get).contains declName then return
         warned.modify (·.insert declName)
-        Linter.logLint linter.discrete info.stx
-          m!"`{.ofConstName declName true}` is discrete and may only be referenced \
-             from discrete declarations; this client is not marked `@[discrete]`")
+        logWarningAt info.stx
+          (.tagged linter.discrete.name
+            m!"`{.ofConstName declName true}` is discrete and may only be referenced by discrete declarations."))
 
 meta initialize addLinter discreteUse
 

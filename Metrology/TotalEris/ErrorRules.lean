@@ -283,11 +283,11 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
         if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
     | _ => 0)
   iexists ((ε_now - ε₁) + 1)
-  -- Sub-goal 1: Reducible. Use `primStep_pos_of_headStep` + `RandNoTapeS`.
+  -- Sub-goal 1: Discrete.Reducible. Use `primStep_pos_of_headStep` + `RandNoTapeS`.
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int 0), σ₁⟩, primStep_pos_of_headStep ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     exact .RandNoTapeS Hz (_root_.le_refl _) Hz
   -- Sub-goal 2: X₂ ρ ≤ ε₃ + 1. The carried `ε₃ = ε_now - ε₁` is constant
   -- across ρ; only the right summand varies. Case-split as before.
@@ -326,7 +326,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
             have hheadred : ∃ ρ : Cfg rT,
                 0 < (headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ} :=
               ⟨⟨.lit (.int 0), σ₁⟩, by
-                rw [headStep_support_iff]
+                rw [Discrete.headStep_support_iff]
                 exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
             rw [primStep_eq_headStep hheadred]
             -- headStep ⟨rand z (), σ⟩ definitionally equals Cfg.uniform z σ.
@@ -424,13 +424,13 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   · ipure_intro
     have hheadred : ∃ ρ : Cfg rT, 0 < (headStep ⟨_, σ₁⟩) {ρ} :=
       ⟨⟨.lit (.int 0), σ₁⟩, by
-        rw [headStep_support_iff]; exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
+        rw [Discrete.headStep_support_iff]; exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
     have hps_eq : primStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩
         = headStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩ :=
       primStep_eq_headStep hheadred
     refine Pgl.mono_pred ?_ (Pgl.zero_positive _)
     intro ρ hpos
-    rw [hps_eq, headStep_support_iff] at hpos
+    rw [hps_eq, Discrete.headStep_support_iff] at hpos
     obtain ⟨e', σ'⟩ := ρ
     cases hpos with
     | RandNoTapeS Hz' Hv0 Hvz => exact ⟨_, Hv0, Hvz, rfl⟩

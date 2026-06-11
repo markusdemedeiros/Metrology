@@ -1148,7 +1148,7 @@ theorem not_HeadStepPred_iff_zero [Countable rT] [MeasurableSingletonClass rT]
       apply hne
       refine ⟨ρ', ?_⟩
       obtain ⟨e2, σ2⟩ := ρ'
-      exact (headStep_support_iff e e2 σ σ2).mp
+      exact (Discrete.headStep_support_iff e e2 σ σ2).mp
         (lt_of_le_of_ne bot_le (Ne.symm hpos))
     have hunivzero : (headStep ⟨e, σ⟩) Set.univ = 0 := by
       rw [show (Set.univ : Set (Cfg rT)) = ⋃ c : Cfg rT, ({c} : Set (Cfg rT)) from by ext; simp]
@@ -1160,7 +1160,7 @@ theorem not_HeadStepPred_iff_zero [Countable rT] [MeasurableSingletonClass rT]
   · rintro h0 ⟨ρ', hsupp⟩
     obtain ⟨e2, σ2⟩ := ρ'
     have : 0 < headStep ⟨e, σ⟩ {⟨e2, σ2⟩} :=
-      (headStep_support_iff e e2 σ σ2).mpr hsupp
+      (Discrete.headStep_support_iff e e2 σ σ2).mpr hsupp
     rw [h0] at this
     simp at this
 
@@ -1375,9 +1375,9 @@ theorem Cfg.uniform_singleton_ne_one [Countable rT] [MeasurableSingletonClass rT
   have hprob : MeasureTheory.IsProbabilityMeasure (Cfg.uniform z σ) :=
     Cfg.uniform_isProbabilityMeasure
   have hpos0 : 0 < Cfg.uniform z σ {⟨.lit (.int 0), σ⟩} :=
-    Cfg.uniform_singleton_pos_of_mem Hz0 (le_refl 0) Hz0
+    Discrete.Cfg.uniform_singleton_pos_of_mem Hz0 (le_refl 0) Hz0
   have hpos1 : 0 < Cfg.uniform z σ {⟨.lit (.int 1), σ⟩} :=
-    Cfg.uniform_singleton_pos_of_mem Hz0 (by norm_num) Hz
+    Discrete.Cfg.uniform_singleton_pos_of_mem Hz0 (by norm_num) Hz
   have hne : (⟨.lit (.int 0), σ⟩ : Cfg rT) ≠ ⟨.lit (.int 1), σ⟩ := by
     intro heq
     have := (Cfg.mk.injEq ..).mp heq |>.1

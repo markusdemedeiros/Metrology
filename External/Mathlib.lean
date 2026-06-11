@@ -18,7 +18,7 @@ public import Mathlib.Probability.Distributions.Uniform
 noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure
 
-theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
+theorem Discrete.measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     [Countable α] (μ : Measure α) (S : Set α) (hS : 0 < μ S) :
     ∃ x ∈ S, 0 < μ {x} := by
   by_contra! h
@@ -28,14 +28,14 @@ theorem measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [Measura
   rw [Set.biUnion_of_singleton] at hzero
   exact (ne_of_gt hS) hzero
 
-theorem map_singleton_pos {α β : Type _}
+theorem Discrete.map_singleton_pos {α β : Type _}
     [MeasurableSpace α] [MeasurableSpace β]
     [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β] [Countable α]
     {f : α → β} {μ : Measure α} {b : β}
     (h : 0 < (μ.map f) {b}) :
     ∃ a, f a = b ∧ 0 < μ {a} := by
   rw [Measure.map_apply .of_discrete .of_discrete] at h
-  obtain ⟨a, ha, hpos⟩ := measure_pos_of_singleton_pos μ _ h
+  obtain ⟨a, ha, hpos⟩ := Discrete.measure_pos_of_singleton_pos μ _ h
   -- `a ∈ f ⁻¹' {b}` means `f a ∈ {b}` means `f a = b`.
   exact ⟨a, Set.mem_singleton_iff.mp (Set.mem_preimage.mp ha), hpos⟩
 
@@ -48,7 +48,7 @@ theorem Measure.bind_map {α β γ : Type _}
 
 abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDensity f
 
-theorem count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
+theorem Discrete.count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
     (f : T → ENNReal) (t : T) : count f {t} = f t := by simp
 
 /-! ## Ports from `theories/prob/distribution.v` §1 (basic pmf bounds)
@@ -277,7 +277,7 @@ theorem dbind_inhabited {α β : Type _}
     (μ : Measure α) (f : α → Measure β)
     (hμ : 0 < μ Set.univ) (hf : ∀ a, 0 < (f a) Set.univ) :
     0 < (μ.bind f) Set.univ := by
-  obtain ⟨a, _, hμa⟩ := measure_pos_of_singleton_pos μ _ hμ
+  obtain ⟨a, _, hμa⟩ := Discrete.measure_pos_of_singleton_pos μ _ hμ
   exact dbind_inhabited_ex μ f ⟨a, hμa, hf a⟩
 
 /-- Rocq `dbind_dret_pair_left`: bind into a pair on the left. -/
@@ -485,7 +485,7 @@ theorem dunifP_not_dzero (N : Nat) : dunifP N ≠ 0 := fun h => by
 
 /-- Rocq `lim_distr_pmf`: singleton application of an `⨆` of measures on a
 countable discrete space. Generic replacement for `Exec.lean`'s
-`iSup_measure_apply` specialized to `Cfg`. -/
+`Discrete.iSup_measure_apply` specialized to `Cfg`. -/
 theorem lim_distr_pmf {α : Type _}
     [MeasurableSpace α] [MeasurableSingletonClass α]
     [DiscreteMeasurableSpace α] [Countable α]
@@ -1080,7 +1080,7 @@ theorem not_dzero_gt_0 {α : Type _} [MeasurableSpace α] [MeasurableSingletonCl
 /-- Existential form: a nonzero measure has some singleton with positive mass. -/
 theorem not_dzero_exists_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
     [Countable α] {μ : Measure α} (h : μ ≠ 0) : ∃ a, 0 < μ {a} :=
-  let ⟨a, _, ha⟩ := measure_pos_of_singleton_pos μ _ (not_dzero_gt_0 h)
+  let ⟨a, _, ha⟩ := Discrete.measure_pos_of_singleton_pos μ _ (not_dzero_gt_0 h)
   ⟨a, ha⟩
 
 /-- Rocq `dbind_dzero_strong`: a bind is zero iff every kernel on the support

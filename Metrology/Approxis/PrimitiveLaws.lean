@@ -102,9 +102,9 @@ theorem wp_alloc {E : CoPset} {v : (Val rT)} {Φ : (Val rT) → IProp GF} :
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.AllocS (Exp.toVal?_ofVal v) rfl rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | AllocS hvd hl hσ =>
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hl; subst hσ
@@ -130,9 +130,9 @@ theorem wp_load {E : CoPset} {l : Loc} {v : (Val rT)} {Φ : (Val rT) → IProp G
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.LoadS hlook rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | LoadS hlook' hofv =>
     rw [hlook] at hlook'; cases hlook'; subst hofv
@@ -157,9 +157,9 @@ theorem wp_store {E : CoPset} {l : Loc} {v v' : (Val rT)} {Φ : (Val rT) → IPr
   · ipure_intro
     exact ⟨_, HeadStepSupport.StoreS (Exp.toVal?_ofVal v)
       (by rw [hlook]; exact Option.isSome_some) rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | StoreS hvd _ hσ =>
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hσ
@@ -184,9 +184,9 @@ theorem wp_alloctape {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} :
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | TapeS hl hσ =>
     subst hl; subst hσ
@@ -212,10 +212,10 @@ theorem wp_rand {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz : 0 < z)
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     exact .RandNoTapeS Hz (_root_.le_refl _) Hz
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandNoTapeS _ Hv0 Hvz =>
     imodintro
@@ -239,10 +239,10 @@ theorem wp_rand_nonpos {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz :
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int (-1)), σ₁⟩, ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     exact .RandNonposS Hz
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandNoTapeS hpos _ _ => exact absurd hpos Hz
   | RandNonposS _ =>
@@ -273,9 +273,9 @@ theorem wp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : Int} {ns : List Int}
   isplitr
   · ipure_intro
     exact ⟨_, HeadStepSupport.RandTapeS hlook rfl rfl rfl
-      |> (headStep_support_iff _ _ _ _).mpr⟩
+      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandTapeS hlook' _ hv hσ =>
     rw [hlook] at hlook'
@@ -314,10 +314,10 @@ theorem wp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     exact .RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandTapeS hlook' _ _ _ =>
     rw [hlook] at hlook'; cases hlook'
@@ -356,10 +356,10 @@ theorem wp_rand_tape_wrong_bound {E : CoPset} {l : Loc} {z M : Int}
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     exact .RandTapeOtherS Hz hlook HneM (_root_.le_refl _) Hz rfl
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandTapeS hlook' heq _ _ =>
     rw [hlook] at hlook'; cases hlook'; exact absurd heq HneM
@@ -397,10 +397,10 @@ theorem wp_rand_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   subst Heq
   have Hhead_rand : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (headStep_support_iff _ _ _ _).mpr (.RandNoTapeS Hz (_root_.le_refl _) Hz)
-  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁' :=
-    Reducible.of_head ⟨_, Hhead_rand⟩
-  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit .unit))) σ₁' :=
+    (Discrete.headStep_support_iff _ _ _ _).mpr (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+  have Hred_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁' :=
+    Discrete.Reducible.of_head ⟨_, Hhead_rand⟩
+  have Hred : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit .unit))) σ₁' :=
     Hred_rand.fill K
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
@@ -414,7 +414,7 @@ theorem wp_rand_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ :=
     primStep_eq_headStep ⟨_, Hhead_rand⟩
-  rw [Hheq, headStep_support_iff] at Hstep'
+  rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandNoTapeS _ Hv0 Hvz =>
     imodintro
@@ -450,12 +450,12 @@ theorem wp_rand_lbl_nonpos {E : CoPset} {l : Loc} {z N : Int}
   isplitr
   · ipure_intro
     refine ⟨⟨.lit (.int (-1)), σ₁⟩, ?_⟩
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     by_cases hN : N = z
     · subst hN; exact .RandTapeNonposEmptyS Hz hlook rfl
     · exact .RandTapeNonposOtherS Hz hlook (Ne.symm hN)
   iintro !> %e₂ %σ₂ %Hstep
-  rw [headStep_support_iff] at Hstep
+  rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
   | RandTapeS hlook' _ _ _ =>
     rw [hlook] at hlook'
@@ -486,10 +486,10 @@ theorem wp_rand_nonpos_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   subst Heq
   have Hhead_rand : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩
         {⟨.lit (.int (-1)), σ₁'⟩} :=
-    (headStep_support_iff _ _ _ _).mpr (.RandNonposS Hz)
-  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁' :=
-    Reducible.of_head ⟨_, Hhead_rand⟩
-  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit .unit))) σ₁' :=
+    (Discrete.headStep_support_iff _ _ _ _).mpr (.RandNonposS Hz)
+  have Hred_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁' :=
+    Discrete.Reducible.of_head ⟨_, Hhead_rand⟩
+  have Hred : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit .unit))) σ₁' :=
     Hred_rand.fill K
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
@@ -503,7 +503,7 @@ theorem wp_rand_nonpos_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ :=
     primStep_eq_headStep ⟨_, Hhead_rand⟩
-  rw [Hheq, headStep_support_iff] at Hstep'
+  rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandNoTapeS hpos _ _ => exact absurd hpos Hz
   | RandNonposS _ =>
@@ -534,11 +534,11 @@ theorem wp_rand_tape_empty_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z : Int} {e
   ihave %hlook := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs HαB
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (headStep_support_iff _ _ _ _).mpr
+    (Discrete.headStep_support_iff _ _ _ _).mpr
       (.RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl)
-  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
-    Reducible.of_head ⟨_, Hhead⟩
-  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
+  have Hred_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
+    Discrete.Reducible.of_head ⟨_, Hhead⟩
+  have Hred : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
     Hred_rand.fill K
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
@@ -552,7 +552,7 @@ theorem wp_rand_tape_empty_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z : Int} {e
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
     primStep_eq_headStep ⟨_, Hhead⟩
-  rw [Hheq, headStep_support_iff] at Hstep'
+  rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS hlook' _ _ _ =>
     rw [hlook] at hlook'; cases hlook'
@@ -591,13 +591,13 @@ theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z N : Int} 
   ihave %hlook := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hl
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩
         {⟨.lit (.int (-1)), σ₁'⟩} := by
-    rw [headStep_support_iff]
+    rw [Discrete.headStep_support_iff]
     by_cases hN : N = z
     · subst hN; exact .RandTapeNonposEmptyS Hz hlook rfl
     · exact .RandTapeNonposOtherS Hz hlook (Ne.symm hN)
-  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
-    Reducible.of_head ⟨_, Hhead⟩
-  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
+  have Hred_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
+    Discrete.Reducible.of_head ⟨_, Hhead⟩
+  have Hred : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
     Hred_rand.fill K
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
@@ -611,7 +611,7 @@ theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z N : Int} 
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
     primStep_eq_headStep ⟨_, Hhead⟩
-  rw [Hheq, headStep_support_iff] at Hstep'
+  rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS hlook' _ _ _ =>
     rw [hlook] at hlook'
@@ -693,11 +693,11 @@ theorem wp_rand_empty_r {E : CoPset} (K : (Ectx rT)) {z : Int} {l : Loc}
   ihave %Hlk := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hαb
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (headStep_support_iff _ _ _ _).mpr
+    (Discrete.headStep_support_iff _ _ _ _).mpr
       (.RandTapeEmptyS Hz Hlk rfl (_root_.le_refl _) Hz rfl)
-  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
-    Reducible.of_head ⟨_, Hhead⟩
-  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
+  have Hred_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
+    Discrete.Reducible.of_head ⟨_, Hhead⟩
+  have Hred : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
     Hred_rand.fill K
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
@@ -711,7 +711,7 @@ theorem wp_rand_empty_r {E : CoPset} (K : (Ectx rT)) {z : Int} {l : Loc}
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
     primStep_eq_headStep ⟨_, Hhead⟩
-  rw [Hheq, headStep_support_iff] at Hstep'
+  rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS Hlk' _ _ _ =>
     rw [Hlk] at Hlk'; cases Hlk'
@@ -761,11 +761,11 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : (Ectx rT)) {z M : Int} {l : Loc}
   ihave %Hlk := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hαb
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (headStep_support_iff _ _ _ _).mpr
+    (Discrete.headStep_support_iff _ _ _ _).mpr
       (.RandTapeOtherS Hz Hlk HneM (_root_.le_refl _) Hz rfl)
-  have Hred_rand : Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
-    Reducible.of_head ⟨_, Hhead⟩
-  have Hred : Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
+  have Hred_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl l))) σ₁' :=
+    Discrete.Reducible.of_head ⟨_, Hhead⟩
+  have Hred : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) σ₁' :=
     Hred_rand.fill K
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
@@ -779,7 +779,7 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : (Ectx rT)) {z M : Int} {l : Loc}
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
     primStep_eq_headStep ⟨_, Hhead⟩
-  rw [Hheq, headStep_support_iff] at Hstep'
+  rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS Hlk' heq _ _ =>
     rw [Hlk] at Hlk'; cases Hlk'; exact absurd heq HneM

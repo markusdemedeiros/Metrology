@@ -290,7 +290,7 @@ abbrev progCoupl (e₁ : (Exp rT)) (σ₁ : (State rT)) (e₁' : (Exp rT)) (σ�
     (Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF) : IProp GF :=
   iprop(∃ (n : Nat) (μ₁' : MeasureTheory.Measure (State rT))
           (X₂ : (Cfg rT) → (Cfg rT) → ENNReal),
-    (⌜Reducible e₁ σ₁⌝) ∗
+    (⌜Discrete.Reducible e₁ σ₁⌝) ∗
     (⌜∃ r : ENNReal, ∀ ρ₁ ρ₂, X₂ ρ₁ ρ₂ ≤ r⌝) ∗
     (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
         (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
@@ -322,7 +322,7 @@ theorem progCoupl_ne {n : Nat} {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (
   refine exists_ne fun n' => ?_
   refine exists_ne fun μ₁' => ?_
   refine exists_ne fun X₂ => ?_
-  refine sep_ne.ne (.of_eq rfl) ?_  -- Reducible : Prop
+  refine sep_ne.ne (.of_eq rfl) ?_  -- Discrete.Reducible : Prop
   refine sep_ne.ne (.of_eq rfl) ?_  -- ∃ r, bound : Prop
   refine sep_ne.ne (.of_eq rfl) ?_  -- expectation bound : Prop
   refine sep_ne.ne (.of_eq rfl) ?_  -- Erasable : Prop
@@ -874,7 +874,7 @@ positive-measure spec successor lets us land on a `specCoupl` at the
 post-step config. Mirrors Rocq's `spec_coupl_step`. -/
 theorem specCoupl_step {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
     {ε : ENNReal} {Z : (State rT) → (Cfg rT) → ENNReal → IProp GF}
-    (Hred : Reducible e₁' σ₁') :
+    (Hred : Discrete.Reducible e₁' σ₁') :
     iprop(∀ (e₂' : (Exp rT)) (σ₂' : (State rT)),
         (⌜0 < primStep ⟨e₁', σ₁'⟩ {⟨e₂', σ₂'⟩}⌝) -∗ |={E}=>
           specCoupl E σ₁ e₂' σ₂' ε Z) ⊢@{IProp GF}
@@ -891,7 +891,7 @@ theorem specCoupl_step {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ�
   have Hpos := AddCoupl.pos_R Htrivial
   have hnotval : ¬ e₁'.isValue := fun hv => by
     obtain ⟨ρ, hρ⟩ := Hred
-    exact val_stuck hρ hv
+    exact Discrete.val_stuck hρ hv
   have hpexec1 : pexecN 1 ⟨e₁', σ₁'⟩ = primStep ⟨e₁', σ₁'⟩ := by
     rw [pexecN_one, stepOrFinal_not_isValue hnotval]
   have HcplR : AddCoupl 0 {p : (State rT) × (Cfg rT) | (fun σ c => σ = σ₁ ∧
@@ -917,7 +917,7 @@ theorem specCoupl_step {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ�
 /-- `progCoupl` implies reducibility of the program. -/
 theorem progCoupl_reducible {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
     {ε : ENNReal} {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF} :
-    progCoupl e₁ σ₁ e₁' σ₁' ε Z ⊢@{IProp GF} ⌜Reducible e₁ σ₁⌝ := by
+    progCoupl e₁ σ₁ e₁' σ₁' ε Z ⊢@{IProp GF} ⌜Discrete.Reducible e₁ σ₁⌝ := by
   iintro HCpl
   icases HCpl with ⟨%n, %μ₁', %X₂, %Hred, _⟩
   ipure_intro; exact Hred
@@ -1121,7 +1121,7 @@ error `X₂` bounded by 1. Mirrors Rocq's `prog_coupl_steps_adv'`. -/
 theorem progCoupl_steps_adv' {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
     {ε : ENNReal} {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
     {X₂ : (Cfg rT) → (Cfg rT) → ENNReal}
-    (Hred : Reducible e₁ σ₁) (Hred' : Reducible e₁' σ₁')
+    (Hred : Discrete.Reducible e₁ σ₁) (Hred' : Discrete.Reducible e₁' σ₁')
     (Hbnd : ∀ ρ₁ ρ₂, X₂ ρ₁ ρ₂ ≤ 1)
     (Hcpl : ∀ (h₁ h₂ : (Cfg rT) → ENNReal),
         (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
@@ -1142,7 +1142,7 @@ theorem progCoupl_steps_adv' {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Ex
     --   = primStep ⟨e₁', σ₁'⟩ (since reducible).
     have hnotval' : ¬ e₁'.isValue := fun hv => by
       obtain ⟨ρ, hρ⟩ := Hred'
-      exact val_stuck hρ hv
+      exact Discrete.val_stuck hρ hv
     have heq : (MeasureTheory.Measure.dirac σ₁' : MeasureTheory.Measure (State rT)).bind
         (fun σ => pexecN 1 ⟨e₁', σ⟩) = primStep ⟨e₁', σ₁'⟩ := by
       rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete]
@@ -1159,7 +1159,7 @@ theorem progCoupl_steps_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp
     {ε₁ ε₂ ε : ENNReal} {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
     {X₂ : (Cfg rT) → (Cfg rT) → ENNReal}
     (Hε : ε₁ + ε₂ ≤ ε)
-    (Hred : Reducible e₁ σ₁) (Hred' : Reducible e₁' σ₁')
+    (Hred : Discrete.Reducible e₁ σ₁) (Hred' : Discrete.Reducible e₁' σ₁')
     (Hbnd : ∀ ρ₁ ρ₂, X₂ ρ₁ ρ₂ ≤ 1)
     (Hcpl : ∀ (h₁ h₂ : (Cfg rT) → ENNReal),
         (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
@@ -1187,7 +1187,7 @@ theorem progCoupl_steps_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp
     intro h₁ h₂ Hh₁ Hh₂ Hh₁h₂
     have hnotval' : ¬ e₁'.isValue := fun hv => by
       obtain ⟨ρ, hρ⟩ := Hred'
-      exact val_stuck hρ hv
+      exact Discrete.val_stuck hρ hv
     have heq : (MeasureTheory.Measure.dirac σ₁' : MeasureTheory.Measure (State rT)).bind
         (fun σ => pexecN 1 ⟨e₁', σ⟩) = primStep ⟨e₁', σ₁'⟩ := by
       rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete]
@@ -1241,7 +1241,7 @@ theorem progCoupl_steps {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)
     {ε₁ ε₂ ε : ENNReal} {R : (Cfg rT) → (Cfg rT) → Prop}
     {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
     (Hε : ε₁ + ε₂ ≤ ε)
-    (Hred : Reducible e₁ σ₁) (Hred' : Reducible e₁' σ₁')
+    (Hred : Discrete.Reducible e₁ σ₁) (Hred' : Discrete.Reducible e₁' σ₁')
     (Hcpl : AddCoupl ε₁ {p : (Cfg rT) × (Cfg rT) | R p.1 p.2}
               (primStep ⟨e₁, σ₁⟩) (primStep ⟨e₁', σ₁'⟩)) :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
@@ -1336,7 +1336,7 @@ theorem progCoupl_step_l_erasable_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e�
     {μ₁' : MeasureTheory.Measure (State rT)} {ε : ENNReal}
     {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
     {X₂ : (Cfg rT) → (State rT) → ENNReal}
-    (Hred : Reducible e₁ σ₁)
+    (Hred : Discrete.Reducible e₁ σ₁)
     (Heras : Erasable μ₁' σ₁')
     (Hbnd : ∀ ρ₁ σ₂', X₂ ρ₁ σ₂' ≤ 1)
     (Hcpl : ∀ (h₁ h₂ : (Cfg rT) → ENNReal),
@@ -1407,7 +1407,7 @@ theorem progCoupl_step_l_erasable {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' 
     {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
     {R : (Cfg rT) → (State rT) → Prop}
     (Hε : ε₁ + ε₂ ≤ ε)
-    (Hred : Reducible e₁ σ₁)
+    (Hred : Discrete.Reducible e₁ σ₁)
     (Hcpl : AddCoupl ε₁ {p : (Cfg rT) × (State rT) | R p.1 p.2} (primStep ⟨e₁, σ₁⟩) μ₁')
     (Heras : Erasable μ₁' σ₁') :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
@@ -1490,7 +1490,7 @@ theorem progCoupl_step_l_dret {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (E
     {ε₁ ε₂ ε : ENNReal} {R : (Cfg rT) → (State rT) → Prop}
     {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
     (Hε : ε₁ + ε₂ ≤ ε)
-    (Hred : Reducible e₁ σ₁)
+    (Hred : Discrete.Reducible e₁ σ₁)
     (Hcpl : AddCoupl ε₁ {p : (Cfg rT) × (State rT) | R p.1 p.2}
               (primStep ⟨e₁, σ₁⟩) (MeasureTheory.Measure.dirac σ₁')) :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
@@ -1530,7 +1530,7 @@ theorem progCoupl_step_l_dret {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (E
 successor lets us land. Mirrors Rocq's `prog_coupl_step_l`. -/
 theorem progCoupl_step_l {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
     {ε : ENNReal} {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
-    (Hred : Reducible e₁ σ₁) :
+    (Hred : Discrete.Reducible e₁ σ₁) :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
           (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
             (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅}=>
@@ -2168,7 +2168,7 @@ under a later. Uses `progCoupl_step_l` through `wp_lift_step_couple`. -/
 theorem wp_lift_step_later {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
     (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E, ∅}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
           stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ)) ⊢@{IProp GF}
@@ -2208,7 +2208,7 @@ theorem wp_lift_step_later {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IPr
 theorem wp_lift_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
     (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E, ∅}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ▷ ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅, E}=>
           stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ) ⊢@{IProp GF}
@@ -2234,8 +2234,8 @@ theorem wp_lift_prim_steps_coupl {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) �
         |={E, ∅}=>
         ∃ (R : (Cfg rT) → (Cfg rT) → Prop) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
-          (⌜Reducible e₁ σ₁⌝) ∗
-          (⌜Reducible e₁' σ₁'⌝) ∗
+          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
+          (⌜Discrete.Reducible e₁' σ₁'⌝) ∗
           (⌜AddCoupl ε₁ {p : (Cfg rT) × (Cfg rT) | R p.1 p.2}
               (primStep ⟨e₁, σ₁⟩) (primStep ⟨e₁', σ₁'⟩)⌝) ∗
           (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)) (e₂' : (Exp rT)) (σ₂' : (State rT)),
@@ -2283,7 +2283,7 @@ theorem wp_lift_prim_step_l_dret {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) �
         |={E, ∅}=>
         ∃ (R : (Cfg rT) → (State rT) → Prop) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
-          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
           (⌜AddCoupl ε₁ {p : (Cfg rT) × (State rT) | R p.1 p.2}
               (primStep ⟨e₁, σ₁⟩) (MeasureTheory.Measure.dirac σ₁')⌝) ∗
           (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
@@ -2332,7 +2332,7 @@ theorem wp_lift_prim_step_l_erasable {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val r
         ∃ (R : (Cfg rT) → (State rT) → Prop) (μ₁' : MeasureTheory.Measure (State rT))
           (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
-          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
           (⌜Erasable μ₁' σ₁'⌝) ∗
           (⌜AddCoupl ε₁ {p : (Cfg rT) × (State rT) | R p.1 p.2}
               (primStep ⟨e₁, σ₁⟩) μ₁'⌝) ∗
@@ -2375,7 +2375,7 @@ theorem wp_lift_prim_step_l_erasable {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val r
 
 /-- `wp_lift_pure_step` — pure LHS step (deterministic state, always reducible). -/
 theorem wp_lift_pure_step {E E' : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
-    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (Hsafe : ∀ σ₁, Discrete.Reducible e₁ σ₁)
     (Hstep : ∀ σ₁ e₂ σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} → σ₂ = σ₁) :
     iprop(|={E}[E']▷=> ∀ (e₂ : (Exp rT)) (σ : (State rT)),
       (⌜0 < primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩}⌝) -∗ wp E e₂ Φ) ⊢@{IProp GF}
@@ -2387,11 +2387,11 @@ theorem wp_lift_pure_step {E E' : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → I
     · exfalso
       have : e₁.isValue := Exp.toVal?_isValue htv
       obtain ⟨ρ, hρ⟩ := Hsafe default
-      exact val_stuck hρ this
+      exact Discrete.val_stuck hρ this
   iapply wp_lift_step Hv
   iintro %σ₁ Hσ
   -- H : |={E,E'}=> ▷ |={E',E}=> ∀ e₂ σ, ⌜...⌝ -∗ wp E e₂ Φ
-  -- Goal : |={E,∅}=> ⌜Reducible⌝ ∗ ▷ ∀ e₂ σ₂, ⌜...⌝ -∗ |={∅,E}=> stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ
+  -- Goal : |={E,∅}=> ⌜Discrete.Reducible⌝ ∗ ▷ ∀ e₂ σ₂, ⌜...⌝ -∗ |={∅,E}=> stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ
   imod H
   -- Now H at mask E'; goal at mask E'
   imod (BIFUpdate.subset (E1 := E') (E2 := ∅) Std.LawfulSet.empty_subset)
@@ -2412,7 +2412,7 @@ theorem wp_lift_pure_step {E E' : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → I
 theorem wp_lift_atomic_step_fupd {E1 E2 : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
     (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E1}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E1}[E2]▷=>
           stateInterp (rT := rT) σ₂ ∗
@@ -2455,7 +2455,7 @@ theorem wp_lift_atomic_step_fupd {E1 E2 : CoPset} {e₁ : (Exp rT)} {Φ : (Val r
 theorem wp_lift_atomic_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
     (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ▷ ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
         (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E}=>
           stateInterp (rT := rT) σ₂ ∗
@@ -2476,7 +2476,7 @@ theorem wp_lift_atomic_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IP
 
 /-- `wp_lift_pure_det_step` — pure deterministic step. -/
 theorem wp_lift_pure_det_step {E E' : CoPset} {e₁ e₂ : (Exp rT)} {Φ : (Val rT) → IProp GF}
-    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (Hsafe : ∀ σ₁, Discrete.Reducible e₁ σ₁)
     (Hdet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
   iintro H
@@ -2623,7 +2623,7 @@ theorem stepFupdN_mono {E E' : CoPset} {n : Nat} {P Q : IProp GF}
 
 /-! ## (Ectx rT)-lifting lemmas (ports `clutch/theories/approxis/ectx_lifting.v`)
 
-Specialize `Lifting` to head-step semantics using `headStep`/`Reducible.of_head`.
+Specialize `Lifting` to head-step semantics using `headStep`/`Discrete.Reducible.of_head`.
 -/
 
 /-- `wp_lift_head_step_prog_couple` — head-step specialization. -/
@@ -2663,7 +2663,7 @@ theorem wp_lift_head_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IPro
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Reducible.of_head Hhred
+  isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   -- primStep positive + head-reducible ⇒ headStep positive at same successor
@@ -2689,7 +2689,7 @@ theorem wp_lift_atomic_head_step_fupd {E1 E2 : CoPset} {e₁ : (Exp rT)} {Φ : (
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Reducible.of_head Hhred
+  isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
     have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
@@ -2713,7 +2713,7 @@ theorem wp_lift_atomic_head_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) �
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Reducible.of_head Hhred
+  isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
@@ -2727,7 +2727,7 @@ theorem wp_lift_pure_det_head_step {E E' : CoPset} {e₁ e₂ : (Exp rT)} {Φ : 
     (Hsafe : ∀ σ₁, ∃ ρ : (Cfg rT), 0 < headStep ⟨e₁, σ₁⟩ {ρ})
     (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
-  iapply wp_lift_pure_det_step (Hsafe := fun σ => Reducible.of_head (Hsafe σ))
+  iapply wp_lift_pure_det_step (Hsafe := fun σ => Discrete.Reducible.of_head (Hsafe σ))
   intros σ e₂' σ₂ hp
   have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep (Hsafe σ)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)

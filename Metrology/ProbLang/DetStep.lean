@@ -18,7 +18,7 @@ def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
   | n+1, a, b => ∃ c, r a c ∧ nsteps r n c b
 
 structure PureStep (e1 e2 : Exp rT) : Prop where
-  safe : ∀ σ, Reducible e1 σ
+  safe : ∀ σ, Discrete.Reducible e1 σ
   det  : ∀ σ, primStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
 class PureExec (φ : Prop) (n : ℕ) (e1 e2 : Exp rT) : Prop where
@@ -29,7 +29,7 @@ structure PureHeadStep (e1 e2 : Exp rT) : Prop where
   det  : ∀ σ : State rT, headStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1
 
 theorem PureHeadStep.toPureStep {e1 e2 : Exp rT} (h : PureHeadStep e1 e2) : PureStep e1 e2 :=
-  ⟨fun σ => Reducible.of_head (h.safe σ), fun σ => primStep_eq_headStep (h.safe σ) ▸ h.det σ⟩
+  ⟨fun σ => Discrete.Reducible.of_head (h.safe σ), fun σ => primStep_eq_headStep (h.safe σ) ▸ h.det σ⟩
 
 theorem PureStep.fill [Countable rT] [MeasurableSingletonClass rT]
   (K : Ectx rT) {e1 e2 : Exp rT} (h : PureStep e1 e2) :
@@ -39,7 +39,7 @@ theorem PureStep.fill [Countable rT] [MeasurableSingletonClass rT]
     obtain ⟨⟨e2', σ2⟩, hρ⟩ := h.safe σ
     exact ⟨⟨K.fill e2', σ2⟩, primStep_fill_pos hρ⟩
   · intro σ
-    rw [← primStep_fill_singleton (val_stuck (h.safe σ).choose_spec)]
+    rw [← primStep_fill_singleton (Discrete.val_stuck (h.safe σ).choose_spec)]
     exact h.det σ
 
 theorem PureStep.fill_nsteps [Countable rT] [MeasurableSingletonClass rT]
@@ -59,7 +59,7 @@ theorem PureExec.fill [Countable rT] [MeasurableSingletonClass rT]
 
 theorem PureExec.reducible {σ : State rT} {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
-    Reducible e1 σ := by
+    Discrete.Reducible e1 σ := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   exact hstep.safe σ
 
@@ -68,7 +68,7 @@ theorem PureExec.not_val [Countable rT] [MeasurableSingletonClass rT] {φ : Prop
     ¬e1.isValue := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   obtain ⟨ρ, hρ⟩ := hstep.safe default
-  exact val_stuck hρ
+  exact Discrete.val_stuck hρ
 
 theorem rtc_pure_step_val [Countable rT] [MeasurableSingletonClass rT] {n : ℕ} {v : Val rT} {e : Exp rT}
     (h : nsteps PureStep n v.1 e) :
@@ -81,7 +81,7 @@ theorem rtc_pure_step_val [Countable rT] [MeasurableSingletonClass rT] {n : ℕ}
   | succ n ih =>
     obtain ⟨c, hstep, hrest⟩ := h
     obtain ⟨ρ, hρ⟩ := hstep.safe default
-    exact absurd v.2.toIsValue (val_stuck hρ)
+    exact absurd v.2.toIsValue (Discrete.val_stuck hρ)
 
 theorem as_val_isSome {e : Exp α} (h : ∃ v : Val α, v.1 = e) : e.isValue := by
   obtain ⟨⟨_, hv⟩, rfl⟩ := h
@@ -109,23 +109,23 @@ structure DetHeadStep (cfg1 cfg2 : Cfg rT) : Prop where
   safe : ∃ ρ : Cfg rT, 0 < headStep cfg1 {ρ}
   det  : headStep cfg1 {cfg2} = 1
 
-theorem DetHeadStep.pos {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) : 0 < headStep cfg1 {cfg2} :=
+theorem DetHeadStep.pos_discrete {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) : 0 < headStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
-theorem DetHeadStep.of_det (cfg1 cfg2 : Cfg rT)
+theorem DetHeadStep.of_det_discrete (cfg1 cfg2 : Cfg rT)
     (hdet : headStep cfg1 {cfg2} = 1) : DetHeadStep cfg1 cfg2 :=
   ⟨⟨cfg2, hdet ▸ one_pos⟩, hdet⟩
 
 -- TODO: This should not be stated in terms of atoms, so that it can be generalized to the measurable case.
 structure DetStep (cfg1 cfg2 : Cfg rT) : Prop where
-  safe : Reducible cfg1.expr cfg1.state
+  safe : Discrete.Reducible cfg1.expr cfg1.state
   det  : primStep cfg1 {cfg2} = 1
 
-theorem DetStep.pos {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) : 0 < primStep cfg1 {cfg2} :=
+theorem DetStep.pos_discrete {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) : 0 < primStep cfg1 {cfg2} :=
   h.det ▸ one_pos
 
 theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) : DetStep cfg1 cfg2 where
-  safe := ⟨_, primStep_pos_of_headStep h.pos⟩
+  safe := ⟨_, primStep_pos_of_headStep h.pos_discrete⟩
   det := by obtain ⟨e1, σ1⟩ := cfg1; rw [primStep_eq_headStep h.safe]; exact h.det
 
 class DetExec (n : ℕ) (cfg1 cfg2 : Cfg rT) : Prop where
@@ -138,24 +138,24 @@ theorem DetExec.succ {cfg1 cfg2 cfg3 : Cfg rT} {n : ℕ}
 
 theorem DetHeadStep.fst_pair {e1 e2 : Exp rT} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State rT) :
     DetHeadStep ⟨.fst (.pair e1 e2), σ⟩ ⟨e1, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2])
+  .of_det_discrete _ _ (by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2])
 
 theorem DetHeadStep.snd_pair {e1 e2 : Exp rT} (h1 : IsVal e1) (h2 : IsVal e2) (σ : State rT) :
     DetHeadStep ⟨.snd (.pair e1 e2), σ⟩ ⟨e2, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2])
+  .of_det_discrete _ _ (by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2])
 
 theorem DetHeadStep.cond_true (et ef : Exp rT) (σ : State rT) :
     DetHeadStep ⟨.cond (.lit (.bool true)) et ef, σ⟩ ⟨et, σ⟩ :=
-  .of_det _ _ (by simp [headStep])
+  .of_det_discrete _ _ (by simp [headStep])
 
 theorem DetHeadStep.cond_false (et ef : Exp rT) (σ : State rT) :
     DetHeadStep ⟨.cond (.lit (.bool false)) et ef, σ⟩ ⟨ef, σ⟩ :=
-  .of_det _ _ (by simp [headStep])
+  .of_det_discrete _ _ (by simp [headStep])
 
 theorem DetHeadStep.app_lam {body v : Exp rT}
     (hv : IsVal v) (σ : State rT) :
     DetHeadStep ⟨.app (.lam body) v, σ⟩ ⟨Exp.open' body v, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
+  .of_det_discrete _ _ (by simp [headStep, Exp.isValM_some' hv])
 
 /-- `PureHeadStep` for `(λ. body) v` when `v` is a value. -/
 theorem PureHeadStep.app_lam {body v : Exp rT} (hv : IsVal v) :
@@ -276,49 +276,49 @@ theorem DetHeadStep.app_fix {body v : Exp rT}
     (hv : IsVal v) (σ : State rT) :
     DetHeadStep ⟨.app (.fix body) v, σ⟩
       ⟨Exp.app (Exp.open' body (.fix body)) v, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
+  .of_det_discrete _ _ (by simp [headStep, Exp.isValM_some' hv])
 
 theorem DetHeadStep.unop {op : UnOp} {e result : Exp rT}
     (hv : IsVal e)
     (heval : UnOp.eval op e = some result) (σ : State rT) :
     DetHeadStep ⟨.unop op e, σ⟩ ⟨result, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some' hv, heval])
+  .of_det_discrete _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some' hv, heval])
 
 theorem DetHeadStep.binop {op : BinOp} {e1 e2 result : Exp rT}
     (h1 : IsVal e1) (h2 : IsVal e2)
     (heval : BinOp.eval op e1 e2 = some result) (σ : State rT) :
     DetHeadStep ⟨.binop op e1 e2, σ⟩ ⟨result, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some' h1, Exp.isValM_some' h2, heval])
+  .of_det_discrete _ _ (by simp [headStep, Option.unwrapM, Exp.isValM_some' h1, Exp.isValM_some' h2, heval])
 
 theorem DetHeadStep.case_inl {v el er : Exp rT} (hv : IsVal v) (σ : State rT) :
     DetHeadStep ⟨.case (.inl v) el er, σ⟩ ⟨el.app v, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
+  .of_det_discrete _ _ (by simp [headStep, Exp.isValM_some' hv])
 
 theorem DetHeadStep.case_inr {v el er : Exp rT} (hv : IsVal v) (σ : State rT) :
     DetHeadStep ⟨.case (.inr v) el er, σ⟩ ⟨er.app v, σ⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.isValM_some' hv])
+  .of_det_discrete _ _ (by simp [headStep, Exp.isValM_some' hv])
 
 theorem DetHeadStep.alloc {v : Exp rT} (hv : IsVal v) (σ : State rT) :
     DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, hv⟩)⟩ := by
   obtain ⟨w, hw⟩ := hv.check?_some
-  exact .of_det _ _ (by simp [headStep, Exp.asValM, Exp.toVal?, hw, IsVal.subsingleton hv w])
+  exact .of_det_discrete _ _ (by simp [headStep, Exp.asValM, Exp.toVal?, hw, IsVal.subsingleton hv w])
 
 theorem DetHeadStep.load {ℓ : Loc} {v : Val rT} (σ : State rT) (hlookup : σ.heap[ℓ]? = some v) :
     DetHeadStep ⟨.load (.lit (.loc ℓ)), σ⟩ ⟨.ofVal v, σ⟩ :=
-  .of_det _ _ (by simp [headStep, hlookup])
+  .of_det_discrete _ _ (by simp [headStep, hlookup])
 
 theorem DetHeadStep.store {ℓ : Loc} {e : Exp rT} {v_old v_new : Val rT}
     (_hv : IsVal e) (σ : State rT)
     (hlookup : σ.heap[ℓ]? = some v_old)
     (hnew : e.toVal? = some v_new) :
     DetHeadStep ⟨.store (.lit (.loc ℓ)) e, σ⟩ ⟨.lit .unit, σ.update_heap (·.insert ℓ v_new)⟩ :=
-  .of_det _ _ (by simp [headStep, Exp.asValM, hnew, hlookup])
+  .of_det_discrete _ _ (by simp [headStep, Exp.asValM, hnew, hlookup])
 
 theorem DetStep.fill [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) :
     DetStep ⟨K.fill cfg1.expr, cfg1.state⟩ ⟨K.fill cfg2.expr, cfg2.state⟩ where
   safe := h.safe.fill K
-  det := by rw [← primStep_fill_singleton (val_stuck h.pos)]; exact h.det
+  det := by rw [← primStep_fill_singleton (Discrete.val_stuck h.pos_discrete)]; exact h.det
 
 theorem DetExec.refl (cfg : Cfg rT) : DetExec 0 cfg cfg where
   det_exec := rfl

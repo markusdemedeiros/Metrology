@@ -2510,8 +2510,7 @@ theorem tryMatch.measurable_joint [ProbLangℝ rT] :
         ext ⟨b, l'⟩
         by_cases hll : b = l'
         · subst hll; simp
-        · have hne : (b == l') ≠ true := fun h => hll (LawfulBEq.eq_of_beq h)
-          simp [hll, hne]
+        · simp [hll]
       rw [hrw']
       refine MeasurableSet.union ?_ ?_ <;> split_ifs
       · exact measurableSet_eq_fun (by fun_prop) (by fun_prop)
@@ -2611,8 +2610,7 @@ theorem tryMatch.measurable_joint [ProbLangℝ rT] :
             ∪ ({q : Exp rT × Pat rT | q.1 ∉ Set.range (Exp.inl : Exp rT → Exp rT) ∧
                 Pat.shape q.2 = s' ∧ (none : Option (Exp rT)) ∈ U}) := by
         ext ⟨e, p'⟩
-        simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range,
-          Set.mem_compl_iff]
+        simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range]
         constructor
         · rintro ⟨hsh, hp⟩
           by_cases hrange : ∃ e', Exp.inl e' = e
@@ -2703,8 +2701,7 @@ theorem tryMatch.measurable_joint [ProbLangℝ rT] :
             ∪ ({q : Exp rT × Pat rT | q.1 ∉ Set.range (Exp.inr : Exp rT → Exp rT) ∧
                 Pat.shape q.2 = s' ∧ (none : Option (Exp rT)) ∈ U}) := by
         ext ⟨e, p'⟩
-        simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range,
-          Set.mem_compl_iff]
+        simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range]
         constructor
         · rintro ⟨hsh, hp⟩
           by_cases hrange : ∃ e', Exp.inr e' = e
@@ -2815,7 +2812,7 @@ theorem tryMatch.measurable_joint [ProbLangℝ rT] :
                 Pat.shape q.2.1 = s1 ∧ Pat.shape q.2.2 = s2 ∧ (none : Option (Exp rT)) ∈ U}) := by
         ext ⟨e, p1, p2⟩
         simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range,
-          Set.mem_compl_iff, Function.uncurry, Prod.mk.injEq]
+          Function.uncurry, Prod.mk.injEq]
         constructor
         · rintro ⟨hs1, hs2, hp⟩
           by_cases hrange : ∃ ee : Exp rT × Exp rT, Function.uncurry Exp.pair ee = e
@@ -2831,8 +2828,7 @@ theorem tryMatch.measurable_joint [ProbLangℝ rT] :
             refine ⟨hrange, hs1, hs2, ?_⟩
             rw [hB_eq _ _ _ hrange] at hp; exact hp
         · rintro (⟨⟨⟨e1, e2⟩, p1', p2'⟩, ⟨hs1, hs2, hp⟩, heq⟩ | ⟨hne, hs1, hs2, hnone⟩)
-          · simp only [Prod.mk.injEq] at heq
-            obtain ⟨he, hp1_eq, hp2_eq⟩ := heq
+          · obtain ⟨he, hp1_eq, hp2_eq⟩ := heq
             subst he; subst hp1_eq; subst hp2_eq
             refine ⟨hs1, hs2, ?_⟩
             rw [hA_eq]; exact hp

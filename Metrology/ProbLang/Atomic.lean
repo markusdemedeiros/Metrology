@@ -67,7 +67,7 @@ or a dirac at a value. -/
 theorem load (l : Loc) : Atomic (rT := rT) (.load (.lit (.loc l))) := by
   intro σ e' σ' hpos
   have hd : (Exp.load (.lit (.loc l)) : Exp rT).decompItem = none := rfl
-  rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
+  rw [primStep_eq_headStep_of_decomp_nil hd, Discrete.headStep_support_iff] at hpos
   cases hpos with
   | LoadS _ he' =>
     -- he' : e' = Exp.ofVal v. Exp.ofVal v = v.1, which is a value.
@@ -87,7 +87,7 @@ theorem store (l : Loc) (v : Val rT) :
     show (v.1.toVal?.casesOn _ _ : Option _) = none
     rw [hv]
     rfl
-  rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
+  rw [primStep_eq_headStep_of_decomp_nil hd, Discrete.headStep_support_iff] at hpos
   cases hpos with
   | StoreS _ _ _ => exact IsVal.lit.toIsValue
 
@@ -98,7 +98,7 @@ theorem alloc (v : Val rT) : Atomic (.alloc v.1) := by
   have hd : (Exp.alloc v.1).decompItem = none := by
     show (v.1.toVal?.casesOn _ _ : Option _) = none
     rw [hv]
-  rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
+  rw [primStep_eq_headStep_of_decomp_nil hd, Discrete.headStep_support_iff] at hpos
   cases hpos with
   | AllocS _ _ _ => exact IsVal.lit.toIsValue
 
@@ -106,7 +106,7 @@ theorem alloc (v : Val rT) : Atomic (.alloc v.1) := by
 theorem rand_unit (z : Int) : Atomic (rT := rT) (.rand (.lit (.int z)) (.lit .unit)) := by
   intro σ e' σ' hpos
   have hd : (Exp.rand (.lit (.int z)) (.lit .unit) : Exp rT).decompItem = none := rfl
-  rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
+  rw [primStep_eq_headStep_of_decomp_nil hd, Discrete.headStep_support_iff] at hpos
   cases hpos with
   | RandNoTapeS _ _ _ => exact IsVal.lit.toIsValue
   | RandNonposS _ => exact IsVal.lit.toIsValue
@@ -116,7 +116,7 @@ theorem rand_lbl (z : Int) (l : Loc) :
     Atomic (rT := rT) (.rand (.lit (.int z)) (.lit (.lbl l))) := by
   intro σ e' σ' hpos
   have hd : (Exp.rand (.lit (.int z)) (.lit (.lbl l)) : Exp rT).decompItem = none := rfl
-  rw [primStep_eq_headStep_of_decomp_nil hd, headStep_support_iff] at hpos
+  rw [primStep_eq_headStep_of_decomp_nil hd, Discrete.headStep_support_iff] at hpos
   cases hpos with
   | RandTapeS _ _ _ _ => exact IsVal.lit.toIsValue
   | RandTapeEmptyS _ _ _ _ _ _ => exact IsVal.lit.toIsValue

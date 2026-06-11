@@ -225,7 +225,7 @@ holds on the `R`-cone, we get the same bound after stepping. -/
 theorem tgl_prim_step [Countable rT] [MeasurableSingletonClass rT]
     {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
     {R : (Cfg rT) → Prop} {P : Set (Cfg rT)}
-    (Hred : Reducible e σ)
+    (Hred : Discrete.Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → 1 - ε₂ ρ ≤ (limExec ρ) P) :
@@ -268,7 +268,7 @@ Mirrors the prim-step branch of Rocq's `twp_step_fupd_tgl_prim_step` +
 theorem dbind_prim_step [Countable rT] [MeasurableSingletonClass rT]
     {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
     {R : (Cfg rT) → Prop} {φ : (Val rT) → Prop}
-    (Hred : Reducible e σ)
+    (Hred : Discrete.Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → Tgl (limExec ρ) φ (ε₂ ρ)) :
@@ -279,7 +279,7 @@ theorem dbind_prim_step [Countable rT] [MeasurableSingletonClass rT]
   have hnv : ¬ (e.isValue) := by
     intro hv
     rcases Hred with ⟨ρ, hρ⟩
-    exact val_stuck hρ hv
+    exact Discrete.val_stuck hρ hv
   rw [limExec_not_final hnv]
   -- `(primStep ρ).bind limExec` evaluated at `S` is `∫⁻ ρ', limExec ρ' S ∂primStep ρ`.
   rw [MeasureTheory.Measure.bind_apply MeasurableSet.of_discrete

@@ -56,7 +56,7 @@ theorem pexecN_1_of_DetStep {ρ ρ' : Cfg rT} (h : DetStep ρ ρ') :
   have hnv : ¬ ρ.expr.isValue := by
     obtain ⟨_, hpos⟩ := h.safe
     obtain ⟨_, _⟩ := ρ
-    exact val_stuck hpos
+    exact Discrete.val_stuck hpos
   rw [stepOrFinal_not_isValue hnv]
   exact Measure.eq_dirac_of_singleton_mass_one h.det (primStep_univ_le_one ρ)
 
@@ -110,7 +110,7 @@ theorem DetHeadStep.tape {z : Int} (σ : State rT) :
     DetHeadStep ⟨.tape (.lit (.int z)), σ⟩
       ⟨.lit (.lbl σ.tapes.fresh),
        σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ :=
-  .of_det _ _ (by simp [headStep])
+  .of_det_discrete _ _ (by simp [headStep])
 
 omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Tape rand: with `σ.tapes[α] = some ⟨z, n :: ns⟩`, the random sample
@@ -120,7 +120,7 @@ theorem DetHeadStep.rand_tape {z : Int} (l : Loc)
     {σ : State rT} (htape : σ.tapes[l]? = some ⟨z, n :: ns⟩) :
     DetHeadStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
       ⟨.lit (.int n), σ.update_tapes (·.insert l ⟨z, ns⟩)⟩ :=
-  .of_det _ _ (by simp [headStep, htape])
+  .of_det_discrete _ _ (by simp [headStep, htape])
 
 /-! ## Stepping rules over the `Cfg.specAuth` interpretation. -/
 

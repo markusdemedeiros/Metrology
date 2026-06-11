@@ -174,7 +174,7 @@ abbrev glmPrimStep
     (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
   iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
-    (⌜Reducible e₁ σ₁⌝) ∗
+    (⌜Discrete.Reducible e₁ σ₁⌝) ∗
     (⌜∀ ρ, X₂ ρ ≤ r⌝) ∗
     (⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e₁, σ₁⟩)) ≤ ε⌝) ∗
     (⌜Pgl ε₁ R (primStep ⟨e₁, σ₁⟩)⌝) ∗
@@ -474,7 +474,7 @@ unlifted continuation. Rocq: `weakestpre.v:367`.
 Uses `least_fixpoint_iter` with `Φ s := bi_least_fixpoint (glmPre Z) ⟨K.fillCfg s.1, s.2⟩`.
 The outer `e` does NOT need to be a non-value — Lean's `Hsv` (the
 non-value-ness needed for `primStep_fill`) is derived per-iteration from the
-prim-step branch's `Reducible` witness via `val_stuck`. -/
+prim-step branch's `Discrete.Reducible` witness via `Discrete.val_stuck`. -/
 theorem glm_bind {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
     glm e σ ε (fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε') ⊢@{IProp GF}
@@ -510,7 +510,7 @@ theorem glm_bind {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal}
       iexists (fun ρ' => ∃ ρ'', ρ' = K.fillCfg ρ'' ∧ R ρ''), ε₁,
         (fun ρ' => (Kinv ρ'.expr).elim 0 (fun e' => X₂ ⟨e', ρ'.state⟩)),
         r
-      have Hsv : ¬ ρ.expr.isValue := val_stuck Hred.choose_spec
+      have Hsv : ¬ ρ.expr.isValue := Discrete.val_stuck Hred.choose_spec
       isplitr; · ipure_intro; exact Hred.fill K
       isplitr
       · ipure_intro
@@ -585,7 +585,7 @@ coupling data, conclude `glm e σ ε Z`. Equivalent to Rocq's `glm_prim_step`. -
 theorem glm_prim_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
-      ⌜Reducible e σ⌝ ∗
+      ⌜Discrete.Reducible e σ⌝ ∗
       ⌜∀ ρ, X₂ ρ ≤ r⌝ ∗
       ⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e, σ⟩)) ≤ ε⌝ ∗
       ⌜Pgl ε₁ R (primStep ⟨e, σ⟩)⌝ ∗

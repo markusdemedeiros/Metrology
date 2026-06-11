@@ -1608,18 +1608,18 @@ abbrev headStepKernelM : Kernel (Cfg rT) (Cfg rT) := headStepKernel
 
 
 @[discrete]
-theorem val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
+theorem Discrete.val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
     0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValue := by
   head_case <;> simp [Exp.isValue_iff_isValueR]
 
-theorem val_head_stuckM {e : Exp rT} {σ : State rT} : headStep ⟨e, σ⟩ ≠ 0 → ¬e.isValue := by
+theorem val_head_stuck {e : Exp rT} {σ : State rT} : headStep ⟨e, σ⟩ ≠ 0 → ¬e.isValue := by
   head_case <;> simp [Exp.isValue_iff_isValueR]
 
 theorem Exp.toVal?_isValue {e : Exp α} : e.toVal? = some v → e.isValue := by
   intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
 set_option maxHeartbeats 4000000 in
-theorem head_ctx_step_val {e : Exp rT} {σ : State rT} {ρ : Cfg rT} {Ki : EctxItem rT} :
+theorem Discrete.head_ctx_step_val {e : Exp rT} {σ : State rT} {ρ : Cfg rT} {Ki : EctxItem rT} :
     0 < headStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
   have Hzero : (0 < (0 : Measure (Cfg rT)) {ρ}) → False := by simp
   head_case
@@ -1731,7 +1731,7 @@ inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
   HeadStepSupport ⟨.scrut e p, σ⟩ ⟨.inr (.lit .unit), σ⟩
 
 @[simp]
-theorem dirac_singleton_pos [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.dirac_singleton_pos [Countable rT] [MeasurableSingletonClass rT]
     {a b : Cfg rT} :
     0 < (dirac a) {b} ↔ a = b := by
   constructor
@@ -1748,7 +1748,7 @@ theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp α} {m : Measure T} {s
   · rw [if_neg He]; exact ⟨fun h => absurd h (by simp), fun ⟨hv, _⟩ => absurd hv He⟩
 
 @[simp]
-theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
+theorem Discrete.unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     {f : α → Measure β} {opt : Option α} {s : Set β} :
     0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
   cases opt <;> simp [Option.unwrapM]
@@ -1758,7 +1758,7 @@ theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp α} {f : Val α → Me
     0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
   unfold Exp.asValM; cases e.toVal? <;> simp
 
-theorem Cfg.uniform_singleton_pos_inv [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.Cfg.uniform_singleton_pos_inv [Countable rT] [MeasurableSingletonClass rT]
     {z : Int} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < Cfg.uniform z σ {ρ}) :
     ρ.state = σ ∧
@@ -1771,11 +1771,11 @@ theorem Cfg.uniform_singleton_pos_inv [Countable rT] [MeasurableSingletonClass r
     obtain ⟨_, _, _, rfl⟩ := h
     refine ⟨rfl, .inl ⟨Hz, _, rfl, ?_, ?_⟩⟩ <;> simp_all
   · simp only [Hz, dite_false] at h
-    rw [dirac_singleton_pos] at h
+    rw [Discrete.dirac_singleton_pos] at h
     have ⟨h1, h2⟩ := (Cfg.mk.injEq ..).mp h
     exact ⟨h2.symm, .inr ⟨Hz, h1.symm⟩⟩
 
-theorem Cfg.uniform_singleton_pos_of_mem [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.Cfg.uniform_singleton_pos_of_mem [Countable rT] [MeasurableSingletonClass rT]
     {z v : Int} {σ : State rT}
     (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) :
     0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩} := by
@@ -1789,19 +1789,19 @@ theorem Cfg.uniform_singleton_pos_of_mem [Countable rT] [MeasurableSingletonClas
     exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz, Set.mem_preimage]⟩
   · exact ENNReal.natCast_ne_top _
 
-theorem Cfg.uniform_singleton_nonpos [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.Cfg.uniform_singleton_nonpos [Countable rT] [MeasurableSingletonClass rT]
     {z : Int} {σ : State rT} (Hz : ¬ 0 < z) :
     0 < Cfg.uniform z σ {⟨.lit (.int (-1)), σ⟩} := by
   unfold Cfg.uniform Int.isPos
   simp only [Hz, dite_false]
-  rw [dirac_singleton_pos]
+  rw [Discrete.dirac_singleton_pos]
 
 /-- Decompose `0 < (dirac a) {b}` into Cfg component equalities, then substitute. -/
 macro "cfg_dirac" h:ident : tactic =>
-  `(tactic| (rw [dirac_singleton_pos] at $h:ident
+  `(tactic| (rw [Discrete.dirac_singleton_pos] at $h:ident
              have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
 
-theorem headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
     (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
     0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
@@ -1823,28 +1823,28 @@ theorem headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
     case rand.tape.deterministic =>
       intro h; cfg_dirac h; exact .RandTapeS ‹_› rfl rfl rfl
     case unop.redex =>
-      intro h; rw [unwrapM_singleton_pos] at h
+      intro h; rw [Discrete.unwrapM_singleton_pos] at h
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .UnOpS ‹_› hr.symm
     case binop.redex =>
-      intro h; rw [unwrapM_singleton_pos] at h
+      intro h; rw [Discrete.unwrapM_singleton_pos] at h
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .BinOpS ‹_› ‹_› hr.symm
     case rand.plain =>
       intro h
-      obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
+      obtain ⟨hσ, hbr⟩ := Discrete.Cfg.uniform_singleton_pos_inv h
       simp at hσ; subst hσ
       rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
       · simp at hv; subst hv; exact .RandNoTapeS Hz Hv0 Hvz
       · simp at hv; subst hv; exact .RandNonposS Hz
     case rand.tape =>
       intro h
-      obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
+      obtain ⟨hσ, hbr⟩ := Discrete.Cfg.uniform_singleton_pos_inv h
       simp at hσ; subst hσ
       rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
       · simp at hv; subst hv; exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
       · simp at hv; subst hv; exact .RandTapeNonposEmptyS Hz ‹_› rfl
     case rand.tape.mismatch =>
       intro h
-      obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
+      obtain ⟨hσ, hbr⟩ := Discrete.Cfg.uniform_singleton_pos_inv h
       simp at hσ; subst hσ
       rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
       · simp at hv; subst hv; exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
@@ -1858,7 +1858,7 @@ theorem headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
     | ScrutSuccessS | ScrutFailureS =>
       simp_all [headStep]
     | RandNoTapeS | RandTapeEmptyS =>
-      simp_all [headStep, Cfg.uniform_singleton_pos_of_mem]
+      simp_all [headStep, Discrete.Cfg.uniform_singleton_pos_of_mem]
     | UnOpS _ heval | BinOpS _ _ heval =>
       simp_all [headStep]
       exact ⟨_, heval.symm, by simp⟩
@@ -1867,17 +1867,17 @@ theorem headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
       simp only [headStep, htape]
       split
       · next hM => rw [hM] at hzN; exact absurd rfl hzN
-      · exact Cfg.uniform_singleton_pos_of_mem Hz Hv0 Hvz
+      · exact Discrete.Cfg.uniform_singleton_pos_of_mem Hz Hv0 Hvz
     | RandNonposS Hz =>
-      simp only [headStep]; exact Cfg.uniform_singleton_nonpos Hz
+      simp only [headStep]; exact Discrete.Cfg.uniform_singleton_nonpos Hz
     | RandTapeNonposEmptyS Hz htape hzN =>
       subst hzN
       simp only [headStep, htape, ↓reduceIte]
-      exact Cfg.uniform_singleton_nonpos Hz
+      exact Discrete.Cfg.uniform_singleton_nonpos Hz
     | RandTapeNonposOtherS Hz htape hzN =>
       simp only [headStep, htape]
       rw [if_neg (Ne.symm hzN)]
-      exact Cfg.uniform_singleton_nonpos Hz
+      exact Discrete.Cfg.uniform_singleton_nonpos Hz
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
@@ -1897,7 +1897,7 @@ theorem Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
       AEMeasurable.of_discrete
   · simp only [Hz, dite_false]; infer_instance
 
-theorem head_step_mass [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.head_step_mass [Countable rT] [MeasurableSingletonClass rT]
     (e : Exp rT) (σ : State rT) :
     (∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
   head_case
@@ -1908,7 +1908,7 @@ theorem head_step_mass [Countable rT] [MeasurableSingletonClass rT]
      | rand.tape.deterministic
      | scrut_success | scrut_failure => intro _; infer_instance
   case unop.redex | binop.redex =>
-    intro ⟨_, hρ⟩; rw [unwrapM_singleton_pos] at hρ
+    intro ⟨_, hρ⟩; rw [Discrete.unwrapM_singleton_pos] at hρ
     obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
   case rand.plain | rand.tape | rand.tape.mismatch =>
     intro _; exact Cfg.uniform_isProbabilityMeasure
@@ -1990,13 +1990,13 @@ theorem headStep_univ_le_one' (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
 
 /-- `headStep` is a sub-probability measure: total mass is at most 1.
 Case split on whether any singleton has positive mass: if so, `headStep ρ`
-is a probability measure (by `head_step_mass`); if not, it is the zero
+is a probability measure (by `Discrete.head_step_mass`); if not, it is the zero
 measure (since `Cfg` is countable, the total mass is a tsum of singletons). -/
-theorem headStep_univ_le_one [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.headStep_univ_le_one [Countable rT] [MeasurableSingletonClass rT]
     (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
   by_cases hred : ∃ ρ' : Cfg rT, 0 < (headStep ρ) {ρ'}
   · obtain ⟨e, σ⟩ := ρ
-    have := head_step_mass e σ hred
+    have := Discrete.head_step_mass e σ hred
     exact (measure_univ (μ := headStep ⟨e, σ⟩)).le
   · have hzero : ∀ ρ', (headStep ρ) {ρ'} = 0 := fun ρ' =>
       le_antisymm (by simpa using (not_exists.mp hred ρ')) bot_le
