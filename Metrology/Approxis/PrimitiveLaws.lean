@@ -415,7 +415,7 @@ theorem wp_rand_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ :=
-    primStep_eq_headStep ⟨_, Hhead_rand⟩
+    primStep_eq_headStep_discrete ⟨_, Hhead_rand⟩
   rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandNoTapeS _ Hv0 Hvz =>
@@ -504,7 +504,7 @@ theorem wp_rand_nonpos_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁'⟩ :=
-    primStep_eq_headStep ⟨_, Hhead_rand⟩
+    primStep_eq_headStep_discrete ⟨_, Hhead_rand⟩
   rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandNoTapeS hpos _ _ => exact absurd hpos Hz
@@ -553,7 +553,7 @@ theorem wp_rand_tape_empty_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z : Int} {e
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
-    primStep_eq_headStep ⟨_, Hhead⟩
+    primStep_eq_headStep_discrete ⟨_, Hhead⟩
   rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS hlook' _ _ _ =>
@@ -612,7 +612,7 @@ theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z N : Int} 
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
-    primStep_eq_headStep ⟨_, Hhead⟩
+    primStep_eq_headStep_discrete ⟨_, Hhead⟩
   rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS hlook' _ _ _ =>
@@ -712,7 +712,7 @@ theorem wp_rand_empty_r {E : CoPset} (K : (Ectx rT)) {z : Int} {l : Loc}
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
-    primStep_eq_headStep ⟨_, Hhead⟩
+    primStep_eq_headStep_discrete ⟨_, Hhead⟩
   rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS Hlk' _ _ _ =>
@@ -780,7 +780,7 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : (Ectx rT)) {z M : Int} {l : Loc}
   subst heq_e2'
   have Hheq : primStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ =
       headStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ₁'⟩ :=
-    primStep_eq_headStep ⟨_, Hhead⟩
+    primStep_eq_headStep_discrete ⟨_, Hhead⟩
   rw [Hheq, Discrete.headStep_support_iff] at Hstep'
   cases Hstep' with
   | RandTapeS Hlk' heq _ _ =>

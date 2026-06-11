@@ -225,6 +225,10 @@ macro "head_case" : tactic =>
       head_split_isValM beta.fix.redex beta.fix.no_redex
   ))
 
+
+abbrev HeadReducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+  headStep ⟨e, σ⟩ ≠ 0
+
 /-! ### Measurability for arbitrary measurable `rT`.
 
 These stubs replace the discrete-`rT` `.of_discrete` shortcuts above with genuine

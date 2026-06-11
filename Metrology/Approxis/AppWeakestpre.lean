@@ -2670,7 +2670,7 @@ theorem wp_lift_head_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IPro
   iintro %e₂ %σ₂ %Hpstep
   -- primStep positive + head-reducible ⇒ headStep positive at same successor
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
-    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
     exact heq ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %hpos
 
@@ -2694,7 +2694,7 @@ theorem wp_lift_atomic_head_step_fupd {E1 E2 : CoPset} {e₁ : (Exp rT)} {Φ : (
   isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
-    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
     exact heq ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %hpos
 
@@ -2719,7 +2719,7 @@ theorem wp_lift_atomic_head_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) �
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
-    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep Hhred
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
     exact heq ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %hpos
 
@@ -2731,7 +2731,7 @@ theorem wp_lift_pure_det_head_step {E E' : CoPset} {e₁ e₂ : (Exp rT)} {Φ : 
     iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
   iapply wp_lift_pure_det_step (Hsafe := fun σ => Discrete.Reducible.of_head (Hsafe σ))
   intros σ e₂' σ₂ hp
-  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep (Hsafe σ)
+  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep_discrete (Hsafe σ)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)
 
 /-- `wp_lift_pure_det_head_step'` — `▷`-form of `wp_lift_pure_det_head_step`. -/

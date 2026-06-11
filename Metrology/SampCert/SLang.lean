@@ -176,13 +176,13 @@ theorem limExec_beta {body v : Exp} {σ : State} (hv : IsVal v) :
   rw [limExec_not_final hnv]
   have hred : ∃ ρ, 0 < headStep ⟨.app (.lam body) v, σ⟩ {ρ} := by
     refine ⟨⟨Exp.open' body v, σ⟩, ?_⟩; simp [headStep, Exp.isValM_some' hv]
-  rw [primStep_eq_headStep hred]
+  rw [primStep_eq_headStep_discrete hred]
   simp [headStep, Exp.isValM_some' hv, Measure.dirac_bind Measurable.of_discrete]
 
 /-- `execN`-level version of a deterministic head step: `execN (n+1) ρ = execN n ρ'`. -/
 theorem execN_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
     (h : DetHeadStep_discrete ρ ρ') (n : Nat) : execN (n+1) ρ = execN n ρ' := by
-  rw [execN_succ_not_isValue hnv, primStep_eq_headStep ⟨ρ', h.pos⟩]
+  rw [execN_succ_not_isValue hnv, primStep_eq_headStep_discrete ⟨ρ', h.pos⟩]
   -- headStep ρ = dirac ρ'
   have hother : ∀ c ≠ ρ', (headStep ρ) {c} = 0 := by
     intro c hc
@@ -234,7 +234,7 @@ theorem limExec_detStep {ρ ρ' : Cfg} (h : DetStep_discrete ρ ρ') : limExec �
 /-- Generic one-step unfolding for `limExec` at a deterministic head redex. -/
 theorem limExec_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
     (h : DetHeadStep_discrete ρ ρ') : limExec ρ = limExec ρ' := by
-  rw [limExec_not_final hnv, primStep_eq_headStep ⟨ρ', h.pos⟩]
+  rw [limExec_not_final hnv, primStep_eq_headStep_discrete ⟨ρ', h.pos⟩]
   -- `headStep ρ = dirac ρ'`: mass 1 at ρ', total mass ≤ 1 ⇒ rest vanishes.
   have hother : ∀ c ≠ ρ', (headStep ρ) {c} = 0 := by
     intro c hc
@@ -455,7 +455,7 @@ theorem probLangUniformByte_isEmbedding :
     rw [show probLangUniformByte = Exp.rand (.lit (.int 256)) (.lit .unit) from rfl]
     simp only [headStep]
     exact ⟨_, Discrete.Cfg.uniform_singleton_pos_of_mem (v := 0) (by norm_num) (by norm_num) (by norm_num)⟩
-  rw [primStep_eq_headStep hred]
+  rw [primStep_eq_headStep_discrete hred]
   show (headStep ⟨probLangUniformByte, σ⟩).bind limExec = _
   have hhead : headStep ⟨probLangUniformByte, σ⟩ = Cfg.uniform 256 σ := by
     simp [probLangUniformByte, headStep]
@@ -2662,7 +2662,7 @@ theorem probLangEq_uint8_isEmbedding (a b : UInt8) :
     simp [BinOp.eval, result]
   have hred : ∃ ρ, 0 < headStep ⟨.binop .eq (.lit (.int ↑a.toNat)) (.lit (.int ↑b.toNat)), σ⟩ {ρ} :=
     ⟨⟨result, σ⟩, (DetHeadStep_discrete.binop .lit .lit heval σ).pos⟩
-  rw [primStep_eq_headStep hred]
+  rw [primStep_eq_headStep_discrete hred]
   show (headStep ⟨.binop .eq (.lit (.int ↑a.toNat)) (.lit (.int ↑b.toNat)), σ⟩).bind limExec = _
   simp only [headStep, Exp.isValM_some' IsVal.lit, heval, Option.unwrapM,
     Measure.dirac_bind Measurable.of_discrete]

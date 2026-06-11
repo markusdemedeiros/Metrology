@@ -33,7 +33,7 @@ structure PureHeadStep_discrete (e1 e2 : Exp rT) : Prop where
 
 @[discrete]
 theorem PureHeadStep_discrete.toPureStep {e1 e2 : Exp rT} (h : PureHeadStep_discrete e1 e2) : PureStep_discrete e1 e2 :=
-  ⟨fun σ => Discrete.Reducible.of_head (h.safe σ), fun σ => primStep_eq_headStep (h.safe σ) ▸ h.det σ⟩
+  ⟨fun σ => Discrete.Reducible.of_head (h.safe σ), fun σ => primStep_eq_headStep_discrete (h.safe σ) ▸ h.det σ⟩
 
 @[discrete]
 theorem PureStep_discrete.fill [Countable rT] [MeasurableSingletonClass rT]
@@ -144,8 +144,8 @@ theorem DetStep_discrete.pos_discrete {cfg1 cfg2 : Cfg rT} (h : DetStep_discrete
 
 @[discrete]
 theorem DetHeadStep_discrete.toDetStep {cfg1 cfg2 : Cfg rT} (h : DetHeadStep_discrete cfg1 cfg2) : DetStep_discrete cfg1 cfg2 where
-  safe := ⟨_, primStep_pos_of_headStep h.pos_discrete⟩
-  det := by obtain ⟨e1, σ1⟩ := cfg1; rw [primStep_eq_headStep h.safe]; exact h.det
+  safe := ⟨_, primStep_pos_of_headStep_discrete h.pos_discrete⟩
+  det := by obtain ⟨e1, σ1⟩ := cfg1; rw [primStep_eq_headStep_discrete h.safe]; exact h.det
 
 @[discrete]
 class DetExec_discrete (n : ℕ) (cfg1 cfg2 : Cfg rT) : Prop where

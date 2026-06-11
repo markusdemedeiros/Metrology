@@ -126,7 +126,7 @@ theorem primStep_rand_unit [Countable rT] [MeasurableSingletonClass rT] {z : Int
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩
         ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
     (Discrete.headStep_support_iff _ _ _ _).mpr (.RandNoTapeS Hz (_root_.le_refl _) Hz)
-  rw [primStep_eq_headStep ⟨_, Hhead⟩]
+  rw [primStep_eq_headStep_discrete ⟨_, Hhead⟩]
   rfl
 
 /-- `primStep` of `rand #z (lbl α)` when the tape has the wrong bound. -/
@@ -138,7 +138,7 @@ theorem primStep_rand_lbl_wrong [Countable rT] [MeasurableSingletonClass rT] {z 
         ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
     (Discrete.headStep_support_iff _ _ _ _).mpr
       (.RandTapeOtherS Hz Hlk HneM (_root_.le_refl _) Hz rfl)
-  rw [primStep_eq_headStep ⟨_, Hhead⟩]
+  rw [primStep_eq_headStep_discrete ⟨_, Hhead⟩]
   show (match σ.tapes[l]? with
         | none => (0 : MeasureTheory.Measure (Cfg rT))
         | some ⟨M, ns⟩ =>
@@ -159,7 +159,7 @@ theorem primStep_rand_lbl_empty [Countable rT] [MeasurableSingletonClass rT] {z 
         ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
     (Discrete.headStep_support_iff _ _ _ _).mpr
       (.RandTapeEmptyS Hz Hlk rfl (_root_.le_refl _) Hz rfl)
-  rw [primStep_eq_headStep ⟨_, Hhead⟩]
+  rw [primStep_eq_headStep_discrete ⟨_, Hhead⟩]
   show (match σ.tapes[l]? with
         | none => (0 : MeasureTheory.Measure (Cfg rT))
         | some ⟨M, ns⟩ =>
