@@ -245,6 +245,7 @@ theorem Discrete.measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α]
   rw [Set.biUnion_of_singleton] at this
   exact absurd this (ne_of_gt hS)
 
+-- I think there's no good continuous version of this...
 @[discrete]
 theorem Discrete.map_singleton_pos {α β : Type _}
     [MeasurableSpace α] [MeasurableSpace β]
@@ -256,6 +257,29 @@ theorem Discrete.map_singleton_pos {α β : Type _}
   obtain ⟨a, ha, hpos⟩ := Discrete.measure_pos_of_singleton_pos μ _ h
   simp [Set.mem_preimage, Set.mem_singleton_iff] at ha
   exact ⟨a, ha, hpos⟩
+
+/-- Continuous variant of `Discrete.map_singleton_pos`. For an *injective* `f` the
+fiber `f ⁻¹' {b}` is at most a single point, so positive pushforward mass on `{b}`
+forces positive mass on that unique preimage — no countability/atoms needed. (The
+general, non-injective statement is false: a constant `f` collapses non-atomic mass
+onto one point.) -/
+theorem map_singleton_pos {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
+    [MeasurableSingletonClass α] [MeasurableSingletonClass β]
+    {f : α → β} {μ : Measure α} {b : β} (hf : Measurable f) (hinj : Function.Injective f)
+    (h : 0 < (μ.map f) {b}) :
+    ∃ a, f a = b ∧ 0 < μ {a} := by
+  rw [Measure.map_apply hf (measurableSet_singleton b)] at h
+  by_cases hb : ∃ a, f a = b
+  · obtain ⟨a, ha⟩ := hb
+    refine ⟨a, ha, ?_⟩
+    have hpre : f ⁻¹' {b} = {a} := by
+      ext x
+      simp only [Set.mem_preimage, Set.mem_singleton_iff]
+      exact ⟨fun hx => hinj (hx.trans ha.symm), fun hx => hx ▸ ha⟩
+    rwa [hpre] at h
+  · exfalso
+    rw [Set.preimage_singleton_eq_empty.mpr hb] at h
+    simp at h
 
 theorem Measure.bind_map {α β γ : Type} [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace γ]
     [DiscreteMeasurableSpace β] {μ : Measure α} {f : α → β} {g : β → Measure γ}

@@ -219,8 +219,7 @@ theorem primStep_fill_singleton [ProbLangℝ rT] {K : Ectx rT} {e1 e2 : Exp rT} 
   ext ⟨e', σ'⟩
   simp [(Ectx.fill_injective K).eq_iff]
 
--- TODO: HERE
-
+-- primStep_fill_pos
 @[discrete]
 theorem primStep_fill_pos_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
@@ -228,7 +227,18 @@ theorem primStep_fill_pos_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSi
     0 < primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
   rwa [← primStep_fill_singleton (Discrete.val_stuck h)]
 
--- Not sure
+theorem primStep_fill_pos [ProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : State rT}
+    (h : primStep ⟨e, σ⟩ ≠ 0) : primStep ⟨K.fill e, σ⟩ ≠ 0 := by
+  by_cases hk : e.isValue
+  · exact val_stuck h hk |>.elim
+  · rw [primStep_fill hk]
+    have hm : Measurable (fun ρ : Cfg rT ↦ (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT)) := by measurability
+    refine fun H => h ?_
+    refine Measure.measure_univ_eq_zero.mp ?_
+    have := H ▸ Measure.map_apply hm .univ (μ := primStep ⟨e, σ⟩)
+    simpa using this.symm
+
+-- primStep_fill_inv
 @[discrete]
 theorem primStep_fill_inv_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
@@ -240,8 +250,17 @@ theorem primStep_fill_inv_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSi
   simp [Cfg.mk.injEq] at heq
   exact ⟨e2', heq.1.symm, heq.2 ▸ hpos⟩
 
+theorem primStep_fill_inv [ProbLangℝ rT]  {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+    (hv : ¬e1.isValue) (h : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
+    ∃ e2', e2 = K.fill e2' ∧ 0 < primStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} := by
+  rw [primStep_fill hv] at h
+  obtain ⟨⟨e2', σ2'⟩, heq, hpos⟩ := map_singleton_pos (by measurability) (Ectx.fillCfg_injective K) h
+  simp [Cfg.mk.injEq] at heq
+  exact ⟨e2', heq.1.symm, heq.2 ▸ hpos⟩
+
 /-! ## Discrete.Reducible: fill interaction -/
 
+-- TODO: HERE
 @[discrete]
 theorem Discrete.Reducible.fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
