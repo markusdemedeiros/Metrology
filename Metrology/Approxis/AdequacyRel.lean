@@ -27,6 +27,7 @@ class abbrev RefinesPreGS (rT : outParam (Type _)) [ProbLangℝ rT] [Countable r
     [MeasurableSingletonClass rT] (GF : BundledGFunctors) :=
   AppPreGS rT GF, SpecPreGS rT GF, ECPreGS GF, InvGpreS GF, NaInvG GF
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- `⤇ e` and `⤇ Ectx.fill [] e` are definitionally equal. Named for use in
 `rw` rewrites where Lean's defeq is not exposed (e.g. when adapting hypotheses
 to fit lemmas that universally quantify over an evaluation context). -/
@@ -34,6 +35,7 @@ theorem spec_eq_fill_nil {GF : BundledGFunctors} [SpecGS rT GF] (e : Exp rT) :
     (iprop(⤇ e) : IProp GF) = iprop(⤇ Ectx.fill ([] : Ectx rT) e) :=
   rfl
 
+omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- `⤇ Ectx.fill [] v.1` and `⤇ Exp.ofVal v` are definitionally equal. -/
 theorem spec_fill_nil_eq_ofVal {GF : BundledGFunctors} [SpecGS rT GF] (v : Val rT) :
     (iprop(⤇ Ectx.fill ([] : Ectx rT) v.1) : IProp GF) = iprop(⤇ Exp.ofVal v) :=

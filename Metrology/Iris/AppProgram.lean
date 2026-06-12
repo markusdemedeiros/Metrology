@@ -37,22 +37,20 @@ verbatim from `SpecProgram.lean` — nothing spec-specific about them, just
 section AppProgramRA
 open Std Iris Iris.Std COFE ProbLang
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 /-! ## Ghost-state classes -/
 
 /-- The preGS bundle: which CMRAs live in `GF`. Reuses `SpecHeap`/`SpecTapes`
 from `SpecProgram.lean` — the algebra is identical for program and spec. -/
-class AppPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
-    [MeasurableSingletonClass rT] (GF : BundledGFunctors) where
+class AppPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors) where
   heap : ElemG GF (constOF (SpecHeap rT))
   tapes : ElemG GF (constOF SpecTapes)
 
 attribute [reducible, instance] AppPreGS.heap AppPreGS.tapes
 
 /-- The full GS: picks concrete γ names for the program-side heap and tapes. -/
-class AppGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
-    [MeasurableSingletonClass rT] (GF : BundledGFunctors) extends AppPreGS rT GF where
+class AppGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors) extends AppPreGS rT GF where
   γheap : GName
   γtapes : GName
 
@@ -353,7 +351,7 @@ live separately from the spec ones). -/
 theorem app_ra_init {GF : BundledGFunctors} [IAPre : AppPreGS rT GF]
     (σ : State rT) :
     ⊢@{IProp GF} |==> ∃ IA : AppGS rT GF,
-      @appStateAuth rT _ _ _ GF IA σ := by
+      @appStateAuth rT _ GF IA σ := by
   imod (iOwn_alloc (E := IAPre.heap)
     (HeapView.Auth (F := ℕ+) (.own 1) (LocHeap.asAgree σ.heap))
     HeapView.auth_one_valid) with ⟨%γH, HH⟩

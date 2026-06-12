@@ -24,7 +24,7 @@ open scoped ENNReal AppGS
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 namespace TotalEris
 
@@ -244,7 +244,7 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
 distribution" function `ε₂ : ℕ → ENNReal` whose average over `[0,z)` is
 bounded by `ε₁`, we may sample `n : Int` in `[0, z)` and recover `↯(ε₂ n)`
 in the postcondition. Rocq: `twp_rand_exp_nat` (`error_rules.v:165`). -/
-theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
+theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {z : Int} {ε₁ : ENNReal}
     {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
     (Hbd : ∀ n, ε₂ n ≤ 1)
     (HSum : (∑' n : ℕ, if n < z.toNat then ε₂ n / z.toNat else 0) ≤ ε₁) :
@@ -480,7 +480,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
 `eris_rules.v:118` — phrases the sum as `∑ k < N+1, ε₂ k ≤ (N+1) * ε₁`.
 Unlike the underlying `twp_rand_exp_nat`, this wrapper does NOT require
 `ε₂ n ≤ 1`; values above 1 are clamped internally (see `eris_rules.v`). -/
-theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
+theorem twp_rand_exp [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {z : Int} {ε₁ : ENNReal}
     {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
     (HSum : (∑ n ∈ Finset.range z.toNat, ε₂ n) ≤ z.toNat * ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}

@@ -24,22 +24,19 @@ open scoped AppGS
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _}
 
 /-! ### `toVal?` simp lemmas for head-step successor expressions
 
 Local re-statement so this file does not depend on Approxis's
 `PrimitiveLaws.lean` (eris should not need Approxis at all). -/
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_lit (b : BaseLit rT) :
     (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit⟩ := rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_lam (e : Exp rT) :
     (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam⟩ := rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 @[simp] theorem Exp.toVal?_fix (e : Exp rT) :
     (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix⟩ := rfl
 
@@ -51,7 +48,7 @@ namespace TotalEris
 
 section Lifting
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
+variable {hlc : Bool} {GF : BundledGFunctors} [ProbLangℝ rT] [Countable rT] [ErisGS rT hlc GF]
 
 /-! ## Heap operations -/
 

@@ -32,7 +32,6 @@ namespace ProbLang
 
 namespace TotalEris
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
 /-- Concrete ghost-state class for Eris.
 
@@ -40,8 +39,7 @@ Mirrors `Metrology.Approxis.ApproxisGS` minus the spec-side `SpecGS`
 (Eris is unary). Uses `extends` via field projections rather than
 nested `extends`-clauses, to avoid Lean's diamond-inheritance field
 collapse — see the comment in `ApproxisGS`. -/
-class ErisGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
-    [MeasurableSingletonClass rT] (hlc : outParam Bool) (GF : BundledGFunctors) where
+class ErisGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (hlc : outParam Bool) (GF : BundledGFunctors) where
   appGS : AppGS rT GF
   ecGS  : ECGS GF
   invGS : InvGS_gen hlc GF
@@ -50,6 +48,7 @@ attribute [reducible, instance] ErisGS.appGS ErisGS.ecGS ErisGS.invGS
 
 section ErisInstance
 
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 @[reducible]

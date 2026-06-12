@@ -14,10 +14,11 @@ open Std Iris Iris.Std Iris.BI COFE ProbLang
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 /-! ## Bridge: `DetStep_discrete` ⇒ `pexecN 1 ρ = MeasureTheory.Measure.dirac ρ'` -/
 
+-- TODO: Move me to Measure.lean
 /-- A sub-probability measure on a countable discrete space with singleton mass
 1 at `a` is the Dirac at `a`. -/
 theorem Measure.eq_dirac_of_singleton_mass_one {α : Type _}
@@ -49,8 +50,11 @@ theorem Measure.eq_dirac_of_singleton_mass_one {α : Type _}
     intro x hx hxa
     exact ha (by simpa using hxa ▸ hx)
 
+
 /-- One-step deterministic advance: `DetStep_discrete ρ ρ'` gives `pexecN 1 ρ = dirac ρ'`. -/
-theorem pexecN_1_of_DetStep {ρ ρ' : Cfg rT} (h : DetStep_discrete ρ ρ') :
+@[discrete] -- pexecN_1_of_DetStep_cts
+theorem pexecN_1_of_DetStep [Countable rT] [MeasurableSingletonClass rT]
+    {ρ ρ' : Cfg rT} (h : DetStep_discrete ρ ρ') :
     pexecN 1 ρ = MeasureTheory.Measure.dirac ρ' := by
   rw [pexecN_one]
   have hnv : ¬ ρ.expr.isValue := by
@@ -60,8 +64,20 @@ theorem pexecN_1_of_DetStep {ρ ρ' : Cfg rT} (h : DetStep_discrete ρ ρ') :
   rw [stepOrFinal_not_isValue hnv]
   exact Measure.eq_dirac_of_singleton_mass_one h.det (primStep_univ_le_one ρ)
 
+/-- One-step deterministic advance: `DetStep_discrete ρ ρ'` gives `pexecN 1 ρ = dirac ρ'`. -/
+theorem pexecN_1_of_DetStep_cts {ρ ρ' : Cfg rT} (h : DetStep ρ ρ') :
+    pexecN 1 ρ = MeasureTheory.Measure.dirac ρ' := by
+  rw [pexecN_one]
+  rcases h with ⟨h1, h2⟩
+  have hnv : ¬ ρ.expr.isValue := by
+    refine val_stuck (σ := ρ.2) ?_
+    simp [h2]
+  rw [stepOrFinal_not_isValue hnv]
+  exact h2
+
 /-- `n`-step version: `DetExec_discrete n ρ ρ'` gives `pexecN n ρ = dirac ρ'`. -/
-theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec_discrete n ρ ρ') :
+theorem pexecN_of_DetExec [Countable rT] [MeasurableSingletonClass rT]
+    {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec_discrete n ρ ρ') :
     pexecN n ρ = MeasureTheory.Measure.dirac ρ' := by
   induction n generalizing ρ with
   | zero =>
@@ -73,7 +89,7 @@ theorem pexecN_of_DetExec {n : ℕ} {ρ ρ' : Cfg rT} (h : DetExec_discrete n ρ
         MeasureTheory.Measure.dirac_bind Measurable.of_discrete,
         ih ⟨hrest⟩]
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+
 /-- `nsteps PureStep_discrete n e1 e2` at a fixed state gives `DetExec_discrete n ⟨e1,σ⟩ ⟨e2,σ⟩`. -/
 theorem DetExec_discrete.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp rT} (σ : State rT)
     (h : nsteps PureStep_discrete n e1 e2) :
@@ -85,7 +101,7 @@ theorem DetExec_discrete.of_nsteps_PureStep {n : ℕ} {e1 e2 : Exp rT} (σ : Sta
     exact (ih hrest).succ ⟨hstep.safe σ, hstep.det σ⟩
 
 /-- `PureExec_discrete φ n e1 e2 + φ` gives `pexecN n ⟨e1,σ⟩ = dirac ⟨e2,σ⟩`. -/
-theorem pexecN_of_PureExec {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
+theorem pexecN_of_PureExec [Countable rT] [MeasurableSingletonClass rT] {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     [h : PureExec_discrete φ n e1 e2] (σ : State rT) (hφ : φ) :
     pexecN n ⟨e1, σ⟩ = MeasureTheory.Measure.dirac ⟨e2, σ⟩ :=
   pexecN_of_DetExec (DetExec_discrete.of_nsteps_PureStep σ (h.pure_exec hφ))
@@ -103,7 +119,6 @@ theorem ExtTreeMap.insert_eq_PartialMap_insert {V : Type _}
 The heap variants `DetHeadStep_discrete.alloc`/`load`/`store` already live in `DetStep_discrete.lean`.
 The two below are tape-specific and used by `step_alloctape` / `step_rand`. -/
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Tape allocation: `tape #z` deterministically allocates a fresh empty tape of
 bound `z`. -/
 theorem DetHeadStep_discrete.tape {z : Int} (σ : State rT) :
@@ -112,7 +127,6 @@ theorem DetHeadStep_discrete.tape {z : Int} (σ : State rT) :
        σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ :=
   .of_det_discrete _ _ (by simp [headStep])
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Tape rand: with `σ.tapes[α] = some ⟨z, n :: ns⟩`, the random sample
 `rand z α` deterministically returns `n` and pops the head. -/
 theorem DetHeadStep_discrete.rand_tape {z : Int} (l : Loc)
@@ -127,6 +141,7 @@ theorem DetHeadStep_discrete.rand_tape {z : Int} (l : Loc)
 section Rules
 
 variable {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [SpecGS rT GF]
+variable [Countable rT] [MeasurableSingletonClass rT]
 
 /-- Pure reduction under an evaluation context. -/
 theorem step_pure {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : ℕ}

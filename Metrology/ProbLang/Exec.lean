@@ -41,6 +41,14 @@ theorem execExactN_measurable (n : Nat) : Measurable (execExactN (rT := rT) n) :
   · simp only [execExactN]
     exact Measurable.ite (by measurability) (by measurability) (by measurability)
 
+-- -- TODO: Do you exist?
+-- theorem Measurable.congr [MeasurableSpace α] [MeasurableSpace β] {f g : α → β}
+--     (H1 : Measurable f) (H2 : f = g) : Measurable g := H2 ▸ H1
+--
+-- theorem execExactN_eval_measurable (n : Nat) (HS : MeasurableSet S) :
+--     Measurable fun a ↦ (execExactN (rT := rT) n a) S :=
+--   (measurable_coe HS).comp (execExactN_measurable _)
+
 -- execExactN_sum_continuous
 /-- execN is the sum of its conditional distributions -/
 @[discrete]
@@ -71,7 +79,6 @@ theorem execExactN_sum [Countable rT] [MeasurableSingletonClass rT]
         simp only [execExactN, hv, ↑reduceIte]
       · simp [hk]
 
--- Pretty sure this is doable, WIP
 theorem execExactN_sum_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableSet S) :
     execN n ρ S = ∑'(N : Nat), if N < n then execExactN N ρ S else 0 := by
   induction n generalizing ρ with
@@ -93,7 +100,7 @@ theorem execExactN_sum_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableSe
       case G3 =>
         refine Measurable.aemeasurable ?_
         refine Measurable.ite (by measurability) ?_ (by measurability)
-        sorry
+        exact (measurable_coe HS).comp (execExactN_measurable _)
       congr 1; ext k
       by_cases hk : k < n
       · have hk' : ∀ k, k + 1 < n + 1 ↔ k < n  := by omega
@@ -119,6 +126,25 @@ theorem execExactN_mono_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableS
   rw [execExactN_sum_continuous HS, Hunfold]
   exact ENNReal.le_tsum n
 
+/-- `Measure.bind_apply` with the side conditions discharged by discreteness. -/
+@[discrete] -- use Measure.bind_apply
+theorem Discrete.bind_apply [Countable rT] [MeasurableSingletonClass rT]
+    {μ : Measure (Cfg rT)} {f : Cfg rT → Measure (Cfg rT)} {S : Set (Cfg rT)} :
+    μ.bind f S = ∫⁻ ρ, f ρ S ∂μ :=
+  Measure.bind_apply .of_discrete Measurable.of_discrete.aemeasurable
+
+/-- A value terminates in exactly zero steps. -/
+theorem execExactN_of_isValue {e : Exp rT} {σ : State rT} (hv : e.isValue) (j : Nat) :
+    execExactN j ⟨e, σ⟩ = if j = 0 then dirac ⟨e, σ⟩ else 0 := by
+  cases j <;> simp [execExactN, hv]
+
+theorem Discrete.tsum_dirac_mul [Countable rT] [MeasurableSingletonClass rT]
+    (ρ : Cfg rT) (f : Cfg rT → ENNReal) : ∑' ρ', dirac ρ {ρ'} * f ρ' = f ρ := by
+  rw [tsum_eq_single ρ fun ρ' hρ' => by simp [hρ'.symm]]
+  simp
+
+-- Probably not going to generalize this unless I need it for SampCert
+
 /-- execN term decomposition lemma. Relates execN of K[e] with the execution of e.
 Note: the theorem is untrue when execExactN is replaced with execN. -/
 @[discrete]
@@ -129,44 +155,22 @@ theorem Discrete.execN_fill_item_eq [Countable rT] [MeasurableSingletonClass rT]
   induction n generalizing ρ with
   | zero => simp [execN]
   | succ n ih =>
-    let ⟨e, σ⟩ := ρ
+    obtain ⟨e, σ⟩ := ρ
     by_cases hv : e.isValue
-    · -- e is a value: RHS collapses to j=0 term = dirac ⟨e,σ⟩ ⊗ execN(n+1)
-      rw [ENNReal.tsum_comm]
-      rw [show (∑' (a : Cfg rT) (j : ℕ), execExactN j ⟨e, σ⟩ {a} *
-          execN (n + 1 - j) (Ki.fillItemCfg a) {ρ''}) =
-          ∑' (a : Cfg rT), execExactN 0 ⟨e, σ⟩ {a} *
-          execN (n + 1) ⟨Ki.fillItem a.expr, a.state⟩ {ρ''} from by
-        congr 1; ext a
-        rw [tsum_eq_zero_add' ENNReal.summable]
-        simp [execExactN, hv]]
-      simp only [execExactN, hv, ↑reduceIte, dirac_apply, Set.indicator_apply,
-        Set.mem_singleton_iff, Pi.one_apply, ite_mul, one_mul, zero_mul, eq_comm]
-      rw [tsum_ite_eq]
-      exact DFunLike.congr rfl rfl
-    · have hfv : ¬(Ki.fillItem e).isValue := EctxItem.fillItem_noVal hv
-      have lhs_eq : execN (n + 1) ⟨Ki.fillItem e, σ⟩ = (primStep ⟨Ki.fillItem e, σ⟩).bind (execN n) := by
-        unfold execN; rw [if_neg hfv]
-      have step2 : (primStep (Ki.fillItemCfg ⟨e, σ⟩)).bind (execN n) = (primStep ⟨e, σ⟩).bind (fun ρ => execN n (Ki.fillItemCfg ρ)) := by
+    · rw [tsum_eq_single 0 fun j hj => by simp [execExactN_of_isValue hv, hj]]
+      simp only [execExactN_of_isValue hv, ↓reduceIte, Nat.sub_zero, Discrete.tsum_dirac_mul]
+    · have step : execN (n + 1) (Ki.fillItemCfg ⟨e, σ⟩) =
+          (primStep ⟨e, σ⟩).bind fun ρ' => execN n (Ki.fillItemCfg ρ') := by
         simp only [EctxItem.fillItemCfg]
-        rw [primStep_fillItem Ki hv, Measure.bind_map .of_discrete .of_discrete]; rfl
-      have lhs_eq2 := lhs_eq.trans step2
-      rw [show (execN (n + 1) (Ki.fillItemCfg ⟨e, σ⟩) {ρ''} = ((primStep ⟨e, σ⟩).bind (fun ρ => execN n (Ki.fillItemCfg ρ))) {ρ''}) from congr_arg (· {ρ''}) lhs_eq2]
-      rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-      simp_rw [ih]
-      rw [lintegral_tsum (fun j => Measurable.of_discrete.aemeasurable)]
-      simp_rw [lintegral_tsum (fun a => Measurable.of_discrete.aemeasurable)]
-      simp_rw [lintegral_mul_const _ Measurable.of_discrete]
-      have bind_exact : ∀ i (a : Cfg rT), ∫⁻ (ρ : Cfg rT), execExactN i ⟨ρ.expr, ρ.state⟩ {a} ∂primStep ⟨e, σ⟩ =
-          execExactN (i + 1) ⟨e, σ⟩ {a} := by
-        intro i a
-        rw [← bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-        simp [execExactN, hv]
-      simp_rw [bind_exact]
+        rw [execN, if_neg (EctxItem.fillItem_noVal hv), primStep_fillItem Ki hv,
+          Measure.bind_map .of_discrete .of_discrete]
+        rfl
+      rw [step, Discrete.bind_apply]
+      simp_rw [ih, lintegral_tsum fun _ => Measurable.of_discrete.aemeasurable,
+        lintegral_mul_const _ Measurable.of_discrete]
       symm
       rw [tsum_eq_zero_add' ENNReal.summable]
-      simp only [execExactN, hv, ↑reduceIte,
-        show ∀ i, n + 1 - (i + 1) = n - i from fun i => by omega,
+      simp only [execExactN, hv, ↓reduceIte, Nat.add_sub_add_right, Discrete.bind_apply,
         Measure.coe_zero, Pi.zero_apply, zero_mul, tsum_zero, zero_add]
 
 /-- Limiting distribution of an execution, over configurations -/
@@ -178,111 +182,51 @@ def asExpr (μ : Measure (Cfg rT)) : Measure (Exp rT) := μ.map (·.expr)
 /-- Limiting distribution of an execution, over return values -/
 def limExecV (ρ : Cfg rT) : Measure (Exp rT) := asExpr <| limExec ρ
 
-/-! ### Measurability for arbitrary measurable `rT`.
+/-! ### Measurability for arbitrary measurable `rT`. -/
 
-These are the non-discrete analogues of the `.of_discrete`-shortcutted lemmas
-scattered through this file. Each follows by routine kernel algebra (bind, iSup,
-map) once `primStep.measurable` lands. -/
-
-/-- `execN n` is measurable as a function `Cfg rT → Measure (Cfg rT)`.
-
-Induction on `n`. Base: constant `0`. Step: `Measurable.ite` with
-`isValueR.measurable ∘ Cfg.measurable_expr`, true branch `measurable_dirac`,
-false branch `measurable_bind'` (taking the IH as the kernel) composed with
-the (stubbed) `primStep.measurable`. -/
-theorem execN.measurable [Inhabited rT] (n : Nat) :
-    Measurable (execN n : Cfg rT → Measure (Cfg rT)) := by
-  induction n with
-  | zero => exact measurable_const
-  | succ n ih =>
-    -- execN (n+1) ρ = if ρ.expr.isValue then dirac ρ else (primStep ρ).bind (execN n)
-    have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
-      have : {ρ : Cfg rT | ρ.expr.isValue} = {ρ : Cfg rT | ρ.expr.isValueR} := by
-        ext ρ; exact Exp.isValue_iff_isValueR
-      rw [this]
-      exact (Exp.isValueR.measurable.comp Cfg.measurable_expr).setOf
-    refine Measurable.ite hpred measurable_dirac ?_
-    -- False branch: (primStep ρ).bind (execN n)
-    exact (Measure.measurable_bind' ih).comp primStep.measurable
-
-/-- `execExactN N` is measurable as a function `Cfg rT → Measure (Cfg rT)`.
-Same shape as `execN.measurable`: induction + ite. -/
-theorem execExactN.measurable [Inhabited rT] (N : Nat) :
-    Measurable (execExactN N : Cfg rT → Measure (Cfg rT)) := by
-  have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
-    have : {ρ : Cfg rT | ρ.expr.isValue} = {ρ : Cfg rT | ρ.expr.isValueR} := by
-      ext ρ; exact Exp.isValue_iff_isValueR
-    rw [this]
-    exact (Exp.isValueR.measurable.comp Cfg.measurable_expr).setOf
-  induction N with
-  | zero =>
-    -- execExactN 0 ρ = if ρ.expr.isValue then dirac ρ else 0
-    exact Measurable.ite hpred measurable_dirac measurable_const
-  | succ N ih =>
-    -- execExactN (N+1) ρ = if ρ.expr.isValue then 0 else (primStep ρ).bind (execExactN N)
-    refine Measurable.ite hpred measurable_const ?_
-    exact (Measure.measurable_bind' ih).comp primStep.measurable
-
-/-- `asExpr : Measure (Cfg rT) → Measure (Exp rT)` is measurable in its argument. -/
+-- TODO: Move me
 theorem asExpr.measurable :
     Measurable (asExpr : Measure (Cfg rT) → Measure (Exp rT)) :=
   Measure.measurable_map _ Cfg.measurable_expr
 
--- (`limExec.measurable` / `limExecV.measurable` appear below, after
--- `execN_mono` is in scope.)
-
-/-! ## `execN` / `limExec` metatheory — ported from Rocq `theories/prob/markov.v`.
-
-We do not port the `markov` structure itself. Rocq's `step_or_final`, `pexec n`
-and `exec n` all collapse to our `execN` because `mstate_ret = Cfg`. See
-`notes/plan-markov.md` for the full port plan. -/
-
-/-- `∑'` and `⨆` commute for monotone ℕ-indexed ENNReal sequences. -/
+@[discrete] -- ENNReal.tsum_iSup_of_monotone_cts
 theorem ENNReal.tsum_iSup_of_monotone [Countable rT] [MeasurableSingletonClass rT]
     {f : ℕ → Cfg rT → ENNReal} (hf : ∀ a, Monotone (f · a)) :
     ∑' a, ⨆ n, f n a = ⨆ n, ∑' a, f n a := by
   simp_rw [← MeasureTheory.lintegral_count]
   exact MeasureTheory.lintegral_iSup (fun _ => Measurable.of_discrete) (fun _ _ hmn a => hf a hmn)
 
-/-- Apply an `iSup` of measures at a singleton of a discrete space (specialized
-to `Cfg`). Mathlib does not provide a `Measure.iSup_apply` for general sets;
-this is the specialized form we need. -/
-@[discrete]
+theorem ENNReal.tsum_iSup_of_monotone_cts {f : ℕ → Cfg rT → ENNReal}
+    (hf : ∀ a, Monotone (f · a)) (hm : ∀ x, Measurable (f x)) :
+    ∑' a, ⨆ n, f n a = ⨆ n, ∑' a, f n a := by
+  simp_rw [← MeasureTheory.lintegral_count]
+  exact MeasureTheory.lintegral_iSup (fun _ => hm _) (fun _ _ hmn a => hf a hmn)
+
+@[discrete] -- iSup_measure_apply
 theorem Discrete.iSup_measure_apply [Countable rT] [MeasurableSingletonClass rT]
     {f : ℕ → Measure (Cfg rT)} {c : Cfg rT} :
     (⨆ i, f i) {c} = ⨆ i, f i {c} := by
-  apply le_antisymm
-  · let w : Cfg rT → ENNReal := fun a => ⨆ i, f i {a}
-    let μ : Measure (Cfg rT) := Measure.sum (fun (a : Cfg rT) => w a • Measure.dirac a)
-    have hval : μ {c} = w c := by
-      simp only [μ, Measure.sum_apply _ MeasurableSet.of_discrete,
-        Measure.smul_apply, smul_eq_mul, Measure.dirac_apply' _ MeasurableSet.of_discrete,
-        Set.mem_singleton_iff, Set.indicator_apply, Pi.one_apply]
-      simp only [mul_ite, mul_one, mul_zero]
-      rw [tsum_eq_single c (by intro b hb; simp [hb])]
-      simp
-    have hub : ∀ i, f i ≤ μ := by
-      intro i
-      rw [Measure.le_iff]
-      intro s hs
-      rw [Measure.sum_apply _ hs]
-      simp only [Measure.smul_apply, smul_eq_mul, Measure.dirac_apply' _ hs,
-        Set.indicator_apply, Pi.one_apply, mul_ite, mul_one, mul_zero]
-      rw [← Measure.sum_smul_dirac (f i)]
-      rw [Measure.sum_apply _ hs]
-      simp only [Measure.smul_apply, smul_eq_mul, Measure.dirac_apply' _ hs,
-        Set.indicator_apply, Pi.one_apply, mul_ite, mul_one, mul_zero]
-      apply ENNReal.tsum_le_tsum
-      intro a
-      split
-      · exact le_iSup (fun i => f i {a}) i
-      · exact le_refl _
-    have := Measure.le_iff'.mp (iSup_le hub) ({c} : Set (Cfg rT))
-    simp only [hval] at this
-    exact this
-  · exact iSup_le (fun i => by gcongr; exact le_iSup f i)
+  refine le_antisymm ?_ (iSup_le fun i => by gcongr; exact le_iSup f i)
+  -- `⨆ i, f i` is bounded by the measure weighting each point by the pointwise sup.
+  have happly (g : Cfg rT → ENNReal) (s : Set (Cfg rT)) :
+      Measure.sum (fun a => g a • dirac a) s = ∑' a, g a * dirac a s := by
+    simp [Measure.sum_apply _ MeasurableSet.of_discrete]
+  have hub (i : ℕ) : f i ≤ Measure.sum fun a => (⨆ j, f j {a}) • dirac a := by
+    rw [← Measure.sum_smul_dirac (f i)]
+    refine Measure.le_iff'.mpr fun s => ?_
+    rw [happly, happly]
+    exact ENNReal.tsum_le_tsum fun a => mul_le_mul' (le_iSup (f · {a}) i) le_rfl
+  refine (Measure.le_iff'.mp (iSup_le hub) {c}).trans_eq ?_
+  rw [happly, tsum_eq_single c fun b hb => by simp [hb]]
+  simp
+
+theorem iSup_measure_apply {f : ℕ → Measure (Cfg rT)} (hf : Monotone f)
+    {S : Set (Cfg rT)} (HS : MeasurableSet S) :
+    (⨆ i, f i) S = ⨆ i, f i S :=
+  Measure.iSup_apply_of_monotone f hf HS
 
 /-- `Measure.bind` is monotone in its kernel argument (discrete case). -/
+@[discrete] -- Measure.bind_mono_right'
 theorem Measure.bind_mono_right {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
     [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β]
     (μ : Measure α) (f g : α → Measure β)
@@ -293,8 +237,17 @@ theorem Measure.bind_mono_right {α β : Type*} [MeasurableSpace α] [Measurable
       bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
   exact lintegral_mono (fun a => h a S)
 
+theorem Measure.bind_mono_right' {α β : Type*} [MeasurableSpace α] [MeasurableSpace β]
+    (μ : Measure α) (f g : α → Measure β) (Hf : Measurable f) (Hg : Measurable g)
+    (h : ∀ a, f a ≤ g a) :
+    μ.bind f ≤ μ.bind g := by
+  refine le_intro fun S HS HNE => ?_
+  rw [bind_apply HS Hf.aemeasurable, bind_apply HS Hg.aemeasurable]
+  exact lintegral_mono (fun a => h a S)
+
 /-- Helper: `execN n ≤ execN (n+1)`. -/
-private theorem execN_succ_le [Countable rT] [MeasurableSingletonClass rT]
+@[discrete] -- execN_succ_le'
+theorem execN_succ_le [Countable rT] [MeasurableSingletonClass rT]
     (n : ℕ) (ρ : Cfg rT) : execN n ρ ≤ execN (n + 1) ρ := by
   induction n generalizing ρ with
   | zero => exact bot_le
@@ -304,28 +257,31 @@ private theorem execN_succ_le [Countable rT] [MeasurableSingletonClass rT]
     · exact le_refl _
     · exact Measure.bind_mono_right _ _ _ (fun a => ih a)
 
+theorem execN_succ_le' (n : ℕ) (ρ : Cfg rT) : execN n ρ ≤ execN (n + 1) ρ := by
+  induction n generalizing ρ with
+  | zero => exact bot_le
+  | succ k ih =>
+    rw (occs := [2]) [execN]
+    rw (occs := [1]) [execN]
+    split
+    · exact le_refl _
+    · apply Measure.bind_mono_right'
+      · measurability
+      · measurability
+      · exact ih
+
 /-! ### Primitive unfoldings -/
 
--- Rocq: (boundary; no direct analogue — `stepN_O` / `exec 0` cases)
 @[simp] theorem execN_zero (ρ : Cfg rT) : execN 0 ρ = 0 := rfl
 
--- Rocq: Lemma exec_is_final — applied to the successor case
 @[simp] theorem execN_succ_isValue {ρ : Cfg rT} (hv : ρ.expr.isValue) (n : Nat) :
     execN (n + 1) ρ = dirac ρ := by
   simp [execN, hv]
 
--- Rocq: Lemma exec_Sn_not_final
 theorem execN_succ_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) (n : Nat) :
     execN (n + 1) ρ = (primStep ρ).bind (execN n) := by
   simp [execN, hv]
 
-/-- "Step-or-final": the one-step transition that absorbs at values.
-Corresponds to Rocq `step_or_final`. Note that our `execN` does **not**
-iterate this directly — `execN 0 = 0` (no fuel), while iterating
-`stepOrFinal` starting from `dirac ρ` would give `dirac ρ` at the zero-step
-mark. The two agree modulo a shift: `execN (n+1) ρ` is the subdistribution
-after running `stepOrFinal` up to `n` times, provided we only count those
-that have reached a value. -/
 def stepOrFinal (ρ : Cfg rT) : Measure (Cfg rT) :=
   if ρ.expr.isValue then dirac ρ else primStep ρ
 
@@ -337,12 +293,7 @@ theorem stepOrFinal_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) :
     stepOrFinal ρ = primStep ρ := by
   simp [stepOrFinal, hv]
 
-/-- `stepOrFinal : Cfg rT → Measure (Cfg rT)` is measurable.
-
-`stepOrFinal ρ = if ρ.expr.isValue then dirac ρ else primStep ρ`. Use
-`Measurable.ite` with predicate `isValue` (measurable via `isValueR.measurable`),
-`measurable_dirac` for the true branch, and the (stubbed) `primStep.measurable`
-for the false branch. -/
+@[measurability]
 theorem stepOrFinal.measurable [Inhabited rT] :
     Measurable (stepOrFinal : Cfg rT → Measure (Cfg rT)) := by
   have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
@@ -354,41 +305,30 @@ theorem stepOrFinal.measurable [Inhabited rT] :
 
 /-! ### Monotonicity (ported from `SampCert/SLang.lean`) -/
 
--- Rocq: exec_mono / exec_mono'
-theorem execN_mono [Countable rT] [MeasurableSingletonClass rT] :
-    ∀ {n m : ℕ} (_ : n ≤ m) (ρ : Cfg rT), execN n ρ ≤ execN m ρ := by
+theorem execN_mono : ∀ {n m : ℕ} (_ : n ≤ m) (ρ : Cfg rT), execN n ρ ≤ execN m ρ := by
   intro n m h ρ
   induction h with
   | refl => exact le_refl _
-  | step h ih => exact le_trans ih (execN_succ_le _ ρ)
+  | step h ih => exact le_trans ih (execN_succ_le' _ ρ)
 
--- Corollary: pointwise monotonicity at singletons
-theorem execN_mono_singleton [Countable rT] [MeasurableSingletonClass rT]
+theorem execN_mono_singleton [MeasurableSingletonClass rT]
     {n m : ℕ} (h : n ≤ m) (ρ : Cfg rT) (c : Cfg rT) :
     execN n ρ {c} ≤ execN m ρ {c} :=
   execN_mono h ρ {c}
 
-/-- `limExec : Cfg rT → Measure (Cfg rT)` is measurable.
-
-`limExec ρ = ⨆ n, execN n ρ`. Apply the keystone
-`Measure.measurable_iSup_countable` with each `execN n` measurable and the
-family monotone in `n` (`execN_mono`). The discreteness hypotheses come from
-`execN_mono`'s dependence on `Measure.bind_mono_right`. -/
-theorem limExec.measurable [Inhabited rT] [Countable rT] [MeasurableSingletonClass rT] :
-    Measurable (limExec : Cfg rT → Measure (Cfg rT)) :=
-  Measure.measurable_iSup_countable (fun n => execN.measurable n)
+@[measurability]
+theorem limExec.measurable : Measurable (limExec : Cfg rT → Measure (Cfg rT)) :=
+  Measure.measurable_iSup_countable (fun n => execN_measurable n)
     (fun ρ _ _ h => execN_mono h ρ)
 
-/-- `limExecV : Cfg rT → Measure (Exp rT)` is measurable, given `limExec.measurable`. -/
-theorem limExecV.measurable [Inhabited rT] [Countable rT] [MeasurableSingletonClass rT] :
-    Measurable (limExecV : Cfg rT → Measure (Exp rT)) :=
+@[measurability]
+theorem limExecV.measurable : Measurable (limExecV : Cfg rT → Measure (Exp rT)) :=
   asExpr.measurable.comp limExec.measurable
+
 
 /-! ### Sub-probability -/
 
-/-- `execN` is a sub-probability measure: total mass is at most 1.
-Follows from `primStep_univ_le_one` by induction on the fuel. -/
-theorem execN_univ_le_one [Countable rT] [MeasurableSingletonClass rT]
+theorem execN_univ_le_one
     (n : Nat) (ρ : Cfg rT) : (execN n ρ) Set.univ ≤ 1 := by
   induction n generalizing ρ with
   | zero => simp [execN]
@@ -397,7 +337,7 @@ theorem execN_univ_le_one [Countable rT] [MeasurableSingletonClass rT]
     by_cases hv : ρ.expr.isValue
     · simp [hv]
     · simp only [hv, ↓reduceIte]
-      rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+      rw [bind_apply (by measurability) (Measurable.aemeasurable (by measurability))]
       calc ∫⁻ a, (execN k a) Set.univ ∂(primStep ρ)
           ≤ ∫⁻ _, 1 ∂(primStep ρ) := lintegral_mono fun a => ih a
         _ = (primStep ρ) Set.univ := by simp
@@ -426,110 +366,103 @@ theorem limExec_of_isVal {e : Exp rT} {σ : State rT} (Hv : IsVal e) :
     | succ n => simp [execN, hv]
   · exact le_iSup_of_le 1 (by simp [execN, hv])
 
-theorem limExec_not_final [Countable rT] [MeasurableSingletonClass rT]
+theorem limExec_not_final -- [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} (Hnv : ¬ e.isValue) :
     limExec ⟨e, σ⟩ = (primStep ⟨e, σ⟩).bind limExec := by
-  unfold limExec
   have hmono : Monotone (fun n => execN n ⟨e, σ⟩) := fun _ _ h => execN_mono h _
-  rw [← hmono.iSup_nat_add 1]
-  simp_rw [show ∀ n, execN (n + 1) ⟨e, σ⟩ = (primStep ⟨e, σ⟩).bind (execN n)
-    from fun n => by simp [execN, Hnv]]
-  apply Measure.ext_of_singleton; intro c
-  simp_rw [Discrete.iSup_measure_apply]
-  rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-  simp_rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-  rw [← lintegral_iSup (fun n => Measurable.of_discrete)
-      (fun n m hnm => fun a => execN_mono hnm a {c})]
-  congr 1; ext a; exact Discrete.iSup_measure_apply.symm
+  have hstep : Monotone fun n => (primStep ⟨e, σ⟩).bind (execN n) := fun n m h =>
+    Measure.bind_mono_right' _ _ _ (execN_measurable n) (execN_measurable m) fun a => execN_mono h a
+  rw [limExec, ← hmono.iSup_nat_add 1]
+  simp_rw [execN_succ_not_isValue (ρ := ⟨e, σ⟩) Hnv]
+  refine Measure.ext fun S HS => ?_
+  rw [iSup_measure_apply hstep HS, Measure.bind_apply HS limExec.measurable.aemeasurable]
+  calc ⨆ n, ((primStep ⟨e, σ⟩).bind (execN n)) S
+      = ⨆ n, ∫⁻ a, execN n a S ∂primStep ⟨e, σ⟩ :=
+        iSup_congr fun n => Measure.bind_apply HS (execN_measurable n).aemeasurable
+    _ = ∫⁻ a, ⨆ n, execN n a S ∂primStep ⟨e, σ⟩ :=
+        (lintegral_iSup (fun n => (measurable_coe HS).comp (execN_measurable n))
+          fun n m h a => execN_mono h a S).symm
+    _ = ∫⁻ a, limExec a S ∂primStep ⟨e, σ⟩ :=
+        lintegral_congr fun a => (iSup_measure_apply (fun _ _ h => execN_mono h a) HS).symm
 
--- Rocq: lim_exec_step
-theorem limExec_step [Countable rT] [MeasurableSingletonClass rT]
+theorem limExec_step
     (ρ : Cfg rT) :
     limExec ρ = (if ρ.expr.isValue then dirac ρ else primStep ρ).bind limExec := by
   obtain ⟨e, σ⟩ := ρ
   by_cases hv : e.isValue
   · simp only [hv, ↑reduceIte]
-    rw [Measure.dirac_bind Measurable.of_discrete]
+    rw [Measure.dirac_bind (by measurability)]
   · simp only [hv, ↑reduceIte]
     exact limExec_not_final hv
 
 /-- `limExec_step` written in terms of `stepOrFinal`. -/
-theorem limExec_step' [Countable rT] [MeasurableSingletonClass rT]
-    (ρ : Cfg rT) : limExec ρ = (stepOrFinal ρ).bind limExec := by
+theorem limExec_step'  (ρ : Cfg rT) : limExec ρ = (stepOrFinal ρ).bind limExec := by
   rw [limExec_step]; rfl
 
-/-! ### `pexecN` — iterated `stepOrFinal`
-
-Corresponds directly to Rocq `pexec n a = iterM n step_or_final a`. Unlike
-`execN`, this is the iterate of `stepOrFinal` starting from `dirac ρ`, so
-`pexecN 0 ρ = dirac ρ` (identity), and `pexecN (n+1) ρ` takes one more
-`stepOrFinal`. This is the Lean analogue of Rocq `pexec`; our `execN` is
-the Lean analogue of Rocq `exec` (shifted by 1, and keeping mstate_ret = Cfg).
-
-The two functions are not the same up to indexing — `execN` filters out
-non-values at the final layer, while `pexecN` does not. They relate via
-`execN (n+1) ρ = (pexecN n ρ).bind (fun ρ' => if isValue ρ' then dirac ρ' else 0)`. -/
+/-! ### `pexecN` — iterated `stepOrFinal` -/
 def pexecN (n : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   match n with
   | 0 => dirac ρ
   | n + 1 => (stepOrFinal ρ).bind (pexecN n)
 
 @[measurability]
-def pexecN_measurable [Countable rT] [MeasurableSingletonClass rT]
-    {n : Nat} : Measurable (pexecN (rT := rT) n) := Measurable.of_discrete
-
+def pexecN_measurable {n : Nat} : Measurable (pexecN (rT := rT) n) := by
+  induction n
+  · simp [pexecN]
+    measurability
+  · simp [pexecN]
+    measurability
 
 @[simp] theorem pexecN_zero (ρ : Cfg rT) : pexecN 0 ρ = dirac ρ := rfl
 
 theorem pexecN_succ (n : Nat) (ρ : Cfg rT) :
     pexecN (n + 1) ρ = (stepOrFinal ρ).bind (pexecN n) := rfl
 
--- Rocq: pexec_1 / stepN_1
 theorem pexecN_one (ρ : Cfg rT) : pexecN 1 ρ = stepOrFinal ρ := by
   show (stepOrFinal ρ).bind (pexecN 0) = stepOrFinal ρ
   show (stepOrFinal ρ).bind dirac = stepOrFinal ρ
   exact Measure.bind_dirac
 
--- Rocq: pexec_plus / stepN_plus
-theorem pexecN_plus [Countable rT] [MeasurableSingletonClass rT]
-    (n m : Nat) (ρ : Cfg rT) :
-    pexecN (n + m) ρ = (pexecN n ρ).bind (pexecN m) := by
+theorem pexecN_plus (n m : Nat) (ρ : Cfg rT) : pexecN (n + m) ρ = (pexecN n ρ).bind (pexecN m) := by
   induction n generalizing ρ with
   | zero =>
-    rw [pexecN_zero, Nat.zero_add, Measure.dirac_bind Measurable.of_discrete]
+    simp
+    rw [Measure.dirac_bind (by measurability)]
   | succ k ih =>
-    rw [show k + 1 + m = (k + m) + 1 from by ring, pexecN_succ, pexecN_succ]
-    rw [Measure.bind_bind
-        (Measurable.aemeasurable .of_discrete)
-        (Measurable.aemeasurable .of_discrete)]
-    congr 1
-    funext ρ'
-    exact ih ρ'
+    rw [show (k + 1 + m) = (k + m) + 1 by linarith]
+    simp [pexecN]
+    rw [MeasureTheory.Measure.bind_bind]
+    · congr 1
+      grind
+    · refine Measurable.aemeasurable ?_
+      measurability
+    · refine Measurable.aemeasurable ?_
+      measurability
 
-theorem pexecN_det_trans [Countable rT] [MeasurableSingletonClass rT]
-    {n m : Nat} {ρ ρ' ρ'' : Cfg rT} (Hn : pexecN n ρ = dirac ρ')
+theorem pexecN_det_trans {n m : Nat} {ρ ρ' ρ'' : Cfg rT} (Hn : pexecN n ρ = dirac ρ')
     (Hm : pexecN m ρ' = dirac ρ'') : pexecN (n + m) ρ = dirac ρ'' := by
   rw [pexecN_plus, Hn, dirac_bind pexecN_measurable, Hm]
 
--- Rocq: lim_exec_pexec
--- `limExec` factors through any finite iterate of `stepOrFinal`.
-theorem limExec_pexecN [Countable rT] [MeasurableSingletonClass rT]
-    (n : Nat) (ρ : Cfg rT) :
-    limExec ρ = (pexecN n ρ).bind limExec := by
+theorem limExec_pexecN (n : Nat) (ρ : Cfg rT) : limExec ρ = (pexecN n ρ).bind limExec := by
   induction n generalizing ρ with
   | zero =>
-    rw [pexecN_zero, Measure.dirac_bind Measurable.of_discrete]
+    rw [pexecN_zero, Measure.dirac_bind]
+    measurability
   | succ k ih =>
     rw [pexecN_succ]
     conv_lhs => rw [limExec_step']
-    rw [Measure.bind_bind
-        (Measurable.aemeasurable .of_discrete)
-        (Measurable.aemeasurable .of_discrete)]
-    congr 1
-    funext ρ'
-    exact ih ρ'
+    rw [Measure.bind_bind]
+    · congr 1
+      funext ρ'
+      exact ih ρ'
+    · refine Measurable.aemeasurable ?_
+      measurability
+    · refine Measurable.aemeasurable ?_
+      measurability
 
 /-! ### `limExec` application and mass -/
+
+-- HERE
 
 -- Apply `limExec` at a singleton — sup of finite unrollings
 @[discrete]
@@ -602,33 +535,17 @@ theorem Discrete.limExec_det_final [Countable rT] [MeasurableSingletonClass rT]
     {ρ ρ' : Cfg rT} {n : Nat}
     (_hv : ρ'.expr.isValue) (H : (execN n ρ) {ρ'} = 1) :
     limExec ρ = dirac ρ' := by
-  -- execN n ρ has singleton mass 1 at ρ'. Sub-probability (total ≤ 1) then forces
-  -- the whole measure to concentrate at ρ'. Combine with limExec_term.
-  have htot : (execN n ρ) Set.univ = 1 := by
-    refine le_antisymm (execN_univ_le_one n ρ) ?_
-    calc (1 : ENNReal) = (execN n ρ) {ρ'} := H.symm
-      _ ≤ (execN n ρ) Set.univ := measure_mono (Set.subset_univ _)
-  have hother : ∀ c ≠ ρ', (execN n ρ) {c} = 0 := by
-    intro c hc
-    have h_disj : Disjoint ({ρ'} : Set (Cfg rT)) {c} :=
-      Set.disjoint_singleton.mpr (Ne.symm hc)
-    have hunion : (execN n ρ) ({ρ'} ∪ {c}) = (execN n ρ) {ρ'} + (execN n ρ) {c} :=
-      measure_union (μ := execN n ρ) h_disj (MeasurableSet.singleton c)
-    have hsub : (execN n ρ) ({ρ'} ∪ {c}) ≤ (execN n ρ) Set.univ :=
-      measure_mono (Set.subset_univ _)
-    rw [htot, hunion, H] at hsub
-    -- hsub : 1 + (execN n ρ) {c} ≤ 1
-    have h1 : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
-    have hzero : (execN n ρ) {c} ≤ 0 := by
-      have hle : 1 + (execN n ρ) {c} ≤ 1 + 0 := by simpa using hsub
-      exact (ENNReal.add_le_add_iff_left h1).mp hle
-    exact le_antisymm hzero bot_le
+  -- A sub-probability measure with mass 1 at ρ' is dirac ρ'; conclude with limExec_term.
+  have htot : (execN n ρ) Set.univ = 1 :=
+    le_antisymm (execN_univ_le_one n ρ) (H.symm.trans_le (measure_mono (Set.subset_univ _)))
+  have hcompl : (execN n ρ) {ρ'}ᶜ = 0 := by
+    rw [measure_compl (MeasurableSet.singleton ρ') (by simp [H]), htot, H, tsub_self]
   rw [limExec_term htot]
   refine Measure.ext_of_singleton fun c => ?_
-  by_cases hcρ' : c = ρ'
-  · subst hcρ'; rw [H]; simp
-  · rw [hother c hcρ']
-    simp [Measure.dirac_apply' _ MeasurableSet.of_discrete, hcρ']
+  rcases eq_or_ne c ρ' with rfl | hc
+  · simpa using H
+  · rw [measure_mono_null (by simp [Ne.symm hc]) hcompl]
+    simp [Ne.symm hc]
 
 /-! ### lintegral against limExec -/
 

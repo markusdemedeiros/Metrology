@@ -15,7 +15,7 @@ public import Metrology.ProbLang.Discrete
 section SpecRA
 open Std Iris Iris.Std COFE ProbLang
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 instance : COFE (Exp rT) := COFE.ofDiscrete _ Eq_Equivalence
 instance : OFE.Discrete (Exp rT) := ⟨id⟩
@@ -33,9 +33,9 @@ instance : OFE.Leibniz (Exp rT) := ⟨id⟩
 instance : OFE.Leibniz Tape := ⟨id⟩
 instance : OFE.Leibniz (Val rT) := ⟨id⟩
 
-abbrev SpecProg (rT : Type _) [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :=
-  Auth ℕ+ (Option (Excl (Exp rT)))
-abbrev SpecHeap (rT : Type _) [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :=
+abbrev SpecProg (α : Type _) [ProbLang.ProbLangℝ α] :=
+  Auth ℕ+ (Option (Excl (Exp α)))
+abbrev SpecHeap (rT : Type _) [ProbLang.ProbLangℝ rT] :=
   HeapView ℕ+ Loc (Agree (Val rT)) LocHeap
 abbrev SpecTapes := HeapView ℕ+ Loc (Agree Tape) LocHeap
 
@@ -64,16 +64,15 @@ theorem LocHeap.asAgree_insert [OFE V] (h : LocHeap V) (l : Loc) (v : V) :
   · rw [LocHeap.asAgree_get?, LawfulPartialMap.get?_insert_ne hk,
         LawfulPartialMap.get?_insert_ne hk, LocHeap.asAgree_get?]
 
-class SpecPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
-    [MeasurableSingletonClass rT] (GF : BundledGFunctors) where
+class SpecPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors) where
   prog : ElemG GF (constOF (SpecProg rT))
   heap : ElemG GF (constOF (SpecHeap rT))
   tapes : ElemG GF (constOF SpecTapes)
 
 attribute [reducible, instance] SpecPreGS.prog SpecPreGS.heap SpecPreGS.tapes
 
-class SpecGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] [Countable rT]
-    [MeasurableSingletonClass rT] (GF : BundledGFunctors) extends SpecPreGS rT GF where
+class SpecGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors)
+   extends SpecPreGS rT GF where
   γprog : GName
   γheap : GName
   γtapes : GName
@@ -113,7 +112,7 @@ variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 
 open ProbLang.Cfg
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp rT} (H : some (Excl.excl e1) ≼ some (Excl.excl e2)) :
     e1 = e2 := by
   have H' := Option.inc_iff.mp H
@@ -355,7 +354,7 @@ this version (the adequacy use-site discards them via `_`). -/
 theorem spec_ra_init {GF : BundledGFunctors} [ISPre : SpecPreGS rT GF]
     (e : Exp rT) (σ : State rT) :
     ⊢@{IProp GF} |==> ∃ IS : SpecGS rT GF,
-      @ProbLang.Cfg.specAuth rT _ _ _ GF IS ⟨e, σ⟩ ∗ @specProgFrag rT _ _ _ GF IS e := by
+      @ProbLang.Cfg.specAuth rT _ GF IS ⟨e, σ⟩ ∗ @specProgFrag rT _ GF IS e := by
   imod (iOwn_alloc (E := ISPre.prog) (SpecProg.auth e • SpecProg.frag e)
     (Auth.auth_both_valid_2 trivial .rfl)) with ⟨%γp, Hp⟩
   imod (iOwn_alloc (E := ISPre.heap)
@@ -457,7 +456,7 @@ variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 contents, as plain integers, match `ns`. -/
 noncomputable def specNatTape (l : Loc) (z : Int) (ns : List Int) : IProp GF :=
   iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
-    (⌜fs.map (fun x => x.val) = ns⌝) ∗ @specTapesFrag rT _ _ _ GF ISpec l ⟨z, fs⟩)
+    (⌜fs.map (fun x => x.val) = ns⌝) ∗ @specTapesFrag rT _ GF ISpec l ⟨z, fs⟩)
 
 /-- `l ↪ₛN⟨z; ns⟩` — spec-side user-level tape points-to. -/
 notation:51 l:51 " ↪ₛN⟨" z:51 "; " ns:51 "⟩" => specNatTape l z ns
