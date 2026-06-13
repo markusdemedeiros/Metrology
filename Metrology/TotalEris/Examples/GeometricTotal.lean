@@ -31,7 +31,7 @@ namespace TotalEris
 namespace Examples
 
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 variable {hlc : Bool} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
 
 /-! ## The geometric sampler

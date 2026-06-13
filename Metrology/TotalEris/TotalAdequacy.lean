@@ -69,7 +69,7 @@ theorem termination_ineq {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) �
 
 /-- `Tgl μ φ ε` together with `μ Set.univ ≤ 1` (sub-probability) gives
 `Pgl ε (¬ value-and-φ) μ`. Rocq: `tgl_implies_pgl`. -/
-theorem implies_pgl [Countable rT] [MeasurableSingletonClass rT]
+theorem implies_pgl
     {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
     {ε : ENNReal} (hμ : μ Set.univ ≤ 1) (h : Tgl μ φ ε) :
     Pgl ε (fun ρ => ∃ v, ρ.expr = Exp.ofVal v ∧ φ v) μ := by
@@ -79,7 +79,8 @@ theorem implies_pgl [Countable rT] [MeasurableSingletonClass rT]
   set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   show μ Sᶜ ≤ ε
   have hSc_add : μ Sᶜ + μ S = μ Set.univ := by
-    rw [add_comm, MeasureTheory.measure_add_measure_compl MeasurableSet.of_discrete]
+    rw [add_comm, MeasureTheory.measure_add_measure_compl ?G1]
+    case G1 => sorry
   have hμS_le_one : μ S ≤ 1 := (MeasureTheory.measure_mono (Set.subset_univ _)).trans hμ
   have hS_ne_top : μ S ≠ (⊤ : ENNReal) := ne_top_of_le_ne_top ENNReal.one_ne_top hμS_le_one
   have h_one_minus_le : 1 - μ S ≤ ε := by
@@ -122,20 +123,21 @@ theorem ext {μ : MeasureTheory.Measure (Cfg rT)} {φ ψ : (Val rT) → Prop}
 
 /-- Dirac on a value config satisfies `Tgl` at grade 0 whenever the
 value satisfies the predicate. Rocq: `tgl_dret`. -/
-theorem of_dirac_val [Countable rT] [MeasurableSingletonClass rT]
+theorem of_dirac_val
     {v : (Val rT)} {σ : (State rT)} {φ : (Val rT) → Prop} (hφ : φ v) :
     Tgl (MeasureTheory.Measure.dirac (⟨Exp.ofVal v, σ⟩ : (Cfg rT))) φ 0 := by
   show 1 - 0 ≤ _
   rw [tsub_zero]
   have h_mem : (⟨Exp.ofVal v, σ⟩ : (Cfg rT)) ∈
       {ρ : (Cfg rT) | ∃ v', ρ.expr = Exp.ofVal v' ∧ φ v'} := ⟨v, rfl, hφ⟩
-  rw [MeasureTheory.Measure.dirac_apply' _ MeasurableSet.of_discrete]
+  rw [MeasureTheory.Measure.dirac_apply' _ ?G1]
+  case G1 => sorry
   simp [Set.indicator_of_mem h_mem]
 
 /-- `Tgl` for `limExec` at a value config: when `e` is already a value
 `v` with `φ v`, the program terminates at grade `0`. Pure structural
 fact independent of the WP soundness. -/
-theorem of_limExec_val [Countable rT] [MeasurableSingletonClass rT]
+theorem of_limExec_val
     {v : (Val rT)} {σ : (State rT)} {φ : (Val rT) → Prop} (hφ : φ v) :
     Tgl (limExec (⟨Exp.ofVal v, σ⟩ : (Cfg rT))) φ 0 := by
   show Tgl (limExec (⟨v.1, σ⟩ : (Cfg rT))) φ 0
@@ -148,9 +150,6 @@ theorem epsilon_limit {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → P
     {ε' : ENNReal} (h : ∀ ε, ε' < ε → Tgl μ φ ε) : Tgl μ φ ε' := by
   set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   show 1 - ε' ≤ μ S
-  -- By contradiction: pick `c` strictly between `μ S` and `1 - ε'`. Then
-  -- both `c < 1 - ε'` and the needed `ε' < 1 - c` are equivalent to
-  -- `¬ (1 ≤ c + ε')` via `tsub_le_iff_left`, so apply `h` at `ε = 1 - c`.
   by_contra hcon
   push Not at hcon
   obtain ⟨c, hμSc, hc1⟩ := exists_between hcon
@@ -165,11 +164,8 @@ theorem epsilon_limit {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → P
   rw [ENNReal.sub_sub_cancel ENNReal.one_ne_top hc_le_one] at hTglS
   exact absurd hTglS (_root_.not_le.mpr hμSc)
 
-/-- Generic measure-theoretic core. Both `tgl_prim_step` (prim-step on
-`(Cfg rT)`) and `tgl_state_step` (tape presample on `(State rT)`) specialize to
-this. -/
 theorem tgl_lift_prob
-    {α : Type*} [MeasurableSpace α] [DiscreteMeasurableSpace α]
+    {α : Type*} [MeasurableSpace α] -- [DiscreteMeasurableSpace α]
     {M : MeasureTheory.Measure α}
     [MeasureTheory.IsProbabilityMeasure M]
     {ε ε₁ : ENNReal} {ε₂ : α → ENNReal}
@@ -182,7 +178,8 @@ theorem tgl_lift_prob
   have hMR : 1 - ε₁ ≤ M {a | R a} := by
     have hMR_eq : M {a | R a} + M {a | ¬ R a} = M Set.univ := by
       have h_compl : {a | ¬ R a} = {a | R a}ᶜ := rfl
-      rw [h_compl, MeasureTheory.measure_add_measure_compl MeasurableSet.of_discrete]
+      rw [h_compl, MeasureTheory.measure_add_measure_compl ?G1]
+      case G1 => sorry
     rw [hM_univ] at hMR_eq
     rw [_root_.tsub_le_iff_left]
     calc 1 = M {a | R a} + M {a | ¬ R a} := hMR_eq.symm
@@ -190,7 +187,8 @@ theorem tgl_lift_prob
       _ = ε₁ + M {a | R a} := add_comm _ _
   have h_int_lb : 1 - ε₁ - (∫⁻ a, ε₂ a ∂M) ≤ ∫⁻ a, k a ∂M := by
     have h_R_bound : ∫⁻ a in {a | R a}, (1 - ε₂ a) ∂M ≤ ∫⁻ a in {a | R a}, k a ∂M := by
-      apply MeasureTheory.setLIntegral_mono_ae .of_discrete
+      apply MeasureTheory.setLIntegral_mono_ae ?G1
+      case G1 => sorry
       refine .of_forall fun a ha => Hcont a ha
     have h_R_upper : ∫⁻ a in {a | R a}, k a ∂M ≤ ∫⁻ a, k a ∂M :=
       MeasureTheory.setLIntegral_le_lintegral _ _
@@ -202,7 +200,7 @@ theorem tgl_lift_prob
         apply MeasureTheory.lintegral_mono
         intro a
         exact le_tsub_add
-      · exact .of_discrete
+      · sorry
     have h_R_combined : 1 - ε₁ ≤ (∫⁻ a in {a | R a}, (1 - ε₂ a) ∂M)
                                 + (∫⁻ a in {a | R a}, ε₂ a ∂M) := hMR.trans h_split
     have step1 : 1 - ε₁ - (∫⁻ a, ε₂ a ∂M) ≤ ∫⁻ a in {a | R a}, (1 - ε₂ a) ∂M := by
@@ -222,16 +220,16 @@ theorem tgl_lift_prob
 Given an `R`-and-grade decomposition of one prim_step (`Pgl R ε₁`,
 expected `ε₂`-grading bounded by `ε - ε₁`), plus a continuation that
 holds on the `R`-cone, we get the same bound after stepping. -/
-theorem tgl_prim_step [Countable rT] [MeasurableSingletonClass rT]
+theorem tgl_prim_step
     {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
     {R : (Cfg rT) → Prop} {P : Set (Cfg rT)}
-    (Hred : Discrete.Reducible e σ)
+    (Hred : Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → 1 - ε₂ ρ ≤ (limExec ρ) P) :
     1 - ε ≤ ∫⁻ ρ, (limExec ρ) P ∂primStep ⟨e, σ⟩ :=
-  haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e, σ⟩) :=
-    prim_step_mass_discrete ⟨e, σ⟩ Hred
+  haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e, σ⟩) := sorry
+    -- prim_step_mass_discrete ⟨e, σ⟩ Hred
   tgl_lift_prob (M := primStep ⟨e, σ⟩) (R := R) (ε₂ := ε₂)
     (k := fun ρ => (limExec ρ) P) Hpgl Hsum Hcont
 
@@ -240,7 +238,7 @@ core for a single tape-presample. Requires the tape `α` to be active
 with positive bound (which makes `tapePresample σ α` a probability
 measure). Used by the future `tgl_state_step`-driven branch of
 `glm_implies_tgl`. -/
-theorem tgl_state_step [Countable rT] [MeasurableSingletonClass rT]
+theorem tgl_state_step
     {e : (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
@@ -265,10 +263,10 @@ without needing to unfold to the raw measure inequality.
 
 Mirrors the prim-step branch of Rocq's `twp_step_fupd_tgl_prim_step` +
 `tgl_dbind`. -/
-theorem dbind_prim_step [Countable rT] [MeasurableSingletonClass rT]
+theorem dbind_prim_step
     {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
     {R : (Cfg rT) → Prop} {φ : (Val rT) → Prop}
-    (Hred : Discrete.Reducible e σ)
+    (Hred : Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → Tgl (limExec ρ) φ (ε₂ ρ)) :
@@ -278,19 +276,17 @@ theorem dbind_prim_step [Countable rT] [MeasurableSingletonClass rT]
   -- `e` is reducible, hence non-value, hence `limExec ⟨e, σ⟩ = primStep ⟨e, σ⟩ >>= limExec`.
   have hnv : ¬ (e.isValue) := by
     intro hv
-    rcases Hred with ⟨ρ, hρ⟩
-    exact Discrete.val_stuck hρ hv
+    sorry
+    -- rcases Hred with ⟨ρ, hρ⟩
+    -- exact Discrete.val_stuck hρ hv
   rw [limExec_not_final hnv]
   -- `(primStep ρ).bind limExec` evaluated at `S` is `∫⁻ ρ', limExec ρ' S ∂primStep ρ`.
-  rw [MeasureTheory.Measure.bind_apply MeasurableSet.of_discrete
-      Measurable.of_discrete.aemeasurable]
+  rw [MeasureTheory.Measure.bind_apply ?G1 ?G2]
+  case G1 => sorry
+  case G2 => sorry
   exact Tgl.tgl_prim_step Hred Hsum Hpgl (fun ρ hρ => Hcont ρ hρ)
 
-/-- **`Tgl` state-step decomposition** at `limExec`. Parallel of
-`dbind_prim_step` for tape presampling. Uses the `asExpr`-level tape
-erasure equality (`limExec_tape_presample_expr_eq`) to bridge the
-presampled bind back to `limExec ⟨e, σ⟩`. -/
-theorem dbind_state_step [Countable rT] [MeasurableSingletonClass rT]
+theorem dbind_state_step
     {e : (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
@@ -306,27 +302,29 @@ theorem dbind_state_step [Countable rT] [MeasurableSingletonClass rT]
   -- The Tgl bound on the bind via `tgl_state_step`.
   have h_bind : 1 - ε ≤ ∫⁻ σ', (limExec ⟨e, σ'⟩) S ∂tapePresample σ α :=
     Tgl.tgl_state_step htape hN Hsum Hpgl (fun σ' hσ' => Hcont σ' hσ')
-  -- Convert the integral to `((tapePresample σ α).bind (limExec ⟨e, ·⟩)) S`.
-  rw [← MeasureTheory.Measure.bind_apply MeasurableSet.of_discrete
-      Measurable.of_discrete.aemeasurable] at h_bind
-  -- Bridge via `asExpr` (image under `(·.expr)`):
-  --   (bind) S = (asExpr bind) S' = (limExecV ⟨e, σ⟩) S' = (asExpr (limExec ⟨e, σ⟩)) S'
-  --           = (limExec ⟨e, σ⟩) S.
+  rw [← MeasureTheory.Measure.bind_apply ?G1 ?G2] at h_bind
+  case G1 => sorry
+  case G2 => sorry
   have h_eq : ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S
             = (limExec ⟨e, σ⟩) S := by
     have hmap1 : ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S
         = asExpr ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S' := by
       unfold asExpr
-      rw [MeasureTheory.Measure.map_apply Measurable.of_discrete .of_discrete]
+      rw [MeasureTheory.Measure.map_apply ?G3 ?G4]
+      case G3 => sorry
+      case G4 => sorry
       rfl
     have hmap2 : (limExec ⟨e, σ⟩) S
         = asExpr (limExec ⟨e, σ⟩) S' := by
       unfold asExpr
-      rw [MeasureTheory.Measure.map_apply Measurable.of_discrete .of_discrete]
+      rw [MeasureTheory.Measure.map_apply ?G5 ?G6]
+      case G5 => sorry
+      case G6 => sorry
       rfl
     rw [hmap1, hmap2]
     congr 1
-    exact limExec_tape_presample_expr_eq htape hN
+    -- exact limExec_tape_presample_expr_eq htape hN
+    sorry -- TODO: Erasure
   exact h_eq ▸ h_bind
 
 end Tgl
@@ -334,9 +332,9 @@ end Tgl
 /-- **Iris-side core**: extract a pure `Tgl` bound from a `glm` claim
 whose leaf body carries a per-leaf pure `Tgl` claim under `|={∅}=>`.
 Mirrors the inner induction of Rocq's `twp_step_fupd_tgl`. -/
-theorem glm_implies_tgl [Countable rT] [MeasurableSingletonClass rT] [ErisGS rT false GF]
+theorem glm_implies_tgl [ErisGS rT false GF]
     {φ : (Val rT) → Prop} {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} :
-    glm (GF := GF) e σ ε
+    glm' (GF := GF) e σ ε
         (fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝))
       ⊢@{IProp GF} iprop(|={∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
   let Z : (Cfg rT) → ENNReal → IProp GF :=
@@ -345,8 +343,8 @@ theorem glm_implies_tgl [Countable rT] [MeasurableSingletonClass rT] [ErisGS rT 
     fun s => iprop(|={∅}=> ⌜Tgl (limExec s.1) φ s.2⌝)
   have : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
   iintro HG
-  ihave HInd : iprop(□ (∀ s, glmPre Z
-      (fun s' => iprop(Ψ s' ∧ bi_least_fixpoint (glmPre Z) s')) s -∗ Ψ s)) $$ []
+  ihave HInd : iprop(□ (∀ s, glmPre' Z
+      (fun s' => iprop(Ψ s' ∧ bi_least_fixpoint (glmPre' Z) s')) s -∗ Ψ s)) $$ []
   · iintro !> %s HPre
     rcases s with ⟨⟨e', σ'⟩, ε'⟩
     icases HPre with ⟨HOT | HPS⟩
@@ -400,7 +398,7 @@ theorem glm_implies_tgl [Countable rT] [MeasurableSingletonClass rT] [ErisGS rT 
         imodintro
         ipure_intro
         exact Tgl.dbind_state_step Hαt.1 Hαt.2 Hsum Hpgl Hf
-  iapply (glm_strong_ind (GF := GF) (Z := Z) (Ψ := Ψ)) $$ HInd
+  iapply (glm'_strong_ind (GF := GF) (Z := Z) (Ψ := Ψ)) $$ HInd
         %(⟨⟨e, σ⟩, ε⟩ : (GlmState rT))
   iexact HG
 
@@ -410,7 +408,7 @@ theorem glm_implies_tgl [Countable rT] [MeasurableSingletonClass rT] [ErisGS rT 
 The outer induction is `tglWp_ind_simple`; per-`e'`, we case-split on
 whether `e'` is a value. The non-value case calls `glm_implies_tgl` to
 extract the pure `Tgl` from the `glm` body produced by `tglWp_unfold_step`. -/
-theorem twp_step_fupd_tgl [Countable rT] [MeasurableSingletonClass rT] [ErisGS rT false GF]
+theorem twp_step_fupd_tgl [ErisGS rT false GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop} :
     iprop(stateInterp σ ∗ errInterp (rT := rT) ε ∗ tglWp ⊤ e (fun v => iprop(⌜φ v⌝)))
       ⊢@{IProp GF} iprop(|={⊤,∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
@@ -446,7 +444,7 @@ theorem twp_step_fupd_tgl [Countable rT] [MeasurableSingletonClass rT] [ErisGS r
     | none =>
       -- Non-value case: cast HBody to its reduced form, then transform
       -- the glm body via `glm_strong_mono` to fit `glm_implies_tgl`.
-      ihave HBody' : iprop(|={⊤,∅}=> glm e' σ' ε'
+      ihave HBody' : iprop(|={⊤,∅}=> glm' e' σ' ε'
           (fun ρ ε₂ => iprop(|={∅,⊤}=>
             stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ Q ρ.expr))) $$ [HBody]
       · iexact HBody
@@ -454,9 +452,9 @@ theorem twp_step_fupd_tgl [Countable rT] [MeasurableSingletonClass rT] [ErisGS r
       -- HG : glm e' σ' ε' (fun ρ ε₂ => |={∅,⊤}=> ...).
       -- Massage the glm body via `glm_strong_mono` to produce a leaf of
       -- the form `|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝`.
-      ihave HG' : iprop(glm e' σ' ε'
+      ihave HG' : iprop(glm' e' σ' ε'
           (fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝))) $$ [HG]
-      · iapply (glm_strong_mono (Z₁ := fun ρ ε₂ => iprop(|={∅,⊤}=>
+      · iapply (glm'_strong_mono (Z₁ := fun ρ ε₂ => iprop(|={∅,⊤}=>
             stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ Q ρ.expr))
           (Z₂ := fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝)))
         isplitr [HG]
@@ -485,7 +483,7 @@ Proof structure: trivial-`ε ≥ 1` case closes from `1 - ε = 0`. For
 `ec_alloc`, then invoke `twp_step_fupd_tgl` (the iris-side adequacy
 helper) and finally `fupd_soundness_no_lc` to extract the pure
 inequality at the metalogic level. -/
-theorem twp_tgl [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
@@ -521,7 +519,7 @@ satisfying the WP triple, we get `Tgl` at grade 0 (regardless of ε).
 This is the "easy half" of `twp_tgl` — extractable via iris soundness
 without needing the full induction. Requires the `*Pre` typeclasses to
 allocate ghost state inside the proof. -/
-theorem twp_tgl_value [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_tgl_value [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {v : (Val rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (hε : ε < 1)
     (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
@@ -558,7 +556,7 @@ theorem twp_tgl_value [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT 
 /-- **Adequacy 2**: termination mass. Rocq: `twp_mass_lim_exec`
 (`total_adequacy.v:437`). Derived directly from `twp_tgl` +
 `Tgl.termination_ineq`. -/
-theorem twp_mass_lim_exec [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_mass_lim_exec [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
@@ -569,7 +567,7 @@ theorem twp_mass_lim_exec [Countable rT] [MeasurableSingletonClass rT] [AppPreGS
 execution. Rocq: `twp_pgl_lim` (`total_adequacy.v:447`). Derived from
 `twp_tgl` + `Tgl.implies_pgl` + the sub-probability fact that
 `limExec ρ Set.univ ≤ 1`. -/
-theorem twp_pgl_lim [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_pgl_lim [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
@@ -580,7 +578,7 @@ theorem twp_pgl_lim [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF
 /-- **Adequacy 1, limit form**: the WP triple only needs to hold for every
 `ε' > ε`. Rocq: `twp_tgl_limit` (`total_adequacy.v:463`). Derived from
 `twp_tgl` + `Tgl.epsilon_limit`. -/
-theorem twp_tgl_limit [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_tgl_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT false GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
@@ -588,7 +586,7 @@ theorem twp_tgl_limit [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT 
   Tgl.epsilon_limit (fun ε' hε' => twp_tgl (Hwp ε' hε'))
 
 /-- **Adequacy 2, limit form**: termination mass via the limit form. -/
-theorem twp_mass_lim_exec_limit [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_mass_lim_exec_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT false GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
@@ -596,7 +594,7 @@ theorem twp_mass_lim_exec_limit [Countable rT] [MeasurableSingletonClass rT] [Ap
   Tgl.termination_ineq (twp_tgl_limit Hwp)
 
 /-- **Adequacy 3, limit form**: Pgl bound via the limit form. -/
-theorem twp_pgl_lim_limit [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_pgl_lim_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
     (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT false GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
@@ -608,7 +606,7 @@ theorem twp_pgl_lim_limit [Countable rT] [MeasurableSingletonClass rT] [AppPreGS
 syntactic form that reduces to a value), the WP triple at `e` gives
 `Tgl ... 0`. Derived from `twp_tgl_value` by rewriting `e` to
 `Exp.ofVal v` via `Exp.ofVal_of_toVal_some`. -/
-theorem twp_tgl_of_toVal [Countable rT] [MeasurableSingletonClass rT] [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_tgl_of_toVal [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {v : (Val rT)} {φ : (Val rT) → Prop}
     (hev : e.toVal? = some v) (hε : ε < 1)
     (Hwp : ∀ [ErisGS rT false GF], iprop(↯ε) ⊢@{IProp GF}

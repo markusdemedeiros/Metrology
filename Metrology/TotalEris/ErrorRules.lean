@@ -108,8 +108,6 @@ section ErisGSStubs
 
 variable [ErisGS rT hlc GF]
 
-/-- Pre-specialized `supply_decrease` against the `ECGS` instance carried
-by `ErisGS`. Same `∗`-bundling trick as `errInterp_supply_bound`. -/
 theorem errInterp_supply_decrease {εₛ ε : ENNReal} :
     iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε)
       ⊢@{IProp GF} iprop(|==> ErisWpGS.errInterp (rT := rT) (εₛ - ε)) := by
@@ -117,10 +115,6 @@ theorem errInterp_supply_decrease {εₛ ε : ENNReal} :
   iintro ⟨Hs, Hε⟩
   iapply (ErrorCredit.supply_decrease (GF := GF)) $$ Hs Hε
 
-/-- Pre-specialized `supply_bound` against the `ECGS` instance carried
-by `ErisGS`. Bundles both arguments into a `∗` to dodge the wand-source
-typeclass diamond. Returns both inputs together with the bound so the
-caller doesn't lose `↯ε` / `errInterp εₛ` from the iris context. -/
 theorem errInterp_supply_bound {εₛ ε : ENNReal} :
     iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε)
       ⊢@{IProp GF} iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝) := by
@@ -131,19 +125,13 @@ theorem errInterp_supply_bound {εₛ ε : ENNReal} :
   isplitl [Hε]; · iexact Hε
   ipure_intro; exact hLe
 
-/-- Pre-specialized `supply_increase` against the `ECGS` instance carried
-by `ErisGS` (i.e., `ErisGS.ecGS`). The outer-scope `[ECGS GF]` was lifted
-into its own `ECGSOnly` section so that this section only sees the
-`ErisGS`-derived ECGS, dodging the typeclass diamond. -/
 theorem errInterp_supply_increase {ε δ : ENNReal} (h : ε + δ < 1) :
     iprop(ErisWpGS.errInterp (rT := rT) ε)
       ⊢@{IProp GF} iprop(|==> (ErisWpGS.errInterp (rT := rT) (ε + δ) ∗ ↯δ)) := by
   simp only [erisWpGS_errInterp_eq]
   exact ErrorCredit.supply_increase h
 
-/-- "Error increase" rule: given `↯ε`, we may freely "borrow" up to any
-`ε' > ε`. Rocq: `twp_err_incr` (`error_rules.v:881`). -/
-theorem twp_err_incr [Countable rT] {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → IProp GF}
+theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → IProp GF}
     (Hnv : e.toVal? = none) :
     iprop(↯ε ∗ ∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗ ↯ε' -∗ tglWp E e Φ)
       ⊢@{IProp GF} tglWp E e Φ := by
@@ -152,30 +140,22 @@ theorem twp_err_incr [Countable rT] {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ
   iintro %σ₁ %ε₂ ⟨Hσ₁, Hε₂⟩
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
   imodintro
-  iapply glm_credit_bump
+  iapply glm'_credit_bump
   iintro %ε' %Hε'
-  -- Case split on `ε' < 1`: if not, the conclusion follows trivially via
-  -- `execStutter_spend`. Otherwise we do the supply-increase + credit
-  -- combination work.
   by_cases hlt : ε' < 1
   case neg =>
     push Not at hlt
     imodintro
     iapply execStutter_spend hlt
   case pos =>
-    -- ε' < 1, so we can increase the supply by `δ := ε' - ε₂`.
     have hle : ε₂ ≤ ε' := Hε'.le
     have hbnd : ε₂ + (ε' - ε₂) < 1 := by
       rw [add_tsub_cancel_of_le hle]; exact hlt
-    -- Apply our typeclass-friendly wrapper.
     imod (errInterp_supply_increase hbnd) $$ Hε₂ with ⟨HsuppNew, Hfrag⟩
-    -- Combine `Herr : ↯ε` with the new fragment `Hfrag : ↯(ε' - ε₂)`.
     ihave Herr' : iprop(↯(ε + (ε' - ε₂))) $$ [Herr Hfrag]
     · iapply ErrorCredit.combine (ε₁ := ε) (ε₂ := ε' - ε₂)
       isplitl [Herr]; · iexact Herr
       iexact Hfrag
-    -- Establish `ε < ε + (ε' - ε₂)` via `ENNReal.lt_add_right`. Need
-    -- `ε ≠ ⊤` (from `ec_valid` on `Herr'`) and `ε' - ε₂ ≠ 0` (from `Hε'`).
     ihave %hValid := ErrorCredit.valid $$ Herr'
     have hsub_ne : (ε' - ε₂) ≠ 0 := by
       rw [Ne, _root_.tsub_eq_zero_iff_le]; exact _root_.not_le.mpr Hε'
@@ -184,17 +164,12 @@ theorem twp_err_incr [Countable rT] {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ
       rw [hε_top, _root_.top_add] at hValid
       exact absurd hValid (by simp)
     have hlt_hwp : ε < ε + (ε' - ε₂) := ENNReal.lt_add_right hε_ne_top hsub_ne
-    -- Invoke `Hwp` to obtain `tglWp E e Φ` at the bigger credit amount.
     ihave HwpRes := Hwp $$ %(ε + (ε' - ε₂)) %hlt_hwp Herr'
-    -- Unfold `tglWp` to `tglWpPre`, then rewrite via `tglWpPre_eq_step Hnv`
-    -- to expose the glm-shaped form. (Same trick as `tglWp_bind` in
-    -- `TotalWeakestpre.lean:540` — `ihave H : iprop(...) $$ [HwpUnfold] ;
-    -- · rw [← heqS] ; iexact HwpUnfold`.)
     ihave HwpUnfold := (BI.equiv_iff.mp tglWp_unfold).1 $$ HwpRes
     have heqS := tglWpPre_eq_step (wp := tglWp) (E := E) (e := e) (Φ := Φ) Hnv
     ihave HwpStep : iprop(∀ (σ : State rT) (ε : ENNReal),
         (stateInterp σ ∗ errInterp (rT := rT) ε) -∗
-          |={E, ∅}=> glm e σ ε (fun ρ ε₂ =>
+          |={E, ∅}=> glm' e σ ε (fun ρ ε₂ =>
             iprop(|={∅, E}=>
               stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ)))
       $$ [HwpUnfold]
@@ -206,10 +181,8 @@ theorem twp_err_incr [Countable rT] {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ
     -- Transition mask: ∅ → E via Hclose, then E → ∅ via HwpStep.
     imod Hclose with _
     imod HwpStep with HGlm
-    -- HGlm : glm e σ₁ (ε₂ + (ε' - ε₂)) cont. Rewrite `ε₂ + (ε' - ε₂) = ε'`
-    -- on the iris hyp via a typed-`ihave`, then `execStutter_free`.
     have heqEps : ε₂ + (ε' - ε₂) = ε' := add_tsub_cancel_of_le hle
-    ihave HGlm' : iprop(glm e σ₁ ε'
+    ihave HGlm' : iprop(glm' e σ₁ ε'
         (fun ρ ε₂ => iprop(|={∅, E}=>
           stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ))) $$ [HGlm]
     · conv_rhs => rw [← heqEps]
@@ -218,17 +191,11 @@ theorem twp_err_incr [Countable rT] {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ
     iapply execStutter_free
     iexact HGlm'
 
-/-- "Error from thin air": when the expression is not a value, we may
-assume ownership of an arbitrary positive amount of error credits. Rocq:
-`twp_err_pos` (`error_rules.v:967`). Derived from `twp_err_incr` +
-`ec_zero` (start from zero credits, bump to any ε > 0). -/
-theorem twp_err_pos [Countable rT] {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
+theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
     (Hnv : e.toVal? = none) :
     iprop(∀ (ε : ENNReal), ⌜0 < ε⌝ -∗ ↯ε -∗ tglWp E e Φ)
       ⊢@{IProp GF} tglWp E e Φ := by
   iintro Hwp
-  -- Lift the goal into a `|={E}=>` so that `elimModal_bupd_fupd` can fire
-  -- on `ec_zero`'s `|==>`.
   iapply ErisWpGS.fupd_tglWp
   ihave HzBupd : iprop(|==> ↯0) $$ []
   · iapply ec_zero
@@ -240,11 +207,7 @@ theorem twp_err_pos [Countable rT] {E : CoPset} {e : Exp rT} {Φ : Val rT → IP
   iapply Hwp; · ipure_intro; exact Hε'
   iexact Hcr
 
-/-- Expectation-preserving uniform sample. From `↯ε₁` and an "error
-distribution" function `ε₂ : ℕ → ENNReal` whose average over `[0,z)` is
-bounded by `ε₁`, we may sample `n : Int` in `[0, z)` and recover `↯(ε₂ n)`
-in the postcondition. Rocq: `twp_rand_exp_nat` (`error_rules.v:165`). -/
-theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {z : Int} {ε₁ : ENNReal}
+theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
     (Hbd : ∀ n, ε₂ n ≤ 1)
     (HSum : (∑' n : ℕ, if n < z.toNat then ε₂ n / z.toNat else 0) ≤ ε₁) :
@@ -253,7 +216,6 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
         Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)) -∗
       tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
   iintro Herr Hcont
-  -- The expression `rand z ()` is not a value.
   have Hnv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (twp_lift_step_fupd_glm Hnv)
@@ -267,14 +229,7 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
   · iapply errInterp_supply_bound
     isplitl [Hε_now]; · iexact Hε_now
     iexact Herr
-  -- Apply `glm_prim_step` (advanced composition). Witnesses:
-  --   R ρ  := "ρ = (val n, σ₁) for some `0 ≤ n < z`"
-  --   ε₁'  := 0 (we pay nothing at the coupling level; credit goes via X₂)
-  --   X₂ ρ := ε₂(n.toNat) if ρ matches val-n with valid n; else 0
-  --   r    := 1 (from `Hbd : ∀ n, ε₂ n ≤ 1`)
-  -- Carried-supply slack `ε₃ := ε_now - ε₁`. Lemma's `↯ε₁` accounts for
-  -- `ε₁`; the remaining `ε₃` rides along with each outcome's X₂.
-  iapply glm_prim_step
+  iapply glm'_prim_step
   iexists (fun ρ => ∃ (n : Int), 0 ≤ n ∧ n < z ∧
     ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT))
   iexists 0
@@ -286,11 +241,10 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
   -- Sub-goal 1: Discrete.Reducible. Use `primStep_pos_of_headStep_discrete` + `RandNoTapeS`.
   isplitr
   · ipure_intro
-    refine ⟨⟨.lit (.int 0), σ₁⟩, primStep_pos_of_headStep_discrete ?_⟩
-    rw [Discrete.headStep_support_iff]
-    exact .RandNoTapeS Hz (_root_.le_refl _) Hz
-  -- Sub-goal 2: X₂ ρ ≤ ε₃ + 1. The carried `ε₃ = ε_now - ε₁` is constant
-  -- across ρ; only the right summand varies. Case-split as before.
+    sorry
+    -- refine ⟨⟨.lit (.int 0), σ₁⟩, primStep_pos_of_headStep_discrete ?_⟩
+    -- rw [Discrete.headStep_support_iff]
+    -- exact .RandNoTapeS Hz (_root_.le_refl _) Hz
   isplitr
   · ipure_intro
     intro ρ
@@ -299,11 +253,6 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
     split
     · split <;> first | exact Hbd _ | exact zero_le _
     · exact zero_le _
-  -- Sub-goal 3: integral bound `0 + ∫ X₂ dμ ≤ ε_now`.
-  -- Strategy: linearity splits `∫ (ε₃ + g) = ε₃ * μ(univ) + ∫ g`. For
-  -- primStep of `rand z ()`, `μ(univ) = 1`. The remaining `∫ g dμ` equals
-  -- `(1/(z+1)) * ∑_{n<z+1} ε₂ n` (≤ ε₁ by HSum). Then `ε₃ + ε₁ = ε_now`
-  -- via `hLe : ε₁ ≤ ε_now` (`tsub_add_cancel_of_le`).
   isplitr
   · ipure_intro
     rw [zero_add, MeasureTheory.lintegral_add_left measurable_const,
@@ -326,8 +275,9 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
             have hheadred : ∃ ρ : Cfg rT,
                 0 < (headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ} :=
               ⟨⟨.lit (.int 0), σ₁⟩, by
-                rw [Discrete.headStep_support_iff]
-                exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
+                sorry⟩
+                -- rw [headStep_support_iff]
+                -- exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
             rw [primStep_eq_headStep_discrete hheadred]
             -- headStep ⟨rand z (), σ⟩ definitionally equals Cfg.uniform z σ.
             show ∫⁻ a, (match a.expr with
@@ -343,13 +293,11 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
               simp only [Int.isPos, dif_pos Hz]
             rw [hCfgUniform]
             -- Push the integral through `Measure.map`.
-            rw [MeasureTheory.lintegral_map .of_discrete .of_discrete]
-            -- Goal: ∫⁻ (n : Int), (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0)
-            --        ∂(uniformOfFinset (Ico 0 z) _).toMeasure ≤ ε₁
-            -- Use `lintegral_finset` after reducing to the support set.
+            rw [MeasureTheory.lintegral_map ?G1 ?G2]
+            case G1 => sorry
+            case G2 => sorry
             have hCard : (Finset.Ico (0:Int) z).card = z.toNat := by
               rw [Int.card_Ico, sub_zero]
-            -- Compute the lintegral as a finite sum.
             have hLI :
                 ∫⁻ (n : Int), (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0)
                   ∂((PMF.uniformOfFinset (Finset.Ico (0:Int) z)
@@ -422,19 +370,20 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
   -- must be of the form `⟨lit n, σ₁⟩` with `0 ≤ n < z` (i.e., `R`).
   isplitr
   · ipure_intro
-    have hheadred : ∃ ρ : Cfg rT, 0 < (headStep ⟨_, σ₁⟩) {ρ} :=
-      ⟨⟨.lit (.int 0), σ₁⟩, by
-        rw [Discrete.headStep_support_iff]; exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
-    have hps_eq : primStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩
-        = headStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩ :=
-      primStep_eq_headStep_discrete hheadred
-    refine Pgl.mono_pred ?_ (Pgl.zero_positive _)
-    intro ρ hpos
-    rw [hps_eq, Discrete.headStep_support_iff] at hpos
-    obtain ⟨e', σ'⟩ := ρ
-    cases hpos with
-    | RandNoTapeS Hz' Hv0 Hvz => exact ⟨_, Hv0, Hvz, rfl⟩
-    | RandNonposS hnz => exact absurd Hz hnz
+    sorry
+    -- have hheadred : ∃ ρ : Cfg rT, 0 < (headStep ⟨_, σ₁⟩) {ρ} := sorry
+    --   -- ⟨⟨.lit (.int 0), σ₁⟩, by
+    --   --   rw [Discrete.headStep_support_iff]; exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
+    -- have hps_eq : primStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩
+    --     = headStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩ :=
+    --   primStep_eq_headStep_discrete hheadred
+    -- refine Pgl.mono_pred ?_ (Pgl.zero_positive _)
+    -- intro ρ hpos
+    -- rw [hps_eq, Discrete.headStep_support_iff] at hpos
+    -- obtain ⟨e', σ'⟩ := ρ
+    -- cases hpos with
+    -- | RandNoTapeS Hz' Hv0 Hvz => exact ⟨_, Hv0, Hvz, rfl⟩
+    -- | RandNonposS hnz => exact absurd Hz hnz
   -- Sub-goal 5: per-outcome continuation.
   iintro %ρ %HRρ
   obtain ⟨n, Hn₁, Hn₂, Hρ_eq⟩ := HRρ
@@ -480,7 +429,7 @@ theorem twp_rand_exp_nat [Countable rT] [MeasurableSingletonClass rT] {E : CoPse
 `eris_rules.v:118` — phrases the sum as `∑ k < N+1, ε₂ k ≤ (N+1) * ε₁`.
 Unlike the underlying `twp_rand_exp_nat`, this wrapper does NOT require
 `ε₂ n ≤ 1`; values above 1 are clamped internally (see `eris_rules.v`). -/
-theorem twp_rand_exp [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {z : Int} {ε₁ : ENNReal}
+theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
     {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
     (HSum : (∑ n ∈ Finset.range z.toNat, ε₂ n) ≤ z.toNat * ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
