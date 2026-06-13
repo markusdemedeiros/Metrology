@@ -208,8 +208,8 @@ theorem tglWp_ind_simple {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
       isplitl [Hσ']; · iexact Hσ'
       isplitl [Hε']; · iexact Hε'
       -- HW : Q' ⟨E, ρ.expr⟩ = ⌜E = E⌝ -∗ Q ρ.expr. Discharge with rfl.
-      iapply HW; ipure_intro; rfl
-  iapply HQ'; ipure_intro; rfl
+      iapply HW; ipureintro; rfl
+  iapply HQ'; ipureintro; rfl
 
 /-! ## Derived structural rules -/
 

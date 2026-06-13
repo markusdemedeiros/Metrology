@@ -195,7 +195,7 @@ theorem execN_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
     rw [hunion, h.det] at hsub
     have : 1 + (headStep ρ) {c} ≤ 1 + 0 := by simpa using hsub
     have hfin : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
-    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le _)
+    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le)
   have hdirac : headStep ρ = dirac ρ' := by
     refine Measure.ext_of_singleton fun c => ?_
     by_cases hc : c = ρ'
@@ -223,7 +223,7 @@ theorem limExec_detStep {ρ ρ' : Cfg} (h : DetStep_discrete ρ ρ') : limExec �
     rw [hunion, h.det] at hsub
     have : 1 + (primStep ρ) {c} ≤ 1 + 0 := by simpa using hsub
     have hfin : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
-    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le _)
+    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le)
   have hdirac : primStep ρ = dirac ρ' := by
     refine Measure.ext_of_singleton fun c => ?_
     by_cases hc : c = ρ'
@@ -247,7 +247,7 @@ theorem limExec_detHeadStep {ρ ρ' : Cfg} (hnv : ¬ ρ.expr.isValue)
     rw [hunion, h.det] at hsub
     have : 1 + (headStep ρ) {c} ≤ 1 + 0 := by simpa using hsub
     have hfin : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
-    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le _)
+    exact le_antisymm (ENNReal.le_of_add_le_add_left hfin this) (zero_le)
   have hdirac : headStep ρ = dirac ρ' := by
     refine Measure.ext_of_singleton fun c => ?_
     by_cases hc : c = ρ'

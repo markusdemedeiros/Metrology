@@ -33,7 +33,7 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingl
 field collapse, which would force program and spec heaps to share γ-names. -/
 class ApproxisGS (rT : Type _) [ProbLang.ProbLangℝ rT] [Countable rT]
     [MeasurableSingletonClass rT]
-    (hlc : outParam Bool) (GF : BundledGFunctors) where
+    (hlc : outParam HasLC) (GF : BundledGFunctors) where
   appGS    : AppGS rT GF
   specGS   : SpecGS rT GF
   ecGS     : ECGS GF
@@ -46,7 +46,7 @@ attribute [reducible, instance] ApproxisGS.appGS ApproxisGS.specGS
 
 section ApproxisInstance
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
 
 @[reducible]
 noncomputable instance approxisWpGS_of_components : ApproxisWpGS (rT := rT) GF where
@@ -90,7 +90,7 @@ attribute [simp] ExtTreeMap.insert_eq_PartialMap_insert
 
 section Lifting
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
 
 theorem wp_alloc {E : CoPset} {v : (Val rT)} {Φ : (Val rT) → IProp GF} :
     iprop(∀ (l : Loc), appHeapFrag l v -∗ Φ (⟨.lit (.loc l), IsVal.lit⟩ : (Val rT)))
@@ -102,7 +102,7 @@ theorem wp_alloc {E : CoPset} {v : (Val rT)} {Φ : (Val rT) → IProp GF} :
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.AllocS (Exp.toVal?_ofVal v) rfl rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
@@ -130,7 +130,7 @@ theorem wp_load {E : CoPset} {l : Loc} {v : (Val rT)} {Φ : (Val rT) → IProp G
   ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.LoadS hlook rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
@@ -156,7 +156,7 @@ theorem wp_store {E : CoPset} {l : Loc} {v v' : (Val rT)} {Φ : (Val rT) → IPr
   ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.StoreS (Exp.toVal?_ofVal v)
       (by rw [hlook]; exact Option.isSome_some) rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
@@ -184,7 +184,7 @@ theorem wp_alloctape {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} :
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
@@ -212,7 +212,7 @@ theorem wp_rand {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz : 0 < z)
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
     rw [Discrete.headStep_support_iff]
     exact .RandNoTapeS Hz (_root_.le_refl _) Hz
@@ -224,7 +224,7 @@ theorem wp_rand {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz : 0 < z)
     simp only [approxisWpGS_stateInterp_eq, Exp.toVal?_lit]
     isplitl [Hσ]; · iexact Hσ
     iapply HΦ
-    ipure_intro
+    ipureintro
     exact ⟨Hv0, Hvz⟩
   | RandNonposS hnz => exact absurd Hz hnz
 
@@ -239,7 +239,7 @@ theorem wp_rand_nonpos {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz :
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨.lit (.int (-1)), σ₁⟩, ?_⟩
     rw [Discrete.headStep_support_iff]
     exact .RandNonposS Hz
@@ -273,7 +273,7 @@ theorem wp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : Int} {ns : List Int}
     omega
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.RandTapeS hlook rfl rfl rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
@@ -291,7 +291,7 @@ theorem wp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : Int} {ns : List Int}
     isplitl [Hσ']; · iexact Hσ'
     ihave HlNew := HHandback $$ Hl'
     iapply HΦ $$ HlNew
-    ipure_intro; exact x.2
+    ipureintro; exact x.2
   | RandTapeEmptyS _ hlook' _ _ _ _ =>
     rw [hlook] at hlook'; cases hlook'
   | RandTapeOtherS _ hlook' hne _ _ _ =>
@@ -314,7 +314,7 @@ theorem wp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ HlBack
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
     rw [Discrete.headStep_support_iff]
     exact .RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl
@@ -330,7 +330,7 @@ theorem wp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
     isplitl [Hσ]; · iexact Hσ
     ihave HlNat := app_empty_to_natTape (GF := GF) (l := l) (z := z) $$ HlBack
     iapply HΦ $$ HlNat
-    ipure_intro; exact ⟨Hv0, Hvz⟩
+    ipureintro; exact ⟨Hv0, Hvz⟩
   | RandTapeOtherS _ hlook' hne _ _ _ =>
     rw [hlook] at hlook'; cases hlook'; exact absurd rfl hne
   | RandTapeNonposEmptyS hnz _ _ => exact absurd Hz hnz
@@ -356,7 +356,7 @@ theorem wp_rand_tape_wrong_bound {E : CoPset} {l : Loc} {z M : Int}
   ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ HlBack
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
     rw [Discrete.headStep_support_iff]
     exact .RandTapeOtherS Hz hlook HneM (_root_.le_refl _) Hz rfl
@@ -378,11 +378,11 @@ theorem wp_rand_tape_wrong_bound {E : CoPset} {l : Loc} {z M : Int}
       iintro Hb
       unfold appNatTape
       iexists fs
-      isplitr; · ipure_intro; exact hmap
+      isplitr; · ipureintro; exact hmap
       iexact Hb
     ihave HlNat' := HlNat $$ HlBack
     iapply HΦ $$ HlNat'
-    ipure_intro; exact ⟨Hv0, Hvz⟩
+    ipureintro; exact ⟨Hv0, Hvz⟩
 
 /-! ### Spec-side `_r` WPs -/
 
@@ -430,7 +430,7 @@ theorem wp_rand_r {E : CoPset} (K : (Ectx rT)) {z : Int} {e : (Exp rT)}
     isplitl [Hs']; · iexact Hs'
     isplitl [Hε]; · iexact Hε
     iapply Hwp
-    · ipure_intro; exact ⟨Hv0, Hvz⟩
+    · ipureintro; exact ⟨Hv0, Hvz⟩
     · iexact Hj'
   | RandNonposS hnz => exact absurd Hz hnz
 
@@ -450,7 +450,7 @@ theorem wp_rand_lbl_nonpos {E : CoPset} {l : Loc} {z N : Int}
   ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨.lit (.int (-1)), σ₁⟩, ?_⟩
     rw [Discrete.headStep_support_iff]
     by_cases hN : N = z
@@ -572,7 +572,7 @@ theorem wp_rand_tape_empty_r {E : CoPset} (K : (Ectx rT)) {l : Loc} {z : Int} {e
     isplitl [Hε]; · iexact Hε
     ihave HαNat := spec_empty_to_natTape (GF := GF) (l := l) (z := z) $$ HαB
     iapply Hwp $$ HαNat Hj'
-    ipure_intro; exact ⟨Hv0, Hvz⟩
+    ipureintro; exact ⟨Hv0, Hvz⟩
   | RandTapeOtherS _ hlook' hne _ _ _ =>
     rw [hlook] at hlook'; cases hlook'; exact absurd rfl hne
   | RandTapeNonposEmptyS hnz _ _ => exact absurd Hz hnz
@@ -677,7 +677,7 @@ theorem wp_rand_tape_r {E : CoPset} (K : (Ectx rT)) {z : Int} {l : Loc}
   subst hxv
   ihave HlNew := HHandback $$ Hback'
   iapply Hwp $$ Hj' HlNew
-  ipure_intro; exact x.2
+  ipureintro; exact x.2
 
 theorem wp_rand_empty_r {E : CoPset} (K : (Ectx rT)) {z : Int} {l : Loc}
     {e : (Exp rT)} {Φ : (Val rT) → IProp GF} (Hz : 0 < z) :
@@ -736,7 +736,7 @@ theorem wp_rand_empty_r {E : CoPset} (K : (Ectx rT)) {z : Int} {l : Loc}
       BI.BIBase.Entails.rfl $$ [HαNat Hj']
     · isplitl [HαNat] <;> iassumption
     iapply Hwp $$ HwpArg
-    ipure_intro; exact ⟨Hv0, Hvz⟩
+    ipureintro; exact ⟨Hv0, Hvz⟩
   | RandTapeOtherS _ Hlk' hne _ _ _ =>
     rw [Hlk] at Hlk'; cases Hlk'; exact absurd rfl hne
   | RandTapeNonposEmptyS hnz _ _ => exact absurd Hz hnz
@@ -805,7 +805,7 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : (Ectx rT)) {z M : Int} {l : Loc}
       iintro Hb
       unfold specNatTape
       iexists fs
-      isplitr; · ipure_intro; exact hmap
+      isplitr; · ipureintro; exact hmap
       iexact Hb
     ihave HαNat' := HαNat $$ Hαb
     ihave HwpArg := show
@@ -814,7 +814,7 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : (Ectx rT)) {z M : Int} {l : Loc}
       BI.BIBase.Entails.rfl $$ [HαNat' Hj']
     · isplitl [HαNat'] <;> iassumption
     iapply Hwp $$ HwpArg
-    ipure_intro; exact ⟨Hv0, Hvz⟩
+    ipureintro; exact ⟨Hv0, Hvz⟩
 
 end Lifting
 

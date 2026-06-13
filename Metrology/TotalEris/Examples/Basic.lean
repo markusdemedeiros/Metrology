@@ -24,13 +24,13 @@ namespace TotalEris
 
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-- Trivial value-return: `tglWp E v (fun w => ⌜w = v⌝)`. -/
 example (E : CoPset) (v : Val rT) :
     ⊢@{IProp GF} tglWp E (.ofVal v) (fun w => iprop(⌜w = v⌝)) := by
   iapply tglWp_value
-  ipure_intro; rfl
+  ipureintro; rfl
 
 /-- Alloc → load roundtrip: `let x = ref v in !x = v`.
 
@@ -45,7 +45,7 @@ example (E : CoPset) (v : Val rT) :
   iintro %l Hl
   iexists l
   isplitr
-  · ipure_intro; rfl
+  · ipureintro; rfl
   iexact Hl
 
 /-- `twp_rand_tape` round-trip: reading the head of a non-empty tape returns
@@ -62,7 +62,7 @@ example (E : CoPset) (l : Loc) (z : Int)
   · iexact Hl
   iintro Hl'
   isplitr
-  · ipure_intro; rfl
+  · ipureintro; rfl
   iexact Hl'
 
 /-- `twp_rand_tape_empty`: rand on an empty tape falls through to uniform
@@ -78,8 +78,8 @@ example (E : CoPset) (l : Loc) (z : Int) (Hz : 0 < z) :
   · iexact Hl
   iintro %n Hl' %Hbnd
   iexists n
-  isplitr; · ipure_intro; exact Hbnd
-  isplitr; · ipure_intro; rfl
+  isplitr; · ipureintro; exact Hbnd
+  isplitr; · ipureintro; rfl
   iexact Hl'
 
 /-- `tglWp_mono`: weaken a `Φ`-post into a stronger `Ψ`-post via a Lean-level
@@ -109,7 +109,7 @@ example (E : CoPset) (v : Val rT) :
   iapply tglWp_wand
   isplitl [HW]; · iexact HW
   iintro %w %Hw
-  ipure_intro
+  ipureintro
   exact Or.inl Hw
 
 /-- `tglWp_strong_mono`: the fupd-aware variant. -/
@@ -122,7 +122,7 @@ example (E : CoPset) (v : Val rT) :
   iintro %w %Hw
   imodintro
   imodintro
-  ipure_intro; exact Hw
+  ipureintro; exact Hw
 
 /-- `tglWp_bind_value`: the value-only specialization of bind. When the inner
 expression is already a value, the bind collapses to running the outer
@@ -186,7 +186,7 @@ Steps:
 --   iapply twp_load
 --   isplitl [Hl]; · iexact Hl
 --   iintro _
---   ipure_intro; rfl
+--   ipureintro; rfl
 example (E : CoPset) (v : Val rT) :
     ⊢@{IProp GF} tglWp E
       (pl((fun x, !x) (alloc({Exp.ofVal v}))) : Exp rT)
@@ -207,7 +207,7 @@ example (E : CoPset) (v : Val rT) :
   iapply twp_load
   isplitl [Hl]; · iexact Hl
   iintro _
-  ipure_intro; rfl
+  ipureintro; rfl
 
 /-- `fupd_tglWp`: a leading `|={E}=>` on a tglWp is absorbed. -/
 example (E : CoPset) (v : Val rT) :
@@ -224,7 +224,7 @@ example (E : CoPset) (v : Val rT) (R : Prop) (HR : R) :
   iintro HW
   iapply tglWp_frame_l (R := iprop(⌜R⌝))
   isplitr [HW]; swap; · iexact HW
-  ipure_intro; exact HR
+  ipureintro; exact HR
 
 /-- `twp_rand_exp` (the wrapper) smoke test on `rand 2 ()` with the
 geometric-style error fn `F 0 = 0`, `F 1 = ε`. Continuation receives
@@ -246,7 +246,7 @@ example (E : CoPset) (ε : ENNReal) :
       exact le_self_add)) $$ Hcr
   iintro %n ⟨%Hn, _⟩
   iexists n
-  ipure_intro
+  ipureintro
   exact ⟨Hn.1, Hn.2, rfl⟩
 
 /-- `twp_rand_exp_nat` smoke test: `rand 1 ()` with zero error distribution.
@@ -257,13 +257,13 @@ example (E : CoPset) (ε : ENNReal) :
         (fun w : Val rT => iprop(⌜w = ⟨.lit (.int 0), IsVal.lit⟩⌝)) := by
   iintro Hε
   iapply (twp_rand_exp_nat (z := 1) (ε₁ := ε) (ε₂ := fun _ => 0)
-    (Hz := by decide) (Hbd := fun _ => zero_le _)
+    (Hz := by decide) (Hbd := fun _ => zero_le)
     (HSum := by simp)) $$ Hε
   iintro %n ⟨%Hn, _⟩
   -- `0 ≤ n < 1` forces `n = 0`.
   obtain ⟨Hn₁, Hn₂⟩ := Hn
   interval_cases n
-  ipure_intro; rfl
+  ipureintro; rfl
 
 /-! ## End-to-end adequacy smoke tests
 
@@ -279,7 +279,7 @@ variable {GF : BundledGFunctors.{0,0,0}}
 example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
   refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
-  intro _; iintro _; iapply tglWp_value; ipure_intro; exact hφ
+  intro _; iintro _; iapply tglWp_value; ipureintro; exact hφ
 
 /-- Mass at ε = 0 for a value: `1 ≤ limExec _ Set.univ`. -/
 example (v : Val rT) (σ : State rT) :
@@ -287,7 +287,7 @@ example (v : Val rT) (σ : State rT) :
   have h : Tgl (limExec ⟨Exp.ofVal v, σ⟩) (fun _ => True) 0 := by
     refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ)
       (φ := fun _ => True) ?_
-    intro _; iintro _; iapply tglWp_value; ipure_intro; trivial
+    intro _; iintro _; iapply tglWp_value; ipureintro; trivial
   have := Tgl.termination_ineq h
   rwa [tsub_zero] at this
 
@@ -296,7 +296,7 @@ example (v : Val rT) (σ : State rT) :
 example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
   refine twp_tgl_limit (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
-  intro _ _ _; iintro _; iapply tglWp_value; ipure_intro; exact hφ
+  intro _ _ _; iintro _; iapply tglWp_value; ipureintro; exact hφ
 
 /-- Pgl bound via adequacy: at ε = 0, the limit-exec measure of the
 non-value-or-`¬φ` set is `0`. -/
@@ -304,7 +304,7 @@ example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v) :
     Pgl 0 (fun ρ => ∃ w, ρ.expr = Exp.ofVal w ∧ φ w)
       (limExec ⟨Exp.ofVal v, σ⟩) := by
   refine twp_pgl_lim (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
-  intro _; iintro _; iapply tglWp_value; ipure_intro; exact hφ
+  intro _; iintro _; iapply tglWp_value; ipureintro; exact hφ
 
 end AdequacySmokeTests
 

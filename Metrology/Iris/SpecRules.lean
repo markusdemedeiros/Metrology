@@ -34,7 +34,7 @@ theorem Measure.eq_dirac_of_singleton_mass_one {α : Type _}
       MeasureTheory.measure_add_measure_compl (measurableSet_singleton a)
     have hbnd : μ {a} + μ ({a}ᶜ) ≤ μ {a} + 0 := by
       rw [hAdd, huniv, add_zero]; exact hmass.symm.le
-    refine _root_.le_antisymm ?_ (zero_le _)
+    refine _root_.le_antisymm ?_ (zero_le)
     exact ENNReal.le_of_add_le_add_left (hmass ▸ ENNReal.one_ne_top) hbnd
   by_cases ha : a ∈ s
   · rw [MeasureTheory.Measure.dirac_apply_of_mem ha]
@@ -140,7 +140,7 @@ theorem DetHeadStep_discrete.rand_tape {z : Int} (l : Loc)
 
 section Rules
 
-variable {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [SpecGS rT GF]
+variable {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [SpecGS rT GF]
 variable [Countable rT] [MeasurableSingletonClass rT]
 
 /-- Pure reduction under an evaluation context. -/
@@ -158,7 +158,7 @@ theorem step_pure {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : �
   imodintro
   iexists ⟨K.fill e', σ⟩, n
   isplitr
-  · ipure_intro; exact pexecN_of_PureExec (h := HexK) σ Hφ
+  · ipureintro; exact pexecN_of_PureExec (h := HexK) σ Hφ
   isplitl [HρNew] <;> iassumption
 
 /-- Allocation under an evaluation context. -/
@@ -181,7 +181,7 @@ theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
   imodintro
   iexists ⟨K.fill (.lit (.loc l)), σ'⟩, 1
   isplitr
-  · ipure_intro
+  · ipureintro
     refine pexecN_1_of_DetStep ?_
     have hstate_eq :
         σ.update_heap (·.insert σ.heap.fresh ⟨v, hv⟩) = σ' := by
@@ -208,7 +208,7 @@ theorem step_load {E : CoPset} (K : Ectx rT) {l : Loc} {v : Val rT} :
   imodintro
   iexists ⟨K.fill (Exp.ofVal v), σ⟩, 1
   isplitr
-  · ipure_intro
+  · ipureintro
     exact pexecN_1_of_DetStep (((DetHeadStep_discrete.load σ Hlk).toDetStep).fill K)
   isplitl [HρNew]
   · iassumption
@@ -235,7 +235,7 @@ theorem step_store {E : CoPset} (K : Ectx rT) {l : Loc} {e : Exp rT} {v_old v_ne
   imodintro
   iexists ⟨K.fill (.lit .unit), σ'⟩, 1
   isplitr
-  · ipure_intro
+  · ipureintro
     refine pexecN_1_of_DetStep ?_
     have hstate_eq : σ.update_heap (·.insert l v_new) = σ' := by
       simp [hσ', State.update_heap, ExtTreeMap.insert_eq_PartialMap_insert]
@@ -266,7 +266,7 @@ theorem step_alloctape {E : CoPset} (K : Ectx rT) (z : Int) :
   imodintro
   iexists ⟨K.fill (.lit (.lbl l)), σ'⟩, 1
   isplitr
-  · ipure_intro
+  · ipureintro
     refine pexecN_1_of_DetStep ?_
     have hstate_eq :
         σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z)) = σ' := by
@@ -300,7 +300,7 @@ theorem step_rand {E : CoPset} (K : Ectx rT) {z : Int} (l : Loc)
   imodintro
   iexists ⟨K.fill (.lit (.int n)), σ'⟩, 1
   isplitr
-  · ipure_intro
+  · ipureintro
     refine pexecN_1_of_DetStep ?_
     have hstate_eq : σ.update_tapes (·.insert l ⟨z, ns⟩) = σ' := by
       simp [hσ', State.update_tapes, ExtTreeMap.insert_eq_PartialMap_insert]

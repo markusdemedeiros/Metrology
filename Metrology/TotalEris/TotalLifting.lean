@@ -62,16 +62,16 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   imodintro
   iapply glm'_prim_step
   iexists (fun ρ => 0 < primStep ⟨e₁, σ₁⟩ {ρ}), 0, (fun _ => ε₁), ε₁
-  isplitr; · ipure_intro; exact Hred
-  isplitr; · ipure_intro; intro _; exact _root_.le_refl _
+  isplitr; · ipureintro; exact Hred
+  isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
-  · ipure_intro
+  · ipureintro
     -- `ε₁ * primStep(univ) ≤ ε₁ * 1 = ε₁` for the sub-probability measure `primStep`.
     rw [zero_add, MeasureTheory.lintegral_const]
     calc ε₁ * primStep ⟨e₁, σ₁⟩ Set.univ
         ≤ ε₁ * 1 := by gcongr; exact primStep_univ_le_one _
       _ = ε₁ := mul_one ε₁
-  isplitr; · ipure_intro; sorry -- exact Pgl.zero_positive _
+  isplitr; · ipureintro; sorry -- exact Pgl.zero_positive _
   iintro %ρ %HR
   ispecialize HCont $$ %ρ.expr %ρ.state %HR
   imod HCont with HC
@@ -105,7 +105,7 @@ theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e�
   imod (BIFUpdate.subset (E1 := E₁) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  isplitr; · ipure_intro; exact Hred
+  isplitr; · ipureintro; exact Hred
   iintro %e₂ %σ₂ %Hstep
   imodintro
   imod Hclose
@@ -139,14 +139,14 @@ theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  isplitr; · ipure_intro; exact Hsafe σ₁
+  isplitr; · ipureintro; exact Hsafe σ₁
   iintro %e₂ %σ₂ %Hstep'
   imodintro
   imod Hclose
   imodintro
   cases Hstep _ _ _ Hstep'
   isplitl [Hσ]; · iexact Hσ
-  iapply H; ipure_intro; exact Hstep'
+  iapply H; ipureintro; exact Hstep'
 
 /-- Single deterministic pure step. Rocq: `twp_lift_pure_det_step`. -/
 theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
@@ -189,7 +189,7 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   ispecialize H $$ %σ₁ Hσ
   imod H with ⟨%Hhred, HCont⟩
   imodintro
-  isplitr; · ipure_intro; sorry -- exact Reducible.of_head Hhred
+  isplitr; · ipureintro; sorry -- exact Reducible.of_head Hhred
   iintro %e₂ %σ₂ %Hpstep
   have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := sorry -- Discrete.primStep_eq_headStep Hhred
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := heq ▸ Hpstep

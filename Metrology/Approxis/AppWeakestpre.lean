@@ -32,7 +32,7 @@ update modality, the invariant ghost state, a state interpretation, and an
 error-credit interpretation. -/
 class ApproxisWpGS {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (GF : BundledGFunctors) extends SpecUpdateGS rT GF where
-  hlc : Bool
+  hlc : HasLC
   invGS : InvGS_gen hlc GF
   stateInterp : (State rT) → IProp GF
   errInterp : ENNReal → IProp GF
@@ -101,7 +101,7 @@ abbrev specCoupl (E : CoPset) (σ : (State rT)) (e' : (Exp rT)) (σ' : (State rT
   bi_least_fixpoint (specCouplPre (GF := GF) E Z)
     ((σ, (⟨e', σ'⟩ : (Cfg rT)), ε) : SpecCouplState rT)
 
-macro "spec_trivial_left" : tactic => `(tactic| (isplitr; · ipure_intro; trivial))
+macro "spec_trivial_left" : tactic => `(tactic| (isplitr; · ipureintro; trivial))
 macro "spec_trivial_cases" : tactic => `(tactic| repeat spec_trivial_left)
 
 /-- `specCouplPre` is monotone in its `Φ` argument.
@@ -132,9 +132,9 @@ instance specCouplPre_mono {E : CoPset} {Z : (State rT) → (Cfg rT) → ENNReal
 /-- Trivial introduction: if `1 ≤ ε`, the coupling holds vacuously. -/
 theorem specCoupl_err_ge_1 {E : CoPset} {σ : (State rT)} {e' : (Exp rT)} {σ' : (State rT)} {ε : ENNReal}
     {Z : (State rT) → (Cfg rT) → ENNReal → IProp GF} (hε : 1 ≤ ε) : ⊢ specCoupl E σ e' σ' ε Z := by
-  iapply least_fixpoint_unfold_2 (specCouplPre E Z)
+  iapply least_fixpoint_unfold_mpr (specCouplPre E Z)
   ileft
-  ipure_intro
+  ipureintro
   exact hε
 
 /-- `Z`-introduction: from the body `Z`, conclude the coupling. -/
@@ -142,7 +142,7 @@ theorem specCoupl_ret {E : CoPset} {σ : (State rT)} {e' : (Exp rT)} {σ' : (Sta
     {ε : ENNReal} {Z : (State rT) → (Cfg rT) → ENNReal → IProp GF} :
     Z σ ⟨e', σ'⟩ ε ⊢@{IProp GF} specCoupl E σ e' σ' ε Z := by
   iintro HZ
-  iapply least_fixpoint_unfold_2 (specCouplPre E Z)
+  iapply least_fixpoint_unfold_mpr (specCouplPre E Z)
   iright
   ileft
   iexact HZ
@@ -160,7 +160,7 @@ theorem specCoupl_rec {E : CoPset} {σ : (State rT)} {e' : (Exp rT)} {σ' : (Sta
       ⊢@{IProp GF} specCoupl E σ e' σ' ε Z := by
   iintro HCpl
   unfold specCoupl
-  iapply (least_fixpoint_unfold_2 (specCouplPre E Z))
+  iapply (least_fixpoint_unfold_mpr (specCouplPre E Z))
   unfold specCouplPre
   iright
   iright
@@ -625,14 +625,14 @@ theorem fupd_specCoupl_of_le {E : CoPset} {σ : (State rT)} {e' : (Exp rT)} {σ'
     MeasureTheory.Measure.dirac σ, MeasureTheory.Measure.dirac σ',
     (ε₂ - ε₁), (fun _ => ε₁), ε₁
   isplitr
-  · ipure_intro
+  · ipureintro
     show AddCoupl (ε₂ - ε₁) _ (MeasureTheory.Measure.dirac σ) _
     rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete]
     simp only [pexecN_zero]
     exact AddCoupl.dirac _ ⟨rfl, rfl⟩
-  isplitr; · ipure_intro; intro _; exact _root_.le_refl _
+  isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
-  · ipure_intro
+  · ipureintro
     set μ := (MeasureTheory.Measure.dirac σ').bind (fun s => pexecN 0 ⟨e', s⟩)
     have hmass : μ .univ ≤ 1 := by
       show μ Set.univ ≤ 1
@@ -643,8 +643,8 @@ theorem fupd_specCoupl_of_le {E : CoPset} {σ : (State rT)} {e' : (Exp rT)} {σ'
       _ ≤ (ε₂ - ε₁) + ε₁ * 1 := by gcongr
       _ = (ε₂ - ε₁) + ε₁ := by rw [mul_one]
       _ = ε₂ := tsub_add_cancel_of_le Hε
-  isplitr; · ipure_intro; exact Erasable.dret σ
-  isplitr; · ipure_intro; exact Erasable.dret σ'
+  isplitr; · ipureintro; exact Erasable.dret σ
+  isplitr; · ipureintro; exact Erasable.dret σ'
   iintro %σ₂ %e₂' %σ₂' %HS'
   obtain ⟨rfl, HS'⟩ := HS'
   cases HS'
@@ -715,7 +715,7 @@ theorem specCoupl_erasables_exp {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp 
   iexists (fun σ₂ c => R σ₂ c.state ∧ c.expr = e₁'), 0, μ₁, μ₁',
     ε₁, (fun ρ => X₂ ρ.state), r
   isplitr
-  · ipure_intro
+  · ipureintro
     show AddCoupl ε₁ _ μ₁ ((μ₁').bind (fun σ => pexecN 0 ⟨e₁', σ⟩))
     simp only [pexecN_zero]
     rw [MeasureTheory.Measure.bind_dirac_eq_map _ Measurable.of_discrete,
@@ -724,9 +724,9 @@ theorem specCoupl_erasables_exp {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp 
       Measurable.of_discrete Measurable.of_discrete
       (fun {σ σ'} HR => ⟨HR, rfl⟩) Hcpl
   isplitr
-  · ipure_intro; exact fun _ => Hbnd _
+  · ipureintro; exact fun _ => Hbnd _
   isplitr
-  · ipure_intro
+  · ipureintro
     refine _root_.le_trans ?_ Hexp
     gcongr
     have heq : (μ₁' : MeasureTheory.Measure (State rT)).bind (fun σ => pexecN 0 ⟨e₁', σ⟩) =
@@ -734,8 +734,8 @@ theorem specCoupl_erasables_exp {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp 
       simp only [pexecN_zero]
       exact MeasureTheory.Measure.bind_dirac_eq_map _ Measurable.of_discrete
     rw [heq, MeasureTheory.lintegral_map Measurable.of_discrete Measurable.of_discrete]
-  isplitr; · ipure_intro; exact Heras₁
-  isplitr; · ipure_intro; exact Heras₁'
+  isplitr; · ipureintro; exact Heras₁
+  isplitr; · ipureintro; exact Heras₁'
   iintro %σ₂ %e₂' %σ₂' %HS
   obtain ⟨HR, rfl⟩ := HS
   iapply H $$ %σ₂ %σ₂' %HR
@@ -779,13 +779,13 @@ theorem specCoupl_erasable_steps {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp
   iapply specCoupl_rec
   iexists R, n, μ₁, MeasureTheory.Measure.dirac σ₁', ε₁, (fun _ => ε₂), ε₂
   isplitr
-  · ipure_intro
+  · ipureintro
     show AddCoupl ε₁ _ μ₁ ((MeasureTheory.Measure.dirac σ₁').bind (fun s => pexecN n ⟨e₁', s⟩))
     rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete]
     exact Hcpl
-  isplitr; · ipure_intro; intro _; exact _root_.le_refl _
+  isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
-  · ipure_intro
+  · ipureintro
     refine _root_.le_trans ?_ Hε
     rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete,
         MeasureTheory.lintegral_const]
@@ -810,8 +810,8 @@ theorem specCoupl_erasable_steps {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp
     calc ε₂ * (pexecN n ⟨e₁', σ₁'⟩) .univ
         ≤ ε₂ * 1 := by gcongr; exact hmass n _
       _ = ε₂ := mul_one _
-  isplitr; · ipure_intro; exact Heras₁
-  isplitr; · ipure_intro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact Heras₁
+  isplitr; · ipureintro; exact Erasable.dret σ₁'
   iintro %σ₂ %e₂' %σ₂' %HR
   iapply H $$ %σ₂ %e₂' %σ₂' %HR
 
@@ -846,13 +846,13 @@ theorem specCoupl_steps_det {E : CoPset} {σ : (State rT)} {e₁' : (Exp rT)} {�
     MeasureTheory.Measure.dirac σ, MeasureTheory.Measure.dirac σ₁',
     (0 : ENNReal), (fun _ => ε), ε
   isplitr
-  · ipure_intro
+  · ipureintro
     show AddCoupl 0 _ (MeasureTheory.Measure.dirac σ) _
     rw [MeasureTheory.Measure.dirac_bind Measurable.of_discrete, Hstep]
     exact AddCoupl.dirac _ ⟨rfl, rfl⟩
-  isplitr; · ipure_intro; intro _; exact _root_.le_refl _
+  isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
-  · ipure_intro
+  · ipureintro
     -- 0 + ∫ ε ∂(dirac σ₁'.bind (pexecN n ⟨e₁', ·⟩)) ≤ ε.
     set μ := (MeasureTheory.Measure.dirac σ₁').bind (fun s => pexecN n ⟨e₁', s⟩)
     have hmass : μ .univ ≤ 1 := by
@@ -863,8 +863,8 @@ theorem specCoupl_steps_det {E : CoPset} {σ : (State rT)} {e₁' : (Exp rT)} {�
             rw [zero_add, MeasureTheory.lintegral_const, mul_comm]
       _ ≤ ε * 1 := by gcongr
       _ = ε := mul_one _
-  isplitr; · ipure_intro; exact Erasable.dret σ
-  isplitr; · ipure_intro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact Erasable.dret σ
+  isplitr; · ipureintro; exact Erasable.dret σ₁'
   iintro %σ₂ %e₂'' %σ₂'' %HS'
   imodintro
   obtain ⟨rfl, HS'⟩ := HS'
@@ -922,7 +922,7 @@ theorem progCoupl_reducible {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp
     progCoupl e₁ σ₁ e₁' σ₁' ε Z ⊢@{IProp GF} ⌜Discrete.Reducible e₁ σ₁⌝ := by
   iintro HCpl
   icases HCpl with ⟨%n, %μ₁', %X₂, %Hred, _⟩
-  ipure_intro; exact Hred
+  ipureintro; exact Hred
 
 /-- Strong monotonicity of `progCoupl`: given a wand that can consume an extra
 fact "∃σ, primStep σ {a} > 0" (saying `a` is reachable from *some* start) and
@@ -950,10 +950,10 @@ theorem progCoupl_strong_mono {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (E
   -- New error function: X₂' a b = X₂ a b if reachable from some start, else 1.
   classical
   iexists (fun a b => if ∃ σ, 0 < primStep ⟨e₁, σ⟩ {a} then X₂ a b else 1)
-  isplitr; · ipure_intro; exact Hred
+  isplitr; · ipureintro; exact Hred
   -- Bound: max r 1 works.
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨max r 1, fun a b => ?_⟩
     show (if ∃ σ, 0 < primStep ⟨e₁, σ⟩ {a} then X₂ a b else 1) ≤ max r 1
     split_ifs with h
@@ -961,7 +961,7 @@ theorem progCoupl_strong_mono {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (E
     · exact le_max_right _ _
   -- Expectation bound.
   isplitr
-  · ipure_intro
+  · ipureintro
     intro h₁ h₂ Hh₁ Hh₂ Hh₁h₂
     -- h₁'(a) := if reachable then h₁(a) else 0.
     let h₁' : (Cfg rT) → ENNReal :=
@@ -977,15 +977,15 @@ theorem progCoupl_strong_mono {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (E
     rw [hcongr]
     -- Step 2: apply Hexp to h₁', h₂.
     refine Hexp h₁' h₂ ?_ Hh₂ ?_
-    · intro a; simp only [h₁']; split_ifs; exacts [Hh₁ a, zero_le _]
+    · intro a; simp only [h₁']; split_ifs; exacts [Hh₁ a, zero_le]
     · intro a b
       simp only [h₁']
       split_ifs with h
       · -- On reachable, X₂' = X₂, use original bound.
         have := Hh₁h₂ a b
         simpa [if_pos h] using this
-      · exact (zero_le _).trans le_self_add
-  isplitr; · ipure_intro; exact Heras
+      · exact (zero_le).trans le_self_add
+  isplitr; · ipureintro; exact Heras
   -- Continuation: for each (e₂, σ₂, e₂', σ₂'), case on reachability.
   iintro %e₂ %σ₂ %e₂' %σ₂'
   by_cases hreach : ∃ σ, 0 < primStep ⟨e₁, σ⟩ {⟨e₂, σ₂⟩}
@@ -996,7 +996,7 @@ theorem progCoupl_strong_mono {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (E
     imodintro
     iapply Hm $$ %e₂ %σ₂ %e₂' %σ₂' %(X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩) [HZ₁]
     isplitr
-    · ipure_intro; exact hreach
+    · ipureintro; exact hreach
     iexact HZ₁
   · -- Unreachable: X₂' = 1, use the catchall.
     simp only [if_neg hreach]
@@ -1019,14 +1019,14 @@ theorem progCoupl_strengthen {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Ex
   isplitr
   · iintro !> %e₂ %σ₂ %e₂' %σ₂'
     isplitr
-    · ipure_intro; exact .inr (_root_.le_refl _)
+    · ipureintro; exact .inr (_root_.le_refl _)
     iexact H1F
   isplitr [HCpl]
   swap
   · iexact HCpl
   iintro %e₂ %σ₂ %e₂' %σ₂' %ε' ⟨%Hreach, HZ⟩
   isplitr
-  · ipure_intro; exact .inl Hreach
+  · ipureintro; exact .inl Hreach
   iexact HZ
 
 /-- `progCoupl_ctx_bind` specialized to ProbLang's `(Ectx rT)`: a program coupling
@@ -1055,10 +1055,10 @@ theorem progCoupl_ctx_bind {K : (Ectx rT)} {e₁ : (Exp rT)} {σ₁ : (State rT)
   iexists (fun a b => match Kinv a.expr with
                      | some e' => X₂ ⟨e', a.state⟩ b
                      | none => 1)
-  isplitr; · ipure_intro; exact Hred.fill K
+  isplitr; · ipureintro; exact Hred.fill K
   -- Bound: max r 1.
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨max r 1, fun a b => ?_⟩
     show (match Kinv a.expr with
           | some e' => X₂ ⟨e', a.state⟩ b
@@ -1068,7 +1068,7 @@ theorem progCoupl_ctx_bind {K : (Ectx rT)} {e₁ : (Exp rT)} {σ₁ : (State rT)
     | some e' => exact (Hr _ _).trans (le_max_left _ _)
   -- Expectation bound.
   isplitr
-  · ipure_intro
+  · ipureintro
     intro h₁ h₂ Hh₁ Hh₂ Hh₁h₂
     -- Pull back h₁ along K.fill: h₁'(ρ) := h₁ ⟨K.fill ρ.expr, ρ.state⟩.
     let h₁' : (Cfg rT) → ENNReal := fun ρ => h₁ ⟨K.fill ρ.expr, ρ.state⟩
@@ -1090,7 +1090,7 @@ theorem progCoupl_ctx_bind {K : (Ectx rT)} {e₁ : (Exp rT)} {σ₁ : (State rT)
       -- `this`: h₁ ⟨K.fill ρ.expr, ρ.state⟩ ≤ h₂ b + X₂ ⟨ρ.expr, ρ.state⟩ b
       -- ρ = ⟨ρ.expr, ρ.state⟩ definitionally.
       exact this
-  isplitr; · ipure_intro; exact Heras
+  isplitr; · ipureintro; exact Heras
   -- Continuation: case on Kinv e₂.
   iintro %e₂ %σ₂ %e₂' %σ₂'
   cases hKinv : Kinv e₂ with
@@ -1135,10 +1135,10 @@ theorem progCoupl_steps_adv' {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Ex
       progCoupl e₁ σ₁ e₁' σ₁' ε Z := by
   iintro Hcnt
   iexists 1, (MeasureTheory.Measure.dirac σ₁'), X₂
-  isplitr; · ipure_intro; exact Hred
-  isplitr; · ipure_intro; exact ⟨1, Hbnd⟩
+  isplitr; · ipureintro; exact Hred
+  isplitr; · ipureintro; exact ⟨1, Hbnd⟩
   isplitr
-  · ipure_intro
+  · ipureintro
     intro h₁ h₂ Hh₁ Hh₂ Hh₁h₂
     -- μ₁'.bind (pexecN 1 ⟨e₁', ·⟩) = dirac σ₁'.bind (primStep ∘ ⟨e₁', ·⟩)
     --   = primStep ⟨e₁', σ₁'⟩ (since reducible).
@@ -1151,7 +1151,7 @@ theorem progCoupl_steps_adv' {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Ex
       rw [pexecN_one, stepOrFinal_not_isValue hnotval']
     rw [heq]
     exact Hcpl h₁ h₂ Hh₁ Hh₂ Hh₁h₂
-  isplitr; · ipure_intro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact Erasable.dret σ₁'
   iintro %e₂ %σ₂ %e₂' %σ₂'
   iapply Hcnt $$ %e₂ %σ₂ %e₂' %σ₂'
 
@@ -1177,15 +1177,15 @@ theorem progCoupl_steps_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp
   -- the simpler route is to inline the witnesses with X₂ := fun a b => X₂ a b + ε₂
   -- and bound r := 1 + ε₂.
   iexists 1, (MeasureTheory.Measure.dirac σ₁'), (fun a b => X₂ a b + ε₂)
-  isplitr; · ipure_intro; exact Hred
+  isplitr; · ipureintro; exact Hred
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨1 + ε₂, fun a b => ?_⟩
     show X₂ a b + ε₂ ≤ 1 + ε₂
     gcongr
     exact Hbnd a b
   isplitr
-  · ipure_intro
+  · ipureintro
     intro h₁ h₂ Hh₁ Hh₂ Hh₁h₂
     have hnotval' : ¬ e₁'.isValue := fun hv => by
       obtain ⟨ρ, hρ⟩ := Hred'
@@ -1232,7 +1232,7 @@ theorem progCoupl_steps_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp
       _ ≤ (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε := by
             rw [mul_one, add_assoc, add_comm ε₂ ε₁]
             gcongr
-  isplitr; · ipure_intro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact Erasable.dret σ₁'
   iintro %e₂ %σ₂ %e₂' %σ₂'
   iapply Hcnt $$ %e₂ %σ₂ %e₂' %σ₂'
 
@@ -1327,7 +1327,7 @@ theorem progCoupl_steps {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)
   simp only [Y]
   split_ifs with h
   · iapply Hcnt $$ %e₂ %σ₂ %e₂' %σ₂'
-    ipure_intro; exact h.1
+    ipureintro; exact h.1
   · imodintro
     iexact H1F
 
@@ -1355,16 +1355,16 @@ theorem progCoupl_step_l_erasable_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e�
   -- n = 0, spec doesn't step. The Y indicator: X₂ when RHS-expr is e₁', else 1.
   iexists 0, μ₁'
   iexists (fun ρ₁ ρ₂ => if ρ₂.expr = e₁' then X₂ ρ₁ ρ₂.state else 1)
-  isplitr; · ipure_intro; exact Hred
+  isplitr; · ipureintro; exact Hred
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨1, fun ρ₁ ρ₂ => ?_⟩
     show (if ρ₂.expr = e₁' then X₂ ρ₁ ρ₂.state else 1) ≤ 1
     split_ifs with h
     · exact Hbnd _ _
     · exact _root_.le_refl _
   isplitr
-  · ipure_intro
+  · ipureintro
     intro h₁ h₂ Hh₁ Hh₂ Hh₁h₂
     simp only [pexecN_zero]
     -- Goal: ∫ h₁ ∂primStep ≤ ∫ h₂ ∂(μ₁'.bind (dirac ∘ ⟨e₁', ·⟩)) + ε.
@@ -1390,7 +1390,7 @@ theorem progCoupl_step_l_erasable_adv {e₁ : (Exp rT)} {σ₁ : (State rT)} {e�
     rw [MeasureTheory.Measure.bind_dirac_eq_map _ Measurable.of_discrete,
         MeasureTheory.lintegral_map Measurable.of_discrete Measurable.of_discrete] at this
     exact this
-  isplitr; · ipure_intro; exact Heras
+  isplitr; · ipureintro; exact Heras
   iintro %e₂ %σ₂ %e₂' %σ₂'
   by_cases he : e₂' = e₁'
   · subst he
@@ -1482,7 +1482,7 @@ theorem progCoupl_step_l_erasable {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' 
   simp only [Y]
   split_ifs with h
   · iapply Hcnt $$ %e₂ %σ₂ %σ₂'
-    ipure_intro; exact h.1
+    ipureintro; exact h.1
   · imodintro
     iexact H1F
 
@@ -2028,16 +2028,16 @@ instance isExcept0_wp {E : CoPset} {e : (Exp rT)} {Φ : (Val rT) → IProp GF} :
 instance elimModal_bupd_wp {p : Bool} {E : CoPset} {e : (Exp rT)} {P : IProp GF}
     {Φ : (Val rT) → IProp GF} :
     ElimModal True p false iprop(|==> P) P (wp E e Φ) (wp E e Φ) where
-  elim_modal _ := (sep_mono_l intuitionisticallyIf_elim).trans <|
-    (sep_mono_l BIUpdateFUpdate.fupd_of_bupd).trans <|
-    fupd_frame_r.trans <| (BIFUpdate.mono wand_elim_r).trans fupd_wp
+  elim_modal _ := (sep_mono_left intuitionisticallyIf_elim).trans <|
+    (sep_mono_left BIUpdateFUpdate.fupd_of_bupd).trans <|
+    fupd_frame_right.trans <| (BIFUpdate.mono wand_elim_right).trans fupd_wp
 
 /-- `iMod` on fancy-update at the same mask. -/
 instance elimModal_fupd_wp {p : Bool} {E : CoPset} {e : (Exp rT)} {P : IProp GF}
     {Φ : (Val rT) → IProp GF} :
     ElimModal True p false iprop(|={E}=> P) P (wp E e Φ) (wp E e Φ) where
-  elim_modal _ := (sep_mono_l intuitionisticallyIf_elim).trans <|
-    fupd_frame_r.trans <| (BIFUpdate.mono wand_elim_r).trans fupd_wp
+  elim_modal _ := (sep_mono_left intuitionisticallyIf_elim).trans <|
+    fupd_frame_right.trans <| (BIFUpdate.mono wand_elim_right).trans fupd_wp
 
 /-- `iMod` on `specUpdate` hypotheses absorbing into a `wp`. -/
 instance elimModal_specUpdate_wp {E : CoPset} {e : (Exp rT)} {P : IProp GF}
@@ -2052,7 +2052,7 @@ instance elimModal_specUpdate_wp {E : CoPset} {e : (Exp rT)} {P : IProp GF}
     imod HP with ⟨%ρ', %n, %Hstep, Hρ', HPv⟩
     imodintro
     iexists ρ', n
-    isplitr; · ipure_intro; exact Hstep
+    isplitr; · ipureintro; exact Hstep
     isplitl [Hρ']; · iassumption
     iapply Hcnt $$ HPv
 
@@ -2070,7 +2070,7 @@ instance elimModal_specUpdateN_wp {n : Nat} {E : CoPset} {e : (Exp rT)} {P : IPr
     imod HP' with ⟨%ρ', %n', %Hstep, Hρ', HPv⟩
     imodintro
     iexists ρ', n'
-    isplitr; · ipure_intro; exact Hstep
+    isplitr; · ipureintro; exact Hstep
     isplitl [Hρ']; · iassumption
     iapply Hcnt $$ HPv
 
@@ -2222,7 +2222,7 @@ theorem wp_lift_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
   · iassumption
   imod H with ⟨%Hred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Hred
+  isplitr; · ipureintro; exact Hred
   iintro %e₂ %σ₂ %Hstep
   imodintro
   iintro !>
@@ -2399,7 +2399,7 @@ theorem wp_lift_pure_step {E E' : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → I
   imod (BIFUpdate.subset (E1 := E') (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  isplitr; · ipure_intro; exact Hsafe σ₁
+  isplitr; · ipureintro; exact Hsafe σ₁
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   have hσ : σ₂ = σ₁ := Hstep σ₁ e₂ σ₂ Hpstep
@@ -2429,7 +2429,7 @@ theorem wp_lift_atomic_step_fupd {E1 E2 : CoPset} {e₁ : (Exp rT)} {Φ : (Val r
   imod (BIFUpdate.subset (E1 := E1) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  isplitr; · ipure_intro; exact Hred
+  isplitr; · ipureintro; exact Hred
   iintro %e₂ %σ₂ %Hpstep
   imod Hclose
   ispecialize H $$ %e₂ %σ₂ %Hpstep
@@ -2470,7 +2470,7 @@ theorem wp_lift_atomic_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IP
   · iassumption
   imod H with ⟨%Hred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Hred
+  isplitr; · ipureintro; exact Hred
   iintro %e₂ %σ₂ %Hpstep
   imodintro
   iintro !>
@@ -2515,7 +2515,7 @@ theorem PureStep_discrete.prim_step_det {e₁ e₂ : (Exp rT)} (h : PureStep_dis
   have hne' : (⟨e₂', σ₂⟩ : (Cfg rT)) ≠ ⟨e₂, σ⟩ := by
     rintro ⟨⟩; exact hne ⟨rfl, rfl⟩
   have hzero : (primStep ⟨e₁, σ⟩) {⟨e₂', σ₂⟩} = 0 := by
-    apply _root_.le_antisymm _ (zero_le _)
+    apply _root_.le_antisymm _ (zero_le)
     rw [← h0]
     exact MeasureTheory.measure_mono (fun x hx => by
       simp only [Set.mem_singleton_iff] at hx
@@ -2665,7 +2665,7 @@ theorem wp_lift_head_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IPro
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
+  isplitr; · ipureintro; exact Discrete.Reducible.of_head Hhred
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   -- primStep positive + head-reducible ⇒ headStep positive at same successor
@@ -2691,7 +2691,7 @@ theorem wp_lift_atomic_head_step_fupd {E1 E2 : CoPset} {e₁ : (Exp rT)} {Φ : (
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
+  isplitr; · ipureintro; exact Discrete.Reducible.of_head Hhred
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
     have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
@@ -2715,7 +2715,7 @@ theorem wp_lift_atomic_head_step {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) �
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipure_intro; exact Discrete.Reducible.of_head Hhred
+  isplitr; · ipureintro; exact Discrete.Reducible.of_head Hhred
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by

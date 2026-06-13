@@ -426,8 +426,8 @@ theorem pos_R [Countable α] [Countable β]
     intro a b HS
     simp only [F, G, f', g']
     split_ifs with Hμa Hμb Hμb
-    · exact zero_le _
-    · exact zero_le _
+    · exact zero_le
+    · exact zero_le
     · exact (Hfb a).trans (le_refl _)
     · exact Hle ⟨HS, Hμa, Hμb⟩
   -- Now show ∫ f dμₗ = ∫ f' dμₗ via countable decomposition.
@@ -493,7 +493,7 @@ theorem antisym {μ₁ μ₂ : Measure α}
     ⟨A.indicator (fun _ => 1), Measurable.indicator measurable_const HA, fun a => by
       simp only [Set.indicator]; split_ifs
       · exact le_refl _
-      · exact zero_le _⟩
+      · exact zero_le⟩
   have Hle : ∀ {a b : α}, a = b → χ.1 a ≤ χ.1 b := fun h => h ▸ le_refl _
   have H12 := H₁ χ χ Hle
   have H21 := H₂ χ χ Hle

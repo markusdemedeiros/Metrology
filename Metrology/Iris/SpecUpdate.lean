@@ -23,18 +23,18 @@ open SpecUpdateGS
 section SpecUpdate
 
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-variable {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [iSpec : SpecUpdateGS rT GF]
+variable {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [iSpec : SpecUpdateGS rT GF]
 
 /-- Spec update for `n` deterministic steps. -/
 def specUpdateN (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-    {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [SpecUpdateGS rT GF]
+    {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [SpecUpdateGS rT GF]
     (n : Nat) (E : CoPset) (P : IProp GF) :
     IProp GF := iprop%
   ∀ (ρ : Cfg rT), specInterp ρ -∗ |={E}=> ∃ ρ', ⌜pexecN n ρ = dirac ρ'⌝ ∗ specInterp ρ' ∗ P
 
 /-- Spec update quantified over an unknown number of deterministic steps -/
 abbrev specUpdate (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-    {GF : BundledGFunctors} {hlc : Bool} [InvGS_gen hlc GF] [SpecUpdateGS rT GF]
+    {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [SpecUpdateGS rT GF]
     (E : CoPset) (P : IProp GF) :
     IProp GF := iprop%
   ∀ (ρ : Cfg rT), specInterp ρ -∗ |={E}=> (∃ ρ' n, ⌜pexecN n ρ = dirac ρ'⌝ ∗ specInterp ρ' ∗ P)
@@ -47,7 +47,7 @@ theorem specUpdateN_specUpdate {n : Nat} {E : CoPset} {P : IProp GF} :
   imodintro
   iexists ρ', n
   iframe
-  ipure_intro
+  ipureintro
   assumption
 
 theorem specUpdate_zero {E : CoPset} {P : IProp GF} : P ⊢ specUpdateN rT 0 E P := by
@@ -55,7 +55,7 @@ theorem specUpdate_zero {E : CoPset} {P : IProp GF} : P ⊢ specUpdateN rT 0 E P
   iintro HP %ρ Hρ !>
   iexists ρ
   iframe
-  ipure_intro
+  ipureintro
   rfl
 
 theorem specUpdate_ret {E : CoPset} {P : IProp GF} : P ⊢ specUpdate rT E P := by
@@ -74,7 +74,7 @@ theorem specUpdateN_bind {n m : Nat} {E1 E2 : CoPset} {P Q : IProp GF} (HE : E1 
   imodintro
   iexists ρ''
   iframe
-  ipure_intro
+  ipureintro
   exact pexecN_det_trans Hexec₁ Hexec₂
 
 theorem specUpdate_bind {E1 E2 : CoPset} {P Q : IProp GF} (HE : E1 ⊆ E2) : iprop%
@@ -88,7 +88,7 @@ theorem specUpdate_bind {E1 E2 : CoPset} {P Q : IProp GF} (HE : E1 ⊆ E2) : ipr
   imodintro
   iexists ρ'', n₁ + n₂
   iframe
-  ipure_intro
+  ipureintro
   exact pexecN_det_trans Hexec₁ Hexec₂
 
 theorem specUpdateN_mono_fupd {n : Nat} {E : CoPset} {P Q : IProp GF} : iprop%
@@ -100,7 +100,7 @@ theorem specUpdateN_mono_fupd {n : Nat} {E : CoPset} {P Q : IProp GF} : iprop%
   imodintro
   iexists ρ'
   iframe
-  ipure_intro
+  ipureintro
   assumption
 
 theorem specUpdate_mono_fupd {E : CoPset} {P Q : IProp GF} : iprop%
@@ -112,7 +112,7 @@ theorem specUpdate_mono_fupd {E : CoPset} {P Q : IProp GF} : iprop%
   imodintro
   iexists ρ', n
   iframe
-  ipure_intro
+  ipureintro
   assumption
 
 theorem specUpdateN_mono {n : Nat} {E : CoPset} {P Q : IProp GF} : iprop%

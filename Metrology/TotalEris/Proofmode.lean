@@ -104,13 +104,16 @@ syntax "wp_value" : tactic
 macro_rules
   | `(tactic| wp_value) => `(tactic| twp_value)
 
-syntax "wp_pure" : tactic
-macro_rules
-  | `(tactic| wp_pure) => `(tactic| twp_pure)
+-- NOTE(iris-bump): the bumped iris HeapLang ProofMode now defines `wp_pure`/`wp_pures`
+-- macros, which collide with these (unused) total-WP aliases. Disabled pending the
+-- planned rewrite of this file to clone iris's elaborator-based `wp_*` tactics.
+-- syntax "wp_pure" : tactic
+-- macro_rules
+--   | `(tactic| wp_pure) => `(tactic| twp_pure)
 
-syntax "wp_pures" : tactic
-macro_rules
-  | `(tactic| wp_pures) => `(tactic| twp_pures)
+-- syntax "wp_pures" : tactic
+-- macro_rules
+--   | `(tactic| wp_pures) => `(tactic| twp_pures)
 
 syntax "wp_lam" : tactic
 macro_rules

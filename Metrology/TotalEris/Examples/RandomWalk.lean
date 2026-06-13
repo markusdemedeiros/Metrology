@@ -55,7 +55,7 @@ namespace Examples
 
 
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-! ## The recursive random-walk body
 
@@ -141,7 +141,7 @@ theorem term_cond_1 (p₀ : Nat) (li : List (Fin 2)) :
 /-- `final_pos_rsm` is non-negative (trivially, as a Nat coerced to ENNReal). -/
 theorem final_pos_rsm_pos (li : List (Fin 2)) :
     0 ≤ final_pos_rsm 1 li :=
-  zero_le _
+  zero_le
 
 /-- If the walk hasn't terminated yet, appending `0` (a "down" step)
 strictly decreases `final_pos`. Rocq: `final_pos_dec_aux`. -/

@@ -23,7 +23,7 @@ open Cslib Exp
 
 section Fundamental
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ## Tctx → RelCtx lifting -/
 
@@ -543,7 +543,7 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
   iintro #IH
   unfold lrel_arr
   isplitr
-  · ipure_intro; exact hfix_closed
+  · ipureintro; exact hfix_closed
   iintro !> %v1 %v2 #HA
   have hL1 : Exp.app (Exp.fix (Exp.substMap vs.fst e)) v1.1 =
     Ectx.fill ([] : Ectx rT) (Exp.app (Exp.fix (Exp.substMap vs.fst e)) v1.1) := rfl
@@ -909,7 +909,7 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   have hUnit : ⊢@{IProp GF} (lrel_unit (rT := rT) (GF := GF)).car
       ⟨.lit .unit, IsVal.lit⟩ ⟨.lit .unit, IsVal.lit⟩ := by
     show ⊢@{IProp GF} iprop(⌜(.lit .unit : Exp rT) = .lit .unit ∧ (.lit .unit : Exp rT) = .lit .unit⌝)
-    ipure_intro; exact ⟨rfl, rfl⟩
+    ipureintro; exact ⟨rfl, rfl⟩
   ihave HvApp : iprop(refines ⊤ (Exp.app v.1 (.lit .unit)) (Exp.app v'.1 (.lit .unit))
       (interp τ (TyEnv.cons (interp τ' Δ) Δ))) $$ [HvArr2]
   · ihave HUnit := hUnit
@@ -1062,7 +1062,7 @@ theorem bin_log_related_pack (Δ : TyEnv rT GF)
         (∃ A : lrel rT GF, (interp τ (TyEnv.cons A Δ)).car v v')) := rfl
   rw [hex]
   isplitr
-  · ipure_intro; exact Hclosed
+  · ipureintro; exact Hclosed
   iexists (interp τ' Δ)
   iexact Hv
 
@@ -1279,7 +1279,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_int))
     unfold lrel_int
     iexists (n1 + n2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case minus =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
@@ -1287,7 +1287,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_int))
     unfold lrel_int
     iexists (n1 - n2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case mult =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
@@ -1295,7 +1295,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_int))
     unfold lrel_int
     iexists (n1 * n2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case div =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
@@ -1303,7 +1303,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_int))
     unfold lrel_int
     iexists (n1 / n2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case mod =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
@@ -1311,7 +1311,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_int))
     unfold lrel_int
     iexists (n1 % n2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case and => simp [BinOp.intResTy] at Hres
   case or  => simp [BinOp.intResTy] at Hres
@@ -1322,7 +1322,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_bool))
     unfold lrel_bool
     iexists (decide ((BaseLit.int n1) = .int n2))
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case lt =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_bool]
@@ -1330,7 +1330,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_bool))
     unfold lrel_bool
     iexists (decide (n1 < n2))
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case le =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_bool]
@@ -1338,7 +1338,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_bool))
     unfold lrel_bool
     iexists (decide (n1 ≤ n2))
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case shl =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
@@ -1346,7 +1346,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_int))
     unfold lrel_int
     iexists (n1 * 2 ^ n2.toNat)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case shr =>
     simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
@@ -1354,7 +1354,7 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_int))
     unfold lrel_int
     iexists (n1 / 2 ^ n2.toNat)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
 
 theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
@@ -1423,7 +1423,7 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_bool))
     unfold lrel_bool
     iexists (b1 && b2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case or =>
     simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
@@ -1431,7 +1431,7 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_bool))
     unfold lrel_bool
     iexists (b1 || b2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case xor =>
     simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
@@ -1439,7 +1439,7 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_bool))
     unfold lrel_bool
     iexists (b1 ^^ b2)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   case eq =>
     simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
@@ -1447,7 +1447,7 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       (heval := rfl) (A := lrel_bool))
     unfold lrel_bool
     iexists (decide ((BaseLit.bool b1) = .bool b2))
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
 
 theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
@@ -1500,7 +1500,7 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     imodintro
     unfold lrel_int
     iexists n.neg
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
 
 theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
@@ -1551,7 +1551,7 @@ theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     imodintro
     unfold lrel_bool
     iexists (¬b)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
 
 /-- **Statement:** `eq` of two `UnboxedType`-related arguments is related at `bool`.
@@ -1653,7 +1653,7 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   unfold lrel_bool
   iexists (decide (l1 = l2))
   rw [hdec]
-  ipure_intro
+  ipureintro
   exact ⟨rfl, rfl⟩
 
 /-- **Pattern-match agreement**: if `v ~ v'` at `interp τs Δ` and `PatTyped τs p τb`,
@@ -1675,7 +1675,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     iapply BI.or_intro_l
     iexists v, v'
     isplitr
-    · ipure_intro
+    · ipureintro
       simp [Pat.tryMatch]
     iexact Hvv
   | @lit_int z =>
@@ -1688,7 +1688,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       iapply BI.or_intro_l
       iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
       isplitr
-      · ipure_intro
+      · ipureintro
         subst hzn
         refine ⟨?_, ?_⟩
         · rw [h.1]; exact Pat.tryMatch_lit_eq (.int z)
@@ -1696,11 +1696,11 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       -- (interp .unit Δ).car ⟨.lit .unit, _⟩ ⟨.lit .unit, _⟩ via lrel_unit.
       rw [interp_unit]
       unfold lrel_unit
-      ipure_intro
+      ipureintro
       exact ⟨rfl, rfl⟩
     · -- Match fails: z ≠ n so the BaseLit beq is false.
       iapply BI.or_intro_r
-      ipure_intro
+      ipureintro
       have hbeq : ¬ ((BaseLit.int z : BaseLit rT) == BaseLit.int n) = true := by
         show ¬ (Int.decEq z n).decide = true
         intro hd
@@ -1716,17 +1716,17 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     · iapply BI.or_intro_l
       iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
       isplitr
-      · ipure_intro
+      · ipureintro
         subst hbb
         refine ⟨?_, ?_⟩
         · rw [h.1]; exact Pat.tryMatch_lit_eq (.bool b)
         · rw [h.2]; exact Pat.tryMatch_lit_eq (.bool b)
       rw [interp_unit]
       unfold lrel_unit
-      ipure_intro
+      ipureintro
       exact ⟨rfl, rfl⟩
     · iapply BI.or_intro_r
-      ipure_intro
+      ipureintro
       have hbeq : ¬ ((BaseLit.bool b : BaseLit rT) == BaseLit.bool b') = true := by
         show ¬ (Bool.decEq b b').decide = true
         intro hd; exact hbb (of_decide_eq_true hd)
@@ -1740,7 +1740,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     iapply BI.or_intro_l
     iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
     isplitr
-    · ipure_intro
+    · ipureintro
       refine ⟨?_, ?_⟩
       · rw [h.1]; exact Pat.tryMatch_lit_eq .unit
       · rw [h.2]; exact Pat.tryMatch_lit_eq .unit
@@ -1751,7 +1751,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
                  (⟨.lit .unit, IsVal.lit⟩ : Val rT).1 = .lit .unit⌝) := rfl
     rw [hrfl]
     iintro
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   | @pair τ1 τ2 p1 p2 b1 b2 Hpat1 Hpat2 ih1 ih2 =>
     have hprod : (interp (Ty.prod τ1 τ2) Δ : lrel rT GF) =
@@ -1771,7 +1771,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
         iexists ⟨.pair ba.1 bb.1, IsVal.pair ba.2 bb.2⟩,
                 ⟨.pair ba'.1 bb'.1, IsVal.pair ba'.2 bb'.2⟩
         isplitr
-        · ipure_intro
+        · ipureintro
           simp [Pat.tryMatch, hv1, hv2, hra.1, hra.2, hrb.1, hrb.2]
         -- Need (interp (.prod b1 b2) Δ).car ⟨.pair ba bb, _⟩ ⟨.pair ba' bb', _⟩.
         have hprodb : (interp (Ty.prod b1 b2) Δ : lrel rT GF) =
@@ -1779,17 +1779,17 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
         rw [hprodb]
         unfold lrel_prod
         iexists ba, ba', bb, bb'
-        isplitr; · ipure_intro; rfl
-        isplitr; · ipure_intro; rfl
+        isplitr; · ipureintro; rfl
+        isplitr; · ipureintro; rfl
         isplitl [HBa]; · iexact HBa
         iexact HBb
       · -- p1 succeeds but p2 fails. Combined match fails.
         iapply BI.or_intro_r
-        ipure_intro
+        ipureintro
         simp [Pat.tryMatch, hv1, hv2, hra.1, hra.2, hnb.1, hnb.2]
     · -- p1 fails. Combined match fails (regardless of p2).
       iapply BI.or_intro_r
-      ipure_intro
+      ipureintro
       simp [Pat.tryMatch, hv1, hv2, hna.1, hna.2]
   | @inl τ1 τ2 p b Hpat' ih =>
     have hsum : (interp (Ty.sum τ1 τ2) Δ : lrel rT GF) =
@@ -1804,15 +1804,15 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       · iapply BI.or_intro_l
         iexists bb, bb'
         isplitr
-        · ipure_intro
+        · ipureintro
           simp [Pat.tryMatch, hv1, hv2, hr.1, hr.2]
         iexact Hbnd
       · iapply BI.or_intro_r
-        ipure_intro
+        ipureintro
         simp [Pat.tryMatch, hv1, hv2, hn.1, hn.2]
     · -- v1 = inr w1, v2 = inr w2: tryMatch (.inl p) (.inr w) = none.
       iapply BI.or_intro_r
-      ipure_intro
+      ipureintro
       simp [Pat.tryMatch, hv1, hv2]
   | @inr τ1 τ2 p b Hpat' ih =>
     have hsum : (interp (Ty.sum τ1 τ2) Δ : lrel rT GF) =
@@ -1822,18 +1822,18 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     ihave ⟨%w1, %w2, Hcase⟩ := lrel_sum_unfold (interp τ1 Δ) (interp τ2 Δ) v v' $$ Hv
     icases Hcase with (⟨%hv1, %hv2, HA⟩ | ⟨%hv1, %hv2, HB⟩)
     · iapply BI.or_intro_r
-      ipure_intro
+      ipureintro
       simp [Pat.tryMatch, hv1, hv2]
     · ihave Hres := ih w1 w2 $$ HB
       icases Hres with (⟨%bb, %bb', %hr, Hbnd⟩ | %hn)
       · iapply BI.or_intro_l
         iexists bb, bb'
         isplitr
-        · ipure_intro
+        · ipureintro
           simp [Pat.tryMatch, hv1, hv2, hr.1, hr.2]
         iexact Hbnd
       · iapply BI.or_intro_r
-        ipure_intro
+        ipureintro
         simp [Pat.tryMatch, hv1, hv2, hn.1, hn.2]
 
 theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp rT}
@@ -1882,8 +1882,8 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     unfold lrel_sum
     iexists bb, bb'
     iapply BI.or_intro_l
-    isplitr; · ipure_intro; rfl
-    isplitr; · ipure_intro; rfl
+    isplitr; · ipureintro; rfl
+    isplitr; · ipureintro; rfl
     iexact Hbnd
   · -- Both fail: step to .inr ()
     have hf1 : Exp.scrut v.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v.1 p) := rfl
@@ -1906,10 +1906,10 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     unfold lrel_sum
     iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
     iapply BI.or_intro_r
-    isplitr; · ipure_intro; rfl
-    isplitr; · ipure_intro; rfl
+    isplitr; · ipureintro; rfl
+    isplitr; · ipureintro; rfl
     unfold lrel_unit
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
 
 /-! ## The fundamental theorem
@@ -2039,7 +2039,7 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     rw [interp_int]
     unfold lrel_int
     iexists n
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   | @lit_bool _ b =>
     unfold bin_log_related_ty bin_log_related
@@ -2053,7 +2053,7 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     rw [interp_bool]
     unfold lrel_bool
     iexists b
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   | lit_unit =>
     unfold bin_log_related_ty bin_log_related
@@ -2066,7 +2066,7 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     imodintro
     rw [interp_unit]
     unfold lrel_unit
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   | binop_int Hty1 Hty2 Hres ih1 ih2 =>
     rename_i op _ _ τ

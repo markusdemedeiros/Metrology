@@ -30,7 +30,7 @@ open scoped AppGS
 variable {GF : BundledGFunctors}
 
 instance heapView_tape_frag_discreteE (l : Loc) (t : Tape) :
-    OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree t)) :=
+    OFE.DiscreteE (HeapView.Frag (H := LocHeap) l (.own 1) (toAgree t)) :=
   View.frag_discrete ⟨fun H => OFE.Discrete.discrete_0 H⟩
 
 instance appTapesFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [AppGS rT GF] (l : Loc) (t : Tape) :
@@ -40,7 +40,7 @@ instance specTapesFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [IS
     BI.Timeless (l ↪ₛ t : IProp GF) := iOwn_timeless
 
 instance heapView_heap_frag_discreteE (l : Loc) (v : Val rT) :
-    OFE.DiscreteE (HeapView.Frag (F := ℕ+) (H := LocHeap) l (.own 1) (toAgree v)) := by
+    OFE.DiscreteE (HeapView.Frag (H := LocHeap) l (.own 1) (toAgree v)) := by
   unfold HeapView.Frag
   exact View.frag_discrete ⟨fun H => OFE.Discrete.discrete_0 H⟩
 
@@ -70,10 +70,10 @@ theorem later_timeless_fupd {PROP : Type _} [BI PROP] [BIUpdate PROP] [BIFUpdate
     {P : PROP} [BI.Timeless P] {E₁ E₂ : CoPset} {Q : PROP} :
     (iprop(▷ P) ∗ (P -∗ |={E₁, E₂}=> Q)) ⊢ (iprop(|={E₁, E₂}=> Q) : PROP) := by
   refine BIBase.Entails.trans ?_ IsExcept0.is_except0
-  refine BI.sep_mono_l BI.Timeless.timeless |>.trans ?_
-  refine BIBase.Entails.trans ?_ (BI.except0_mono (BI.wand_elim_r (P := P) (Q := iprop(|={E₁,E₂}=> Q))))
+  refine BI.sep_mono_left BI.Timeless.timeless |>.trans ?_
+  refine BIBase.Entails.trans ?_ (BI.except0_mono (BI.wand_elim_right (P := P) (Q := iprop(|={E₁,E₂}=> Q))))
   refine BIBase.Entails.trans ?_ BI.except0_sep.2
-  exact BI.sep_mono_r BI.except0_intro
+  exact BI.sep_mono_right BI.except0_intro
 
 end TimelessTapes
 
@@ -214,7 +214,7 @@ theorem AddCoupl_steps_ctx_bind_r_no_state [Countable rT] [MeasurableSingletonCl
 
 section CouplingRules
 
-variable {hlc : Bool} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors}
     [Countable rT] [MeasurableSingletonClass rT] [ApproxisGS rT hlc GF]
     [Countable rT] [MeasurableSingletonClass rT]
 
@@ -255,11 +255,11 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
-  isplitr; · ipure_intro; rw [zero_add]
-  isplitr; · ipure_intro; exact HredL
-  isplitr; · ipure_intro; exact HredR
+  isplitr; · ipureintro; rw [zero_add]
+  isplitr; · ipureintro; exact HredL
+  isplitr; · ipureintro; exact HredR
   isplitr
-  · ipure_intro
+  · ipureintro
     rw [primStep_rand_unit Hz]
     have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
@@ -297,7 +297,7 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
   isplitl [Hε]; · iexact Hε
   iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
   iapply Hcnt
-  · ipure_intro; exact ⟨hn0, hnz⟩
+  · ipureintro; exact ⟨hn0, hnz⟩
   · iexact Hj'
 
 /-- Labeled-rand coupling where both tapes have the wrong bound `M ≠ z`.
@@ -360,11 +360,11 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
-  isplitr; · ipure_intro; rw [zero_add]
-  isplitr; · ipure_intro; exact HredL
-  isplitr; · ipure_intro; exact HredR
+  isplitr; · ipureintro; rw [zero_add]
+  isplitr; · ipureintro; exact HredL
+  isplitr; · ipureintro; exact HredR
   isplitr
-  · ipure_intro
+  · ipureintro
     rw [primStep_rand_lbl_wrong Hz HneM σ₁ α fs Hlk_α]
     have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α')) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
@@ -405,21 +405,21 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
     iintro Hb
     unfold appNatTape
     iexists fs
-    isplitr; · ipure_intro; exact hmap_fs
+    isplitr; · ipureintro; exact hmap_fs
     iexact Hb
   ihave HαNat' := HαNat $$ Hα_b
   ihave Hα'Nat := show (α' ↪ₛ ⟨M, fs'⟩) ⊢@{IProp GF} specNatTape α' M ys by
     iintro Hb
     unfold specNatTape
     iexists fs'
-    isplitr; · ipure_intro; exact hmap_fs'
+    isplitr; · ipureintro; exact hmap_fs'
     iexact Hb
   ihave Hα'Nat' := Hα'Nat $$ Hα'_b
   iapply Hcnt
   isplitl [HαNat']; · iexact HαNat'
   isplitl [Hα'Nat']; · iexact Hα'Nat'
   isplitl [Hj']; · iexact Hj'
-  ipure_intro; exact ⟨hn0, hnz⟩
+  ipureintro; exact ⟨hn0, hnz⟩
 
 /-- Fully labeled two-sided coupling via a bijection `f`, both tapes empty. -/
 theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
@@ -482,11 +482,11 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
-  isplitr; · ipure_intro; rw [zero_add]
-  isplitr; · ipure_intro; exact HredL
-  isplitr; · ipure_intro; exact HredR
+  isplitr; · ipureintro; rw [zero_add]
+  isplitr; · ipureintro; exact HredL
+  isplitr; · ipureintro; exact HredR
   isplitr
-  · ipure_intro
+  · ipureintro
     rw [primStep_rand_lbl_empty Hz σ₁ α Hlk_α]
     have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α')) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
@@ -527,21 +527,21 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
     iintro Hb
     unfold appNatTape
     iexists ([] : List _)
-    isplitr; · ipure_intro; simp
+    isplitr; · ipureintro; simp
     iexact Hb
   ihave HαNat' := HαNat $$ Hα_b
   ihave Hα'Nat := show (α' ↪ₛ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} specNatTape α' z [] by
     iintro Hb
     unfold specNatTape
     iexists ([] : List _)
-    isplitr; · ipure_intro; simp
+    isplitr; · ipureintro; simp
     iexact Hb
   ihave Hα'Nat' := Hα'Nat $$ Hα'_b
   iapply Hcnt
   isplitl [HαNat']; · iexact HαNat'
   isplitl [Hα'Nat']; · iexact Hα'Nat'
   isplitl [Hj']; · iexact Hj'
-  ipure_intro; exact ⟨hn0, hnz⟩
+  ipureintro; exact ⟨hn0, hnz⟩
 
 /-! ## Mixed tape-rand couplings -/
 
@@ -594,11 +594,11 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
-  isplitr; · ipure_intro; rw [zero_add]
-  isplitr; · ipure_intro; exact HredL
-  isplitr; · ipure_intro; exact HredR
+  isplitr; · ipureintro; rw [zero_add]
+  isplitr; · ipureintro; exact HredL
+  isplitr; · ipureintro; exact HredR
   isplitr
-  · ipure_intro
+  · ipureintro
     rw [primStep_rand_lbl_empty Hz σ₁ α Hlk_α]
     have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
@@ -639,13 +639,13 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
     iintro Hb
     unfold appNatTape
     iexists ([] : List _)
-    isplitr; · ipure_intro; simp
+    isplitr; · ipureintro; simp
     iexact Hb
   ihave HαNat' := HαNat $$ Hα_b
   iapply Hcnt
   isplitl [HαNat']; · iexact HαNat'
   isplitl [Hj']; · iexact Hj'
-  ipure_intro; exact ⟨hn0, hnz⟩
+  ipureintro; exact ⟨hn0, hnz⟩
 
 /-- Symmetric: couple LHS unit rand with RHS rand on empty tape. -/
 theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
@@ -697,11 +697,11 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
     ∃ n : Int, 0 ≤ n ∧ n < z ∧
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
-  isplitr; · ipure_intro; rw [zero_add]
-  isplitr; · ipure_intro; exact HredL
-  isplitr; · ipure_intro; exact HredR
+  isplitr; · ipureintro; rw [zero_add]
+  isplitr; · ipureintro; exact HredL
+  isplitr; · ipureintro; exact HredR
   isplitr
-  · ipure_intro
+  · ipureintro
     rw [primStep_rand_unit Hz]
     have Hv_rand : ¬ (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α')) : Exp rT).isValue := by
       intro ⟨w⟩; nomatch w
@@ -742,13 +742,13 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
     iintro Hb
     unfold specNatTape
     iexists ([] : List _)
-    isplitr; · ipure_intro; simp
+    isplitr; · ipureintro; simp
     iexact Hb
   ihave Hα'Nat' := Hα'Nat $$ Hα'_b
   iapply Hcnt
   isplitl [Hα'Nat']; · iexact Hα'Nat'
   isplitl [Hj']; · iexact Hj'
-  ipure_intro; exact ⟨hn0, hnz⟩
+  ipureintro; exact ⟨hn0, hnz⟩
 
 end CouplingRules
 

@@ -51,12 +51,12 @@ external probabilistic semantics, obtained by combining the WP-level
 adequacy theorem `wp_adequacy_error_lim` with the parametric assumption
 to allocate a fresh non-atomic invariant pool. -/
 theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
-    (A : ∀ (_ : ApproxisRGS rT false GF), lrel rT GF)
+    (A : ∀ (_ : ApproxisRGS rT .hasNoLC GF), lrel rT GF)
     (φ : (Val rT) → (Val rT) → Prop) (e e' : Exp rT) (σ σ' : State rT)
-    (HA : ∀ (IR : ApproxisRGS rT false GF) (v v' : Val rT),
+    (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
       ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
-    (Hlog : ∀ (IR : ApproxisRGS rT false GF),
-      ⊢@{IProp GF} refines (hlc := false) (GF := GF) ⊤ e e' (A IR)) :
+    (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),
+      ⊢@{IProp GF} refines (hlc := .hasNoLC) (GF := GF) ⊤ e e' (A IR)) :
     AddCoupl 0 (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
   -- Reduce relational adequacy to the WP-level adequacy theorem.
   apply wp_adequacy_error_lim (GF := GF) e e' σ σ' 0 φ
@@ -65,7 +65,7 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   -- Allocate the non-atomic invariant pool needed to build an `ApproxisRGS`.
   imod (Iris.NonAtomicInvariant.alloc (GF := GF)) with HnaEx
   icases HnaEx with ⟨%γ, Htok⟩
-  set IR : ApproxisRGS rT false GF :=
+  set IR : ApproxisRGS rT .hasNoLC GF :=
     { approxisGS := IGS, naInvG := _, nais := γ }
   -- Specialize the parametric `refines` to this instance and unfold to a WP.
   ihave HlogR := Hlog IR
@@ -77,7 +77,7 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   -- Weaken the WP post-condition from `(A IR).car v v'` to `φ v v'`.
   iapply (wp_mono
     (Φ := fun v => iprop(∃ (v' : Val rT) (ε'' : ENNReal),
-      (⤇ Ectx.fill ([] : Ectx rT) v'.1) ∗ (naOwnP (rT := rT) (hlc := false) ⊤) ∗ (↯ ε'') ∗
+      (⤇ Ectx.fill ([] : Ectx rT) v'.1) ∗ (naOwnP (rT := rT) (hlc := .hasNoLC) ⊤) ∗ (↯ ε'') ∗
       (⌜(0 : ENNReal) < ε''⌝) ∗ (A IR).car v v')))
   case HΦ =>
     intro v
@@ -96,11 +96,11 @@ noncomputable def ApproxisFunctor (rT : Type) [ProbLangℝ rT] [Countable rT]
   | 0 => ⟨InvMapF, by infer_instance⟩
   | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
   | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
-  | 3 => ⟨AuthURF (F := ℕ+) (constOF Credit), by infer_instance⟩
+  | 3 => ⟨AuthURF (constOF Credit), by infer_instance⟩
   | 4 => ⟨constOF (SpecHeap rT), by infer_instance⟩
   | 5 => ⟨constOF SpecTapes, by infer_instance⟩
   | 6 => ⟨constOF (SpecProg rT), by infer_instance⟩
-  | 7 => ⟨constOF (Auth ℕ+ ErrorCredit), by infer_instance⟩
+  | 7 => ⟨constOF (Auth ErrorCredit), by infer_instance⟩
   | 8 => ⟨NaInvF, by infer_instance⟩
   | _ => ⟨constOF Unit, by infer_instance⟩
 

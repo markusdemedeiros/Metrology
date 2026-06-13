@@ -32,7 +32,7 @@ namespace Examples
 
 
 variable {rT : Type _} [ProbLangℝ rT]
-variable {hlc : Bool} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
 
 /-! ## The geometric sampler
 
@@ -213,7 +213,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     -- Step E: conclude `tglWp E (lit 0) geoPost` via the value rule.
     iapply (ErisWpGS.tglWp_value_of_toVal (v := ⟨.lit (.int 0), IsVal.lit⟩) rfl)
     iexists 0
-    ipure_intro
+    ipureintro
     exact ⟨rfl, _root_.le_refl _⟩
   · -- n = 1 branch: symmetric to n=0 up to step D, then recurses via `IH`.
     -- Step A: bind on the cond context.
@@ -305,7 +305,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     iapply (ErisWpGS.tglWp_value_of_toVal
       (v := ⟨.lit (.int (m + 1)), IsVal.lit⟩) rfl)
     iexists (m + 1)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, by omega⟩
 
 /-! ## Spec: `geo_nonneg`
@@ -344,7 +344,7 @@ theorem geo_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF] (σ : State rT) :
     refine this.trans (ErisWpGS.tglWp_mono (Φ := geoPost (rT := rT) (GF := GF)) ?_)
     intro v
     iintro ⟨%m, %Hm⟩
-    ipure_intro
+    ipureintro
     exact ⟨m, Hm.1, Hm.2⟩
   iintro _
   iapply hwp

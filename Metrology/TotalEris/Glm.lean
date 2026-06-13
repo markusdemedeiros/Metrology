@@ -70,7 +70,7 @@ state, a state interpretation, and an error-credit interpretation. Mirrors
 Rocq `erisWpGS`. No spec side — Eris is a unary logic.  -/
 
 class ErisWpGS (GF : BundledGFunctors) where
-  hlc : Bool
+  hlc : HasLC
   invGS : InvGS_gen hlc GF
   stateInterp : State rT → IProp GF
   errInterp : ENNReal → IProp GF
@@ -92,13 +92,13 @@ theorem execStutter_free {P : ENNReal → IProp GF} {ε : ENNReal} :
 
 theorem execStutter_spend {P : ENNReal → IProp GF} {ε : ENNReal} (hε : 1 ≤ ε) :
     ⊢ execStutter (GF := GF) P ε := by
-  iintro; ileft; ipure_intro; exact hε
+  iintro; ileft; ipureintro; exact hε
 
 theorem execStutter_mono {P Q : ENNReal → IProp GF} {ε ε' : ENNReal} (hε : ε ≤ ε') :
     ((P ε -∗ Q ε') ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε' := by
   iintro ⟨HM, HS⟩
   icases HS with ⟨%HVac | HP⟩
-  · ileft; ipure_intro; exact HVac.trans hε
+  · ileft; ipureintro; exact HVac.trans hε
   · iright; iapply HM; iexact HP
 
 theorem execStutter_mono_pred {P Q : ENNReal → IProp GF} {ε : ENNReal} :
@@ -187,15 +187,15 @@ instance glmPre_mono [Countable rT] [MeasurableSingletonClass rT] {Z : Cfg rT �
       imod HOT $$ %ε' %Hlt with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iapply Hwand; iexact HP
     · iright; ileft
       icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hred
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hred
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %ρ' HR
       ihave HC := HCont $$ %ρ' HR
       imod HC
@@ -204,17 +204,17 @@ instance glmPre_mono [Countable rT] [MeasurableSingletonClass rT] {Z : Cfg rT �
     · iright; iright
       icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
-      isplitr; · ipure_intro; exact Hαt
+      isplitr; · ipureintro; exact Hαt
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %σ' %HR
       ihave HC := HCont $$ %σ' %HR
       imod HC with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iapply Hwand; iexact HP
   mono_pred_ne.ne {_ s s'} hd := by
     have := eq_of_dist_discrete_leibniz hd; subst this; exact .of_eq rfl
@@ -229,7 +229,7 @@ instance glmPre'_mono {Z : Cfg rT → ENNReal → IProp GF} : BIMonoPred (glmPre
       imod HOT $$ %ε' %Hlt with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iapply Hwand; iexact HP
     · iright; ileft
       icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
@@ -251,7 +251,7 @@ instance glmPre'_mono {Z : Cfg rT → ENNReal → IProp GF} : BIMonoPred (glmPre
       imod HC with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iapply Hwand; iexact HP
   mono_pred_ne.ne {_ s s'} hd := by
     have := eq_of_dist_discrete_leibniz hd; subst this; exact .of_eq rfl
@@ -314,7 +314,7 @@ theorem glm_strong_mono [Countable rT] [MeasurableSingletonClass rT]
     -- Discharge: `□ (∀ y, glmPre Z₁ Ψ y -∗ Ψ y)`.
     iintro !> %s HF
     iintro Hwand
-    iapply least_fixpoint_unfold_2 (glmPre Z₂)
+    iapply least_fixpoint_unfold_mpr (glmPre Z₂)
     rcases s with ⟨ρ, ε⟩
     icases HF with ⟨HOT | HPS | HSS⟩
     · ileft
@@ -322,38 +322,38 @@ theorem glm_strong_mono [Countable rT] [MeasurableSingletonClass rT]
       imod HOT $$ %ε' %Hlt with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright
         iapply HP; iexact Hwand
     · iright; ileft
       icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hred
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hred
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %ρ' HR
       ihave HC := HCont $$ %ρ' HR
       imod HC with HS
       imodintro
       icases HS with ⟨%HVac | HC1⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright
         iapply Hwand; iexact HC1
     · iright; iright
       icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
-      isplitr; · ipure_intro; exact Hαt
+      isplitr; · ipureintro; exact Hαt
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %σ' %HR
       ihave HC := HCont $$ %σ' %HR
       imod HC with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright
         iapply HP; iexact Hwand
   iapply HΨ; iexact HZ
@@ -378,7 +378,7 @@ theorem glm'_strong_mono
     -- Discharge: `□ (∀ y, glmPre Z₁ Ψ y -∗ Ψ y)`.
     iintro !> %s HF
     iintro Hwand
-    iapply least_fixpoint_unfold_2 (glmPre' Z₂)
+    iapply least_fixpoint_unfold_mpr (glmPre' Z₂)
     rcases s with ⟨ρ, ε⟩
     icases HF with ⟨HOT | HPS | HSS⟩
     · ileft
@@ -386,38 +386,38 @@ theorem glm'_strong_mono
       imod HOT $$ %ε' %Hlt with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright
         iapply HP; iexact Hwand
     · iright; ileft
       icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hred
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hred
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %ρ' HR
       ihave HC := HCont $$ %ρ' HR
       imod HC with HS
       imodintro
       icases HS with ⟨%HVac | HC1⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright
         iapply Hwand; iexact HC1
     · iright; iright
       icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
-      isplitr; · ipure_intro; exact Hαt
+      isplitr; · ipureintro; exact Hαt
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %σ' %HR
       ihave HC := HCont $$ %σ' %HR
       imod HC with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright
         iapply HP; iexact Hwand
   iapply HΨ; iexact HZ
@@ -438,19 +438,19 @@ theorem glm_mono_grading [Countable rT] [MeasurableSingletonClass rT]
   · iright; ileft
     icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hred
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact _root_.le_trans Hexp Hε
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hred
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact _root_.le_trans Hexp Hε
+    isplitr; · ipureintro; exact Hpgl
     iexact HCont
   · iright; iright
     icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists α, t
-    isplitr; · ipure_intro; exact Hαt
+    isplitr; · ipureintro; exact Hαt
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact _root_.le_trans Hexp Hε
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact _root_.le_trans Hexp Hε
+    isplitr; · ipureintro; exact Hpgl
     iexact HCont
 
 theorem glm'_mono_grading
@@ -468,19 +468,19 @@ theorem glm'_mono_grading
   · iright; ileft
     icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hred
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact _root_.le_trans Hexp Hε
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hred
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact _root_.le_trans Hexp Hε
+    isplitr; · ipureintro; exact Hpgl
     iexact HCont
   · iright; iright
     icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists α, t
-    isplitr; · ipure_intro; exact Hαt
+    isplitr; · ipureintro; exact Hαt
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact _root_.le_trans Hexp Hε
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact _root_.le_trans Hexp Hε
+    isplitr; · ipureintro; exact Hpgl
     iexact HCont
 
 @[discrete] -- glm'_strong_mono_grading
@@ -524,25 +524,25 @@ theorem glm_mono_pred [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} 
   · iright; ileft
     icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hred
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact Hexp
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hred
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact Hexp
+    isplitr; · ipureintro; exact Hpgl
     iintro %ρ' HR
     ihave HC := HCont $$ %ρ' HR
     imod HC
     imodintro
     icases HC with ⟨%HVac | HC1⟩
-    · ileft; ipure_intro; exact HVac
+    · ileft; ipureintro; exact HVac
     · iright; iapply HZ; iexact HC1
   · iright; iright
     icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists α, t
-    isplitr; · ipure_intro; exact Hαt
+    isplitr; · ipureintro; exact Hαt
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact Hexp
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact Hexp
+    isplitr; · ipureintro; exact Hpgl
     iintro %σ' %HR
     ihave HC := HCont $$ %σ' %HR
     imod HC
@@ -569,25 +569,25 @@ theorem glm'_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
   · iright; ileft
     icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hred
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact Hexp
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hred
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact Hexp
+    isplitr; · ipureintro; exact Hpgl
     iintro %ρ' HR
     ihave HC := HCont $$ %ρ' HR
     imod HC
     imodintro
     icases HC with ⟨%HVac | HC1⟩
-    · ileft; ipure_intro; exact HVac
+    · ileft; ipureintro; exact HVac
     · iright; iapply HZ; iexact HC1
   · iright; iright
     icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists α, t
-    isplitr; · ipure_intro; exact Hαt
+    isplitr; · ipureintro; exact Hαt
     iexists R, ε₁, X₂, r
-    isplitr; · ipure_intro; exact Hbnd
-    isplitr; · ipure_intro; exact Hexp
-    isplitr; · ipure_intro; exact Hpgl
+    isplitr; · ipureintro; exact Hbnd
+    isplitr; · ipureintro; exact Hexp
+    isplitr; · ipureintro; exact Hpgl
     iintro %σ' %HR
     ihave HC := HCont $$ %σ' %HR
     imod HC
@@ -614,7 +614,7 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
     swap; · iexact HG
     iintro !> %s HF
     rcases s with ⟨ρ, ε'⟩
-    iapply least_fixpoint_unfold_2 (glmPre Z)
+    iapply least_fixpoint_unfold_mpr (glmPre Z)
     icases HF with ⟨HOT | HPS | HSS⟩
     · -- OT branch.
       ileft
@@ -622,7 +622,7 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
       imod HOT $$ %ε'' %Hlt with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iexact HP
     · -- prim_step branch.
       iright; ileft
@@ -631,15 +631,15 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
         (fun ρ' => (Kinv ρ'.expr).elim 0 (fun e' => X₂ ⟨e', ρ'.state⟩)),
         r
       have Hsv : ¬ ρ.expr.isValue := Discrete.val_stuck Hred.choose_spec
-      isplitr; · ipure_intro; exact Hred.fill K
+      isplitr; · ipureintro; exact Hred.fill K
       isplitr
-      · ipure_intro
+      · ipureintro
         intro ρ'
         cases h : Kinv ρ'.expr with
         | none => simp [h, Option.elim]
         | some e' => simp [h, Option.elim]; exact Hbnd ⟨e', ρ'.state⟩
       isplitr
-      · ipure_intro
+      · ipureintro
         show ε₁ + (∫⁻ a, (Kinv a.expr).elim 0 (fun e' => X₂ ⟨e', a.state⟩) ∂
                    primStep ⟨K.fill ρ.expr, ρ.state⟩) ≤ ε'
         rw [primStep_fill Hsv]
@@ -652,7 +652,7 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
         show (Kinv (K.fillCfg a).expr).elim 0 (fun e' => X₂ ⟨e', (K.fillCfg a).state⟩) = X₂ a
         simp only [Ectx.fillCfg, Kinv_left, Option.elim]
       isplitr
-      · ipure_intro
+      · ipureintro
         show primStep ⟨K.fill ρ.expr, ρ.state⟩ {x | ¬ ∃ ρ'', x = K.fillCfg ρ'' ∧ R ρ''} ≤ ε₁
         rw [primStep_fill Hsv]
         rw [MeasureTheory.Measure.map_apply Measurable.of_discrete .of_discrete]
@@ -674,7 +674,7 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
       -- Reduce `(Kinv (K.fillCfg ρ'').expr).elim ...` to `X₂ ρ''`.
       simp only [Ectx.fillCfg, Kinv_left, Option.elim]
       icases HS with ⟨%HVac | HC1⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iexact HC1
     · -- state_step branch. K does not affect the state; the same
       -- `α, t, R, X₂, ε₁` data transports directly. The continuation
@@ -683,11 +683,11 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
       iright; iright
       icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
-      isplitr; · ipure_intro; exact Hαt
+      isplitr; · ipureintro; exact Hαt
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %σ' %HR
       ihave HC := HCont $$ %σ' %HR
       imod HC
@@ -717,14 +717,14 @@ theorem glm'_bind
     swap; · iexact HG
     iintro !> %s HF
     rcases s with ⟨ρ, ε'⟩
-    iapply least_fixpoint_unfold_2 (glmPre' Z)
+    iapply least_fixpoint_unfold_mpr (glmPre' Z)
     icases HF with ⟨HOT | HPS | HSS⟩
     · ileft
       iintro %ε'' %Hlt
       imod HOT $$ %ε'' %Hlt with HS
       imodintro
       icases HS with ⟨%HVac | HP⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iexact HP
     · iright; ileft
       icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
@@ -732,15 +732,15 @@ theorem glm'_bind
         (fun ρ' => (Kinv ρ'.expr).elim 0 (fun e' => X₂ ⟨e', ρ'.state⟩)),
         r
       have Hsv : ¬ ρ.expr.isValue := val_stuck Hred
-      isplitr; · ipure_intro; exact Hred.fill K
+      isplitr; · ipureintro; exact Hred.fill K
       isplitr
-      · ipure_intro
+      · ipureintro
         intro ρ'
         cases h : Kinv ρ'.expr with
         | none => simp [h, Option.elim]
         | some e' => simp [h, Option.elim]; exact Hbnd ⟨e', ρ'.state⟩
       isplitr
-      · ipure_intro
+      · ipureintro
         show ε₁ + (∫⁻ a, (Kinv a.expr).elim 0 (fun e' => X₂ ⟨e', a.state⟩) ∂ primStep ⟨K.fill ρ.expr, ρ.state⟩) ≤ ε'
         rw [primStep_fill Hsv]
         rw [MeasureTheory.lintegral_map ?G1 ?G2]
@@ -752,7 +752,7 @@ theorem glm'_bind
         show (Kinv (K.fillCfg a).expr).elim 0 (fun e' => X₂ ⟨e', (K.fillCfg a).state⟩) = X₂ a
         simp only [Ectx.fillCfg, Kinv_left, Option.elim]
       isplitr
-      · ipure_intro
+      · ipureintro
         show primStep ⟨K.fill ρ.expr, ρ.state⟩ {x | ¬ ∃ ρ'', x = K.fillCfg ρ'' ∧ R ρ''} ≤ ε₁
         rw [primStep_fill Hsv]
         rw [MeasureTheory.Measure.map_apply ?G1 ?G2]
@@ -775,16 +775,16 @@ theorem glm'_bind
       imodintro
       simp only [Ectx.fillCfg, Kinv_left, Option.elim]
       icases HS with ⟨%HVac | HC1⟩
-      · ileft; ipure_intro; exact HVac
+      · ileft; ipureintro; exact HVac
       · iright; iexact HC1
     · iright; iright
       icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
-      isplitr; · ipure_intro; exact Hαt
+      isplitr; · ipureintro; exact Hαt
       iexists R, ε₁, X₂, r
-      isplitr; · ipure_intro; exact Hbnd
-      isplitr; · ipure_intro; exact Hexp
-      isplitr; · ipure_intro; exact Hpgl
+      isplitr; · ipureintro; exact Hbnd
+      isplitr; · ipureintro; exact Hexp
+      isplitr; · ipureintro; exact Hpgl
       iintro %σ' %HR
       ihave HC := HCont $$ %σ' %HR
       imod HC
@@ -810,7 +810,7 @@ theorem glm_prim_step [Countable rT] [MeasurableSingletonClass rT]
         glm e σ ε Z := by
   iintro HPS
   unfold glm
-  iapply least_fixpoint_unfold_2 (glmPre Z)
+  iapply least_fixpoint_unfold_mpr (glmPre Z)
   iright; ileft
   iexact HPS
 
@@ -826,7 +826,7 @@ theorem glm'_prim_step
         glm' e σ ε Z := by
   iintro HPS
   unfold glm'
-  iapply least_fixpoint_unfold_2 (glmPre' Z)
+  iapply least_fixpoint_unfold_mpr (glmPre' Z)
   iright; ileft
   iexact HPS
 
@@ -845,7 +845,7 @@ theorem glm_state_step [Countable rT] [MeasurableSingletonClass rT]
           glm e σ ε Z := by
   iintro HSS
   unfold glm
-  iapply least_fixpoint_unfold_2 (glmPre Z)
+  iapply least_fixpoint_unfold_mpr (glmPre Z)
   iright; iright
   iexact HSS
 
@@ -861,7 +861,7 @@ theorem glm'_state_step  {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT
           glm' e σ ε Z := by
   iintro HSS
   unfold glm'
-  iapply least_fixpoint_unfold_2 (glmPre' Z)
+  iapply least_fixpoint_unfold_mpr (glmPre' Z)
   iright; iright
   iexact HSS
 
@@ -873,7 +873,7 @@ theorem glm_credit_bump [Countable rT] [MeasurableSingletonClass rT]
         glm e σ ε Z := by
   iintro HOT
   unfold glm
-  iapply least_fixpoint_unfold_2 (glmPre Z)
+  iapply least_fixpoint_unfold_mpr (glmPre Z)
   ileft
   iexact HOT
 
@@ -885,7 +885,7 @@ theorem glm'_credit_bump
         glm' e σ ε Z := by
   iintro HOT
   unfold glm'
-  iapply least_fixpoint_unfold_2 (glmPre' Z)
+  iapply least_fixpoint_unfold_mpr (glmPre' Z)
   ileft
   iexact HOT
 

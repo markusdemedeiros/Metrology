@@ -135,7 +135,7 @@ public import Iris.Algebra.HeapView
 --   validN_ne := (· ▸ ·)
 --   valid_iff_validN := ⟨fun H _ => H, fun H => H 0⟩
 --   validN_succ := (·)
---   validN_op_left := (le_of_add_le_of_nonneg_left · <| zero_le _)
+--   validN_op_left := (le_of_add_le_of_nonneg_left · <| zero_le)
 --   assoc := by simp [add_assoc]
 --   comm := by simp [add_comm]
 --   pcore_op_left := by simp
@@ -355,7 +355,7 @@ public import Iris.Algebra.HeapView
 --       have H : μ₃ (S₁ ∪ (S₁ ∪ S₃)ᶜ) ≤ μ₃ S₁ + μ₃ ((S₁ ∪ S₃)ᶜ) := measure_union_le _ _
 --       rw [Hsing, H2] at H
 --       simp only [add_zero] at H
---       exact _root_.le_antisymm H (zero_le _)
+--       exact _root_.le_antisymm H (zero_le)
 --     exists (.ok S₃ H₃ (μ₃) Hzero')
 --     simp [CMRA.op]
 --     simp only [HS₁S₃, ↓reduceIte]
@@ -492,7 +492,7 @@ public import Iris.Algebra.HeapView
 -- -- #synth CMRA (View ℕ+ (MeasureViewRel T) )
 --
 -- class WpMarkov (GF : BundledGFunctors) (T : Type _) [MeasurableSpace T] where
---   ec : ElemG GF (constOF (Auth ℕ+ ENNReal))
+--   ec : ElemG GF (constOF (Auth ENNReal))
 --   ec_γ : GName
 --   state : ElemG GF (constOF (View ℕ+ (MeasureViewRel T)))
 --   state_γ : GName
@@ -624,7 +624,7 @@ public import Iris.Algebra.HeapView
 --   iapply wp_unfold
 --   ileft
 --   isplitr
---   · ipure_intro; trivial
+--   · ipureintro; trivial
 --   · iexact HΦ
 --
 -- -- This is the rule I want to support, in some form or another.

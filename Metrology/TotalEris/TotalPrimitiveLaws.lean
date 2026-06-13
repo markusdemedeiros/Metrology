@@ -48,7 +48,7 @@ namespace TotalEris
 
 section Lifting
 
-variable {hlc : Bool} {GF : BundledGFunctors} [ProbLangℝ rT] [Countable rT] [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ProbLangℝ rT] [Countable rT] [ErisGS rT hlc GF]
 
 /-! ## Heap operations -/
 
@@ -63,7 +63,7 @@ theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.AllocS (Exp.toVal?_ofVal v) rfl rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
@@ -92,7 +92,7 @@ theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} 
   ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.LoadS hlook rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
@@ -118,7 +118,7 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
   ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.StoreS (Exp.toVal?_ofVal v)
       (by rw [hlook]; exact Option.isSome_some) rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
@@ -149,7 +149,7 @@ theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
@@ -180,7 +180,7 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
     rw [Discrete.headStep_support_iff]
     exact .RandNoTapeS Hz (_root_.le_refl _) Hz
@@ -192,7 +192,7 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
     simp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
     isplitl [Hσ]; · iexact Hσ
     iapply HΦ
-    ipure_intro
+    ipureintro
     exact ⟨Hv0, Hvz⟩
   | RandNonposS hnz => exact absurd Hz hnz
 
@@ -213,7 +213,7 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int}
   have Hzpos : 0 < z := _root_.lt_of_le_of_lt n.2.1 n.2.2
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.RandTapeS hlook rfl rfl rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro %e₂ %σ₂ %Hstep
@@ -253,7 +253,7 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
     rw [Discrete.headStep_support_iff]
     exact .RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl
@@ -268,7 +268,7 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
     simp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
     isplitl [Hσ]; · iexact Hσ
     iapply HΦ $$ Hl
-    ipure_intro; exact ⟨Hv0, Hvz⟩
+    ipureintro; exact ⟨Hv0, Hvz⟩
   | RandTapeOtherS _ hlook' hne _ _ _ =>
     rw [hlook] at hlook'; cases hlook'; exact absurd rfl hne
   | RandTapeNonposEmptyS hnz _ _ => exact absurd Hz hnz

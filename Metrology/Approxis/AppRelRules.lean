@@ -21,7 +21,7 @@ namespace ProbLang
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 
 section AppRelRules
-variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ## Forward reductions on the LHS -/
 
@@ -188,7 +188,7 @@ theorem refines_wp_l {E : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel rT GF}
     iintro ⟨⟨HK', Hna', Herr', %Hpos'⟩, HRefv⟩
     ihave HRefv' := refines_unfold $$ HRefv
     iapply HRefv' $$ %K' %ε HK' Hna' Herr'
-    ipure_intro; exact Hpos'
+    ipureintro; exact Hpos'
   iexact HFrame
 
 /-- `refines_atomic_l` (app_rel_rules.v:54): atomic step on the LHS, opening the
@@ -248,7 +248,7 @@ theorem refines_atomic_l {E E' : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel
     imodintro
     ihave HRef' := refines_unfold $$ HRef
     iapply HRef' $$ %K' %ε HKt' Hna' Herr'
-    ipure_intro; exact Hpos'
+    ipureintro; exact Hpos'
   iexact HFrame
 
 /-! ## Stateful reductions on the LHS -/
@@ -407,7 +407,7 @@ theorem refines_randU_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A : l
   iapply (wp_rand Hz)
   iintro %n %Hbnds
   iapply Hlog $$ %n
-  ipure_intro; exact Hbnds
+  ipureintro; exact Hbnds
 
 /-- `refines_randT_l`: LHS tape-rand pop. Consumes the head `n` of tape `α`. -/
 theorem refines_randT_l {E : CoPset} {K : Ectx rT} {l : Loc} {z n : Int}
@@ -422,7 +422,7 @@ theorem refines_randT_l {E : CoPset} {K : Ectx rT} {l : Loc} {z n : Int}
   isplitl [Hl]; · iexact Hl
   iintro Hl' %Hbnds
   iapply Hlog $$ Hl'
-  ipure_intro; exact Hbnds
+  ipureintro; exact Hbnds
 
 /-- `refines_randT_empty_l`: LHS rand on an empty tape — uniform sample, tape stays empty. -/
 theorem refines_randT_empty_l {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
@@ -437,7 +437,7 @@ theorem refines_randT_empty_l {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
   isplitl [Hl]; · iexact Hl
   iintro %n Hl' %Hbnds
   iapply Hlog $$ %n Hl'
-  ipure_intro; exact Hbnds
+  ipureintro; exact Hbnds
 
 /-- `refines_randU_r`: RHS unit-rand step. -/
 theorem refines_randU_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : lrel rT GF}
@@ -461,7 +461,7 @@ theorem refines_randU_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : l
   · rw [← hfcN]; iexact HKRes
   ispecialize Hlog $$ %n
   ihave Hpure : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
-  · ipure_intro; exact Hbnds
+  · ipureintro; exact Hbnds
   ispecialize Hlog $$ Hpure
   ispecialize Hlog $$ %K' %ε
   ispecialize Hlog $$ HKRes'
@@ -511,11 +511,11 @@ theorem refines_randT_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
     ihave HαResNat : iprop(specNatTape l z ns) $$ [HαResNew]
     · unfold specNatTape
       iexists ws
-      isplitr; · ipure_intro; exact hwsm
+      isplitr; · ipureintro; exact hwsm
       iexact HαResNew
     ispecialize Hlog $$ HαResNat
     ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
-    · ipure_intro; exact ⟨hw_eq ▸ w.2.1, hw_eq ▸ w.2.2⟩
+    · ipureintro; exact ⟨hw_eq ▸ w.2.1, hw_eq ▸ w.2.2⟩
     ispecialize Hlog $$ Hbnds
     ispecialize Hlog $$ %K' %ε
     ispecialize Hlog $$ HKRes'
@@ -548,7 +548,7 @@ theorem refines_randT_empty_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
   · rw [← hfcN]; iexact HKRes
   ispecialize Hlog $$ %n HαNew
   ihave Hbpure : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
-  · ipure_intro; exact Hbnds
+  · ipureintro; exact Hbnds
   ispecialize Hlog $$ Hbpure
   ispecialize Hlog $$ %K' %ε
   ispecialize Hlog $$ HKRes'
@@ -630,7 +630,7 @@ theorem refines_arrow_val {v v' : Val rT} {A A' : lrel rT GF}
   imodintro
   unfold lrel_arr
   isplitr
-  · ipure_intro; exact hv
+  · ipureintro; exact hv
   iintro !> %w1 %w2 HA
   iapply H $$ %w1 %w2 HA
 
@@ -673,9 +673,9 @@ theorem refines_get_ec {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} :
   have hpos2 : (0 : ENNReal) < ε / 2 :=
     ENNReal.div_pos_iff.mpr ⟨ne_of_gt HposTot, by simp⟩
   ihave Hpos2I : iprop(⌜(0 : ENNReal) < ε / 2⌝) $$ []
-  · ipure_intro; exact hpos2
+  · ipureintro; exact hpos2
   ihave Hpos2I' : iprop(⌜(0 : ENNReal) < ε / 2⌝) $$ []
-  · ipure_intro; exact hpos2
+  · ipureintro; exact hpos2
   ihave HrefFolded := Hcnt $$ %(ε / 2) Herr1 Hpos2I
   iapply HrefFolded $$ %K %(ε / 2) Hj Hna Herr2 Hpos2I'
 
@@ -756,7 +756,7 @@ theorem refines_couple_TU {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n HαNew
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
-  · ipure_intro; exact Hn
+  · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
   have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
       Exp.lit (.int n) := rfl
@@ -797,7 +797,7 @@ theorem refines_couple_UT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n Hα'New
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
-  · ipure_intro; exact Hn
+  · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
   have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
       Exp.lit (.int n) := rfl
@@ -839,7 +839,7 @@ theorem refines_couple_TT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n HαNew Hα'New
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
-  · ipure_intro; exact Hn
+  · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
   have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
       Exp.lit (.int n) := rfl

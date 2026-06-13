@@ -26,7 +26,7 @@ namespace ProbLang
 
 section Compatibility
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-- Helper: unfold `lrel_arr` application. Proves that `(lrel_arr A B).car v v'`
 is definitionally `⌜v.closed ∧ v'.closed⌝ ∗ □ (∀ w w', A w w' -∗ REL (v w) << (v' w') : B)`,
@@ -54,7 +54,7 @@ theorem lrel_arr_unfold_closed (A B : lrel rT GF) (v v' : Val rT) :
   iintro H
   ihave H' := lrel_arr_unfold A B v v' $$ H
   icases H' with ⟨%hc, _⟩
-  ipure_intro; exact hc
+  ipureintro; exact hc
 
 theorem lrel_arr_fold (A B : lrel rT GF) (v v' : Val rT) :
     iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
@@ -91,8 +91,8 @@ theorem refines_pair {e1 e2 e1' e2' : Exp rT} {A B : lrel rT GF} :
   imodintro
   unfold lrel_prod
   iexists v1, v1', v2, v2'
-  isplitr; · ipure_intro; rfl
-  isplitr; · ipure_intro; rfl
+  isplitr; · ipureintro; rfl
+  isplitr; · ipureintro; rfl
   isplitl [HA]; · iexact HA
   iexact HB
 
@@ -115,8 +115,8 @@ theorem refines_injl {e e' : Exp rT} {A B : lrel rT GF} :
   unfold lrel_sum
   iexists v, v'
   iapply BI.or_intro_l
-  isplitr; · ipure_intro; rfl
-  isplitr; · ipure_intro; rfl
+  isplitr; · ipureintro; rfl
+  isplitr; · ipureintro; rfl
   iexact HA
 
 /-- `refines_injr` (compatibility.v:41): right-injection compatibility. -/
@@ -138,8 +138,8 @@ theorem refines_injr {e e' : Exp rT} {A B : lrel rT GF} :
   unfold lrel_sum
   iexists v, v'
   iapply BI.or_intro_r
-  isplitr; · ipure_intro; rfl
-  isplitr; · ipure_intro; rfl
+  isplitr; · ipureintro; rfl
+  isplitr; · ipureintro; rfl
   iexact HB
 
 /-- `refines_app` (compatibility.v:51): function application compatibility. -/
@@ -419,7 +419,7 @@ theorem refines_alloctape {e e' : Exp rT} :
   iintro %σ₁ Hσ
   imodintro
   isplitr
-  · ipure_intro
+  · ipureintro
     exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
       |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
   iintro !> %e₂ %σ₂ %Hstep
@@ -455,8 +455,8 @@ theorem refines_alloctape {e e' : Exp rT} :
     isplitl [Hpos]; · iexact Hpos
     unfold lrel_tape
     iexists lL, l', n
-    isplitr; · ipure_intro; rfl
-    isplitr; · ipure_intro; rfl
+    isplitr; · ipureintro; rfl
+    isplitr; · ipureintro; rfl
     iexact HInv
 
 /-- `refines_alloc`: alloc compatibility. After binding `e/e'` to value pair
@@ -497,8 +497,8 @@ theorem refines_alloc {e e' : Exp rT} {A : lrel rT GF} :
   imodintro
   unfold lrel_ref
   iexists l, l'
-  isplitr; · ipure_intro; rfl
-  isplitr; · ipure_intro; rfl
+  isplitr; · ipureintro; rfl
+  isplitr; · ipureintro; rfl
   iexact HInv
 
 /-- `refines_if`: if-then-else compatibility. -/
@@ -608,7 +608,7 @@ theorem refines_pack (A : lrel rT GF) {e e' : Exp rT} {C : lrel rT GF → lrel r
   · iapply (hCclosed v v'); iexact HCA
   iapply lrel_exists_unfold
   isplitr
-  · ipure_intro; exact Hcl
+  · ipureintro; exact Hcl
   iexists A
   iexact HCA
 
@@ -633,7 +633,7 @@ theorem refines_forall {e e' : Exp rT} {C : lrel rT GF → lrel rT GF}
   iintro %A
   unfold lrel_arr
   isplitr
-  · ipure_intro
+  · ipureintro
     refine ⟨⟨?_, ?_⟩, ⟨?_, ?_⟩⟩
     · exact Exp.IsLocallyClosed.lam ∅ e (fun y _ => by
         show (e.open' (Exp.fvar y)).IsLocallyClosed
@@ -781,7 +781,7 @@ theorem refines_store {e1 e2 e1' e2' : Exp rT} {A : lrel rT GF} :
     (hv1 := rfl) (hv2 := rfl))
   imodintro
   unfold lrel_unit
-  ipure_intro
+  ipureintro
   exact ⟨rfl, rfl⟩
 
 /-- `refines_load` (compatibility.v:118): dereference compatibility.
@@ -966,7 +966,7 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     unfold lrel_nat
     obtain ⟨Hn0, Hnm⟩ := Hnr
     iexists n.toNat
-    ipure_intro
+    ipureintro
     have hk : (n.toNat : Int) = n := Int.toNat_of_nonneg Hn0
     refine ⟨?_, ?_⟩ <;> rw [hk]
     · rfl
@@ -1003,7 +1003,7 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     unfold lrel_nat
     obtain ⟨Hn0, Hnm⟩ := Hnr
     iexists n.toNat
-    ipure_intro
+    ipureintro
     have hk : (n.toNat : Int) = n := Int.toNat_of_nonneg Hn0
     refine ⟨?_, ?_⟩ <;> rw [hk]
     · rfl
@@ -1058,7 +1058,7 @@ theorem refines_rand_unit {e e' : Exp rT} :
     imodintro
     unfold lrel_nat
     iexists m.toNat
-    ipure_intro
+    ipureintro
     have hk : (m.toNat : Int) = m := Int.toNat_of_nonneg Hm0
     refine ⟨?_, ?_⟩ <;> rw [hk]
 
@@ -1147,7 +1147,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       imodintro
       unfold lrel_int
       iexists m
-      ipure_intro
+      ipureintro
       exact ⟨rfl, rfl⟩
     · iapply (wp_couple_rand_lbl_rand_lbl_wrong n N id
         (hdom := fun _ h0 hlt => ⟨h0, hlt⟩)
@@ -1180,7 +1180,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       imodintro
       unfold lrel_int
       iexists m
-      ipure_intro
+      ipureintro
       exact ⟨rfl, rfl⟩
   · -- Nonpositive bound: open invariant, both sides step deterministically to -1.
     have hfill_empty : (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT) =
@@ -1223,7 +1223,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
     imodintro
     unfold lrel_int
     iexists (-1)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
 
 /-- `refines_rand_unit_int`: int-flavored unit-rand compatibility. Takes the
@@ -1269,7 +1269,7 @@ theorem refines_rand_unit_int {e e' : Exp rT} :
     imodintro
     unfold lrel_int
     iexists m
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
   · unfold refines
     iintro %K %ε HK Hna Herr Hpos
@@ -1285,7 +1285,7 @@ theorem refines_rand_unit_int {e e' : Exp rT} :
     isplitl [Hpos]; · iexact Hpos
     unfold lrel_int
     iexists (-1)
-    ipure_intro
+    ipureintro
     exact ⟨rfl, rfl⟩
 
 end Compatibility

@@ -15,7 +15,7 @@ open Iris Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 namespace OTP
 
-variable {hlc : Bool} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS hlc GF]
 
 /-! ### The bijection -/
 
@@ -109,7 +109,7 @@ theorem otp_refines (m N : Int) (HN : 0 < N) :
   imodintro
   unfold lrel_int
   iexists (addMod m N n)
-  ipure_intro
+  ipureintro
   exact ⟨rfl, rfl⟩
 
 /-! ### Reverse direction -/
@@ -166,7 +166,7 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
   imodintro
   unfold lrel_int
   iexists n
-  ipure_intro
+  ipureintro
   exact ⟨rfl, rfl⟩
 
 /-! ## Adequacy: exit the logic
@@ -184,7 +184,7 @@ theorem lrel_int_to_otpφ {GF : BundledGFunctors} (v v' : Val) :
     ⊢@{IProp GF} iprop((lrel_int (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝) := by
   iintro Hint
   ihave ⟨%n, %hv, %hv'⟩ := lrel_int_unfold v v' $$ Hint
-  ipure_intro
+  ipureintro
   exact ⟨n, hv, hv'⟩
 
 /-- **Semantic OTP guarantee (forward)**: the encrypted-message distribution
@@ -199,7 +199,7 @@ theorem otp_adequate
   ProbLang.refines_coupling (A := fun _ => lrel_int) (φ := otpφ)
     (otp_enc m N) (otp_ideal N) σ σ'
     (fun _ v v' => lrel_int_to_otpφ v v')
-    (fun IR => otp_refines (hlc := false) (GF := GF) (IR := IR) m N HN)
+    (fun IR => otp_refines (hlc := .hasNoLC) (GF := GF) (IR := IR) m N HN)
 
 /-- **Semantic OTP guarantee (reverse)**: the uniform-sample distribution and
 the encrypted-message distribution are coupled by value-equality with zero
@@ -213,7 +213,7 @@ theorem otp_adequate_rev
   ProbLang.refines_coupling (A := fun _ => lrel_int) (φ := otpφ)
     (otp_ideal N) (otp_enc m N) σ σ'
     (fun _ v v' => lrel_int_to_otpφ v v')
-    (fun IR => otp_refines_rev (hlc := false) (GF := GF) (IR := IR) m N HN)
+    (fun IR => otp_refines_rev (hlc := .hasNoLC) (GF := GF) (IR := IR) m N HN)
 
 /-! ## Final closed statement: instantiated at the concrete model
 

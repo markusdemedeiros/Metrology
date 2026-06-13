@@ -22,7 +22,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 
 section Soundness
 variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Recursive predicate: K's binder atoms are pairwise distinct AND each is
 fresh in Γrc.dom (and accumulated dom from outer binders). Used to close the
@@ -564,11 +564,11 @@ def boolEqVal (v v' : Val rT) : Prop :=
 
 omit [RefinesPreGS rT GF] in
 /-- `lrel_bool` extracts purely to `boolEqVal`. -/
-theorem lrel_bool_to_boolEqVal [ApproxisRGS rT false GF] (v v' : Val rT) :
+theorem lrel_bool_to_boolEqVal [ApproxisRGS rT .hasNoLC GF] (v v' : Val rT) :
     ⊢@{IProp GF} iprop((lrel_bool (GF := GF)).car v v' -∗ ⌜boolEqVal v v'⌝) := by
   iintro Hbool
   ihave ⟨%b, %h⟩ := lrel_bool_unfold v v' $$ Hbool
-  ipure_intro
+  ipureintro
   exact ⟨b, h.1, h.2⟩
 
 /-- Set-level monotonicity from `AddCoupl 0`: if `S(a, b) → a ∈ T → b ∈ T'`, then
@@ -620,9 +620,9 @@ in `e.fv ∪ e'.fv ∪ payloadFv K`. -/
 theorem refines_sound_open_fresh
     (Γtc : Tctx) (e e' : Exp rT) (τ : Ty)
     (Hty_e : Typed Γtc e τ) (Hty_e' : Typed Γtc e' τ)
-    (Hlog : ∀ (_IR : ApproxisRGS rT false GF) (Δ : TyEnv rT GF) (Γrc : RelCtx rT GF),
+    (Hlog : ∀ (_IR : ApproxisRGS rT .hasNoLC GF) (Δ : TyEnv rT GF) (Γrc : RelCtx rT GF),
       TctxRelated Δ Γtc Γrc →
-      ⊢@{IProp GF} bin_log_related_ty (hlc := false) (GF := GF)
+      ⊢@{IProp GF} bin_log_related_ty (hlc := .hasNoLC) (GF := GF)
         (⊤ : CoPset) Δ Γrc e e' τ) :
     ∀ (K : Ctx rT) (σ₀ : State rT) (b : Bool),
       TypedCtx K Γtc τ Tctx.empty .bool →
@@ -679,8 +679,8 @@ theorem refines_sound_open_fresh
 /-- **Soundness of the logical relation (closed case), restricted to fresh contexts.** -/
 theorem refines_sound_fresh (e e' : Exp rT) (τ : Ty)
     (Hty_e : Typed Tctx.empty e τ) (Hty_e' : Typed Tctx.empty e' τ)
-    (Hlog : ∀ (_IR : ApproxisRGS rT false GF) (Δ : TyEnv rT GF),
-      ⊢@{IProp GF} refines (hlc := false) (GF := GF)
+    (Hlog : ∀ (_IR : ApproxisRGS rT .hasNoLC GF) (Δ : TyEnv rT GF),
+      ⊢@{IProp GF} refines (hlc := .hasNoLC) (GF := GF)
         (⊤ : CoPset) e e' (interp τ Δ)) :
     ∀ (K : Ctx rT) (σ₀ : State rT) (b : Bool),
       TypedCtx K Tctx.empty τ Tctx.empty .bool →

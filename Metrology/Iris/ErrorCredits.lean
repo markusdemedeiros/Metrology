@@ -31,7 +31,7 @@ instance : CMRA ErrorCredit where
   validN_ne {_ _ _} := by rintro ⟨rfl⟩; exact id
   valid_iff_validN := .symm <| forall_const Nat
   validN_succ := (·)
-  validN_op_left {n x y} H := lt_of_add_lt_of_nonneg_left H (zero_le y)
+  validN_op_left {n x y} H := lt_of_add_lt_of_nonneg_left H (zero_le)
   assoc {_ _ _} := (add_assoc ..).symm
   comm {_ _} := (add_comm ..).symm
   pcore_op_left {_ _} := by rintro ⟨rfl⟩; simp [OFE.Equiv]
@@ -79,13 +79,13 @@ theorem ErrorCredit.localUpdate {ε₁ ε₂ ε₁' ε₂' : ErrorCredit} (h1 : 
     rw [add_comm]
     exact (add_le_add_left h1 ε)
 
-instance : Iris.IsUnit (◯ 0 : Auth ℕ+ ErrorCredit) where
+instance : Iris.IsUnit (◯ 0 : Auth ErrorCredit) where
   unit_valid := Auth.frag_valid.mpr (by simp [CMRA.Valid])
   unit_left_id := by simp [CMRA.op]
   pcore_unit := .rfl
 
 class ECPreGS (GF : BundledGFunctors) where
-  ec : ElemG GF (constOF (Auth ℕ+ ErrorCredit))
+  ec : ElemG GF (constOF (Auth ErrorCredit))
 
 attribute [reducible, instance] ECPreGS.ec
 
@@ -101,8 +101,8 @@ def ec (ε : ℝ≥0∞) : IProp GF := iOwn (E := IEC.ec) IEC.γec (◯ ε)
 notation "↯" r:50 => ec r
 notation "●↯" r:50 => ecAuth r
 
-instance : CMRA.Discrete (Auth ℕ+ ErrorCredit) := by infer_instance
-instance : OFE.DiscreteE (◯ r : Auth ℕ+ ErrorCredit) := Auth.frag_discrete (by infer_instance)
+instance : CMRA.Discrete (Auth ErrorCredit) := by infer_instance
+instance : OFE.DiscreteE (◯ r : Auth ErrorCredit) := Auth.frag_discrete (by infer_instance)
 
 end Resources
 
@@ -138,8 +138,8 @@ theorem supply_bound {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ �
   iintro Hs Hε
   ihave Hv := iOwn_cmraValid_op (E := IEC.ec) $$ [Hs Hε]
   · isplitl [Hs] <;> first | iexact Hs | iexact Hε
-  ihave %hv := internalCmraValid_discrete (A := Auth ℕ+ ErrorCredit) (PROP := IProp GF) $$ Hv
-  ipure_intro
+  ihave %hv := internalCmraValid_discrete (A := Auth ErrorCredit) (PROP := IProp GF) $$ Hv
+  ipureintro
   obtain ⟨hinc, _⟩ := Auth.auth_both_valid.mp hv
   exact ErrorCredit.includedN_iff.mp (hinc 0)
 
@@ -151,13 +151,13 @@ theorem supply_decrease {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗
   · isplitl [Hs] <;> first | iexact Hs | iexact Hε
   refine iOwn_update <| Auth.auth_update_dealloc ?_
   simp only [UCMRA.unit]
-  refine localUpdate (zero_le _) ?_
+  refine localUpdate (zero_le) ?_
   simpa [add_zero] using (tsub_add_cancel_of_le Hle).symm
 
 theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
     ●↯ ε₁ ⊢@{IProp GF} |==> (●↯ (ε₁ + ε₂) ∗ ↯ε₂) := by
   unfold ec ecAuth
-  have Hupd : (● ε₁) ~~> (● ε₁ + ε₂) • (◯ ε₂ : Auth ℕ+ ℝ≥0∞) := by
+  have Hupd : (● ε₁) ~~> (● ε₁ + ε₂) • (◯ ε₂ : Auth ℝ≥0∞) := by
     refine Auth.auth_update_alloc <| (local_update_unital_discrete ..).mpr ?_
     simp only [CMRA.Valid, OFE.Equiv, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
     exact fun _ => ⟨h, add_comm _ _⟩
@@ -194,8 +194,8 @@ theorem valid {ε : ℝ≥0∞} : ↯ε ⊢@{IProp GF} ⌜ε < 1⌝ := by
   unfold ec
   iintro Hε
   ihave Hv := iOwn_cmraValid (E := IEC.ec) $$ Hε
-  ihave %hv := internalCmraValid_discrete (A := Auth ℕ+ ErrorCredit) (PROP := IProp GF) $$ Hv
-  ipure_intro
+  ihave %hv := internalCmraValid_discrete (A := Auth ErrorCredit) (PROP := IProp GF) $$ Hv
+  ipureintro
   exact Auth.frag_valid.mp hv
 
 theorem contradict {ε : ℝ≥0∞} (h : 1 ≤ ε) : ↯ε ⊢@{IProp GF} False := by

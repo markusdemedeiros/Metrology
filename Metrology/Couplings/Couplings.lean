@@ -93,7 +93,7 @@ theorem trivial {μₗ : Measure α} {μᵣ : Measure β}
 /-- Exact coupling implies approximate coupling for any `ε`: just use `mono_ε`. -/
 theorem exact {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
     (H : RelCoupl S μₗ μᵣ) : AddCoupl ε S μₗ μᵣ := by
-  refine AddCoupl.mono_grading (ε := 0) (zero_le ε) ?_
+  refine AddCoupl.mono_grading (ε := 0) (zero_le) ?_
   rwa [← relCoupl_addCoupl]
 
 /-- Limit lemma: if the coupling holds for every `ε' > ε`, it holds at `ε` itself.

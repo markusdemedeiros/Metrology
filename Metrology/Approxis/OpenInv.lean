@@ -31,9 +31,9 @@ theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 
 
 theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 E3 : CoPset}
     {P R Q : IProp GF} (h : P ∗ R ⊢ |={E2, E3}=> Q) : (|={E1, E2}=> P) ∗ R ⊢ |={E1, E3}=> Q :=
-  fupd_frame_r.trans (fupd_elim h)
+  fupd_frame_right.trans (fupd_elim h)
 
-theorem specCoupl_atomic_bridge_some {hlc : Bool} {GF : BundledGFunctors}
+theorem specCoupl_atomic_bridge_some {hlc : HasLC} {GF : BundledGFunctors}
     [ApproxisWpGS (rT := rT) GF] [InvGS_gen hlc GF]
     {E1 E2 : CoPset}
     {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)} {ε₁ : ENNReal}

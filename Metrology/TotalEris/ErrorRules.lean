@@ -28,7 +28,7 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 namespace TotalEris
 
-variable {hlc : Bool} {GF : BundledGFunctors}
+variable {hlc : HasLC} {GF : BundledGFunctors}
 
 section ECGSOnly
 
@@ -123,7 +123,7 @@ theorem errInterp_supply_bound {εₛ ε : ENNReal} :
   ihave %hLe := ErrorCredit.supply_bound (GF := GF) $$ Hs Hε
   isplitl [Hs]; · iexact Hs
   isplitl [Hε]; · iexact Hε
-  ipure_intro; exact hLe
+  ipureintro; exact hLe
 
 theorem errInterp_supply_increase {ε δ : ENNReal} (h : ε + δ < 1) :
     iprop(ErisWpGS.errInterp (rT := rT) ε)
@@ -204,7 +204,7 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
   iapply (twp_err_incr Hnv)
   isplitl [Herr]; · iexact Herr
   iintro %ε' %Hε' Hcr
-  iapply Hwp; · ipure_intro; exact Hε'
+  iapply Hwp; · ipureintro; exact Hε'
   iexact Hcr
 
 theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
@@ -240,21 +240,21 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   iexists ((ε_now - ε₁) + 1)
   -- Sub-goal 1: Discrete.Reducible. Use `primStep_pos_of_headStep_discrete` + `RandNoTapeS`.
   isplitr
-  · ipure_intro
+  · ipureintro
     sorry
     -- refine ⟨⟨.lit (.int 0), σ₁⟩, primStep_pos_of_headStep_discrete ?_⟩
     -- rw [Discrete.headStep_support_iff]
     -- exact .RandNoTapeS Hz (_root_.le_refl _) Hz
   isplitr
-  · ipure_intro
+  · ipureintro
     intro ρ
     simp only
     gcongr
     split
-    · split <;> first | exact Hbd _ | exact zero_le _
-    · exact zero_le _
+    · split <;> first | exact Hbd _ | exact zero_le
+    · exact zero_le
   isplitr
-  · ipure_intro
+  · ipureintro
     rw [zero_add, MeasureTheory.lintegral_add_left measurable_const,
         MeasureTheory.lintegral_const]
     -- `(ε_now - ε₁) * μ(univ) ≤ ε_now - ε₁` since `μ(univ) ≤ 1`.
@@ -369,7 +369,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   -- every config in the positive-mass support of `primStep ⟨rand z (), σ₁⟩`
   -- must be of the form `⟨lit n, σ₁⟩` with `0 ≤ n < z` (i.e., `R`).
   isplitr
-  · ipure_intro
+  · ipureintro
     sorry
     -- have hheadred : ∃ ρ : Cfg rT, 0 < (headStep ⟨_, σ₁⟩) {ρ} := sorry
     --   -- ⟨⟨.lit (.int 0), σ₁⟩, by
@@ -417,7 +417,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     ihave HΦ : iprop(Φ ⟨.lit (.int n), IsVal.lit⟩) $$ [Hcont Hcr]
     · iapply Hcont $$ %n
       isplitr
-      · ipure_intro; exact ⟨Hn₁, Hn₂⟩
+      · ipureintro; exact ⟨Hn₁, Hn₂⟩
       iexact Hcr
     imodintro
     isplitl [Hσ]; · iexact Hσ
@@ -477,7 +477,7 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
   · -- `min (ε₂ n) 1 = ε₂ n`. Convert Hcr's type via `ec_eq` and feed Hcont.
     iapply Hcont $$ %n
     isplitr
-    · ipure_intro; exact Hn
+    · ipureintro; exact Hn
     iapply (ec_eq (show min (ε₂ n.toNat) 1 = ε₂ n.toNat from _root_.min_eq_left h))
     iexact Hcr
   · -- `1 < ε₂ n`, so `min = 1` and `↯1` is contradictory.

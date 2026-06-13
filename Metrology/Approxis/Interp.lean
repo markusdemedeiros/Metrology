@@ -53,7 +53,7 @@ theorem TyEnv.cons_ne_tail {n : Nat} {X : lrel rT GF} {Δ Δ' : TyEnv rT GF}
 end TyEnvSetup
 
 section interp
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- A function `TyEnv rT GF → lrel rT GF` paired with its pointwise
 nonexpansiveness witness. -/
@@ -149,7 +149,7 @@ end interp
 /-! ## Closedness of related values -/
 
 section interp_closed
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Every `interp τ Δ` value-relation only relates closed values. -/
 theorem interp_closed {Δ : TyEnv rT GF} (τ : Ty) (v v' : Val rT) :
@@ -172,7 +172,7 @@ end interp_closed
 /-! ## Soundness of the semantic type interpretation -/
 
 section interp_sound
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Unboxed-type values are unboxed. -/
 theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
@@ -181,19 +181,19 @@ theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
   cases H
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩
-    ipure_intro
+    ipureintro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%n, %h1, %h2⟩
-    ipure_intro
+    ipureintro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%b, %h1, %h2⟩
-    ipure_intro
+    ipureintro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
   · show iprop(∃ _ _, _) ⊢ _
     iintro ⟨%l1, %l2, %h1, %h2, _⟩
-    ipure_intro
+    ipureintro
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
 
 /-- At an unboxed type, both related values are bare literals. Stronger than
@@ -205,19 +205,19 @@ theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
   cases H
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩
-    ipure_intro
+    ipureintro
     exact ⟨_, _, h1, h2⟩
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%n, %h1, %h2⟩
-    ipure_intro
+    ipureintro
     exact ⟨_, _, h1, h2⟩
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%b, %h1, %h2⟩
-    ipure_intro
+    ipureintro
     exact ⟨_, _, h1, h2⟩
   · show iprop(∃ _ _, _) ⊢ _
     iintro ⟨%l1, %l2, %h1, %h2, _⟩
-    ipure_intro
+    ipureintro
     exact ⟨_, _, h1, h2⟩
 
 /-- At equality-types, both related values are pointwise equal. -/
@@ -226,17 +226,17 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType �
   induction H generalizing v v'
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩
-    ipure_intro
+    ipureintro
     apply Val.ext
     rw [h1, h2]
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%n, %h1, %h2⟩
-    ipure_intro
+    ipureintro
     apply Val.ext
     rw [h1, h2]
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%b, %h1, %h2⟩
-    ipure_intro
+    ipureintro
     apply Val.ext
     rw [h1, h2]
   · rename_i τ1 τ2 Hτ1 Hτ2 ih1 ih2
@@ -245,7 +245,7 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType �
     unfold interp at ih1 ih2
     ihave %heq1 := ih1 (v := a1) (v' := a2) $$ HA
     ihave %heq2 := ih2 (v := b1) (v' := b2) $$ HB
-    ipure_intro
+    ipureintro
     apply Val.ext
     rw [h1, h2, heq1, heq2]
   · rename_i τ1 τ2 Hτ1 Hτ2 ih1 ih2
@@ -254,11 +254,11 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType �
     iintro ⟨%w1, %w2, Hd⟩
     icases Hd with (⟨%h1, %h2, HA⟩ | ⟨%h1, %h2, HB⟩)
     · ihave %heq := ih1 (v := w1) (v' := w2) $$ HA
-      ipure_intro
+      ipureintro
       apply Val.ext
       rw [h1, h2, heq]
     · ihave %heq := ih2 (v := w1) (v' := w2) $$ HB
-      ipure_intro
+      ipureintro
       apply Val.ext
       rw [h1, h2, heq]
 
@@ -272,7 +272,7 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
     ihave %heq1 := eq_type_sound Hτ $$ H1
     ihave %heq2 := eq_type_sound Hτ $$ H2
     imodintro
-    ipure_intro
+    ipureintro
     refine ⟨fun h => ?_, fun h => ?_⟩
     · rw [← heq1, ← heq2, h]
     · rw [heq1, heq2, h]
@@ -286,7 +286,7 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
     by_cases h_l1_r1 : l1 = r1
     · by_cases h_l2_r2 : l2 = r2
       · imodintro
-        ipure_intro
+        ipureintro
         subst h_l1_r1 h_l2_r2
         refine ⟨fun _ => ?_, fun _ => ?_⟩
         · apply Val.ext; rw [he1', he2']
@@ -361,7 +361,7 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         iexact HbotLater
       · -- l1 ≠ r1 and l2 ≠ r2: both `v = w` inequalities hold.
         imodintro
-        ipure_intro
+        ipureintro
         refine ⟨fun h => ?_, fun h => ?_⟩
         · exfalso; apply h_l1_r1
           have := congrArg Val.fst h; rw [he1, he2] at this
@@ -380,7 +380,7 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
     by_cases h_α1_β1 : α1 = β1
     · by_cases h_α2_β2 : α2 = β2
       · imodintro
-        ipure_intro
+        ipureintro
         subst h_α1_β1 h_α2_β2
         refine ⟨fun _ => ?_, fun _ => ?_⟩
         · apply Val.ext; rw [he1', he2']
@@ -433,7 +433,7 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         iapply BI.or_intro_l
         iexact HbotLater
       · imodintro
-        ipure_intro
+        ipureintro
         refine ⟨fun h => ?_, fun h => ?_⟩
         · exfalso; apply h_α1_β1
           have := congrArg Val.fst h; rw [he1, he2] at this
@@ -756,7 +756,7 @@ theorem snd_cons_delete (vs : ValSubstMap rT) (x : Var) (w1 w2 : Val rT) :
 end ValSubstMap
 
 section env_typed
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- The relational typing assertion on value substitutions.
 
@@ -786,7 +786,7 @@ theorem env_ltyped2_domEq (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
       iprop(⌜∀ x, (Γ.lookup x).isSome ↔ (vs.lookup x).isSome⌝) := by
   unfold env_ltyped2
   iintro ⟨%H, _, _⟩
-  ipure_intro; exact H
+  ipureintro; exact H
 
 omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Closedness: every binding in `vs` is closed. -/
@@ -795,7 +795,7 @@ theorem env_ltyped2_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
       iprop(⌜∀ p ∈ vs, p.2.1.1.isClosed .empty ∧ p.2.2.1.isClosed .empty⌝) := by
   unfold env_ltyped2
   iintro ⟨_, %Hc, _⟩
-  ipure_intro; exact Hc
+  ipureintro; exact Hc
 
 omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Lookup-by-Γ: if `Γ x = some A`, the substitution has a matching pair
@@ -809,19 +809,19 @@ theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (
   have hvs : (vs.lookup x).isSome := (Hdom x).mp (by rw [hΓ]; rfl)
   obtain ⟨⟨v1, v2⟩, hvs_eq⟩ := Option.isSome_iff_exists.mp hvs
   iexists v1, v2
-  isplitr; · ipure_intro; exact hvs_eq
+  isplitr; · ipureintro; exact hvs_eq
   iapply Hall $$ %x %A %v1 %v2
-  · ipure_intro; exact hΓ
-  · ipure_intro; exact hvs_eq
+  · ipureintro; exact hΓ
+  · ipureintro; exact hvs_eq
 
 omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- Empty-Γ empty-vs. -/
 theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx rT GF) [] := by
   unfold env_ltyped2
   isplitr
-  · ipure_intro; intro x; simp [RelCtx.lookup, ValSubstMap.lookup]
+  · ipureintro; intro x; simp [RelCtx.lookup, ValSubstMap.lookup]
   isplitr
-  · ipure_intro; intro p hp; cases hp
+  · ipureintro; intro p hp; cases hp
   iintro %x %A %v1 %v2 %hΓ %hvs
   simp [RelCtx.lookup] at hΓ
 
@@ -831,7 +831,7 @@ theorem env_ltyped2_empty_inv (vs : ValSubstMap rT) :
     env_ltyped2 ([] : RelCtx rT GF) vs ⊢@{IProp GF} ⌜vs = []⌝ := by
   unfold env_ltyped2
   iintro ⟨%Hdom, _, _⟩
-  ipure_intro
+  ipureintro
   cases vs with
   | nil => rfl
   | cons p rest =>
@@ -856,7 +856,7 @@ theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
   unfold env_ltyped2
   icases HΓ with ⟨%Hdom, %Hclosed, #Hall⟩
   isplitr
-  · ipure_intro
+  · ipureintro
     intro y
     simp only [RelCtx.lookup, ValSubstMap.lookup]
     have hdom_y := Hdom y
@@ -872,7 +872,7 @@ theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
       have hvy : vs.lookup y = none := Option.not_isSome_iff_eq_none.mp this
       rw [hvy]; simp
   isplitr
-  · ipure_intro
+  · ipureintro
     intro p hp
     rcases List.mem_cons.mp hp with rfl | hpm
     · exact ⟨hv1c, hv2c⟩
@@ -887,8 +887,8 @@ theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
     obtain ⟨⟨w1', w2'⟩, hvy⟩ := Option.isSome_iff_exists.mp hsome_vs
     rw [hvy] at hvs'; injection hvs' with heq; obtain ⟨rfl, rfl⟩ := heq
     iapply Hall $$ %y %Bold %w1 %w2
-    · ipure_intro; exact hΓy
-    · ipure_intro; exact hvy
+    · ipureintro; exact hΓy
+    · ipureintro; exact hvy
   | none =>
     rw [hΓy] at hΓ'
     simp only at hΓ'
@@ -944,7 +944,7 @@ theorem env_ltyped2_drop_head (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
       have hsome : (Γ.lookup y).isSome := by rw [hΓ]; rfl
       exact hyNotDom (RelCtx.mem_of_lookup_isSome hsome)
   isplitr
-  · ipure_intro
+  · ipureintro
     intro z
     by_cases hzy : z = y
     · subst hzy
@@ -967,7 +967,7 @@ theorem env_ltyped2_drop_head (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
         simp [hzy] at heq ⊢
         exact heq
   isplitr
-  · ipure_intro
+  · ipureintro
     intro p hp
     rw [ValSubstMap.mem_delete] at hp
     exact Hclosed p hp.1
@@ -985,8 +985,8 @@ theorem env_ltyped2_drop_head (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
           | none => if z = y then some A else none) = some B
     rw [hΓz]
   iapply Hall $$ %z %B %v1 %v2
-  · ipure_intro; exact hΓhead
-  · ipure_intro; exact hvsz
+  · ipureintro; exact hΓhead
+  · ipureintro; exact hvsz
 
 end env_typed
 
@@ -998,7 +998,7 @@ can lift via `fun x => (Γ.lookupTy x).map (fun τ => interp τ Δ)` or a
 list analogue). -/
 
 section bin_log_related
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 noncomputable def bin_log_related (E : CoPset) (Γ : RelCtx rT GF)
     (e e' : Exp rT) (A : lrel rT GF) : IProp GF :=
@@ -1179,7 +1179,7 @@ going through a general renaming-equivariance lemma
 (`interp_substComp`) as internal tools. -/
 
 section interp_subst
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Composing a `TyEnv` with a renaming. -/
 @[reducible] def TyEnv.comp (Δ : TyEnv rT GF) (ξ : Nat → Nat) : TyEnv rT GF :=

@@ -16,33 +16,9 @@ open Std Iris COFE ProbabilityTheory MeasureTheory
 
 noncomputable section
 
-instance : UFraction ℕ+ where
-  Proper := (· ≤ 1)
-  add_comm := by grind
-  add_assoc := by grind
-  add_left_cancel := by simp
-  add_ne {a b} H := by
-    cases a; cases b
-    rename_i va ha vb hb
-    have : va = vb + va := by injection H
-    omega
-  proper_add_mono_left := by
-    intro a b hab
-    cases a; cases b
-    rename_i va ha vb hb
-    change va + vb ≤ 1 at hab
-    change va ≤ 1
-    omega
-  one_whole := by
-    simp only [Fraction.Whole, _root_.le_refl, Fraction.Fractional,
-      PNat.le_one_iff, not_exists, true_and]
-    intro b
-    have : 1 + b ≠ 1 := by
-      cases b; rename_i vb hb
-      intro H
-      have : 1 + vb = 1 := by injection H
-      omega
-    exact this
+-- The generic `UFraction ℕ+` instance was removed: iris-lean dropped the
+-- `UFraction` interface in favour of a concrete `Qp`-based `DFrac`, so the
+-- fraction algebra is no longer parameterised by `ℕ+`.
 
 instance authMeasureOFE [MeasurableSpace α] : OFE (Measure α) where
   Equiv x y := x = y
@@ -62,7 +38,7 @@ instance [MeasurableSpace α] : CMRA (Measure α) where
   validN_ne := (· ▸ ·)
   valid_iff_validN := ⟨fun H _ => H, fun H => H 0⟩
   validN_succ := (·)
-  validN_op_left := (le_of_add_le_of_nonneg_left · <| zero_le _)
+  validN_op_left := (le_of_add_le_of_nonneg_left · <| zero_le)
   assoc := by simp [add_assoc]
   comm := by simp [add_comm]
   pcore_op_left := by simp

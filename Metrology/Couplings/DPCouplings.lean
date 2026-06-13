@@ -95,7 +95,7 @@ theorem ARCoupling.DP.bind {ε'} {δ' : NNReal} {f : α → Measure α'} {g : β
     rw [add_comm]
     refine Hcpl F G (fun {a b} HS => ?_)
     simp only [F, G]
-    refine max_le (zero_le _) (le_min ?_ ?_)
+    refine max_le (zero_le) (le_min ?_ ?_)
     · exact Hf'le _
     · refine tsub_le_iff_left.mpr ?_
       rw [add_comm]; exact Hbind HS ⟨f', ⟨Hf'm, Hf'b⟩⟩ ⟨g', ⟨Hg'm, Hg'b⟩⟩ Hf'g'

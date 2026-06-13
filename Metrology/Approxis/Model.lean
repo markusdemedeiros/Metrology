@@ -106,7 +106,7 @@ def logN : Namespace := nroot.@ (1 : Pos)
 /-! ## `ApproxisRGS` ghost-state bundle -/
 
 class ApproxisRGS (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-    (hlc : outParam Bool) (GF : BundledGFunctors) where
+    (hlc : outParam HasLC) (GF : BundledGFunctors) where
   approxisGS : ApproxisGS rT hlc GF
   naInvG     : NaInvG GF
   nais       : NaInvPoolName
@@ -203,7 +203,7 @@ instance lrel.leibniz {GF : BundledGFunctors} : OFE.Leibniz (lrel rT GF) where
 /-! ## `na_own` / `na_inv` abbreviations keyed on the pool name -/
 
 section NaShorthand
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 @[reducible] noncomputable def naOwnP (E : CoPset) : IProp GF :=
   Iris.NonAtomicInvariant.own (GF := GF) (ApproxisRGS.nais (rT := rT) (hlc := hlc) GF) E
@@ -219,7 +219,7 @@ end NaShorthand
 /-! ## Refinement judgement -/
 
 section Refines
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 noncomputable def refines (E : CoPset) (e e' : Exp rT) (A : lrel rT GF) : IProp GF :=
   iprop(∀ (K : Ectx rT) (ε : ENNReal),
@@ -255,14 +255,14 @@ scoped notation:100 "REL " e1 " << " e2 " : " A =>
 /-! ## Simple lrel constructors -/
 
 section SimpleLRels
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
     iprop(⌜v1.1 = .lit .unit ∧ v2.1 = .lit .unit⌝ : IProp GF)
       ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
   iintro %h
-  ipure_intro
+  ipureintro
   exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_unit : lrel rT GF where
@@ -275,7 +275,7 @@ noncomputable def lrel_bool : lrel rT GF where
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%b, %h⟩
-    ipure_intro
+    ipureintro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_nat : lrel rT GF where
@@ -283,7 +283,7 @@ noncomputable def lrel_nat : lrel rT GF where
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%n, %h⟩
-    ipure_intro
+    ipureintro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- Both values are the same positive integer literal (`0 < n`). -/
@@ -293,7 +293,7 @@ noncomputable def lrel_pos_nat : lrel rT GF where
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%n, %h⟩
-    ipure_intro
+    ipureintro
     exact ⟨h.2.1 ▸ Exp.lit_isClosedEmpty _, h.2.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_int : lrel rT GF where
@@ -301,7 +301,7 @@ noncomputable def lrel_int : lrel rT GF where
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%n, %h⟩
-    ipure_intro
+    ipureintro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
@@ -310,7 +310,7 @@ noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
       □ (∀ (w1 w2 : Val rT), A1 w1 w2 -∗
         refines (⊤ : CoPset) (.app v1.1 w1.1) (.app v2.1 w2.1) A2))
   persistent _ _ := inferInstance
-  closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
+  closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
 noncomputable def lrel_prod (A B : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
@@ -323,7 +323,7 @@ noncomputable def lrel_prod (A B : lrel rT GF) : lrel rT GF where
     iintro ⟨%a1, %a2, %b1, %b2, %h1, %h2, HA, HB⟩
     ihave %hAcl := A.closed a1 a2 $$ HA
     ihave %hBcl := B.closed b1 b2 $$ HB
-    ipure_intro
+    ipureintro
     refine ⟨?_, ?_⟩
     · refine ⟨?_, ?_⟩
       · rw [h1]
@@ -345,7 +345,7 @@ noncomputable def lrel_sum (A B : lrel rT GF) : lrel rT GF where
     iintro ⟨%w1, %w2, Hd⟩
     icases Hd with (⟨%h1, %h2, HA⟩ | ⟨%h1, %h2, HB⟩)
     · ihave %hAcl := A.closed w1 w2 $$ HA
-      ipure_intro
+      ipureintro
       refine ⟨?_, ?_⟩
       · refine ⟨?_, ?_⟩
         · rw [h1]; exact Exp.IsLocallyClosed.inl hAcl.1.1
@@ -354,7 +354,7 @@ noncomputable def lrel_sum (A B : lrel rT GF) : lrel rT GF where
         · rw [h2]; exact Exp.IsLocallyClosed.inl hAcl.2.1
         · rw [h2]; simp [Exp.fv]; exact hAcl.2.2
     · ihave %hBcl := B.closed w1 w2 $$ HB
-      ipure_intro
+      ipureintro
       refine ⟨?_, ?_⟩
       · refine ⟨?_, ?_⟩
         · rw [h1]; exact Exp.IsLocallyClosed.inr hBcl.1.1
@@ -367,7 +367,7 @@ noncomputable def lrel_exists (C : lrel rT GF → lrel rT GF) : lrel rT GF where
   car v1 v2 := iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
     ∃ A : lrel rT GF, C A v1 v2)
   persistent _ _ := inferInstance
-  closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
+  closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
 /-- Universal over semantic types, uniform via `lrel_arr lrel_unit`. -/
 noncomputable def lrel_forall (C : lrel rT GF → lrel rT GF) : lrel rT GF where
@@ -394,7 +394,7 @@ noncomputable def lrelRec1 (C : lrel rT GF -n> lrel rT GF) (r : lrel rT GF) : lr
   car w1 w2 := iprop((⌜w1.1.isClosedEmpty ∧ w2.1.isClosedEmpty⌝) ∗
     ▷ (C r).car w1 w2)
   persistent _ _ := inferInstance
-  closed _ _ := by iintro ⟨%h, _⟩; ipure_intro; exact h
+  closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
 instance lrelRec1_contractive (C : lrel rT GF -n> lrel rT GF) : OFE.Contractive (lrelRec1 C) where
   distLater_dist {n P Q} hPQ w1 w2 := by
@@ -523,7 +523,7 @@ noncomputable def lrel_ref (A : lrel rT GF) : lrel rT GF where
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%l1, %l2, %h1, %h2, _⟩
-    ipure_intro
+    ipureintro
     exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_tape`: tape values whose contents are empty and sampled from the
@@ -537,7 +537,7 @@ noncomputable def lrel_tape : lrel rT GF where
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%α1, %α2, %z, %h1, %h2, _⟩
-    ipure_intro
+    ipureintro
     exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_ref` is nonexpansive in its content type. -/
@@ -580,7 +580,7 @@ end SimpleLRels
 /-! ### Semantic property lemmas -/
 
 section SemtypesProperties
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 instance : Inhabited (Val rT) := ⟨⟨.lit .unit, .lit⟩⟩
 
@@ -602,7 +602,7 @@ theorem interp_ref_funct {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
   subst heq_l' heq_l1 heq_l2
   subst heq_l
   by_cases h : l1 = l2
-  · imodintro; ipure_intro; exact h
+  · imodintro; ipureintro; exact h
   · have hN_disj : logN.@ ((l, l1) : Loc × Loc) ## logN.@ ((l, l2) : Loc × Loc) :=
       ndot_ne_disjoint _ (fun heq => h (by injection heq))
     have h1 : (↑(logN.@ ((l, l1) : Loc × Loc)) : CoPset) ⊆ E :=
@@ -654,7 +654,7 @@ theorem interp_ref_inj {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
   subst heq_l1 heq_l heq_l2
   subst heq_l'
   by_cases h : l1 = l2
-  · imodintro; ipure_intro; exact h
+  · imodintro; ipureintro; exact h
   · have hN_disj :
         logN.@ ((l1, l) : Loc × Loc) ## logN.@ ((l2, l) : Loc × Loc) :=
       ndot_ne_disjoint _ (fun heq => h (by injection heq))
@@ -709,7 +709,7 @@ theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
   have heq_l2 : l2 = l2' := by simp at Heq2'; exact Heq2'
   subst heq_l' heq_l1 heq_l2 heq_l
   by_cases h : l1 = l2
-  · imodintro; ipure_intro; exact h
+  · imodintro; ipureintro; exact h
   · have hN_disj : logN.@ ((l, l1) : Loc × Loc) ## logN.@ ((l, l2) : Loc × Loc) :=
       ndot_ne_disjoint _ (fun heq => h (by injection heq))
     have h1 : (↑(logN.@ ((l, l1) : Loc × Loc)) : CoPset) ⊆ E :=
@@ -752,7 +752,7 @@ theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
   subst heq_l1 heq_l heq_l2
   subst heq_l'
   by_cases h : l1 = l2
-  · imodintro; ipure_intro; exact h
+  · imodintro; ipureintro; exact h
   · have hN_disj :
         logN.@ ((l1, l) : Loc × Loc) ## logN.@ ((l2, l) : Loc × Loc) :=
       ndot_ne_disjoint _ (fun heq => h (by injection heq))
@@ -784,7 +784,7 @@ end SemtypesProperties
 /-! ## Monadic layer -/
 
 section Monadic
-variable {hlc : Bool} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 theorem fupd_refines {E : CoPset} {e t : Exp rT} {A : lrel rT GF} :
     iprop(|={⊤}=> refines E e t A) ⊢@{IProp GF} refines E e t A := by

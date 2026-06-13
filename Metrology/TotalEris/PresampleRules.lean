@@ -27,7 +27,7 @@ namespace TotalEris
 
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
-variable {hlc : Bool} {GF : BundledGFunctors} [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-- Basic *total* presample rule. Given tape ownership `α ↪ₐ ⟨N, bs⟩`
 with positive bound `N`, the WP can be advanced by appending a freshly
@@ -59,20 +59,20 @@ theorem twp_presample {E : CoPset} {e : Exp rT} {α : Loc} {Φ : Val rT → IPro
   imodintro
   iapply glm'_state_step
   iexists α, ⟨N, bs⟩
-  isplitr; · ipure_intro; exact ⟨hlookup, hN⟩
+  isplitr; · ipureintro; exact ⟨hlookup, hN⟩
   iexists (fun σ' => ∃ n : { z : Int // 0 ≤ z ∧ z < N },
             σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)),
     0, (fun _ => ε₁), ε₁
-  isplitr; · ipure_intro; intro _; exact _root_.le_refl _
+  isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
-  · ipure_intro
+  · ipureintro
     -- 0 + ∫⁻ σ', ε₁ ∂(tapePresample σ₁ α) ≤ ε₁
     -- The integral over a probability measure equals ε₁ * 1 = ε₁.
     haveI : MeasureTheory.IsProbabilityMeasure (tapePresample σ₁ α) :=
       ⟨tapePresample_univ_eq_one hlookup hN⟩
     rw [MeasureTheory.lintegral_const, MeasureTheory.measure_univ, mul_one, zero_add]
   isplitr
-  · ipure_intro
+  · ipureintro
     -- Pgl 0 R (tapePresample σ₁ α). Use `tapePresample_ae` to characterize
     -- the support: every σ' has the form `σ₁.update_tapes (· insert ⟨N, bs ++ [n]⟩)`.
     show (tapePresample σ₁ α) {σ' | ¬ _} ≤ 0
@@ -194,22 +194,22 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
     exact ((List.cons.injEq _ _ _ _).mp this |>.1).symm
   iapply glm'_state_step
   iexists α, ⟨N, bs⟩
-  isplitr; · ipure_intro; exact ⟨hlookup, hN⟩
+  isplitr; · ipureintro; exact ⟨hlookup, hN⟩
   iexists (fun σ' => ∃ n : { z : Int // 0 ≤ z ∧ z < N },
               σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)),
     0, (fun σ' => (ε_now - ε₁) + presampleAdvCompX₂ σ₁ α N bs ε₂ σ'),
     ((ε_now - ε₁) + 1)
   -- Sub-goal 1: bound on X₂.
   isplitr
-  · ipure_intro
+  · ipureintro
     intro σ'
     simp only
     gcongr
     unfold presampleAdvCompX₂
-    split <;> first | exact Hbd _ | exact zero_le _
+    split <;> first | exact Hbd _ | exact zero_le
   -- Sub-goal 2: integral bound.
   isplitr
-  · ipure_intro
+  · ipureintro
     rw [zero_add]
     haveI : MeasureTheory.IsProbabilityMeasure (tapePresample σ₁ α) :=
       ⟨tapePresample_univ_eq_one hlookup hN⟩
@@ -316,7 +316,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
       _ = ε_now := tsub_add_cancel_of_le hLe
   -- Sub-goal 3: Pgl 0 R. Support of tapePresample = R-states.
   isplitr
-  · ipure_intro
+  · ipureintro
     show (tapePresample σ₁ α) {σ' | ¬ _} ≤ 0
     refine _root_.le_of_eq ?_
     rw [← MeasureTheory.ae_iff]

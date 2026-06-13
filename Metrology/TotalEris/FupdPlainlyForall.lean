@@ -38,11 +38,15 @@ namespace TotalEris
 universal moves *inside* the fupd, provided each body is plain. Mirrors
 iris-Coq's `fupd_plainly_forall_2` (the standard `BiFUpdPlainly` axiom). -/
 theorem iProp_fupd_plainly_forall_2_no_lc
-    {GF : BundledGFunctors} [InvGS_gen false GF]
+    {GF : BundledGFunctors} [InvGS_gen .hasNoLC GF]
     {E : CoPset} {A : Type _} {Φ : A → IProp GF}
     [∀ x, Plain (Φ x)] :
     (∀ x, iprop(|={E}=> Φ x)) ⊢@{IProp GF} iprop(|={E}=> ∀ x, Φ x) := by
-  simp only [fupd, uPred_fupd, le_upd_if, Bool.false_eq_true, ↓reduceIte]
+  -- iris-bump: the `IProp` fupd unfolds to a `le_upd` (`|==£>`) rather than `|==> ◇`.
+  -- In the no-LC case `le_upd_unfold_no_le` gives `(|==£> P) ⊣⊢ |==> ◇ P` (the
+  -- `[LcGS .hasNoLC GF]` instance comes from `InvGS_gen .hasNoLC`), recovering the
+  -- old `|==> ◇` shape, after which the original `imod`-based proof goes through.
+  simp only [fupd, uPred_fupd, le_upd_unfold_no_le.to_eq]
   iintro H ⟨Hwsat, HE⟩
   -- Assert the plain universal as intuitionistic. Because the goal is
   -- plain, `ihave #` duplicates the spatial context for the subproof —
@@ -75,7 +79,7 @@ pure premise `⌜R x⌝`, conclude a single fupd of the universally-quantified
 pure implication. The shape that matches `glmPrimStep`'s per-outcome
 continuation. -/
 theorem iProp_fupd_plainly_forall_pure_impl_no_lc
-    {GF : BundledGFunctors} [InvGS_gen false GF]
+    {GF : BundledGFunctors} [InvGS_gen .hasNoLC GF]
     {E : CoPset} {A : Type _} {R : A → Prop} {P : A → Prop} :
     (∀ x, iprop(⌜R x⌝ -∗ |={E}=> ⌜P x⌝))
       ⊢@{IProp GF} iprop(|={E}=> ⌜∀ x, R x → P x⌝) := by
@@ -90,16 +94,16 @@ theorem iProp_fupd_plainly_forall_pure_impl_no_lc
       ihave Hx := H $$ %x
       ihave HP : iprop(|={E}=> ⌜P x⌝) $$ [Hx]
       · iapply Hx
-        ipure_intro
+        ipureintro
         exact hR
       imod HP with %hP
       imodintro
-      ipure_intro
+      ipureintro
       intro _
       exact hP
     · -- Vacuously: `¬R x → (R x → P x)`.
       imodintro
-      ipure_intro
+      ipureintro
       intro hRx
       exact absurd hRx hR
   -- Stage 2: apply `fupd_plainly_forall_2` to commute the universal in.
