@@ -311,6 +311,8 @@ theorem execN_mono : ∀ {n m : ℕ} (_ : n ≤ m) (ρ : Cfg rT), execN n ρ ≤
   | refl => exact le_refl _
   | step h ih => exact le_trans ih (execN_succ_le' _ ρ)
 
+theorem execN_monotone : Monotone fun i ↦ execN (rT := rT) i ρ := fun _ _ h => execN_mono h _
+
 theorem execN_mono_singleton [MeasurableSingletonClass rT]
     {n m : ℕ} (h : n ≤ m) (ρ : Cfg rT) (c : Cfg rT) :
     execN n ρ {c} ≤ execN m ρ {c} :=
@@ -462,16 +464,17 @@ theorem limExec_pexecN (n : Nat) (ρ : Cfg rT) : limExec ρ = (pexecN n ρ).bind
 
 /-! ### `limExec` application and mass -/
 
--- HERE
-
--- Apply `limExec` at a singleton — sup of finite unrollings
 @[discrete]
 theorem Discrete.limExec_apply [Countable rT] [MeasurableSingletonClass rT]
     (ρ : Cfg rT) (c : Cfg rT) :
     limExec ρ {c} = ⨆ n, (execN n ρ) {c} :=
   Discrete.iSup_measure_apply
 
--- Rocq: lim_exec_Sup_seq
+theorem limExec_apply (ρ : Cfg rT) (HS : MeasurableSet S) :
+    limExec ρ S = ⨆ n, (execN n ρ) S :=
+  iSup_measure_apply execN_monotone  HS
+
+@[discrete] -- limExec_univ'
 theorem limExec_univ [Countable rT] [MeasurableSingletonClass rT]
     (ρ : Cfg rT) :
     (limExec ρ) Set.univ = ⨆ n, (execN n ρ) Set.univ := by
@@ -485,30 +488,29 @@ theorem limExec_univ [Countable rT] [MeasurableSingletonClass rT]
   simp_rw [hdecomp (execN _ ρ), Discrete.limExec_apply]
   exact ENNReal.tsum_iSup_of_monotone (fun c _ _ h => execN_mono_singleton h _ _)
 
+theorem limExec_univ' (ρ : Cfg rT) : (limExec ρ) .univ = ⨆ n, (execN n ρ) .univ :=
+  limExec_apply _ .univ
+
 /-! ### Pointwise and mass bounds -/
 
 -- Rocq: lim_exec_leq
-@[discrete]
+@[discrete] -- limExec_leq_setwise
 theorem Discrete.limExec_leq_pointwise [Countable rT] [MeasurableSingletonClass rT]
     {ρ : Cfg rT} {c : Cfg rT} {r : ENNReal}
     (H : ∀ n, (execN n ρ) {c} ≤ r) : (limExec ρ) {c} ≤ r := by
   rw [Discrete.limExec_apply]; exact iSup_le H
 
--- Rocq: lim_exec_leq_mass
-theorem limExec_leq_mass [Countable rT] [MeasurableSingletonClass rT]
-    {ρ : Cfg rT} {r : ENNReal}
-    (H : ∀ n, (execN n ρ) Set.univ ≤ r) : (limExec ρ) Set.univ ≤ r := by
-  rw [limExec_univ]; exact iSup_le H
+theorem limExec_leq_setwise {ρ : Cfg rT} {S : Set (Cfg rT)} {r : ENNReal} (HS : MeasurableSet S)
+    (H : ∀ n, (execN n ρ) S ≤ r) : (limExec ρ) S ≤ r := by
+  rw [limExec_apply _ HS]
+  exact iSup_le H
 
--- Rocq: lim_exec_term
--- If at some fuel level `n` the execN mass is 1 (total termination), limExec collapses to it.
-theorem limExec_term [Countable rT] [MeasurableSingletonClass rT]
-    {ρ : Cfg rT} {n : Nat}
-    (Hv : (execN n ρ) Set.univ = 1) : limExec ρ = execN n ρ := by
-  -- For k ≥ n we have (execN n ρ) ≤ (execN k ρ) as measures; their univ masses both
-  -- sit between 1 (the n-level) and 1 (sub-probability bound), so they match. Hence
-  -- execN k ρ = execN n ρ for all k ≥ n. Thus ⨆ k, execN k ρ = execN n ρ.
-  -- We use `Measure.eq_of_le_of_measure_univ_eq` at each such k.
+theorem limExec_leq_mass  {ρ : Cfg rT} {r : ENNReal}
+    (H : ∀ n, (execN n ρ) Set.univ ≤ r) : (limExec ρ) Set.univ ≤ r := by
+  rw [limExec_univ']; exact iSup_le H
+
+theorem limExec_term  {ρ : Cfg rT} {n : Nat} (Hv : (execN n ρ) Set.univ = 1) :
+    limExec ρ = execN n ρ := by
   have hfin_n : IsFiniteMeasure (execN n ρ) :=
     ⟨by rw [Hv]; exact ENNReal.one_lt_top⟩
   have hk_eq : ∀ k, n ≤ k → execN k ρ = execN n ρ := by
@@ -518,19 +520,21 @@ theorem limExec_term [Countable rT] [MeasurableSingletonClass rT]
       calc (1 : ENNReal) = (execN n ρ) Set.univ := Hv.symm
         _ ≤ (execN k ρ) Set.univ := (execN_mono hk ρ) _
     exact (Measure.eq_of_le_of_measure_univ_eq (execN_mono hk ρ) (Hv.trans hk_univ.symm)).symm
-  refine Measure.ext_of_singleton fun c => ?_
-  rw [Discrete.limExec_apply]
+  ext
+  rename_i S HS
+  rw [limExec_apply _ HS]
   apply le_antisymm
   · apply iSup_le; intro k
     by_cases hkn : k ≤ n
-    · exact execN_mono_singleton hkn ρ c
+    · have X := execN_mono hkn ρ
+      exact measure_mono_both (execN_mono hkn ρ) (fun ⦃a⦄ => id)
     · rw [hk_eq k (Nat.le_of_not_le hkn)]
   · exact le_iSup_of_le n (le_refl _)
 
 /-! ### Deterministic trace -/
 
--- Rocq: lim_exec_det_final (specialized: our return type is Cfg, so we phrase it at a value-Cfg)
-@[discrete]
+-- Ah... this one is this way because long-running executions becomes zeroed out
+@[discrete] -- limExec_det_final
 theorem Discrete.limExec_det_final [Countable rT] [MeasurableSingletonClass rT]
     {ρ ρ' : Cfg rT} {n : Nat}
     (_hv : ρ'.expr.isValue) (H : (execN n ρ) {ρ'} = 1) :
@@ -547,15 +551,47 @@ theorem Discrete.limExec_det_final [Countable rT] [MeasurableSingletonClass rT]
   · rw [measure_mono_null (by simp [Ne.symm hc]) hcompl]
     simp [Ne.symm hc]
 
+theorem limExec_det_final {ρ ρ' : Cfg rT} {n : Nat} (H : (execN n ρ) = dirac ρ') :
+    limExec ρ = dirac ρ' := by
+  have htot : (execN n ρ) Set.univ = 1 := H ▸ dirac_apply_of_mem trivial
+  rw [limExec_term htot]
+  ext
+  rename_i S _
+  exact DFunLike.congr_fun H S
+
 /-! ### lintegral against limExec -/
 
 /-- `lintegral` commutes with monotone `⨆` of measures on `Cfg`. -/
+@[discrete] -- lintegral_limExec'
 theorem lintegral_limExec [Countable rT] [MeasurableSingletonClass rT]
     (ρ : Cfg rT) (f : Cfg rT → ENNReal) :
     ∫⁻ x, f x ∂(limExec ρ) = ⨆ n, ∫⁻ x, f x ∂(execN n ρ) := by
   simp_rw [lintegral_countable' f, Discrete.limExec_apply, ENNReal.mul_iSup]
   refine ENNReal.tsum_iSup_of_monotone (fun c i j hij => ?_)
   exact mul_le_mul' (le_refl _) (execN_mono_singleton hij _ _)
+
+-- Good exercise
+theorem lintegral_limExec'
+    (ρ : Cfg rT) (f : Cfg rT → ENNReal) :
+    ∫⁻ x, f x ∂(limExec ρ) = ⨆ n, ∫⁻ x, f x ∂(execN n ρ) := by
+  unfold limExec
+  apply le_antisymm
+  · rw [lintegral_def]
+    refine iSup_le fun g => iSup_le fun hg => ?_
+    have hstep : g.lintegral (⨆ i, execN i ρ) = ⨆ n, g.lintegral (execN n ρ) := by
+      have hms : ∀ x, MeasurableSet (⇑g ⁻¹' {x}) := fun x => g.measurableSet_preimage _
+      simp_rw [MeasureTheory.SimpleFunc.lintegral,
+        show ∀ x, (⨆ i, execN i ρ) (⇑g ⁻¹' {x}) = ⨆ n, (execN n ρ) (⇑g ⁻¹' {x})
+          from fun x => iSup_measure_apply execN_monotone (hms x),
+        ENNReal.mul_iSup]
+      exact ENNReal.finsetSum_iSup_of_monotone
+        (fun x _ _ h => mul_le_mul' le_rfl ((execN_mono h ρ) _))
+    rw [hstep]
+    refine iSup_mono fun n => ?_
+    rw [lintegral_def]
+    exact le_iSup_of_le g (le_iSup_of_le hg le_rfl)
+  · exact iSup_le fun n => lintegral_mono' (le_iSup (fun i => execN i ρ) n) le_rfl
+
 
 /-! ### Additive coupling lift (Approxis glue) -/
 
@@ -567,7 +603,7 @@ theorem limExec_AddCoupl [Countable rT] [MeasurableSingletonClass rT]
     (H : ∀ n, AddCoupl ε Φ (execN n ρ) μ₂) :
     AddCoupl ε Φ (limExec ρ) μ₂ := by
   intro ⟨f, hf, hfb⟩ ⟨g, hg, hgb⟩ hfg
-  rw [lintegral_limExec ρ f]
+  rw [lintegral_limExec' ρ f]
   refine iSup_le fun n => ?_
   exact H n ⟨f, hf, hfb⟩ ⟨g, hg, hgb⟩ hfg
 
