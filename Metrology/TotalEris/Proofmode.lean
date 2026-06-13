@@ -80,20 +80,14 @@ macro_rules
 
 /-! ### Structural / bind -/
 
-/-- `twp_bind <K>` rebases the WP goal at `K.fill e` to `e` with the
-continuation wrapped through `K`. Useful for focusing on a subexpression. -/
-macro "twp_bind " K:term : tactic =>
-  `(tactic| iapply (ErisWpGS.tglWp_bind (K := $K)))
+-- NOTE: `twp_bind` is now an elaborator tactic in `WpTactics.lean` that discovers
+-- the evaluation context automatically (`twp_bind <focus : pl_exp>`), superseding the
+-- old macro that required an explicit `K`:
+--   macro "twp_bind " K:term : tactic => `(tactic| iapply (ErisWpGS.tglWp_bind (K := $K)))
 
 /-- `twp_apply <L>` — plain `iapply L`. Use for top-level applications. -/
 macro "twp_apply " L:term : tactic =>
   `(tactic| iapply ($L : _))
-
-/-- `twp_apply_at <K> <L>` — combined bind+apply. Equivalent to
-`twp_bind <K>; iapply <L>`. Use when the rule `L` is for a primitive that
-appears inside an evaluation context `K` in the current goal. -/
-macro "twp_apply_at " K:term ", " L:term : tactic =>
-  `(tactic| (twp_bind $K; iapply ($L : _)))
 
 /-! ### Aliases that match Rocq's `wp_*` (since `pgl_wp` is the
 "default" WP in eris). These delegate to the `twp_*` variants — once

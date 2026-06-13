@@ -9,6 +9,7 @@ public import Metrology.TotalEris.ErisGS
 public import Metrology.TotalEris.TotalPrimitiveLaws
 public import Metrology.TotalEris.ErrorRules
 public import Metrology.TotalEris.Proofmode
+public import Metrology.TotalEris.WpTactics
 public import Metrology.TotalEris.TotalAdequacy
 public import Metrology.TotalEris.PresampleRules
 
