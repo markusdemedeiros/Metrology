@@ -21,7 +21,7 @@ def execN (n : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   | 0 => 0
   | n + 1 => if ρ.expr.isValue then dirac ρ else (primStep ρ).bind (execN n)
 
-@[measurability]
+@[fun_prop]
 theorem execN_measurable (n : Nat) : Measurable (execN (rT := rT) n) := by
   induction n
   · simp [execN]
@@ -33,7 +33,7 @@ def execExactN (N : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   | 0 => if ρ.expr.isValue then dirac ρ else 0
   | N + 1 => if ρ.expr.isValue then 0 else (primStep ρ).bind (execExactN N)
 
-@[measurability]
+@[fun_prop]
 theorem execExactN_measurable (n : Nat) : Measurable (execExactN (rT := rT) n) := by
   induction n
   · simp only [execExactN]
@@ -293,7 +293,7 @@ theorem stepOrFinal_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) :
     stepOrFinal ρ = primStep ρ := by
   simp [stepOrFinal, hv]
 
-@[measurability]
+@[fun_prop]
 theorem stepOrFinal.measurable [Inhabited rT] :
     Measurable (stepOrFinal : Cfg rT → Measure (Cfg rT)) := by
   have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
@@ -318,12 +318,12 @@ theorem execN_mono_singleton [MeasurableSingletonClass rT]
     execN n ρ {c} ≤ execN m ρ {c} :=
   execN_mono h ρ {c}
 
-@[measurability]
+@[fun_prop]
 theorem limExec.measurable : Measurable (limExec : Cfg rT → Measure (Cfg rT)) :=
   Measure.measurable_iSup_countable (fun n => execN_measurable n)
     (fun ρ _ _ h => execN_mono h ρ)
 
-@[measurability]
+@[fun_prop]
 theorem limExecV.measurable : Measurable (limExecV : Cfg rT → Measure (Exp rT)) :=
   asExpr.measurable.comp limExec.measurable
 
@@ -407,7 +407,7 @@ def pexecN (n : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   | 0 => dirac ρ
   | n + 1 => (stepOrFinal ρ).bind (pexecN n)
 
-@[measurability]
+@[fun_prop]
 def pexecN_measurable {n : Nat} : Measurable (pexecN (rT := rT) n) := by
   induction n
   · simp [pexecN]

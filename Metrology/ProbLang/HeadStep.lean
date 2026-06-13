@@ -320,7 +320,7 @@ theorem Exp.isValM.measurable {T : Type _} [MeasurableSpace T] :
 /-- `fun a : Cfg rT => a.expr.isValue` is measurable: it is `isValueR ∘ expr`,
 both measurable (`isValueR` via the structural recursion, `expr` via
 `Cfg.measurable_expr`). -/
-@[measurability]
+@[fun_prop]
 theorem Cfg.isValue_measurable : Measurable (fun a : Cfg rT => a.expr.isValue) := by
   have h : (fun a : Cfg rT => a.expr.isValue) = (fun e : Exp rT => e.isValueR) ∘ Cfg.expr := by
     funext a; simp [Exp.isValue_iff_isValueR]

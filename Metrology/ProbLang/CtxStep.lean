@@ -30,7 +30,7 @@ theorem Ectx.fillCfg_injective [ProbLangℝ rT] (K : Ectx rT) :
   rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ h
   simpa [Cfg.mk.injEq, Ectx.fill_injective K |>.eq_iff] using h
 
-@[measurability]
+@[fun_prop]
 theorem Ectx.fillCfg.measurable [ProbLangℝ rT] (K : Ectx rT) :
     Measurable K.fillCfg := by
   rw [Cfg.measurable_iff]
@@ -63,7 +63,7 @@ measurability to joint measurability of:
   `Ectx.fill.measurable` (stamped via `List.measurable_foldl`),
 - the "headStep input" map `cfg ↦ ⟨cfg.expr.decomp.2, cfg.state⟩` composed
   with `headStep.measurable`. -/
-@[measurability]
+@[fun_prop]
 theorem primStep.measurable [ProbLangℝ rT] : Measurable (primStep : Cfg rT → Measure (Cfg rT)) := by
   -- Source kernel `k : Cfg rT → Measure (Cfg rT)`.
   have hk_inner : Measurable

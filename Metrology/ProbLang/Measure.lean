@@ -71,7 +71,7 @@ theorem MeasurableSet.singleton_none {α : Type _} [MeasurableSpace α] :
   ext x; cases x <;> simp
 
 /-- `Option.getD · d` is measurable for any default value. -/
-@[measurability]
+@[fun_prop]
 theorem Option.measurable_getD {α : Type _} [MeasurableSpace α] (d : α) :
     Measurable (fun x : Option α => x.getD d) := by
   intro S hS

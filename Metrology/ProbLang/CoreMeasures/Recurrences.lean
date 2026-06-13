@@ -464,7 +464,7 @@ theorem fillItem.measurable [MeasurableSpace rT] :
 Measurable once `EctxItem.fillItem`'s joint version is. Standard `List.foldl`
 measurability argument; mechanical extension once the input is measurable. -/
 
-@[measurability]
+@[fun_prop]
 theorem Ectx_fill.measurable [MeasurableSpace rT] :
     Measurable (fun (q : Ectx rT × Exp rT) => Ectx.fill q.1 q.2) := by
   -- `Ectx.fill K e = K.foldl (flip EctxItem.fillItem) e`.
@@ -492,7 +492,7 @@ current keystone with one extra `t_X b`-precomposition at each constructor.
 
 **Status**: stubbed pending the binder-transforming variant. -/
 
-@[measurability]
+@[fun_prop]
 theorem openRec.measurable [MeasurableSpace rT] :
     Measurable (fun (q : (Nat × Exp rT) × Exp rT) => Exp.openRec q.1.1 q.1.2 q.2) := by
   -- Apply `measurable_struct_rec_param_shift` with β = (Nat × Exp rT) and shift
@@ -1360,7 +1360,7 @@ private theorem decompN_measurable [MeasurableSpace rT] : ∀ n,
       -- (q ↦ (decompN n q.2.2).1 ++ [q.2.1]) = List.measurable_append_singleton ∘ ⟨...⟩
       exact List.measurable_append_singleton.comp (h_decompN_fst.prodMk h_Ki)
 
-@[measurability]
+@[fun_prop]
 theorem decomp.measurable [MeasurableSpace rT] :
     Measurable (Exp.decomp : Exp rT → Ectx rT × Exp rT) := by
   have hrw : (Exp.decomp : Exp rT → Ectx rT × Exp rT) = fun e => decompN e.height e := by

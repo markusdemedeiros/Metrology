@@ -745,7 +745,7 @@ theorem glm'_bind
         rw [primStep_fill Hsv]
         rw [MeasureTheory.lintegral_map ?G1 ?G2]
         case G1 => sorry
-        case G2 => sorry
+        case G2 => measurability
         refine _root_.le_trans (_root_.le_of_eq ?_) Hexp
         congr 1
         refine MeasureTheory.lintegral_congr_ae (Filter.Eventually.of_forall fun a => ?_)
@@ -756,7 +756,7 @@ theorem glm'_bind
         show primStep ⟨K.fill ρ.expr, ρ.state⟩ {x | ¬ ∃ ρ'', x = K.fillCfg ρ'' ∧ R ρ''} ≤ ε₁
         rw [primStep_fill Hsv]
         rw [MeasureTheory.Measure.map_apply ?G1 ?G2]
-        case G1 => sorry
+        case G1 => measurability
         case G2 => sorry
         refine _root_.le_trans (_root_.le_of_eq ?_) Hpgl
         congr 1
