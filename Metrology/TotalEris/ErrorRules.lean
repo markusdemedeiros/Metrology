@@ -143,7 +143,7 @@ theorem errInterp_supply_increase {ε δ : ENNReal} (h : ε + δ < 1) :
 
 /-- "Error increase" rule: given `↯ε`, we may freely "borrow" up to any
 `ε' > ε`. Rocq: `twp_err_incr` (`error_rules.v:881`). -/
-theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → IProp GF}
+theorem twp_err_incr [Countable rT] {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → IProp GF}
     (Hnv : e.toVal? = none) :
     iprop(↯ε ∗ ∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗ ↯ε' -∗ tglWp E e Φ)
       ⊢@{IProp GF} tglWp E e Φ := by
@@ -222,7 +222,7 @@ theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → I
 assume ownership of an arbitrary positive amount of error credits. Rocq:
 `twp_err_pos` (`error_rules.v:967`). Derived from `twp_err_incr` +
 `ec_zero` (start from zero credits, bump to any ε > 0). -/
-theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
+theorem twp_err_pos [Countable rT] {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
     (Hnv : e.toVal? = none) :
     iprop(∀ (ε : ENNReal), ⌜0 < ε⌝ -∗ ↯ε -∗ tglWp E e Φ)
       ⊢@{IProp GF} tglWp E e Φ := by

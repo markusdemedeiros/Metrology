@@ -14,7 +14,7 @@ open scoped ENNReal
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 namespace TotalEris
 
@@ -49,7 +49,7 @@ This shape (always-quantify, match-inside) mirrors `Metrology/Approxis/AppWeakes
 which is the only structure for which the Iris-Lean `Contractive` instance
 proof completes within the default heartbeat budget. It is logically
 equivalent to Rocq's top-level `match to_val e1 with ... end`. -/
-abbrev pglWpPre
+abbrev pglWpPre [Countable rT] [MeasurableSingletonClass rT]
     (wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF)
     (E : CoPset) (e₁ : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
   iprop(∀ (σ₁ : State rT) (ε₁ : ENNReal),
@@ -67,7 +67,8 @@ abbrev PglWpType := CoPset → Exp rT → (Val rT → IProp GF) → IProp GF
 
 /-- `pglWpPre` is `Contractive`: the only recursive use of the `wp`
 parameter sits under `▷`, justifying the contractive step. -/
-instance pglWpPre_contractive : Contractive (pglWpPre (rT := rT) (GF := GF)) where
+instance pglWpPre_contractive [Countable rT] [MeasurableSingletonClass rT] :
+    Contractive (pglWpPre (rT := rT) (GF := GF)) where
   distLater_dist := by
     intro n wp wp' Hwp E e Φ
     refine forall_ne fun σ => ?_
@@ -101,20 +102,23 @@ instance pglWpPre_contractive : Contractive (pglWpPre (rT := rT) (GF := GF)) whe
       exact DistLater.dist_lt (Hwp · · E ρ'.expr Φ) Hm
 
 /-- The Eris partial-correctness weakest precondition. -/
-noncomputable def pglWp (E : CoPset) (e : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
+noncomputable def pglWp [Countable rT] [MeasurableSingletonClass rT]
+    (E : CoPset) (e : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
   fixpoint (pglWpPre (rT := rT) (GF := GF)) E e Φ
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Fixpoint unfolding for `pglWp`. -/
-theorem pglWp_unfold {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+theorem pglWp_unfold [Countable rT] [MeasurableSingletonClass rT]
+    {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     pglWp (GF := GF) E e Φ ≡ pglWpPre (pglWp (rT := rT) (GF := GF)) E e Φ :=
   (fixpoint_unfold ⟨pglWpPre, OFE.ne_of_contractive _⟩) E e Φ
 
 /-! ## Value rules -/
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Value introduction (fupd-flavored). -/
-theorem pglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
+theorem pglWp_value_fupd [Countable rT] [MeasurableSingletonClass rT]
+    {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     iprop(|={E}=> Φ v) ⊢@{IProp GF} pglWp E (Exp.ofVal v) Φ := by
   iintro HΦ
   iapply pglWp_unfold
@@ -127,19 +131,21 @@ theorem pglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   isplitl [Hε]; · iexact Hε
   iexact HΦ'
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Plain value introduction. -/
-theorem pglWp_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
+theorem pglWp_value [Countable rT] [MeasurableSingletonClass rT]
+    {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     Φ v ⊢@{IProp GF} pglWp E (Exp.ofVal v) Φ := by
   iintro HΦ
   iapply pglWp_value_fupd
   imodintro
   iexact HΦ
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- General value form: from `e.toVal? = some v`, introduce `pglWp E e Φ`
 from `Φ v`. -/
-theorem pglWp_value_of_toVal {E : CoPset} {e : Exp rT} {v : Val rT}
+theorem pglWp_value_of_toVal [Countable rT] [MeasurableSingletonClass rT]
+    {E : CoPset} {e : Exp rT} {v : Val rT}
     {Φ : Val rT → IProp GF} (h : e.toVal? = some v) :
     Φ v ⊢@{IProp GF} pglWp E e Φ := by
   rw [← Exp.ofVal_of_toVal_some h]

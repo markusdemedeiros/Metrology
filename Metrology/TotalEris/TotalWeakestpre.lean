@@ -13,7 +13,7 @@ open scoped ENNReal
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] -- [Countable rT] [MeasurableSingletonClass rT]
 
 namespace TotalEris
 namespace ErisWpGS
@@ -61,7 +61,7 @@ instance : OFE.Leibniz (TglWpState rT) := ⟨id⟩
 recursive call is **not** under `▷`. The body is again written in the
 "always-quantify, match-inside" form so the Iris-Lean structural-walk
 lemmas work without bumping `maxHeartbeats`. -/
-abbrev tglWpPre
+abbrev tglWpPre [Countable rT] [MeasurableSingletonClass rT]
     (wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF)
     (E : CoPset) (e₁ : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
   iprop(∀ (σ₁ : State rT) (ε₁ : ENNReal),
@@ -75,12 +75,12 @@ abbrev tglWpPre
               stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ wp E ρ.expr Φ))))
 
 /-- Uncurried form of `tglWpPre` at a fixed postcondition `Φ`. -/
-abbrev tglWpPreFixed (Φ : Val rT → IProp GF)
+abbrev tglWpPreFixed [Countable rT] [MeasurableSingletonClass rT]  (Φ : Val rT → IProp GF)
     (wp : TglWpState rT → IProp GF) : TglWpState rT → IProp GF :=
   fun ⟨E, e⟩ => tglWpPre (fun E' e' _ => wp ⟨E', e'⟩) E e Φ
 
 /-- The pre-functor at a fixed `Φ` is monotone. -/
-instance tglWpPreFixed_mono {Φ : Val rT → IProp GF} :
+instance tglWpPreFixed_mono [Countable rT] [MeasurableSingletonClass rT]  {Φ : Val rT → IProp GF} :
     BIMonoPred (tglWpPreFixed (rT := rT) (GF := GF) Φ) where
   mono_pred {wp1 wp2 _ _} := by
     iintro #Hwand %s Hs
@@ -112,21 +112,21 @@ instance tglWpPreFixed_mono {Φ : Val rT → IProp GF} :
 
 /-- The Eris total weakest precondition. -/
 @[reducible, expose]
-noncomputable def tglWp (E : CoPset) (e : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
+noncomputable def tglWp [Countable rT] [MeasurableSingletonClass rT]  (E : CoPset) (e : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
   bi_least_fixpoint (tglWpPreFixed (rT := rT) (GF := GF) Φ) ⟨E, e⟩
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Fixpoint unfolding for `tglWp`. -/
-theorem tglWp_unfold {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+theorem tglWp_unfold [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     tglWp (rT := rT) (GF := GF) E e Φ ≡ tglWpPre (tglWp (rT := rT) (GF := GF)) E e Φ :=
   least_fixpoint_unfold (F := tglWpPreFixed (rT := rT) (GF := GF) Φ) (x := ⟨E, e⟩)
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Specialised unfolding at a *value* expression: the `match` reduces by
 `Exp.toVal?_ofVal`, eliminating the recursive call and exposing the post
 `Φ v` directly. This is the Lean term-level equality used to derive value
 extraction without an Iris-side rewrite. -/
-theorem tglWp_unfold_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
+theorem tglWp_unfold_value [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     tglWp E (Exp.ofVal v) Φ ≡
       iprop(∀ (σ : State rT) (ε : ENNReal),
         (stateInterp σ ∗ errInterp (rT := rT) ε) -∗
@@ -135,11 +135,11 @@ theorem tglWp_unfold_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} 
   unfold tglWpPre
   rw [Exp.toVal?_ofVal]
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Specialised unfolding at a *non-value* expression: the `match` reduces by
 the hypothesis `Hv : e.toVal? = none`, exposing the `glm`-step body directly.
 Dual to `tglWp_unfold_value`. -/
-theorem tglWp_unfold_step {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
+theorem tglWp_unfold_step [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
     (Hv : e.toVal? = none) :
     tglWp E e Φ ≡
       iprop(∀ (σ : State rT) (ε : ENNReal),
@@ -151,12 +151,12 @@ theorem tglWp_unfold_step {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
   unfold tglWpPre
   rw [Hv]
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Lean-level equality for `tglWpPre` at a value (reduces the inner `match`).
 Used by clients (e.g. `tglWp_bind`) that need to cast an iris hypothesis of
 type `tglWpPre wp E (ofVal v) Φ` to the reduced body form without an
 iris-side rewrite. -/
-theorem tglWpPre_eq_value {wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF}
+theorem tglWpPre_eq_value [Countable rT] [MeasurableSingletonClass rT]  {wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF}
     {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     tglWpPre wp E (Exp.ofVal v) Φ =
       iprop(∀ (σ : State rT) (ε : ENNReal),
@@ -164,9 +164,9 @@ theorem tglWpPre_eq_value {wp : CoPset → Exp rT → (Val rT → IProp GF) → 
           |={E}=> stateInterp σ ∗ errInterp (rT := rT) ε ∗ Φ v) := by
   unfold tglWpPre; rw [Exp.toVal?_ofVal]
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Lean-level equality for `tglWpPre` at a non-value (dual of `tglWpPre_eq_value`). -/
-theorem tglWpPre_eq_step {wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF}
+theorem tglWpPre_eq_step [Countable rT] [MeasurableSingletonClass rT] {wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF}
     {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} (Hv : e.toVal? = none) :
     tglWpPre wp E e Φ =
       iprop(∀ (σ : State rT) (ε : ENNReal),
@@ -178,9 +178,9 @@ theorem tglWpPre_eq_step {wp : CoPset → Exp rT → (Val rT → IProp GF) → I
 
 /-! ## Value rules -/
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Value introduction (fupd-flavored). -/
-theorem tglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
+theorem tglWp_value_fupd [Countable rT] [MeasurableSingletonClass rT]  {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     iprop(|={E}=> Φ v) ⊢@{IProp GF} tglWp E (Exp.ofVal v) Φ := by
   iintro HΦ
   iapply tglWp_unfold
@@ -193,39 +193,39 @@ theorem tglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   isplitl [Hε]; · iexact Hε
   iexact HΦ'
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Plain value introduction. -/
-theorem tglWp_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
+theorem tglWp_value [Countable rT] [MeasurableSingletonClass rT]  {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     Φ v ⊢@{IProp GF} tglWp E (Exp.ofVal v) Φ := by
   iintro HΦ
   iapply tglWp_value_fupd
   imodintro
   iexact HΦ
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- General value form. -/
-theorem tglWp_value_of_toVal {E : CoPset} {e : Exp rT} {v : Val rT}
+theorem tglWp_value_of_toVal [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {v : Val rT}
     {Φ : Val rT → IProp GF} (h : e.toVal? = some v) :
     Φ v ⊢@{IProp GF} tglWp E e Φ := by
   rw [← Exp.ofVal_of_toVal_some h]
   exact tglWp_value
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- General fupd-value form: the fupd variant of `tglWp_value_of_toVal`. -/
-theorem tglWp_value_fupd_of_toVal {E : CoPset} {e : Exp rT} {v : Val rT}
+theorem tglWp_value_fupd_of_toVal [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {v : Val rT}
     {Φ : Val rT → IProp GF} (h : e.toVal? = some v) :
     iprop(|={E}=> Φ v) ⊢@{IProp GF} tglWp E e Φ := by
   rw [← Exp.ofVal_of_toVal_some h]
   exact tglWp_value_fupd
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Extract a value-WP's post under state interp. The state-monadic dual of
 `tglWp_value_fupd`: with `stateInterp σ` and `errInterp ε` available, the
 value-WP `tglWp E (ofVal v) Φ` produces `|={E}=> stateInterp σ ∗ errInterp ε ∗ Φ v`.
 
 Useful for examples that need to "execute" a value-WP after its preceding
 primitive step (which yielded fresh state/err interps). -/
-theorem tglWp_value_inv_with_state {E : CoPset} {v : Val rT} {σ : State rT}
+theorem tglWp_value_inv_with_state [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {v : Val rT} {σ : State rT}
     {ε : ENNReal} {Φ : Val rT → IProp GF} :
     iprop(tglWp E (Exp.ofVal v) Φ ∗ stateInterp σ ∗ errInterp (rT := rT) ε) ⊢@{IProp GF}
       iprop(|={E}=> stateInterp σ ∗ errInterp (rT := rT) ε ∗ Φ v) := by
@@ -237,7 +237,7 @@ theorem tglWp_value_inv_with_state {E : CoPset} {v : Val rT} {σ : State rT}
 
 /-! ## Induction principle -/
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- *Simple* fixpoint induction for `tglWp`.
 
 To prove `Q e'` from `tglWp E e Φ`, it suffices to exhibit a per-`e'`
@@ -248,7 +248,7 @@ This is the analogue of Rocq's `tgl_wp_ind_simple` (specialised to a
 single-mask, fixed-`Φ` use). The outer `E` is threaded as an iris-level
 `⌜E' = E⌝` premise on the induction predicate so that `least_fixpoint_iter`
 (which quantifies over arbitrary fixpoint-state seeds) still goes through. -/
-theorem tglWp_ind_simple {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
+theorem tglWp_ind_simple [Countable rT] [MeasurableSingletonClass rT]  {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
     (Q : Exp rT → IProp GF) [NonExpansive Q] :
     iprop(□ (∀ e',
       tglWpPre (fun _ e'' _ => Q e'') E e' Φ -∗ Q e')) ⊢@{IProp GF}
@@ -301,12 +301,12 @@ theorem tglWp_ind_simple {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
 
 /-! ## Derived structural rules -/
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Strong monotonicity at a fixed mask under a *spatial* `fupd` wand. Rocq:
 `tgl_wp_strong_mono` (with `E1 = E2`). Uses `glm_strong_mono` (spatial) to
 walk the non-value case, and the standard "carry the wand through the
 fixpoint via `Q`" trick to make `tglWp_ind_simple` accept a spatial wand. -/
-theorem tglWp_strong_mono {E : CoPset} {e : Exp rT}
+theorem tglWp_strong_mono [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT}
     {Φ Ψ : Val rT → IProp GF} :
     iprop(tglWp E e Φ ∗ (∀ v, Φ v ={E}=∗ Ψ v)) ⊢@{IProp GF} tglWp E e Ψ := by
   iintro ⟨HW, Hwand⟩
@@ -352,10 +352,10 @@ theorem tglWp_strong_mono {E : CoPset} {e : Exp rT}
       iapply HQρ $$ %Ψ' Hwand'
   iapply HQe $$ %Ψ Hwand
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Spatial wand variant of strong-mono — directly absorbs the no-fupd wand
 into the `={E}=∗` form expected by `tglWp_strong_mono`. -/
-theorem tglWp_wand {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF} :
+theorem tglWp_wand [Countable rT] [MeasurableSingletonClass rT]  {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF} :
     iprop(tglWp E e Φ ∗ (∀ v, Φ v -∗ Ψ v)) ⊢@{IProp GF} tglWp E e Ψ := by
   iintro ⟨HW, HΦΨ⟩
   iapply tglWp_strong_mono
@@ -364,18 +364,18 @@ theorem tglWp_wand {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF} :
   imodintro
   iapply HΦΨ; iexact HΦv
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Wand-on-the-left curry: take the WP after the wand. -/
-theorem tglWp_wand_l {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF} :
+theorem tglWp_wand_l [Countable rT] [MeasurableSingletonClass rT]  {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF} :
     iprop((∀ v, Φ v -∗ Ψ v) ∗ tglWp E e Φ) ⊢@{IProp GF} tglWp E e Ψ := by
   iintro ⟨HΦΨ, HW⟩
   iapply tglWp_wand
   isplitl [HW]; · iexact HW
   iexact HΦΨ
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Absorb a leading `|={E}=>` into the WP. Rocq: `fupd_tgl_wp`. -/
-theorem fupd_tglWp {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+theorem fupd_tglWp [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     iprop(|={E}=> tglWp E e Φ) ⊢@{IProp GF} tglWp E e Φ := by
   iintro HW
   iapply tglWp_unfold
@@ -396,9 +396,9 @@ theorem fupd_tglWp {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     isplitl [Hσ]; · iexact Hσ
     iexact Hε
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Absorb a `fupd` from the post-condition. Rocq: `tgl_wp_fupd`. -/
-theorem tglWp_fupd {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+theorem tglWp_fupd [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     tglWp E e (fun v => iprop(|={E}=> Φ v)) ⊢@{IProp GF} tglWp E e Φ := by
   iintro HW
   iapply tglWp_strong_mono
@@ -409,10 +409,10 @@ theorem tglWp_fupd {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
   imodintro
   iexact HΦfupd
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Frame a (spatial) resource on the left into a `tglWp`. Rocq:
 `tgl_wp_frame_l`. -/
-theorem tglWp_frame_l {E : CoPset} {e : Exp rT} {R : IProp GF}
+theorem tglWp_frame_l [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {R : IProp GF}
     {Φ : Val rT → IProp GF} :
     iprop(R ∗ tglWp E e Φ) ⊢@{IProp GF} tglWp E e (fun v => iprop(R ∗ Φ v)) := by
   iintro ⟨HR, HW⟩
@@ -423,10 +423,10 @@ theorem tglWp_frame_l {E : CoPset} {e : Exp rT} {R : IProp GF}
   · iexact HΦv
   iexact HR
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Frame a (spatial) resource on the right into a `tglWp`. Rocq:
 `tgl_wp_frame_r`. -/
-theorem tglWp_frame_r {E : CoPset} {e : Exp rT} {R : IProp GF}
+theorem tglWp_frame_r [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {R : IProp GF}
     {Φ : Val rT → IProp GF} :
     iprop(tglWp E e Φ ∗ R) ⊢@{IProp GF} tglWp E e (fun v => iprop(Φ v ∗ R)) := by
   iintro ⟨HW, HR⟩
@@ -437,12 +437,12 @@ theorem tglWp_frame_r {E : CoPset} {e : Exp rT} {R : IProp GF}
   · iexact HΦv
   iexact HR
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Spatial-frame variant where the framed resource is *also* in the post.
 `R ∗ WP e {fun v => R -∗ Φ v} ⊢ WP e {Φ}`. Useful when a spatial resource
 needs to survive the step and then be re-consumed in the post.
 Rocq: `wp_frame_wand` (Approxis port). -/
-theorem tglWp_frame_wand {E : CoPset} {e : Exp rT} {R : IProp GF}
+theorem tglWp_frame_wand [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {R : IProp GF}
     {Φ : Val rT → IProp GF} :
     iprop(R ∗ tglWp E e (fun v => iprop(R -∗ Φ v))) ⊢@{IProp GF} tglWp E e Φ := by
   iintro ⟨HR, HW⟩
@@ -454,10 +454,10 @@ theorem tglWp_frame_wand {E : CoPset} {e : Exp rT} {R : IProp GF}
   iintro %v ⟨HRv, HW'⟩
   iapply HW' $$ HRv
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Pointwise post-strengthening for `tglWp`. Rocq: `tgl_wp_mono` (specialised
 to a fixed mask). -/
-theorem tglWp_mono {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF}
+theorem tglWp_mono [Countable rT] [MeasurableSingletonClass rT] {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF}
     (HΦ : ∀ v, Φ v ⊢@{IProp GF} Ψ v) :
     tglWp E e Φ ⊢@{IProp GF} tglWp E e Ψ := by
   iintro HW
@@ -496,7 +496,7 @@ value/step sub-cases use the per-branch `tglWpPre_eq_value`/`tglWpPre_eq_step`
 Lean equalities, applied via `Eq.mpr` term-level cast (which works because
 the equalities are between definitionally-equal `IProp GF` terms — the only
 thing the inner `match` does is depend on `e'.toVal?`). -/
-theorem tglWp_bind {K : Ectx rT} {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+theorem tglWp_bind [Countable rT] [MeasurableSingletonClass rT] {K : Ectx rT} {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     tglWp E e (fun v => tglWp E (K.fill (Exp.ofVal v)) Φ) ⊢@{IProp GF}
       tglWp E (K.fill e) Φ := by
   iintro HW
@@ -590,13 +590,13 @@ theorem tglWp_bind {K : Ectx rT} {E : CoPset} {e : Exp rT} {Φ : Val rT → IPro
               stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ)))
     iexact HF_red
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Value-only specialization of `tglWp_bind`. When the inner expression has
 already reduced to a value, the bind collapses to executing the outer
 continuation. Uses `tglWp_unfold_value` to extract the post, then
 `tglWp_unfold_{value,step}` to discharge the outer-WP body (avoiding
 iris-hyp rewrites on the inner match). -/
-theorem tglWp_bind_value {K : Ectx rT} {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
+theorem tglWp_bind_value [Countable rT] [MeasurableSingletonClass rT] {K : Ectx rT} {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     tglWp E (Exp.ofVal v) (fun v' => tglWp E (K.fill (Exp.ofVal v')) Φ) ⊢@{IProp GF}
       tglWp E (K.fill (Exp.ofVal v)) Φ := by
   iintro HW

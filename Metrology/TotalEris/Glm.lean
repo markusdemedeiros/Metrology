@@ -21,37 +21,15 @@ open scoped ENNReal
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 namespace TotalEris
 
-/-! # `glm` graded lifting modality
+/-! # `glm` graded lifting modality -/
 
-Port of `clutch/theories/eris/weakestpre.v` `glm` section. `glm` is the
-program-step coupling modality used by both `pgl_wp` (partial) and `tgl_wp`
-(total) Eris WPs.
-
-The Rocq version has three disjuncts:
-1. Out-of-thin-air error credits — bump `ε` up to any `ε' > ε` paying nothing.
-2. `prim_step` with adversarial composition — take one program step, pay
-   per-outcome error.
-3. `state_step` on an active tape — presample without taking a program step.
-
-This Lean port currently supports disjuncts 1 and 2; the presampling
-disjunct will be added when `PresampleRules.lean` is ported (it requires
-`stateStep` / `getActive` infrastructure that hasn't been ported yet). The
-fixpoint state already has the shape `(Cfg × ENNReal)` so the third disjunct
-can be added without breaking existing clients. -/
-
-/-! ## `Pgl` — probabilistic graded lift
-
-`Pgl ε φ μ` says: `μ` assigns at most `ε` mass to the complement of `φ`. -/
-
-/-- `Pgl ε φ μ`: the measure `μ` puts at most `ε` mass on `¬φ`. Rocq:
-`pgl μ f ε := prob μ (λ a, negb (bool_decide (f a))) ≤ ε`. -/
 @[expose]
 def Pgl {α : Type _} [MeasurableSpace α] (ε : ENNReal) (φ : α → Prop)
-    (μ : MeasureTheory.Measure α) : Prop :=
+  (μ : MeasureTheory.Measure α) : Prop :=
   μ {x | ¬ φ x} ≤ ε
 
 namespace Pgl
@@ -72,6 +50,7 @@ theorem mono_pred {ε : ENNReal} {φ ψ : α → Prop} {μ : MeasureTheory.Measu
 /-- On a countable measurable space, `Pgl 0` holds for the "positive mass"
 predicate: a measure assigns zero mass to the set of points it gives zero mass
 to (since that set is countable). -/
+@[discrete]
 theorem zero_positive [Countable α] (μ : MeasureTheory.Measure α) :
     Pgl 0 (fun a => 0 < μ {a}) μ := by
   show μ {x | ¬ (0 < μ {x})} ≤ 0
@@ -101,23 +80,9 @@ attribute [reducible, instance] ErisWpGS.invGS
 namespace ErisWpGS
 variable {GF : BundledGFunctors}
 
-/-! ## `execStutter` — credit-bump primitive
-
-The Rocq `exec_stutter` modality says: there is a small slack `(R, ε₁, ε₂)`
-splitting of the budget such that, *modulo* a `tgl (dret tt) R ε₁` coupling,
-the body `P` holds at `ε₂`. Because the underlying distribution is `dret tt`
-this collapses to a binary choice: either we have `1 ≤ ε` and the coupling
-is vacuous, or `R tt` is forced and `P ε` follows.
-
-We use the propositional collapsed form `execStutter₁` (`exec_stutter_1` in
-Rocq) as the working definition — it is easier to reason about in Lean and
-provably equivalent to the relational form. -/
-
-/-- Propositional collapse of `exec_stutter`: either we already have ≥ 1 unit
-of error (so any conclusion follows vacuously), or the body holds. -/
 @[expose]
-abbrev execStutter (P : ENNReal → IProp GF) (ε : ENNReal) : IProp GF :=
-  iprop(⌜1 ≤ ε⌝ ∨ P ε)
+abbrev execStutter (P : ENNReal → IProp GF) (ε : ENNReal) : IProp GF := iprop%
+  ⌜1 ≤ ε⌝ ∨ P ε
 
 /-- If you have `P ε`, you have `execStutter P ε`. -/
 theorem execStutter_free {P : ENNReal → IProp GF} {ε : ENNReal} :
@@ -170,7 +135,7 @@ instance : OFE.Leibniz (GlmState rT) := ⟨id⟩
 `primStep ⟨e₁, σ₁⟩` lifts `R` with slack `ε₁`, the expected total error is
 within budget, and the body `Z` holds on every `R`-related successor under
 the empty mask. -/
-abbrev glmPrimStep
+abbrev glmPrimStep [Countable rT] [MeasurableSingletonClass rT]
     (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
   iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
@@ -207,7 +172,7 @@ abbrev glmStateStep
 2. *Prim-step* — take one program step; see `glmPrimStep`.
 3. *State-step* — presample on a positively-bounded active tape; see
    `glmStateStep`. -/
-abbrev glmPre
+abbrev glmPre [Countable rT] [MeasurableSingletonClass rT]
     (Z : Cfg rT → ENNReal → IProp GF)
     (Φ : GlmState rT → IProp GF) : GlmState rT → IProp GF :=
   fun ⟨ρ, ε⟩ => iprop%
@@ -219,12 +184,12 @@ abbrev glmPre
 /-- `glm e σ ε Z` is the least fixpoint of `glmPre Z`, evaluated at
 `(⟨e, σ⟩, ε)`. -/
 @[expose]
-abbrev glm (e : Exp rT) (σ : State rT) (ε : ENNReal)
+abbrev glm [Countable rT] [MeasurableSingletonClass rT] (e : Exp rT) (σ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
   bi_least_fixpoint (glmPre (GF := GF) Z) ((⟨e, σ⟩, ε) : GlmState rT)
 
 /-- The pre-functor is monotone in `Φ`. -/
-instance glmPre_mono {Z : Cfg rT → ENNReal → IProp GF} :
+instance glmPre_mono [Countable rT] [MeasurableSingletonClass rT] {Z : Cfg rT → ENNReal → IProp GF} :
     BIMonoPred (glmPre (GF := GF) (rT := rT) Z) where
   mono_pred {Φ Ψ _ _} := by
     iintro #Hwand %s Hs
@@ -267,10 +232,10 @@ instance glmPre_mono {Z : Cfg rT → ENNReal → IProp GF} :
   mono_pred_ne.ne {_ s s'} hd := by
     have := eq_of_dist_discrete_leibniz hd; subst this; exact .of_eq rfl
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Unfolding equation: `glm` equals one application of the pre-functor at
 the fixpoint. -/
-theorem glm_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
+theorem glm_unfold [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
     glm (GF := GF) e σ ε Z ≡
       glmPre (GF := GF) Z
@@ -278,7 +243,7 @@ theorem glm_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
         ((⟨e, σ⟩, ε) : GlmState rT) :=
   least_fixpoint_unfold _
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- **Strong induction principle for `glm`.** Specialization of iris's
 `least_fixpoint_ind` to the `glm` fixpoint.
 
@@ -288,7 +253,7 @@ unrolling — assuming `Ψ` holds *and* the underlying `glm` claim is still
 available at every recursive position — implies `Ψ ⟨e, σ⟩ ε`.
 
 Rocq counterpart: `glm_strong_ind` (`total_adequacy.v` private). -/
-theorem glm_strong_ind
+theorem glm_strong_ind [Countable rT] [MeasurableSingletonClass rT]
     {Z : Cfg rT → ENNReal → IProp GF}
     {Ψ : GlmState rT → IProp GF} [NonExpansive Ψ] :
     iprop(□ (∀ s, glmPre Z
@@ -299,7 +264,7 @@ theorem glm_strong_ind
   iapply least_fixpoint_ind (F := glmPre Z) (Φ := Ψ)
   iexact HM
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Strong monotonicity in the body `Z` under a *spatial* continuation wand.
 
 Uses the standard "carry the wand through the fixpoint" trick: the
@@ -309,8 +274,8 @@ without requiring `□`.
 
 Mirrors Rocq's `glm_strong_mono` (specialised to equal grading; the
 ε-relaxation form would compose with `glm_mono_grading`, deferred). -/
-theorem glm_strong_mono {e : Exp rT} {σ : State rT} {ε : ENNReal}
-    {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
+theorem glm_strong_mono [Countable rT] [MeasurableSingletonClass rT]
+    {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
     iprop((∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') ∗ glm e σ ε Z₁) ⊢@{IProp GF}
       glm e σ ε Z₂ := by
   iintro ⟨HZ, HG⟩
@@ -372,12 +337,12 @@ theorem glm_strong_mono {e : Exp rT} {σ : State rT} {ε : ENNReal}
         iapply HP; iexact Hwand
   iapply HΨ; iexact HZ
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Monotonicity in the error grade: `ε ≤ ε' → glm e σ ε Z ⊢ glm e σ ε' Z`.
 Direct single-step weakening of the bound in both disjuncts (the recursive
 calls are unchanged). Rocq: `glm_mono_grading`. -/
-theorem glm_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
-    {Z : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
+theorem glm_mono_grading [Countable rT] [MeasurableSingletonClass rT]
+    {e : Exp rT} {σ : State rT} {ε ε' : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
     glm e σ ε Z ⊢@{IProp GF} glm e σ ε' Z := by
   iintro HG
   ihave HG' := (BI.equiv_iff.mp glm_unfold).1 $$ HG
@@ -406,10 +371,10 @@ theorem glm_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
     isplitr; · ipure_intro; exact Hpgl
     iexact HCont
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Combined ε-relaxation + body weakening. Direct composition of
 `glm_strong_mono` and `glm_mono_grading`. -/
-theorem glm_strong_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
+theorem glm_strong_mono_grading [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
     {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
     iprop((∀ ρ ε'', Z₁ ρ ε'' -∗ Z₂ ρ ε'') ∗ glm e σ ε Z₁) ⊢@{IProp GF}
       glm e σ ε' Z₂ := by
@@ -420,10 +385,10 @@ theorem glm_strong_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
   · iexact HZ
   iexact HG
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- Monotonicity in the body `Z` under an *intuitionistic* continuation
 entailment. Specialised, easier-to-use form of `glm_strong_mono`. -/
-theorem glm_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
+theorem glm_mono_pred [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
     iprop((□ (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε')) ∗ glm e σ ε Z₁) ⊢@{IProp GF}
       glm e σ ε Z₂ := by
@@ -475,8 +440,8 @@ Uses `least_fixpoint_iter` with `Φ s := bi_least_fixpoint (glmPre Z) ⟨K.fillC
 The outer `e` does NOT need to be a non-value — Lean's `Hsv` (the
 non-value-ness needed for `primStep_fill`) is derived per-iteration from the
 prim-step branch's `Discrete.Reducible` witness via `Discrete.val_stuck`. -/
-theorem glm_bind {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal}
-    {Z : Cfg rT → ENNReal → IProp GF} :
+theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
+    {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     glm e σ ε (fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε') ⊢@{IProp GF}
       glm (K.fill e) σ ε Z := by
   iintro HG
@@ -579,10 +544,11 @@ theorem glm_bind {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal}
 
 /-! ## Introduction rules for `glm` -/
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- *Right-introduction* for the `prim_step` disjunct: from the appropriate
 coupling data, conclude `glm e σ ε Z`. Equivalent to Rocq's `glm_prim_step`. -/
-theorem glm_prim_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
+theorem glm_prim_step [Countable rT] [MeasurableSingletonClass rT]
+    {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
       ⌜Discrete.Reducible e σ⌝ ∗
@@ -597,12 +563,12 @@ theorem glm_prim_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
   iright; ileft
   iexact HPS
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- *Right-introduction* for the state-step disjunct: from the coupling
 data on `tapePresample σ α` (with positively-bounded tape `α`), conclude
 `glm e σ ε Z`. -/
-theorem glm_state_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
-    {Z : Cfg rT → ENNReal → IProp GF} :
+theorem glm_state_step [Countable rT] [MeasurableSingletonClass rT]
+    {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∃ (α : Loc) (t : Tape),
         ⌜σ.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
         ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
@@ -618,10 +584,10 @@ theorem glm_state_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
   iright; iright
   iexact HSS
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+-- omit [Countable rT] [MeasurableSingletonClass rT] in
 /-- *Right-introduction* for the out-of-thin-air disjunct. -/
-theorem glm_credit_bump {e : Exp rT} {σ : State rT} {ε : ENNReal}
-    {Z : Cfg rT → ENNReal → IProp GF} :
+theorem glm_credit_bump [Countable rT] [MeasurableSingletonClass rT]
+    {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗
       |={∅}=> execStutter (fun ε'' => glm e σ ε'' Z) ε') ⊢@{IProp GF}
         glm e σ ε Z := by
