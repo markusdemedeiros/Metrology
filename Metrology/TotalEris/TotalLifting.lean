@@ -191,7 +191,7 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   imodintro
   isplitr; · ipureintro; sorry -- exact Reducible.of_head Hhred
   iintro %e₂ %σ₂ %Hpstep
-  have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := sorry -- Discrete.primStep_eq_headStep Hhred
+  have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := heq ▸ Hpstep
   iapply HCont $$ %e₂ %σ₂ %hpos
 
@@ -203,7 +203,7 @@ theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e�
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   iapply twp_lift_pure_det_step hv (Hsafe := fun σ => sorry) -- Reducible.of_head (Hsafe σ))
   intros σ e₂' σ₂ hp
-  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := sorry -- primStep_eq_headStep_discrete (Hsafe σ)
+  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep_discrete (Hsafe σ)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)
 
 /-! ## `PureExec_discrete` integration -/

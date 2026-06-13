@@ -30,6 +30,23 @@ open Lean hiding Expr
 open Lean renaming Expr → LeanExpr
 open Meta Elab Tactic Qq Iris Iris.ProofMode
 
+/-! ## Context-lifted pure step (lemma consumed by `twp_pure`)
+
+`twp_pure_step_fupd` takes a bare `PureExec`; `twp_pure_step_ctx` lifts it through an
+evaluation context `K` via `PureExec.fill`, so the tactic can step a redex in place.
+Total WP has no `▷`, so there is no later-credit accounting to thread. -/
+
+section
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
+
+public theorem ErisWpGS.twp_pure_step_ctx (K : Ectx rT) (φ : Prop) {n : ℕ} {e₁ e₂ : Exp rT}
+    [PureExec φ n e₁ e₂] (Hφ : φ) {E : CoPset} {Φ : Val rT → IProp GF} :
+    tglWp E (K.fill e₂) Φ ⊢@{IProp GF} tglWp E (K.fill e₁) Φ := by
+  letI : PureExec φ n (K.fill e₁) (K.fill e₂) := PureExec.fill K
+  exact twp_pure_step_fupd (n := n) φ Hφ
+
+end
+
 /-! ## Evaluation-context engine (mirrors `HeapLang/Tactic.lean`)
 
 `extractEctxItem e` peels the outermost evaluation-context frame off `e`,
@@ -37,32 +54,17 @@ returning the frame and the sub-expression in its hole (mirrors
 `Exp.decompItem`). `findECtx` searches the resulting frame stack for a
 sub-expression satisfying a predicate. -/
 
-/-- Peel one evaluation-context frame off `e`. Returns `(some Ki, e')` with
-`Ki.fillItem e' = e` when `e` has a redex position, else `(none, e)`. -/
-meta partial def extractEctxItem {α : Q(Type)} :
-    Q(Exp $α) → MetaM (Option Q(EctxItem $α) × Q(Exp $α))
-  | ~q(.app $e (.ofVal $v₂))   => return (some q(.appL $v₂), e)
-  | ~q(.app $e₁ $e)            => return (some q(.appR $e₁), e)
-  | ~q(.unop $op $e)           => return (some q(.unop $op), e)
-  | ~q(.binop $op $e (.ofVal $v₂)) => return (some q(.binopL $op $v₂), e)
-  | ~q(.binop $op $e₁ $e)      => return (some q(.binopR $op $e₁), e)
-  | ~q(.cond $e $e₁ $e₂)       => return (some q(.condC $e₁ $e₂), e)
-  | ~q(.pair $e (.ofVal $v₂))  => return (some q(.pairL $v₂), e)
-  | ~q(.pair $e₁ $e)           => return (some q(.pairR $e₁), e)
-  | ~q(.fst $e)                => return (some q(.fst), e)
-  | ~q(.snd $e)                => return (some q(.snd), e)
-  | ~q(.inl $e)                => return (some q(.inl), e)
-  | ~q(.inr $e)                => return (some q(.inr), e)
-  | ~q(.case $e $e₁ $e₂)       => return (some q(.case $e₁ $e₂), e)
-  | ~q(.alloc $e)              => return (some q(.alloc), e)
-  | ~q(.load $e)               => return (some q(.load), e)
-  | ~q(.store $e (.ofVal $v₂)) => return (some q(.storeL $v₂), e)
-  | ~q(.store $e₁ $e)          => return (some q(.storeR $e₁), e)
-  | ~q(.tape $e)               => return (some q(.tape), e)
-  | ~q(.rand $e (.ofVal $v₂))  => return (some q(.randL $v₂), e)
-  | ~q(.rand $e₁ $e)           => return (some q(.randR $e₁), e)
-  | ~q(.scrut $e $p)           => return (some q(.scrut $p), e)
-  | e => return (none, e)
+/-- Peel one evaluation-context frame off `e`, returning the frame and the
+sub-expression in its hole, or `(none, e)` if `e` is not decomposable. This *reflects*
+ProbLang's `Exp.decompItem` (whnf + read off the result), so it uses the language's own
+semantic value test (`toVal?`) rather than a syntactic `.ofVal` check — ProbLang values
+are raw `.lit`/`.lam`/…, not `.ofVal`-wrapped as in HeapLang. -/
+meta def extractEctxItem {α : Q(Type)} (e : Q(Exp $α)) :
+    MetaM (Option Q(EctxItem $α) × Q(Exp $α)) := do
+  let r : Q(Option (EctxItem $α × Exp $α)) ← whnf q(Exp.decompItem $e)
+  match r with
+  | ~q(some ($Ki, $e')) => return (some Ki, e')
+  | _ => return (none, e)
 
 /-- Fully decompose `e` into a frame stack `[innermost, …, outermost]` and the
 innermost non-context sub-expression. The list order matches `Ectx.fill`
@@ -102,6 +104,13 @@ meta def quoteList {α : Q(Type)} : List Q(EctxItem $α) → Q(Ectx $α)
   | [] => q([])
   | x :: xs => q($x :: $(quoteList xs))
 
+/-- Plug `e` into the (quoted) context `K`, computing the filled expression at the meta
+level. Result is defeq to `Ectx.fill K e` but β-reduced (no residual `Ectx.fill`). -/
+meta partial def fill {α : Q(Type)} (K : Q(Ectx $α)) (e : Q(Exp $α)) : MetaM Q(Exp $α) :=
+  match K with
+  | ~q([]) => pure e
+  | ~q($Ki :: $K') => do fill K' (← fillItem e Ki)
+
 /-- A decomposition `e = Ectx.fill K e'` together with a result `a` computed at
 the focus `e'`. -/
 meta structure ECtxResultOf (α : Q(Type)) (β : Type) where
@@ -112,12 +121,12 @@ meta structure ECtxResultOf (α : Q(Type)) (β : Type) where
 /-- Walk the frame stack of `ogE` from innermost outward, returning the first
 focus `e'` at which `pred e'` succeeds, together with the surrounding context. -/
 meta partial def findECtx {α : Q(Type)} {β : Type} (ogE : Q(Exp $α))
-    (pred : Q(Exp $α) → MetaM β) : MetaM (Option (ECtxResultOf α β)) := do
+    (pred : Q(Exp $α) → ProofModeM β) : ProofModeM (Option (ECtxResultOf α β)) := do
   let (Kis, inner) ← extractAllEctxItems ogE
   go inner Kis
 where
   go (e : Q(Exp $α)) (Kis : List Q(EctxItem $α)) :
-      MetaM (Option (ECtxResultOf α β)) := do
+      ProofModeM (Option (ECtxResultOf α β)) := do
     if let some a ← observing? <| pred e then
       return some { result := a, K := quoteList Kis, e' := e }
     let Ki :: Kis' := Kis | return none
@@ -186,12 +195,13 @@ elab "twp_bind" colGt ppSpace focus:term:max : tactic =>
           m!"cannot unify {← ppExpr focus} with any evaluation context of {← ppExpr e}"
     have K : Q(Ectx $α) := res.K
     have e' : Q(Exp $α) := res.e'
-    -- Φ' v := tglWp E (K.fill (ofVal v)) Φ
+    -- Φ' v := tglWp E (K.fill (ofVal v)) Φ, with `K` filled at the meta level so the
+    -- continuation shows the clean refocused expression (defeq to `Ectx.fill K (ofVal v)`).
     let Φc : Q(Val $α → IProp $GF) ←
       withLocalDeclDQ `v q(Val $α) fun v => do
+        let body : Q(Exp $α) ← fill K q(Exp.ofVal $v)
         mkLambdaFVars #[v]
-          q(@ProbLang.TotalEris.ErisWpGS.tglWp $α $instPL $GF $instWp $E
-              (Ectx.fill $K (Exp.ofVal $v)) $Φ)
+          q(@ProbLang.TotalEris.ErisWpGS.tglWp $α $instPL $GF $instWp $E $body $Φ)
     let pf ← addBIGoal hyps
       q(@ProbLang.TotalEris.ErisWpGS.tglWp $α $instPL $GF $instWp $E $e' $Φc)
     -- Build the proof with raw `mkApp*` rather than `q(…)`: `tglWp` is
@@ -202,5 +212,120 @@ elab "twp_bind" colGt ppSpace focus:term:max : tactic =>
       (#[α, instPL, GF, instWp, K, E, e', Φ].map some)
     let transPf ← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, bindPf]
     mvar.assign transPf
+
+/-- Symbolic result of one pure step at a redex head (mirrors the syntactic-result
+`PureExec` instances). Returns the stepped expression *unreduced* (e.g. `open' body v`);
+`PureExec` synthesis then confirms the step and `wp_expr_simp` cleans it up. Computed-
+result redexes (`binop`/`unop`/`scrut`) are not handled — use the explicit pure-step
+lemma for those. -/
+meta def pureStepResult {α : Q(Type)} : Q(Exp $α) → MetaM (Option Q(Exp $α))
+  | ~q(.app (.lam $body) $v)              => return some q(Exp.open' $body $v)
+  | ~q(.app (.fix $body) $v)              => return some q(Exp.app (Exp.open' $body (.fix $body)) $v)
+  | ~q(.cond (.lit (.bool true)) $et $ef) => return some et
+  | ~q(.cond (.lit (.bool false)) $et $ef)=> return some ef
+  | ~q(.fst (.pair $e1 $_e2))             => return some e1
+  | ~q(.snd (.pair $_e1 $e2))             => return some e2
+  | ~q(.case (.inl $v) $el $_er)          => return some q(Exp.app $el $v)
+  | ~q(.case (.inr $v) $_el $er)          => return some q(Exp.app $er $v)
+  | _                                     => return none
+
+/-! ## `twp_pure` — take a pure step at a redex, auto-discovering its context -/
+
+/-- `twp_pure e` takes a single pure (`PureExec`) reduction step at the redex `e`,
+discovering the surrounding evaluation context `K` automatically. The pure-step side
+condition `φ` (e.g. value-hood) is discharged if trivial, else left as a goal. -/
+elab "twp_pure" focus:(ppSpace colGt term:max)? : tactic =>
+  runTacticTglWp fun mvar { α, GF, instPL, instWp, hyps, E, e, Φ, .. } => do
+    -- Optional focus: with an argument, step that specific redex; without, step the
+    -- first redex found while descending the evaluation context.
+    let focusE? : Option Q(Exp $α) ← focus.mapM fun f => elabTermEnsuringTypeQ f q(Exp $α)
+    let some res ← findECtx e fun e₁ => do
+      if let some focusE := focusE? then guard (← isDefEq e₁ focusE)
+      let some e₂ ← pureStepResult e₁ | failure
+      let φ : Q(Prop) ← mkFreshExprMVarQ q(Prop)
+      let n : Q(Nat) ← mkFreshExprMVarQ q(Nat)
+      let some inst ← ProofModeM.trySynthInstanceQ q(ProbLang.PureExec $φ $n $e₁ $e₂)
+        | failure
+      return (φ, n, e₂, inst)
+      | throwTacticEx `twp_pure mvar m!"no pure step applies"
+    have K : Q(Ectx $α) := res.K
+    have e₁ : Q(Exp $α) := res.e'
+    let φ : Q(Prop) ← instantiateMVars res.result.1
+    let n : Q(Nat) ← instantiateMVars res.result.2.1
+    let e₂ : Q(Exp $α) ← instantiateMVars res.result.2.2.1
+    let inst : Q(ProbLang.PureExec $φ $n $e₁ $e₂) := res.result.2.2.2
+    -- New goal: `tglWp E (K.fill e₂) Φ`, but with `K` filled at the meta level so the
+    -- goal shows the clean stepped expression (not a `Ectx.fill` redex that would hide
+    -- the next redex from `twp_pures`). Defeq to `Ectx.fill K e₂`.
+    let inner : Q(Exp $α) ← fill K e₂
+    let pf ← addBIGoal hyps
+      q(@ProbLang.TotalEris.ErisWpGS.tglWp $α $instPL $GF $instWp $E $inner $Φ)
+    -- Discharge the pure-step side condition (`True`, value-hood, …); leave it as a
+    -- goal if non-trivial. Unlike `iSolveSidecondition`, this never throws.
+    let HΦ : Q($φ) ← mkFreshExprSyntheticOpaqueMVar q($φ)
+    let gs ← Tactic.evalTacticAt
+      (← `(tactic| (try (first
+            | trivial
+            | repeat' (first | exact ⟨IsVal.lit⟩ | exact ⟨IsVal.lam⟩ | refine ⟨?_, ?_⟩)))))
+      HΦ.mvarId!
+    gs.forM addMVarGoal
+    let stepPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.twp_pure_step_ctx
+      (#[α, instPL, GF, instWp, K, φ, n, e₁, e₂, inst, HΦ, E, Φ].map some)
+    let transPf ← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, stepPf]
+    mvar.assign transPf
+
+/-! ## `twp_value` — discharge a value WP (semantic value head) -/
+
+/-- `twp_value` closes a goal `tglWp E e Φ` when `e` is a value `v` (detected via
+`e.toVal?`, so it works on raw `.lit`/`.lam`/… values, not just `Exp.ofVal v`),
+reducing it to the postcondition `Φ v`. The TotalEris analogue of iris's
+`wp_value_head`. -/
+elab "twp_value" : tactic =>
+  runTacticTglWp fun mvar { α, GF, instPL, instWp, hyps, E, e, Φ, .. } => do
+    let tv : Q(Option (Val $α)) ← whnf q(Exp.toVal? $e)
+    let ~q(some $v) := tv
+      | throwTacticEx `twp_value mvar m!"{← ppExpr e} is not a value"
+    -- `e.toVal? = some v` holds definitionally (`v` came from whnf of `e.toVal?`);
+    -- discharge it with `rfl`.
+    let hproof : Q(Exp.toVal? $e = some $v) ← mkFreshExprSyntheticOpaqueMVar
+      q(Exp.toVal? $e = some $v)
+    (← Tactic.evalTacticAt (← `(tactic| rfl)) hproof.mvarId!).forM addMVarGoal
+    let pf ← addBIGoal hyps q($Φ $v)
+    let valPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.tglWp_value_of_toVal
+      (#[α, instPL, GF, instWp, E, e, v, Φ, hproof].map some)
+    let transPf ← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, valPf]
+    mvar.assign transPf
+
+/-- `wp_value` — Rocq-facing alias for `twp_value`. -/
+macro "wp_value" : tactic => `(tactic| twp_value)
+
+/-! ## Cleanup + composite tactics -/
+
+/-- `twp_expr_simp` reduces the substitutions left by a pure step (`open'`/`openRec`)
+and the surrounding boolean/arithmetic redexes, recovering a clean WP goal. The
+TotalEris analogue of iris's `wp_expr_simp` (named `twp_*` to avoid the clash with
+iris-lean's HeapLang `wp_expr_simp`). -/
+macro "twp_expr_simp" : tactic =>
+  `(tactic| simp only [Exp.open', Exp.openRec, Exp.close, Exp.closeRec, Exp.ofVal,
+      ↓reduceIte, Nat.reduceAdd, Nat.reduceSub, Nat.reduceEqDiff, Nat.zero_add,
+      Var.internal.injEq, reduceCtorEq])
+
+/-- `twp_lam` β-reduces a `(λ. _) v` application — an alias for `twp_pure`. -/
+macro "twp_lam" : tactic => `(tactic| twp_pure)
+
+/-- `wp_lam` — Rocq-facing alias for `twp_lam`. -/
+macro "wp_lam" : tactic => `(tactic| twp_lam)
+
+/-- `twp_rec` unfolds a recursive call `(rec f x := e) v` — `twp_pure` already handles
+the `app_fix` step, so this is an alias. -/
+macro "twp_rec" : tactic => `(tactic| twp_pure)
+
+/-- `twp_finish` cleans up after a step: reduce leftover substitutions, then close the
+goal if it has become a value WP. The TotalEris analogue of iris's `wp_finish`. -/
+macro "twp_finish" : tactic =>
+  `(tactic| ((try twp_expr_simp); (try iapply ProbLang.TotalEris.ErisWpGS.tglWp_value)))
+
+/-- `twp_pures` repeatedly takes pure steps (cleaning up after each) until none apply. -/
+macro "twp_pures" : tactic => `(tactic| repeat (twp_pure; try twp_expr_simp))
 
 end ProbLang.TotalEris

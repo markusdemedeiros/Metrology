@@ -29,5 +29,23 @@ example (E : CoPset) (Φ : Val rT → IProp GF) :
     (fun w => tglWp E pl(fst({Exp.ofVal w})) Φ)
   sorry
 
+/-- `twp_pure` β-reduces `(fun x, x) #1` at the top level (`K = []`); `wp_expr_simp`
+then reduces the `open'`, leaving `tglWp E #1 Φ`. -/
+example (E : CoPset) (Φ : Val rT → IProp GF) :
+    ⊢@{IProp GF} tglWp E pl((fun x, x) #1) Φ := by
+  twp_pure pl((fun x, x) #1)
+  twp_expr_simp
+  show ⊢@{IProp GF} tglWp E pl(#1) Φ
+  sorry
+
+/-- End-to-end (no `sorry`): `twp_pures` β-reduces `(fun x, x) #1` and evaluates the
+`fst`, reaching the value `#1`; `twp_value` then discharges the value postcondition. -/
+example (E : CoPset) :
+    ⊢@{IProp GF} tglWp E pl(fst(((fun x, x) #1, #2)))
+      (fun w : Val rT => iprop(⌜w = ⟨.lit (.int 1), IsVal.lit⟩⌝)) := by
+  twp_pures
+  twp_value
+  ipureintro; rfl
+
 end TotalEris
 end ProbLang

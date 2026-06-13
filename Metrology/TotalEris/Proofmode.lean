@@ -26,9 +26,9 @@ open Iris Iris.BI Iris.ProofMode
 
 /-! ### Value / return -/
 
-syntax "twp_value" : tactic
-macro_rules
-  | `(tactic| twp_value) => `(tactic| iapply ErisWpGS.tglWp_value)
+-- `twp_value` now lives in `WpTactics.lean` as an elaborator tactic that detects values
+-- semantically (via `toVal?`), so it works on raw `.lit`/`.lam`/… values. The old macro
+-- `iapply ErisWpGS.tglWp_value` only matched a syntactic `Exp.ofVal v`.
 
 /-! ### Pure-step tactics
 
@@ -45,15 +45,13 @@ iapply (ErisWpGS.twp_pure_step_fupd
 
 — pinning enough arguments lets the relevant `PureExec_discrete` instance unify. -/
 
-syntax "twp_pure" : tactic
-macro_rules
-  | `(tactic| twp_pure) =>
-    `(tactic| iapply (ErisWpGS.twp_pure_step_fupd _ (by trivial)))
-
-syntax "twp_pures" : tactic
-macro_rules
-  | `(tactic| twp_pures) =>
-    `(tactic| (try repeat twp_pure))
+-- NOTE: `twp_pure`/`twp_pures` are now elaborator tactics in `WpTactics.lean` that
+-- locate the redex and its evaluation context automatically. The old metavar-fragile
+-- macros are retired:
+--   syntax "twp_pure" : tactic
+--   macro_rules | `(tactic| twp_pure) => `(tactic| iapply (ErisWpGS.twp_pure_step_fupd _ (by trivial)))
+--   syntax "twp_pures" : tactic
+--   macro_rules | `(tactic| twp_pures) => `(tactic| (try repeat twp_pure))
 
 /-- `twp_pure_at <e₁> ↦ <e₂>` — explicit pure-step with both endpoints
 pinned. Use when `twp_pure`'s implicit `PureExec_discrete` synthesis fails because
@@ -73,10 +71,7 @@ macro "twp_pure_at " e1:term:max " ↦ " e2:term:max " by " h:term : tactic =>
   `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
       (n := 1) (e₁ := $e1) (e₂ := $e2) _ $h))
 
-syntax "twp_lam" : tactic
-macro_rules
-  | `(tactic| twp_lam) =>
-    `(tactic| twp_pure)
+-- `twp_lam` now lives in `WpTactics.lean` (alias for the elaborator `twp_pure`).
 
 /-! ### Structural / bind -/
 
@@ -94,9 +89,7 @@ macro "twp_apply " L:term : tactic =>
 `Lifting.lean` (partial) is filled in, separate `wp_*` versions can be
 added. -/
 
-syntax "wp_value" : tactic
-macro_rules
-  | `(tactic| wp_value) => `(tactic| twp_value)
+-- `wp_value` now lives in `WpTactics.lean` (alongside `twp_value`).
 
 -- NOTE(iris-bump): the bumped iris HeapLang ProofMode now defines `wp_pure`/`wp_pures`
 -- macros, which collide with these (unused) total-WP aliases. Disabled pending the
@@ -109,9 +102,7 @@ macro_rules
 -- macro_rules
 --   | `(tactic| wp_pures) => `(tactic| twp_pures)
 
-syntax "wp_lam" : tactic
-macro_rules
-  | `(tactic| wp_lam) => `(tactic| twp_lam)
+-- `wp_lam` now lives in `WpTactics.lean` (alongside `twp_lam`).
 
 macro "wp_apply " L:term : tactic =>
   `(tactic| twp_apply $L)

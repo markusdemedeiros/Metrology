@@ -113,34 +113,9 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   -- Collapse `openRec 2 () innerBody = innerBody` (innerBody has only
   -- bvar 0/1, so a level-2 open is a no-op).
   simp only [hInner, Exp.openRec, ↓reduceIte, Nat.reduceAdd, Nat.reduceEqDiff]
-  -- Focus on `rand 2 ()` via `twp_bind`. Trick: a direct `iapply (tglWp_bind …)`
-  -- fails because `iapply`'s unifier won't reduce `K.fill` to the `cond …`
-  -- syntactic form. Instead, build the bind entailment as a typed `have`
-  -- (Lean's elaborator checks the type ascription via defeq on `K.fill`),
-  -- then `iapply` that pre-shaped entailment.
-  have hBind : iprop(tglWp E (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit))
-      (fun v => tglWp E
-        (Exp.cond
-          (Exp.binop .eq (Exp.ofVal v) (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
-          (.lit (.int 0))
-          (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-            (.lit (.int 1))))
-        geoPost))
-    ⊢@{IProp GF}
-      iprop(tglWp E
-        (Exp.cond
-          (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit))
-            (Exp.lit (.int 0)))
-          (.lit (.int 0))
-          (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-            (.lit (.int 1))))
-        geoPost) :=
-    ErisWpGS.tglWp_bind (K :=
-      [EctxItem.binopL .eq ⟨.lit (.int 0), IsVal.lit⟩,
-       EctxItem.condC (.lit (.int 0))
-         (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-           (.lit (.int 1)))])
-  iapply hBind
+  -- Focus on `rand 2 ()` via `twp_bind`, which discovers the evaluation context
+  -- `K = [binopL .eq 0, condC …]` automatically (replacing the explicit `tglWp_bind`).
+  twp_bind (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit))
   -- Goal: `tglWp E (rand 2 ()) (fun v => tglWp E (cond (v = 0) 0 (geo()+1)) _)`.
   -- Apply `twp_rand_exp` with `F(n) = if n=0 then 0 else (3/2)*ε`. The
   -- `$$ [Herr]` clause threads the iris hypothesis `Herr : ↯ε` into the
@@ -161,29 +136,10 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   obtain ⟨Hn₁, Hn₂⟩ := Hn
   interval_cases n
   · -- n = 0 branch. Reduce `cond (binop eq 0 0) 0 (…) → … → lit 0`.
-    -- Step A: `twp_bind` on the cond context to focus the discriminant.
-    have hBindCond0 : iprop(tglWp E
-        (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩)
-          (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
-        (fun v => tglWp E
-          (Exp.cond (Exp.ofVal v) (.lit (.int 0))
-            (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-              (.lit (.int 1))))
-          geoPost))
-      ⊢@{IProp GF}
-      iprop(tglWp E
-        (Exp.cond
-          (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩)
-            (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
-          (.lit (.int 0))
-          (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-            (.lit (.int 1))))
-        geoPost) :=
-      ErisWpGS.tglWp_bind (K :=
-        [EctxItem.condC (.lit (.int 0))
-          (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-            (.lit (.int 1)))])
-    iapply hBindCond0
+    -- Step A: `twp_bind` focuses the `cond` discriminant (context `K = [condC …]`
+    -- discovered automatically).
+    twp_bind (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩)
+      (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
     -- Step B: reduce `binop eq 0 0 → lit true` (pure step). `ofVal` is reducible;
     -- normalise so the goal exposes the literal form before invoking `PureExec_discrete`.
     simp only [Exp.ofVal]
@@ -216,29 +172,9 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     ipureintro
     exact ⟨rfl, _root_.le_refl _⟩
   · -- n = 1 branch: symmetric to n=0 up to step D, then recurses via `IH`.
-    -- Step A: bind on the cond context.
-    have hBindCond1 : iprop(tglWp E
-        (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 1), IsVal.lit⟩)
-          (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
-        (fun v => tglWp E
-          (Exp.cond (Exp.ofVal v) (.lit (.int 0))
-            (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-              (.lit (.int 1))))
-          geoPost))
-      ⊢@{IProp GF}
-      iprop(tglWp E
-        (Exp.cond
-          (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 1), IsVal.lit⟩)
-            (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
-          (.lit (.int 0))
-          (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-            (.lit (.int 1))))
-        geoPost) :=
-      ErisWpGS.tglWp_bind (K :=
-        [EctxItem.condC (.lit (.int 0))
-          (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-            (.lit (.int 1)))])
-    iapply hBindCond1
+    -- Step A: `twp_bind` focuses the `cond` discriminant.
+    twp_bind (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 1), IsVal.lit⟩)
+      (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
     -- Step B: reduce `binop eq 1 0 → lit false`.
     simp only [Exp.ofVal]
     iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
@@ -261,19 +197,8 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
           (.lit (.int 1))))
       ↦ (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
           (.lit (.int 1)))
-    -- Step E: bind on `[binopL .plus ⟨lit 1, lit⟩]` to focus the recursive call.
-    have hBindPlus : iprop(tglWp E
-        (Exp.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-        (fun v => tglWp E
-          (.binop .plus (Exp.ofVal v) (.lit (.int 1)))
-          geoPost))
-      ⊢@{IProp GF}
-      iprop(tglWp E
-        (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-          (.lit (.int 1)))
-        geoPost) :=
-      ErisWpGS.tglWp_bind (K := [EctxItem.binopL .plus ⟨.lit (.int 1), IsVal.lit⟩])
-    iapply hBindPlus
+    -- Step E: `twp_bind` focuses the recursive call (context `[binopL .plus 1]`).
+    twp_bind (Exp.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
     -- Step F: invoke IH via `tglWp_wand` — IH's post is `geoPost`, but our
     -- bound continuation expects `fun v => tglWp E (plus v 1) geoPost`. Use
     -- `tglWp_wand` to weaken.

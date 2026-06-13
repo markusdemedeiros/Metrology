@@ -41,7 +41,7 @@ structure PureStep (e1 e2 : Exp rT) : Prop where
 class PureExec_discrete (φ : Prop) (n : ℕ) (e1 e2 : Exp rT) : Prop where
   pure_exec : φ → nsteps PureStep_discrete n e1 e2
 
-class PureExec (φ : Prop) (n : ℕ) (e1 e2 : Exp rT) : Prop where
+class PureExec (φ : outParam Prop) (n : outParam ℕ) (e1 e2 : Exp rT) : Prop where
   pure_exec : φ → nsteps PureStep n e1 e2
 
 -- PureHeadStep
