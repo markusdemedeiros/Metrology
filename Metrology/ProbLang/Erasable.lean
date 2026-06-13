@@ -75,10 +75,15 @@ namespace Erasable
 /-- The dirac distribution at `σ` is erasable at `σ`. The bind collapses
 to a single evaluation at `σ`, after which the projection is trivially
 equal. -/
+@[discrete] -- dret'
 theorem dret [Countable rT] [MeasurableSingletonClass rT]
     (σ : State rT) : Erasable (Measure.dirac σ) σ := by
   intro e m
   rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) Measurable.of_discrete]
+
+theorem dret' (σ : State rT) : Erasable (Measure.dirac σ) σ := by
+  intro e m
+  rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) (by measurability)]
 
 /-- Erasable distributions compose under `bind`. If `μ₁` is erasable at `σ`
 and `μ₂ σ'` is erasable at `σ'` for every `σ'` in the support of `μ₁`,
@@ -88,6 +93,7 @@ Clutch's proof has a support-conditional hypothesis (`μ₁ σ' > 0`). For
 measures we strengthen it to an unconditional hypothesis; the
 conditional form follows because any kernel can be modified on a null
 set without changing the bind. -/
+@[discrete] -- dbind'
 theorem dbind [Countable rT] [MeasurableSingletonClass rT]
     {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
     (h₁ : Erasable μ₁ σ) (h₂ : ∀ σ', Erasable (μ₂ σ') σ') :
@@ -102,27 +108,19 @@ theorem dbind [Countable rT] [MeasurableSingletonClass rT]
           funext σ'; exact h₂ σ' e m]
   exact h₁ e m
 
-/-! ### The load-bearing lemma: erasability lifts through `limExec`.
+theorem dbind'
+    {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
+    (h₁ : Erasable μ₁ σ) (h₂ : ∀ σ', Erasable (μ₂ σ') σ') (hm₂ : AEMeasurable μ₂ μ₁) :
+    Erasable (μ₁.bind μ₂) σ := by
+  intro e m
+  rw [Measure.bind_bind hm₂ (Measurable.aemeasurable (by measurability))]
+  conv_lhs =>
+    rw [show (fun σ' => (μ₂ σ').bind (fun σ'' => execN m ⟨e, σ''⟩))
+            = (fun σ' => execN m ⟨e, σ'⟩) from by
+          funext σ'; exact h₂ σ' e m]
+  exact h₁ e m
 
-We prove `μ.bind (limExec ⟨e, ·⟩) = limExec ⟨e, σ⟩` by `Measure.ext` +
-singleton decomposition, using monotone convergence (`lintegral_iSup`) to
-swap the `iSup` in `limExec` with the outer `lintegral` from `bind_apply`.
-The trickiest step — that the `iSup` of measures agrees pointwise on sets
-with the pointwise `iSup` — is avoided by going through singletons
-(where `Discrete.limExec_apply` already supplies the needed equation) and then
-decomposing arbitrary sets via `⋃ c ∈ S, {c}`, mirroring `limExec_univ`.
--/
-
-/-- The main consequence: if `μ` is erasable at `σ`, then we can push `μ`
-through `limExec` on any expression `e`.
-
-Proof sketch: both sides of the equation are measures on `Cfg` determined
-by their values on singletons. On a singleton `{c}`, both reduce via
-`Discrete.limExec_apply` to an iSup of `execN n _ {c}` values. The hypothesis `h e n`,
-applied at `{c}`, gives exactly what we need to collapse the outer
-`lintegral` to a constant `(execN n ⟨e, σ⟩) {c}`, and then `Discrete.limExec_apply`
-reassembles the RHS. Monotone convergence (`lintegral_iSup`) handles the
-swap between `lintegral` and `iSup`. -/
+@[discrete] -- lim_exec'
 theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
     μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
@@ -144,8 +142,28 @@ theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
              Measurable.of_discrete.aemeasurable] using hμ
   simp only [hbind, ← Discrete.limExec_apply]
 
-/-- `dret v = μ >>= (λ _, dret v)` when `e` is already a value. This is
-the specialization of `Erasable.lim_exec` to the value case. -/
+theorem lim_exec'
+    {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
+    μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
+  sorry
+  -- refine Cfg.measure_ext_singletons fun c => ?_
+  -- -- LHS: apply `bind_apply`, then unfold `limExec` at singleton via `Discrete.limExec_apply`.
+  -- rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+  -- simp_rw [Discrete.limExec_apply]
+  -- -- Swap `lintegral` with `iSup`: monotone convergence.
+  -- rw [lintegral_iSup
+  --       (fun _ => Measurable.of_discrete)
+  --       (fun i j hij σ' => execN_mono_singleton hij ⟨e, σ'⟩ _)]
+  -- -- Each `∫⁻ σ', (execN n ⟨e,σ'⟩) {c} ∂μ` equals `(execN n ⟨e,σ⟩) {c}`
+  -- -- by the erasability hypothesis applied at `{c}`.
+  -- have hbind : ∀ n,
+  --     ∫⁻ σ', (execN n ⟨e, σ'⟩) {c} ∂μ = (execN n ⟨e, σ⟩) {c} := by
+  --   intro n
+  --   have hμ := congrArg (fun ν => ν ({c} : Set (Cfg rT))) (h e n)
+  --   simpa [bind_apply MeasurableSet.of_discrete
+  --            Measurable.of_discrete.aemeasurable] using hμ
+  -- simp only [hbind, ← Discrete.limExec_apply]
+
 theorem dret_final {μ : Measure (State rT)} {σ : State rT} {e : Exp rT} (hv : IsVal e)
     (h : Erasable μ σ) :
     μ.bind (fun σ' => Measure.dirac (⟨e, σ'⟩ : Cfg rT)) =
@@ -161,45 +179,38 @@ theorem dret_final {μ : Measure (State rT)} {σ : State rT} {e : Exp rT} (hv : 
     _ = execN 1 ⟨e, σ⟩ := h e 1
     _ = Measure.dirac ⟨e, σ⟩ := hstep σ
 
-/-- Push an erasable distribution through `pexecN n` then `limExec`. -/
-theorem pexecN_lim_exec [Countable rT] [MeasurableSingletonClass rT]
+theorem pexecN_lim_exec
     {μ : Measure (State rT)} {σ : State rT}
     (h : Erasable μ σ) (n : Nat) (e : Exp rT) :
     (μ.bind (fun σ' => pexecN n ⟨e, σ'⟩)).bind limExec = limExec ⟨e, σ⟩ := by
   rw [Measure.bind_bind
-        (Measurable.aemeasurable .of_discrete)
-        (Measurable.aemeasurable .of_discrete)]
+        (Measurable.aemeasurable (by measurability))
+        (Measurable.aemeasurable (by measurability))]
   conv_lhs =>
     rw [show (fun σ' => (pexecN n ⟨e, σ'⟩).bind limExec)
            = (fun σ' => limExec ⟨e, σ'⟩) from by
          funext σ'; exact (limExec_pexecN n ⟨e, σ'⟩).symm]
-  exact h.lim_exec e
+  exact h.lim_exec' e
 
-/-- An erasable distribution has total mass 1, provided the language has at
-least one value (we use `.lit .unit`). -/
-theorem mass [Countable rT] [MeasurableSingletonClass rT]
+theorem mass
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) :
     μ Set.univ = 1 := by
-  -- Specialize `h` to the unit literal (always a value) and 1 step.
   have hv : IsVal (Exp.lit (rT := rT) .unit) := .lit
   have hstep : ∀ σ' : State rT,
       execN 1 ((⟨.lit .unit, σ'⟩ : Cfg rT)) = Measure.dirac (⟨.lit .unit, σ'⟩ : Cfg rT) :=
     fun σ' => execN_succ_isValue (ρ := ⟨.lit .unit, σ'⟩) hv.toIsValue 0
   have h1 := h (.lit .unit) 1
-  -- Take `Set.univ`-mass of both sides of `h1`.
   have hboth := congrArg (fun ν => ν (Set.univ : Set (Cfg rT))) h1
   simp only at hboth
-  -- RHS mass: `(execN 1 _) univ = (dirac _) univ = 1`.
   rw [hstep σ] at hboth
-  rw [Measure.dirac_apply' _ MeasurableSet.of_discrete] at hboth
+  rw [Measure.dirac_apply' _ .univ] at hboth
   simp at hboth
-  -- LHS mass: collapses to `μ Set.univ` via `bind_apply` + `hstep`.
-  rw [bind_apply MeasurableSet.of_discrete
-        Measurable.of_discrete.aemeasurable] at hboth
+  rw [bind_apply .univ (Measurable.aemeasurable (by measurability))] at hboth
   simp_rw [hstep] at hboth
-  simp_rw [Measure.dirac_apply' _ MeasurableSet.of_discrete] at hboth
+  simp_rw [Measure.dirac_apply' _ .univ] at hboth
   simp at hboth
   exact hboth
+
 
 /-- A two-branch erasable combinator: dispatching on a measurable Boolean
 function through a total distribution yields an erasable combination. -/
