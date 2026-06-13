@@ -80,49 +80,33 @@ attribute [reducible, instance] ErisWpGS.invGS
 namespace ErisWpGS
 variable {GF : BundledGFunctors}
 
+-- TODO Should be a def
 @[expose]
 abbrev execStutter (P : ENNReal → IProp GF) (ε : ENNReal) : IProp GF := iprop%
   ⌜1 ≤ ε⌝ ∨ P ε
 
-/-- If you have `P ε`, you have `execStutter P ε`. -/
+-- TODO: Rename execStutter.intro
 theorem execStutter_free {P : ENNReal → IProp GF} {ε : ENNReal} :
     P ε ⊢ execStutter P ε := by
   iintro HP; iright; iexact HP
 
-/-- If you have `1 ≤ ε`, you have `execStutter P ε` for any `P`. -/
 theorem execStutter_spend {P : ENNReal → IProp GF} {ε : ENNReal} (hε : 1 ≤ ε) :
     ⊢ execStutter (GF := GF) P ε := by
   iintro; ileft; ipure_intro; exact hε
 
-/-- Combined monotonicity: any grade ↑ and body ↦ Q at the new grade. -/
-theorem execStutter_mono {P Q : ENNReal → IProp GF} {ε ε' : ENNReal}
-    (hε : ε ≤ ε') :
-    iprop((P ε -∗ Q ε') ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε' := by
+theorem execStutter_mono {P Q : ENNReal → IProp GF} {ε ε' : ENNReal} (hε : ε ≤ ε') :
+    ((P ε -∗ Q ε') ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε' := by
   iintro ⟨HM, HS⟩
   icases HS with ⟨%HVac | HP⟩
-  · ileft; ipure_intro; exact _root_.le_trans HVac hε
+  · ileft; ipure_intro; exact HVac.trans hε
   · iright; iapply HM; iexact HP
 
-/-- Body monotonicity at a fixed grade. -/
 theorem execStutter_mono_pred {P Q : ENNReal → IProp GF} {ε : ENNReal} :
-    iprop((P ε -∗ Q ε) ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε :=
+    ((P ε -∗ Q ε) ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε :=
   execStutter_mono (_root_.le_refl ε)
 
 variable [ErisWpGS (rT := rT) GF]
 
-/-! ## `glm` fixpoint state and pre-functor
-
-The fixpoint operates on `(Cfg × ENNReal)` and produces an iProp. Rocq:
-```
-Definition glm_pre Z Φ : cfg × nonnegreal → iProp Σ :=
-  λ '((e1, σ1), ε), <three disjuncts>.
-Definition glm' Z := bi_least_fixpoint (glm_pre Z).
-Definition glm e σ ε Z := glm' Z ((e, σ), ε).
-```
--/
-
-/-- Packed state for the `glm` fixpoint: a config paired with an error
-budget. -/
 @[expose]
 abbrev GlmState (rT : Type _) [ProbLang.ProbLangℝ rT] : Type _ := Cfg rT × ENNReal
 
@@ -130,11 +114,7 @@ instance : COFE (GlmState rT) := COFE.ofDiscrete _ Eq_Equivalence
 instance : OFE.Discrete (GlmState rT) := ⟨id⟩
 instance : OFE.Leibniz (GlmState rT) := ⟨id⟩
 
-/-- The `prim_step` disjunct, factored out: a relation `R`, an outer error
-`ε₁`, and a per-outcome continuation `X₂` bounded by some `r`, such that
-`primStep ⟨e₁, σ₁⟩` lifts `R` with slack `ε₁`, the expected total error is
-within budget, and the body `Z` holds on every `R`-related successor under
-the empty mask. -/
+@[discrete]
 abbrev glmPrimStep [Countable rT] [MeasurableSingletonClass rT]
     (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
@@ -146,32 +126,29 @@ abbrev glmPrimStep [Countable rT] [MeasurableSingletonClass rT]
     (∀ (ρ : Cfg rT), (⌜R ρ⌝) -∗
       |={∅}=> execStutter (Z ρ) (X₂ ρ)))
 
-/-- The *state-step* (presampling) disjunct: at some tape `α` with
-positive bound currently allocated in `σ₁`, the state-step kernel
-`tapePresample σ₁ α` lifts a relation `R` on states with slack `ε₁`,
-the expected total error stays within budget, and the body holds on
-every `R`-related successor state under the empty mask. Unlike
-`glmPrimStep`, the continuation references `Φ` (the recursive
-position) — presampling does not terminate, it just refines the state. -/
-abbrev glmStateStep
-    (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
-    (Φ : GlmState rT → IProp GF) : IProp GF :=
-  iprop(∃ (α : Loc) (t : Tape),
+abbrev glmPrimStep' (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
+    (Z : Cfg rT → ENNReal → IProp GF) : IProp GF := iprop%
+  ∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
+    (⌜Reducible e₁ σ₁⌝) ∗
+    (⌜∀ ρ, X₂ ρ ≤ r⌝) ∗
+    (⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e₁, σ₁⟩)) ≤ ε⌝) ∗
+    (⌜Pgl ε₁ R (primStep ⟨e₁, σ₁⟩)⌝) ∗
+    (∀ (ρ : Cfg rT), (⌜R ρ⌝) -∗
+      |={∅}=> execStutter (Z ρ) (X₂ ρ))
+
+-- TODO: Rename me to not reference state steps
+abbrev glmStateStep (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
+   (Φ : GlmState rT → IProp GF) : IProp GF := iprop%
+  ∃ (α : Loc) (t : Tape),
     ⌜σ₁.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
     ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
       (⌜∀ σ', X₂ σ' ≤ r⌝) ∗
       (⌜ε₁ + (∫⁻ σ', X₂ σ' ∂(tapePresample σ₁ α)) ≤ ε⌝) ∗
       (⌜Pgl ε₁ R (tapePresample σ₁ α)⌝) ∗
       (∀ (σ' : State rT), ⌜R σ'⌝ -∗
-        |={∅}=> execStutter (fun ε'' => Φ (⟨e₁, σ'⟩, ε'')) (X₂ σ')))
+        |={∅}=> execStutter (fun ε'' => Φ (⟨e₁, σ'⟩, ε'')) (X₂ σ'))
 
-/-- One-step `glm` pre-functor. Disjuncts:
-
-1. *Out-of-thin-air* — pay nothing and bump `ε` to any `ε' > ε`, then
-   continue at `ε'`.
-2. *Prim-step* — take one program step; see `glmPrimStep`.
-3. *State-step* — presample on a positively-bounded active tape; see
-   `glmStateStep`. -/
+@[discrete] -- glmPre'
 abbrev glmPre [Countable rT] [MeasurableSingletonClass rT]
     (Z : Cfg rT → ENNReal → IProp GF)
     (Φ : GlmState rT → IProp GF) : GlmState rT → IProp GF :=
@@ -181,14 +158,24 @@ abbrev glmPre [Countable rT] [MeasurableSingletonClass rT]
     glmPrimStep ρ.expr ρ.state ε Z ∨
     glmStateStep ρ.expr ρ.state ε Φ
 
-/-- `glm e σ ε Z` is the least fixpoint of `glmPre Z`, evaluated at
-`(⟨e, σ⟩, ε)`. -/
-@[expose]
+abbrev glmPre' (Z : Cfg rT → ENNReal → IProp GF)
+    (Φ : GlmState rT → IProp GF) : GlmState rT → IProp GF :=
+  fun ⟨ρ, ε⟩ => iprop%
+    (∀ (ε' : ENNReal), (⌜ε < ε'⌝) -∗
+        |={∅}=> execStutter (fun ε'' => Φ (ρ, ε'')) ε') ∨
+    glmPrimStep' ρ.expr ρ.state ε Z ∨
+    glmStateStep ρ.expr ρ.state ε Φ
+
+@[expose, discrete] -- glm'
 abbrev glm [Countable rT] [MeasurableSingletonClass rT] (e : Exp rT) (σ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
   bi_least_fixpoint (glmPre (GF := GF) Z) ((⟨e, σ⟩, ε) : GlmState rT)
 
-/-- The pre-functor is monotone in `Φ`. -/
+abbrev glm' (e : Exp rT) (σ : State rT) (ε : ENNReal)
+    (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
+  bi_least_fixpoint (glmPre' (GF := GF) Z) ((⟨e, σ⟩, ε) : GlmState rT)
+
+@[discrete] -- glmPre'_mono
 instance glmPre_mono [Countable rT] [MeasurableSingletonClass rT] {Z : Cfg rT → ENNReal → IProp GF} :
     BIMonoPred (glmPre (GF := GF) (rT := rT) Z) where
   mono_pred {Φ Ψ _ _} := by
@@ -232,9 +219,44 @@ instance glmPre_mono [Countable rT] [MeasurableSingletonClass rT] {Z : Cfg rT �
   mono_pred_ne.ne {_ s s'} hd := by
     have := eq_of_dist_discrete_leibniz hd; subst this; exact .of_eq rfl
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- Unfolding equation: `glm` equals one application of the pre-functor at
-the fixpoint. -/
+instance glmPre'_mono {Z : Cfg rT → ENNReal → IProp GF} : BIMonoPred (glmPre' (GF := GF) (rT := rT) Z) where
+  mono_pred {Φ Ψ _ _} := by
+    iintro #Hwand %s Hs
+    rcases s with ⟨ρ, ε⟩
+    icases Hs with ⟨HOT | HPS | HSS⟩
+    · ileft
+      iintro %ε' %Hlt
+      imod HOT $$ %ε' %Hlt with HS
+      imodintro
+      icases HS with ⟨%HVac | HP⟩
+      · ileft; ipure_intro; exact HVac
+      · iright; iapply Hwand; iexact HP
+    · iright; ileft
+      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      iexists R, ε₁, X₂, r
+      iframe %Hred %Hbnd %Hexp %Hpgl
+      iintro %ρ' HR
+      ihave HC := HCont $$ %ρ' HR
+      imod HC
+      imodintro
+      iexact HC
+    · iright; iright
+      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      iexists α, t
+      iframe %Hαt
+      iexists R, ε₁, X₂, r
+      iframe %Hbnd %Hexp %Hpgl
+      iintro %σ' %HR
+      ihave HC := HCont $$ %σ' %HR
+      imod HC with HS
+      imodintro
+      icases HS with ⟨%HVac | HP⟩
+      · ileft; ipure_intro; exact HVac
+      · iright; iapply Hwand; iexact HP
+  mono_pred_ne.ne {_ s s'} hd := by
+    have := eq_of_dist_discrete_leibniz hd; subst this; exact .of_eq rfl
+
+@[discrete] -- glm'_unfold
 theorem glm_unfold [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
     glm (GF := GF) e σ ε Z ≡
@@ -243,16 +265,15 @@ theorem glm_unfold [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} {σ
         ((⟨e, σ⟩, ε) : GlmState rT) :=
   least_fixpoint_unfold _
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- **Strong induction principle for `glm`.** Specialization of iris's
-`least_fixpoint_ind` to the `glm` fixpoint.
+theorem glm'_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} :
+    glm' (GF := GF) e σ ε Z ≡
+      glmPre' (GF := GF) Z
+        (fun s => glm' s.1.expr s.1.state s.2 Z)
+        ((⟨e, σ⟩, ε) : GlmState rT) :=
+  least_fixpoint_unfold _
 
-Given an invariant `Ψ : Cfg → ENNReal → IProp GF` and a body `Z`, to prove
-that `glm e σ ε Z ⊢ Ψ ⟨e, σ⟩ ε` it suffices to show that one pre-functor
-unrolling — assuming `Ψ` holds *and* the underlying `glm` claim is still
-available at every recursive position — implies `Ψ ⟨e, σ⟩ ε`.
-
-Rocq counterpart: `glm_strong_ind` (`total_adequacy.v` private). -/
+@[discrete] -- glm'_strong_ind
 theorem glm_strong_ind [Countable rT] [MeasurableSingletonClass rT]
     {Z : Cfg rT → ENNReal → IProp GF}
     {Ψ : GlmState rT → IProp GF} [NonExpansive Ψ] :
@@ -264,16 +285,16 @@ theorem glm_strong_ind [Countable rT] [MeasurableSingletonClass rT]
   iapply least_fixpoint_ind (F := glmPre Z) (Φ := Ψ)
   iexact HM
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- Strong monotonicity in the body `Z` under a *spatial* continuation wand.
+theorem glm'_strong_ind {Z : Cfg rT → ENNReal → IProp GF} {Ψ : GlmState rT → IProp GF} [NonExpansive Ψ] :
+    iprop(□ (∀ s, glmPre' Z
+              (fun s' => iprop(Ψ s' ∧ bi_least_fixpoint (glmPre' Z) s')) s
+              -∗ Ψ s)) ⊢@{IProp GF}
+      (∀ s, bi_least_fixpoint (glmPre' Z) s -∗ Ψ s) := by
+  iintro #HM
+  iapply least_fixpoint_ind (F := glmPre' Z) (Φ := Ψ)
+  iexact HM
 
-Uses the standard "carry the wand through the fixpoint" trick: the
-non-expansive predicate `Ψ` packs the wand as a parameter, so each iteration
-of `least_fixpoint_iter` reuses the same shared wand at every fixpoint point
-without requiring `□`.
-
-Mirrors Rocq's `glm_strong_mono` (specialised to equal grading; the
-ε-relaxation form would compose with `glm_mono_grading`, deferred). -/
+@[discrete] -- glm'_strong_mono
 theorem glm_strong_mono [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
     iprop((∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') ∗ glm e σ ε Z₁) ⊢@{IProp GF}
@@ -337,10 +358,71 @@ theorem glm_strong_mono [Countable rT] [MeasurableSingletonClass rT]
         iapply HP; iexact Hwand
   iapply HΨ; iexact HZ
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- Monotonicity in the error grade: `ε ≤ ε' → glm e σ ε Z ⊢ glm e σ ε' Z`.
-Direct single-step weakening of the bound in both disjuncts (the recursive
-calls are unchanged). Rocq: `glm_mono_grading`. -/
+
+theorem glm'_strong_mono
+    {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
+    iprop((∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') ∗ glm' e σ ε Z₁) ⊢@{IProp GF}
+      glm' e σ ε Z₂ := by
+  iintro ⟨HZ, HG⟩
+  letI Ψ : GlmState rT → IProp GF := fun s => iprop(
+    (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') -∗ bi_least_fixpoint (glmPre' Z₂) s)
+  letI : NonExpansive Ψ := by
+    constructor
+    intro n s s' hd
+    have : s = s' := OFE.Leibniz.eq_of_eqv (OFE.Discrete.discrete_0 hd)
+    subst this; exact .of_eq rfl
+  -- Apply the iter to derive `Ψ ⟨..., ε⟩` from `HG`.
+  ihave HΨ : iprop(Ψ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
+  · iapply least_fixpoint_iter (F := glmPre' Z₁) (Φ := Ψ)
+    swap; · iexact HG
+    -- Discharge: `□ (∀ y, glmPre Z₁ Ψ y -∗ Ψ y)`.
+    iintro !> %s HF
+    iintro Hwand
+    iapply least_fixpoint_unfold_2 (glmPre' Z₂)
+    rcases s with ⟨ρ, ε⟩
+    icases HF with ⟨HOT | HPS | HSS⟩
+    · ileft
+      iintro %ε' %Hlt
+      imod HOT $$ %ε' %Hlt with HS
+      imodintro
+      icases HS with ⟨%HVac | HP⟩
+      · ileft; ipure_intro; exact HVac
+      · iright
+        iapply HP; iexact Hwand
+    · iright; ileft
+      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      iexists R, ε₁, X₂, r
+      isplitr; · ipure_intro; exact Hred
+      isplitr; · ipure_intro; exact Hbnd
+      isplitr; · ipure_intro; exact Hexp
+      isplitr; · ipure_intro; exact Hpgl
+      iintro %ρ' HR
+      ihave HC := HCont $$ %ρ' HR
+      imod HC with HS
+      imodintro
+      icases HS with ⟨%HVac | HC1⟩
+      · ileft; ipure_intro; exact HVac
+      · iright
+        iapply Hwand; iexact HC1
+    · iright; iright
+      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      iexists α, t
+      isplitr; · ipure_intro; exact Hαt
+      iexists R, ε₁, X₂, r
+      isplitr; · ipure_intro; exact Hbnd
+      isplitr; · ipure_intro; exact Hexp
+      isplitr; · ipure_intro; exact Hpgl
+      iintro %σ' %HR
+      ihave HC := HCont $$ %σ' %HR
+      imod HC with HS
+      imodintro
+      icases HS with ⟨%HVac | HP⟩
+      · ileft; ipure_intro; exact HVac
+      · iright
+        iapply HP; iexact Hwand
+  iapply HΨ; iexact HZ
+
+@[discrete] -- glm'_mono_grading
 theorem glm_mono_grading [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ε ε' : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
     glm e σ ε Z ⊢@{IProp GF} glm e σ ε' Z := by
@@ -371,9 +453,37 @@ theorem glm_mono_grading [Countable rT] [MeasurableSingletonClass rT]
     isplitr; · ipure_intro; exact Hpgl
     iexact HCont
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- Combined ε-relaxation + body weakening. Direct composition of
-`glm_strong_mono` and `glm_mono_grading`. -/
+theorem glm'_mono_grading
+    {e : Exp rT} {σ : State rT} {ε ε' : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
+    glm' e σ ε Z ⊢@{IProp GF} glm' e σ ε' Z := by
+  iintro HG
+  ihave HG' := (BI.equiv_iff.mp glm'_unfold).1 $$ HG
+  iapply (BI.equiv_iff.mp glm'_unfold).2
+  icases HG' with ⟨HOT | HPS | HSS⟩
+  · ileft
+    iintro %ε'' %Hlt'
+    have Hlt : ε < ε'' := _root_.lt_of_le_of_lt Hε Hlt'
+    ispecialize HOT $$ %ε'' %Hlt
+    iexact HOT
+  · iright; ileft
+    icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    iexists R, ε₁, X₂, r
+    isplitr; · ipure_intro; exact Hred
+    isplitr; · ipure_intro; exact Hbnd
+    isplitr; · ipure_intro; exact _root_.le_trans Hexp Hε
+    isplitr; · ipure_intro; exact Hpgl
+    iexact HCont
+  · iright; iright
+    icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    iexists α, t
+    isplitr; · ipure_intro; exact Hαt
+    iexists R, ε₁, X₂, r
+    isplitr; · ipure_intro; exact Hbnd
+    isplitr; · ipure_intro; exact _root_.le_trans Hexp Hε
+    isplitr; · ipure_intro; exact Hpgl
+    iexact HCont
+
+@[discrete] -- glm'_strong_mono_grading
 theorem glm_strong_mono_grading [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
     {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
     iprop((∀ ρ ε'', Z₁ ρ ε'' -∗ Z₂ ρ ε'') ∗ glm e σ ε Z₁) ⊢@{IProp GF}
@@ -385,9 +495,16 @@ theorem glm_strong_mono_grading [Countable rT] [MeasurableSingletonClass rT] {e 
   · iexact HZ
   iexact HG
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- Monotonicity in the body `Z` under an *intuitionistic* continuation
-entailment. Specialised, easier-to-use form of `glm_strong_mono`. -/
+theorem glm'_strong_mono_grading {e : Exp rT} {σ : State rT} {ε ε' : ENNReal}
+    {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} (Hε : ε ≤ ε') :
+    iprop((∀ ρ ε'', Z₁ ρ ε'' -∗ Z₂ ρ ε'') ∗ glm' e σ ε Z₁) ⊢@{IProp GF}
+      glm' e σ ε' Z₂ := by
+  iintro ⟨HZ, HG⟩
+  iapply glm'_mono_grading Hε
+  iapply glm'_strong_mono
+  iframe
+
+@[discrete] -- glm'_mono_pred
 theorem glm_mono_pred [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
     iprop((□ (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε')) ∗ glm e σ ε Z₁) ⊢@{IProp GF}
@@ -432,14 +549,52 @@ theorem glm_mono_pred [Countable rT] [MeasurableSingletonClass rT] {e : Exp rT} 
     imodintro
     iexact HC
 
-/-- Evaluation-context bind for `glm`: a `glm` derivation at `e` with
-continuation lifted through `K` produces a `glm` at `K.fill e` with the
-unlifted continuation. Rocq: `weakestpre.v:367`.
 
-Uses `least_fixpoint_iter` with `Φ s := bi_least_fixpoint (glmPre Z) ⟨K.fillCfg s.1, s.2⟩`.
-The outer `e` does NOT need to be a non-value — Lean's `Hsv` (the
-non-value-ness needed for `primStep_fill`) is derived per-iteration from the
-prim-step branch's `Discrete.Reducible` witness via `Discrete.val_stuck`. -/
+theorem glm'_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z₁ Z₂ : Cfg rT → ENNReal → IProp GF} :
+    iprop((□ (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε')) ∗ glm' e σ ε Z₁) ⊢@{IProp GF}
+      glm' e σ ε Z₂ := by
+  iintro ⟨#HZ, HG⟩
+  unfold glm'
+  iapply (least_fixpoint_strong_mono (glmPre' Z₁) (glmPre' Z₂))
+    $$ [] HG
+  iintro !> %Φ %s HF
+  rcases s with ⟨ρ, ε⟩
+  icases HF with ⟨HOT | HPS | HSS⟩
+  · ileft
+    iintro %ε' %Hlt
+    imod HOT $$ %ε' %Hlt with HS
+    imodintro
+    iexact HS
+  · iright; ileft
+    icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    iexists R, ε₁, X₂, r
+    isplitr; · ipure_intro; exact Hred
+    isplitr; · ipure_intro; exact Hbnd
+    isplitr; · ipure_intro; exact Hexp
+    isplitr; · ipure_intro; exact Hpgl
+    iintro %ρ' HR
+    ihave HC := HCont $$ %ρ' HR
+    imod HC
+    imodintro
+    icases HC with ⟨%HVac | HC1⟩
+    · ileft; ipure_intro; exact HVac
+    · iright; iapply HZ; iexact HC1
+  · iright; iright
+    icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    iexists α, t
+    isplitr; · ipure_intro; exact Hαt
+    iexists R, ε₁, X₂, r
+    isplitr; · ipure_intro; exact Hbnd
+    isplitr; · ipure_intro; exact Hexp
+    isplitr; · ipure_intro; exact Hpgl
+    iintro %σ' %HR
+    ihave HC := HCont $$ %σ' %HR
+    imod HC
+    imodintro
+    iexact HC
+
+@[discrete] -- glm'_bind
 theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
     {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     glm e σ ε (fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε') ⊢@{IProp GF}
@@ -542,11 +697,107 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
   -- by definitional unfolding (Φ is `letI`-bound, `glm` is `@[reducible]`).
   iexact HΦ
 
+
+theorem glm'_bind
+    {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
+    glm' e σ ε (fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε') ⊢@{IProp GF}
+      glm' (K.fill e) σ ε Z := by
+  iintro HG
+  classical
+  let Kinv : Exp rT → Option (Exp rT) := Function.partialInv K.fill
+  have Kinv_left : ∀ e', Kinv (K.fill e') = some e' :=
+    Function.partialInv_left (Ectx.fill_injective K)
+  letI Z' : Cfg rT → ENNReal → IProp GF :=
+    fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε'
+  letI Φ : GlmState rT → IProp GF :=
+    fun s => bi_least_fixpoint (glmPre' Z) ((⟨K.fill s.1.expr, s.1.state⟩, s.2) : GlmState rT)
+  letI : NonExpansive Φ := nonExpansive_of_discrete_leibniz Φ
+  ihave HΦ : iprop(Φ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
+  · iapply least_fixpoint_iter (F := glmPre' Z') (Φ := Φ)
+    swap; · iexact HG
+    iintro !> %s HF
+    rcases s with ⟨ρ, ε'⟩
+    iapply least_fixpoint_unfold_2 (glmPre' Z)
+    icases HF with ⟨HOT | HPS | HSS⟩
+    · ileft
+      iintro %ε'' %Hlt
+      imod HOT $$ %ε'' %Hlt with HS
+      imodintro
+      icases HS with ⟨%HVac | HP⟩
+      · ileft; ipure_intro; exact HVac
+      · iright; iexact HP
+    · iright; ileft
+      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      iexists (fun ρ' => ∃ ρ'', ρ' = K.fillCfg ρ'' ∧ R ρ''), ε₁,
+        (fun ρ' => (Kinv ρ'.expr).elim 0 (fun e' => X₂ ⟨e', ρ'.state⟩)),
+        r
+      have Hsv : ¬ ρ.expr.isValue := val_stuck Hred
+      isplitr; · ipure_intro; exact Hred.fill K
+      isplitr
+      · ipure_intro
+        intro ρ'
+        cases h : Kinv ρ'.expr with
+        | none => simp [h, Option.elim]
+        | some e' => simp [h, Option.elim]; exact Hbnd ⟨e', ρ'.state⟩
+      isplitr
+      · ipure_intro
+        show ε₁ + (∫⁻ a, (Kinv a.expr).elim 0 (fun e' => X₂ ⟨e', a.state⟩) ∂ primStep ⟨K.fill ρ.expr, ρ.state⟩) ≤ ε'
+        rw [primStep_fill Hsv]
+        rw [MeasureTheory.lintegral_map ?G1 ?G2]
+        case G1 => sorry
+        case G2 => sorry
+        refine _root_.le_trans (_root_.le_of_eq ?_) Hexp
+        congr 1
+        refine MeasureTheory.lintegral_congr_ae (Filter.Eventually.of_forall fun a => ?_)
+        show (Kinv (K.fillCfg a).expr).elim 0 (fun e' => X₂ ⟨e', (K.fillCfg a).state⟩) = X₂ a
+        simp only [Ectx.fillCfg, Kinv_left, Option.elim]
+      isplitr
+      · ipure_intro
+        show primStep ⟨K.fill ρ.expr, ρ.state⟩ {x | ¬ ∃ ρ'', x = K.fillCfg ρ'' ∧ R ρ''} ≤ ε₁
+        rw [primStep_fill Hsv]
+        rw [MeasureTheory.Measure.map_apply ?G1 ?G2]
+        case G1 => sorry
+        case G2 => sorry
+        refine _root_.le_trans (_root_.le_of_eq ?_) Hpgl
+        congr 1
+        ext a
+        simp only [Set.mem_preimage, Set.mem_setOf_eq, not_exists, not_and]
+        constructor
+        · intro h hR; exact h a rfl hR
+        · intro hR ρ''' hEq hR'''
+          have : ρ''' = a := Ectx.fillCfg_injective K hEq.symm
+          exact hR (this ▸ hR''')
+      iintro %ρ' HR'
+      icases HR' with ⟨%ρ'', %heq, %HR⟩
+      subst heq
+      ihave HC := HCont $$ %ρ'' %HR
+      imod HC with HS
+      imodintro
+      simp only [Ectx.fillCfg, Kinv_left, Option.elim]
+      icases HS with ⟨%HVac | HC1⟩
+      · ileft; ipure_intro; exact HVac
+      · iright; iexact HC1
+    · iright; iright
+      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      iexists α, t
+      isplitr; · ipure_intro; exact Hαt
+      iexists R, ε₁, X₂, r
+      isplitr; · ipure_intro; exact Hbnd
+      isplitr; · ipure_intro; exact Hexp
+      isplitr; · ipure_intro; exact Hpgl
+      iintro %σ' %HR
+      ihave HC := HCont $$ %σ' %HR
+      imod HC
+      imodintro
+      iexact HC
+  -- `Φ ⟨e, σ, ε⟩ = bi_least_fixpoint (glmPre Z) (⟨K.fill e, σ⟩, ε) = glm (K.fill e) σ ε Z`
+  -- by definitional unfolding (Φ is `letI`-bound, `glm` is `@[reducible]`).
+  iexact HΦ
+
 /-! ## Introduction rules for `glm` -/
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- *Right-introduction* for the `prim_step` disjunct: from the appropriate
-coupling data, conclude `glm e σ ε Z`. Equivalent to Rocq's `glm_prim_step`. -/
+
+@[discrete] -- glm'_prim_step
 theorem glm_prim_step [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
@@ -563,10 +814,24 @@ theorem glm_prim_step [Countable rT] [MeasurableSingletonClass rT]
   iright; ileft
   iexact HPS
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- *Right-introduction* for the state-step disjunct: from the coupling
-data on `tapePresample σ α` (with positively-bounded tape `α`), conclude
-`glm e σ ε Z`. -/
+theorem glm'_prim_step
+    {e : Exp rT} {σ : State rT} {ε : ENNReal}
+    {Z : Cfg rT → ENNReal → IProp GF} :
+    iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
+      ⌜Reducible e σ⌝ ∗
+      ⌜∀ ρ, X₂ ρ ≤ r⌝ ∗
+      ⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e, σ⟩)) ≤ ε⌝ ∗
+      ⌜Pgl ε₁ R (primStep ⟨e, σ⟩)⌝ ∗
+      (∀ (ρ : Cfg rT), (⌜R ρ⌝) -∗ |={∅}=> execStutter (Z ρ) (X₂ ρ))) ⊢@{IProp GF}
+        glm' e σ ε Z := by
+  iintro HPS
+  unfold glm'
+  iapply least_fixpoint_unfold_2 (glmPre' Z)
+  iright; ileft
+  iexact HPS
+
+-- TODO: Rename me
+@[discrete] -- glm'_state_step
 theorem glm_state_step [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∃ (α : Loc) (t : Tape),
@@ -584,8 +849,23 @@ theorem glm_state_step [Countable rT] [MeasurableSingletonClass rT]
   iright; iright
   iexact HSS
 
--- omit [Countable rT] [MeasurableSingletonClass rT] in
-/-- *Right-introduction* for the out-of-thin-air disjunct. -/
+theorem glm'_state_step  {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
+    iprop(∃ (α : Loc) (t : Tape),
+        ⌜σ.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
+        ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
+          ⌜∀ σ', X₂ σ' ≤ r⌝ ∗
+          ⌜ε₁ + (∫⁻ σ', X₂ σ' ∂(tapePresample σ α)) ≤ ε⌝ ∗
+          ⌜Pgl ε₁ R (tapePresample σ α)⌝ ∗
+          (∀ (σ' : State rT), ⌜R σ'⌝ -∗
+            |={∅}=> execStutter (fun ε'' => glm' e σ' ε'' Z) (X₂ σ'))) ⊢@{IProp GF}
+          glm' e σ ε Z := by
+  iintro HSS
+  unfold glm'
+  iapply least_fixpoint_unfold_2 (glmPre' Z)
+  iright; iright
+  iexact HSS
+
+@[discrete] -- glm_credit_bump
 theorem glm_credit_bump [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗
@@ -594,6 +874,18 @@ theorem glm_credit_bump [Countable rT] [MeasurableSingletonClass rT]
   iintro HOT
   unfold glm
   iapply least_fixpoint_unfold_2 (glmPre Z)
+  ileft
+  iexact HOT
+
+
+theorem glm'_credit_bump
+    {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
+    iprop(∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗
+      |={∅}=> execStutter (fun ε'' => glm' e σ ε'' Z) ε') ⊢@{IProp GF}
+        glm' e σ ε Z := by
+  iintro HOT
+  unfold glm'
+  iapply least_fixpoint_unfold_2 (glmPre' Z)
   ileft
   iexact HOT
 
