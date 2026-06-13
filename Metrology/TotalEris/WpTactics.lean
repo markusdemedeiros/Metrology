@@ -213,12 +213,15 @@ elab "twp_bind" colGt ppSpace focus:term:max : tactic =>
     let transPf ← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, bindPf]
     mvar.assign transPf
 
-/-- Symbolic result of one pure step at a redex head (mirrors the syntactic-result
-`PureExec` instances). Returns the stepped expression *unreduced* (e.g. `open' body v`);
-`PureExec` synthesis then confirms the step and `wp_expr_simp` cleans it up. Computed-
-result redexes (`binop`/`unop`/`scrut`) are not handled — use the explicit pure-step
-lemma for those. -/
-meta def pureStepResult {α : Q(Type)} : Q(Exp $α) → MetaM (Option Q(Exp $α))
+/-- Symbolic result of one pure step at a redex head, mirroring the `PureExec` instances.
+For syntactic-result redexes (beta, fix, cond, fst/snd, case) it returns the stepped
+expression *unreduced* (e.g. `open' body v`). For computed-result redexes (`binop`,
+`unop`, `scrut`) it reduces the corresponding evaluator (`BinOp.eval`/`UnOp.eval`/
+`Pat.tryMatch`) via `whnf` and reads off the result, returning `none` if the evaluator is
+stuck (operands not concrete). `PureExec` synthesis then confirms the step and
+`twp_expr_simp` cleans up. -/
+meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α)) :
+    Q(Exp $α) → MetaM (Option Q(Exp $α))
   | ~q(.app (.lam $body) $v)              => return some q(Exp.open' $body $v)
   | ~q(.app (.fix $body) $v)              => return some q(Exp.app (Exp.open' $body (.fix $body)) $v)
   | ~q(.cond (.lit (.bool true)) $et $ef) => return some et
@@ -227,21 +230,38 @@ meta def pureStepResult {α : Q(Type)} : Q(Exp $α) → MetaM (Option Q(Exp $α)
   | ~q(.snd (.pair $_e1 $e2))             => return some e2
   | ~q(.case (.inl $v) $el $_er)          => return some q(Exp.app $el $v)
   | ~q(.case (.inr $v) $_el $er)          => return some q(Exp.app $er $v)
+  | ~q(.binop $op $e1 $e2)                => do
+    let r : Q(Option (Exp $α)) ← whnf q(@BinOp.eval $α $instPL $op $e1 $e2)
+    match r with
+    | ~q(some $res) => return some res
+    | _             => return none
+  | ~q(.unop $op $e1)                     => do
+    let r : Q(Option (Exp $α)) ← whnf q(@UnOp.eval $α $op $e1)
+    match r with
+    | ~q(some $res) => return some res
+    | _             => return none
+  | ~q(.scrut $v $p)                      => do
+    let r : Q(Option (Exp $α)) ← whnf q(@Pat.tryMatch $α $instPL $p $v)
+    match r with
+    | ~q(some $b) => return some q(Exp.inl $b)
+    | ~q(none)    => return some q(Exp.inr (.lit .unit))
+    | _           => return none
   | _                                     => return none
 
 /-! ## `twp_pure` — take a pure step at a redex, auto-discovering its context -/
 
-/-- `twp_pure e` takes a single pure (`PureExec`) reduction step at the redex `e`,
+/-- `twp_pure_core e` takes a single pure (`PureExec`) reduction step at the redex `e`,
 discovering the surrounding evaluation context `K` automatically. The pure-step side
-condition `φ` (e.g. value-hood) is discharged if trivial, else left as a goal. -/
-elab "twp_pure" focus:(ppSpace colGt term:max)? : tactic =>
+condition `φ` (e.g. value-hood) is discharged if trivial, else left as a goal. Leaves the
+stepped goal *unreduced*; `twp_pure` is the cleaning wrapper. -/
+elab "twp_pure_core" focus:(ppSpace colGt term:max)? : tactic =>
   runTacticTglWp fun mvar { α, GF, instPL, instWp, hyps, E, e, Φ, .. } => do
     -- Optional focus: with an argument, step that specific redex; without, step the
     -- first redex found while descending the evaluation context.
     let focusE? : Option Q(Exp $α) ← focus.mapM fun f => elabTermEnsuringTypeQ f q(Exp $α)
     let some res ← findECtx e fun e₁ => do
       if let some focusE := focusE? then guard (← isDefEq e₁ focusE)
-      let some e₂ ← pureStepResult e₁ | failure
+      let some e₂ ← pureStepResult instPL e₁ | failure
       let φ : Q(Prop) ← mkFreshExprMVarQ q(Prop)
       let n : Q(Nat) ← mkFreshExprMVarQ q(Nat)
       let some inst ← ProofModeM.trySynthInstanceQ q(ProbLang.PureExec $φ $n $e₁ $e₂)
@@ -266,7 +286,8 @@ elab "twp_pure" focus:(ppSpace colGt term:max)? : tactic =>
     let gs ← Tactic.evalTacticAt
       (← `(tactic| (try (first
             | trivial
-            | repeat' (first | exact ⟨IsVal.lit⟩ | exact ⟨IsVal.lam⟩ | refine ⟨?_, ?_⟩)))))
+            | repeat' (first
+                | rfl | exact ⟨IsVal.lit⟩ | exact ⟨IsVal.lam⟩ | refine ⟨?_, ?_⟩)))))
       HΦ.mvarId!
     gs.forM addMVarGoal
     let stepPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.twp_pure_step_ctx
@@ -290,11 +311,29 @@ elab "twp_value" : tactic =>
     let hproof : Q(Exp.toVal? $e = some $v) ← mkFreshExprSyntheticOpaqueMVar
       q(Exp.toVal? $e = some $v)
     (← Tactic.evalTacticAt (← `(tactic| rfl)) hproof.mvarId!).forM addMVarGoal
-    let pf ← addBIGoal hyps q($Φ $v)
-    let valPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.tglWp_value_of_toVal
-      (#[α, instPL, GF, instWp, E, e, v, Φ, hproof].map some)
-    let transPf ← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, valPf]
-    mvar.assign transPf
+    have goal : Q(IProp $GF) := Expr.headBeta q($Φ $v)
+    -- iWpValueHead: if the postcondition can absorb a `|={E}=>` (an `ElimModal` exists
+    -- whose side condition is dischargeable), leave the clean goal `Φ v`; otherwise hand
+    -- back `|={E}=> Φ v` so the user can still update ghost state.
+    let c : Q(Prop) ← mkFreshExprMVarQ q(Prop)
+    let p' : Q(Bool) ← mkFreshExprMVarQ q(Bool)
+    let A' : Q(IProp $GF) ← mkFreshExprMVarQ q(IProp $GF)
+    let Q' : Q(IProp $GF) ← mkFreshExprMVarQ q(IProp $GF)
+    let useNoFupd : Bool ←
+      if (← ProofModeM.trySynthInstanceQ
+            q(ElimModal $c false $p' iprop(|={$E}=> $goal) $A' $goal $Q')).isSome then
+        pure (← observing? (iSolveSidecondition c)).isSome
+      else pure false
+    if useNoFupd then
+      let pf ← addBIGoal hyps goal
+      let valPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.tglWp_value_of_toVal
+        (#[α, instPL, GF, instWp, E, e, v, Φ, hproof].map some)
+      mvar.assign (← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, valPf])
+    else
+      let pf ← addBIGoal hyps q(iprop(|={$E}=> $goal))
+      let valPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.tglWp_value_fupd_of_toVal
+        (#[α, instPL, GF, instWp, E, e, v, Φ, hproof].map some)
+      mvar.assign (← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, valPf])
 
 /-- `wp_value` — Rocq-facing alias for `twp_value`. -/
 macro "wp_value" : tactic => `(tactic| twp_value)
@@ -310,6 +349,11 @@ macro "twp_expr_simp" : tactic =>
       ↓reduceIte, Nat.reduceAdd, Nat.reduceSub, Nat.reduceEqDiff, Nat.zero_add,
       Var.internal.injEq, reduceCtorEq])
 
+/-- `twp_pure [e]` takes one pure step (`twp_pure_core`) and then cleans up the resulting
+substitutions (`twp_expr_simp`), matching iris's auto-finishing `wp_pure`. -/
+macro "twp_pure" focus:(ppSpace colGt term:max)? : tactic =>
+  `(tactic| (twp_pure_core $[$focus]?; try twp_expr_simp))
+
 /-- `twp_lam` β-reduces a `(λ. _) v` application — an alias for `twp_pure`. -/
 macro "twp_lam" : tactic => `(tactic| twp_pure)
 
@@ -323,9 +367,9 @@ macro "twp_rec" : tactic => `(tactic| twp_pure)
 /-- `twp_finish` cleans up after a step: reduce leftover substitutions, then close the
 goal if it has become a value WP. The TotalEris analogue of iris's `wp_finish`. -/
 macro "twp_finish" : tactic =>
-  `(tactic| ((try twp_expr_simp); (try iapply ProbLang.TotalEris.ErisWpGS.tglWp_value)))
+  `(tactic| ((try twp_expr_simp); (try twp_value)))
 
 /-- `twp_pures` repeatedly takes pure steps (cleaning up after each) until none apply. -/
-macro "twp_pures" : tactic => `(tactic| repeat (twp_pure; try twp_expr_simp))
+macro "twp_pures" : tactic => `(tactic| repeat (twp_pure_core; try twp_expr_simp))
 
 end ProbLang.TotalEris

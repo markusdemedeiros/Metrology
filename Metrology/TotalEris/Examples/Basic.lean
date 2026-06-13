@@ -191,19 +191,12 @@ example (E : CoPset) (v : Val rT) :
     ⊢@{IProp GF} tglWp E
       (pl((fun x, !x) (alloc({Exp.ofVal v}))) : Exp rT)
       (fun w => iprop(⌜w = v⌝)) := by
-  let K : Ectx rT := [EctxItem.appR (Exp.lam (Exp.load (Exp.bvar 0)))]
-  show ⊢@{IProp GF} tglWp E (K.fill (Exp.alloc (Exp.ofVal v))) _
-  iapply tglWp_bind
+  -- `twp_bind` focuses the `alloc` (discovering `K = [appR (λ x. !x)]`);
+  -- after allocating, `twp_pure` β-reduces `(λ x. !x) (loc l)` to `!(loc l)`.
+  twp_bind (Exp.alloc (Exp.ofVal v))
   iapply twp_alloc
   iintro %l Hl
-  -- Unfold the `pl(...)` lambda's `Exp.close` into bvar form so `PureExec_discrete`
-  -- on `app_lam` fires.
-  simp only [K, Ectx.fill, List.foldl, flip, EctxItem.fillItem, Exp.ofVal]
-  iapply (twp_pure_step_fupd (n := 1)
-    (e₁ := Exp.app (Exp.lam (Exp.load (Exp.bvar 0))) (Exp.lit (.loc l) : Exp rT))
-    (e₂ := Exp.open' (Exp.load (Exp.bvar 0)) (Exp.lit (.loc l)))
-    (Exp.lit (.loc l) : Exp rT).isValue ⟨IsVal.lit⟩)
-  simp only [Exp.open', Exp.openRec, ↓reduceIte]
+  twp_pures
   iapply twp_load
   isplitl [Hl]; · iexact Hl
   iintro _

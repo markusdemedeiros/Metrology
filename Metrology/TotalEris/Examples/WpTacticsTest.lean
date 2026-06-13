@@ -29,12 +29,11 @@ example (E : CoPset) (Φ : Val rT → IProp GF) :
     (fun w => tglWp E pl(fst({Exp.ofVal w})) Φ)
   sorry
 
-/-- `twp_pure` β-reduces `(fun x, x) #1` at the top level (`K = []`); `wp_expr_simp`
-then reduces the `open'`, leaving `tglWp E #1 Φ`. -/
+/-- `twp_pure` β-reduces `(fun x, x) #1` at the top level (`K = []`) and auto-cleans the
+`open'`, leaving `tglWp E #1 Φ`. -/
 example (E : CoPset) (Φ : Val rT → IProp GF) :
     ⊢@{IProp GF} tglWp E pl((fun x, x) #1) Φ := by
   twp_pure pl((fun x, x) #1)
-  twp_expr_simp
   show ⊢@{IProp GF} tglWp E pl(#1) Φ
   sorry
 
@@ -44,6 +43,15 @@ example (E : CoPset) :
     ⊢@{IProp GF} tglWp E pl(fst(((fun x, x) #1, #2)))
       (fun w : Val rT => iprop(⌜w = ⟨.lit (.int 1), IsVal.lit⟩⌝)) := by
   twp_pures
+  twp_value
+  ipureintro; rfl
+
+/-- `twp_pure` now also handles computed-result redexes: `#1 + #2` evaluates to `#3`
+via `BinOp.eval` (the side condition `… ∧ op.eval = some 3` is discharged by `rfl`). -/
+example (E : CoPset) :
+    ⊢@{IProp GF} tglWp E pl(#1 + #2)
+      (fun w : Val rT => iprop(⌜w = ⟨.lit (.int 3), IsVal.lit⟩⌝)) := by
+  twp_pure pl(#1 + #2)
   twp_value
   ipureintro; rfl
 
