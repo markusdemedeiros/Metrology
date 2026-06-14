@@ -274,16 +274,11 @@ theorem dbind_prim_step
   set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   show 1 - ε ≤ (limExec ⟨e, σ⟩) S
   -- `e` is reducible, hence non-value, hence `limExec ⟨e, σ⟩ = primStep ⟨e, σ⟩ >>= limExec`.
-  have hnv : ¬ (e.isValue) := by
-    intro hv
-    sorry
-    -- rcases Hred with ⟨ρ, hρ⟩
-    -- exact Discrete.val_stuck hρ hv
+  have hnv : ¬ (e.isValue) := val_stuck Hred
   rw [limExec_not_final hnv]
   -- `(primStep ρ).bind limExec` evaluated at `S` is `∫⁻ ρ', limExec ρ' S ∂primStep ρ`.
-  rw [MeasureTheory.Measure.bind_apply ?G1 ?G2]
+  rw [MeasureTheory.Measure.bind_apply ?G1 (by measurability)]
   case G1 => sorry
-  case G2 => sorry
   exact Tgl.tgl_prim_step Hred Hsum Hpgl (fun ρ hρ => Hcont ρ hρ)
 
 theorem dbind_state_step
@@ -304,22 +299,26 @@ theorem dbind_state_step
     Tgl.tgl_state_step htape hN Hsum Hpgl (fun σ' hσ' => Hcont σ' hσ')
   rw [← MeasureTheory.Measure.bind_apply ?G1 ?G2] at h_bind
   case G1 => sorry
-  case G2 => sorry
+  case G2 =>
+    refine Measurable.aemeasurable ?_
+    measurability
   have h_eq : ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S
             = (limExec ⟨e, σ⟩) S := by
     have hmap1 : ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S
         = asExpr ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S' := by
       unfold asExpr
       rw [MeasureTheory.Measure.map_apply ?G3 ?G4]
-      case G3 => sorry
+      case G3 => measurability
       case G4 => sorry
       rfl
     have hmap2 : (limExec ⟨e, σ⟩) S
         = asExpr (limExec ⟨e, σ⟩) S' := by
       unfold asExpr
       rw [MeasureTheory.Measure.map_apply ?G5 ?G6]
-      case G5 => sorry
-      case G6 => sorry
+      case G5 => measurability
+      case G6 =>
+        -- refine Measurable.setOf ?_
+        sorry
       rfl
     rw [hmap1, hmap2]
     congr 1

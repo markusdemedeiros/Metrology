@@ -328,7 +328,7 @@ theorem irreducible_fill_inv_discrete [ProbLangℝ rT] [Countable rT] [Measurabl
     (hirr : ¬ Discrete.Reducible (K.fill e) σ) : ¬ Discrete.Reducible e σ :=
   fun hred => hirr (hred.fill K)
 
-theorem irreducible_fill_inv [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+theorem irreducible_fill_inv [ProbLangℝ rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hirr : ¬ Reducible (K.fill e) σ) : ¬ Reducible e σ :=
   fun hred => hirr (hred.fill K)
@@ -475,6 +475,30 @@ theorem prim_step_iff_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingle
     rw [← primStep_fill_singleton (Discrete.val_head_stuck hhs)]
     exact primStep_pos_of_headStep_discrete hhs
 
+/-- Countable-free version of `prim_step_iff_discrete`, stated with the
+measurability-free `Possible` predicate. Needs only `[ProbLangℝ rT]` (the
+`MeasurableSingletonClass (Cfg rT)` that `map_singleton_pos`/`possible_iff_pos`
+want is derivable from it), not the full discrete structure. -/
+theorem prim_step_iff [ProbLangℝ rT]
+    {e1 e2 : Exp rT} {σ1 σ2 : State rT} :
+    Possible (⟨e2, σ2⟩ : Cfg rT) (primStep ⟨e1, σ1⟩) ↔
+    ∃ (K : Ectx rT) (e1' e2' : Exp rT),
+      K.fill e1' = e1 ∧
+      K.fill e2' = e2 ∧
+      Possible (⟨e2', σ2⟩ : Cfg rT) (headStep ⟨e1', σ1⟩) := by
+  simp only [possible_iff_pos]
+  constructor
+  · intro h
+    simp only [primStep] at h
+    set d := e1.decomp with hd; obtain ⟨K, e1'⟩ := d
+    obtain ⟨⟨e2', σ2'⟩, heq, hpos⟩ :=
+      map_singleton_pos (by measurability) (Ectx.fillCfg_injective K) h
+    simp [Ectx.fillCfg, Cfg.mk.injEq] at heq
+    exact ⟨K, e1', e2', Exp.decomp_fill hd.symm, heq.1, heq.2 ▸ hpos⟩
+  · rintro ⟨K, e1', e2', rfl, rfl, hhs⟩
+    rw [← primStep_fill_singleton (val_head_stuck (by intro h0; rw [h0] at hhs; simp at hhs))]
+    exact primStep_pos_of_headStep_discrete hhs
+
 -- TODO: Blocked
 @[discrete]
 theorem prim_step_iff'_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
@@ -617,7 +641,7 @@ theorem NotStuck.of_fill_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSin
   · exact if hv : e.isValue then .inl hv
     else .inr (hred.of_fill K hv)
 
-theorem NotStuck.of_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+theorem NotStuck.of_fill [ProbLangℝ rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (h : notStuck (K.fill e) σ) : notStuck e σ := by
   rcases h with hv | hred

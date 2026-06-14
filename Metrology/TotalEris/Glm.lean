@@ -697,7 +697,7 @@ theorem glm_bind [Countable rT] [MeasurableSingletonClass rT]
   -- by definitional unfolding (Φ is `letI`-bound, `glm` is `@[reducible]`).
   iexact HΦ
 
-
+-- This one might actually be hard
 theorem glm'_bind
     {K : Ectx rT} {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     glm' e σ ε (fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε') ⊢@{IProp GF}
@@ -744,6 +744,12 @@ theorem glm'_bind
         show ε₁ + (∫⁻ a, (Kinv a.expr).elim 0 (fun e' => X₂ ⟨e', a.state⟩) ∂ primStep ⟨K.fill ρ.expr, ρ.state⟩) ≤ ε'
         rw [primStep_fill Hsv]
         rw [MeasureTheory.lintegral_map ?G1 ?G2]
+        -- G1 is `Measurable (fun a => (Kinv a.expr).elim 0 (fun e' => X₂ ⟨e',a.state⟩))`
+        -- for an ARBITRARY `X₂` (no measurability hypothesis is carried by `glm'`). Only
+        -- `Measurable.of_discrete` closes it, which needs `DiscreteMeasurableSpace (Cfg rT)`
+        -- ⇒ `Countable rT`. Adding that to `glm'_bind` cascades countability into the
+        -- foundational WP stack (`TotalWeakestpre`). The countability-free fix is a design
+        -- change: have `glm'` carry measurability hypotheses on `X₂`/`R`. (Novel insight.)
         case G1 => sorry
         case G2 => measurability
         refine _root_.le_trans (_root_.le_of_eq ?_) Hexp
@@ -757,6 +763,9 @@ theorem glm'_bind
         rw [primStep_fill Hsv]
         rw [MeasureTheory.Measure.map_apply ?G1 ?G2]
         case G1 => measurability
+        -- G2 is `MeasurableSet {x | ¬ ∃ ρ'', x = K.fillCfg ρ'' ∧ R ρ''}` for an ARBITRARY
+        -- predicate `R`; only `MeasurableSet.of_discrete` closes it (needs `Countable rT`).
+        -- Same design-change blocker as G1 above.
         case G2 => sorry
         refine _root_.le_trans (_root_.le_of_eq ?_) Hpgl
         congr 1
@@ -790,8 +799,6 @@ theorem glm'_bind
       imod HC
       imodintro
       iexact HC
-  -- `Φ ⟨e, σ, ε⟩ = bi_least_fixpoint (glmPre Z) (⟨K.fill e, σ⟩, ε) = glm (K.fill e) σ ε Z`
-  -- by definitional unfolding (Φ is `letI`-bound, `glm` is `@[reducible]`).
   iexact HΦ
 
 /-! ## Introduction rules for `glm` -/

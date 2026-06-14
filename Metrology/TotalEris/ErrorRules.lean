@@ -238,13 +238,10 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
         if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
     | _ => 0)
   iexists ((ε_now - ε₁) + 1)
-  -- Sub-goal 1: Discrete.Reducible. Use `primStep_pos_of_headStep_discrete` + `RandNoTapeS`.
+  -- Sub-goal 1: Reducible, via the measurability-free `HeadStepSupport.possible`.
   isplitr
   · ipureintro
-    sorry
-    -- refine ⟨⟨.lit (.int 0), σ₁⟩, primStep_pos_of_headStep_discrete ?_⟩
-    -- rw [Discrete.headStep_support_iff]
-    -- exact .RandNoTapeS Hz (_root_.le_refl _) Hz
+    exact Reducible.of_head (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
   isplitr
   · ipureintro
     intro ρ
@@ -275,9 +272,8 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
             have hheadred : ∃ ρ : Cfg rT,
                 0 < (headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ} :=
               ⟨⟨.lit (.int 0), σ₁⟩, by
-                sorry⟩
-                -- rw [headStep_support_iff]
-                -- exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
+                exact possible_iff_pos.mp
+                  (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible⟩
             rw [primStep_eq_headStep_discrete hheadred]
             -- headStep ⟨rand z (), σ⟩ definitionally equals Cfg.uniform z σ.
             show ∫⁻ a, (match a.expr with
@@ -294,8 +290,13 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
             rw [hCfgUniform]
             -- Push the integral through `Measure.map`.
             rw [MeasureTheory.lintegral_map ?G1 ?G2]
+            -- G1/G2: `Measurable` of the concrete integrand / the `Int → Cfg` map.
+            -- G2 is fine, but G1 only closes via `Measurable.of_discrete`
+            -- (`DiscreteMeasurableSpace (Cfg rT)` ⇒ `Countable rT`). Countability-free
+            -- closure needs novel insight (a measurability lemma for the expr-match,
+            -- or carrying measurability). Left as a sorry.
             case G1 => sorry
-            case G2 => sorry
+            case G2 => exact Measurable.of_discrete
             have hCard : (Finset.Ico (0:Int) z).card = z.toNat := by
               rw [Int.card_Ico, sub_zero]
             have hLI :
@@ -370,20 +371,15 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   -- must be of the form `⟨lit n, σ₁⟩` with `0 ≤ n < z` (i.e., `R`).
   isplitr
   · ipureintro
+    -- Support *inversion* is measurability-free (`headStep_support_of_pos`), but the
+    -- "support has full measure" half needs `Pgl.zero_positive`, i.e. `Countable (Cfg rT)`.
+    -- Per the countability-removal goal we do NOT add `[Countable rT]`; this is a
+    -- genuine-novel-insight case (custom finite-support measure-zero proof, or a
+    -- countability-free `Pgl` for atomic measures). Left as a sorry.
+    -- Inversion (works countability-free):
+    --   cases headStep_support_of_pos _ _ _ _ hpos with
+    --   | RandNoTapeS _ Hv0 Hvz => exact ⟨_, Hv0, Hvz, rfl⟩ | RandNonposS hnz => exact absurd Hz hnz
     sorry
-    -- have hheadred : ∃ ρ : Cfg rT, 0 < (headStep ⟨_, σ₁⟩) {ρ} := sorry
-    --   -- ⟨⟨.lit (.int 0), σ₁⟩, by
-    --   --   rw [Discrete.headStep_support_iff]; exact .RandNoTapeS Hz (_root_.le_refl _) Hz⟩
-    -- have hps_eq : primStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩
-    --     = headStep ⟨Exp.rand (Exp.lit (.int z)) (Exp.lit .unit), σ₁⟩ :=
-    --   primStep_eq_headStep_discrete hheadred
-    -- refine Pgl.mono_pred ?_ (Pgl.zero_positive _)
-    -- intro ρ hpos
-    -- rw [hps_eq, Discrete.headStep_support_iff] at hpos
-    -- obtain ⟨e', σ'⟩ := ρ
-    -- cases hpos with
-    -- | RandNoTapeS Hz' Hv0 Hvz => exact ⟨_, Hv0, Hvz, rfl⟩
-    -- | RandNonposS hnz => exact absurd Hz hnz
   -- Sub-goal 5: per-outcome continuation.
   iintro %ρ %HRρ
   obtain ⟨n, Hn₁, Hn₂, Hρ_eq⟩ := HRρ

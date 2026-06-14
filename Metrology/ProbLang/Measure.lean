@@ -12,6 +12,85 @@ public import Mathlib.Probability.Distributions.Uniform
 noncomputable section
 open Classical MeasureTheory ProbabilityTheory Measure
 
+/-! ## `Possible`: a measurability-free "positive-mass point" of a measure
+
+`Possible ρ μ` says that `ρ` is a *possible outcome* of `μ` — a point carrying
+positive mass — but states it as `∃ p > 0, p • dirac ρ ≤ μ` rather than the more
+obvious `0 < μ {ρ}`. The two agree for discrete measures (`possible_iff_pos`),
+yet because `Possible` never names the singleton `{ρ}` it is well-behaved — and
+can be related to operational support facts — **without** assuming
+`MeasurableSingletonClass`. This is what lets the support characterisations drop
+the `[MeasurableSingletonClass rT]` hypothesis. -/
+def Possible {α : Type _} [MeasurableSpace α] (ρ : α) (μ : Measure α) : Prop :=
+  ∃ p : ENNReal, 0 < p ∧ p • dirac ρ ≤ μ
+
+/-- `Possible` is monotone in the measure. -/
+theorem Possible.mono {α : Type _} [MeasurableSpace α] {ρ : α} {μ ν : Measure α}
+    (hμν : μ ≤ ν) : Possible ρ μ → Possible ρ ν
+  | ⟨p, hp, hle⟩ => ⟨p, hp, hle.trans hμν⟩
+
+/-- If `dirac ρ ≤ μ` then `ρ` is possible (take `p = 1`). Measurability-free. -/
+theorem Possible.of_dirac_le {α : Type _} [MeasurableSpace α] {ρ : α} {μ : Measure α}
+    (h : dirac ρ ≤ μ) : Possible ρ μ :=
+  ⟨1, one_pos, by rwa [one_smul]⟩
+
+/-- A possible outcome witnesses that the measure is nonzero. Measurability-free;
+this is what discharges `HeadReducible` (`headStep … ≠ 0`) safety obligations. -/
+theorem Possible.ne_zero {α : Type _} [MeasurableSpace α] {ρ : α} {μ : Measure α}
+    (h : Possible ρ μ) : μ ≠ 0 := by
+  obtain ⟨p, hp, hle⟩ := h
+  rintro rfl
+  have hu : p ≤ 0 := by simpa [Measure.smul_apply] using (hle Set.univ)
+  exact absurd hu (not_le.mpr hp)
+
+/-- A deterministic step (`μ = dirac ρ`) makes `ρ` possible. Measurability-free;
+this is the `←` engine for the deterministic head-step constructors. -/
+theorem Possible.of_dirac_eq {α : Type _} [MeasurableSpace α] {ρ : α} {μ : Measure α}
+    (h : μ = dirac ρ) : Possible ρ μ :=
+  Possible.of_dirac_le (h ▸ le_refl _)
+
+/-- `Possible` transports along a measurable map. Needs only `Measurable g` — no
+`MeasurableSingletonClass`. This is the `←` engine for the (non-deterministic)
+`rand` constructors, whose head step is a pushforward of the uniform PMF. -/
+theorem Possible.map {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
+    {g : α → β} (hg : Measurable g) {ρ : α} {μ : Measure α} :
+    Possible ρ μ → Possible (g ρ) (μ.map g)
+  | ⟨p, hp, hle⟩ => ⟨p, hp, by
+      rw [Measure.le_iff]
+      intro s hs
+      rw [Measure.map_apply hg hs, Measure.smul_apply, dirac_apply' _ hs, smul_eq_mul]
+      by_cases hmem : g ρ ∈ s
+      · rw [Set.indicator_of_mem hmem, Pi.one_apply, mul_one]
+        have hρ : ρ ∈ g ⁻¹' s := hmem
+        have hle' := Measure.le_iff.mp hle (g ⁻¹' s) (hg hs)
+        simp only [Measure.smul_apply, dirac_apply' _ (hg hs), Set.indicator_of_mem hρ,
+          Pi.one_apply, smul_eq_mul, mul_one] at hle'
+        exact hle'
+      · rw [Set.indicator_of_notMem hmem]; simp⟩
+
+/-- On a space with measurable singletons, `Possible ρ μ` is exactly positive
+mass at `ρ`. This is the bridge between the measurability-free `Possible` and the
+discrete `0 < μ {ρ}` formulation. -/
+theorem possible_iff_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
+    {ρ : α} {μ : Measure α} : Possible ρ μ ↔ 0 < μ {ρ} := by
+  have hdir : (dirac ρ) {ρ} = 1 := by
+    rw [dirac_apply' _ (measurableSet_singleton ρ)]; simp
+  constructor
+  · rintro ⟨p, hp, hle⟩
+    have hle' := Measure.le_iff.mp hle {ρ} (measurableSet_singleton ρ)
+    rw [Measure.smul_apply, hdir, smul_eq_mul, mul_one] at hle'
+    exact hp.trans_le hle'
+  · intro hpos
+    refine ⟨μ {ρ}, hpos, ?_⟩
+    rw [Measure.le_iff]
+    intro s hs
+    rw [Measure.smul_apply, dirac_apply' _ hs, smul_eq_mul]
+    by_cases hρs : ρ ∈ s
+    · rw [Set.indicator_of_mem hρs]
+      simp only [Pi.one_apply, mul_one]
+      exact measure_mono (Set.singleton_subset_iff.mpr hρs)
+    · rw [Set.indicator_of_notMem hρs]; simp
+
 instance [MeasurableSpace α] : MeasurableSpace (Option α) :=
   MeasurableSpace.comap (Equiv.optionEquivSumPUnit.{0, _} α) inferInstance
 

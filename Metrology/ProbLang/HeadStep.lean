@@ -1763,6 +1763,18 @@ theorem Discrete.dirac_singleton_pos [Countable rT] [MeasurableSingletonClass rT
     split <;> simp; trivial
   · simp_all [dirac_apply_of_mem (Set.mem_singleton _)]
 
+/-- Countable-free version of `Discrete.dirac_singleton_pos`: needs only
+`[MeasurableSingletonClass rT]` (so the singleton `{b}` is measurable), not the
+full discrete structure. -/
+theorem dirac_singleton_pos' [MeasurableSingletonClass rT]
+    {a b : Cfg rT} :
+    0 < (dirac a) {b} ↔ a = b := by
+  constructor
+  · rw [dirac_apply' a (measurableSet_singleton b), Set.indicator_singleton, Pi.single,
+        Function.update]
+    split <;> simp; trivial
+  · simp_all [dirac_apply_of_mem (Set.mem_singleton _)]
+
 @[simp]
 theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp α} {m : Measure T} {s : Set T} :
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
@@ -1773,6 +1785,13 @@ theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp α} {m : Measure T} {s
 
 @[simp, discrete]
 theorem Discrete.unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
+    {f : α → Measure β} {opt : Option α} {s : Set β} :
+    0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
+  cases opt <;> simp [Option.unwrapM]
+
+/-- Non-`@[discrete]` copy of `Discrete.unwrapM_singleton_pos` — it needs no
+discreteness — for use in Countable-free proofs. -/
+theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     {f : α → Measure β} {opt : Option α} {s : Set β} :
     0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
   cases opt <;> simp [Option.unwrapM]
@@ -1797,6 +1816,34 @@ theorem Discrete.Cfg.uniform_singleton_pos_inv [Countable rT] [MeasurableSinglet
     refine ⟨rfl, .inl ⟨Hz, _, rfl, ?_, ?_⟩⟩ <;> simp_all
   · simp only [Hz, dite_false] at h
     rw [Discrete.dirac_singleton_pos] at h
+    have ⟨h1, h2⟩ := (Cfg.mk.injEq ..).mp h
+    exact ⟨h2.symm, .inr ⟨Hz, h1.symm⟩⟩
+
+/-- Countable-free version of `Discrete.Cfg.uniform_singleton_pos_inv`: needs only
+`[MeasurableSingletonClass rT]`. The `Int → Cfg rT` embedding is measurable for
+any `rT`, and the only singleton-measurability used is on `Cfg rT` (from
+`MeasurableSingletonClass rT`). -/
+theorem Cfg.uniform_singleton_pos_inv' [MeasurableSingletonClass rT]
+    {z : Int} {σ : State rT} {ρ : Cfg rT}
+    (h : 0 < Cfg.uniform z σ {ρ}) :
+    ρ.state = σ ∧
+    ((0 < z ∧ ∃ v : Int, ρ.expr = .lit (.int v) ∧ 0 ≤ v ∧ v < z) ∨
+     (¬ 0 < z ∧ ρ.expr = .lit (.int (-1)))) := by
+  unfold Cfg.uniform Int.isPos at h
+  by_cases Hz : 0 < z
+  · simp only [Hz, dite_true] at h
+    rw [Measure.map_apply (by measurability) (measurableSet_singleton ρ),
+        PMF.toMeasure_uniformOfFinset_apply _ _ (by measurability),
+        ENNReal.div_pos_iff] at h
+    obtain ⟨hcard, _⟩ := h
+    rw [Nat.cast_ne_zero, Finset.card_ne_zero, Finset.filter_nonempty_iff] at hcard
+    obtain ⟨a, ha, hfa⟩ := hcard
+    simp only [Set.mem_preimage, Set.mem_singleton_iff] at hfa
+    rw [Finset.mem_Ico] at ha
+    subst hfa
+    exact ⟨rfl, .inl ⟨Hz, a, rfl, ha.1, ha.2⟩⟩
+  · simp only [Hz, dite_false] at h
+    rw [dirac_singleton_pos'] at h
     have ⟨h1, h2⟩ := (Cfg.mk.injEq ..).mp h
     exact ⟨h2.symm, .inr ⟨Hz, h1.symm⟩⟩
 
@@ -1828,6 +1875,11 @@ macro "cfg_dirac" h:ident : tactic =>
   `(tactic| (rw [Discrete.dirac_singleton_pos] at $h:ident
              have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
 
+/-- Countable-free `cfg_dirac`, using `dirac_singleton_pos'`. -/
+macro "cfg_dirac'" h:ident : tactic =>
+  `(tactic| (rw [dirac_singleton_pos'] at $h:ident
+             have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
+
 @[discrete]
 theorem Discrete.headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
     (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
@@ -1851,10 +1903,10 @@ theorem Discrete.headStep_support_iff [Countable rT] [MeasurableSingletonClass r
     case rand.tape.deterministic =>
       intro h; cfg_dirac h; exact .RandTapeS ‹_› rfl rfl rfl
     case unop.redex =>
-      intro h; rw [Discrete.unwrapM_singleton_pos] at h
+      intro h; rw [unwrapM_singleton_pos] at h
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .UnOpS ‹_› hr.symm
     case binop.redex =>
-      intro h; rw [Discrete.unwrapM_singleton_pos] at h
+      intro h; rw [unwrapM_singleton_pos] at h
       obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .BinOpS ‹_› ‹_› hr.symm
     case rand.plain =>
       intro h
@@ -1906,6 +1958,152 @@ theorem Discrete.headStep_support_iff [Countable rT] [MeasurableSingletonClass r
       simp only [headStep, htape]
       rw [if_neg (Ne.symm hzN)]
       exact Discrete.Cfg.uniform_singleton_nonpos Hz
+
+/-- Measurability-free `←` core for the `rand` constructors: every value in
+`[0, z)` is a *possible* outcome of the uniform head step. The key point is that
+this needs no `MeasurableSingletonClass rT` — `Possible.map` transports the fact
+along the (measurable) `Int → Cfg rT` embedding, and the only singleton-mass
+reasoning happens on `Int`, which is countable. -/
+theorem Cfg.uniform_possible {z v : Int} {σ : State rT}
+    (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) :
+    Possible (⟨.lit (.int v), σ⟩ : Cfg rT) (Cfg.uniform z σ) := by
+  unfold Cfg.uniform Int.isPos
+  simp only [Hz, dite_true]
+  refine Possible.map (g := fun x : Int => (⟨.lit (.int x), σ⟩ : Cfg rT)) (ρ := v)
+    (by measurability) ?_
+  rw [possible_iff_pos, PMF.toMeasure_uniformOfFinset_apply _ _ (measurableSet_singleton v)]
+  rw [ENNReal.div_pos_iff]
+  refine ⟨?_, ENNReal.natCast_ne_top _⟩
+  rw [ne_eq, Nat.cast_eq_zero]
+  exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz]⟩
+
+/-- `←` direction of the continuous support characterisation: every operational
+head-step outcome is a *possible* outcome of the head step.  **Measurability-free**
+— no `[MeasurableSingletonClass rT]` — because the deterministic constructors go
+through `Possible.of_dirac_eq` and the `rand` ones through `Cfg.uniform_possible`. -/
+theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+    (h : HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩) :
+    Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩) := by
+  cases h with
+  | BetaLamS hv he | BetaFixS hv he =>
+    subst he; exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv])
+  | IfTrueS | IfFalseS =>
+    exact Possible.of_dirac_eq (by simp [headStep])
+  | FstS hv1 hv2 | SndS hv1 hv2 =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv1, hv2])
+  | CaseLS hv | CaseRS hv =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv])
+  | UnOpS hv heval =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv, Option.unwrapM, ← heval])
+  | BinOpS hv1 hv2 heval =>
+    exact Possible.of_dirac_eq
+      (by simp [headStep, Exp.isValM, hv1, hv2, Option.unwrapM, ← heval])
+  | AllocS hvd hl hσ =>
+    subst hl; subst hσ; exact Possible.of_dirac_eq (by simp [headStep, Exp.asValM, hvd])
+  | LoadS hlook he =>
+    subst he; exact Possible.of_dirac_eq (by simp [headStep, hlook])
+  | StoreS hv hsome hσ =>
+    subst hσ
+    obtain ⟨vold, hvold⟩ := Option.isSome_iff_exists.mp hsome
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.asValM, hv, hvold])
+  | TapeS hl hσ =>
+    subst hl; subst hσ; exact Possible.of_dirac_eq (by simp [headStep])
+  | ScrutSuccessS hv hmatch =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv, hmatch])
+  | ScrutFailureS hv hmatch =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv, hmatch])
+  | RandNoTapeS Hz Hv0 Hvz =>
+    simp only [headStep]; exact Cfg.uniform_possible Hz Hv0 Hvz
+  | RandNonposS Hz =>
+    exact Possible.of_dirac_eq (by simp [headStep, Cfg.uniform, Int.isPos, Hz])
+  | RandTapeS htape hz hv hσ =>
+    subst hz; subst hv; subst hσ; exact Possible.of_dirac_eq (by simp [headStep, htape])
+  | RandTapeEmptyS Hz htape hz Hv0 Hvz hσ =>
+    subst hσ; subst hz; simp only [headStep, htape, ↓reduceIte]
+    exact Cfg.uniform_possible Hz Hv0 Hvz
+  | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
+    subst hσ; simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    exact Cfg.uniform_possible Hz Hv0 Hvz
+  | RandTapeNonposEmptyS Hz htape hz =>
+    subst hz; exact Possible.of_dirac_eq (by simp [headStep, htape, Cfg.uniform, Int.isPos, Hz])
+  | RandTapeNonposOtherS Hz htape hzN =>
+    refine Possible.of_dirac_eq ?_
+    simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    simp [Cfg.uniform, Int.isPos, Hz]
+
+/-- `→` direction of the continuous support characterisation. Unlike
+`HeadStepSupport.possible`, this needs `[MeasurableSingletonClass rT]`: recovering
+*which* outcome occurred from a positive-mass fact requires separating configs by
+measurable sets, which on the `rT`-payload needs measurable singletons. **No
+`[Countable rT]`**: the proof mirrors the `→` direction of
+`Discrete.headStep_support_iff` but uses the Countable-free inversions
+(`dirac_singleton_pos'`, `Cfg.uniform_singleton_pos_inv'`). -/
+theorem headStep_support_of_pos [MeasurableSingletonClass rT]
+    (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
+    0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} → HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
+  head_case
+  all_goals try (· simp)
+  case cond.true | cond.false => intro h; cfg_dirac' h; constructor
+  case beta.lam.redex => intro h; cfg_dirac' h; exact .BetaLamS ‹_› rfl
+  case beta.fix.redex => intro h; cfg_dirac' h; exact .BetaFixS ‹_› rfl
+  case fst.redex => intro h; cfg_dirac' h; exact .FstS ‹_› ‹_›
+  case snd.redex => intro h; cfg_dirac' h; exact .SndS ‹_› ‹_›
+  case case.left.redex => intro h; cfg_dirac' h; exact .CaseLS ‹_›
+  case case.right.redex => intro h; cfg_dirac' h; exact .CaseRS ‹_›
+  case tape => intro h; cfg_dirac' h; exact .TapeS rfl rfl
+  case load.redex => intro h; cfg_dirac' h; exact .LoadS ‹_› rfl
+  case alloc.redex => intro h; cfg_dirac' h; exact .AllocS ‹_› rfl rfl
+  case store.redex =>
+    intro h; cfg_dirac' h
+    exact .StoreS ‹_› (by rw [Option.isSome_iff_exists]; exact ⟨_, ‹_›⟩) rfl
+  case rand.tape.deterministic =>
+    intro h; cfg_dirac' h; exact .RandTapeS ‹_› rfl rfl rfl
+  case unop.redex =>
+    intro h; rw [unwrapM_singleton_pos] at h
+    obtain ⟨r, hr, h⟩ := h; cfg_dirac' h; exact .UnOpS ‹_› hr.symm
+  case binop.redex =>
+    intro h; rw [unwrapM_singleton_pos] at h
+    obtain ⟨r, hr, h⟩ := h; cfg_dirac' h; exact .BinOpS ‹_› ‹_› hr.symm
+  case rand.plain =>
+    intro h
+    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv' h
+    simp at hσ; subst hσ
+    rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
+    · simp at hv; subst hv; exact .RandNoTapeS Hz Hv0 Hvz
+    · simp at hv; subst hv; exact .RandNonposS Hz
+  case rand.tape =>
+    intro h
+    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv' h
+    simp at hσ; subst hσ
+    rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
+    · simp at hv; subst hv; exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
+    · simp at hv; subst hv; exact .RandTapeNonposEmptyS Hz ‹_› rfl
+  case rand.tape.mismatch =>
+    intro h
+    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv' h
+    simp at hσ; subst hσ
+    rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
+    · simp at hv; subst hv; exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
+    · simp at hv; subst hv; exact .RandTapeNonposOtherS Hz ‹_› (Ne.symm ‹_›)
+  case scrut_success => intro h; cfg_dirac' h; exact .ScrutSuccessS ‹_› ‹_›
+  case scrut_failure => intro h; cfg_dirac' h; exact .ScrutFailureS ‹_› ‹_›
+
+/-- `→` direction of the continuous support characterisation. Needs
+`[MeasurableSingletonClass rT]` (to recover *which* outcome occurred), but **not**
+`[Countable rT]`. Routes through `possible_iff_pos` to `headStep_support_of_pos`. -/
+theorem Possible.headStepSupport [MeasurableSingletonClass rT]
+    {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+    (h : Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩)) :
+    HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ :=
+  headStep_support_of_pos e1 e2 σ1 σ2 (possible_iff_pos.mp h)
+
+/-- Combined continuous characterisation. The `↔` carries
+`[MeasurableSingletonClass rT]` for the `→` direction; the `←` direction
+(`HeadStepSupport.possible`) is itself instance-free. **No `[Countable rT]`.** -/
+theorem headStep_possible_iff [MeasurableSingletonClass rT]
+    (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
+    Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩) ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ :=
+  ⟨Possible.headStepSupport, HeadStepSupport.possible⟩
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by

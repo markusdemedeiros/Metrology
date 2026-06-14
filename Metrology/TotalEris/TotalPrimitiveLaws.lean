@@ -64,8 +64,7 @@ theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   imodintro
   isplitr
   · ipureintro
-    exact ⟨_, HeadStepSupport.AllocS (Exp.toVal?_ofVal v) rfl rfl
-      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
+    exact (HeadStepSupport.AllocS (Exp.toVal?_ofVal v) rfl rfl).possible.ne_zero
   iintro %e₂ %σ₂ %Hstep
   rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
@@ -93,8 +92,7 @@ theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} 
   imodintro
   isplitr
   · ipureintro
-    exact ⟨_, HeadStepSupport.LoadS hlook rfl
-      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
+    exact (HeadStepSupport.LoadS hlook rfl).possible.ne_zero
   iintro %e₂ %σ₂ %Hstep
   rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
@@ -119,9 +117,8 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
   imodintro
   isplitr
   · ipureintro
-    exact ⟨_, HeadStepSupport.StoreS (Exp.toVal?_ofVal v)
-      (by rw [hlook]; exact Option.isSome_some) rfl
-      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
+    exact (HeadStepSupport.StoreS (Exp.toVal?_ofVal v)
+      (by rw [hlook]; exact Option.isSome_some) rfl).possible.ne_zero
   iintro %e₂ %σ₂ %Hstep
   rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
@@ -150,8 +147,7 @@ theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
   imodintro
   isplitr
   · ipureintro
-    exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
-      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
+    exact (HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl).possible.ne_zero
   iintro %e₂ %σ₂ %Hstep
   rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
@@ -181,9 +177,7 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
   imodintro
   isplitr
   · ipureintro
-    refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
-    rw [Discrete.headStep_support_iff]
-    exact .RandNoTapeS Hz (_root_.le_refl _) Hz
+    exact (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
   iintro %e₂ %σ₂ %Hstep
   rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
@@ -214,8 +208,7 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int}
   imodintro
   isplitr
   · ipureintro
-    exact ⟨_, HeadStepSupport.RandTapeS hlook rfl rfl rfl
-      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
+    exact (HeadStepSupport.RandTapeS hlook rfl rfl rfl).possible.ne_zero
   iintro %e₂ %σ₂ %Hstep
   rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with
@@ -254,9 +247,7 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   imodintro
   isplitr
   · ipureintro
-    refine ⟨⟨.lit (.int 0), σ₁⟩, ?_⟩
-    rw [Discrete.headStep_support_iff]
-    exact .RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl
+    exact (HeadStepSupport.RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl).possible.ne_zero
   iintro %e₂ %σ₂ %Hstep
   rw [Discrete.headStep_support_iff] at Hstep
   cases Hstep with

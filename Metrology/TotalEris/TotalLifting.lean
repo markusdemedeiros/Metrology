@@ -71,7 +71,10 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
     calc ε₁ * primStep ⟨e₁, σ₁⟩ Set.univ
         ≤ ε₁ * 1 := by gcongr; exact primStep_univ_le_one _
       _ = ε₁ := mul_one ε₁
-  isplitr; · ipureintro; sorry -- exact Pgl.zero_positive _
+  -- `Pgl 0 (positive-mass) primStep` for the general lift needs `Pgl.zero_positive`,
+  -- i.e. `Countable (Cfg rT)`. Per the countability-removal goal we do not add it;
+  -- genuine-novel-insight (needs `primStep` atomicity / a countability-free `Pgl`).
+  isplitr; · ipureintro; sorry
   iintro %ρ %HR
   ispecialize HCont $$ %ρ.expr %ρ.state %HR
   imod HCont with HC
@@ -175,7 +178,7 @@ between the two views. -/
 theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E}=>
-      (⌜∃ ρ : Cfg rT, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
+      (⌜HeadReducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E}=>
           stateInterp σ₂ ∗
@@ -189,9 +192,12 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   ispecialize H $$ %σ₁ Hσ
   imod H with ⟨%Hhred, HCont⟩
   imodintro
-  isplitr; · ipureintro; sorry -- exact Reducible.of_head Hhred
+  isplitr
+  · ipureintro
+    exact reducible_of_headReducible Hhred
   iintro %e₂ %σ₂ %Hpstep
-  have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
+  have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := by
+    exact primStep_eq_headStep Hhred
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := heq ▸ Hpstep
   iapply HCont $$ %e₂ %σ₂ %hpos
 
@@ -199,9 +205,12 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
 theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
+    -- How is this used? Can it be changed to be the Dirac critereon?
     (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
-  iapply twp_lift_pure_det_step hv (Hsafe := fun σ => sorry) -- Reducible.of_head (Hsafe σ))
+  iapply twp_lift_pure_det_step hv
+    (Hsafe := fun σ => Reducible.of_head (by
+      obtain ⟨ρ, hρ⟩ := Hsafe σ; intro h0; rw [h0] at hρ; simp at hρ))
   intros σ e₂' σ₂ hp
   have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep_discrete (Hsafe σ)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)
@@ -215,31 +224,20 @@ theorem twp_lift_pure_det_step_of_pureStep
     (h : PureStep e₁ e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   -- The first reducibility witness gives us a non-value status.
-  have hv : e₁.toVal? = none := by
-    sorry
-    -- obtain ⟨ρ, hρ⟩ := h.safe default
-    -- exact Exp.toVal?_eq_none.mpr (Discrete.val_stuck hρ)
+  have hv : e₁.toVal? = none := Exp.toVal?_eq_none.mpr <| val_stuck <| h.safe default
   iapply twp_lift_pure_det_step hv h.safe
   intros σ e₂' σ₂ hp
-  have htot := primStep_univ_le_one ⟨e₁, σ⟩
   have hpt := h.det σ
   by_contra hne
   have hother : (⟨e₂', σ₂⟩ : Cfg rT) ≠ ⟨e₂, σ⟩ := by
     intro heq
     cases heq
     exact hne ⟨rfl, rfl⟩
-  have hadd : primStep ⟨e₁, σ⟩ ({⟨e₂', σ₂⟩} ∪ {⟨e₂, σ⟩} : Set (Cfg rT)) =
-      primStep ⟨e₁, σ⟩ {⟨e₂', σ₂⟩} + primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩} :=
-    MeasureTheory.measure_union (by simp [hother]) (MeasurableSet.singleton _)
-  have hsum_le : primStep ⟨e₁, σ⟩ {⟨e₂', σ₂⟩} + primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩} ≤
-      primStep ⟨e₁, σ⟩ Set.univ := by
-    rw [← hadd]
-    exact MeasureTheory.measure_mono (Set.subset_univ _)
-  rw [hpt] at hsum_le
-  have hsum_gt : 1 < primStep ⟨e₁, σ⟩ {⟨e₂', σ₂⟩} + 1 := by
-    rw [add_comm]
-    exact ENNReal.lt_add_right ENNReal.one_ne_top hp.ne'
-  sorry
+  -- Determinacy: `primStep ⟨e₁,σ⟩ = dirac ⟨e₂,σ⟩`, so a positive-mass outcome must
+  -- *be* `⟨e₂,σ⟩` (via the measurability-free `dirac_singleton_pos'`), contradicting
+  -- `hother`.
+  rw [hpt, dirac_singleton_pos'] at hp
+  exact hother hp.symm
   -- exact absurd (hsum_le.trans htot) (_root_.not_le.mpr hsum_gt)
 
 theorem twp_pure_step_fupd
