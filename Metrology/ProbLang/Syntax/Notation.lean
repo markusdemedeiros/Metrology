@@ -1,6 +1,7 @@
 module
 
 public meta import Lean.PrettyPrinter.Delaborator
+public meta import Lean.PrettyPrinter.Parenthesizer
 public meta import Lean.Elab.Term
 public import Metrology.ProbLang.Syntax.Syntax
 public meta import Metrology.ProbLang.Syntax.Syntax
@@ -28,6 +29,19 @@ declare_syntax_cat pl_pat
 syntax:max "pl(" pl_exp ")" : term
 syntax:max "pl_ty(" pl_ty ")" : term
 syntax:max "pl_pat(" pl_pat ")" : term
+
+/-! ### Low-precedence entry sugar
+
+As in Iris-Lean's HeapLang (`hl% e`), `pl% e` / `pl_ty% τ` / `pl_pat% p`
+embed without the closing paren, convenient at statement level where the
+trailing `)` is otherwise easy to misplace. -/
+syntax:min "pl% " pl_exp:min : term
+syntax:min "pl_ty% " pl_ty:min : term
+syntax:min "pl_pat% " pl_pat:min : term
+macro_rules
+  | `(pl% $e)     => `(pl($e))
+  | `(pl_ty% $τ)  => `(pl_ty($τ))
+  | `(pl_pat% $p) => `(pl_pat($p))
 
 /-! ## `plBinderHint!`: attach display metadata to a binder expression.
 `plBinderHint! name τ? e` elaborates `e` and wraps it in an `Expr.mdata`
@@ -77,6 +91,10 @@ syntax:max "(" pl_pat " : " pl_ty ")"                           : pl_pat
 
 -- Expressions
 syntax:max "{" term "}"                                         : pl_exp
+-- Escape into a Lean term. `{t}` brace-delimits any term; `&t` (à la
+-- Iris-Lean HeapLang) is a terser form for an atomic (max-precedence)
+-- term — e.g. `&f` — and needs parens for compound terms (`&(g x)`).
+syntax:max "&" term:max                                         : pl_exp
 syntax:max "#" term:max                                         : pl_exp
 syntax:max ident                                                : pl_exp
 syntax:max "(" pl_exp ")"                                       : pl_exp
@@ -95,7 +113,7 @@ syntax:50 pl_exp:50 " = " pl_exp:50                             : pl_exp
 syntax:10 "if " pl_exp " then " pl_exp " else " pl_exp          : pl_exp
 syntax:75 "~" pl_exp:75                                         : pl_exp
 syntax:75 "-" pl_exp:75                                         : pl_exp
-syntax:100 pl_exp:100 ppSpace pl_exp:101                        : pl_exp
+syntax:100 pl_exp:100 colGt ppSpace pl_exp:101                  : pl_exp
 syntax:10 "let " pl_arg " := " pl_exp:10 "; " pl_exp:1          : pl_exp
 syntax:5 pl_exp:6 "; " pl_exp:5                                 : pl_exp
 syntax:10 "fun" pl_arg+ ", " pl_exp:10                          : pl_exp
@@ -116,6 +134,28 @@ syntax:10 "scrut " pl_exp " with " pl_pat                       : pl_exp
 syntax:max "fail"                                               : pl_exp
 syntax:10 "let! " pl_pat " := " pl_exp:10 "; " pl_exp:1         : pl_exp
 syntax:100 "assert(" pl_exp ")"                                 : pl_exp
+
+/-! ## Category parenthesizers
+
+Following Iris-Lean's HeapLang (`hl_exp.parenthesizer`), register a
+parenthesizer per syntax category. This lets the delaborator emit nested
+syntax *without* explicit parentheses and have the pretty-printer insert
+them only where precedence demands — yielding minimal, correctly-grouped
+output. In particular it fixes type rendering such as
+`int × (bool + unit)`, which previously printed (and re-parsed) wrongly
+as `int × bool + unit`. -/
+
+open Lean.PrettyPrinter.Parenthesizer in
+@[category_parenthesizer pl_exp]
+meta def pl_exp.parenthesizer : CategoryParenthesizer := fun prec => do
+  maybeParenthesize `pl_exp false (fun stx => Unhygienic.run `(pl_exp|($(⟨stx⟩)))) prec <|
+    parenthesizeCategoryCore `pl_exp prec
+
+open Lean.PrettyPrinter.Parenthesizer in
+@[category_parenthesizer pl_ty]
+meta def pl_ty.parenthesizer : CategoryParenthesizer := fun prec => do
+  maybeParenthesize `pl_ty false (fun stx => Unhygienic.run `(pl_ty|($(⟨stx⟩)))) prec <|
+    parenthesizeCategoryCore `pl_ty prec
 
 meta def reservedKeywords : List String :=
   ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "scrut",
@@ -231,6 +271,7 @@ meta partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
       `(Exp.annotated pl_ty($τ) $(← elabPL env st e))
   | `(pl_exp|($e))         => elabPL env st e
   | `(pl_exp|{$t})         => `(($t))
+  | `(pl_exp|&$t)          => `(($t))
   | `(pl_exp|# $n:num)     => `(Exp.lit (.int $n))
   | `(pl_exp|#true)        => `(Exp.lit (.bool true))
   | `(pl_exp|#false)       => `(Exp.lit (.bool false))
@@ -404,10 +445,13 @@ namespace ProbLang
 
 open Lean Lean.PrettyPrinter
 
-/-- Strip the `pl(...)` wrapper to get a raw `pl_exp`, or fall back to `{t}` escape. -/
+/-- Strip the `pl(...)` wrapper to get a raw `pl_exp`. For an escaped Lean
+    term, use the terser `&t` form when it is an atom (identifier) and fall
+    back to the brace-delimited `{t}` for compound terms. -/
 meta def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
-  | `(pl($e)) => `(pl_exp|$e)
-  | `($t)     => `(pl_exp|{$t})
+  | `(pl($e))     => `(pl_exp|$e)
+  | `($i:ident)   => `(pl_exp|&$i)
+  | `($t)         => `(pl_exp|{$t})
 
 /-- Strip the `pl_ty(...)` wrapper to get a raw `pl_ty`. -/
 meta def unpackPLTy [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
@@ -523,23 +567,23 @@ meta def unexpFail : Unexpander
 
 @[app_unexpander Exp.binop]
 meta def unexpBinop : Unexpander
-  | `($_ BinOp.plus  $e1 $e2) => do `(pl(($(← unpackPLExp e1) + $(← unpackPLExp e2))))
-  | `($_ BinOp.minus $e1 $e2) => do `(pl(($(← unpackPLExp e1) - $(← unpackPLExp e2))))
-  | `($_ BinOp.mult  $e1 $e2) => do `(pl(($(← unpackPLExp e1) * $(← unpackPLExp e2))))
-  | `($_ BinOp.div   $e1 $e2) => do `(pl(($(← unpackPLExp e1) / $(← unpackPLExp e2))))
-  | `($_ BinOp.mod   $e1 $e2) => do `(pl(($(← unpackPLExp e1) % $(← unpackPLExp e2))))
-  | `($_ BinOp.lt    $e1 $e2) => do `(pl(($(← unpackPLExp e1) < $(← unpackPLExp e2))))
-  | `($_ BinOp.le    $e1 $e2) => do `(pl(($(← unpackPLExp e1) <= $(← unpackPLExp e2))))
-  | `($_ BinOp.and   $e1 $e2) => do `(pl(($(← unpackPLExp e1) && $(← unpackPLExp e2))))
-  | `($_ BinOp.or    $e1 $e2) => do `(pl(($(← unpackPLExp e1) || $(← unpackPLExp e2))))
-  | `($_ BinOp.xor   $e1 $e2) => do `(pl(($(← unpackPLExp e1) ^^ $(← unpackPLExp e2))))
-  | `($_ BinOp.eq    $e1 $e2) => do `(pl(($(← unpackPLExp e1) = $(← unpackPLExp e2))))
+  | `($_ BinOp.plus  $e1 $e2) => do `(pl($(← unpackPLExp e1) + $(← unpackPLExp e2)))
+  | `($_ BinOp.minus $e1 $e2) => do `(pl($(← unpackPLExp e1) - $(← unpackPLExp e2)))
+  | `($_ BinOp.mult  $e1 $e2) => do `(pl($(← unpackPLExp e1) * $(← unpackPLExp e2)))
+  | `($_ BinOp.div   $e1 $e2) => do `(pl($(← unpackPLExp e1) / $(← unpackPLExp e2)))
+  | `($_ BinOp.mod   $e1 $e2) => do `(pl($(← unpackPLExp e1) % $(← unpackPLExp e2)))
+  | `($_ BinOp.lt    $e1 $e2) => do `(pl($(← unpackPLExp e1) < $(← unpackPLExp e2)))
+  | `($_ BinOp.le    $e1 $e2) => do `(pl($(← unpackPLExp e1) <= $(← unpackPLExp e2)))
+  | `($_ BinOp.and   $e1 $e2) => do `(pl($(← unpackPLExp e1) && $(← unpackPLExp e2)))
+  | `($_ BinOp.or    $e1 $e2) => do `(pl($(← unpackPLExp e1) || $(← unpackPLExp e2)))
+  | `($_ BinOp.xor   $e1 $e2) => do `(pl($(← unpackPLExp e1) ^^ $(← unpackPLExp e2)))
+  | `($_ BinOp.eq    $e1 $e2) => do `(pl($(← unpackPLExp e1) = $(← unpackPLExp e2)))
   | _ => throw ()
 
 @[app_unexpander Exp.unop]
 meta def unexpUnop : Unexpander
   | `($_ UnOp.neg   $e) => do `(pl(~$(← unpackPLExp e)))
-  | `($_ UnOp.minus $e) => do `(pl(-$(← unpackPLExp e)))
+  | `($_ UnOp.minus $e) => do `(pl(- $(← unpackPLExp e)))
   | _ => throw ()
 
 @[app_unexpander Exp.cond]
@@ -699,7 +743,8 @@ open Lean.PrettyPrinter.Delaborator in
 @[delab app.ProbLang.Exp.fvar]
 meta def delabExpFvar : Delab := do
   let e ← SubExpr.getExpr
-  unless e.getAppNumArgs == 1 do failure
+  -- `Exp.fvar : Var → Exp rT` carries an implicit `rT`, so the application
+  -- has two arguments (`rT` and the `Var`); the variable is the last one.
   let_expr Var.named sLit := e.appArg! | failure
   let .lit (.strVal s) := sLit | failure
   `(pl($(Lean.mkIdent (Name.mkSimple s)):ident))

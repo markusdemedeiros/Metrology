@@ -124,45 +124,40 @@ theorem dbind'
 theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
     μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
+  -- Prove equal by extensionality
   refine Cfg.measure_ext_singletons fun c => ?_
-  -- LHS: apply `bind_apply`, then unfold `limExec` at singleton via `Discrete.limExec_apply`.
+  -- Bind → integral
   rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
+  -- Both lim_exec's become suprema
   simp_rw [Discrete.limExec_apply]
-  -- Swap `lintegral` with `iSup`: monotone convergence.
+  -- Exchange integral and sup
   rw [lintegral_iSup
         (fun _ => Measurable.of_discrete)
         (fun i j hij σ' => execN_mono_singleton hij ⟨e, σ'⟩ _)]
-  -- Each `∫⁻ σ', (execN n ⟨e,σ'⟩) {c} ∂μ` equals `(execN n ⟨e,σ⟩) {c}`
-  -- by the erasability hypothesis applied at `{c}`.
   have hbind : ∀ n,
       ∫⁻ σ', (execN n ⟨e, σ'⟩) {c} ∂μ = (execN n ⟨e, σ⟩) {c} := by
     intro n
     have hμ := congrArg (fun ν => ν ({c} : Set (Cfg rT))) (h e n)
     simpa [bind_apply MeasurableSet.of_discrete
              Measurable.of_discrete.aemeasurable] using hμ
-  simp only [hbind, ← Discrete.limExec_apply]
+  simp only [hbind]
 
 theorem lim_exec'
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
     μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
-  sorry
-  -- refine Cfg.measure_ext_singletons fun c => ?_
-  -- -- LHS: apply `bind_apply`, then unfold `limExec` at singleton via `Discrete.limExec_apply`.
-  -- rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-  -- simp_rw [Discrete.limExec_apply]
-  -- -- Swap `lintegral` with `iSup`: monotone convergence.
-  -- rw [lintegral_iSup
-  --       (fun _ => Measurable.of_discrete)
-  --       (fun i j hij σ' => execN_mono_singleton hij ⟨e, σ'⟩ _)]
-  -- -- Each `∫⁻ σ', (execN n ⟨e,σ'⟩) {c} ∂μ` equals `(execN n ⟨e,σ⟩) {c}`
-  -- -- by the erasability hypothesis applied at `{c}`.
-  -- have hbind : ∀ n,
-  --     ∫⁻ σ', (execN n ⟨e, σ'⟩) {c} ∂μ = (execN n ⟨e, σ⟩) {c} := by
-  --   intro n
-  --   have hμ := congrArg (fun ν => ν ({c} : Set (Cfg rT))) (h e n)
-  --   simpa [bind_apply MeasurableSet.of_discrete
-  --            Measurable.of_discrete.aemeasurable] using hμ
-  -- simp only [hbind, ← Discrete.limExec_apply]
+  ext S HS
+  rw [bind_apply HS (by measurability)]
+  simp_rw [limExec_apply _ HS]
+  rw [lintegral_iSup (fun n => ?G1) ?G2]
+  case G1 =>
+    exact (Measure.measurable_coe HS).comp ((execN_measurable n).comp (by measurability))
+  case G2 =>
+    exact fun n m hnm a => execN_mono hnm ⟨e, a⟩ S
+  suffices hbind : ∀ n, ∫⁻ σ', (execN n ⟨e, σ'⟩) S ∂μ = (execN n ⟨e, σ⟩) S by
+    simp [hbind]
+  intro n
+  have hμ : (μ.bind fun σ' ↦ execN n ⟨e, σ'⟩) S = (execN n ⟨e, σ⟩) S := congrArg (· S) (h e n)
+  rw [← hμ, bind_apply HS (by measurability)]
 
 theorem dret_final {μ : Measure (State rT)} {σ : State rT} {e : Exp rT} (hv : IsVal e)
     (h : Erasable μ σ) :

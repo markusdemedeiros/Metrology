@@ -51,10 +51,10 @@ Definition geometric : val :=
     if: rand #2 = #0 then #0 else "geo" "n" + #1.
 ``` -/
 def geometric : Exp rT :=
-  pl(rec geo n :=
-      if rand(#2, #.unit) = #0
-        then #0
-        else (geo n) + #1)
+  pl% rec geo n :=
+        if rand(#2, #.unit) = #0
+          then #0
+          else (geo n) + #1
 
 /-- The result-postcondition shared by all geometric specs: the sampler
 returns a non-negative integer. -/

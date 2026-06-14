@@ -401,14 +401,24 @@ example : (pl(x) : Exp Int) = Exp.fvar "x" := by rfl
 #elabpl_pat pl_pat((inl(x), inr(y)))
 #expect Pat.pair (Pat.inl .wildcard) (Pat.inr .wildcard)
 
-/-! ## Escape hatch -/
+/-! ## Escape hatch — `{t}` (brace-delimited) and `&t` (atomic, HeapLang-style) -/
 
--- TODO: revisit after rT parameterization (escape-hatch `{e}` annotation refers to bare `Exp`)
--- #elabpl pl({e})
--- #expect e
--- 
--- #elabpl pl({e1} + {e2})
--- #expect binop .plus e1 e2
+#elabpl pl({e})
+#expect e
+
+#elabpl pl({e1} + {e2})
+#expect binop .plus e1 e2
+
+-- `&t` is the terser escape for an atomic term; agrees with `{t}`.
+#elabpl pl(&e)
+#expect e
+
+#elabpl pl(&e1 + &e2)
+#expect binop .plus e1 e2
+
+-- Compound escaped terms still need the brace form (or parens around `&`).
+#elabpl pl(&(e1) + {binop .plus e1 e2})
+#expect binop .plus e1 (binop .plus e1 e2)
 
 /-! ## Delaboration round-trip tests
 
@@ -502,7 +512,84 @@ These verify that elaborated `Exp` values delaborate back to readable
 -- /-- info: pl(scrut inl(x) with inl(_)) : Exp Int -/
 -- #guard_msgs in #check (pl(scrut inl(x) with inl(y)) : Exp Int)
 
+/-! ### Low-precedence entry sugar (`pl%`, `pl_ty%`, `pl_pat%`) -/
+
+-- `pl%` embeds without the closing paren and parses the whole tail as one
+-- expression, agreeing with the parenthesized `pl(...)` form.
+example : (pl% x + #1 : Exp Int) = pl(x + #1) := rfl
+example : (pl% f x : Exp Int) = pl(f x) := rfl
+example : (pl% if x then y else z : Exp Int) = pl(if x then y else z) := rfl
+example : (pl_ty% int × bool) = pl_ty(int × bool) := rfl
+example : (pl_pat% (x, y) : Pat Int) = pl_pat((x, y)) := rfl
+
+/-! ### Atomic / operator round-trips
+
+These now round-trip cleanly thanks to the fixed `Exp.fvar` delaborator and
+the `pl_exp`/`pl_ty` category parenthesizers (minimal parentheses, inserted
+only where precedence demands). -/
+
+/-- info: pl(x) : Exp ℤ -/
+#guard_msgs in #check (pl(x) : Exp Int)
+
+/-- info: pl(x + #1) : Exp ℤ -/
+#guard_msgs in #check (pl(x + #1) : Exp Int)
+
+/-- info: pl(x - y) : Exp ℤ -/
+#guard_msgs in #check (pl(x - y) : Exp Int)
+
+/-- info: pl(x * y) : Exp ℤ -/
+#guard_msgs in #check (pl(x * y) : Exp Int)
+
+-- Parenthesizer keeps the structurally-tighter subterm unparenthesized…
+/-- info: pl(x + y * z) : Exp ℤ -/
+#guard_msgs in #check (pl(x + y * z) : Exp Int)
+
+-- …and parenthesizes only the lower-precedence subterm where required.
+/-- info: pl((x + y) * z) : Exp ℤ -/
+#guard_msgs in #check (pl((x + y) * z) : Exp Int)
+
+/-- info: pl(x && y || z) : Exp ℤ -/
+#guard_msgs in #check (pl(x && y || z) : Exp Int)
+
+/-- info: pl(~x) : Exp ℤ -/
+#guard_msgs in #check (pl(~x) : Exp Int)
+
+/-- info: pl(!x) : Exp ℤ -/
+#guard_msgs in #check (pl(!x) : Exp Int)
+
+/-- info: pl(if x then y else z) : Exp ℤ -/
+#guard_msgs in #check (pl(if x then y else z) : Exp Int)
+
+/-- info: pl((x, y, z)) : Exp ℤ -/
+#guard_msgs in #check (pl((x, y, z)) : Exp Int)
+
+/-- info: pl(fst(x)) : Exp ℤ -/
+#guard_msgs in #check (pl(fst(x)) : Exp Int)
+
+/-- info: pl(inl(x)) : Exp ℤ -/
+#guard_msgs in #check (pl(inl(x)) : Exp Int)
+
+/-- info: pl(alloc(x)) : Exp ℤ -/
+#guard_msgs in #check (pl(alloc(x)) : Exp Int)
+
+/-- info: pl(x ← y) : Exp ℤ -/
+#guard_msgs in #check (pl(x ← y) : Exp Int)
+
+/-- info: pl(f x y) : Exp ℤ -/
+#guard_msgs in #check (pl(f x y) : Exp Int)
+
 /-! ### Type delaboration -/
+
+-- Regression: nested sum under product must keep its parentheses
+-- (previously delaborated to the wrongly-reparsing `int × bool + unit`).
+/-- info: pl_ty(int × (bool + unit)) : Ty -/
+#guard_msgs in #check (pl_ty(int × (bool + unit)))
+
+/-- info: pl_ty(int × bool → unit) : Ty -/
+#guard_msgs in #check (pl_ty(int × bool → unit))
+
+/-- info: pl_ty(int + bool → unit) : Ty -/
+#guard_msgs in #check (pl_ty(int + bool → unit))
 
 /-- info: pl_ty(int) : Ty -/
 #guard_msgs in #check (pl_ty(int))
