@@ -2105,6 +2105,62 @@ theorem headStep_possible_iff [MeasurableSingletonClass rT]
     Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩) ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ :=
   ⟨Possible.headStepSupport, HeadStepSupport.possible⟩
 
+/-- **Atomicity of `headStep` (countability-free).** A nonzero head step has
+a support point: `headStep ⟨e, σ⟩` is always `0`, a `dirac`, or a
+`Cfg.uniform`, so if it is nonzero it has some `HeadStepSupport` witness.
+The `head_case` enumeration mirrors `headStep_support_of_pos`, but here the
+witness is produced *structurally* from each branch (no positivity needed). -/
+theorem headStep_exists_support_of_ne_zero
+    {e : Exp rT} {σ : State rT} (h : headStep ⟨e, σ⟩ ≠ 0) :
+    ∃ ρ', HeadStepSupport ⟨e, σ⟩ ρ' := by
+  revert h
+  head_case
+  all_goals intro h
+  all_goals try (exact absurd rfl h)
+  case cond.true => exact ⟨_, .IfTrueS⟩
+  case cond.false => exact ⟨_, .IfFalseS⟩
+  case beta.lam.redex => exact ⟨_, .BetaLamS ‹_› rfl⟩
+  case beta.fix.redex => exact ⟨_, .BetaFixS ‹_› rfl⟩
+  case fst.redex => exact ⟨_, .FstS ‹_› ‹_›⟩
+  case snd.redex => exact ⟨_, .SndS ‹_› ‹_›⟩
+  case case.left.redex => exact ⟨_, .CaseLS ‹_›⟩
+  case case.right.redex => exact ⟨_, .CaseRS ‹_›⟩
+  case tape => exact ⟨_, .TapeS rfl rfl⟩
+  case load.redex => exact ⟨_, .LoadS ‹_› rfl⟩
+  case alloc.redex => exact ⟨_, .AllocS ‹_› rfl rfl⟩
+  case store.redex =>
+    exact ⟨_, .StoreS ‹_› (by rw [Option.isSome_iff_exists]; exact ⟨_, ‹_›⟩) rfl⟩
+  case rand.tape.deterministic => exact ⟨_, .RandTapeS ‹_› rfl rfl rfl⟩
+  case scrut_success => exact ⟨_, .ScrutSuccessS ‹_› ‹_›⟩
+  case scrut_failure => exact ⟨_, .ScrutFailureS ‹_› ‹_›⟩
+  case unop.redex =>
+    simp only [Option.unwrapM] at h
+    split at h
+    · rename_i hv optx r heval
+      exact ⟨⟨r, σ⟩, .UnOpS hv heval.symm⟩
+    · exact absurd rfl h
+  case binop.redex =>
+    simp only [Option.unwrapM] at h
+    split at h
+    · rename_i hv1 hv2 optx r heval
+      exact ⟨⟨r, σ⟩, .BinOpS hv1 hv2 heval.symm⟩
+    · exact absurd rfl h
+  case rand.plain =>
+    rename_i z
+    by_cases hz : 0 < z
+    · exact ⟨_, .RandNoTapeS hz (le_refl 0) hz⟩
+    · exact ⟨_, .RandNonposS hz⟩
+  case rand.tape =>
+    rename_i z α optT ns htape
+    by_cases hz : 0 < z
+    · exact ⟨_, .RandTapeEmptyS hz htape rfl (le_refl 0) hz rfl⟩
+    · exact ⟨_, .RandTapeNonposEmptyS hz htape rfl⟩
+  case rand.tape.mismatch =>
+    rename_i z α optT N ns htape hne
+    by_cases hz : 0 < z
+    · exact ⟨_, .RandTapeOtherS hz htape (Ne.symm hne) (le_refl 0) hz rfl⟩
+    · exact ⟨_, .RandTapeNonposOtherS hz htape (Ne.symm hne)⟩
+
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
   rw [Exp.isValM, if_pos he]; infer_instance
@@ -2158,6 +2214,123 @@ theorem head_step_mass {e : Exp rT} {σ : State rT} :
     · simpa [Option.unwrapM] using dirac.isProbabilityMeasure
   case rand.plain | rand.tape | rand.tape.mismatch =>
     intro _; exact Cfg.uniform_isProbabilityMeasure
+
+/-! ### Pure atomicity of `headStep`
+
+`headStep` (and hence `primStep`) is *purely atomic*: it assigns zero mass to the
+set of points it gives zero mass to. This is the countability-free replacement for
+the discrete `Pgl.zero_positive` (which used `Countable (Cfg rT)` to make the
+co-support countable). The proof reduces every branch to `0`, a `dirac`, or a
+`Cfg.uniform` — each of which is a `PMF.toMeasure`, and `PMF.toMeasure` is atomic
+because its zero-set is exactly `(support)ᶜ`, disjoint from the support. -/
+
+/-- A measure is *atomic* if it gives zero mass to its own null singletons. -/
+def IsAtomicSupport {α : Type _} [MeasurableSpace α] (μ : Measure α) : Prop :=
+  μ {x | μ {x} = 0} = 0
+
+theorem isAtomicSupport_zero {α : Type _} [MeasurableSpace α] :
+    IsAtomicSupport (0 : Measure α) := by simp [IsAtomicSupport]
+
+/-- Every `PMF.toMeasure` is atomic: its null-singleton set is exactly the
+complement of the (countable) support. -/
+theorem PMF.toMeasure_isAtomicSupport {α : Type _} [MeasurableSpace α]
+    [MeasurableSingletonClass α] (p : PMF α) : IsAtomicSupport p.toMeasure := by
+  unfold IsAtomicSupport
+  have hset : {x : α | p.toMeasure {x} = 0} = (p.support : Set α)ᶜ := by
+    ext x
+    rw [Set.mem_setOf_eq, p.toMeasure_apply_singleton x (measurableSet_singleton x),
+      Set.mem_compl_iff, PMF.mem_support_iff, not_not]
+  rw [hset, p.toMeasure_apply_eq_zero_iff p.support_countable.measurableSet.compl]
+  exact disjoint_compl_right
+
+theorem isAtomicSupport_dirac {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
+    (a : α) : IsAtomicSupport (Measure.dirac a) := by
+  unfold IsAtomicSupport
+  refine measure_mono_null (t := {a}ᶜ) ?_ ?_
+  · intro x hx
+    rw [Set.mem_compl_iff, Set.mem_singleton_iff]
+    rintro rfl
+    rw [Set.mem_setOf_eq, Measure.dirac_apply_of_mem (Set.mem_singleton x)] at hx
+    exact one_ne_zero hx
+  · rw [Measure.dirac_apply' _ (measurableSet_singleton a).compl, Set.indicator_of_notMem (by simp)]
+
+theorem isAtomicSupport_isValM {T : Type _} [MeasurableSpace T] (e : Exp rT) {m : Measure T}
+    (hm : IsAtomicSupport m) : IsAtomicSupport (e.isValM m) := by
+  by_cases hv : e.isValue
+  · rw [Exp.isValM_some hv]; exact hm
+  · rw [Exp.isValM_none hv]; exact isAtomicSupport_zero
+
+theorem isAtomicSupport_asValM {T : Type _} [MeasurableSpace T] (e : Exp rT)
+    {f : Val rT → Measure T} (hf : ∀ v, IsAtomicSupport (f v)) :
+    IsAtomicSupport (e.asValM f) := by
+  unfold Exp.asValM
+  split <;> first | exact isAtomicSupport_zero | exact hf _
+
+theorem isAtomicSupport_unwrapM {β T : Type _} [MeasurableSpace T] (o : Option β)
+    (f : β → Measure T) (hf : ∀ a, IsAtomicSupport (f a)) :
+    IsAtomicSupport (o.unwrapM f) := by
+  cases o with
+  | none => simpa only [Option.unwrapM] using (isAtomicSupport_zero : IsAtomicSupport (0 : Measure T))
+  | some a => simpa only [Option.unwrapM] using hf a
+
+theorem isAtomicSupport_uniform (z : Int) (σ : State rT) :
+    IsAtomicSupport (Cfg.uniform z σ) := by
+  by_cases hz : 0 < z
+  · have hrw : Cfg.uniform z σ
+        = ((PMF.uniformOfFinset (Finset.Ico (0:Int) z) (Finset.nonempty_Ico.mpr hz)).map
+            (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg rT))).toMeasure := by
+      unfold Cfg.uniform
+      simp only [Int.isPos, dif_pos hz]
+      rw [PMF.toMeasure_map _ _ Measurable.of_discrete]
+    rw [hrw]; exact PMF.toMeasure_isAtomicSupport _
+  · have hrw : Cfg.uniform z σ = Measure.dirac (⟨.lit (.int (-1)), σ⟩ : Cfg rT) := by
+      unfold Cfg.uniform; simp only [Int.isPos, dif_neg hz]
+    rw [hrw]; exact isAtomicSupport_dirac _
+
+set_option maxHeartbeats 1000000 in
+/-- **`headStep` is purely atomic** (countability-free). -/
+theorem headStep_atomic (e : Exp rT) (σ : State rT) :
+    IsAtomicSupport (headStep ⟨e, σ⟩) := by
+  show IsAtomicSupport (headStep ⟨e, σ⟩)
+  unfold headStep
+  split
+  case _ => apply isAtomicSupport_isValM; exact isAtomicSupport_dirac _ -- app lam
+  case _ => apply isAtomicSupport_isValM; exact isAtomicSupport_dirac _ -- app fix
+  case _ => -- unop
+    apply isAtomicSupport_isValM; apply isAtomicSupport_unwrapM; intro _; exact isAtomicSupport_dirac _
+  case _ => -- binop
+    apply isAtomicSupport_isValM; apply isAtomicSupport_isValM
+    apply isAtomicSupport_unwrapM; intro _; exact isAtomicSupport_dirac _
+  case _ => exact isAtomicSupport_dirac _ -- cond.true
+  case _ => exact isAtomicSupport_dirac _ -- cond.false
+  case _ => apply isAtomicSupport_isValM; apply isAtomicSupport_isValM; exact isAtomicSupport_dirac _ -- fst
+  case _ => apply isAtomicSupport_isValM; apply isAtomicSupport_isValM; exact isAtomicSupport_dirac _ -- snd
+  case _ => apply isAtomicSupport_isValM; exact isAtomicSupport_dirac _ -- case inl
+  case _ => apply isAtomicSupport_isValM; exact isAtomicSupport_dirac _ -- case inr
+  case _ => apply isAtomicSupport_asValM; intro _; exact isAtomicSupport_dirac _ -- alloc
+  case _ => -- load
+    split
+    · exact isAtomicSupport_zero
+    · exact isAtomicSupport_dirac _
+  case _ => -- store
+    apply isAtomicSupport_asValM; intro _
+    split
+    · exact isAtomicSupport_zero
+    · exact isAtomicSupport_dirac _
+  case _ => exact isAtomicSupport_uniform _ _ -- rand.plain
+  case _ => exact isAtomicSupport_dirac _ -- tape
+  case _ => -- rand.tape
+    split
+    · exact isAtomicSupport_zero
+    · split
+      · split
+        · exact isAtomicSupport_uniform _ _
+        · exact isAtomicSupport_dirac _
+      · exact isAtomicSupport_uniform _ _
+  case _ => -- scrut
+    apply isAtomicSupport_isValM
+    split <;> exact isAtomicSupport_dirac _
+  case _ => exact isAtomicSupport_zero -- default
 
 /-- `headStep` is a sub-probability measure for arbitrary `rT`: by case analysis,
 each branch returns either `0`, a `dirac`, or a probability measure (gated by

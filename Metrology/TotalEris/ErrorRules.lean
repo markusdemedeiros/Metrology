@@ -26,6 +26,46 @@ namespace ProbLang
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
+/-- Measurability of an integer-literal reader
+`fun e => match e with | .lit (.int n) => g n | _ => 0` on `Exp rT`, for any
+`g : Int → ENNReal`. Countability-free: built from the `Exp`/`BaseLit` structural
+recursion measurability keystones (`measurable_struct_rec` / `BaseLit.measurable_rec`).
+Shared by the advanced-composition rules' integral side conditions
+(`twp_rand_adv_comp`, `twp_presample_adv_comp`). -/
+theorem measurable_litInt_elim (g : Int → ENNReal) :
+    Measurable (fun e : Exp rT => match e with
+      | .lit (.int n) => g n
+      | _ => (0 : ENNReal)) := by
+  -- The `.lit` branch's combinator, proved measurable via `BaseLit.measurable_rec`
+  -- after bridging the `match` to its `casesOn` normal form.
+  have hlit : Measurable (fun b : BaseLit rT =>
+      match b with | .int n => g n | _ => (0 : ENNReal)) := by
+    have heq : (fun b : BaseLit rT => match b with | .int n => g n | _ => (0 : ENNReal))
+        = (fun b : BaseLit rT => BaseLit.casesOn (motive := fun _ => ENNReal) b
+            g (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) (fun _ => 0)) := by
+      funext b; cases b <;> rfl
+    rw [heq]
+    exact BaseLit.measurable_rec g (fun _ => 0) (fun _ => 0) (fun _ => 0)
+      (fun _ => 0) (fun _ => 0) measurable_const
+  apply Exp.measurable_struct_rec
+    (f := fun e : Exp rT => match e with | .lit (.int n) => g n | _ => (0 : ENNReal))
+    (c_bvar := fun _ => 0) (c_fvar := fun _ => 0)
+    (c_lit := fun b => match b with | .int n => g n | _ => (0 : ENNReal))
+    (c_lam := fun _ => 0) (c_fix := fun _ => 0)
+    (c_app := fun _ _ => 0) (c_unop := fun _ _ => 0) (c_binop := fun _ _ _ => 0)
+    (c_cond := fun _ _ _ => 0) (c_pair := fun _ _ => 0)
+    (c_fst := fun _ => 0) (c_snd := fun _ => 0)
+    (c_inl := fun _ => 0) (c_inr := fun _ => 0) (c_case := fun _ _ _ => 0)
+    (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ _ => 0)
+    (c_tape := fun _ => 0) (c_rand := fun _ _ => 0) (c_fail := (0 : ENNReal))
+    (c_scrut := fun _ _ => 0)
+  all_goals first
+    | (intros; rfl)
+    | rfl
+    | exact hlit
+    | (intro b; cases b <;> rfl)
+    | fun_prop
+
 namespace TotalEris
 
 variable {hlc : HasLC} {GF : BundledGFunctors}
@@ -242,6 +282,14 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   isplitr
   · ipureintro
     exact Reducible.of_head (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
+  -- Sub-goal 1b: the support predicate is an explicit countable set of int-configs.
+  isplitr
+  · ipureintro
+    have hctble : {ρ : Cfg rT | ∃ n : Int, 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)}.Countable := by
+      apply Set.Countable.mono (s₂ := (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) '' Set.univ)
+      · rintro ρ ⟨n, _, _, rfl⟩; exact ⟨n, trivial, rfl⟩
+      · exact (Set.countable_univ).image _
+    exact hctble.measurableSet
   isplitr
   · ipureintro
     intro ρ
@@ -291,11 +339,9 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
             -- Push the integral through `Measure.map`.
             rw [MeasureTheory.lintegral_map ?G1 ?G2]
             -- G1/G2: `Measurable` of the concrete integrand / the `Int → Cfg` map.
-            -- G2 is fine, but G1 only closes via `Measurable.of_discrete`
-            -- (`DiscreteMeasurableSpace (Cfg rT)` ⇒ `Countable rT`). Countability-free
-            -- closure needs novel insight (a measurability lemma for the expr-match,
-            -- or carrying measurability). Left as a sorry.
-            case G1 => sorry
+            -- G1: the expr-match integrand, via the countability-free
+            -- `measurable_litInt_elim` composed with `Cfg.measurable_expr`.
+            case G1 => exact (measurable_litInt_elim _).comp Cfg.measurable_expr
             case G2 => exact Measurable.of_discrete
             have hCard : (Finset.Ico (0:Int) z).card = z.toNat := by
               rw [Int.card_Ico, sub_zero]
@@ -371,15 +417,43 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
   -- must be of the form `⟨lit n, σ₁⟩` with `0 ≤ n < z` (i.e., `R`).
   isplitr
   · ipureintro
-    -- Support *inversion* is measurability-free (`headStep_support_of_pos`), but the
-    -- "support has full measure" half needs `Pgl.zero_positive`, i.e. `Countable (Cfg rT)`.
-    -- Per the countability-removal goal we do NOT add `[Countable rT]`; this is a
-    -- genuine-novel-insight case (custom finite-support measure-zero proof, or a
-    -- countability-free `Pgl` for atomic measures). Left as a sorry.
-    -- Inversion (works countability-free):
-    --   cases headStep_support_of_pos _ _ _ _ hpos with
-    --   | RandNoTapeS _ Hv0 Hvz => exact ⟨_, Hv0, Hvz, rfl⟩ | RandNonposS hnz => exact absurd Hz hnz
-    sorry
+    -- `Pgl 0 R μ` means `μ {¬R} = 0`. Compute `μ = Cfg.uniform z σ₁` as the pushforward
+    -- of `PMF.uniformOfFinset (Ico 0 z)` under `n ↦ ⟨lit n, σ₁⟩`; its support is exactly
+    -- the `R`-states, so the complement has measure 0. Countability-free: the support
+    -- is a finite Finset, and `{¬R}` is measurable as the complement of a countable set.
+    show (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩)
+        {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} ≤ 0
+    refine _root_.le_of_eq ?_
+    have hheadred : ∃ ρ : Cfg rT,
+        0 < (headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ} :=
+      ⟨⟨.lit (.int 0), σ₁⟩, by
+        exact possible_iff_pos.mp
+          (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible⟩
+    rw [primStep_eq_headStep_discrete hheadred]
+    show (Cfg.uniform z σ₁)
+        {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} = 0
+    have hCfgUniform :
+        Cfg.uniform z σ₁ =
+          (PMF.uniformOfFinset (Finset.Ico (0:Int) z)
+              (Finset.nonempty_Ico.mpr Hz)).toMeasure.map
+            (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) := by
+      unfold Cfg.uniform; simp only [Int.isPos, dif_pos Hz]
+    have hg : Measurable (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) := Measurable.of_discrete
+    have hRc : MeasurableSet
+        {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} := by
+      refine MeasurableSet.compl ?_
+      have hctble : {ρ : Cfg rT | ∃ n : Int, 0 ≤ n ∧ n < z ∧
+          ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)}.Countable := by
+        apply Set.Countable.mono
+          (s₂ := (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) '' Set.univ)
+        · rintro ρ ⟨n, _, _, rfl⟩; exact ⟨n, trivial, rfl⟩
+        · exact (Set.countable_univ).image _
+      exact hctble.measurableSet
+    rw [hCfgUniform, MeasureTheory.Measure.map_apply hg hRc,
+      PMF.toMeasure_apply_eq_zero_iff _ (hg hRc), PMF.support_uniformOfFinset, Set.disjoint_left]
+    intro n hn hcontra
+    rw [Finset.mem_coe, Finset.mem_Ico] at hn
+    exact hcontra ⟨n, hn.1, hn.2, rfl⟩
   -- Sub-goal 5: per-outcome continuation.
   iintro %ρ %HRρ
   obtain ⟨n, Hn₁, Hn₂, Hρ_eq⟩ := HRρ

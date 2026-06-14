@@ -256,12 +256,23 @@ theorem geo_nonneg (E : CoPset) :
 def geoPredicate (v : Val rT) : Prop :=
   ∃ m : Int, v = ⟨.lit (.int m), IsVal.lit⟩ ∧ 0 ≤ m
 
+/-- `{v | geoPredicate v}` is measurable: it is the countable set of integer
+literals `⟨.lit (.int m), _⟩` over `m : ℤ`. -/
+theorem geoPredicate_measurableSet :
+    MeasurableSet {v : Val rT | geoPredicate v} := by
+  have hc : {v : Val rT | geoPredicate v}.Countable := by
+    apply Set.Countable.mono
+      (s₂ := (fun m : Int => (⟨.lit (.int m), IsVal.lit⟩ : Val rT)) '' Set.univ)
+    · rintro v ⟨m, rfl, _⟩; exact ⟨m, trivial, rfl⟩
+    · exact (Set.countable_univ).image _
+  exact hc.measurableSet
+
 /-- The geometric sampler almost-surely terminates at a non-negative
 integer (Tgl-form). -/
 theorem geo_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF] (σ : State rT) :
     Tgl (limExec ⟨Exp.app geometric (Exp.lit .unit), σ⟩) geoPredicate 0 := by
   refine twp_tgl (GF := GF) (e := Exp.app geometric (Exp.lit .unit)) (σ := σ)
-    (φ := geoPredicate) ?_
+    (φ := geoPredicate) geoPredicate_measurableSet ?_
   intro _
   have hwp : ⊢@{IProp GF} tglWp ⊤ (Exp.app (geometric (rT := rT)) (Exp.lit .unit))
       (fun v : Val rT => iprop(⌜geoPredicate v⌝)) := by

@@ -130,6 +130,7 @@ abbrev glmPrimStep' (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF := iprop%
   ∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
     (⌜Reducible e₁ σ₁⌝) ∗
+    (⌜MeasurableSet {ρ | R ρ}⌝) ∗
     (⌜∀ ρ, X₂ ρ ≤ r⌝) ∗
     (⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e₁, σ₁⟩)) ≤ ε⌝) ∗
     (⌜Pgl ε₁ R (primStep ⟨e₁, σ₁⟩)⌝) ∗
@@ -142,6 +143,22 @@ abbrev glmStateStep (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
   ∃ (α : Loc) (t : Tape),
     ⌜σ₁.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
     ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
+      (⌜∀ σ', X₂ σ' ≤ r⌝) ∗
+      (⌜ε₁ + (∫⁻ σ', X₂ σ' ∂(tapePresample σ₁ α)) ≤ ε⌝) ∗
+      (⌜Pgl ε₁ R (tapePresample σ₁ α)⌝) ∗
+      (∀ (σ' : State rT), ⌜R σ'⌝ -∗
+        |={∅}=> execStutter (fun ε'' => Φ (⟨e₁, σ'⟩, ε'')) (X₂ σ'))
+
+/-- Countability-free analogue of `glmStateStep` carrying a measurability witness
+`⌜MeasurableSet {σ' | R σ'}⌝` for the support predicate `R`. The witness is needed
+downstream (total adequacy) to evaluate the `tapePresample`-mass on `{R}` and its
+complement via `measure_add_measure_compl`. Mirrors `glmPrimStep'`. -/
+abbrev glmStateStep' (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
+   (Φ : GlmState rT → IProp GF) : IProp GF := iprop%
+  ∃ (α : Loc) (t : Tape),
+    ⌜σ₁.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
+    ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
+      (⌜MeasurableSet {σ' | R σ'}⌝) ∗
       (⌜∀ σ', X₂ σ' ≤ r⌝) ∗
       (⌜ε₁ + (∫⁻ σ', X₂ σ' ∂(tapePresample σ₁ α)) ≤ ε⌝) ∗
       (⌜Pgl ε₁ R (tapePresample σ₁ α)⌝) ∗
@@ -164,7 +181,7 @@ abbrev glmPre' (Z : Cfg rT → ENNReal → IProp GF)
     (∀ (ε' : ENNReal), (⌜ε < ε'⌝) -∗
         |={∅}=> execStutter (fun ε'' => Φ (ρ, ε'')) ε') ∨
     glmPrimStep' ρ.expr ρ.state ε Z ∨
-    glmStateStep ρ.expr ρ.state ε Φ
+    glmStateStep' ρ.expr ρ.state ε Φ
 
 @[expose, discrete] -- glm'
 abbrev glm [Countable rT] [MeasurableSingletonClass rT] (e : Exp rT) (σ : State rT) (ε : ENNReal)
@@ -232,20 +249,20 @@ instance glmPre'_mono {Z : Cfg rT → ENNReal → IProp GF} : BIMonoPred (glmPre
       · ileft; ipureintro; exact HVac
       · iright; iapply Hwand; iexact HP
     · iright; ileft
-      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists R, ε₁, X₂, r
-      iframe %Hred %Hbnd %Hexp %Hpgl
+      iframe %Hred %HRmeas %Hbnd %Hexp %Hpgl
       iintro %ρ' HR
       ihave HC := HCont $$ %ρ' HR
       imod HC
       imodintro
       iexact HC
     · iright; iright
-      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
       iframe %Hαt
       iexists R, ε₁, X₂, r
-      iframe %Hbnd %Hexp %Hpgl
+      iframe %HRmeas %Hbnd %Hexp %Hpgl
       iintro %σ' %HR
       ihave HC := HCont $$ %σ' %HR
       imod HC with HS
@@ -390,9 +407,10 @@ theorem glm'_strong_mono
       · iright
         iapply HP; iexact Hwand
     · iright; ileft
-      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists R, ε₁, X₂, r
       isplitr; · ipureintro; exact Hred
+      isplitr; · ipureintro; exact HRmeas
       isplitr; · ipureintro; exact Hbnd
       isplitr; · ipureintro; exact Hexp
       isplitr; · ipureintro; exact Hpgl
@@ -405,10 +423,11 @@ theorem glm'_strong_mono
       · iright
         iapply Hwand; iexact HC1
     · iright; iright
-      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
       isplitr; · ipureintro; exact Hαt
       iexists R, ε₁, X₂, r
+      isplitr; · ipureintro; exact HRmeas
       isplitr; · ipureintro; exact Hbnd
       isplitr; · ipureintro; exact Hexp
       isplitr; · ipureintro; exact Hpgl
@@ -466,18 +485,20 @@ theorem glm'_mono_grading
     ispecialize HOT $$ %ε'' %Hlt
     iexact HOT
   · iright; ileft
-    icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists R, ε₁, X₂, r
     isplitr; · ipureintro; exact Hred
+    isplitr; · ipureintro; exact HRmeas
     isplitr; · ipureintro; exact Hbnd
     isplitr; · ipureintro; exact _root_.le_trans Hexp Hε
     isplitr; · ipureintro; exact Hpgl
     iexact HCont
   · iright; iright
-    icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists α, t
     isplitr; · ipureintro; exact Hαt
     iexists R, ε₁, X₂, r
+    isplitr; · ipureintro; exact HRmeas
     isplitr; · ipureintro; exact Hbnd
     isplitr; · ipureintro; exact _root_.le_trans Hexp Hε
     isplitr; · ipureintro; exact Hpgl
@@ -567,9 +588,10 @@ theorem glm'_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
     imodintro
     iexact HS
   · iright; ileft
-    icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists R, ε₁, X₂, r
     isplitr; · ipureintro; exact Hred
+    isplitr; · ipureintro; exact HRmeas
     isplitr; · ipureintro; exact Hbnd
     isplitr; · ipureintro; exact Hexp
     isplitr; · ipureintro; exact Hpgl
@@ -581,10 +603,11 @@ theorem glm'_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
     · ileft; ipureintro; exact HVac
     · iright; iapply HZ; iexact HC1
   · iright; iright
-    icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+    icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
     iexists α, t
     isplitr; · ipureintro; exact Hαt
     iexists R, ε₁, X₂, r
+    isplitr; · ipureintro; exact HRmeas
     isplitr; · ipureintro; exact Hbnd
     isplitr; · ipureintro; exact Hexp
     isplitr; · ipureintro; exact Hpgl
@@ -727,12 +750,22 @@ theorem glm'_bind
       · ileft; ipureintro; exact HVac
       · iright; iexact HP
     · iright; ileft
-      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists (fun ρ' => ∃ ρ'', ρ' = K.fillCfg ρ'' ∧ R ρ''), ε₁,
         (fun ρ' => (Kinv ρ'.expr).elim 0 (fun e' => X₂ ⟨e', ρ'.state⟩)),
         r
       have Hsv : ¬ ρ.expr.isValue := val_stuck Hred
+      -- The transported support predicate is the (measurable) image of `{R}` under
+      -- the measurable embedding `K.fillCfg`.
+      have hR'set : {ρ' : Cfg rT | ∃ ρ'', ρ' = K.fillCfg ρ'' ∧ R ρ''}
+          = K.fillCfg '' {ρ'' | R ρ''} := by
+        ext ρ'; simp only [Set.mem_setOf_eq, Set.mem_image]
+        exact ⟨fun ⟨ρ'', heq, hR⟩ => ⟨ρ'', hR, heq.symm⟩,
+          fun ⟨ρ'', hR, heq⟩ => ⟨ρ'', heq.symm, hR⟩⟩
+      have hR'meas : MeasurableSet {ρ' : Cfg rT | ∃ ρ'', ρ' = K.fillCfg ρ'' ∧ R ρ''} :=
+        hR'set ▸ Ectx.measurableSet_fillCfg_image K HRmeas
       isplitr; · ipureintro; exact Hred.fill K
+      isplitr; · ipureintro; exact hR'meas
       isplitr
       · ipureintro
         intro ρ'
@@ -743,17 +776,13 @@ theorem glm'_bind
       · ipureintro
         show ε₁ + (∫⁻ a, (Kinv a.expr).elim 0 (fun e' => X₂ ⟨e', a.state⟩) ∂ primStep ⟨K.fill ρ.expr, ρ.state⟩) ≤ ε'
         rw [primStep_fill Hsv]
-        rw [MeasureTheory.lintegral_map ?G1 ?G2]
-        -- G1 is `Measurable (fun a => (Kinv a.expr).elim 0 (fun e' => X₂ ⟨e',a.state⟩))`
-        -- for an ARBITRARY `X₂` (no measurability hypothesis is carried by `glm'`). Only
-        -- `Measurable.of_discrete` closes it, which needs `DiscreteMeasurableSpace (Cfg rT)`
-        -- ⇒ `Countable rT`. Adding that to `glm'_bind` cascades countability into the
-        -- foundational WP stack (`TotalWeakestpre`). The countability-free fix is a design
-        -- change: have `glm'` carry measurability hypotheses on `X₂`/`R`. (Novel insight.)
-        case G1 => sorry
-        case G2 => measurability
-        refine _root_.le_trans (_root_.le_of_eq ?_) Hexp
-        congr 1
+        -- Push the (arbitrary, possibly non-measurable) integrand `X₂'` through the
+        -- pushforward with the *inequality* `lintegral_map_le` — which needs **no**
+        -- measurability of the integrand (only the change-of-variables ≤ direction),
+        -- sidestepping the `Countable rT` requirement entirely.
+        refine _root_.le_trans ?_ Hexp
+        gcongr ε₁ + ?_
+        refine _root_.le_trans (MeasureTheory.lintegral_map_le _ K.fillCfg) (_root_.le_of_eq ?_)
         refine MeasureTheory.lintegral_congr_ae (Filter.Eventually.of_forall fun a => ?_)
         show (Kinv (K.fillCfg a).expr).elim 0 (fun e' => X₂ ⟨e', (K.fillCfg a).state⟩) = X₂ a
         simp only [Ectx.fillCfg, Kinv_left, Option.elim]
@@ -763,10 +792,9 @@ theorem glm'_bind
         rw [primStep_fill Hsv]
         rw [MeasureTheory.Measure.map_apply ?G1 ?G2]
         case G1 => measurability
-        -- G2 is `MeasurableSet {x | ¬ ∃ ρ'', x = K.fillCfg ρ'' ∧ R ρ''}` for an ARBITRARY
-        -- predicate `R`; only `MeasurableSet.of_discrete` closes it (needs `Countable rT`).
-        -- Same design-change blocker as G1 above.
-        case G2 => sorry
+        -- G2: `{x | ¬R' x}` is the complement of the measurable transported support
+        -- `{R'}` (now available from the carried `MeasurableSet {R}`).
+        case G2 => exact hR'meas.compl
         refine _root_.le_trans (_root_.le_of_eq ?_) Hpgl
         congr 1
         ext a
@@ -787,10 +815,11 @@ theorem glm'_bind
       · ileft; ipureintro; exact HVac
       · iright; iexact HC1
     · iright; iright
-      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %Hbnd, %Hexp, %Hpgl, HCont⟩
+      icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %HRmeas, %Hbnd, %Hexp, %Hpgl, HCont⟩
       iexists α, t
       isplitr; · ipureintro; exact Hαt
       iexists R, ε₁, X₂, r
+      isplitr; · ipureintro; exact HRmeas
       isplitr; · ipureintro; exact Hbnd
       isplitr; · ipureintro; exact Hexp
       isplitr; · ipureintro; exact Hpgl
@@ -826,6 +855,7 @@ theorem glm'_prim_step
     {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∃ (R : Cfg rT → Prop) (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
       ⌜Reducible e σ⌝ ∗
+      ⌜MeasurableSet {ρ | R ρ}⌝ ∗
       ⌜∀ ρ, X₂ ρ ≤ r⌝ ∗
       ⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(primStep ⟨e, σ⟩)) ≤ ε⌝ ∗
       ⌜Pgl ε₁ R (primStep ⟨e, σ⟩)⌝ ∗
@@ -860,6 +890,7 @@ theorem glm'_state_step  {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT
     iprop(∃ (α : Loc) (t : Tape),
         ⌜σ.tapes[α]? = some t ∧ 0 < t.bound⌝ ∗
         ∃ (R : State rT → Prop) (ε₁ : ENNReal) (X₂ : State rT → ENNReal) (r : ENNReal),
+          ⌜MeasurableSet {σ' | R σ'}⌝ ∗
           ⌜∀ σ', X₂ σ' ≤ r⌝ ∗
           ⌜ε₁ + (∫⁻ σ', X₂ σ' ∂(tapePresample σ α)) ≤ ε⌝ ∗
           ⌜Pgl ε₁ R (tapePresample σ α)⌝ ∗

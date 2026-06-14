@@ -46,6 +46,43 @@ namespace TotalEris
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors}
 
+/-- `Exp.ofVal` is a measurable embedding. It is the injective, measurable
+`Val.fst`, and the σ-algebra on `Val rT` is the comap of `Val.fst`, so it carries
+measurable sets to measurable sets: `Val.fst '' (Val.fst ⁻¹' U) = U ∩ range Val.fst`
+and `range Val.fst = {e | e.isValueR}` is measurable. -/
+theorem measurableEmbedding_ofVal :
+    MeasurableEmbedding (Exp.ofVal : Val rT → Exp rT) := by
+  refine ⟨fun a b h => Val.ext h, Exp.ofVal.measurable, fun s hs => ?_⟩
+  obtain ⟨U, hU, rfl⟩ := MeasurableSpace.measurableSet_comap.mp hs
+  have hrange : Set.range (Val.fst : Val rT → Exp rT) = {e : Exp rT | e.isValueR} := by
+    ext e
+    simp only [Set.mem_range, Set.mem_setOf_eq]
+    constructor
+    · rintro ⟨v, rfl⟩; rw [← Exp.isValue_iff_isValueR]; exact Val.isValue v
+    · intro h
+      exact ⟨Val.mk e (IsVal.ofIsValue (Exp.isValue_iff_isValueR.mpr h)), rfl⟩
+  show MeasurableSet (Val.fst '' (Val.fst ⁻¹' U))
+  rw [Set.image_preimage_eq_inter_range, hrange]
+  exact hU.inter Exp.isValueR.measurable.setOf
+
+/-- The pure post-condition, lifted to `Exp rT`, is a measurable set when
+`{v | φ v}` is — it is the image `Exp.ofVal '' {v | φ v}`. -/
+theorem measurableSet_ofValSet {φ : Val rT → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v}) :
+    MeasurableSet {e : Exp rT | ∃ v, e = Exp.ofVal v ∧ φ v} := by
+  have heq : {e : Exp rT | ∃ v, e = Exp.ofVal v ∧ φ v} = Exp.ofVal '' {v | φ v} := by
+    ext e; simp only [Set.mem_setOf_eq, Set.mem_image]
+    exact ⟨fun ⟨v, he, hv⟩ => ⟨v, hv, he.symm⟩, fun ⟨v, hv, he⟩ => ⟨v, he.symm, hv⟩⟩
+  rw [heq]
+  exact measurableEmbedding_ofVal.measurableSet_image' hφ
+
+/-- The pure post-condition lifted to `Cfg rT` (the set appearing in `Tgl`) is
+measurable when `{v | φ v}` is. -/
+theorem measurableSet_TglCfgSet {φ : Val rT → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v}) :
+    MeasurableSet {ρ : Cfg rT | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v} :=
+  (measurableSet_ofValSet hφ).preimage Cfg.measurable_expr
+
 /-- Graded-probability total lift `Tgl μ φ ε`: the measure `μ` has mass at
 least `1 - ε` concentrated on value-cfg outcomes satisfying `φ`. Rocq:
 `tgl` (`clutch/common/graded_predicate_lifting.v`).
@@ -71,7 +108,9 @@ theorem termination_ineq {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) �
 `Pgl ε (¬ value-and-φ) μ`. Rocq: `tgl_implies_pgl`. -/
 theorem implies_pgl
     {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → Prop}
-    {ε : ENNReal} (hμ : μ Set.univ ≤ 1) (h : Tgl μ φ ε) :
+    {ε : ENNReal}
+    (hS : MeasurableSet {ρ : Cfg rT | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v})
+    (hμ : μ Set.univ ≤ 1) (h : Tgl μ φ ε) :
     Pgl ε (fun ρ => ∃ v, ρ.expr = Exp.ofVal v ∧ φ v) μ := by
   -- Chain: `μ Sᶜ ≤ μ univ - μ S ≤ 1 - μ S ≤ ε`, the first from
   -- `μ S + μ Sᶜ = μ univ` (with μ S ≠ ⊤), the third from `Tgl`'s
@@ -79,8 +118,7 @@ theorem implies_pgl
   set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   show μ Sᶜ ≤ ε
   have hSc_add : μ Sᶜ + μ S = μ Set.univ := by
-    rw [add_comm, MeasureTheory.measure_add_measure_compl ?G1]
-    case G1 => sorry
+    rw [add_comm, MeasureTheory.measure_add_measure_compl hS]
   have hμS_le_one : μ S ≤ 1 := (MeasureTheory.measure_mono (Set.subset_univ _)).trans hμ
   have hS_ne_top : μ S ≠ (⊤ : ENNReal) := ne_top_of_le_ne_top ENNReal.one_ne_top hμS_le_one
   have h_one_minus_le : 1 - μ S ≤ ε := by
@@ -130,9 +168,8 @@ theorem of_dirac_val
   rw [tsub_zero]
   have h_mem : (⟨Exp.ofVal v, σ⟩ : (Cfg rT)) ∈
       {ρ : (Cfg rT) | ∃ v', ρ.expr = Exp.ofVal v' ∧ φ v'} := ⟨v, rfl, hφ⟩
-  rw [MeasureTheory.Measure.dirac_apply' _ ?G1]
-  case G1 => sorry
-  simp [Set.indicator_of_mem h_mem]
+  -- `dirac_apply_of_mem` needs no measurability of the target set.
+  exact _root_.le_of_eq (MeasureTheory.Measure.dirac_apply_of_mem h_mem).symm
 
 /-- `Tgl` for `limExec` at a value config: when `e` is already a value
 `v` with `φ v`, the program terminates at grade `0`. Pure structural
@@ -165,11 +202,13 @@ theorem epsilon_limit {μ : MeasureTheory.Measure (Cfg rT)} {φ : (Val rT) → P
   exact absurd hTglS (_root_.not_le.mpr hμSc)
 
 theorem tgl_lift_prob
-    {α : Type*} [MeasurableSpace α] -- [DiscreteMeasurableSpace α]
+    {α : Type*} [MeasurableSpace α]
     {M : MeasureTheory.Measure α}
     [MeasureTheory.IsProbabilityMeasure M]
     {ε ε₁ : ENNReal} {ε₂ : α → ENNReal}
     {R : α → Prop} {k : α → ENNReal}
+    (hR : MeasurableSet {a | R a})
+    (hk : Measurable k)
     (Hpgl : M {a | ¬ R a} ≤ ε₁)
     (Hsum : ε₁ + (∫⁻ a, ε₂ a ∂M) ≤ ε)
     (Hcont : ∀ a, R a → 1 - ε₂ a ≤ k a) :
@@ -178,39 +217,30 @@ theorem tgl_lift_prob
   have hMR : 1 - ε₁ ≤ M {a | R a} := by
     have hMR_eq : M {a | R a} + M {a | ¬ R a} = M Set.univ := by
       have h_compl : {a | ¬ R a} = {a | R a}ᶜ := rfl
-      rw [h_compl, MeasureTheory.measure_add_measure_compl ?G1]
-      case G1 => sorry
+      rw [h_compl, MeasureTheory.measure_add_measure_compl hR]
     rw [hM_univ] at hMR_eq
     rw [_root_.tsub_le_iff_left]
     calc 1 = M {a | R a} + M {a | ¬ R a} := hMR_eq.symm
       _ ≤ M {a | R a} + ε₁ := by gcongr
       _ = ε₁ + M {a | R a} := add_comm _ _
-  have h_int_lb : 1 - ε₁ - (∫⁻ a, ε₂ a ∂M) ≤ ∫⁻ a, k a ∂M := by
-    have h_R_bound : ∫⁻ a in {a | R a}, (1 - ε₂ a) ∂M ≤ ∫⁻ a in {a | R a}, k a ∂M := by
-      apply MeasureTheory.setLIntegral_mono_ae ?G1
-      case G1 => sorry
-      refine .of_forall fun a ha => Hcont a ha
-    have h_R_upper : ∫⁻ a in {a | R a}, k a ∂M ≤ ∫⁻ a, k a ∂M :=
-      MeasureTheory.setLIntegral_le_lintegral _ _
-    have h_split : M {a | R a} ≤ (∫⁻ a in {a | R a}, (1 - ε₂ a) ∂M)
-                                + (∫⁻ a in {a | R a}, ε₂ a ∂M) := by
-      rw [← MeasureTheory.lintegral_add_left]
-      · rw [show M {a | R a} = ∫⁻ _ in {a | R a}, (1 : ENNReal) ∂M by
-            rw [MeasureTheory.setLIntegral_const, one_mul]]
-        apply MeasureTheory.lintegral_mono
-        intro a
-        exact le_tsub_add
-      · sorry
-    have h_R_combined : 1 - ε₁ ≤ (∫⁻ a in {a | R a}, (1 - ε₂ a) ∂M)
-                                + (∫⁻ a in {a | R a}, ε₂ a ∂M) := hMR.trans h_split
-    have step1 : 1 - ε₁ - (∫⁻ a, ε₂ a ∂M) ≤ ∫⁻ a in {a | R a}, (1 - ε₂ a) ∂M := by
-      rw [_root_.tsub_le_iff_right]
-      refine h_R_combined.trans ?_
-      gcongr
-      exact MeasureTheory.Measure.restrict_le_self
-    refine step1.trans ?_
-    exact h_R_bound.trans h_R_upper
-  refine _root_.le_trans ?_ h_int_lb
+  -- `M {R} ≤ ∫_{R} k + ∫_{R} ε₂`: pointwise `1 ≤ k a + ε₂ a` on `R`, splitting the
+  -- integral using measurability of `k` (NOT of `ε₂`).
+  have h_split : M {a | R a}
+      ≤ (∫⁻ a in {a | R a}, k a ∂M) + (∫⁻ a in {a | R a}, ε₂ a ∂M) := by
+    rw [← MeasureTheory.lintegral_add_left hk]
+    rw [show M {a | R a} = ∫⁻ _ in {a | R a}, (1 : ENNReal) ∂M by
+          rw [MeasureTheory.setLIntegral_const, one_mul]]
+    refine MeasureTheory.lintegral_mono_ae ((MeasureTheory.ae_restrict_iff' hR).mpr
+      (.of_forall fun a ha => ?_))
+    -- `1 ≤ k a + ε₂ a` from `1 - ε₂ a ≤ k a`.
+    rw [← _root_.tsub_le_iff_right]
+    exact Hcont a ha
+  have h_full : 1 - ε₁ ≤ (∫⁻ a, k a ∂M) + (∫⁻ a, ε₂ a ∂M) :=
+    (hMR.trans h_split).trans
+      (by gcongr <;> exact MeasureTheory.Measure.restrict_le_self)
+  have step1 : 1 - ε₁ - (∫⁻ a, ε₂ a ∂M) ≤ ∫⁻ a, k a ∂M := by
+    rw [_root_.tsub_le_iff_right]; exact h_full
+  refine _root_.le_trans ?_ step1
   rw [tsub_tsub]
   exact tsub_le_tsub_left Hsum 1
 
@@ -223,15 +253,17 @@ holds on the `R`-cone, we get the same bound after stepping. -/
 theorem tgl_prim_step
     {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
     {R : (Cfg rT) → Prop} {P : Set (Cfg rT)}
+    (hR : MeasurableSet {ρ | R ρ})
+    (hP : MeasurableSet P)
     (Hred : Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → 1 - ε₂ ρ ≤ (limExec ρ) P) :
     1 - ε ≤ ∫⁻ ρ, (limExec ρ) P ∂primStep ⟨e, σ⟩ :=
-  haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e, σ⟩) := sorry
-    -- prim_step_mass_discrete ⟨e, σ⟩ Hred
+  haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e, σ⟩) := prim_step_mass Hred
   tgl_lift_prob (M := primStep ⟨e, σ⟩) (R := R) (ε₂ := ε₂)
-    (k := fun ρ => (limExec ρ) P) Hpgl Hsum Hcont
+    (k := fun ρ => (limExec ρ) P) hR ((MeasureTheory.Measure.measurable_coe hP).comp limExec.measurable)
+    Hpgl Hsum Hcont
 
 /-- (State rT)-step analog of `tgl_prim_step`: the pure measure-theoretic
 core for a single tape-presample. Requires the tape `α` to be active
@@ -243,6 +275,8 @@ theorem tgl_state_step
     (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
     {R : (State rT) → Prop} {P : Set (Cfg rT)}
+    (hR : MeasurableSet {σ' | R σ'})
+    (hP : MeasurableSet P)
     (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂tapePresample σ α) ≤ ε)
     (Hpgl : Pgl ε₁ R (tapePresample σ α))
     (Hcont : ∀ σ', R σ' → 1 - ε₂ σ' ≤ (limExec ⟨e, σ'⟩) P) :
@@ -250,7 +284,10 @@ theorem tgl_state_step
   haveI : MeasureTheory.IsProbabilityMeasure (tapePresample σ α) :=
     ⟨tapePresample_univ_eq_one htape hN⟩
   tgl_lift_prob (M := tapePresample σ α) (R := R) (ε₂ := ε₂)
-    (k := fun σ' => (limExec ⟨e, σ'⟩) P) Hpgl Hsum Hcont
+    (k := fun σ' => (limExec ⟨e, σ'⟩) P) hR
+    ((MeasureTheory.Measure.measurable_coe hP).comp
+      (limExec.measurable.comp (by fun_prop : Measurable (fun σ' : State rT => (⟨e, σ'⟩ : Cfg rT)))))
+    Hpgl Hsum Hcont
 
 /-- **`Tgl` one-step decomposition** at `limExec`. If `e` is reducible
 and we have a Pgl/Tgl decomposition of one prim-step that continues to a
@@ -266,39 +303,44 @@ Mirrors the prim-step branch of Rocq's `twp_step_fupd_tgl_prim_step` +
 theorem dbind_prim_step
     {e : (Exp rT)} {σ : (State rT)} {ε ε₁ : ENNReal} {ε₂ : (Cfg rT) → ENNReal}
     {R : (Cfg rT) → Prop} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
+    (hR : MeasurableSet {ρ | R ρ})
     (Hred : Reducible e σ)
     (Hsum : ε₁ + (∫⁻ ρ, ε₂ ρ ∂primStep ⟨e, σ⟩) ≤ ε)
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → Tgl (limExec ρ) φ (ε₂ ρ)) :
     Tgl (limExec ⟨e, σ⟩) φ ε := by
   set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
+  have hSmeas : MeasurableSet S := measurableSet_TglCfgSet hφ
   show 1 - ε ≤ (limExec ⟨e, σ⟩) S
   -- `e` is reducible, hence non-value, hence `limExec ⟨e, σ⟩ = primStep ⟨e, σ⟩ >>= limExec`.
   have hnv : ¬ (e.isValue) := val_stuck Hred
   rw [limExec_not_final hnv]
   -- `(primStep ρ).bind limExec` evaluated at `S` is `∫⁻ ρ', limExec ρ' S ∂primStep ρ`.
-  rw [MeasureTheory.Measure.bind_apply ?G1 (by measurability)]
-  case G1 => sorry
-  exact Tgl.tgl_prim_step Hred Hsum Hpgl (fun ρ hρ => Hcont ρ hρ)
+  rw [MeasureTheory.Measure.bind_apply hSmeas (by measurability)]
+  exact Tgl.tgl_prim_step hR hSmeas Hred Hsum Hpgl (fun ρ hρ => Hcont ρ hρ)
 
 theorem dbind_state_step
     {e : (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
     (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
     {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
     {R : (State rT) → Prop} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
+    (hR : MeasurableSet {σ' | R σ'})
     (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂tapePresample σ α) ≤ ε)
     (Hpgl : Pgl ε₁ R (tapePresample σ α))
     (Hcont : ∀ σ', R σ' → Tgl (limExec ⟨e, σ'⟩) φ (ε₂ σ')) :
     Tgl (limExec ⟨e, σ⟩) φ ε := by
   set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
   set S' : Set (Exp rT) := {e | ∃ v, e = Exp.ofVal v ∧ φ v}
+  have hS'meas : MeasurableSet S' := measurableSet_ofValSet hφ
+  have hSmeas : MeasurableSet S := measurableSet_TglCfgSet hφ
   have hS_pre : S = (·.expr) ⁻¹' S' := rfl
   show 1 - ε ≤ (limExec ⟨e, σ⟩) S
   -- The Tgl bound on the bind via `tgl_state_step`.
   have h_bind : 1 - ε ≤ ∫⁻ σ', (limExec ⟨e, σ'⟩) S ∂tapePresample σ α :=
-    Tgl.tgl_state_step htape hN Hsum Hpgl (fun σ' hσ' => Hcont σ' hσ')
-  rw [← MeasureTheory.Measure.bind_apply ?G1 ?G2] at h_bind
-  case G1 => sorry
+    Tgl.tgl_state_step htape hN hR hSmeas Hsum Hpgl (fun σ' hσ' => Hcont σ' hσ')
+  rw [← MeasureTheory.Measure.bind_apply hSmeas ?G2] at h_bind
   case G2 =>
     refine Measurable.aemeasurable ?_
     measurability
@@ -307,23 +349,16 @@ theorem dbind_state_step
     have hmap1 : ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S
         = asExpr ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S' := by
       unfold asExpr
-      rw [MeasureTheory.Measure.map_apply ?G3 ?G4]
-      case G3 => measurability
-      case G4 => sorry
+      rw [MeasureTheory.Measure.map_apply (by measurability) hS'meas]
       rfl
     have hmap2 : (limExec ⟨e, σ⟩) S
         = asExpr (limExec ⟨e, σ⟩) S' := by
       unfold asExpr
-      rw [MeasureTheory.Measure.map_apply ?G5 ?G6]
-      case G5 => measurability
-      case G6 =>
-        -- refine Measurable.setOf ?_
-        sorry
+      rw [MeasureTheory.Measure.map_apply (by measurability) hS'meas]
       rfl
     rw [hmap1, hmap2]
     congr 1
-    -- exact limExec_tape_presample_expr_eq htape hN
-    sorry -- TODO: Erasure
+    exact limExec_tape_presample_expr_eq htape hN
   exact h_eq ▸ h_bind
 
 end Tgl
@@ -332,7 +367,8 @@ end Tgl
 whose leaf body carries a per-leaf pure `Tgl` claim under `|={∅}=>`.
 Mirrors the inner induction of Rocq's `twp_step_fupd_tgl`. -/
 theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
-    {φ : (Val rT) → Prop} {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} :
+    {φ : (Val rT) → Prop} {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal}
+    (hφ : MeasurableSet {v : Val rT | φ v}) :
     glm' (GF := GF) e σ ε
         (fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝))
       ⊢@{IProp GF} iprop(|={∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
@@ -365,7 +401,7 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
     · icases HPS with ⟨HPS | HSS⟩
       · -- prim-step branch. In `glmPrimStep`, the leaf body is `Z ρ`
         -- (not the recursive `Φ`), so `HZ` is already `|={∅}=> ⌜Tgl⌝`.
-        icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %_, %Hsum, %Hpgl, HCont⟩
+        icases HPS with ⟨%R, %ε₁, %X₂, %r, %Hred, %HRmeas, %_, %Hsum, %Hpgl, HCont⟩
         ihave Hfa : iprop(∀ ρ, ⌜R ρ⌝ -∗
             |={∅}=> ⌜Tgl (limExec ρ) φ (X₂ ρ)⌝) $$ [HCont]
         · iintro %ρ %hR
@@ -378,11 +414,11 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
         imod Hf with %Hf
         imodintro
         ipureintro
-        exact Tgl.dbind_prim_step Hred Hsum Hpgl Hf
+        exact Tgl.dbind_prim_step hφ HRmeas Hred Hsum Hpgl Hf
       · -- state-step branch. Same shape, but indexed by σ' rather than
         -- ρ; the continuation references `Ψ` (recursive position), so
         -- `HZ` is `Ψ ∧ glm` — take the `Ψ` (= |={∅}=> ⌜Tgl⌝) side.
-        icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %_, %Hsum, %Hpgl, HCont⟩
+        icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %HRmeas, %_, %Hsum, %Hpgl, HCont⟩
         ihave Hfa : iprop(∀ σ'', ⌜R σ''⌝ -∗
             |={∅}=> ⌜Tgl (limExec ⟨e', σ''⟩) φ (X₂ σ'')⌝) $$ [HCont]
         · iintro %σ'' %hR
@@ -396,7 +432,7 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
         imod Hf with %Hf
         imodintro
         ipureintro
-        exact Tgl.dbind_state_step Hαt.1 Hαt.2 Hsum Hpgl Hf
+        exact Tgl.dbind_state_step Hαt.1 Hαt.2 hφ HRmeas Hsum Hpgl Hf
   iapply (glm'_strong_ind (GF := GF) (Z := Z) (Ψ := Ψ)) $$ HInd
         %(⟨⟨e, σ⟩, ε⟩ : (GlmState rT))
   iexact HG
@@ -408,7 +444,8 @@ The outer induction is `tglWp_ind_simple`; per-`e'`, we case-split on
 whether `e'` is a value. The non-value case calls `glm_implies_tgl` to
 extract the pure `Tgl` from the `glm` body produced by `tglWp_unfold_step`. -/
 theorem twp_step_fupd_tgl [ErisGS rT .hasNoLC GF]
-    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop} :
+    {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v}) :
     iprop(stateInterp σ ∗ errInterp (rT := rT) ε ∗ tglWp ⊤ e (fun v => iprop(⌜φ v⌝)))
       ⊢@{IProp GF} iprop(|={⊤,∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
   iintro ⟨Hσ, Hε, HW⟩
@@ -468,7 +505,7 @@ theorem twp_step_fupd_tgl [ErisGS rT .hasNoLC GF]
         -- `ρ = ⟨ρ.expr, ρ.state⟩`.
         iexact HT
       -- Goal: `|={∅}=> ⌜Tgl (limExec ⟨e', σ'⟩) φ ε'⌝`. Apply glm_implies_tgl.
-      iapply glm_implies_tgl
+      iapply (glm_implies_tgl hφ)
       iexact HG'
   iapply Hq $$ %σ %ε
   isplitl [Hσ]; · iexact Hσ
@@ -484,6 +521,7 @@ helper) and finally `fupd_soundness_no_lc` to extract the pure
 inequality at the metalogic level. -/
 theorem twp_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
     (Hwp : ∀ [ErisGS rT .hasNoLC GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Tgl (limExec ⟨e, σ⟩) φ ε := by
@@ -506,7 +544,7 @@ theorem twp_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     ecGS := { toECPreGS := inferInstance, γec := γec }
     invGS := Hinv }
   ihave Hwp' := Hwp $$ HecFrag
-  iapply twp_step_fupd_tgl (GF := GF) (e := e) (σ := σ) (ε := ε) (φ := φ)
+  iapply twp_step_fupd_tgl (GF := GF) (e := e) (σ := σ) (ε := ε) (φ := φ) hφ
   isplitl [HappAuth]
   · iexact HappAuth
   isplitl [HecAuth]
@@ -557,10 +595,11 @@ theorem twp_tgl_value [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
 `Tgl.termination_ineq`. -/
 theorem twp_mass_lim_exec [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
     (Hwp : ∀ [ErisGS rT .hasNoLC GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     1 - ε ≤ (limExec ⟨e, σ⟩) Set.univ :=
-  Tgl.termination_ineq (twp_tgl Hwp)
+  Tgl.termination_ineq (twp_tgl hφ Hwp)
 
 /-- **Adequacy 3**: probabilistic graded-lift bound on the limit
 execution. Rocq: `twp_pgl_lim` (`total_adequacy.v:447`). Derived from
@@ -568,10 +607,11 @@ execution. Rocq: `twp_pgl_lim` (`total_adequacy.v:447`). Derived from
 `limExec ρ Set.univ ≤ 1`. -/
 theorem twp_pgl_lim [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
     (Hwp : ∀ [ErisGS rT .hasNoLC GF], iprop(↯ε) ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Pgl ε (fun ρ => ∃ v, ρ.expr = Exp.ofVal v ∧ φ v) (limExec ⟨e, σ⟩) := by
-  refine Tgl.implies_pgl ?_ (twp_tgl Hwp)
+  refine Tgl.implies_pgl (measurableSet_TglCfgSet hφ) ?_ (twp_tgl hφ Hwp)
   exact limExec_leq_mass (fun n => execN_univ_le_one n ⟨e, σ⟩)
 
 /-- **Adequacy 1, limit form**: the WP triple only needs to hold for every
@@ -579,26 +619,29 @@ theorem twp_pgl_lim [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
 `twp_tgl` + `Tgl.epsilon_limit`. -/
 theorem twp_tgl_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
     (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT .hasNoLC GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Tgl (limExec ⟨e, σ⟩) φ ε :=
-  Tgl.epsilon_limit (fun ε' hε' => twp_tgl (Hwp ε' hε'))
+  Tgl.epsilon_limit (fun ε' hε' => twp_tgl hφ (Hwp ε' hε'))
 
 /-- **Adequacy 2, limit form**: termination mass via the limit form. -/
 theorem twp_mass_lim_exec_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
     (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT .hasNoLC GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     1 - ε ≤ (limExec ⟨e, σ⟩) Set.univ :=
-  Tgl.termination_ineq (twp_tgl_limit Hwp)
+  Tgl.termination_ineq (twp_tgl_limit hφ Hwp)
 
 /-- **Adequacy 3, limit form**: Pgl bound via the limit form. -/
 theorem twp_pgl_lim_limit [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
     {e : (Exp rT)} {σ : (State rT)} {ε : ENNReal} {φ : (Val rT) → Prop}
+    (hφ : MeasurableSet {v : Val rT | φ v})
     (Hwp : ∀ ε', ε < ε' → ∀ [ErisGS rT .hasNoLC GF], iprop(↯ε') ⊢@{IProp GF}
       tglWp ⊤ e (fun v => iprop(⌜φ v⌝))) :
     Pgl ε (fun ρ => ∃ v, ρ.expr = Exp.ofVal v ∧ φ v) (limExec ⟨e, σ⟩) := by
-  refine Tgl.implies_pgl ?_ (twp_tgl_limit Hwp)
+  refine Tgl.implies_pgl (measurableSet_TglCfgSet hφ) ?_ (twp_tgl_limit hφ Hwp)
   exact limExec_leq_mass (fun n => execN_univ_le_one n ⟨e, σ⟩)
 
 /-- **Adequacy 1, generalized value form**: if `e.toVal? = some v` (any

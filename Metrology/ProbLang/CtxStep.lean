@@ -37,6 +37,86 @@ theorem Ectx.fillCfg.measurable [ProbLangℝ rT] (K : Ectx rT) :
   exact ⟨Exp.Ectx_fill.measurable.comp (measurable_const.prodMk Cfg.measurable_expr),
     Cfg.measurable_state⟩
 
+/-- For a fixed evaluation-context *item* `Ki`, plugging an expression into its
+hole is a measurable embedding `Exp rT → Exp rT`: it is the corresponding `Exp`
+constructor embedding precomposed with inserting `e` into the appropriate slot
+(the remaining slots being constants). Each constant-insertion is itself a
+measurable embedding because `Exp rT` has measurable singletons (from
+`ProbLangℝ.toMeasurableEq`). -/
+theorem EctxItem.fillItem.measurableEmbedding [ProbLangℝ rT] (Ki : EctxItem rT) :
+    MeasurableEmbedding Ki.fillItem := by
+  cases Ki with
+  | appL v2 => exact Exp.app.measurableEmbedding.comp (measurableEmbedding_prod_mk_right _)
+  | appR e1 => exact Exp.app.measurableEmbedding.comp (measurableEmbedding_prodMk_left _)
+  | unop op => exact Exp.unop.measurableEmbedding.comp (measurableEmbedding_prodMk_left _)
+  | binopL op v2 =>
+      exact Exp.binop.measurableEmbedding.comp
+        (MeasurableEmbedding.prodMk_left _ (measurableEmbedding_prod_mk_right _))
+  | binopR op e1 =>
+      exact Exp.binop.measurableEmbedding.comp
+        (MeasurableEmbedding.prodMk_left _ (measurableEmbedding_prodMk_left _))
+  | condC e1 e2 =>
+      exact Exp.cond.measurableEmbedding.comp (measurableEmbedding_prod_mk_right (e1, e2))
+  | pairL v2 => exact Exp.pair.measurableEmbedding.comp (measurableEmbedding_prod_mk_right _)
+  | pairR e1 => exact Exp.pair.measurableEmbedding.comp (measurableEmbedding_prodMk_left _)
+  | fst => exact Exp.fst.measurableEmbedding
+  | snd => exact Exp.snd.measurableEmbedding
+  | inl => exact Exp.inl.measurableEmbedding
+  | inr => exact Exp.inr.measurableEmbedding
+  | case e1 e2 =>
+      exact Exp.case.measurableEmbedding.comp (measurableEmbedding_prod_mk_right (e1, e2))
+  | alloc => exact Exp.alloc.measurableEmbedding
+  | load => exact Exp.load.measurableEmbedding
+  | storeL v2 => exact Exp.store.measurableEmbedding.comp (measurableEmbedding_prod_mk_right _)
+  | storeR e1 => exact Exp.store.measurableEmbedding.comp (measurableEmbedding_prodMk_left _)
+  | tape => exact Exp.tape.measurableEmbedding
+  | randL v2 => exact Exp.rand.measurableEmbedding.comp (measurableEmbedding_prod_mk_right _)
+  | randR e1 => exact Exp.rand.measurableEmbedding.comp (measurableEmbedding_prodMk_left _)
+  | scrut p => exact Exp.scrut.measurableEmbedding.comp (measurableEmbedding_prod_mk_right _)
+
+/-- Filling a fixed evaluation context `K` is a measurable embedding
+`Exp rT → Exp rT`. By induction on `K` (as a `foldl` of per-item fills): the
+empty context is the identity and `K = Ki :: K'` is `K'.fill ∘ Ki.fillItem`, a
+composition of measurable embeddings. -/
+theorem Ectx.fill.measurableEmbedding [ProbLangℝ rT] (K : Ectx rT) :
+    MeasurableEmbedding K.fill := by
+  induction K with
+  | nil => exact MeasurableEmbedding.id
+  | cons Ki K ih => exact ih.comp (EctxItem.fillItem.measurableEmbedding Ki)
+
+/-- `Cfg rT` is measurably isomorphic to `Exp rT × State rT`. -/
+def Cfg.measurableEquivProd [ProbLangℝ rT] : Cfg rT ≃ᵐ Exp rT × State rT where
+  toFun ρ := (ρ.expr, ρ.state)
+  invFun p := ⟨p.1, p.2⟩
+  left_inv _ := rfl
+  right_inv _ := rfl
+  measurable_toFun := Cfg.measurable_expr.prodMk Cfg.measurable_state
+  measurable_invFun := Cfg.measurable_mk
+
+/-- `K.fillCfg` is a measurable embedding: under the measurable isomorphism
+`Cfg rT ≃ᵐ Exp rT × State rT` it is `Prod.map K.fill id`, a composition of
+measurable embeddings. -/
+theorem Ectx.fillCfg.measurableEmbedding [ProbLangℝ rT] (K : Ectx rT) :
+    MeasurableEmbedding K.fillCfg := by
+  have h : K.fillCfg
+      = Cfg.measurableEquivProd.symm ∘ Prod.map K.fill id ∘ Cfg.measurableEquivProd := by
+    funext ρ; rfl
+  rw [h]
+  exact (Cfg.measurableEquivProd.symm.measurableEmbedding.comp
+    ((Ectx.fill.measurableEmbedding K).prodMap MeasurableEmbedding.id)).comp
+    Cfg.measurableEquivProd.measurableEmbedding
+
+/-- `K.fillCfg` is a **measurable embedding**: it carries measurable sets to
+measurable sets. It factors through the measurable isomorphism
+`Cfg rT ≃ᵐ Exp rT × State rT` as `Prod.map K.fill id`, where `K.fill` is a
+measurable embedding (`Ectx.fill.measurableEmbedding`, built per-constructor from
+the `Exp` constructor embeddings). This is the single remaining fact behind the
+countability-free `glm'_bind` (the transported support predicate
+`K.fillCfg '' {R}` must be measurable). -/
+theorem Ectx.measurableSet_fillCfg_image [ProbLangℝ rT] (K : Ectx rT)
+    {S : Set (Cfg rT)} (hS : MeasurableSet S) : MeasurableSet (K.fillCfg '' S) :=
+  (Ectx.fillCfg.measurableEmbedding K).measurableSet_image' hS
+
 @[simp] def EctxItem.fillItemCfg [ProbLangℝ rT] (K : EctxItem rT) (ρ : Cfg rT) : Cfg rT :=
   ⟨K.fillItem ρ.expr, ρ.state⟩
 
@@ -148,6 +228,21 @@ theorem primStep_univ_le_one [ProbLangℝ rT] (ρ : Cfg rT) : (primStep ρ) Set.
   have Hmeas : Measurable e.decomp.1.fillCfg := by measurability
   rw [Measure.map_apply Hmeas MeasurableSet.univ]
   simpa using headStep_univ_le_one' ⟨e.decomp.2, σ⟩
+
+/-- `primStep` of a reducible configuration is a probability measure. Countability-free
+analogue of `prim_step_mass_discrete`: `Reducible e σ` means `primStep ⟨e,σ⟩ ≠ 0`, which
+forces the underlying `headStep` to be nonzero, hence (by `head_step_mass`) a probability
+measure; pushing forward under the measurable `fillCfg` preserves total mass `1`. -/
+theorem prim_step_mass [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (hred : Reducible e σ) : IsProbabilityMeasure (primStep ⟨e, σ⟩) := by
+  have hmeas : Measurable e.decomp.1.fillCfg := by measurability
+  have hhs : headStep ⟨e.decomp.2, σ⟩ ≠ 0 := by
+    intro h
+    apply hred
+    simp only [primStep, h, Measure.map_zero]
+  haveI := head_step_mass hhs
+  simp only [primStep]
+  exact isProbabilityMeasure_map hmeas.aemeasurable
 
 /-! ## Bridge: headStep ↔ primStep -/
 
@@ -679,6 +774,58 @@ theorem Stuck.fill [ProbLangℝ rT]
     (h : stuck e σ) : stuck (K.fill e) σ :=
   ⟨fun hv => h.1 (Ectx.fill_isValue hv),
    fun hred => h.2 (hred.of_fill K h.1)⟩
+
+/-- The positive-mass ("support") set of `primStep ⟨e, σ⟩` is measurable.
+`primStep` is purely atomic (a pushforward of the dirac/uniform `headStep`),
+so its support is countable, hence measurable in the `MeasurableSingletonClass`
+space `Cfg rT`. Establishing the countable support countability-free is the
+remaining structural fact (it follows from the `headStep` atomicity enumeration
+`headStep_exists_support_of_ne_zero`). -/
+theorem measurableSet_primStep_support [ProbLangℝ rT] (e : Exp rT) (σ : State rT) :
+    MeasurableSet {ρ : Cfg rT | 0 < primStep ⟨e, σ⟩ {ρ}} := by
+  -- `primStep` is a finite measure, so its set of positive-mass points (atoms) is
+  -- countable (`Measure.countable_meas_level_set_pos`), hence measurable.
+  haveI : IsFiniteMeasure (primStep ⟨e, σ⟩) :=
+    ⟨lt_of_le_of_lt (primStep_univ_le_one _) ENNReal.one_lt_top⟩
+  have hc : {ρ : Cfg rT | 0 < primStep ⟨e, σ⟩ {ρ}}.Countable := by
+    have h := MeasureTheory.Measure.countable_meas_level_set_pos
+      (μ := primStep ⟨e, σ⟩) (g := (id : Cfg rT → Cfg rT)) measurable_id
+    simpa only [id_eq, Set.setOf_eq_eq_singleton] using h
+  exact hc.measurableSet
+
+/-- **`primStep` is purely atomic** (countability-free): it gives zero mass to the
+set of points it gives zero mass to. Transfers `headStep_atomic` through the
+injective pushforward `K.fillCfg` (so the co-support pulls back to `headStep`'s
+co-support, with no need for `fillCfg`-image measurability). -/
+theorem primStep_atomic [ProbLangℝ rT] (e : Exp rT) (σ : State rT) :
+    IsAtomicSupport (primStep ⟨e, σ⟩) := by
+  have hmeas : Measurable e.decomp.1.fillCfg := by measurability
+  have hinj : Function.Injective e.decomp.1.fillCfg := Ectx.fillCfg_injective _
+  -- Singleton masses transfer along the injective pushforward.
+  have hsingle : ∀ ρ' : Cfg rT,
+      (primStep ⟨e, σ⟩) {e.decomp.1.fillCfg ρ'} = (headStep ⟨e.decomp.2, σ⟩) {ρ'} := by
+    intro ρ'
+    show ((headStep ⟨e.decomp.2, σ⟩).map e.decomp.1.fillCfg) {e.decomp.1.fillCfg ρ'} = _
+    rw [Measure.map_apply hmeas (measurableSet_singleton _)]
+    congr 1
+    ext x
+    simp only [Set.mem_preimage, Set.mem_singleton_iff]
+    exact ⟨fun h => hinj h, fun h => by rw [h]⟩
+  -- The co-support is measurable (complement of the countable support).
+  have hcomeas : MeasurableSet {ρ : Cfg rT | (primStep ⟨e, σ⟩) {ρ} = 0} := by
+    have heq : {ρ : Cfg rT | (primStep ⟨e, σ⟩) {ρ} = 0}
+        = {ρ : Cfg rT | 0 < primStep ⟨e, σ⟩ {ρ}}ᶜ := by
+      ext ρ; simp [pos_iff_ne_zero]
+    rw [heq]; exact (measurableSet_primStep_support e σ).compl
+  unfold IsAtomicSupport
+  show ((headStep ⟨e.decomp.2, σ⟩).map e.decomp.1.fillCfg)
+      {ρ : Cfg rT | (primStep ⟨e, σ⟩) {ρ} = 0} = 0
+  rw [Measure.map_apply hmeas hcomeas]
+  have hpre : e.decomp.1.fillCfg ⁻¹' {ρ : Cfg rT | (primStep ⟨e, σ⟩) {ρ} = 0}
+      = {ρ' : Cfg rT | (headStep ⟨e.decomp.2, σ⟩) {ρ'} = 0} := by
+    ext ρ'; simp only [Set.mem_preimage, Set.mem_setOf_eq, hsingle ρ']
+  rw [hpre]
+  exact headStep_atomic e.decomp.2 σ
 
 end ProbLang
 end

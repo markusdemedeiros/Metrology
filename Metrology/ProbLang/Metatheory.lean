@@ -1136,35 +1136,21 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
     | RandTapeNonposEmptyS hz htape hzN => exact .inr (.randTapeNonposEmpty hz htape hzN)
     | RandTapeNonposOtherS hz htape hzN => exact .inr (.randTapeNonposOther hz htape hzN)
 
-theorem not_HeadStepPred_iff_zero [Countable rT] [MeasurableSingletonClass rT]
+theorem not_HeadStepPred_iff_zero [MeasurableSingletonClass rT]
     (e : Exp rT) (σ : State rT) :
     ¬ HeadStepPred e σ ↔ headStep ⟨e, σ⟩ = 0 := by
   rw [HeadStepPred_iff_exists_support]
   constructor
-  · intro hne
-    have hzero : ∀ ρ', (headStep ⟨e, σ⟩) {ρ'} = 0 := by
-      intro ρ'
-      by_contra hpos
-      apply hne
-      refine ⟨ρ', ?_⟩
-      obtain ⟨e2, σ2⟩ := ρ'
-      exact (Discrete.headStep_support_iff e e2 σ σ2).mp
-        (lt_of_le_of_ne bot_le (Ne.symm hpos))
-    have hunivzero : (headStep ⟨e, σ⟩) Set.univ = 0 := by
-      rw [show (Set.univ : Set (Cfg rT)) = ⋃ c : Cfg rT, ({c} : Set (Cfg rT)) from by ext; simp]
-      rw [MeasureTheory.measure_iUnion
-          (fun i j hij => by simp only [Set.disjoint_singleton]; exact hij)
-          (fun _ => .of_discrete)]
-      simp [hzero]
-    exact (MeasureTheory.Measure.measure_univ_eq_zero).mp hunivzero
-  · rintro h0 ⟨ρ', hsupp⟩
-    obtain ⟨e2, σ2⟩ := ρ'
-    have : 0 < headStep ⟨e, σ⟩ {⟨e2, σ2⟩} :=
-      (Discrete.headStep_support_iff e e2 σ σ2).mpr hsupp
-    rw [h0] at this
-    simp at this
+  · -- No support point ⇒ `headStep` is zero. Countability-free via the
+    -- structural atomicity lemma `headStep_exists_support_of_ne_zero`.
+    intro hns
+    by_contra h0
+    exact hns (headStep_exists_support_of_ne_zero h0)
+  · -- A support point gives a `Possible` outcome, hence `headStep ≠ 0`.
+    rintro h0 ⟨ρ', hsupp⟩
+    exact (HeadStepSupport.possible hsupp).ne_zero h0
 
-theorem det_or_prob_or_zero [Countable rT] [MeasurableSingletonClass rT]
+theorem det_or_prob_or_zero [MeasurableSingletonClass rT]
     (e : Exp rT) (σ : State rT) :
     DetHeadStepPred e σ ∨ ProbHeadStepPred e σ ∨ headStep ⟨e, σ⟩ = 0 := by
   by_cases hpred : HeadStepPred e σ
@@ -1286,7 +1272,7 @@ theorem Cfg.uniform_nonpos_eq {z : Int} {σ : State rT} (hz : ¬ 0 < z) :
   unfold Cfg.uniform Int.isPos
   rw [dif_neg hz]
 
-theorem Cfg.uniform_ne_zero [Countable rT] [MeasurableSingletonClass rT]
+theorem Cfg.uniform_ne_zero
     (z : Int) (σ : State rT) : Cfg.uniform z σ ≠ 0 := by
   intro heq
   have hp : MeasureTheory.IsProbabilityMeasure (Cfg.uniform z σ) :=
@@ -1415,7 +1401,7 @@ theorem Cfg.uniform_singleton_ne_one [Countable rT] [MeasurableSingletonClass rT
     exact absurd (lt_of_lt_of_le hpos0 this) (lt_irrefl _)
 
 set_option linter.unnecessarySimpa false in
-theorem State.head_step_dzero_upd_tapes [Countable rT] [MeasurableSingletonClass rT]
+theorem State.head_step_dzero_upd_tapes [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {α : Loc} {bs bs' : Tape}
     (hmem : σ.tapes[α]? = some bs)
     (h0 : ProbLang.headStep ⟨e, σ⟩ = 0) :

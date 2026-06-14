@@ -269,9 +269,10 @@ variable {GF : BundledGFunctors.{0,0,0}}
   [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
 
 /-- A value at zero error has `Tgl = 0` after adequacy. -/
-example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v) :
+example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v)
+    (hφm : MeasurableSet {v : Val rT | φ v}) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
-  refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
+  refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) hφm ?_
   intro _; iintro _; iapply tglWp_value; ipureintro; exact hφ
 
 /-- Mass at ε = 0 for a value: `1 ≤ limExec _ Set.univ`. -/
@@ -279,24 +280,26 @@ example (v : Val rT) (σ : State rT) :
     1 ≤ (limExec ⟨Exp.ofVal v, σ⟩) Set.univ := by
   have h : Tgl (limExec ⟨Exp.ofVal v, σ⟩) (fun _ => True) 0 := by
     refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ)
-      (φ := fun _ => True) ?_
+      (φ := fun _ => True) (by simpa using MeasurableSet.univ) ?_
     intro _; iintro _; iapply tglWp_value; ipureintro; trivial
   have := Tgl.termination_ineq h
   rwa [tsub_zero] at this
 
 /-- ε-limit form (`twp_tgl_limit`): a value with the WP triple at every
 `ε' > 0` yields `Tgl ... 0`. -/
-example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v) :
+example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v)
+    (hφm : MeasurableSet {v : Val rT | φ v}) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
-  refine twp_tgl_limit (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
+  refine twp_tgl_limit (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) hφm ?_
   intro _ _ _; iintro _; iapply tglWp_value; ipureintro; exact hφ
 
 /-- Pgl bound via adequacy: at ε = 0, the limit-exec measure of the
 non-value-or-`¬φ` set is `0`. -/
-example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v) :
+example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v)
+    (hφm : MeasurableSet {v : Val rT | φ v}) :
     Pgl 0 (fun ρ => ∃ w, ρ.expr = Exp.ofVal w ∧ φ w)
       (limExec ⟨Exp.ofVal v, σ⟩) := by
-  refine twp_pgl_lim (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) ?_
+  refine twp_pgl_lim (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) hφm ?_
   intro _; iintro _; iapply tglWp_value; ipureintro; exact hφ
 
 end AdequacySmokeTests

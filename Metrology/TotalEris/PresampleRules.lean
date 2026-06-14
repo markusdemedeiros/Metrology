@@ -29,6 +29,21 @@ namespace TotalEris
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
+/-- The support of a `tapePresample` step is a countable set of tape-updated
+states, hence measurable (countability-free; `State rT` has measurable
+singletons via `ProbLangℝ`). -/
+theorem presample_support_measurableSet {σ₁ : State rT} {α : Loc} {N : Int}
+    {bs : List { z : Int // 0 ≤ z ∧ z < N }} :
+    MeasurableSet {σ' : State rT | ∃ n : { z : Int // 0 ≤ z ∧ z < N },
+      σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)} := by
+  have hc : {σ' : State rT | ∃ n : { z : Int // 0 ≤ z ∧ z < N },
+      σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)}.Countable := by
+    apply Set.Countable.mono (s₂ := (fun n : { z : Int // 0 ≤ z ∧ z < N } =>
+      σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)) '' Set.univ)
+    · rintro σ' ⟨n, rfl⟩; exact ⟨n, trivial, rfl⟩
+    · exact (Set.countable_univ).image _
+  exact hc.measurableSet
+
 /-- Basic *total* presample rule. Given tape ownership `α ↪ₐ ⟨N, bs⟩`
 with positive bound `N`, the WP can be advanced by appending a freshly
 sampled `n` to the tape; the body then takes back the updated tape and
@@ -63,6 +78,16 @@ theorem twp_presample {E : CoPset} {e : Exp rT} {α : Loc} {Φ : Val rT → IPro
   iexists (fun σ' => ∃ n : { z : Int // 0 ≤ z ∧ z < N },
             σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)),
     0, (fun _ => ε₁), ε₁
+  -- MeasurableSet of the support: a countable set of tape-updated states.
+  isplitr
+  · ipureintro
+    have hctble : {σ' : State rT | ∃ n : { z : Int // 0 ≤ z ∧ z < N },
+        σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)}.Countable := by
+      apply Set.Countable.mono (s₂ := (fun n : { z : Int // 0 ≤ z ∧ z < N } =>
+        σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)) '' Set.univ)
+      · rintro σ' ⟨n, rfl⟩; exact ⟨n, trivial, rfl⟩
+      · exact (Set.countable_univ).image _
+    exact hctble.measurableSet
   isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
   · ipureintro
@@ -78,10 +103,8 @@ theorem twp_presample {E : CoPset} {e : Exp rT} {α : Loc} {Φ : Val rT → IPro
     show (tapePresample σ₁ α) {σ' | ¬ _} ≤ 0
     refine _root_.le_of_eq ?_
     rw [← MeasureTheory.ae_iff]
-    sorry
-    -- refine tapePresample_ae hlookup ?_
-    -- intro n
-    -- exact ⟨n, rfl⟩
+    -- Support of `tapePresample` is exactly the `R`-states (countability-free).
+    exact tapePresample_ae hlookup presample_support_measurableSet (fun n => ⟨n, rfl⟩)
   iintro %σ' %hR
   rcases hR with ⟨n, hσ'⟩
   subst hσ'
@@ -124,6 +147,65 @@ noncomputable def presampleAdvCompX₂
       σ' = σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)
     then ε₂ (Classical.choose h)
     else 0
+
+open Classical in
+/-- `presampleAdvCompX₂` is measurable. It is supported on the (finite) set of
+tape-updated states indexed by the sample `n : {z // 0 ≤ z ∧ z < N}`, and — using
+that distinct samples produce distinct states — equals the countable sum of
+singleton-indicators `∑' n, {update n}.indicator (ε₂ n)`. Countability-free: the
+sum ranges over the finite sample index, and singleton measurability comes from
+`MeasurableSingletonClass (State rT)` (not `Countable rT`). -/
+theorem presampleAdvCompX₂.measurable
+    (σ : State rT) (α : Loc) (N : Int)
+    (bs : List { z : Int // 0 ≤ z ∧ z < N })
+    (ε₂ : { z : Int // 0 ≤ z ∧ z < N } → ENNReal) :
+    Measurable (presampleAdvCompX₂ σ α N bs ε₂) := by
+  -- Distinct samples yield distinct tape-updated states.
+  have hInj : Function.Injective
+      (fun n : { z : Int // 0 ≤ z ∧ z < N } =>
+        σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)) := by
+    intro n₁ n₂ heq
+    have htape_eq : (σ.tapes.insert α ⟨N, bs ++ [n₁]⟩)
+                  = (σ.tapes.insert α ⟨N, bs ++ [n₂]⟩) := by
+      have := congrArg State.tapes heq
+      simpa [State.update_tapes] using this
+    have hget₁ : (σ.tapes.insert α ⟨N, bs ++ [n₁]⟩)[α]? = some ⟨N, bs ++ [n₁]⟩ :=
+      Std.ExtTreeMap.getElem?_insert_self
+    have hget₂ : (σ.tapes.insert α ⟨N, bs ++ [n₂]⟩)[α]? = some ⟨N, bs ++ [n₂]⟩ :=
+      Std.ExtTreeMap.getElem?_insert_self
+    rw [htape_eq] at hget₁
+    rw [hget₂] at hget₁
+    have hbs : bs ++ [n₂] = bs ++ [n₁] := by simpa using hget₁
+    have : [n₂] = [n₁] := List.append_cancel_left hbs
+    exact ((List.cons.injEq _ _ _ _).mp this |>.1).symm
+  -- Rewrite as a countable sum of singleton-indicators.
+  have hrw : presampleAdvCompX₂ σ α N bs ε₂
+      = fun σ' => ∑' n : { z : Int // 0 ≤ z ∧ z < N },
+          ({σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)} : Set (State rT)).indicator
+            (fun _ => ε₂ n) σ' := by
+    funext σ'
+    unfold presampleAdvCompX₂
+    by_cases h : ∃ n : { z : Int // 0 ≤ z ∧ z < N },
+        σ' = σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)
+    · rw [dif_pos h]
+      have hc : σ' = σ.update_tapes (·.insert α ⟨N, bs ++ [Classical.choose h]⟩) :=
+        Classical.choose_spec h
+      rw [tsum_eq_single (Classical.choose h) ?_]
+      · rw [Set.indicator_of_mem (Set.mem_singleton_iff.mpr hc)]
+      · intro n hn
+        apply Set.indicator_of_notMem
+        rw [Set.mem_singleton_iff]
+        intro hcontra
+        exact hn (hInj (hc.symm.trans hcontra)).symm
+    · rw [dif_neg h]
+      refine (ENNReal.tsum_eq_zero.mpr fun n => ?_).symm
+      apply Set.indicator_of_notMem
+      rw [Set.mem_singleton_iff]
+      intro hcontra
+      exact h ⟨n, hcontra⟩
+  rw [hrw]
+  exact Measurable.ennreal_tsum fun n =>
+    measurable_const.indicator (measurableSet_singleton _)
 
 /-- **Advanced-composition presample rule** (Rocq: `twp_presample_adv_comp`,
 `presample_rules.v:115`).
@@ -199,6 +281,16 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
               σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)),
     0, (fun σ' => (ε_now - ε₁) + presampleAdvCompX₂ σ₁ α N bs ε₂ σ'),
     ((ε_now - ε₁) + 1)
+  -- Sub-goal 0: MeasurableSet of the support (countable set of tape-updated states).
+  isplitr
+  · ipureintro
+    have hctble : {σ' : State rT | ∃ n : { z : Int // 0 ≤ z ∧ z < N },
+        σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)}.Countable := by
+      apply Set.Countable.mono (s₂ := (fun n : { z : Int // 0 ≤ z ∧ z < N } =>
+        σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)) '' Set.univ)
+      · rintro σ' ⟨n, rfl⟩; exact ⟨n, trivial, rfl⟩
+      · exact (Set.countable_univ).image _
+    exact hctble.measurableSet
   -- Sub-goal 1: bound on X₂.
   isplitr
   · ipureintro
@@ -234,9 +326,8 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
       classical
       -- Push the integral through `tapePresample`'s unfolding and collapse the
       -- integrand pointwise to `ε₂ n` (via `hPointwise`).
-      sorry
-      /-
-      rw [tapePresample_lintegral hlookup]
+      rw [tapePresample_lintegral hlookup (presampleAdvCompX₂ σ₁ α N bs ε₂)
+            (presampleAdvCompX₂.measurable σ₁ α N bs ε₂)]
       simp_rw [hPointwise]
       -- Goal: `∫⁻ n, ε₂ n ∂tapeIndexUniform N ≤ ε₁`.
       -- Common integrand `F : Int → ℝ≥0∞`, total via a `0` default off-bounds.
@@ -259,14 +350,17 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
           intro n; rw [hεF n]
         simp_rw [hf_eq]
         rw [tapeIndexUniform_lintegral_eq_cfg_uniform hN σ₁ (fun ρ => match ρ.expr with
-              | .lit (.int m) => F m | _ => 0)]
+              | .lit (.int m) => F m | _ => 0)
+              ((measurable_litInt_elim F).comp Cfg.measurable_expr)]
         -- Now over `Cfg.uniform N σ₁`; mirror the `ErrorRules` computation.
         have hCfgUniform :
             Cfg.uniform N σ₁ =
               (PMF.uniformOfFinset (Finset.Ico (0:Int) N) hNonempty).toMeasure.map
                 (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) := by
           unfold Cfg.uniform; simp only [Int.isPos, dif_pos hN]
-        rw [hCfgUniform, MeasureTheory.lintegral_map .of_discrete .of_discrete]
+        rw [hCfgUniform, MeasureTheory.lintegral_map
+              (f := fun ρ : Cfg rT => match ρ.expr with | .lit (.int m) => F m | _ => 0)
+              ((measurable_litInt_elim F).comp Cfg.measurable_expr) .of_discrete]
         -- `∫⁻ z, F z ∂uniform = ∑ z ∈ Ico 0 N, F z / N.toNat`.
         have hIndic : (fun z : Int => (match (⟨.lit (.int z), σ₁⟩ : Cfg rT).expr with
               | .lit (.int m) => F m | _ => 0))
@@ -310,7 +404,6 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
         simp_rw [div_eq_mul_inv]; rw [← Finset.sum_mul]
       rw [hLI, hdiv, ← hSumImage]
       exact HSum
-      -/
     calc (ε_now - ε₁) + ∫⁻ σ', presampleAdvCompX₂ σ₁ α N bs ε₂ σ' ∂(tapePresample σ₁ α)
         ≤ (ε_now - ε₁) + ε₁ := by gcongr
       _ = ε_now := tsub_add_cancel_of_le hLe
@@ -320,10 +413,8 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
     show (tapePresample σ₁ α) {σ' | ¬ _} ≤ 0
     refine _root_.le_of_eq ?_
     rw [← MeasureTheory.ae_iff]
-    sorry
-    -- refine tapePresample_ae hlookup ?_
-    -- intro n
-    -- exact ⟨n, rfl⟩
+    -- Support of `tapePresample` is exactly the `R`-states (countability-free).
+    exact tapePresample_ae hlookup presample_support_measurableSet (fun n => ⟨n, rfl⟩)
   -- Per-outcome continuation.
   iintro %σ' %hR
   rcases hR with ⟨n, hσ'⟩

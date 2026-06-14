@@ -63,6 +63,7 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   iapply glm'_prim_step
   iexists (fun ρ => 0 < primStep ⟨e₁, σ₁⟩ {ρ}), 0, (fun _ => ε₁), ε₁
   isplitr; · ipureintro; exact Hred
+  isplitr; · ipureintro; exact measurableSet_primStep_support e₁ σ₁
   isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
   · ipureintro
@@ -71,10 +72,17 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
     calc ε₁ * primStep ⟨e₁, σ₁⟩ Set.univ
         ≤ ε₁ * 1 := by gcongr; exact primStep_univ_le_one _
       _ = ε₁ := mul_one ε₁
-  -- `Pgl 0 (positive-mass) primStep` for the general lift needs `Pgl.zero_positive`,
-  -- i.e. `Countable (Cfg rT)`. Per the countability-removal goal we do not add it;
-  -- genuine-novel-insight (needs `primStep` atomicity / a countability-free `Pgl`).
-  isplitr; · ipureintro; sorry
+  -- `Pgl 0 (positive-mass) primStep`: the complement of the support is the
+  -- co-support `{ρ | primStep{ρ} = 0}`, which is null because `primStep` is purely
+  -- atomic (`primStep_atomic`, countability-free).
+  isplitr
+  · ipureintro
+    show (primStep ⟨e₁, σ₁⟩) {ρ : Cfg rT | ¬ (0 < primStep ⟨e₁, σ₁⟩ {ρ})} ≤ 0
+    have hco : {ρ : Cfg rT | ¬ (0 < primStep ⟨e₁, σ₁⟩ {ρ})}
+        = {ρ : Cfg rT | (primStep ⟨e₁, σ₁⟩) {ρ} = 0} := by
+      ext ρ; simp [pos_iff_ne_zero]
+    rw [hco]
+    exact (primStep_atomic e₁ σ₁).le
   iintro %ρ %HR
   ispecialize HCont $$ %ρ.expr %ρ.state %HR
   imod HCont with HC
