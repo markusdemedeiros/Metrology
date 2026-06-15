@@ -446,6 +446,47 @@ theorem pos_R [Countable α] [Countable β]
   rw [Hfeq, Hgeq]
   exact H F G HFG
 
+/-- Refine the RHS relation of an additive coupling to a `μᵣ`-concentrated set.
+
+Countability-free analogue of the RHS half of `pos_R`: if `μᵣ` lives on a
+measurable set `T` (`μᵣ Tᶜ = 0`), the coupling relation may be strengthened with
+`v.2 ∈ T`. For `μᵣ = dirac b` and `T = {b}` this recovers "the RHS sample is `b`"
+with no atom enumeration, which is exactly what the deterministic/dret step rules
+need. Mirrors `pos_R`'s proof but modifies only `g` (to `1` off `T`) and uses the
+a.e.-equality `g =ᵐ[μᵣ] g'` instead of a countable singleton decomposition. -/
+theorem concentrated_R {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
+    {T : Set β} (hT : MeasurableSet T) (hconc : μᵣ Tᶜ = 0)
+    (H : AddCoupl ε S μₗ μᵣ) :
+    AddCoupl ε (fun v => S v ∧ v.2 ∈ T) μₗ μᵣ := by
+  classical
+  rintro ⟨f, Hfm, Hfb⟩ ⟨g, Hgm, Hgb⟩ Hle
+  -- Modify `g` to be `1` off `T`; it agrees with `g` `μᵣ`-a.e. since `μᵣ Tᶜ = 0`.
+  let g' : β → ENNReal := fun b => if b ∈ T then g b else 1
+  have Hg'm : Measurable g' := Measurable.ite hT Hgm measurable_const
+  have Hg'b : ∀ b, g' b ≤ 1 := fun b => by
+    simp only [g']; split_ifs
+    · exact Hgb b
+    · exact le_refl _
+  let G : CouplingFunction β := ⟨g', Hg'm, Hg'b⟩
+  -- `f ≤ g'` on the *original* `S`: on `T` use the refined hypothesis, off `T`
+  -- use `g' = 1 ≥ f`.
+  have HFG : ∀ {a b}, S (a, b) → f a ≤ G.1 b := by
+    intro a b HS
+    simp only [G, g']
+    split_ifs with hbT
+    · exact Hle ⟨HS, hbT⟩
+    · exact Hfb a
+  have hae : g =ᶠ[MeasureTheory.ae μᵣ] g' := by
+    rw [Filter.EventuallyEq, MeasureTheory.ae_iff]
+    refine measure_mono_null ?_ hconc
+    intro b hb
+    simp only [Set.mem_compl_iff]
+    intro hbT
+    exact hb (by simp only [g', if_pos hbT])
+  have Hgeq : ∫⁻ b, g b ∂μᵣ = ∫⁻ b, g' b ∂μᵣ := MeasureTheory.lintegral_congr_ae hae
+  rw [Hgeq]
+  exact H ⟨f, Hfm, Hfb⟩ G HFG
+
 /-- Exact couplings embed into approximate couplings at any `ε`. -/
 theorem of_RelCoupl {ε : ENNReal} {S : Set (α × β)}
     {μₗ : Measure α} {μᵣ : Measure β}

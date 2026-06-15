@@ -1519,12 +1519,11 @@ theorem progCoupl_step_l_erasable {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' 
 
 /-- `prog_coupl_step_l_dret` — LHS-only step with spec staying at exactly
 `(e₁', σ₁')` (RHS is `dirac σ₁'`). Specialization of `_step_l_erasable`. -/
-@[discrete]
-theorem progCoupl_step_l_dret [Countable rT] {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
+theorem progCoupl_step_l_dret {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
     {ε₁ ε₂ ε : ENNReal} {R : (Cfg rT) → (State rT) → Prop}
     {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
     (Hε : ε₁ + ε₂ ≤ ε)
-    (Hred : Discrete.Reducible e₁ σ₁)
+    (Hred : Reducible e₁ σ₁)
     (Hcpl : AddCoupl ε₁ {p : (Cfg rT) × (State rT) | R p.1 p.2}
               (primStep ⟨e₁, σ₁⟩) (MeasureTheory.Measure.dirac σ₁')) :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
@@ -1534,25 +1533,19 @@ theorem progCoupl_step_l_dret [Countable rT] {e₁ : (Exp rT)} {σ₁ : (State r
       progCoupl e₁ σ₁ e₁' σ₁' ε Z := by
   iintro ⟨#H1F, H⟩
   classical
-  -- Use pos_R to force σ₂' = σ₁' in the relation (since dirac σ₁' is supported
-  -- only at σ₁').
-  have Hpos := AddCoupl.pos_R Hcpl
-  -- Hpos : AddCoupl ε₁ {p | R p.1 p.2 ∧ (primStep ⟨e₁,σ₁⟩) {p.1} ≠ 0 ∧
-  --                              (dirac σ₁') {p.2} ≠ 0} ...
-  -- The last condition forces p.2 = σ₁'.
-  -- Redefine the relation to include "σ₂' = σ₁'":
+  -- `dirac σ₁'` is concentrated on `{σ₁'}`, so the coupling relation may be
+  -- refined to force the RHS sample `p.2 = σ₁'` — countability-free, via
+  -- `AddCoupl.concentrated_R` (the continuous analogue of `pos_R`'s RHS half).
+  have hconc : (MeasureTheory.Measure.dirac σ₁' : MeasureTheory.Measure (State rT)) {σ₁'}ᶜ = 0 := by
+    rw [MeasureTheory.Measure.dirac_apply' _ (by measurability)]; simp
   have HcplR : AddCoupl ε₁ {p : (Cfg rT) × (State rT) | R p.1 p.2 ∧ p.2 = σ₁'}
       (primStep ⟨e₁, σ₁⟩) (MeasureTheory.Measure.dirac σ₁') := by
-    refine AddCoupl.mono_rel ?_ Hpos
-    rintro ⟨ρ, σ⟩ ⟨HR, _, hσ⟩
-    refine ⟨HR, ?_⟩
-    -- hσ : dirac σ₁' {σ} ≠ 0 → σ = σ₁'
-    by_contra hne
-    apply hσ
-    rw [MeasureTheory.Measure.dirac_apply' _ (by measurability)]
-    simp [Ne.symm hne]
+    refine AddCoupl.mono_rel ?_
+      (AddCoupl.concentrated_R (MeasurableSet.singleton σ₁') hconc Hcpl)
+    rintro ⟨ρ, σ⟩ ⟨HR, hmem⟩
+    exact ⟨HR, hmem⟩
   iapply (progCoupl_step_l_erasable (μ₁' := MeasureTheory.Measure.dirac σ₁')
-    (Hε := Hε) (Hred := Reducible_ReducibleM_iff.mp Hred)
+    (Hε := Hε) (Hred := Hred)
     (R := fun ρ σ => R ρ σ ∧ σ = σ₁') HcplR (Erasable.dret' σ₁'))
   isplitr
   · iintro !> %e₂ %σ₂ %e₂' %σ₂'; iexact H1F
@@ -1592,7 +1585,7 @@ theorem progCoupl_step_l [Countable rT] {e₁ : (Exp rT)} {σ₁ : (State rT)} {
     exact pos_iff_ne_zero.mpr hρ
   iapply (progCoupl_step_l_dret (ε₁ := 0) (ε₂ := ε)
     (R := fun ρ _ => 0 < primStep ⟨e₁, σ₁⟩ {ρ})
-    (Hε := Hε) (Hred := Hred) HcplR)
+    (Hε := Hε) (Hred := Reducible_ReducibleM_iff.mp Hred) HcplR)
   isplitr
   · iintro !> %e₂ %σ₂ %e₂' %σ₂'; iexact H1F
   iintro %e₂ %σ₂ %Hpos'
@@ -2343,7 +2336,7 @@ theorem wp_lift_prim_step_l_dret [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {
     iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
       iprop(|={∅, E}=>
         stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
-          wp E e₃ Φ)))) Hεsum Hred Hcpl)
+          wp E e₃ Φ)))) Hεsum (Reducible_ReducibleM_iff.mp Hred) Hcpl)
   isplitr
   · iintro !> %e₃ %σ₃ %e₃' %σ₃'
     iintro !>
