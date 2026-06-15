@@ -317,12 +317,9 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
             -- `Finset.Ico 0 z` support, and reindexing `n : Int` ↦
             -- `n.toNat : ℕ` to match HSum's form.
             -- Reduce primStep to headStep (= Cfg.uniform on rand z ()).
-            have hheadred : ∃ ρ : Cfg rT,
-                0 < (headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ} :=
-              ⟨⟨.lit (.int 0), σ₁⟩, by
-                exact possible_iff_pos.mp
-                  (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible⟩
-            rw [primStep_eq_headStep_discrete hheadred]
+            have hhead : HeadReducible (.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
+              (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
+            rw [primStep_eq_headStep hhead]
             -- headStep ⟨rand z (), σ⟩ definitionally equals Cfg.uniform z σ.
             show ∫⁻ a, (match a.expr with
                 | .lit (.int n) => if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
@@ -424,12 +421,9 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     show (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩)
         {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} ≤ 0
     refine _root_.le_of_eq ?_
-    have hheadred : ∃ ρ : Cfg rT,
-        0 < (headStep ⟨.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ} :=
-      ⟨⟨.lit (.int 0), σ₁⟩, by
-        exact possible_iff_pos.mp
-          (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible⟩
-    rw [primStep_eq_headStep_discrete hheadred]
+    have hhead : HeadReducible (.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
+      (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
+    rw [primStep_eq_headStep hhead]
     show (Cfg.uniform z σ₁)
         {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} = 0
     have hCfgUniform :

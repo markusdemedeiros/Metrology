@@ -61,6 +61,19 @@ theorem zero_positive [Countable α] (μ : MeasureTheory.Measure α) :
     Set.Countable.mono (Set.subset_univ _) Set.countable_univ
   exact ((MeasureTheory.measure_null_iff_singleton hctble).mpr (fun _ hx => hx)).le
 
+/-- `Possible`-native `Pgl 0`: an *atomic* measure assigns zero mass to the
+complement of its `Possible`-support. This is the measurability-free /
+countability-free reformulation of `zero_positive`: instead of `[Countable α]`
+it takes `IsAtomicSupport μ` (the co-support `{x | μ{x}=0}` is null) and only
+needs measurable singletons. `IsAtomicSupport μ ↔ Pgl 0 (Possible · μ) μ`, so
+this is exactly the atomicity certificate the step rules feed to `glm'`. -/
+theorem zero_possible [MeasurableSingletonClass α] {μ : MeasureTheory.Measure α}
+    (h : IsAtomicSupport μ) : Pgl 0 (fun a => Possible a μ) μ := by
+  show μ {x | ¬ Possible x μ} ≤ 0
+  have hset : {x : α | ¬ Possible x μ} = {x | μ {x} = 0} := by
+    ext x; simp [possible_iff_pos, pos_iff_ne_zero]
+  rw [hset]; exact h.le
+
 end Pgl
 
 /-! ## `ErisWpGS` ghost-state class

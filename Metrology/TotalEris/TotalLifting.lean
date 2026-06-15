@@ -51,7 +51,7 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
       (⌜Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
-        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗
+        (⌜Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩)⌝) -∗
         |={∅}=> |={∅, E}=>
           stateInterp σ₂ ∗ tglWp E e₂ Φ) ⊢@{IProp GF}
       tglWp E e₁ Φ := by
@@ -61,9 +61,15 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   imod H $$ %σ₁ Hσ with ⟨%Hred, HCont⟩
   imodintro
   iapply glm'_prim_step
-  iexists (fun ρ => 0 < primStep ⟨e₁, σ₁⟩ {ρ}), 0, (fun _ => ε₁), ε₁
+  iexists (fun ρ => Possible ρ (primStep ⟨e₁, σ₁⟩)), 0, (fun _ => ε₁), ε₁
   isplitr; · ipureintro; exact Hred
-  isplitr; · ipureintro; exact measurableSet_primStep_support e₁ σ₁
+  isplitr
+  · ipureintro
+    -- The `Possible`-support set coincides with the positive-mass set
+    -- (`possible_iff_pos`), which is measurable (`measurableSet_primStep_support`).
+    have hset : {ρ : Cfg rT | Possible ρ (primStep ⟨e₁, σ₁⟩)}
+        = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} := Set.ext fun ρ => possible_iff_pos
+    rw [hset]; exact measurableSet_primStep_support e₁ σ₁
   isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
   · ipureintro
@@ -72,17 +78,12 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
     calc ε₁ * primStep ⟨e₁, σ₁⟩ Set.univ
         ≤ ε₁ * 1 := by gcongr; exact primStep_univ_le_one _
       _ = ε₁ := mul_one ε₁
-  -- `Pgl 0 (positive-mass) primStep`: the complement of the support is the
+  -- `Pgl 0 Possible primStep`: the complement of the `Possible`-support is the
   -- co-support `{ρ | primStep{ρ} = 0}`, which is null because `primStep` is purely
-  -- atomic (`primStep_atomic`, countability-free).
+  -- atomic (`primStep_atomic`, countability-free). Packaged as `Pgl.zero_possible`.
   isplitr
   · ipureintro
-    show (primStep ⟨e₁, σ₁⟩) {ρ : Cfg rT | ¬ (0 < primStep ⟨e₁, σ₁⟩ {ρ})} ≤ 0
-    have hco : {ρ : Cfg rT | ¬ (0 < primStep ⟨e₁, σ₁⟩ {ρ})}
-        = {ρ : Cfg rT | (primStep ⟨e₁, σ₁⟩) {ρ} = 0} := by
-      ext ρ; simp [pos_iff_ne_zero]
-    rw [hco]
-    exact (primStep_atomic e₁ σ₁).le
+    exact Pgl.zero_possible (primStep_atomic e₁ σ₁)
   iintro %ρ %HR
   ispecialize HCont $$ %ρ.expr %ρ.state %HR
   imod HCont with HC
@@ -103,7 +104,7 @@ theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e�
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E₁}=>
       (⌜Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
-        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E₁}=>
+        (⌜Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩)⌝) -∗ |={E₁}=>
           stateInterp σ₂ ∗
           iprop(match e₂.toVal? with
                 | some v => Φ v
@@ -137,10 +138,10 @@ Rocq: `twp_lift_pure_step`. -/
 theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
-    (Hstep : ∀ σ₁ e₂ σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} → σ₂ = σ₁) :
+    (Hstep : ∀ σ₁ e₂ σ₂, Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩) → σ₂ = σ₁) :
     iprop(|={E}=>
       ∀ (e₂ : Exp rT) (σ : State rT),
-        (⌜0 < primStep ⟨e₁, σ⟩ {⟨e₂, σ⟩}⌝) -∗
+        (⌜Possible (⟨e₂, σ⟩ : Cfg rT) (primStep ⟨e₁, σ⟩)⌝) -∗
         tglWp E e₂ Φ) ⊢@{IProp GF}
       tglWp E e₁ Φ := by
   iintro H
@@ -163,7 +164,7 @@ theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
 theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
-    (Hpuredet : ∀ σ₁ e₂' σ₂, 0 < primStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} →
+    (Hpuredet : ∀ σ₁ e₂' σ₂, Possible (⟨e₂', σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩) →
       σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   iintro H
@@ -188,7 +189,7 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E}=>
       (⌜HeadReducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
-        (⌜0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={E}=>
+        (⌜Possible (⟨e₂, σ₂⟩ : Cfg rT) (headStep ⟨e₁, σ₁⟩)⌝) -∗ |={E}=>
           stateInterp σ₂ ∗
           iprop(match e₂.toVal? with
                 | some v => Φ v
@@ -206,21 +207,21 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   iintro %e₂ %σ₂ %Hpstep
   have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := by
     exact primStep_eq_headStep Hhred
-  have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := heq ▸ Hpstep
+  have hpos : Possible (⟨e₂, σ₂⟩ : Cfg rT) (headStep ⟨e₁, σ₁⟩) := heq ▸ Hpstep
   iapply HCont $$ %e₂ %σ₂ %hpos
 
 /-- Pure-deterministic head-step lifting. Rocq: `twp_lift_pure_det_head_step`. -/
 theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
-    (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, 0 < headStep ⟨e₁, σ₁⟩ {ρ})
+    (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, Possible ρ (headStep ⟨e₁, σ₁⟩))
     -- How is this used? Can it be changed to be the Dirac critereon?
-    (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
+    (Hdet : ∀ σ₁ e₂' σ₂, Possible (⟨e₂', σ₂⟩ : Cfg rT) (headStep ⟨e₁, σ₁⟩) → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   iapply twp_lift_pure_det_step hv
-    (Hsafe := fun σ => Reducible.of_head (by
-      obtain ⟨ρ, hρ⟩ := Hsafe σ; intro h0; rw [h0] at hρ; simp at hρ))
+    (Hsafe := fun σ => Reducible.of_head ((Hsafe σ).elim fun _ hρ => hρ.ne_zero))
   intros σ e₂' σ₂ hp
-  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep_discrete (Hsafe σ)
+  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ :=
+    primStep_eq_headStep ((Hsafe σ).elim fun _ hρ => hρ.ne_zero)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)
 
 /-! ## `PureExec_discrete` integration -/
@@ -244,7 +245,7 @@ theorem twp_lift_pure_det_step_of_pureStep
   -- Determinacy: `primStep ⟨e₁,σ⟩ = dirac ⟨e₂,σ⟩`, so a positive-mass outcome must
   -- *be* `⟨e₂,σ⟩` (via the measurability-free `dirac_singleton_pos'`), contradicting
   -- `hother`.
-  rw [hpt, dirac_singleton_pos'] at hp
+  rw [hpt, possible_iff_pos, dirac_singleton_pos'] at hp
   exact hother hp.symm
   -- exact absurd (hsum_le.trans htot) (_root_.not_le.mpr hsum_gt)
 
