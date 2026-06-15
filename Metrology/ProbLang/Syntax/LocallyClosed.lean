@@ -93,7 +93,7 @@ theorem fv_subst_subset (e : Exp rT) (x : Var) (v : Exp rT) :
       · simp [subst, hxy] at hz; subst hz
         refine Finset.mem_union_left _ ?_
         simp; exact fun h => hxy h.symm
-  | bvar _ | lit _ | fail => simp [subst] at hz
+  | bvar _ | lit _ | fail | urand => simp [subst] at hz
   | lam e ih | fix e ih | unop _ e ih | fst e ih | snd e ih
   | inl e ih | inr e ih | alloc e ih | load e ih | tape e ih | scrut e _ ih =>
       simp [subst] at hz; exact ih hz
@@ -335,7 +335,7 @@ theorem open_close_subst_lc_gen (x : Var) (e v : Exp rT)
         · -- x ≠ y; inner subst leaves fvar y, outer subst hits z vs y.
           have hzy : z ≠ y := fun h => hze (by rw [h]; simp [fv])
           simp [subst, hxy, hzy]
-    | bvar _ | lit _ | fail => simp [subst]
+    | bvar _ | lit _ | fail | urand => simp [subst]
     | lam e ih | fix e ih | unop _ e ih | fst e ih | snd e ih
     | inl e ih | inr e ih | alloc e ih | load e ih | tape e ih | scrut e _ ih =>
         simp only [subst, fv] at hze ⊢

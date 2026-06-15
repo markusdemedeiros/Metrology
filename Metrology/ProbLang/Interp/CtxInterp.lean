@@ -144,6 +144,9 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : IO (
     | some bindings => return .inl bindings
     | none          => return .inr (.lit .unit)
 
+  -- Continuous uniform sampling: not executable in the generic interpreter.
+  | .urand => throw' (Error.unsupported (rT := rT) "continuous uniform sampling (urand)")
+
   -- Stuck / failure
   | .fail => throw' (Error.fail (rT := rT))
 

@@ -114,8 +114,14 @@ This allows us to gradually port the development to use a continuous semantics. 
 class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, Inhabited T,
     MeasurableEq T where
   instDecidableEq : DecidableEq T
+  /-- The uniform probability distribution on the unit interval `[0,1]`. This is the
+  measure a continuous uniform sample (`Exp.urand`) draws from. -/
+  unifUnit : MeasureTheory.Measure T
+  /-- `unifUnit` is a genuine probability measure (total mass `1`). -/
+  unifUnit_isProbabilityMeasure : MeasureTheory.IsProbabilityMeasure unifUnit
 
 attribute [reducible, instance] ProbLangℝ.instDecidableEq
+attribute [instance] ProbLangℝ.unifUnit_isProbabilityMeasure
 
 /-- Type of base literals with a given type of reals. Countable etc when rT is. -/
 @[uncurriedProjections, curriedProjections, constructors]
@@ -195,6 +201,8 @@ inductive Exp (rT : Type _)
   | rand (en et : Exp rT)
   /-- Halt and fail -/
   | fail
+  /-- Continuous uniform random sample from the unit interval `[0,1]`. Nullary. -/
+  | urand
   /-- Pattern matching primitive -/
   | scrut (e : Exp rT) (pat : Pat rT)
   deriving Inhabited, Countable, BEq
@@ -231,6 +239,7 @@ namespace Exp
   | tape e => tape (openRec i sub e)
   | rand e1 e2 => rand (openRec i sub e1) (openRec i sub e2)
   | fail => fail
+  | urand => urand
   | scrut e p => scrut (openRec i sub e) p
 
 /-- Open the outermost binder. -/
@@ -259,6 +268,7 @@ namespace Exp
   | tape e => tape (closeRec i x e)
   | rand e1 e2 => rand (closeRec i x e1) (closeRec i x e2)
   | fail => fail
+  | urand => urand
   | scrut e p => scrut (closeRec i x e) p
 
 /-- Close the x using the outermost binder (bvar 0). -/
@@ -288,6 +298,7 @@ namespace Exp
   | tape e => tape (subst e x sub)
   | rand e1 e2 => rand (subst e1 x sub) (subst e2 x sub)
   | fail => fail
+  | urand => urand
   | scrut e p => scrut (subst e x sub) p
 
 instance : HasSubstitution (Exp rT) Var (Exp rT) where
@@ -316,6 +327,7 @@ instance : HasSubstitution (Exp rT) Var (Exp rT) where
   | tape e => fv e
   | rand e1 e2 => fv e1 ∪ fv e2
   | fail => {}
+  | urand => {}
   | scrut e _ => fv e
 
 /-- An expression is locally closed. -/
@@ -386,6 +398,8 @@ inductive IsLocallyClosed : Exp rT → Prop
     IsLocallyClosed (rand e1 e2)
   | fail :
     IsLocallyClosed fail
+  | urand :
+    IsLocallyClosed urand
   | scrut {e} (p : Pat rT) :
     IsLocallyClosed e →
     IsLocallyClosed (scrut e p)
@@ -409,6 +423,7 @@ attribute [scoped grind .]
   IsLocallyClosed.tape
   IsLocallyClosed.rand
   IsLocallyClosed.fail
+  IsLocallyClosed.urand
   IsLocallyClosed.scrut
 
 end Exp
@@ -903,6 +918,7 @@ def Exp.height : Exp α → Nat
   | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
   | scrut e _ => 1 + e.height
   | fail => 1
+  | urand => 1
 
 private theorem Exp.toVal?_of_isVal {e : Exp α} (w : IsVal e) : ∃ v : Val α, e.toVal? = some v ∧ v.1 = e :=
   let ⟨w', hw'⟩ := w.check?_some; ⟨⟨e, w'⟩, by simp [toVal?, hw'], rfl⟩

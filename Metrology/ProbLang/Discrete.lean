@@ -131,5 +131,8 @@ single canonical `ProbLangℝ Int` instance here so they all share one definitio
 duplicate-name collisions when one file transitively imports two of them). -/
 instance instProbLangℝInt : ProbLang.ProbLangℝ Int where
   instDecidableEq := inferInstance
+  -- The integer "unit interval" `[0,1] ∩ ℤ = {0,1}`, sampled uniformly.
+  unifUnit := (PMF.uniformOfFinset ({0, 1} : Finset Int) (by decide)).toMeasure
+  unifUnit_isProbabilityMeasure := PMF.toMeasure.isProbabilityMeasure _
 
 end ProbLangDiscrete

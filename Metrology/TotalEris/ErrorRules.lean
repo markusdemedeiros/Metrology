@@ -66,6 +66,41 @@ theorem measurable_litInt_elim (g : Int → ENNReal) :
     | (intro b; cases b <;> rfl)
     | fun_prop
 
+/-- Continuous analogue of `measurable_litInt_elim`: the real-literal eliminator
+is measurable when its payload map `g : rT → ENNReal` is. Used to push the
+error-credit integrand through the `urand` pushforward `unifUnit.map (⟨.lit (.real ·), σ⟩)`. -/
+theorem measurable_litReal_elim (g : rT → ENNReal) (hg : Measurable g) :
+    Measurable (fun e : Exp rT => match e with
+      | .lit (.real r) => g r
+      | _ => (0 : ENNReal)) := by
+  have hlit : Measurable (fun b : BaseLit rT =>
+      match b with | .real r => g r | _ => (0 : ENNReal)) := by
+    have heq : (fun b : BaseLit rT => match b with | .real r => g r | _ => (0 : ENNReal))
+        = (fun b : BaseLit rT => BaseLit.casesOn (motive := fun _ => ENNReal) b
+            (fun _ => 0) (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) g) := by
+      funext b; cases b <;> rfl
+    rw [heq]
+    exact BaseLit.measurable_rec (fun _ => 0) (fun _ => 0) (fun _ => 0)
+      (fun _ => 0) (fun _ => 0) g hg
+  apply Exp.measurable_struct_rec
+    (f := fun e : Exp rT => match e with | .lit (.real r) => g r | _ => (0 : ENNReal))
+    (c_bvar := fun _ => 0) (c_fvar := fun _ => 0)
+    (c_lit := fun b => match b with | .real r => g r | _ => (0 : ENNReal))
+    (c_lam := fun _ => 0) (c_fix := fun _ => 0)
+    (c_app := fun _ _ => 0) (c_unop := fun _ _ => 0) (c_binop := fun _ _ _ => 0)
+    (c_cond := fun _ _ _ => 0) (c_pair := fun _ _ => 0)
+    (c_fst := fun _ => 0) (c_snd := fun _ => 0)
+    (c_inl := fun _ => 0) (c_inr := fun _ => 0) (c_case := fun _ _ _ => 0)
+    (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ _ => 0)
+    (c_tape := fun _ => 0) (c_rand := fun _ _ => 0) (c_fail := (0 : ENNReal))
+    (c_scrut := fun _ _ => 0)
+  all_goals first
+    | (intros; rfl)
+    | rfl
+    | exact hlit
+    | (intro b; cases b <;> rfl)
+    | fun_prop
+
 namespace TotalEris
 
 variable {hlc : HasLC} {GF : BundledGFunctors}
@@ -488,6 +523,154 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     isplitl [Hε_new]; · iexact Hε_new
     iapply (ErisWpGS.tglWp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
     iexact HΦ
+
+/-- **Continuous error-credit conditioning at a uniform sample.** Given an error
+budget `ε₁` and a measurable per-outcome credit map `ε₂ : rT → ℝ≥0∞` whose
+**Lebesgue integral over the unit interval** `∫⁻ r, ε₂ r ∂unifUnit` is at most
+`ε₁`, the continuous uniform sample `urand` can spend `↯ε₁` to deliver `↯(ε₂ r)`
+at each real outcome `r`.
+
+This is the continuous analogue of `twp_rand_exp_nat` (where the discrete `∑`/`z`
+average is replaced by `∫⁻ … ∂unifUnit`). It uses NO atomicity: the support
+certificate is `Concentrated (primStep …) (real-image)` via `concentratedOn_map`,
+and the integral bound goes through `unifUnit.map (⟨.lit (.real ·), σ⟩)` change of
+variables (`lintegral_map`). -/
+theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
+    {ε₂ : rT → ENNReal} {Φ : Val rT → IProp GF}
+    (hε₂ : Measurable ε₂) (Hbd : ∀ r, ε₂ r ≤ 1)
+    (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
+    iprop(↯ε₁) ⊢@{IProp GF}
+      iprop((∀ (r : rT), ↯(ε₂ r) -∗ Φ (⟨.lit (.real r), IsVal.lit⟩ : Val rT)) -∗
+      tglWp E Exp.urand Φ) := by
+  iintro Herr Hcont
+  have Hnv : (Exp.urand : Exp rT).toVal? = none :=
+    Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
+  -- The real-literal image map and its measurable-embedding facts.
+  have hg : ∀ σ₁ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
+    fun σ₁ => Cfg.measurable_iff.mpr
+      ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
+  have hgemb : ∀ σ₁ : State rT,
+      MeasurableEmbedding (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) := fun σ₁ => by
+    have hcomp : (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT))
+        = Cfg.measurableEquivProd.symm ∘ (fun e : Exp rT => (e, σ₁))
+            ∘ Exp.lit ∘ BaseLit.real := rfl
+    rw [hcomp]
+    exact Cfg.measurableEquivProd.symm.measurableEmbedding.comp
+      ((measurableEmbedding_prod_mk_right σ₁).comp
+        (Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding))
+  iapply (twp_lift_step_fupd_glm Hnv)
+  iintro %σ₁ %ε_now ⟨Hσ, Hε_now⟩
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
+  imodintro
+  ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp (rT := rT) ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
+      $$ [Hε_now Herr]
+  · iapply errInterp_supply_bound
+    isplitl [Hε_now]; · iexact Hε_now
+    iexact Herr
+  -- `urand` is reducible (probability measure), and `primStep = headStep = uniformReal`.
+  have hhead : HeadReducible (Exp.urand : Exp rT) σ₁ := by
+    show Cfg.uniformReal σ₁ ≠ 0; exact MeasureTheory.IsProbabilityMeasure.ne_zero _
+  have hps : primStep (⟨Exp.urand, σ₁⟩ : Cfg rT) = Cfg.uniformReal σ₁ :=
+    primStep_eq_headStep hhead
+  -- The reach set is the real-literal image — measurable, and (via `concentratedOn_map`)
+  -- co-null for the diffuse `uniformReal`.
+  have hrange : {ρ : Cfg rT | ∃ r : rT, ρ = ⟨.lit (.real r), σ₁⟩}
+      = (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) '' Set.univ := by
+    ext ρ; simp only [Set.image_univ, Set.mem_range, Set.mem_setOf_eq]
+    exact ⟨fun ⟨r, h⟩ => ⟨r, h.symm⟩, fun ⟨r, h⟩ => ⟨r, h.symm⟩⟩
+  have hRmeas : MeasurableSet {ρ : Cfg rT | ∃ r : rT, ρ = ⟨.lit (.real r), σ₁⟩} := by
+    rw [hrange, Set.image_univ]; exact (hgemb σ₁).measurableSet_range
+  iapply glm'_prim_step
+  iexists (fun ρ => ∃ (r : rT), ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT))
+  iexists 0
+  iexists (fun ρ : Cfg rT => (ε_now - ε₁) + match ρ.1 with
+    | .lit (.real r) => ε₂ r
+    | _ => 0)
+  iexists ((ε_now - ε₁) + 1)
+  -- Sub-goal 1: Reducible.
+  isplitr
+  · ipureintro; exact reducible_of_headReducible hhead
+  -- Sub-goal 2: the reach support is measurable.
+  isplitr
+  · ipureintro; exact hRmeas
+  -- Sub-goal 3: the per-outcome credit is bounded.
+  isplitr
+  · ipureintro
+    intro ρ; simp only; gcongr
+    split
+    · exact Hbd _
+    · exact zero_le
+  -- Sub-goal 4: the integral budget — a genuine Lebesgue integral over `unifUnit`.
+  isplitr
+  · ipureintro
+    rw [zero_add, MeasureTheory.lintegral_add_left measurable_const,
+        MeasureTheory.lintegral_const]
+    have hμ_le_one : (primStep ⟨Exp.urand, σ₁⟩) Set.univ ≤ 1 := primStep_univ_le_one _
+    calc (ε_now - ε₁) * (primStep ⟨Exp.urand, σ₁⟩) Set.univ +
+            ∫⁻ a : Cfg rT, (match a.1 with | .lit (.real r) => ε₂ r | _ => 0)
+              ∂primStep ⟨Exp.urand, σ₁⟩
+        ≤ (ε_now - ε₁) * 1 + ε₁ := by
+          gcongr
+          · have hGmeas : Measurable (fun a : Cfg rT =>
+                match a.expr with | .lit (.real r) => ε₂ r | _ => (0 : ENNReal)) :=
+              (measurable_litReal_elim ε₂ hε₂).comp Cfg.measurable_expr
+            rw [hps,
+              show Cfg.uniformReal σ₁
+                  = (ProbLangℝ.unifUnit (T := rT)).map
+                      (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) from rfl,
+              MeasureTheory.lintegral_map hGmeas (hg σ₁)]
+            exact HInt
+      _ = ε_now := by rw [mul_one]; exact tsub_add_cancel_of_le hLe
+  -- Sub-goal 5: `Pgl 0 R` — the `Concentrated`-on-image certificate (NO atoms).
+  isplitr
+  · ipureintro
+    apply Pgl.of_concentrated
+    rw [hps, hrange,
+      show Cfg.uniformReal σ₁
+          = (ProbLangℝ.unifUnit (T := rT)).map
+              (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) from rfl]
+    exact concentratedOn_map (hg σ₁)
+      (by rw [Set.image_univ]; exact (hgemb σ₁).measurableSet_range) Concentrated.univ
+  -- Sub-goal 6: per-outcome continuation, delivering `↯(ε₂ r)`.
+  iintro %ρ %HRρ
+  obtain ⟨r, Hρ_eq⟩ := HRρ
+  subst Hρ_eq
+  simp only
+  ihave Hsupp1 : iprop(|==> ErisWpGS.errInterp (rT := rT) (ε_now - ε₁)) $$ [Hε_now Herr]
+  · iapply errInterp_supply_decrease
+    isplitl [Hε_now]; · iexact Hε_now
+    iexact Herr
+  imod Hsupp1 with Hε_minus
+  imodintro
+  by_cases hlt : (ε_now - ε₁) + ε₂ r < 1
+  case neg =>
+    push Not at hlt
+    iapply execStutter_spend hlt
+  case pos =>
+    iapply execStutter_free
+    imod (errInterp_supply_increase hlt) $$ Hε_minus with ⟨Hε_new, Hcr⟩
+    imod Hclose with _
+    ihave HΦ : iprop(Φ ⟨.lit (.real r), IsVal.lit⟩) $$ [Hcont Hcr]
+    · iapply Hcont $$ %r
+      iexact Hcr
+    imodintro
+    isplitl [Hσ]; · iexact Hσ
+    isplitl [Hε_new]; · iexact Hε_new
+    iapply (ErisWpGS.tglWp_value_of_toVal (v := ⟨.lit (.real r), IsVal.lit⟩) rfl)
+    iexact HΦ
+
+/-- **Demonstration of continuous error-credit conditioning at a uniform sample.**
+A self-contained Total Eris proof: spend `↯ε₁` at a `urand` draw, where the
+per-outcome credit is the constant `ε₁`. The budget side-condition is discharged
+by the **Lebesgue integral** `∫⁻ r, ε₁ ∂unifUnit = ε₁ · unifUnit(univ) = ε₁`
+(`unifUnit` is a probability measure). This is exactly the continuous analogue of
+discrete `rand` error conditioning — the average is a `∫⁻ … ∂unifUnit`. -/
+example {E : CoPset} {ε₁ : ENNReal} (hε₁ : ε₁ ≤ 1) {Φ : Val rT → IProp GF} :
+    iprop(↯ε₁) ⊢@{IProp GF}
+      iprop((∀ (r : rT), ↯ε₁ -∗ Φ (⟨.lit (.real r), IsVal.lit⟩ : Val rT)) -∗
+      tglWp E Exp.urand Φ) :=
+  twp_urand_exp measurable_const (fun _ => hε₁)
+    (le_of_eq (by rw [MeasureTheory.lintegral_const, MeasureTheory.measure_univ, mul_one]))
 
 /-- Tutorial wrapper around `twp_rand_exp_nat` matching the form used in
 `eris_rules.v:118` — phrases the sum as `∑ k < N+1, ε₂ k ≤ (N+1) * ε₁`.

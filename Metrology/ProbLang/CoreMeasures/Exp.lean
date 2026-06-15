@@ -20,7 +20,7 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 Follows the same `BaseLit`/`Pat` template. `Exp` has:
 - two syntax-leaf constructors (`bvar : Nat`, `fvar : Var`)
 - one data-leaf constructor (`lit : BaseLit rT`)
-- one nullary constructor (`fail`)
+- two nullary constructors (`fail`, `urand`)
 - many recursive constructors of arities 1–3 (`lam`, `fix`, `fst`, `snd`, `inl`, `inr`,
   `alloc`, `load`, `tape`; `app`, `pair`, `store`, `rand`; `cond`, `case`)
 - mixed constructors:
@@ -78,6 +78,7 @@ inductive Cylinder (rT : Type _)
   | tape (c : Cylinder rT)
   | rand (c1 c2 : Cylinder rT)
   | fail
+  | urand
   | scrut (c : Cylinder rT) (S : Set (Pat rT))
 
 /-- An expression with all data-leaf payloads forgotten. Syntax-leaf args are kept. -/
@@ -103,6 +104,7 @@ inductive Shape
   | tape (s : Shape)
   | rand (s1 s2 : Shape)
   | fail
+  | urand
   | scrut (s : Shape)
   deriving Countable
 
@@ -133,6 +135,7 @@ inductive Shape
   | .tape c        => Exp.tape '' flatten c
   | .rand c1 c2    => (fun p => Exp.rand p.1 p.2) '' (flatten c1 ×ˢ flatten c2)
   | .fail          => {Exp.fail}
+  | .urand         => {Exp.urand}
   | .scrut c S     => (fun p => Exp.scrut p.1 p.2) '' (flatten c ×ˢ S)
 
 /-- A cylinder has measurable leaves if every data-leaf set it carries is measurable. -/
@@ -161,6 +164,7 @@ inductive Cylinder.HasMeasurableLeaves {rT : Type _} [MeasurableSpace rT] :
   | tape  : HasMeasurableLeaves c → HasMeasurableLeaves (.tape c)
   | rand  : HasMeasurableLeaves c1 → HasMeasurableLeaves c2 → HasMeasurableLeaves (.rand c1 c2)
   | fail  : HasMeasurableLeaves .fail
+  | urand : HasMeasurableLeaves .urand
   | scrut S : HasMeasurableLeaves c → MeasurableSet S → HasMeasurableLeaves (.scrut c S)
 
 instance instMeasurableSpaceExp [MeasurableSpace rT] : MeasurableSpace (Exp rT) :=
@@ -188,6 +192,7 @@ instance instMeasurableSpaceExp [MeasurableSpace rT] : MeasurableSpace (Exp rT) 
   | .tape e        => .tape (shape e)
   | .rand e1 e2    => .rand (shape e1) (shape e2)
   | .fail          => .fail
+  | .urand         => .urand
   | .scrut e _     => .scrut (shape e)
 
 /-- Shape of a cylinder (forgets data leaves). -/
@@ -213,6 +218,7 @@ instance instMeasurableSpaceExp [MeasurableSpace rT] : MeasurableSpace (Exp rT) 
   | .tape c        => .tape (shape c)
   | .rand c1 c2    => .rand (shape c1) (shape c2)
   | .fail          => .fail
+  | .urand         => .urand
   | .scrut c _     => .scrut (shape c)
 
 /-- The "universe cylinder" for a given shape: `univ` at every data leaf, same skeleton. -/
@@ -238,6 +244,7 @@ instance instMeasurableSpaceExp [MeasurableSpace rT] : MeasurableSpace (Exp rT) 
   | .tape s        => .tape (cylinder s)
   | .rand s1 s2    => .rand (cylinder s1) (cylinder s2)
   | .fail          => .fail
+  | .urand         => .urand
   | .scrut s       => .scrut (cylinder s) Set.univ
 
 /-! ### Cylinder intersection. -/
@@ -320,6 +327,7 @@ def Cylinder.inter? {rT : Type _} : Cylinder rT → Cylinder rT → Option (Cyli
       | some r₁, some r₂ => some (.rand r₁ r₂)
       | _, _ => none
   | .fail, .fail => some .fail
+  | .urand, .urand => some .urand
   | .scrut c S, .scrut c' S' =>
       match Cylinder.inter? c c' with
       | some r => some (.scrut r (S ∩ S'))
@@ -330,7 +338,7 @@ def Cylinder.inter? {rT : Type _} : Cylinder rT → Cylinder rT → Option (Cyli
 theorem Cylinder.shape_of_mem_flatten {rT : Type _} {c : Cylinder rT} {e : Exp rT}
     (h : e ∈ Cylinder.flatten c) : Exp.shape e = Cylinder.shape c := by
   induction c generalizing e with
-  | bvar _ | fvar _ | fail => simp_all
+  | bvar _ | fvar _ | fail | urand => simp_all
   | lit _ => obtain ⟨_, _, rfl⟩ := h; rfl
   | lam _ ih | fix _ ih | fst _ ih | snd _ ih | inl _ ih | inr _ ih
   | alloc _ ih | load _ ih | tape _ ih =>
@@ -507,6 +515,10 @@ theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
     cases c₂
     case fail => simp [Cylinder.inter?]
     all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+  | urand =>
+    cases c₂
+    case urand => simp [Cylinder.inter?]
+    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
   | scrut c S ih =>
     cases c₂
     case scrut c' S' =>
@@ -532,7 +544,7 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
     (h₁ : c₁.HasMeasurableLeaves) (h₂ : c₂.HasMeasurableLeaves)
     (h : Cylinder.inter? c₁ c₂ = some c) : c.HasMeasurableLeaves := by
   induction c₁ generalizing c₂ c with
-  | bvar | fvar | fail =>
+  | bvar | fvar | fail | urand =>
     cases c₂ <;> simp only [Cylinder.inter?, reduceCtorEq] at h ⊢
     all_goals first | (split at h <;> simp_all) | simp_all
   | lit S₁ =>
@@ -648,6 +660,9 @@ theorem Cylinder.hasMeasurableLeaves_inter [MeasurableSpace rT]
 
 @[stamp_simp] def cover.fail (S : Set Unit) : Set (Exp rT) :=
   ⋃ _ ∈ S, Cylinder.flatten (Cylinder.fail : Cylinder rT)
+
+@[stamp_simp] def cover.urand (S : Set Unit) : Set (Exp rT) :=
+  ⋃ _ ∈ S, Cylinder.flatten (Cylinder.urand : Cylinder rT)
 
 @[stamp_simp] def cover.scrut (S : Set Shape) : Set (Exp rT) :=
   ⋃ s ∈ S, Cylinder.flatten (.scrut s.cylinder Set.univ)
@@ -779,6 +794,10 @@ theorem cover.fail.measurable [MeasurableSpace rT] (S : Set Unit) :
     MeasurableSet (fail (rT := rT) S) := by solve_cover_measurable
 
 @[measurability]
+theorem cover.urand.measurable [MeasurableSpace rT] (S : Set Unit) :
+    MeasurableSet (urand (rT := rT) S) := by solve_cover_measurable
+
+@[measurability]
 theorem cover.scrut.measurable [MeasurableSpace rT] (S : Set Shape) :
     MeasurableSet (scrut (rT := rT) S) := by solve_cover_measurable
 
@@ -866,6 +885,10 @@ theorem cover.fail_eq_image (S : Set Unit) :
     cover.fail (rT := rT) S = (fun _ : Unit => (Exp.fail : Exp rT)) '' S := by
   solve_cover_eq_image cover.fail
 
+theorem cover.urand_eq_image (S : Set Unit) :
+    cover.urand (rT := rT) S = (fun _ : Unit => (Exp.urand : Exp rT)) '' S := by
+  solve_cover_eq_image cover.urand
+
 theorem cover.scrut_univ_eq_range :
     cover.scrut (rT := rT) Set.univ = .range (Function.uncurry Exp.scrut) := by
   solve_cover_eq_image cover.scrut
@@ -883,6 +906,10 @@ theorem fvar.ι.measurable {rT : Type _} [MeasurableSpace rT] :
 @[fun_prop]
 theorem fail.ι.measurable {rT : Type _} [MeasurableSpace rT] :
     Measurable (Exp.fail.ι (rT := rT)) := (by measurability)
+
+@[fun_prop]
+theorem urand.ι.measurable {rT : Type _} [MeasurableSpace rT] :
+    Measurable (Exp.urand.ι (rT := rT)) := (by measurability)
 
 @[fun_prop]
 theorem lit.ι.measurable {rT : Type _} [MeasurableSpace rT] :
@@ -1227,6 +1254,16 @@ theorem fail.measurableEmbedding [MeasurableSpace rT] :
   · exact measurable_const
   · intro; rfl
 
+theorem urand.measurableEmbedding [MeasurableSpace rT] :
+    MeasurableEmbedding (fun _ : Unit => (Exp.urand : Exp rT)) := by
+  apply MeasurableEmbedding.of_measurable_inverse (g := fun _ => ())
+  · exact measurable_const
+  · rw [show Set.range (fun _ : Unit => (Exp.urand : Exp rT)) = cover.urand .univ from by
+             rw [cover.urand_eq_image]; ext; simp]
+    exact cover.urand.measurable _
+  · exact measurable_const
+  · intro; rfl
+
 theorem lit.measurableEmbedding [MeasurableSpace rT] :
     MeasurableEmbedding (Exp.lit : BaseLit rT → Exp rT) :=
   ⟨fun _ _ h => by injection h, Exp.lit.ι.measurable,
@@ -1460,7 +1497,8 @@ def decompCell
     (f_case : Exp rT × Exp rT × Exp rT → α)
     (f_alloc : Exp rT → α) (f_load : Exp rT → α) (f_store : Exp rT × Exp rT → α)
     (f_tape : Exp rT → α) (f_rand : Exp rT × Exp rT → α)
-    (f_fail : Unit → α) (f_scrut : Exp rT × Pat rT → α) : Fin 22 → Set (Exp rT) :=
+    (f_fail : Unit → α) (f_urand : Unit → α)
+    (f_scrut : Exp rT × Pat rT → α) : Fin 23 → Set (Exp rT) :=
   ![ Exp.bvar.ι  '' (f_bvar  ⁻¹' S)
    , Exp.fvar.ι  '' (f_fvar  ⁻¹' S)
    , Exp.lit.ι   '' (f_lit   ⁻¹' S)
@@ -1482,6 +1520,7 @@ def decompCell
    , Exp.tape.ι  '' (f_tape  ⁻¹' S)
    , Exp.rand.ι  '' (f_rand  ⁻¹' S)
    , Exp.fail.ι  '' (f_fail  ⁻¹' S)
+   , Exp.urand.ι '' (f_urand ⁻¹' S)
    , Exp.scrut.ι '' (f_scrut ⁻¹' S) ]
 
 theorem casesOn_preimage_decomp
@@ -1497,7 +1536,8 @@ theorem casesOn_preimage_decomp
     (f_case : Exp rT × Exp rT × Exp rT → α)
     (f_alloc : Exp rT → α) (f_load : Exp rT → α) (f_store : Exp rT × Exp rT → α)
     (f_tape : Exp rT → α) (f_rand : Exp rT × Exp rT → α)
-    (f_fail : Unit → α) (f_scrut : Exp rT × Pat rT → α) :
+    (f_fail : Unit → α) (f_urand : Unit → α)
+    (f_scrut : Exp rT × Pat rT → α) :
     (fun e : Exp rT => Exp.casesOn (motive := fun _ => α) e
         f_bvar f_fvar f_lit f_lam f_fix
         (fun e1 e2 => f_app (e1, e2))
@@ -1512,10 +1552,11 @@ theorem casesOn_preimage_decomp
         f_tape
         (fun e1 e2 => f_rand (e1, e2))
         (f_fail ())
+        (f_urand ())
         (fun e p => f_scrut (e, p))) ⁻¹' S
       = ⋃ i, decompCell S f_bvar f_fvar f_lit f_lam f_fix f_app f_unop f_binop
           f_cond f_pair f_fst f_snd f_inl f_inr f_case f_alloc f_load f_store
-          f_tape f_rand f_fail f_scrut i := by
+          f_tape f_rand f_fail f_urand f_scrut i := by
   ext e
   simp only [Set.mem_preimage, Set.mem_iUnion, decompCell]
   constructor
@@ -1541,7 +1582,8 @@ theorem casesOn_preimage_decomp
     · exact ⟨18, _, he, rfl⟩
     · exact ⟨19, ⟨_, _⟩, he, rfl⟩
     · exact ⟨20, (), he, rfl⟩
-    · exact ⟨21, ⟨_, _⟩, he, rfl⟩
+    · exact ⟨21, (), he, rfl⟩
+    · exact ⟨22, ⟨_, _⟩, he, rfl⟩
   · rintro ⟨i, hi⟩; fin_cases i <;>
       · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
@@ -1560,7 +1602,8 @@ theorem measurable_rec
     (f_case : Exp rT × Exp rT × Exp rT → α)
     (f_alloc : Exp rT → α) (f_load : Exp rT → α) (f_store : Exp rT × Exp rT → α)
     (f_tape : Exp rT → α) (f_rand : Exp rT × Exp rT → α)
-    (f_fail : Unit → α) (f_scrut : Exp rT × Pat rT → α)
+    (f_fail : Unit → α) (f_urand : Unit → α)
+    (f_scrut : Exp rT × Pat rT → α)
     (h_lit : Measurable f_lit)
     (h_lam : Measurable f_lam) (h_fix : Measurable f_fix)
     (h_app : Measurable f_app) (h_unop : Measurable f_unop) (h_binop : Measurable f_binop)
@@ -1586,6 +1629,7 @@ theorem measurable_rec
         f_tape
         (fun e1 e2 => f_rand (e1, e2))
         (f_fail ())
+        (f_urand ())
         (fun e p => f_scrut (e, p))) := by
   intro S hS
   rw [Exp.casesOn_preimage_decomp]
@@ -1612,6 +1656,7 @@ theorem measurable_rec
   · exact tape.measurableEmbedding.measurableSet_image'  (h_tape hS)
   · exact rand.measurableEmbedding.measurableSet_image'  (h_rand hS)
   · exact fail.measurableEmbedding.measurableSet_image'  (by measurability)
+  · exact urand.measurableEmbedding.measurableSet_image' (by measurability)
   · exact scrut.measurableEmbedding.measurableSet_image' (h_scrut hS)
 
 /-! ### Param-threaded one-level dispatch (no recursion).
@@ -1636,8 +1681,9 @@ def decompCell_param
     (f_alloc : β × Exp rT → α) (f_load : β × Exp rT → α)
     (f_store : β × Exp rT × Exp rT → α)
     (f_tape : β × Exp rT → α) (f_rand : β × Exp rT × Exp rT → α)
-    (f_fail : β × Unit → α) (f_scrut : β × Exp rT × Pat rT → α) :
-    Fin 22 → Set (Exp rT × β) :=
+    (f_fail : β × Unit → α) (f_urand : β × Unit → α)
+    (f_scrut : β × Exp rT × Pat rT → α) :
+    Fin 23 → Set (Exp rT × β) :=
   ![ (fun q : β × Nat => (Exp.bvar q.2, q.1))   '' (f_bvar  ⁻¹' S)
    , (fun q : β × Var => (Exp.fvar q.2, q.1))   '' (f_fvar  ⁻¹' S)
    , (fun q : β × BaseLit rT => (Exp.lit q.2, q.1))   '' (f_lit ⁻¹' S)
@@ -1662,6 +1708,7 @@ def decompCell_param
    , (fun q : β × Exp rT => (Exp.tape q.2, q.1)) '' (f_tape ⁻¹' S)
    , (fun q : β × Exp rT × Exp rT => (Exp.rand q.2.1 q.2.2, q.1)) '' (f_rand ⁻¹' S)
    , (fun q : β × Unit => (Exp.fail, q.1)) '' (f_fail ⁻¹' S)
+   , (fun q : β × Unit => (Exp.urand, q.1)) '' (f_urand ⁻¹' S)
    , (fun q : β × Exp rT × Pat rT => (Exp.scrut q.2.1 q.2.2, q.1)) '' (f_scrut ⁻¹' S) ]
 
 /-- Joint preimage decomposition for `Exp.casesOn` with a `β` parameter. -/
@@ -1679,7 +1726,8 @@ theorem casesOn_preimage_decomp_param
     (f_alloc : β × Exp rT → α) (f_load : β × Exp rT → α)
     (f_store : β × Exp rT × Exp rT → α)
     (f_tape : β × Exp rT → α) (f_rand : β × Exp rT × Exp rT → α)
-    (f_fail : β × Unit → α) (f_scrut : β × Exp rT × Pat rT → α) :
+    (f_fail : β × Unit → α) (f_urand : β × Unit → α)
+    (f_scrut : β × Exp rT × Pat rT → α) :
     (fun p : Exp rT × β => Exp.casesOn (motive := fun _ => α) p.1
         (fun n => f_bvar (p.2, n)) (fun x => f_fvar (p.2, x))
         (fun l => f_lit (p.2, l))
@@ -1697,10 +1745,11 @@ theorem casesOn_preimage_decomp_param
         (fun e => f_tape (p.2, e))
         (fun e1 e2 => f_rand (p.2, e1, e2))
         (f_fail (p.2, ()))
+        (f_urand (p.2, ()))
         (fun e pat => f_scrut (p.2, e, pat))) ⁻¹' S
       = ⋃ i, decompCell_param S f_bvar f_fvar f_lit f_lam f_fix f_app f_unop f_binop
           f_cond f_pair f_fst f_snd f_inl f_inr f_case f_alloc f_load f_store
-          f_tape f_rand f_fail f_scrut i := by
+          f_tape f_rand f_fail f_urand f_scrut i := by
   ext ⟨e, b⟩
   simp only [Set.mem_preimage, Set.mem_iUnion, decompCell_param]
   constructor
@@ -1726,7 +1775,8 @@ theorem casesOn_preimage_decomp_param
     · exact ⟨18, (b, _), he, rfl⟩
     · exact ⟨19, (b, _, _), he, rfl⟩
     · exact ⟨20, (b, ()), he, rfl⟩
-    · exact ⟨21, (b, _, _), he, rfl⟩
+    · exact ⟨21, (b, ()), he, rfl⟩
+    · exact ⟨22, (b, _, _), he, rfl⟩
   · rintro ⟨i, hi⟩; fin_cases i <;>
       · obtain ⟨q, hq, hp⟩ := hi; cases hp; simpa using hq
 
@@ -1751,7 +1801,8 @@ theorem measurable_rec_param
     (c_alloc : β × Exp rT → α) (c_load : β × Exp rT → α)
     (c_store : β × Exp rT × Exp rT → α)
     (c_tape : β × Exp rT → α) (c_rand : β × Exp rT × Exp rT → α)
-    (c_fail : β × Unit → α) (c_scrut : β × Exp rT × Pat rT → α)
+    (c_fail : β × Unit → α) (c_urand : β × Unit → α)
+    (c_scrut : β × Exp rT × Pat rT → α)
     (h_bvar : Measurable c_bvar) (h_fvar : Measurable c_fvar)
     (h_lit : Measurable c_lit)
     (h_lam : Measurable c_lam) (h_fix : Measurable c_fix)
@@ -1763,7 +1814,8 @@ theorem measurable_rec_param
     (h_alloc : Measurable c_alloc) (h_load : Measurable c_load)
     (h_store : Measurable c_store)
     (h_tape : Measurable c_tape) (h_rand : Measurable c_rand)
-    (h_fail : Measurable c_fail) (h_scrut : Measurable c_scrut) :
+    (h_fail : Measurable c_fail) (h_urand : Measurable c_urand)
+    (h_scrut : Measurable c_scrut) :
     Measurable (fun p : Exp rT × β => Exp.casesOn (motive := fun _ => α) p.1
         (fun n => c_bvar (p.2, n)) (fun x => c_fvar (p.2, x))
         (fun l => c_lit (p.2, l))
@@ -1781,6 +1833,7 @@ theorem measurable_rec_param
         (fun e => c_tape (p.2, e))
         (fun e1 e2 => c_rand (p.2, e1, e2))
         (c_fail (p.2, ()))
+        (c_urand (p.2, ()))
         (fun e pat => c_scrut (p.2, e, pat))) := by
   intro S hS
   rw [casesOn_preimage_decomp_param]
@@ -1830,6 +1883,8 @@ theorem measurable_rec_param
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_rand hS)
   · exact ((fail.measurableEmbedding.prodMap (.id (α := β))).comp
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_fail hS)
+  · exact ((urand.measurableEmbedding.prodMap (.id (α := β))).comp
+      MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_urand hS)
   · exact ((scrut.measurableEmbedding.prodMap (.id (α := β))).comp
       MeasurableEquiv.prodComm.measurableEmbedding).measurableSet_image' (h_scrut hS)
 
@@ -1857,6 +1912,7 @@ variable {c_case : α → α → α → α}
 variable {c_alloc : α → α} {c_load : α → α} {c_store : α → α → α}
 variable {c_tape : α → α} {c_rand : α → α → α}
 variable {c_fail : α}
+variable {c_urand : α}
 variable {c_scrut : α → Pat rT → α}
 
 -- Per-constructor equations
@@ -1881,6 +1937,7 @@ variable (eq_store : ∀ e1 e2,    f (.store e1 e2)   = c_store (f e1) (f e2))
 variable (eq_tape  : ∀ e,        f (.tape e)        = c_tape (f e))
 variable (eq_rand  : ∀ e1 e2,    f (.rand e1 e2)    = c_rand (f e1) (f e2))
 variable (eq_fail  :             f .fail            = c_fail)
+variable (eq_urand :             f .urand           = c_urand)
 variable (eq_scrut : ∀ e p,      f (.scrut e p)     = c_scrut (f e) p)
 
 -- Per-constructor combinator measurability
@@ -1902,7 +1959,7 @@ variable (h_scrut : Measurable (Function.uncurry c_scrut))
 
 include eq_bvar eq_fvar eq_lit eq_lam eq_fix eq_app eq_unop eq_binop eq_cond
         eq_pair eq_fst eq_snd eq_inl eq_inr eq_case eq_alloc eq_load eq_store
-        eq_tape eq_rand eq_fail eq_scrut
+        eq_tape eq_rand eq_fail eq_urand eq_scrut
         h_lit h_lam h_fix h_app h_unop h_binop h_cond h_pair h_fst h_snd
         h_inl h_inr h_case h_alloc h_load h_store h_tape h_rand h_scrut in
 /-- **The keystone**: structurally-recursive `f : Exp rT → α` is measurable when each
@@ -2011,6 +2068,10 @@ theorem measurable_struct_rec : Measurable f := by
     intro U hU
     exact _root_.StructRec.cell_nullary Exp.shape (ctor := .fail)
       (fun p => by cases p <;> simp) eq_fail (flatten_measurable .fail)
+  | urand =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary Exp.shape (ctor := .urand)
+      (fun p => by cases p <;> simp) eq_urand (flatten_measurable .urand)
   | scrut _ ih =>
     intro U hU
     exact _root_.StructRec.cell_scrutLike Exp.shape (ctor := Exp.scrut)
@@ -2043,6 +2104,7 @@ variable {c_case : β → α → α → α → α}
 variable {c_alloc : β → α → α} {c_load : β → α → α} {c_store : β → α → α → α}
 variable {c_tape : β → α → α} {c_rand : β → α → α → α}
 variable {c_fail : β → α}
+variable {c_urand : β → α}
 variable {c_scrut : β → α → Pat rT → α}
 
 -- Equations
@@ -2067,6 +2129,7 @@ variable (eq_store : ∀ b e1 e2,    g b (.store e1 e2)   = c_store b (g b e1) (
 variable (eq_tape  : ∀ b e,        g b (.tape e)        = c_tape b (g b e))
 variable (eq_rand  : ∀ b e1 e2,    g b (.rand e1 e2)    = c_rand b (g b e1) (g b e2))
 variable (eq_fail  : ∀ b,          g b .fail            = c_fail b)
+variable (eq_urand : ∀ b,          g b .urand           = c_urand b)
 variable (eq_scrut : ∀ b e p,      g b (.scrut e p)     = c_scrut b (g b e) p)
 
 -- Combinator measurability (each Function.uncurry across β + other args)
@@ -2091,14 +2154,15 @@ variable (h_store : Measurable (fun (q : β × α × α) => c_store q.1 q.2.1 q.
 variable (h_tape  : Measurable (Function.uncurry c_tape))
 variable (h_rand  : Measurable (fun (q : β × α × α) => c_rand q.1 q.2.1 q.2.2))
 variable (h_fail  : Measurable c_fail)
+variable (h_urand : Measurable c_urand)
 variable (h_scrut : Measurable (fun (q : β × α × Pat rT) => c_scrut q.1 q.2.1 q.2.2))
 
 include eq_bvar eq_fvar eq_lit eq_lam eq_fix eq_app eq_unop eq_binop eq_cond
         eq_pair eq_fst eq_snd eq_inl eq_inr eq_case eq_alloc eq_load eq_store
-        eq_tape eq_rand eq_fail eq_scrut
+        eq_tape eq_rand eq_fail eq_urand eq_scrut
         h_bvar h_fvar h_lit h_lam h_fix h_app h_unop h_binop h_cond
         h_pair h_fst h_snd h_inl h_inr h_case
-        h_alloc h_load h_store h_tape h_rand h_fail h_scrut in
+        h_alloc h_load h_store h_tape h_rand h_fail h_urand h_scrut in
 /-- Param-threaded keystone. -/
 theorem measurable_struct_rec_param : Measurable (Function.uncurry g) := by
   apply _root_.StructRec.measurable_of_cells_param Exp.shape; intro s
@@ -2179,6 +2243,10 @@ theorem measurable_struct_rec_param : Measurable (Function.uncurry g) := by
     intro U hU
     exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .fail)
       (fun p => by cases p <;> simp) eq_fail h_fail hU (flatten_measurable .fail)
+  | urand =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .urand)
+      (fun p => by cases p <;> simp) eq_urand h_urand hU (flatten_measurable .urand)
   | unop u _ ih =>
     -- Mixed (syntax-leaf × recursive): at shape (Shape.unop u s'), `u` is fixed, so
     -- slice the uncurried embedding at `u` and call `cell_unary_param`.
@@ -2248,6 +2316,7 @@ variable {c_case : β → α → α → α → α}
 variable {c_alloc : β → α → α} {c_load : β → α → α} {c_store : β → α → α → α}
 variable {c_tape : β → α → α} {c_rand : β → α → α → α}
 variable {c_fail : β → α}
+variable {c_urand : β → α}
 variable {c_scrut : β → α → Pat rT → α}
 
 -- Binder param transformers (only for lam and fix; identity for all other ctors).
@@ -2275,6 +2344,7 @@ variable (eq_store : ∀ b e1 e2,    g b (.store e1 e2)   = c_store b (g b e1) (
 variable (eq_tape  : ∀ b e,        g b (.tape e)        = c_tape b (g b e))
 variable (eq_rand  : ∀ b e1 e2,    g b (.rand e1 e2)    = c_rand b (g b e1) (g b e2))
 variable (eq_fail  : ∀ b,          g b .fail            = c_fail b)
+variable (eq_urand : ∀ b,          g b .urand           = c_urand b)
 variable (eq_scrut : ∀ b e p,      g b (.scrut e p)     = c_scrut b (g b e) p)
 
 -- Combinator measurability (same as non-shift version).
@@ -2299,6 +2369,7 @@ variable (h_store : Measurable (fun (q : β × α × α) => c_store q.1 q.2.1 q.
 variable (h_tape  : Measurable (Function.uncurry c_tape))
 variable (h_rand  : Measurable (fun (q : β × α × α) => c_rand q.1 q.2.1 q.2.2))
 variable (h_fail  : Measurable c_fail)
+variable (h_urand : Measurable c_urand)
 variable (h_scrut : Measurable (fun (q : β × α × Pat rT) => c_scrut q.1 q.2.1 q.2.2))
 
 -- Transformer measurability.
@@ -2307,10 +2378,10 @@ variable (h_t_fix : Measurable t_fix)
 
 include eq_bvar eq_fvar eq_lit eq_lam eq_fix eq_app eq_unop eq_binop eq_cond
         eq_pair eq_fst eq_snd eq_inl eq_inr eq_case eq_alloc eq_load eq_store
-        eq_tape eq_rand eq_fail eq_scrut
+        eq_tape eq_rand eq_fail eq_urand eq_scrut
         h_bvar h_fvar h_lit h_lam h_fix h_app h_unop h_binop h_cond
         h_pair h_fst h_snd h_inl h_inr h_case
-        h_alloc h_load h_store h_tape h_rand h_fail h_scrut
+        h_alloc h_load h_store h_tape h_rand h_fail h_urand h_scrut
         h_t_lam h_t_fix in
 /-- **Param-threaded keystone with binder-shifting for `lam` and `fix`.** -/
 theorem measurable_struct_rec_param_shift : Measurable (Function.uncurry g) := by
@@ -2392,6 +2463,10 @@ theorem measurable_struct_rec_param_shift : Measurable (Function.uncurry g) := b
     intro U hU
     exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .fail)
       (fun p => by cases p <;> simp) eq_fail h_fail hU (flatten_measurable .fail)
+  | urand =>
+    intro U hU
+    exact _root_.StructRec.cell_nullary_param Exp.shape (ctor := .urand)
+      (fun p => by cases p <;> simp) eq_urand h_urand hU (flatten_measurable .urand)
   | unop u _ ih =>
     -- Mixed (syntax-leaf × recursive): `unop` does not cross a binder, so the shift
     -- keystone uses the same `cell_unary_param` as the param keystone. Leaf `u` fixed.
@@ -2457,6 +2532,7 @@ end StructRecParamShift
   | .tape e        => tagDepth e + 1
   | .rand e1 e2    => max (tagDepth e1) (tagDepth e2) + 1
   | .fail          => 0
+  | .urand         => 0
   | .scrut e _     => tagDepth e + 1
 
 theorem tagDepth.measurable [MeasurableSpace rT] :
@@ -2474,6 +2550,7 @@ theorem tagDepth.measurable [MeasurableSpace rT] :
     (c_alloc := (· + 1)) (c_load := (· + 1)) (c_store := fun n1 n2 => max n1 n2 + 1)
     (c_tape := (· + 1)) (c_rand := fun n1 n2 => max n1 n2 + 1)
     (c_fail := 0)
+    (c_urand := 0)
     (c_scrut := fun n _ => n + 1)
   all_goals first | (intros; rfl) | fun_prop
 
@@ -2501,6 +2578,7 @@ data leaves). -/
   | .tape e        => countLeaves e
   | .rand e1 e2    => countLeaves e1 + countLeaves e2
   | .fail          => 0
+  | .urand         => 0
   | .scrut e _     => countLeaves e + 1
 
 theorem countLeaves.measurable [MeasurableSpace rT] :
@@ -2518,6 +2596,7 @@ theorem countLeaves.measurable [MeasurableSpace rT] :
     (c_alloc := id) (c_load := id) (c_store := (· + ·))
     (c_tape := id) (c_rand := (· + ·))
     (c_fail := 0)
+    (c_urand := 0)
     (c_scrut := fun n _ => n + 1)
   all_goals first | (intros; rfl) | fun_prop
 
@@ -2544,6 +2623,7 @@ theorem countLeaves.measurable [MeasurableSpace rT] :
   | .tape e        => .tape (endoMap e)
   | .rand e1 e2    => .rand (endoMap e1) (endoMap e2)
   | .fail          => .fail
+  | .urand         => .urand
   | .scrut e p     => .scrut (endoMap e) p
 
 theorem endoMap.measurable [MeasurableSpace rT] :
@@ -2561,6 +2641,7 @@ theorem endoMap.measurable [MeasurableSpace rT] :
     (c_alloc := Exp.alloc) (c_load := Exp.load) (c_store := fun e1 e2 => .store e1 e2)
     (c_tape := Exp.tape) (c_rand := fun e1 e2 => .rand e1 e2)
     (c_fail := .fail)
+    (c_urand := .urand)
     (c_scrut := fun e p => .scrut e p)
   all_goals first | (intros; rfl) | fun_prop
 
@@ -2589,6 +2670,7 @@ uses the accumulator). -/
   | acc, .tape e        => addAcc acc e
   | acc, .rand e1 e2    => addAcc acc e1 + addAcc acc e2
   | acc, .fail          => acc
+  | acc, .urand         => acc
   | acc, .scrut e _     => addAcc acc e
 
 theorem addAcc.measurable [MeasurableSpace rT] :
@@ -2607,6 +2689,7 @@ theorem addAcc.measurable [MeasurableSpace rT] :
     (c_alloc := fun _ n => n) (c_load := fun _ n => n) (c_store := fun _ n1 n2 => n1 + n2)
     (c_tape := fun _ n => n) (c_rand := fun _ n1 n2 => n1 + n2)
     (c_fail := fun acc => acc)
+    (c_urand := fun acc => acc)
     (c_scrut := fun _ n _ => n)
   all_goals first | (intros; rfl) | fun_prop
 
@@ -2637,6 +2720,7 @@ singleton section (matching `BaseLit.lean`/`Pat.lean`). -/
   | .tape e        => .tape (singletonCyl e)
   | .rand e1 e2    => .rand (singletonCyl e1) (singletonCyl e2)
   | .fail          => .fail
+  | .urand         => .urand
   | .scrut e p     => .scrut (singletonCyl e) {p}
 
 theorem singletonCyl_flatten {rT : Type _} (e : Exp rT) :
@@ -2663,6 +2747,7 @@ theorem singletonCyl_flatten {rT : Type _} (e : Exp rT) :
   | tape e ih => simp [ih]
   | rand e1 e2 ih1 ih2 => simp [ih1, ih2]
   | fail => simp
+  | urand => simp
   | scrut e p ih => simp [ih]
 
 theorem singletonCyl_hasMeasurableLeaves
@@ -2690,6 +2775,7 @@ theorem singletonCyl_hasMeasurableLeaves
   | tape e ih => exact .tape ih
   | rand e1 e2 ih1 ih2 => exact .rand ih1 ih2
   | fail => exact .fail
+  | urand => exact .urand
   | scrut e p ih => exact .scrut _ ih (MeasurableSet.singleton p)
 
 instance instMeasurableSingletonClass

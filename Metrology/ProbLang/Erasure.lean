@@ -378,6 +378,9 @@ theorem primStep_tape_persists_support [ProbLangℝ rT]
     exact ⟨t, h, rfl⟩
   | ScrutFailureS =>
     exact ⟨t, h, rfl⟩
+  | UrandS =>
+    -- Continuous sample leaves the state (hence all tapes) unchanged.
+    exact ⟨t, h, rfl⟩
 
 /-- Discrete (positivity-phrased) wrapper around `primStep_tape_persists_support`. -/
 @[discrete]
@@ -1025,6 +1028,57 @@ theorem erasure_uniform_close
     _ = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
           ∂headStep ⟨e_h, σ⟩ := by rw [hstep_σ]
 
+/-- Continuous analogue of `erasure_uniform_close`: the `urand` head step pushes
+`unifUnit` forward onto real-literal configs at the unchanged state. Tape
+presampling commutes because `urand` ignores tapes. Same Tonelli-swap proof as
+the discrete case, with `unifUnit` (a probability ⇒ s-finite measure) in place of
+the finite PMF and genuine measurability of `r ↦ ⟨.lit (.real r), σ⟩`. -/
+theorem erasure_uniformReal_close
+    {m : Nat} {K : (Ectx rT)} {S : Set (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
+    (hS : MeasurableSet S)
+    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound)
+    (ih_fill : ∀ (e' : (Exp rT)) (σ' : (State rT)) (t' : Tape),
+      σ'.tapes[α]? = some t' → 0 < t'.bound →
+      ∫⁻ σ'', ((execN m ∘ K.fillCfg) ⟨e', σ''⟩) ((fun x => x.expr) ⁻¹' S)
+          ∂tapePresample σ' α
+        = ((execN m ∘ K.fillCfg) ⟨e', σ'⟩) ((fun x => x.expr) ⁻¹' S))
+    (e_h : (Exp rT))
+    (hstep_ae : ∀ᵐ σ' ∂(tapePresample σ α),
+        headStep (⟨e_h, σ'⟩ : (Cfg rT)) = Cfg.uniformReal σ')
+    (hstep_σ : headStep (⟨e_h, σ⟩ : (Cfg rT)) = Cfg.uniformReal σ) :
+    ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+              ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
+      = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+          ∂headStep ⟨e_h, σ⟩ := by
+  haveI : IsProbabilityMeasure (tapePresample σ α) :=
+    ⟨tapePresample_univ_eq_one h hN⟩
+  have hunif : ∀ σ₀ : (State rT), Cfg.uniformReal σ₀ =
+      (ProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₀⟩ : (Cfg rT))) :=
+    fun _ => rfl
+  calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+                ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
+      = ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+                ∂Cfg.uniformReal σ' ∂tapePresample σ α := by
+        refine lintegral_congr_ae ?_
+        filter_upwards [hstep_ae] with σ' hs; rw [hs]
+    _ = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+          ∂Cfg.uniformReal σ := by
+        have hcfgbuild : Measurable (fun p : (State rT) × rT =>
+            (⟨.lit (.real p.2), p.1⟩ : (Cfg rT))) := by
+          refine Cfg.measurable_mk.comp (Measurable.prodMk ?_ measurable_fst)
+          exact Exp.lit.measurable.comp (BaseLit.real.measurable.comp measurable_snd)
+        have hmap : ∀ σ₀ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), σ₀⟩ : (Cfg rT))) :=
+          fun σ₀ => Cfg.measurable_iff.mpr
+            ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
+        simp_rw [hunif,
+          lintegral_map (erasure_integrand_measurable hS) (hmap _)]
+        rw [lintegral_lintegral_swap (f := fun σ' r =>
+              ((execN m ∘ K.fillCfg) ⟨.lit (.real r), σ'⟩) ((fun x => x.expr) ⁻¹' S))
+            ((erasure_integrand_measurable hS).comp hcfgbuild).aemeasurable]
+        congr 1; funext r; exact ih_fill _ σ t h hN
+    _ = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
+          ∂headStep ⟨e_h, σ⟩ := by rw [hstep_σ]
+
 /-! ### Per-head-step case closers
 
 One lemma per non-trivial `HeadStepSupport` constructor whose closure does
@@ -1397,6 +1451,9 @@ theorem execN_tape_presample_expr_eq
       have uniform_close := fun e_h z_r hz hstep_ae hstep_σ =>
         erasure_uniform_close (m := m) (K := K) (S := S) hS h hN ih_fill
           e_h z_r hz hstep_ae hstep_σ
+      have uniformReal_close := fun e_h hstep_ae hstep_σ =>
+        erasure_uniformReal_close (m := m) (K := K) (S := S) hS h hN ih_fill
+          e_h hstep_ae hstep_σ
       -- Case-split on headStep using det_or_prob_or_zero.
       rcases det_or_prob_or_zero e_red σ with hdet | hprob | hzero
       · -- Deterministic case: headStep produces a dirac. Each constructor
@@ -1696,6 +1753,10 @@ theorem execN_tape_presample_expr_eq
               exact Cfg.uniform_nonpos_eq hz
           · filter_upwards [tapePresample_tape_ne_ae h (Ne.symm hαeq)] with σ' htape_eq
             exact hstep (htape_eq.trans htapes)
+        | urand =>
+          -- Continuous sampler: ignores tapes, so `headStep = Cfg.uniformReal`
+          -- regardless of presampling. Closed by the continuous closer.
+          exact uniformReal_close Exp.urand (MeasureTheory.ae_of_all _ fun _ => rfl) rfl
       · -- Zero case handled by `erasure_zero_close`.
         exact erasure_zero_close (e_red := e_red) h hN hzero
 

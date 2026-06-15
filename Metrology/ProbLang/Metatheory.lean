@@ -150,7 +150,7 @@ theorem Exp.subst_subst {e v v' : Exp α} {x : Var} {y : Var}
           Exp.subst_fresh _ _ _ hv'
         simp [Exp.subst, h1, hv'_fresh]
       · simp [Exp.subst, h1, h2]
-  | bvar _ | lit _ | fail => rfl
+  | bvar _ | lit _ | fail | urand => rfl
   | lam e ih | fix e ih | unop _ e ih | fst e ih | snd e ih
   | inl e ih | inr e ih | alloc e ih | load e ih | tape e ih | scrut e _ ih =>
       simp [Exp.subst, ih]
@@ -190,7 +190,7 @@ theorem Exp.subst_subst_fvar_id (e w : Exp α) (x y : Var) (hyv : y ∉ e.fv) :
     · -- z ≠ x, so subst e x (.fvar y) = .fvar z; then subst by y leaves it alone (y ≠ z since y ∉ e.fv).
       have hyz : y ≠ z := fun h => hyv (h ▸ by simp [Exp.fv])
       simp [Exp.subst, h1, hyz]
-  | bvar _ | lit _ | fail => rfl
+  | bvar _ | lit _ | fail | urand => rfl
   | lam e ih | fix e ih | unop _ e ih | fst e ih | snd e ih
   | inl e ih | inr e ih | alloc e ih | load e ih | tape e ih | scrut e _ ih =>
     have hyv' : y ∉ e.fv := by
@@ -433,6 +433,12 @@ relational expression constructors before invoking the corresponding
 
 @[simp] theorem Exp.substMap_fail (vs : SubstMap rT) :
     Exp.fail.substMap vs = .fail := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+
+@[simp] theorem Exp.substMap_urand (vs : SubstMap rT) :
+    Exp.urand.substMap vs = .urand := by
   induction vs with
   | nil => rfl
   | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
@@ -969,6 +975,7 @@ inductive ProbHeadStepPred : Exp rT → State rT → Prop
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
   | randTapeNonposOther {z α σ N L} : ¬ 0 < z → σ.tapes[α]? = some ⟨N, L⟩ → z ≠ N →
       ProbHeadStepPred (.rand (.lit (.int z)) (.lit (.lbl α))) σ
+  | urand {σ} : ProbHeadStepPred Exp.urand σ
 
 /-- Either a deterministic or a probabilistic head step is taken. -/
 def HeadStepPred (e : Exp rT) (σ : State rT) : Prop :=
@@ -1108,6 +1115,7 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
           exact ⟨_, .RandTapeNonposEmptyS hz htape hzN⟩
       | randTapeNonposOther hz htape hzN =>
           exact ⟨_, .RandTapeNonposOtherS hz htape hzN⟩
+      | urand => exact ⟨_, .UrandS (r := default)⟩
   · rintro ⟨ρ', hsupp⟩
     cases hsupp with
     | BetaLamS hv _ => exact .inl (.betaLam hv)
@@ -1135,6 +1143,7 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
     | RandNonposS hz => exact .inr (.randNonpos hz)
     | RandTapeNonposEmptyS hz htape hzN => exact .inr (.randTapeNonposEmpty hz htape hzN)
     | RandTapeNonposOtherS hz htape hzN => exact .inr (.randTapeNonposOther hz htape hzN)
+    | UrandS => exact .inr .urand
 
 theorem not_HeadStepPred_iff_zero [MeasurableSingletonClass rT]
     (e : Exp rT) (σ : State rT) :
@@ -1450,6 +1459,9 @@ theorem State.head_step_dzero_upd_tapes [MeasurableSingletonClass rT]
     exact absurd h0 (Cfg.uniform_ne_zero _ _)
   case rand.tape.empty =>
     exact absurd h0 (Cfg.uniform_ne_zero _ _)
+  case urand h0 =>
+    -- `urand` always steps (probability measure), so the `headStep = 0` premise is false.
+    exact absurd h0 (MeasureTheory.IsProbabilityMeasure.ne_zero _)
 
 theorem State.det_head_step_upd_tapes
     {e : Exp rT} {σ : State rT} {α : Loc} {bs' : Tape}
