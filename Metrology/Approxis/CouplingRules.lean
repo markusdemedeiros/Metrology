@@ -256,8 +256,8 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
   isplitr; · ipureintro; rw [zero_add]
-  isplitr; · ipureintro; exact HredL
-  isplitr; · ipureintro; exact HredR
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredL
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredR
   isplitr
   · ipureintro
     rw [primStep_rand_unit Hz]
@@ -361,8 +361,8 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
   isplitr; · ipureintro; rw [zero_add]
-  isplitr; · ipureintro; exact HredL
-  isplitr; · ipureintro; exact HredR
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredL
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredR
   isplitr
   · ipureintro
     rw [primStep_rand_lbl_wrong Hz HneM σ₁ α fs Hlk_α]
@@ -483,8 +483,8 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
   isplitr; · ipureintro; rw [zero_add]
-  isplitr; · ipureintro; exact HredL
-  isplitr; · ipureintro; exact HredR
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredL
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredR
   isplitr
   · ipureintro
     rw [primStep_rand_lbl_empty Hz σ₁ α Hlk_α]
@@ -595,8 +595,8 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
   isplitr; · ipureintro; rw [zero_add]
-  isplitr; · ipureintro; exact HredL
-  isplitr; · ipureintro; exact HredR
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredL
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredR
   isplitr
   · ipureintro
     rw [primStep_rand_lbl_empty Hz σ₁ α Hlk_α]
@@ -698,8 +698,8 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
       c₁ = ⟨.lit (.int n), σ₁⟩ ∧ c₂ = ⟨K.fill (.lit (.int (f n))), σ₁'⟩
   iexists R, 0, ε
   isplitr; · ipureintro; rw [zero_add]
-  isplitr; · ipureintro; exact HredL
-  isplitr; · ipureintro; exact HredR
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredL
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp HredR
   isplitr
   · ipureintro
     rw [primStep_rand_unit Hz]

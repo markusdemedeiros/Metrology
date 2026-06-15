@@ -288,6 +288,48 @@ theorem of_erasable_pexecN [Countable rT] [MeasurableSingletonClass rT]
     funext σ; exact (limExec_pexecN m ⟨ρ.expr, σ⟩).symm
   rw [this, h.lim_exec ρ.expr]
 
+/-! ### Countability-free variants
+
+These mirror the `@[discrete]` lemmas above but route through the
+countability-free `limExec.measurable` and `Erasable.lim_exec'` instead of
+`Measurable.of_discrete` / `Erasable.lim_exec`, so they hold for a diffuse `rT`. -/
+
+/-- Dirac rewritability, countability-free: `limExec ρ = dirac ρ >>= limExec`. -/
+theorem dret' (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
+  show limExec ρ = (Measure.dirac ρ).bind limExec
+  rw [Measure.dirac_bind (f := limExec) limExec.measurable]
+
+/-- Every finite unfolding `pexecN m ρ` is rewritable at `ρ`, countability-free. -/
+theorem ofPexecN' (ρ : Cfg rT) (m : Nat) : Rewritable ρ (ProbLang.pexecN m ρ) :=
+  limExec_pexecN m ρ
+
+/-- Erasability on the state component lifts to rewritability, countability-free. -/
+theorem of_erasable' {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.state) :
+    Rewritable ρ (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))) := by
+  show limExec ρ
+      = (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))).bind limExec
+  rw [Measure.bind_bind
+        (Measurable.aemeasurable (by measurability))
+        (Measurable.aemeasurable limExec.measurable)]
+  have hker : (fun σ : State rT => (Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT)).bind limExec)
+       = (fun σ : State rT => limExec ⟨ρ.expr, σ⟩) := by
+    funext σ
+    rw [Measure.dirac_bind (f := limExec) limExec.measurable]
+  rw [hker, h.lim_exec' ρ.expr]
+
+/-- Erasability combined with `pexecN`, countability-free. -/
+theorem of_erasable_pexecN' {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
+    (h : Erasable μ ρ.state) :
+    Rewritable ρ (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)) := by
+  show limExec ρ = (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)).bind limExec
+  rw [Measure.bind_bind
+        (Measurable.aemeasurable (by measurability))
+        (Measurable.aemeasurable limExec.measurable)]
+  have : (fun σ => (pexecN m ⟨ρ.expr, σ⟩).bind limExec)
+       = (fun σ => limExec ⟨ρ.expr, σ⟩) := by
+    funext σ; exact (limExec_pexecN m ⟨ρ.expr, σ⟩).symm
+  rw [this, h.lim_exec' ρ.expr]
+
 end Rewritable
 
 /-- Turn a state-erasable `μ` plus an expression `e` into the `Cfg`-valued

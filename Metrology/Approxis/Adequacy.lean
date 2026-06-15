@@ -289,7 +289,7 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : (Exp rT)) (σ₁ : (State rT)
     iexact HZApp
   ·
     icases HCpl with ⟨%S, %k, %μ₁, %μ₁', %ε₁, %X₂, %r,
-      %HAC, %HX₂bnd, %HεBnd, %Herase1, %Herase1', HCont⟩
+      %HAC, %HX₂meas, %HX₂bnd, %HεBnd, %Herase1, %Herase1', HCont⟩
     have Himpl : (∀ σ₂ e₂' σ₂', S σ₂ ⟨e₂', σ₂'⟩ →
       AddCoupl (X₂ ⟨e₂', σ₂'⟩) (adequacyRel φ)
         (asExpr (execN m ⟨e₁, σ₂⟩))
@@ -300,7 +300,7 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : (Exp rT)) (σ₁ : (State rT)
       AddCoupl_erasure_erasable_exp_rhs
         (e₁ := e₁) (e₁' := e₀') (σ₁ := σ₀) (σ₁' := σ₀') (m := k) (n := m)
         (ε₂ := ∫⁻ ρ, X₂ ρ ∂(μ₁'.bind (fun σ => pexecN k ⟨e₀', σ⟩)))
-        (hE₂meas := Measurable.of_discrete)
+        (hE₂meas := HX₂meas)
         (hCoupl := HAC)
         (hBoundSum := _root_.le_refl _)
         (hEpsSum := HεBnd)

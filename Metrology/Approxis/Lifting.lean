@@ -13,7 +13,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 /-! For the Approxis layer, carry the abstract real type `rT` as a section variable. -/
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 namespace ProbLang.ApproxisWpGS
 
@@ -26,10 +26,11 @@ theorem wp_lift_prim_steps_coupl_adv {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val r
         |={E, ∅}=>
         ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
-          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
-          (⌜Discrete.Reducible e₁' σ₁'⌝) ∗
+          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
           (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
+              Measurable h₁ → Measurable h₂ →
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
               (∀ a b, h₁ a ≤ h₂ b + X a b) →
               (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
@@ -67,10 +68,11 @@ theorem wp_lift_prim_steps_coupl_adv' {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val 
       (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε) -∗
         |={E, ∅}=>
         ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal),
-          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
-          (⌜Discrete.Reducible e₁' σ₁'⌝) ∗
+          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
           (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
+              Measurable h₁ → Measurable h₂ →
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
               (∀ a b, h₁ a ≤ h₂ b + X a b) →
               (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
@@ -110,10 +112,11 @@ theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : (Exp rT)}
         |={E, ∅}=>
         ∃ (X : (Cfg rT) → (Cfg rT) → ENNReal) (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
-          (⌜Discrete.Reducible e₁ σ₁⌝) ∗
-          (⌜Discrete.Reducible e₁' σ₁'⌝) ∗
+          (⌜Reducible e₁ σ₁⌝) ∗
+          (⌜Reducible e₁' σ₁'⌝) ∗
           (⌜∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1⌝) ∗
           (⌜∀ (h₁ h₂ : (Cfg rT) → ENNReal),
+              Measurable h₁ → Measurable h₂ →
               (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
               (∀ a b, h₁ a ≤ h₂ b + X a b) →
               (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤

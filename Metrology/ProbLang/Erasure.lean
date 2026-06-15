@@ -2277,6 +2277,7 @@ theorem AddCoupl_erasure_erasable_exp_lhs_kanto [Countable rT] [MeasurableSingle
     {n m : Nat}
     (hErase₁' : ErasableExpr μ₁' σ₁')
     (hExp : ∀ (h₁ h₂ : (Cfg rT) → ENNReal),
+        Measurable h₁ → Measurable h₂ →
         (∀ ρ, h₁ ρ ≤ 1) → (∀ ρ, h₂ ρ ≤ 1) →
         (∀ ρ ρ', h₁ ρ ≤ h₂ ρ' + E₂ ρ ρ') →
         ∫⁻ ρ, h₁ ρ ∂(primStep ⟨e₁, σ₁⟩) ≤
@@ -2320,7 +2321,7 @@ theorem AddCoupl_erasure_erasable_exp_lhs_kanto [Countable rT] [MeasurableSingle
   exact AddCoupl.bind_adv_kanto
     (Hfm := Measurable.of_discrete) (Hgm := Measurable.of_discrete)
     (Hfsprob := hmassk_L) (Hgsprob := hmassk_R)
-    (Hexp := fun h₁ h₂ _ _ => hExp h₁ h₂)
+    (Hexp := fun h₁ h₂ Hm₁ Hm₂ => hExp h₁ h₂ Hm₁ Hm₂)
     (Hcont := fun ρ ρ' => by
       have := hCont ρ ρ'
       unfold asExpr limExecV asExpr at this

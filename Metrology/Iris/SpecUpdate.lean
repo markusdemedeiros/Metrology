@@ -14,7 +14,7 @@ namespace ProbLang
 
 
 /-- Spec Update. Gives an interpretation of a spec into an resource. -/
-class SpecUpdateGS (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+class SpecUpdateGS (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT]
     (GF : BundledGFunctors) where
   specInterp : Cfg rT → IProp GF
 
@@ -22,18 +22,18 @@ open SpecUpdateGS
 
 section SpecUpdate
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 variable {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [iSpec : SpecUpdateGS rT GF]
 
 /-- Spec update for `n` deterministic steps. -/
-def specUpdateN (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+def specUpdateN (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT]
     {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [SpecUpdateGS rT GF]
     (n : Nat) (E : CoPset) (P : IProp GF) :
     IProp GF := iprop%
   ∀ (ρ : Cfg rT), specInterp ρ -∗ |={E}=> ∃ ρ', ⌜pexecN n ρ = dirac ρ'⌝ ∗ specInterp ρ' ∗ P
 
 /-- Spec update quantified over an unknown number of deterministic steps -/
-abbrev specUpdate (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+abbrev specUpdate (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT]
     {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [SpecUpdateGS rT GF]
     (E : CoPset) (P : IProp GF) :
     IProp GF := iprop%
@@ -165,7 +165,7 @@ theorem specUpdate_frame_l {E : CoPset} {R P : IProp GF} :
 end SpecUpdate
 
 /-- Concrete Approxis SpecUpdateGS -/
-instance defaultSpecUpdateGS {rT : Type _} [ProbLangℝ rT] [Countable rT]
+instance defaultSpecUpdateGS {rT : Type _} [ProbLangℝ rT]
     [MeasurableSingletonClass rT] {GF} [SpecGS rT GF] : SpecUpdateGS rT GF where
   specInterp := Cfg.specAuth
 
