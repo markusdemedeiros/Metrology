@@ -120,28 +120,6 @@ theorem dbind'
           funext σ'; exact h₂ σ' e m]
   exact h₁ e m
 
-@[discrete] -- lim_exec'
-theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
-    {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
-    μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
-  -- Prove equal by extensionality
-  refine Cfg.measure_ext_singletons fun c => ?_
-  -- Bind → integral
-  rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
-  -- Both lim_exec's become suprema
-  simp_rw [Discrete.limExec_apply]
-  -- Exchange integral and sup
-  rw [lintegral_iSup
-        (fun _ => Measurable.of_discrete)
-        (fun i j hij σ' => execN_mono_singleton hij ⟨e, σ'⟩ _)]
-  have hbind : ∀ n,
-      ∫⁻ σ', (execN n ⟨e, σ'⟩) {c} ∂μ = (execN n ⟨e, σ⟩) {c} := by
-    intro n
-    have hμ := congrArg (fun ν => ν ({c} : Set (Cfg rT))) (h e n)
-    simpa [bind_apply MeasurableSet.of_discrete
-             Measurable.of_discrete.aemeasurable] using hμ
-  simp only [hbind]
-
 theorem lim_exec'
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
     μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
@@ -158,6 +136,12 @@ theorem lim_exec'
   intro n
   have hμ : (μ.bind fun σ' ↦ execN n ⟨e, σ'⟩) S = (execN n ⟨e, σ⟩) S := congrArg (· S) (h e n)
   rw [← hμ, bind_apply HS (by measurability)]
+
+@[discrete] -- lim_exec'
+theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
+    {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
+    μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ :=
+  lim_exec' h e
 
 theorem dret_final {μ : Measure (State rT)} {σ : State rT} {e : Exp rT} (hv : IsVal e)
     (h : Erasable μ σ) :

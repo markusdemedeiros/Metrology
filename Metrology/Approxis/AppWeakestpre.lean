@@ -897,14 +897,14 @@ theorem specCoupl_step [Countable rT] {E : CoPset} {σ₁ : (State rT)} {e₁' :
   have hprob_lhs : (MeasureTheory.Measure.dirac σ₁ : MeasureTheory.Measure (State rT)) .univ = 1 := by
     simp
   have hprob_rhs : (primStep ⟨e₁', σ₁'⟩) .univ = 1 := by
-    haveI := prim_step_mass_discrete ⟨e₁', σ₁'⟩ Hred
+    haveI := prim_step_mass (Reducible_ReducibleM_iff.mp Hred)
     exact MeasureTheory.IsProbabilityMeasure.measure_univ
   have Htrivial : AddCoupl 0 Set.univ (MeasureTheory.Measure.dirac σ₁) (primStep ⟨e₁', σ₁'⟩) :=
     RelCoupl.exact (RelCoupl.trivial hprob_lhs hprob_rhs)
   have Hpos := AddCoupl.pos_R Htrivial
   have hnotval : ¬ e₁'.isValue := fun hv => by
     obtain ⟨ρ, hρ⟩ := Hred
-    exact Discrete.val_stuck hρ hv
+    exact val_stuck (fun hz => by rw [hz] at hρ; simp at hρ) hv
   have hpexec1 : pexecN 1 ⟨e₁', σ₁'⟩ = primStep ⟨e₁', σ₁'⟩ := by
     rw [pexecN_one, stepOrFinal_not_isValue hnotval]
   have HcplR : AddCoupl 0 {p : (State rT) × (Cfg rT) | (fun σ c => σ = σ₁ ∧
@@ -1569,7 +1569,7 @@ theorem progCoupl_step_l [Countable rT] {e₁ : (Exp rT)} {σ₁ : (State rT)} {
   -- Build AddCoupl 0 R (primStep ⟨e₁,σ₁⟩) (dirac σ₁') via pos_R, where
   -- R ρ₁ _ := 0 < primStep {ρ₁}.
   have hprob_lhs : (primStep ⟨e₁, σ₁⟩) .univ = 1 := by
-    haveI := prim_step_mass_discrete ⟨e₁, σ₁⟩ Hred
+    haveI := prim_step_mass (Reducible_ReducibleM_iff.mp Hred)
     exact MeasureTheory.IsProbabilityMeasure.measure_univ
   have hprob_rhs : (MeasureTheory.Measure.dirac σ₁' : MeasureTheory.Measure (State rT)) .univ = 1 := by
     simp
@@ -2419,7 +2419,7 @@ theorem wp_lift_pure_step [Countable rT] {E E' : CoPset} {e₁ : (Exp rT)} {Φ :
     · exfalso
       have : e₁.isValue := Exp.toVal?_isValue htv
       obtain ⟨ρ, hρ⟩ := Hsafe default
-      exact Discrete.val_stuck hρ this
+      exact val_stuck (fun hz => by rw [hz] at hρ; simp at hρ) this
   iapply wp_lift_step Hv
   iintro %σ₁ Hσ
   -- H : |={E,E'}=> ▷ |={E',E}=> ∀ e₂ σ, ⌜...⌝ -∗ wp E e₂ Φ
@@ -2537,7 +2537,7 @@ theorem PureStep_discrete.prim_step_det [Countable rT] {e₁ e₂ : (Exp rT)} (h
     σ₂ = σ ∧ e₂' = e₂ := by
   classical
   haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e₁, σ⟩) :=
-    prim_step_mass_discrete _ ⟨⟨e₂, σ⟩, h.det σ ▸ zero_lt_one⟩
+    prim_step_mass (Reducible_ReducibleM_iff.mp ⟨⟨e₂, σ⟩, h.det σ ▸ zero_lt_one⟩)
   have hmass := h.det σ
   -- {⟨e₂,σ⟩} has full mass 1, so its complement has mass 0.
   have h0 : (primStep ⟨e₁, σ⟩) ({⟨e₂, σ⟩}ᶜ : Set (Cfg rT)) = 0 := by
@@ -2702,12 +2702,13 @@ theorem wp_lift_head_step [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {Φ : (V
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipureintro; exact Discrete.Reducible.of_head Hhred
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ))
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   -- primStep positive + head-reducible ⇒ headStep positive at same successor
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
-    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ :=
+      primStep_eq_headStep (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ)
     exact heq ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %hpos
 
@@ -2729,10 +2730,11 @@ theorem wp_lift_atomic_head_step_fupd [Countable rT] {E1 E2 : CoPset} {e₁ : (E
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipureintro; exact Discrete.Reducible.of_head Hhred
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ))
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
-    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ :=
+      primStep_eq_headStep (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ)
     exact heq ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %hpos
 
@@ -2754,11 +2756,12 @@ theorem wp_lift_atomic_head_step [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipureintro; exact Discrete.Reducible.of_head Hhred
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ))
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
-    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ := primStep_eq_headStep_discrete Hhred
+    have heq : primStep ⟨e₁, σ₁⟩ = headStep ⟨e₁, σ₁⟩ :=
+      primStep_eq_headStep (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ)
     exact heq ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %hpos
 
@@ -2769,9 +2772,12 @@ theorem wp_lift_pure_det_head_step [Countable rT] {E E' : CoPset} {e₁ e₂ : (
     (Hsafe : ∀ σ₁, ∃ ρ : (Cfg rT), 0 < headStep ⟨e₁, σ₁⟩ {ρ})
     (Hdet : ∀ σ₁ e₂' σ₂, 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂', σ₂⟩} → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
-  iapply wp_lift_pure_det_step (Hsafe := fun σ => Discrete.Reducible.of_head (Hsafe σ))
+  iapply wp_lift_pure_det_step (Hsafe := fun σ =>
+    Reducible_ReducibleM_iff.mpr
+      (reducible_of_headReducible (let ⟨ρ, hρ⟩ := Hsafe σ; fun hz => by rw [hz] at hρ; simp at hρ)))
   intros σ e₂' σ₂ hp
-  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ := primStep_eq_headStep_discrete (Hsafe σ)
+  have heq : primStep ⟨e₁, σ⟩ = headStep ⟨e₁, σ⟩ :=
+    primStep_eq_headStep (let ⟨ρ, hρ⟩ := Hsafe σ; fun hz => by rw [hz] at hρ; simp at hρ)
   exact Hdet σ e₂' σ₂ (heq ▸ hp)
 
 /-- `wp_lift_pure_det_head_step'` — `▷`-form of `wp_lift_pure_det_head_step`. -/

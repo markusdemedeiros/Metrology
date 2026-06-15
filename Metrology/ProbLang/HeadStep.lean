@@ -2270,7 +2270,7 @@ theorem Discrete.head_step_mass [Countable rT] [MeasurableSingletonClass rT]
      | scrut_success | scrut_failure
      | rand.plain | rand.tape | rand.tape.mismatch | urand => intro _; infer_instance
   case unop.redex | binop.redex =>
-    intro ⟨_, hρ⟩; rw [Discrete.unwrapM_singleton_pos] at hρ
+    intro ⟨_, hρ⟩; rw [unwrapM_singleton_pos] at hρ
     obtain ⟨_, he, _⟩ := hρ; simp [Option.unwrapM, he]; infer_instance
 
 theorem head_step_mass {e : Exp rT} {σ : State rT} :
@@ -2555,7 +2555,9 @@ theorem Discrete.headStep_univ_le_one [Countable rT] [MeasurableSingletonClass r
     (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
   by_cases hred : ∃ ρ' : Cfg rT, 0 < (headStep ρ) {ρ'}
   · obtain ⟨e, σ⟩ := ρ
-    have := Discrete.head_step_mass e σ hred
+    obtain ⟨ρ', hρ'⟩ := hred
+    have hne : headStep ⟨e, σ⟩ ≠ 0 := fun hz => by rw [hz] at hρ'; simp at hρ'
+    have := _root_.ProbLang.head_step_mass hne
     exact (measure_univ (μ := headStep ⟨e, σ⟩)).le
   · have hzero : ∀ ρ', (headStep ρ) {ρ'} = 0 := fun ρ' =>
       le_antisymm (by simpa using (not_exists.mp hred ρ')) bot_le

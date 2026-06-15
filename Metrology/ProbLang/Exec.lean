@@ -117,7 +117,7 @@ theorem execExactN_sum_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableSe
 theorem execExactN_mono [Countable rT] [MeasurableSingletonClass rT]
     {n : Nat} {ρ : Cfg rT} {S} : execExactN n ρ S ≤ execN (n + 1) ρ S := by
   have Hunfold : execExactN n ρ S = (if n < n + 1 then execExactN n ρ S else 0) := by simp
-  rw [execExactN_sum, Hunfold]
+  rw [execExactN_sum_continuous MeasurableSet.of_discrete, Hunfold]
   exact ENNReal.le_tsum n
 
 theorem execExactN_mono_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableSet S) :
@@ -165,12 +165,13 @@ theorem Discrete.execN_fill_item_eq [Countable rT] [MeasurableSingletonClass rT]
         rw [execN, if_neg (EctxItem.fillItem_noVal hv), primStep_fillItem Ki hv,
           Measure.bind_map .of_discrete .of_discrete]
         rfl
-      rw [step, Discrete.bind_apply]
+      rw [step, Measure.bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable]
       simp_rw [ih, lintegral_tsum fun _ => Measurable.of_discrete.aemeasurable,
         lintegral_mul_const _ Measurable.of_discrete]
       symm
       rw [tsum_eq_zero_add' ENNReal.summable]
-      simp only [execExactN, hv, ↓reduceIte, Nat.add_sub_add_right, Discrete.bind_apply,
+      simp only [execExactN, hv, ↓reduceIte, Nat.add_sub_add_right,
+        Measure.bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable,
         Measure.coe_zero, Pi.zero_apply, zero_mul, tsum_zero, zero_add]
 
 /-- Limiting distribution of an execution, over configurations -/
@@ -252,10 +253,11 @@ theorem execN_succ_le [Countable rT] [MeasurableSingletonClass rT]
   induction n generalizing ρ with
   | zero => exact bot_le
   | succ k ih =>
-    simp only [execN]
+    rw (occs := [2]) [execN]
+    rw (occs := [1]) [execN]
     split
     · exact le_refl _
-    · exact Measure.bind_mono_right _ _ _ (fun a => ih a)
+    · exact Measure.bind_mono_right' _ _ _ (execN_measurable k) (execN_measurable (k + 1)) (fun a => ih a)
 
 theorem execN_succ_le' (n : ℕ) (ρ : Cfg rT) : execN n ρ ≤ execN (n + 1) ρ := by
   induction n generalizing ρ with
@@ -468,7 +470,7 @@ theorem limExec_pexecN (n : Nat) (ρ : Cfg rT) : limExec ρ = (pexecN n ρ).bind
 theorem Discrete.limExec_apply [Countable rT] [MeasurableSingletonClass rT]
     (ρ : Cfg rT) (c : Cfg rT) :
     limExec ρ {c} = ⨆ n, (execN n ρ) {c} :=
-  Discrete.iSup_measure_apply
+  _root_.ProbLang.iSup_measure_apply execN_monotone (MeasurableSet.singleton c)
 
 theorem limExec_apply (ρ : Cfg rT) (HS : MeasurableSet S) :
     limExec ρ S = ⨆ n, (execN n ρ) S :=
@@ -477,33 +479,25 @@ theorem limExec_apply (ρ : Cfg rT) (HS : MeasurableSet S) :
 @[discrete] -- limExec_univ'
 theorem limExec_univ [Countable rT] [MeasurableSingletonClass rT]
     (ρ : Cfg rT) :
-    (limExec ρ) Set.univ = ⨆ n, (execN n ρ) Set.univ := by
-  have hdecomp : ∀ μ : Measure (Cfg rT), μ Set.univ = ∑' c : Cfg rT, μ {c} := by
-    intro μ
-    rw [show (Set.univ : Set (Cfg rT)) = ⋃ c : Cfg rT, ({c} : Set (Cfg rT)) from by ext; simp]
-    rw [measure_iUnion
-        (fun i j hij => by simp only [Set.disjoint_singleton]; exact hij)
-        (fun _ => .of_discrete)]
-  rw [hdecomp (limExec ρ)]
-  simp_rw [hdecomp (execN _ ρ), Discrete.limExec_apply]
-  exact ENNReal.tsum_iSup_of_monotone (fun c _ _ h => execN_mono_singleton h _ _)
+    (limExec ρ) Set.univ = ⨆ n, (execN n ρ) Set.univ :=
+  limExec_apply _ MeasurableSet.univ
 
 theorem limExec_univ' (ρ : Cfg rT) : (limExec ρ) .univ = ⨆ n, (execN n ρ) .univ :=
   limExec_apply _ .univ
 
 /-! ### Pointwise and mass bounds -/
 
--- Rocq: lim_exec_leq
-@[discrete] -- limExec_leq_setwise
-theorem Discrete.limExec_leq_pointwise [Countable rT] [MeasurableSingletonClass rT]
-    {ρ : Cfg rT} {c : Cfg rT} {r : ENNReal}
-    (H : ∀ n, (execN n ρ) {c} ≤ r) : (limExec ρ) {c} ≤ r := by
-  rw [Discrete.limExec_apply]; exact iSup_le H
-
 theorem limExec_leq_setwise {ρ : Cfg rT} {S : Set (Cfg rT)} {r : ENNReal} (HS : MeasurableSet S)
     (H : ∀ n, (execN n ρ) S ≤ r) : (limExec ρ) S ≤ r := by
   rw [limExec_apply _ HS]
   exact iSup_le H
+
+-- Rocq: lim_exec_leq
+@[discrete] -- limExec_leq_setwise
+theorem Discrete.limExec_leq_pointwise [Countable rT] [MeasurableSingletonClass rT]
+    {ρ : Cfg rT} {c : Cfg rT} {r : ENNReal}
+    (H : ∀ n, (execN n ρ) {c} ≤ r) : (limExec ρ) {c} ≤ r :=
+  limExec_leq_setwise (MeasurableSet.singleton c) H
 
 theorem limExec_leq_mass  {ρ : Cfg rT} {r : ENNReal}
     (H : ∀ n, (execN n ρ) Set.univ ≤ r) : (limExec ρ) Set.univ ≤ r := by
@@ -561,15 +555,6 @@ theorem limExec_det_final {ρ ρ' : Cfg rT} {n : Nat} (H : (execN n ρ) = dirac 
 
 /-! ### lintegral against limExec -/
 
-/-- `lintegral` commutes with monotone `⨆` of measures on `Cfg`. -/
-@[discrete] -- lintegral_limExec'
-theorem lintegral_limExec [Countable rT] [MeasurableSingletonClass rT]
-    (ρ : Cfg rT) (f : Cfg rT → ENNReal) :
-    ∫⁻ x, f x ∂(limExec ρ) = ⨆ n, ∫⁻ x, f x ∂(execN n ρ) := by
-  simp_rw [lintegral_countable' f, Discrete.limExec_apply, ENNReal.mul_iSup]
-  refine ENNReal.tsum_iSup_of_monotone (fun c i j hij => ?_)
-  exact mul_le_mul' (le_refl _) (execN_mono_singleton hij _ _)
-
 -- Good exercise
 theorem lintegral_limExec'
     (ρ : Cfg rT) (f : Cfg rT → ENNReal) :
@@ -591,6 +576,13 @@ theorem lintegral_limExec'
     rw [lintegral_def]
     exact le_iSup_of_le g (le_iSup_of_le hg le_rfl)
   · exact iSup_le fun n => lintegral_mono' (le_iSup (fun i => execN i ρ) n) le_rfl
+
+/-- `lintegral` commutes with monotone `⨆` of measures on `Cfg`. -/
+@[discrete] -- lintegral_limExec'
+theorem lintegral_limExec [Countable rT] [MeasurableSingletonClass rT]
+    (ρ : Cfg rT) (f : Cfg rT → ENNReal) :
+    ∫⁻ x, f x ∂(limExec ρ) = ⨆ n, ∫⁻ x, f x ∂(execN n ρ) :=
+  lintegral_limExec' ρ f
 
 
 /-! ### Additive coupling lift (Approxis glue) -/

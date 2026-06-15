@@ -58,8 +58,12 @@ structure PureHeadStep (e1 e2 : Exp rT) : Prop where
 @[discrete]
 theorem PureHeadStep_discrete.toPureStep {e1 e2 : Exp rT} (h : PureHeadStep_discrete e1 e2) :
    PureStep_discrete e1 e2 :=
-  ⟨fun σ => Discrete.Reducible.of_head (h.safe σ),
-   fun σ => primStep_eq_headStep_discrete (h.safe σ) ▸ h.det σ⟩
+  ⟨fun σ =>
+    let ⟨ρ, hρ⟩ := h.safe σ
+    ⟨ρ, primStep_eq_headStep (fun hz => by rw [hz] at hρ; simp at hρ) ▸ hρ⟩,
+   fun σ =>
+    let ⟨ρ, hρ⟩ := h.safe σ
+    primStep_eq_headStep (fun hz => by rw [hz] at hρ; simp at hρ) ▸ h.det σ⟩
 
 theorem PureHeadStep.toPureStep {e1 e2 : Exp rT} (h : PureHeadStep e1 e2) :
    PureStep e1 e2 :=
@@ -74,9 +78,12 @@ theorem PureStep_discrete.fill [Countable rT] [MeasurableSingletonClass rT]
   constructor
   · intro σ
     obtain ⟨⟨e2', σ2⟩, hρ⟩ := h.safe σ
-    exact ⟨⟨K.fill e2', σ2⟩, primStep_fill_pos_discrete hρ⟩
+    have hne : primStep ⟨e1, σ⟩ ≠ 0 := fun hz => by rw [hz] at hρ; simp at hρ
+    refine Reducible_ReducibleM_iff.mpr ?_
+    exact primStep_fill_pos (e := e1) hne
   · intro σ
-    rw [← primStep_fill_singleton (Discrete.val_stuck (h.safe σ).choose_spec)]
+    obtain ⟨ρ, hρ⟩ := h.safe σ
+    rw [← primStep_fill_singleton (val_stuck (fun hz => by rw [hz] at hρ; simp at hρ))]
     exact h.det σ
 
 theorem PureStep.fill (K : Ectx rT) {e1 e2 : Exp rT} (h : PureStep e1 e2) :
@@ -139,7 +146,7 @@ theorem PureExec_discrete.not_val [Countable rT] [MeasurableSingletonClass rT] {
     ¬e1.isValue := by
   obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
   obtain ⟨ρ, hρ⟩ := hstep.safe default
-  exact Discrete.val_stuck hρ
+  exact val_stuck (fun hz => by rw [hz] at hρ; simp at hρ)
 
 theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
@@ -160,7 +167,7 @@ theorem rtc_pure_step_val_discrete [Countable rT] [MeasurableSingletonClass rT] 
   | succ n ih =>
     obtain ⟨c, hstep, hrest⟩ := h
     obtain ⟨ρ, hρ⟩ := hstep.safe default
-    exact absurd v.2.toIsValue (Discrete.val_stuck hρ)
+    exact absurd v.2.toIsValue (val_stuck (fun hz => by rw [hz] at hρ; simp at hρ))
 
 theorem rtc_pure_step_val {n : ℕ} {v : Val rT} {e : Exp rT}
     (h : nsteps PureStep n v.1 e) :
@@ -260,8 +267,15 @@ theorem DetStep.pos {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) :
 -- DetHeadStep.toDetStep
 @[discrete]
 theorem DetHeadStep_discrete.toDetStep {cfg1 cfg2 : Cfg rT} (h : DetHeadStep_discrete cfg1 cfg2) : DetStep_discrete cfg1 cfg2 where
-  safe := ⟨_, primStep_pos_of_headStep_discrete h.pos_discrete⟩
-  det := by obtain ⟨e1, σ1⟩ := cfg1; rw [primStep_eq_headStep_discrete h.safe]; exact h.det
+  safe := by
+    obtain ⟨e1, σ1⟩ := cfg1
+    obtain ⟨ρ, hρ⟩ := h.safe
+    have hhs : HeadReducible e1 σ1 := fun hz => by rw [hz] at hρ; simp at hρ
+    exact ⟨_, primStep_eq_headStep hhs ▸ h.pos_discrete⟩
+  det := by
+    obtain ⟨e1, σ1⟩ := cfg1
+    obtain ⟨ρ, hρ⟩ := h.safe
+    rw [primStep_eq_headStep (fun hz => by rw [hz] at hρ; simp at hρ)]; exact h.det
 
 theorem DetHeadStep.toDetStep {cfg1 cfg2 : Cfg rT} (h : DetHeadStep cfg1 cfg2) :
     DetStep cfg1 cfg2 where
@@ -713,7 +727,9 @@ theorem DetStep_discrete.fill [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {cfg1 cfg2 : Cfg rT} (h : DetStep_discrete cfg1 cfg2) :
     DetStep_discrete ⟨K.fill cfg1.expr, cfg1.state⟩ ⟨K.fill cfg2.expr, cfg2.state⟩ where
   safe := h.safe.fill K
-  det := by rw [← primStep_fill_singleton (Discrete.val_stuck h.pos_discrete)]; exact h.det
+  det := by
+    obtain ⟨ρ, hρ⟩ := h.safe
+    rw [← primStep_fill_singleton (val_stuck (fun hz => by rw [hz] at hρ; simp at hρ))]; exact h.det
 
 theorem DetStep.fill (K : Ectx rT) {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) :
     DetStep ⟨K.fill cfg1.expr, cfg1.state⟩ ⟨K.fill cfg2.expr, cfg2.state⟩ where

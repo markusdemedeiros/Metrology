@@ -60,7 +60,7 @@ theorem pexecN_1_of_DetStep [Countable rT] [MeasurableSingletonClass rT]
   have hnv : ¬ ρ.expr.isValue := by
     obtain ⟨_, hpos⟩ := h.safe
     obtain ⟨_, _⟩ := ρ
-    exact Discrete.val_stuck hpos
+    exact val_stuck (fun hz => by rw [hz] at hpos; simp at hpos)
   rw [stepOrFinal_not_isValue hnv]
   exact Measure.eq_dirac_of_singleton_mass_one h.det (primStep_univ_le_one ρ)
 
