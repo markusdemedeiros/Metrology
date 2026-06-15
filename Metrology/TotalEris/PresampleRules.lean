@@ -52,7 +52,8 @@ continues. Rocq: `twp_presample` (`presample_rules.v:49`).
 Proof strategy:
 1. `twp_lift_step_fupd_glm` to expose the glm goal.
 2. Look up the tape via `app_state_lookup_tape`.
-3. Apply `glm_state_step` with the singleton/uniform R, slack ε₁ = 0,
+3. Apply `glm'_erasable_step` with `μ := tapePresample σ₁ α` (erasable via
+   `ErasableExpr.tapePresample`), the singleton/uniform R, slack ε₁ = 0,
    and per-outcome `X₂ ≡ ε_now` (no credit spent on presample).
 4. Per outcome: update ghost tape via `app_state_update_tape`, feed
    the IH via `tglWp_unfold_step`, mod through the body fupd. -/
@@ -72,12 +73,13 @@ theorem twp_presample {E : CoPset} {e : Exp rT} {α : Loc} {Φ : Val rT → IPro
   -- Mask shift E → ∅, save the closer to reopen later.
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
   imodintro
-  iapply glm'_state_step
-  iexists α, ⟨N, bs⟩
-  isplitr; · ipureintro; exact ⟨hlookup, hN⟩
-  iexists (fun σ' => ∃ n : { z : Int // 0 ≤ z ∧ z < N },
+  iapply glm'_erasable_step
+  iexists (tapePresample σ₁ α),
+    (fun σ' => ∃ n : { z : Int // 0 ≤ z ∧ z < N },
             σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)),
     0, (fun _ => ε₁), ε₁
+  -- Erasability: presampling onto tape `α` is expression-erasable.
+  isplitr; · ipureintro; exact ErasableExpr.tapePresample hlookup hN
   -- MeasurableSet of the support: a countable set of tape-updated states.
   isplitr
   · ipureintro
@@ -138,7 +140,7 @@ open Classical in
 /-- Per-outcome error function `X₂ : State → ENNReal` for advanced
 composition. On any `σ'` that has the form `σ.update_tapes (insert α
 ⟨N, bs ++ [n]⟩)` for some `n`, extracts `ε₂ n`; off-support, returns
-`0`. Used as the `glmStateStep` continuation's per-outcome credit. -/
+`0`. Used as the `glmErasable'` continuation's per-outcome credit. -/
 noncomputable def presampleAdvCompX₂
     (σ : State rT) (α : Loc) (N : Int)
     (bs : List { z : Int // 0 ≤ z ∧ z < N })
@@ -274,13 +276,14 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
       simpa using hget₁
     have : [n₂] = [n₁] := List.append_cancel_left hbs
     exact ((List.cons.injEq _ _ _ _).mp this |>.1).symm
-  iapply glm'_state_step
-  iexists α, ⟨N, bs⟩
-  isplitr; · ipureintro; exact ⟨hlookup, hN⟩
-  iexists (fun σ' => ∃ n : { z : Int // 0 ≤ z ∧ z < N },
+  iapply glm'_erasable_step
+  iexists (tapePresample σ₁ α),
+    (fun σ' => ∃ n : { z : Int // 0 ≤ z ∧ z < N },
               σ' = σ₁.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)),
     0, (fun σ' => (ε_now - ε₁) + presampleAdvCompX₂ σ₁ α N bs ε₂ σ'),
     ((ε_now - ε₁) + 1)
+  -- Erasability: presampling onto tape `α` is expression-erasable.
+  isplitr; · ipureintro; exact ErasableExpr.tapePresample hlookup hN
   -- Sub-goal 0: MeasurableSet of the support (countable set of tape-updated states).
   isplitr
   · ipureintro

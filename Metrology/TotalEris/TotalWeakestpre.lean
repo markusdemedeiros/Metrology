@@ -1,6 +1,6 @@
 module
 
-public import Metrology.TotalEris.Weakestpre
+public import Metrology.TotalEris.Glm
 public import Iris.BI.Lib.Fixpoint
 public import Iris.ProofMode.Classes
 public import Iris.ProofMode.InstancesUpdates

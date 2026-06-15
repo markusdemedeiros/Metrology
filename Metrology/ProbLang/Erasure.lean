@@ -1891,14 +1891,39 @@ theorem of_erasable {μ : Measure (State rT)} {σ : (State rT)} (h : Erasable μ
   intro e m
   rw [h e m]
 
+/-- An `ErasableExpr` measure is a probability measure (total mass `1`). Evaluated
+at a value expression with one step, `execN 1 ⟨v, ·⟩ = dirac ⟨v, ·⟩`, so the
+expression-projected total masses on both sides of `ErasableExpr` force `μ univ = 1`.
+Mirrors `Erasable.mass`, unwrapping the `asExpr` projection on `univ`. -/
+theorem mass {μ : Measure (State rT)} {σ : (State rT)} (h : ErasableExpr μ σ) :
+    μ Set.univ = 1 := by
+  have hv : IsVal (Exp.lit (rT := rT) .unit) := .lit
+  have hstep : ∀ σ' : State rT,
+      execN 1 ((⟨.lit .unit, σ'⟩ : Cfg rT)) = Measure.dirac (⟨.lit .unit, σ'⟩ : Cfg rT) :=
+    fun σ' => execN_succ_isValue (ρ := ⟨.lit .unit, σ'⟩) hv.toIsValue 0
+  have hexpr : ∀ ν : Measure (Cfg rT), asExpr ν Set.univ = ν Set.univ := fun ν => by
+    rw [asExpr, Measure.map_apply Cfg.measurable_expr MeasurableSet.univ, Set.preimage_univ]
+  have h1 := h (.lit .unit) 1
+  have hboth := congrArg (fun ν => ν (Set.univ : Set (Exp rT))) h1
+  simp only [hexpr] at hboth
+  rw [hstep σ] at hboth
+  rw [Measure.dirac_apply' _ .univ] at hboth
+  simp at hboth
+  rw [bind_apply .univ (Measurable.aemeasurable (by measurability))] at hboth
+  simp_rw [hstep] at hboth
+  simp_rw [Measure.dirac_apply' _ .univ] at hboth
+  simp at hboth
+  exact hboth
+
 /-- Dirac distributions are `ErasableExpr`. -/
 theorem dret [Countable rT] [MeasurableSingletonClass rT]
     (σ : (State rT)) : ErasableExpr (Measure.dirac σ) σ :=
   of_erasable (Erasable.dret σ)
 
 /-- `tapePresample σ α` is `ErasableExpr`. This is the main theorem
-`execN_tape_presample_expr_eq`, repackaged as an `ErasableExpr` witness. -/
-theorem tapePresample [Countable rT] [MeasurableSingletonClass rT]
+`execN_tape_presample_expr_eq`, repackaged as an `ErasableExpr` witness.
+Countability-free (`execN_tape_presample_expr_eq` is). -/
+theorem tapePresample
     {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
     ErasableExpr (tapePresample σ α) σ := by
@@ -1945,58 +1970,64 @@ level. This is the load-bearing corollary for the adequacy wrappers.
 Proof via `lintegral_limExec`: we test both sides against the indicator of
 `(·.expr) ⁻¹' S`, use the integral-vs-iSup equation `lintegral_limExec`,
 and apply the `ErasableExpr` hypothesis pointwise at each `n`. -/
-theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
+theorem lim_exec
     {μ : Measure (State rT)} {σ : (State rT)} (h : ErasableExpr μ σ)
     (e : (Exp rT)) :
     asExpr (μ.bind (fun σ' => limExec ⟨e, σ'⟩)) =
       limExecV ⟨e, σ⟩ := by
+  -- Countability-free: replace the `Measurable.of_discrete` shortcuts with the
+  -- genuine measurability lemmas (`Cfg.measurable_expr`, `execN_measurable`,
+  -- `limExec.measurable`).
+  have hexpr : Measurable (·.expr : Cfg rT → Exp rT) := Cfg.measurable_expr
+  have hmk : Measurable (fun σ' : State rT => (⟨e, σ'⟩ : Cfg rT)) := by fun_prop
   unfold asExpr limExecV asExpr
   refine Measure.ext fun S hS => ?_
   -- Rewrite both sides as `limExec ... (preimage S)`:
-  rw [Measure.map_apply Measurable.of_discrete hS,
-      Measure.map_apply Measurable.of_discrete hS,
-      Measure.bind_apply (Measurable.of_discrete hS)
-        Measurable.of_discrete.aemeasurable]
-  -- Goal now:
-  --   ∫⁻ σ', limExec ⟨e,σ'⟩ ((·.expr) ⁻¹' S) ∂μ
-  --   = limExec ⟨e,σ⟩ ((·.expr) ⁻¹' S)
+  rw [Measure.map_apply hexpr hS,
+      Measure.map_apply hexpr hS,
+      Measure.bind_apply (hexpr hS)
+        (show Measurable (fun σ' : State rT => limExec (⟨e, σ'⟩ : Cfg rT)) from
+          limExec.measurable.comp hmk).aemeasurable]
   -- Express each `limExec ρ A` as `∫⁻ x, indicator A 1 x ∂(limExec ρ)`:
   have hind : ∀ ρ : (Cfg rT),
       limExec ρ ((·.expr) ⁻¹' S)
         = ∫⁻ x, (((·.expr) ⁻¹' S) : Set (Cfg rT)).indicator 1 x ∂(limExec ρ) := by
     intro ρ
-    rw [lintegral_indicator_one (Measurable.of_discrete hS)]
+    rw [lintegral_indicator_one (hexpr hS)]
   simp_rw [hind]
-  -- Use `lintegral_limExec` on both sides (outer iSup swap).
-  simp_rw [lintegral_limExec]
-  -- Goal:
-  --   ∫⁻ σ', (⨆ n, ∫⁻ x, indicator _ 1 x ∂(execN n ⟨e,σ'⟩)) ∂μ
-  --   = ⨆ n, ∫⁻ x, indicator _ 1 x ∂(execN n ⟨e,σ⟩)
+  -- Use `lintegral_limExec'` on both sides (outer iSup swap; countability-free).
+  simp_rw [lintegral_limExec']
   -- Pull the outer iSup through the outer integral:
-  rw [lintegral_iSup (fun _ => Measurable.of_discrete)
+  rw [lintegral_iSup
+        (fun n => by
+          have hrw : (fun σ' => ∫⁻ x,
+                  (((·.expr) ⁻¹' S) : Set (Cfg rT)).indicator 1 x ∂(execN n ⟨e, σ'⟩))
+                = (fun σ' => (execN n ⟨e, σ'⟩) ((·.expr) ⁻¹' S)) := by
+            funext σ'; exact lintegral_indicator_one (hexpr hS)
+          rw [hrw]
+          exact (Measure.measurable_coe (hexpr hS)).comp ((execN_measurable n).comp hmk))
         (fun i j hij σ' =>
           lintegral_mono' (execN_mono hij ⟨e, σ'⟩) (le_refl _))]
   -- Now just pointwise equality at each n, via the `ErasableExpr` hypothesis.
   refine iSup_congr fun n => ?_
-  -- For each n, apply h e n and evaluate at the set S. The hypothesis is
-  -- about the projected measure on `(Exp rT)`.
   have hn := h e n
   unfold asExpr at hn
   have hval : (μ.bind (fun σ' => execN n ⟨e, σ'⟩)).map (·.expr) S
             = (execN n ⟨e, σ⟩).map (·.expr) S := by
     rw [hn]
-  rw [Measure.map_apply Measurable.of_discrete hS,
-      Measure.map_apply Measurable.of_discrete hS,
-      Measure.bind_apply (Measurable.of_discrete hS)
-        Measurable.of_discrete.aemeasurable] at hval
+  rw [Measure.map_apply hexpr hS,
+      Measure.map_apply hexpr hS,
+      Measure.bind_apply (hexpr hS)
+        (show Measurable (fun σ' : State rT => execN n (⟨e, σ'⟩ : Cfg rT)) from
+          (execN_measurable n).comp hmk).aemeasurable] at hval
   -- Convert both sides' integrals from indicator form:
   rw [show (∫⁻ x, (((·.expr) ⁻¹' S) : Set (Cfg rT)).indicator 1 x ∂(execN n ⟨e, σ⟩))
         = (execN n ⟨e, σ⟩) ((·.expr) ⁻¹' S)
-      from lintegral_indicator_one (Measurable.of_discrete hS)]
+      from lintegral_indicator_one (hexpr hS)]
   simp_rw [show ∀ σ' : (State rT),
         (∫⁻ x, (((·.expr) ⁻¹' S) : Set (Cfg rT)).indicator 1 x ∂(execN n ⟨e, σ'⟩))
           = (execN n ⟨e, σ'⟩) ((·.expr) ⁻¹' S)
-      from fun σ' => lintegral_indicator_one (Measurable.of_discrete hS)]
+      from fun σ' => lintegral_indicator_one (hexpr hS)]
   exact hval
 
 end ErasableExpr

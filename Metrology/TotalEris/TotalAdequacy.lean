@@ -265,25 +265,25 @@ theorem tgl_prim_step
     (k := fun ρ => (limExec ρ) P) hR ((MeasureTheory.Measure.measurable_coe hP).comp limExec.measurable)
     Hpgl Hsum Hcont
 
-/-- (State rT)-step analog of `tgl_prim_step`: the pure measure-theoretic
-core for a single tape-presample. Requires the tape `α` to be active
-with positive bound (which makes `tapePresample σ α` a probability
-measure). Used by the future `tgl_state_step`-driven branch of
-`glm_implies_tgl`. -/
-theorem tgl_state_step
-    {e : (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
-    (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
+/-- Erasability-step analog of `tgl_prim_step`: the pure measure-theoretic
+core for advancing the state by ANY expression-erasable measure `μ`. The
+`ErasableExpr μ σ` hypothesis makes `μ` a probability measure (`ErasableExpr.mass`),
+which is all this lemma needs; the erasure equation itself is used one level up in
+`dbind_erasable`. Generalises the old tape-specific `tgl_state_step`. -/
+theorem tgl_erasable
+    {e : (Exp rT)} {σ : (State rT)} {μ : MeasureTheory.Measure (State rT)}
+    (heras : ErasableExpr μ σ)
     {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
     {R : (State rT) → Prop} {P : Set (Cfg rT)}
     (hR : MeasurableSet {σ' | R σ'})
     (hP : MeasurableSet P)
-    (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂tapePresample σ α) ≤ ε)
-    (Hpgl : Pgl ε₁ R (tapePresample σ α))
+    (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂μ) ≤ ε)
+    (Hpgl : Pgl ε₁ R μ)
     (Hcont : ∀ σ', R σ' → 1 - ε₂ σ' ≤ (limExec ⟨e, σ'⟩) P) :
-    1 - ε ≤ ∫⁻ σ', (limExec ⟨e, σ'⟩) P ∂tapePresample σ α :=
-  haveI : MeasureTheory.IsProbabilityMeasure (tapePresample σ α) :=
-    ⟨tapePresample_univ_eq_one htape hN⟩
-  tgl_lift_prob (M := tapePresample σ α) (R := R) (ε₂ := ε₂)
+    1 - ε ≤ ∫⁻ σ', (limExec ⟨e, σ'⟩) P ∂μ :=
+  haveI : MeasureTheory.IsProbabilityMeasure μ :=
+    ⟨ErasableExpr.mass heras⟩
+  tgl_lift_prob (M := μ) (R := R) (ε₂ := ε₂)
     (k := fun σ' => (limExec ⟨e, σ'⟩) P) hR
     ((MeasureTheory.Measure.measurable_coe hP).comp
       (limExec.measurable.comp (by fun_prop : Measurable (fun σ' : State rT => (⟨e, σ'⟩ : Cfg rT)))))
@@ -320,15 +320,15 @@ theorem dbind_prim_step
   rw [MeasureTheory.Measure.bind_apply hSmeas (by measurability)]
   exact Tgl.tgl_prim_step hR hSmeas Hred Hsum Hpgl (fun ρ hρ => Hcont ρ hρ)
 
-theorem dbind_state_step
-    {e : (Exp rT)} {σ : (State rT)} {α : Loc} {t : Tape}
-    (htape : σ.tapes[α]? = some t) (hN : 0 < t.bound)
+theorem dbind_erasable
+    {e : (Exp rT)} {σ : (State rT)} {μ : MeasureTheory.Measure (State rT)}
+    (heras : ErasableExpr μ σ)
     {ε ε₁ : ENNReal} {ε₂ : (State rT) → ENNReal}
     {R : (State rT) → Prop} {φ : (Val rT) → Prop}
     (hφ : MeasurableSet {v : Val rT | φ v})
     (hR : MeasurableSet {σ' | R σ'})
-    (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂tapePresample σ α) ≤ ε)
-    (Hpgl : Pgl ε₁ R (tapePresample σ α))
+    (Hsum : ε₁ + (∫⁻ σ', ε₂ σ' ∂μ) ≤ ε)
+    (Hpgl : Pgl ε₁ R μ)
     (Hcont : ∀ σ', R σ' → Tgl (limExec ⟨e, σ'⟩) φ (ε₂ σ')) :
     Tgl (limExec ⟨e, σ⟩) φ ε := by
   set S : Set (Cfg rT) := {ρ | ∃ v, ρ.expr = Exp.ofVal v ∧ φ v}
@@ -337,17 +337,19 @@ theorem dbind_state_step
   have hSmeas : MeasurableSet S := measurableSet_TglCfgSet hφ
   have hS_pre : S = (·.expr) ⁻¹' S' := rfl
   show 1 - ε ≤ (limExec ⟨e, σ⟩) S
-  -- The Tgl bound on the bind via `tgl_state_step`.
-  have h_bind : 1 - ε ≤ ∫⁻ σ', (limExec ⟨e, σ'⟩) S ∂tapePresample σ α :=
-    Tgl.tgl_state_step htape hN hR hSmeas Hsum Hpgl (fun σ' hσ' => Hcont σ' hσ')
+  -- The Tgl bound on the bind via `tgl_erasable`.
+  have h_bind : 1 - ε ≤ ∫⁻ σ', (limExec ⟨e, σ'⟩) S ∂μ :=
+    Tgl.tgl_erasable heras hR hSmeas Hsum Hpgl (fun σ' hσ' => Hcont σ' hσ')
   rw [← MeasureTheory.Measure.bind_apply hSmeas ?G2] at h_bind
   case G2 =>
     refine Measurable.aemeasurable ?_
     measurability
-  have h_eq : ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S
+  -- Erasability: binding `μ` into `limExec` leaves the observable (value)
+  -- distribution unchanged.
+  have h_eq : (μ.bind (fun σ' => limExec ⟨e, σ'⟩)) S
             = (limExec ⟨e, σ⟩) S := by
-    have hmap1 : ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S
-        = asExpr ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) S' := by
+    have hmap1 : (μ.bind (fun σ' => limExec ⟨e, σ'⟩)) S
+        = asExpr (μ.bind (fun σ' => limExec ⟨e, σ'⟩)) S' := by
       unfold asExpr
       rw [MeasureTheory.Measure.map_apply (by measurability) hS'meas]
       rfl
@@ -358,7 +360,7 @@ theorem dbind_state_step
       rfl
     rw [hmap1, hmap2]
     congr 1
-    exact limExec_tape_presample_expr_eq htape hN
+    exact ErasableExpr.lim_exec heras e
   exact h_eq ▸ h_bind
 
 end Tgl
@@ -415,10 +417,10 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
         imodintro
         ipureintro
         exact Tgl.dbind_prim_step hφ HRmeas Hred Hsum Hpgl Hf
-      · -- state-step branch. Same shape, but indexed by σ' rather than
+      · -- erasability branch. Same shape, but indexed by σ' rather than
         -- ρ; the continuation references `Ψ` (recursive position), so
         -- `HZ` is `Ψ ∧ glm` — take the `Ψ` (= |={∅}=> ⌜Tgl⌝) side.
-        icases HSS with ⟨%α, %t, %Hαt, %R, %ε₁, %X₂, %r, %HRmeas, %_, %Hsum, %Hpgl, HCont⟩
+        icases HSS with ⟨%μ, %R, %ε₁, %X₂, %r, %Heras, %HRmeas, %_, %Hsum, %Hpgl, HCont⟩
         ihave Hfa : iprop(∀ σ'', ⌜R σ''⌝ -∗
             |={∅}=> ⌜Tgl (limExec ⟨e', σ''⟩) φ (X₂ σ'')⌝) $$ [HCont]
         · iintro %σ'' %hR
@@ -432,7 +434,7 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
         imod Hf with %Hf
         imodintro
         ipureintro
-        exact Tgl.dbind_state_step Hαt.1 Hαt.2 hφ HRmeas Hsum Hpgl Hf
+        exact Tgl.dbind_erasable Heras hφ HRmeas Hsum Hpgl Hf
   iapply (glm'_strong_ind (GF := GF) (Z := Z) (Ψ := Ψ)) $$ HInd
         %(⟨⟨e, σ⟩, ε⟩ : (GlmState rT))
   iexact HG
