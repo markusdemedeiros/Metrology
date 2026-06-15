@@ -670,7 +670,7 @@ example {E : CoPset} {ε₁ : ENNReal} (hε₁ : ε₁ ≤ 1) {Φ : Val rT → I
       iprop((∀ (r : rT), ↯ε₁ -∗ Φ (⟨.lit (.real r), IsVal.lit⟩ : Val rT)) -∗
       tglWp E Exp.urand Φ) :=
   twp_urand_exp measurable_const (fun _ => hε₁)
-    (le_of_eq (by rw [MeasureTheory.lintegral_const, MeasureTheory.measure_univ, mul_one]))
+    (_root_.le_of_eq (by rw [MeasureTheory.lintegral_const, MeasureTheory.measure_univ, mul_one]))
 
 /-- Tutorial wrapper around `twp_rand_exp_nat` matching the form used in
 `eris_rules.v:118` — phrases the sum as `∑ k < N+1, ε₂ k ≤ (N+1) * ε₁`.

@@ -11,6 +11,7 @@ public import Metrology.ProbLang.HeadStep
 public import Metrology.ProbLang.Interp.CtxInterp
 public import Metrology.ProbLang.Measure
 public import Metrology.ProbLang.Metatheory
+public import Metrology.ProbLang.Reals
 public import Metrology.ProbLang.Syntax.Syntax
 public import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.Syntax.Types
