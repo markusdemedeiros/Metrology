@@ -21,7 +21,7 @@ open MeasureTheory
 
 /-- ProbLang's real parameter instantiated with `ℝ`, the continuous semantics.
 The measurable structure is the Borel σ-algebra; `unifUnit` is `Uniform[0,1]`. -/
-noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
+public noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
   -- `BEq`/`LawfulBEq` via classical decidable equality on `ℝ`.
   beq a b := decide (a = b)
   eq_of_beq h := of_decide_eq_true h

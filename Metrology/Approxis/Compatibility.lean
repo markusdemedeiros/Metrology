@@ -421,9 +421,9 @@ theorem refines_alloctape {e e' : Exp rT} :
   isplitr
   · ipureintro
     exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
-      |> (Discrete.headStep_support_iff _ _ _ _).mpr⟩
+      |> (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))⟩
   iintro !> %e₂ %σ₂ %Hstep
-  rw [Discrete.headStep_support_iff] at Hstep
+  replace Hstep := Possible.headStepSupport (possible_iff_pos.mpr Hstep)
   cases Hstep with
   | TapeS hl hσ =>
     subst hl; subst hσ

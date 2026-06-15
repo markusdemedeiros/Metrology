@@ -3,6 +3,8 @@ module
 public import Metrology.TotalEris.Glm
 public import Metrology.Iris.AppProgram
 public import Metrology.Iris.ErrorCredits
+public import Metrology.ProbLang.Reals
+public import Iris.Algebra.Auth
 
 @[expose] public section
 
@@ -25,7 +27,7 @@ The `↦` (heap pointsto) and `↪ₐ` (tape pointsto) notations come from
 `Metrology/Iris/AppProgram.lean`; the `●↯` (error auth) notation comes
 from `Metrology/Iris/ErrorCredits.lean`. -/
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
+open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang Auth
 
 namespace ProbLang
 
@@ -67,6 +69,37 @@ noncomputable instance erisWpGS_of_components : ErisWpGS (rT := rT) GF where
     (ErisWpGS.errInterp (rT := rT) : ENNReal → IProp GF) = ecAuth := rfl
 
 end ErisInstance
+
+noncomputable def erisGF : BundledGFunctors.{0,0,0} := fun n =>
+  match n with
+  | 0 => ⟨InvMapF, by infer_instance⟩
+  | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
+  | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
+  | 3 => ⟨AuthURF (constOF Credit), by infer_instance⟩
+  | 4 => ⟨constOF (Auth ErrorCredit), by infer_instance⟩
+  | 5 => ⟨constOF (SpecHeap ℝ), by infer_instance⟩
+  | 6 => ⟨constOF SpecTapes, by infer_instance⟩
+  | _ => ⟨constOF Unit, by infer_instance⟩
+
+instance : WsatGpreS erisGF where
+  inv := { τ := 0, transp := by unfold erisGF; rfl }
+  enabled := { τ := 1, transp := by unfold erisGF; rfl }
+  disabled := { τ := 2, transp := by unfold erisGF; rfl }
+
+instance : LcGpreS erisGF where
+  lc_elem := { τ := 3, transp := by unfold erisGF; rfl }
+
+instance : InvGpreS erisGF where
+  toWsatGpreS := inferInstance
+  toLcGpreS := inferInstance
+
+instance : ECPreGS erisGF where
+  ec := { τ := 4, transp := by unfold erisGF; rfl }
+
+instance : AppPreGS ℝ erisGF where
+  heap := { τ := 5, transp := by unfold erisGF; rfl }
+  tapes := { τ := 6, transp := by unfold erisGF; rfl }
+
 
 end TotalEris
 end ProbLang

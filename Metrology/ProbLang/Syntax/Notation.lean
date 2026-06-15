@@ -132,6 +132,7 @@ syntax:100 "tape(" pl_exp ")"                                   : pl_exp
 syntax:100 "rand(" pl_exp ", " pl_exp ")"                       : pl_exp
 syntax:10 "scrut " pl_exp " with " pl_pat                       : pl_exp
 syntax:max "fail"                                               : pl_exp
+syntax:max "urand"                                              : pl_exp
 syntax:10 "let! " pl_pat " := " pl_exp:10 "; " pl_exp:1         : pl_exp
 syntax:100 "assert(" pl_exp ")"                                 : pl_exp
 
@@ -158,7 +159,7 @@ meta def pl_ty.parenthesizer : CategoryParenthesizer := fun prec => do
     parenthesizeCategoryCore `pl_ty prec
 
 meta def reservedKeywords : List String :=
-  ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "scrut",
+  ["fst", "snd", "inl", "inr", "alloc", "tape", "rand", "fail", "urand", "scrut",
    "if", "then", "else", "let", "fun", "rec", "case"]
 
 meta def checkNotReserved (i : Lean.Ident) : TermElabM Unit := do
@@ -339,6 +340,7 @@ meta partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
       let lam ← closeAnonLam chain scrutAtom
       `(Exp.app $lam $(← elabPL env st e))
   | `(pl_exp|fail)               => `(Exp.fail)
+  | `(pl_exp|urand)              => `(Exp.urand)
   | `(pl_exp|assert($e))         => do
       elabPL env st (← `(pl_exp|if $e then #.unit else fail))
   | e => throwErrorAt e s!"unrecognised pl expression: {e}"
@@ -562,6 +564,10 @@ meta def unexpBLUnit : Unexpander := fun _ => `(())
 @[app_unexpander Exp.fail]
 meta def unexpFail : Unexpander
   | `($_) => do `(pl(fail))
+
+@[app_unexpander Exp.urand]
+meta def unexpUrand : Unexpander
+  | `($_) => do `(pl(urand))
 
 /-! ### Operators -/
 
