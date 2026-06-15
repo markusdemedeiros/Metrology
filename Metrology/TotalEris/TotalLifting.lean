@@ -43,15 +43,25 @@ theorem twp_lift_step_fupd_glm {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : E
   isplitl [Hσ]; · iexact Hσ
   iexact Hε
 
-/-- Lift a step rule that doesn't need an `err_interp` change.
+/-- **Generic single-step lifting**, parametrised by an arbitrary support family
+`R σ₁ : Cfg rT → Prop`. The prover supplies (i) measurability of each support
+`{ρ | R σ₁ ρ}` and (ii) a **`Concentrated`** certificate — `primStep ⟨e₁,σ₁⟩` lives
+on that support. The continuation is then quantified over `R σ₁`, error-free.
 
-Rocq: `twp_lift_step_fupd`. -/
-theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) :
+This replaces the atomicity dependency in the critical path with the more general
+"concentrated on a measurable operational support" — the unary-lifting view. The
+atomic case (`twp_lift_step_fupd`) is the instance `R := Possible`; a future
+continuous sampler is the instance `R := reach`, with the `Concentrated` certificate
+from `concentratedOn_map`. -/
+theorem twp_lift_step_fupd_gen {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
+    (hv : e₁.toVal? = none)
+    (R : State rT → Cfg rT → Prop)
+    (hRmeas : ∀ σ₁, MeasurableSet {ρ | R σ₁ ρ})
+    (hconc : ∀ σ₁, Concentrated (primStep ⟨e₁, σ₁⟩) {ρ | R σ₁ ρ}) :
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
       (⌜Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
-        (⌜Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩)⌝) -∗
+        (⌜R σ₁ (⟨e₂, σ₂⟩ : Cfg rT)⌝) -∗
         |={∅}=> |={∅, E}=>
           stateInterp σ₂ ∗ tglWp E e₂ Φ) ⊢@{IProp GF}
       tglWp E e₁ Φ := by
@@ -61,15 +71,9 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   imod H $$ %σ₁ Hσ with ⟨%Hred, HCont⟩
   imodintro
   iapply glm'_prim_step
-  iexists (fun ρ => Possible ρ (primStep ⟨e₁, σ₁⟩)), 0, (fun _ => ε₁), ε₁
+  iexists (R σ₁), 0, (fun _ => ε₁), ε₁
   isplitr; · ipureintro; exact Hred
-  isplitr
-  · ipureintro
-    -- The `Possible`-support set coincides with the positive-mass set
-    -- (`possible_iff_pos`), which is measurable (`measurableSet_primStep_support`).
-    have hset : {ρ : Cfg rT | Possible ρ (primStep ⟨e₁, σ₁⟩)}
-        = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} := Set.ext fun ρ => possible_iff_pos
-    rw [hset]; exact measurableSet_primStep_support e₁ σ₁
+  isplitr; · ipureintro; exact hRmeas σ₁
   isplitr; · ipureintro; intro _; exact _root_.le_refl _
   isplitr
   · ipureintro
@@ -78,12 +82,11 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
     calc ε₁ * primStep ⟨e₁, σ₁⟩ Set.univ
         ≤ ε₁ * 1 := by gcongr; exact primStep_univ_le_one _
       _ = ε₁ := mul_one ε₁
-  -- `Pgl 0 Possible primStep`: the complement of the `Possible`-support is the
-  -- co-support `{ρ | primStep{ρ} = 0}`, which is null because `primStep` is purely
-  -- atomic (`primStep_atomic`, countability-free). Packaged as `Pgl.zero_possible`.
+  -- `Pgl 0 R primStep`: the support `{R σ₁}` is co-null — exactly the
+  -- `Concentrated` certificate, bridged via `Pgl.of_concentrated`.
   isplitr
   · ipureintro
-    exact Pgl.zero_possible (primStep_atomic e₁ σ₁)
+    exact Pgl.of_concentrated (hconc σ₁)
   iintro %ρ %HR
   ispecialize HCont $$ %ρ.expr %ρ.state %HR
   imod HCont with HC
@@ -96,6 +99,32 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   isplitl [Hε]
   · iexact Hε
   iexact HW
+
+/-- Lift a step rule that doesn't need an `err_interp` change. The **atomic
+driver**: instantiates the generic `twp_lift_step_fupd_gen` with the atom support
+`R := Possible · (primStep …)`, discharging measurability via the countable-atoms
+proof (`measurableSet_primStep_support`) and concentration via `primStep_atomic`.
+
+Rocq: `twp_lift_step_fupd`. -/
+theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
+    (hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ∀ (e₂ : Exp rT) (σ₂ : State rT),
+        (⌜Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩)⌝) -∗
+        |={∅}=> |={∅, E}=>
+          stateInterp σ₂ ∗ tglWp E e₂ Φ) ⊢@{IProp GF}
+      tglWp E e₁ Φ :=
+  twp_lift_step_fupd_gen hv
+    (fun σ₁ ρ => Possible ρ (primStep ⟨e₁, σ₁⟩))
+    (fun σ₁ => by
+      have hset : {ρ : Cfg rT | Possible ρ (primStep ⟨e₁, σ₁⟩)}
+          = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} := Set.ext fun ρ => possible_iff_pos
+      rw [hset]; exact measurableSet_primStep_support e₁ σ₁)
+    (fun σ₁ => by
+      have hset : {ρ : Cfg rT | Possible ρ (primStep ⟨e₁, σ₁⟩)}
+          = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} := Set.ext fun ρ => possible_iff_pos
+      rw [hset]; exact (primStep_atomic e₁ σ₁).concentrated_atoms)
 
 /-- Lift an atomic-step (post-condition delivered on the value
 of the stepped expression). Rocq: `twp_lift_atomic_step_fupd`. -/

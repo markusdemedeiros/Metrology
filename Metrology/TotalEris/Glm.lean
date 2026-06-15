@@ -74,6 +74,14 @@ theorem zero_possible [MeasurableSingletonClass α] {μ : MeasureTheory.Measure 
     ext x; simp [possible_iff_pos, pos_iff_ne_zero]
   rw [hset]; exact h.le
 
+/-- `Pgl 0` is exactly concentration on the predicate's set: `Concentrated μ {φ}`
+gives the zero-error lifting `Pgl 0 φ μ`. This is the bridge by which the generic
+step rule consumes a `Concentrated` support certificate (atomic or diffuse). -/
+theorem of_concentrated {μ : MeasureTheory.Measure α} {φ : α → Prop}
+    (h : Concentrated μ {x | φ x}) : Pgl 0 φ μ := by
+  show μ {x | ¬ φ x} ≤ 0
+  exact h.le
+
 end Pgl
 
 /-! ## `ErisWpGS` ghost-state class

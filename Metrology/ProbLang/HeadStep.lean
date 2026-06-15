@@ -2332,6 +2332,58 @@ theorem headStep_atomic (e : Exp rT) (σ : State rT) :
     split <;> exact isAtomicSupport_dirac _
   case _ => exact isAtomicSupport_zero -- default
 
+/-! ### `Concentrated`: the unary support-lifting
+
+`Concentrated μ S` says the measure `μ` lives on the set `S` — its complement is
+`μ`-null. It is the unary degenerate of a relational coupling/lifting `μ ~_R ν`
+(the relation collapsed to a one-sided predicate `S`), which is why it composes
+like a coupling (`mono`, `map`, …). `IsAtomicSupport` is the special case where
+`S` is the atom set (`IsAtomicSupport.concentrated_atoms`). This is the support
+certificate the WP step rule needs, and — unlike atomicity — it survives diffuse
+measures: a pushforward measure is always concentrated on the image of its source
+support (`concentratedOn_map`). -/
+def Concentrated {α : Type _} [MeasurableSpace α] (μ : Measure α) (S : Set α) : Prop :=
+  μ Sᶜ = 0
+
+theorem Concentrated.univ {α : Type _} [MeasurableSpace α] {μ : Measure α} :
+    Concentrated μ Set.univ := by simp [Concentrated]
+
+theorem concentratedOn_zero {α : Type _} [MeasurableSpace α] {S : Set α} :
+    Concentrated (0 : Measure α) S := by simp [Concentrated]
+
+/-- Enlarging the concentration set preserves concentration. -/
+theorem Concentrated.mono {α : Type _} [MeasurableSpace α] {μ : Measure α} {S T : Set α}
+    (hST : S ⊆ T) (h : Concentrated μ S) : Concentrated μ T :=
+  MeasureTheory.measure_mono_null (Set.compl_subset_compl.mpr hST) h
+
+/-- A `dirac` is concentrated on any (measurable) set containing its point. -/
+theorem concentratedOn_dirac {α : Type _} [MeasurableSpace α] {a : α} {S : Set α}
+    (hS : MeasurableSet S) (h : a ∈ S) : Concentrated (Measure.dirac a) S := by
+  unfold Concentrated
+  rw [Measure.dirac_apply' a hS.compl, Set.indicator_of_notMem (by simpa using h)]
+
+/-- **The engine.** A pushforward `ν.map f` is concentrated on the image `f '' T`
+of any set `T` carrying `ν` — needs only `Measurable f` and `MeasurableSet (f '' T)`.
+Covers both `Cfg.uniform` (image of a finite PMF) and a future `Cfg.uniformReal`
+(image of a continuous uniform), uniformly. -/
+theorem concentratedOn_map {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
+    {f : α → β} (hf : Measurable f) {ν : Measure α} {T : Set α}
+    (hfT : MeasurableSet (f '' T)) (h : Concentrated ν T) :
+    Concentrated (ν.map f) (f '' T) := by
+  unfold Concentrated at h ⊢
+  rw [Measure.map_apply hf hfT.compl]
+  refine MeasureTheory.measure_mono_null (fun x hx => ?_) h
+  simp only [Set.mem_preimage, Set.mem_compl_iff] at hx ⊢
+  exact fun hxT => hx ⟨x, hxT, rfl⟩
+
+/-- `IsAtomicSupport` is exactly concentration on the atom set. This recovers the
+existing atomicity machinery as a `Concentrated` instance. -/
+theorem IsAtomicSupport.concentrated_atoms {α : Type _} [MeasurableSpace α]
+    {μ : Measure α} (h : IsAtomicSupport μ) : Concentrated μ {x | 0 < μ {x}} := by
+  have hset : {x | 0 < μ {x}}ᶜ = {x | μ {x} = 0} := by
+    ext x; simp [Set.mem_compl_iff, not_lt, nonpos_iff_eq_zero]
+  rw [Concentrated, hset]; exact h
+
 /-- `headStep` is a sub-probability measure for arbitrary `rT`: by case analysis,
 each branch returns either `0`, a `dirac`, or a probability measure (gated by
 `isValM`/`asValM`/`unwrapM` which only ever shrink mass). -/
