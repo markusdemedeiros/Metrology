@@ -313,10 +313,10 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
         if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
     | _ => 0)
   iexists ((ε_now - ε₁) + 1)
-  -- Sub-goal 1: Reducible, via the measurability-free `HeadStepSupport.possible`.
+  -- Sub-goal 1: Reducible, via the measurability-free `HeadStepSupport.ne_zero`.
   isplitr
   · ipureintro
-    exact Reducible.of_head (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
+    exact Reducible.of_head (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).ne_zero
   -- Sub-goal 1b: the support predicate is an explicit countable set of int-configs.
   isplitr
   · ipureintro
@@ -353,7 +353,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
             -- `n.toNat : ℕ` to match HSum's form.
             -- Reduce primStep to headStep (= Cfg.uniform on rand z ()).
             have hhead : HeadReducible (.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
-              (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
+              (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).ne_zero
             rw [primStep_eq_headStep hhead]
             -- headStep ⟨rand z (), σ⟩ definitionally equals Cfg.uniform z σ.
             show ∫⁻ a, (match a.expr with
@@ -457,7 +457,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
         {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} ≤ 0
     refine _root_.le_of_eq ?_
     have hhead : HeadReducible (.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
-      (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).possible.ne_zero
+      (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).ne_zero
     rw [primStep_eq_headStep hhead]
     show (Cfg.uniform z σ₁)
         {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} = 0

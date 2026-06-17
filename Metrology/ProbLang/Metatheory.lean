@@ -1116,8 +1116,8 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
       | randTapeNonposOther hz htape hzN =>
           exact ⟨_, .RandTapeNonposOtherS hz htape hzN⟩
       | urand =>
-          refine ⟨_, .UrandS (r := default) ?_⟩
-          sorry
+          obtain ⟨r, hr⟩ := ProbLangℝ.unifUnitSupport_nonempty rT
+          exact ⟨_, .UrandS (r := r) hr⟩
   · rintro ⟨ρ', hsupp⟩
     cases hsupp with
     | BetaLamS hv _ => exact .inl (.betaLam hv)
@@ -1145,7 +1145,7 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
     | RandNonposS hz => exact .inr (.randNonpos hz)
     | RandTapeNonposEmptyS hz htape hzN => exact .inr (.randTapeNonposEmpty hz htape hzN)
     | RandTapeNonposOtherS hz htape hzN => exact .inr (.randTapeNonposOther hz htape hzN)
-    | UrandS => exact .inr .urand
+    | UrandS _ => exact .inr .urand
 
 theorem not_HeadStepPred_iff_zero [MeasurableSingletonClass rT]
     (e : Exp rT) (σ : State rT) :
@@ -1157,9 +1157,9 @@ theorem not_HeadStepPred_iff_zero [MeasurableSingletonClass rT]
     intro hns
     by_contra h0
     exact hns (headStep_exists_support_of_ne_zero h0)
-  · -- A support point gives a `Possible` outcome, hence `headStep ≠ 0`.
+  · -- A support point witnesses `headStep ≠ 0` directly.
     rintro h0 ⟨ρ', hsupp⟩
-    exact (HeadStepSupport.possible hsupp).ne_zero h0
+    exact HeadStepSupport.ne_zero hsupp h0
 
 theorem det_or_prob_or_zero [MeasurableSingletonClass rT]
     (e : Exp rT) (σ : State rT) :

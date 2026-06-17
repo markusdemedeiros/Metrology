@@ -53,8 +53,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS ℝ hlc GF]
 theorem twp_urand_irrational (E : CoPset) :
     ⊢@{IProp GF} tglWp E pl(urand)
       (fun w => iprop% ⌜∃ r : ℝ, w = ⟨.lit (.real r), .lit⟩ ∧ Irrational r⌝) := by
-  have Hnv : (pl(urand) : Exp ℝ).toVal? = none := Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply twp_err_pos Hnv
+  iapply twp_err_pos solve_not_red
   iintro %ε %Hε Herr
   iapply (twp_urand_exp irratErr_measurable irratErr_le_one (by simp [irratErr_lintegral_zero])) $$ Herr
   iintro %r Hcr

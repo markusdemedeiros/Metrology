@@ -2020,11 +2020,21 @@ theorem Cfg.uniform_possible {z v : Int} {σ : State rT}
   rw [ne_eq, Nat.cast_eq_zero]
   exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz]⟩
 
+/-- **Discrete-fragment** support→positive-mass lemma: a support point carries
+positive singleton mass. `@[discrete]`: this is an *atom* notion (`Possible` is
+`0 < μ {ρ}` modulo measurability), which is **false** for the diffuse continuous
+sampler — the `UrandS` arm is therefore a deferred `sorry`. The continuous/total
+path never needs this; it uses the universally-true `HeadStepSupport.ne_zero`
+(for `headStep ≠ 0`) and `Possible.headStepSupport` (the converse). This lemma
+survives only for the discrete partial-WP layer (`Approxis`). -/
+@[discrete]
 theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (h : HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩) :
     Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩) := by
   cases h with
   | UrandS he =>
+    -- Atom notion; false for diffuse `unifUnit`. Deferred within the discrete
+    -- fragment (see the docstring) — the total path uses `ne_zero` instead.
     dsimp [headStep]
     sorry
   | BetaLamS hv he | BetaFixS hv he =>
@@ -2072,6 +2082,71 @@ theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     refine Possible.of_dirac_eq ?_
     simp only [headStep, htape, if_neg (Ne.symm hzN)]
     simp [Cfg.uniform, Int.isPos, Hz]
+
+/-- A support point witnesses that the head step is nonzero. This is the
+**universally-true** (measurability-free) fact every total-path caller needs
+(`HeadReducible`, `headStep … ≠ 0`); it is the replacement for the atom-based
+`HeadStepSupport.possible`, which is false for the diffuse continuous sampler.
+The deterministic constructors reduce `headStep` to a `dirac` (nonzero, known to
+`simp`); the discrete-`rand` constructors reduce to a `Cfg.uniform`
+(`Cfg.uniform_possible.ne_zero`); and the continuous `urand` step is a
+pushforward of the probability measure `unifUnit`, hence itself a probability
+measure (`isProbabilityMeasure_map`) and so nonzero. -/
+theorem HeadStepSupport.ne_zero {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+    (h : HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩) :
+    headStep ⟨e1, σ1⟩ ≠ 0 := by
+  cases h with
+  | UrandS _ =>
+    have hg : Measurable (fun r : rT => (⟨.lit (.real r), σ1⟩ : Cfg rT)) := by
+      rw [Cfg.measurable_iff]
+      exact ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
+    have hprob : IsProbabilityMeasure (headStep ⟨Exp.urand, σ1⟩) := by
+      show IsProbabilityMeasure (Cfg.uniformReal σ1)
+      rw [Cfg.uniformReal]; exact isProbabilityMeasure_map hg.aemeasurable
+    exact hprob.ne_zero
+  | BetaLamS hv he | BetaFixS hv he =>
+    subst he; simp [headStep, Exp.isValM, hv]
+  | IfTrueS | IfFalseS =>
+    simp [headStep]
+  | FstS hv1 hv2 | SndS hv1 hv2 =>
+    simp [headStep, Exp.isValM, hv1, hv2]
+  | CaseLS hv | CaseRS hv =>
+    simp [headStep, Exp.isValM, hv]
+  | UnOpS hv heval =>
+    simp [headStep, Exp.isValM, hv, Option.unwrapM, ← heval]
+  | BinOpS hv1 hv2 heval =>
+    simp [headStep, Exp.isValM, hv1, hv2, Option.unwrapM, ← heval]
+  | AllocS hvd hl hσ =>
+    subst hl; subst hσ; simp [headStep, Exp.asValM, hvd]
+  | LoadS hlook he =>
+    subst he; simp [headStep, hlook]
+  | StoreS hv hsome hσ =>
+    subst hσ
+    obtain ⟨vold, hvold⟩ := Option.isSome_iff_exists.mp hsome
+    simp [headStep, Exp.asValM, hv, hvold]
+  | TapeS hl hσ =>
+    subst hl; subst hσ; simp [headStep]
+  | ScrutSuccessS hv hmatch =>
+    simp [headStep, Exp.isValM, hv, hmatch]
+  | ScrutFailureS hv hmatch =>
+    simp [headStep, Exp.isValM, hv, hmatch]
+  | RandNoTapeS Hz Hv0 Hvz =>
+    simp only [headStep]; exact (Cfg.uniform_possible Hz Hv0 Hvz).ne_zero
+  | RandNonposS Hz =>
+    simp [headStep, Cfg.uniform, Int.isPos, Hz]
+  | RandTapeS htape hz hv hσ =>
+    subst hz; subst hv; subst hσ; simp [headStep, htape]
+  | RandTapeEmptyS Hz htape hz Hv0 Hvz hσ =>
+    subst hσ; subst hz; simp only [headStep, htape, ↓reduceIte]
+    exact (Cfg.uniform_possible Hz Hv0 Hvz).ne_zero
+  | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
+    subst hσ; simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    exact (Cfg.uniform_possible Hz Hv0 Hvz).ne_zero
+  | RandTapeNonposEmptyS Hz htape hz =>
+    subst hz
+    simp [headStep, htape, Cfg.uniform, Int.isPos, Hz]
+  | RandTapeNonposOtherS Hz htape hzN =>
+    simp [headStep, htape, if_neg (Ne.symm hzN), Cfg.uniform, Int.isPos, Hz]
 
 /-- `→` direction of the continuous support characterisation. Unlike
 `HeadStepSupport.possible`, this needs `[MeasurableSingletonClass rT]`: recovering
@@ -2143,10 +2218,15 @@ theorem headStep_support_of_pos [MeasurableSingletonClass rT]
       intro a b hab; simp only [Cfg.mk.injEq, Exp.lit.injEq, BaseLit.real.injEq, and_true] at hab
       exact hab
     unfold Cfg.uniformReal at h
-    obtain ⟨r, hr, _⟩ := map_singleton_pos hg hinj h
+    obtain ⟨r, hr, hpos⟩ := map_singleton_pos hg hinj h
     rw [← hr]
     refine .UrandS (rT := rT) ?_
-    sorry
+    -- `r` carries positive `unifUnit`-mass, so it lies in `unifUnitSupport`:
+    -- otherwise `{r} ⊆ unifUnitSupportᶜ` would force `unifUnit {r} = 0`.
+    by_contra hr_notin
+    have hsub : ({r} : Set rT) ⊆ (ProbLangℝ.unifUnitSupport)ᶜ := by simpa using hr_notin
+    exact (ne_of_gt hpos)
+      (le_zero_iff.mp ((measure_mono hsub).trans_eq ProbLangℝ.unifUnitIsConcentrated))
 
 /-- `→` direction of the continuous support characterisation. Needs
 `[MeasurableSingletonClass rT]` (to recover *which* outcome occurred), but **not**
@@ -2156,14 +2236,6 @@ theorem Possible.headStepSupport [MeasurableSingletonClass rT]
     (h : Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩)) :
     HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ :=
   headStep_support_of_pos e1 e2 σ1 σ2 (possible_iff_pos.mp h)
-
-/-- Combined continuous characterisation. The `↔` carries
-`[MeasurableSingletonClass rT]` for the `→` direction; the `←` direction
-(`HeadStepSupport.possible`) is itself instance-free. **No `[Countable rT]`.** -/
-theorem headStep_possible_iff [MeasurableSingletonClass rT]
-    (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
-    Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩) ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ :=
-  ⟨Possible.headStepSupport, HeadStepSupport.possible⟩
 
 /-- **Atomicity of `headStep` (countability-free).** A nonzero head step has
 a support point: `headStep ⟨e, σ⟩` is always `0`, a `dirac`, or a
@@ -2223,9 +2295,10 @@ theorem headStep_exists_support_of_ne_zero
   case urand =>
     rename_i _ σ' heq
     obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..) ▸ heq
-    refine ⟨_, HeadStepSupport.UrandS (r := default) ?_⟩
-
-    sorry
+    -- `unifUnit` is a probability measure concentrated on `unifUnitSupport`, so
+    -- the support is nonempty; any of its points is a reachable real outcome.
+    obtain ⟨r, hr⟩ := ProbLangℝ.unifUnitSupport_nonempty rT
+    exact ⟨_, HeadStepSupport.UrandS (r := r) hr⟩
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
