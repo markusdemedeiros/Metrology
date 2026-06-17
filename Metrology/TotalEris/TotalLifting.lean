@@ -9,7 +9,6 @@ open scoped ENNReal
 
 namespace ProbLang
 
-
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 namespace TotalEris
@@ -17,54 +16,31 @@ namespace ErisWpGS
 
 variable {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
 
-/-! # Total-WP lifting lemmas
+/-! # Total-WP lifting lemmas -/
 
-Port of `clutch/theories/eris/total_lifting.v`. These let us prove
-`tgl_wp` triples by exhibiting an appropriate `glm` coupling. Mirrors
-the partial-WP lifting in `Metrology/TotalEris/Lifting.lean`. -/
-
--- omit [Countable rT] in
-/-- Lift a `glm`-shaped predicate into `tgl_wp`. Rocq:
-`twp_lift_step_fupd_glm`. -/
 theorem twp_lift_step_fupd_glm {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State rT) (ε₁ : ENNReal),
-      (stateInterp σ₁ ∗ errInterp (rT := rT) ε₁) -∗
-        |={E, ∅}=> glm' e₁ σ₁ ε₁ (fun ρ ε₂ =>
-          iprop(|={∅, E}=>
-            stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ))) ⊢@{IProp GF}
-      tglWp E e₁ Φ := by
+    (hv : e₁.toVal? = none) : iprop%
+    (∀ (σ₁ : State rT) (ε₁ : ENNReal), (stateInterp σ₁ ∗ errInterp (rT := rT) ε₁) -∗
+        |={E, ∅}=> glm' e₁ σ₁ ε₁ (fun ρ ε₂ => iprop%
+          |={∅, E}=> stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ))
+    ⊢@{IProp GF} tglWp E e₁ Φ := by
   iintro HG
   iapply tglWp_unfold
   unfold tglWpPre
   iintro %σ %ε ⟨Hσ, Hε⟩
-  rw [hv]
+  simp only [hv]
   iapply HG $$ %σ %ε
-  isplitl [Hσ]; · iexact Hσ
-  iexact Hε
+  iframe
 
-/-- **Generic single-step lifting**, parametrised by an arbitrary support family
-`R σ₁ : Cfg rT → Prop`. The prover supplies (i) measurability of each support
-`{ρ | R σ₁ ρ}` and (ii) a **`Concentrated`** certificate — `primStep ⟨e₁,σ₁⟩` lives
-on that support. The continuation is then quantified over `R σ₁`, error-free.
-
-This replaces the atomicity dependency in the critical path with the more general
-"concentrated on a measurable operational support" — the unary-lifting view. The
-atomic case (`twp_lift_step_fupd`) is the instance `R := Possible`; a future
-continuous sampler is the instance `R := reach`, with the `Concentrated` certificate
-from `concentratedOn_map`. -/
 theorem twp_lift_step_fupd_gen {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none)
-    (R : State rT → Cfg rT → Prop)
-    (hRmeas : ∀ σ₁, MeasurableSet {ρ | R σ₁ ρ})
-    (hconc : ∀ σ₁, Concentrated (primStep ⟨e₁, σ₁⟩) {ρ | R σ₁ ρ}) :
-    iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+    (hv : e₁.toVal? = none) (R : State rT → Cfg rT → Prop) (hRmeas : ∀ σ₁, MeasurableSet {ρ | R σ₁ ρ})
+    (hconc : ∀ σ₁, Concentrated (primStep ⟨e₁, σ₁⟩) {ρ | R σ₁ ρ}) : iprop%
+    (∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
+      ⌜Reducible e₁ σ₁⌝ ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜R σ₁ (⟨e₂, σ₂⟩ : Cfg rT)⌝) -∗
-        |={∅}=> |={∅, E}=>
-          stateInterp σ₂ ∗ tglWp E e₂ Φ) ⊢@{IProp GF}
-      tglWp E e₁ Φ := by
+        |={∅}=> |={∅, E}=> stateInterp σ₂ ∗ tglWp E e₂ Φ)
+    ⊢@{IProp GF} tglWp E e₁ Φ := by
   iintro H
   iapply twp_lift_step_fupd_glm hv
   iintro %σ₁ %ε₁ ⟨Hσ, Hε⟩
@@ -72,49 +48,34 @@ theorem twp_lift_step_fupd_gen {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : E
   imodintro
   iapply glm'_prim_step
   iexists (R σ₁), 0, (fun _ => ε₁), ε₁
-  isplitr; · ipureintro; exact Hred
-  isplitr; · ipureintro; exact hRmeas σ₁
-  isplitr; · ipureintro; intro _; exact _root_.le_refl _
+  have hfr (ρ : Cfg rT) : (fun x ↦ ε₁) ρ ≤ ε₁ := _root_.le_refl _
+  specialize hRmeas σ₁
+  have hfr' : Pgl 0 (R σ₁) (primStep ⟨e₁, σ₁⟩) := Pgl.of_concentrated (hconc σ₁)
+  iframe %Hred %hRmeas %hfr %hfr'
   isplitr
   · ipureintro
-    -- `ε₁ * primStep(univ) ≤ ε₁ * 1 = ε₁` for the sub-probability measure `primStep`.
-    rw [zero_add, MeasureTheory.lintegral_const]
-    calc ε₁ * primStep ⟨e₁, σ₁⟩ Set.univ
-        ≤ ε₁ * 1 := by gcongr; exact primStep_univ_le_one _
+    calc  0 + ∫⁻ ρ, (fun _ ↦ ε₁) ρ ∂primStep ⟨e₁, σ₁⟩
+        = ∫⁻ ρ, (fun _ ↦ ε₁) ρ ∂primStep ⟨e₁, σ₁⟩ := by grind
+      _ = ε₁ * primStep ⟨e₁, σ₁⟩ .univ := by rw [MeasureTheory.lintegral_const]
+      _ ≤ ε₁ * 1 := by gcongr; exact primStep_univ_le_one _
       _ = ε₁ := mul_one ε₁
-  -- `Pgl 0 R primStep`: the support `{R σ₁}` is co-null — exactly the
-  -- `Concentrated` certificate, bridged via `Pgl.of_concentrated`.
-  isplitr
-  · ipureintro
-    exact Pgl.of_concentrated (hconc σ₁)
   iintro %ρ %HR
   ispecialize HCont $$ %ρ.expr %ρ.state %HR
   imod HCont with HC
   imodintro
   iright
   imod HC with ⟨Hσ', HW⟩
-  imodintro
-  isplitl [Hσ']
-  · iexact Hσ'
-  isplitl [Hε]
-  · iexact Hε
-  iexact HW
+  iframe
 
-/-- Lift a step rule that doesn't need an `err_interp` change. The **atomic
-driver**: instantiates the generic `twp_lift_step_fupd_gen` with the atom support
-`R := Possible · (primStep …)`, discharging measurability via the countable-atoms
-proof (`measurableSet_primStep_support`) and concentration via `primStep_atomic`.
-
-Rocq: `twp_lift_step_fupd`. -/
 theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
+    (hv : e₁.toVal? = none) : iprop%
+    (∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E, ∅}=>
       (⌜Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩)⌝) -∗
         |={∅}=> |={∅, E}=>
-          stateInterp σ₂ ∗ tglWp E e₂ Φ) ⊢@{IProp GF}
-      tglWp E e₁ Φ :=
+          stateInterp σ₂ ∗ tglWp E e₂ Φ)
+      ⊢@{IProp GF} tglWp E e₁ Φ :=
   twp_lift_step_fupd_gen hv
     (fun σ₁ ρ => Possible ρ (primStep ⟨e₁, σ₁⟩))
     (fun σ₁ => by
@@ -126,55 +87,41 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
           = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} := Set.ext fun ρ => possible_iff_pos
       rw [hset]; exact (primStep_atomic e₁ σ₁).concentrated_atoms)
 
-/-- Lift an atomic-step (post-condition delivered on the value
-of the stepped expression). Rocq: `twp_lift_atomic_step_fupd`. -/
 theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) :
-    iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E₁}=>
-      (⌜Reducible e₁ σ₁⌝) ∗
+    (hv : e₁.toVal? = none) : iprop%
+    (∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E₁}=>
+      ⌜Reducible e₁ σ₁⌝ ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
         (⌜Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩)⌝) -∗ |={E₁}=>
           stateInterp σ₂ ∗
-          iprop(match e₂.toVal? with
-                | some v => Φ v
-                | none => iprop(False : IProp GF)))
+          iprop(match e₂.toVal? with | some v => Φ v | none => iprop(False : IProp GF)))
       ⊢@{IProp GF} tglWp E₁ e₁ Φ := by
   iintro H
-  iapply (twp_lift_step_fupd hv)
+  iapply twp_lift_step_fupd hv
   iintro %σ₁ Hσ
   imod H $$ %σ₁ Hσ with ⟨%Hred, HCont⟩
   imod (BIFUpdate.subset (E1 := E₁) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
-  isplitr; · ipureintro; exact Hred
+  iframe %Hred
   iintro %e₂ %σ₂ %Hstep
   imodintro
   imod Hclose
   ispecialize HCont $$ %e₂ %σ₂ %Hstep
   imod HCont with ⟨Hσ', HΦv⟩
   imodintro
-  isplitl [Hσ']; · iexact Hσ'
+  iframe Hσ'
   cases htv : e₂.toVal? with
-  | some v =>
-    iapply (tglWp_value_of_toVal htv)
-    iexact HΦv
-  | none =>
-    iexfalso
-    iexact HΦv
+  | some v => iapply tglWp_value_of_toVal htv $$ [$]
+  | none => iexfalso; iexact HΦv
 
-/-- Lift a pure (state-preserving, possibly-nondeterministic) reduction.
-Rocq: `twp_lift_pure_step`. -/
 theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none)
-    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
-    (Hstep : ∀ σ₁ e₂ σ₂, Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩) → σ₂ = σ₁) :
-    iprop(|={E}=>
-      ∀ (e₂ : Exp rT) (σ : State rT),
-        (⌜Possible (⟨e₂, σ⟩ : Cfg rT) (primStep ⟨e₁, σ⟩)⌝) -∗
-        tglWp E e₂ Φ) ⊢@{IProp GF}
-      tglWp E e₁ Φ := by
+    (hv : e₁.toVal? = none) (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (Hstep : ∀ σ₁ e₂ σ₂, Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩) → σ₂ = σ₁) : iprop%
+    (|={E}=> ∀ e₂ σ, ⌜Possible ⟨e₂, σ⟩ (primStep ⟨e₁, σ⟩)⌝ -∗ tglWp E e₂ Φ)
+    ⊢@{IProp GF} tglWp E e₁ Φ := by
   iintro H
-  iapply (twp_lift_step_fupd hv)
+  iapply twp_lift_step_fupd hv
   iintro %σ₁ Hσ
   imod H with H
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
@@ -189,7 +136,6 @@ theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   isplitl [Hσ]; · iexact Hσ
   iapply H; ipureintro; exact Hstep'
 
-/-- Single deterministic pure step. Rocq: `twp_lift_pure_det_step`. -/
 theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
@@ -206,13 +152,6 @@ theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e�
   subst heq
   iexact H
 
-/-! ## Head-step bridges
-
-The primitive WP laws prefer `headStep` over `primStep` because head steps
-are easier to discriminate (no ambient context). The bridges below convert
-between the two views. -/
-
-/-- Atomic-step lifting via `headStep`. Rocq: `twp_lift_atomic_head_step`. -/
 theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
     (hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State rT), stateInterp σ₁ -∗ |={E}=>
@@ -239,7 +178,6 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   have hpos : Possible (⟨e₂, σ₂⟩ : Cfg rT) (headStep ⟨e₁, σ₁⟩) := heq ▸ Hpstep
   iapply HCont $$ %e₂ %σ₂ %hpos
 
-/-- Pure-deterministic head-step lifting. Rocq: `twp_lift_pure_det_head_step`. -/
 theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, Possible ρ (headStep ⟨e₁, σ₁⟩))
@@ -255,13 +193,10 @@ theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e�
 
 /-! ## `PureExec_discrete` integration -/
 
-/-- From a single `PureStep_discrete e₁ e₂` (deterministic, state-preserving, safe),
-take one step. Used by the `n+1` case of `twp_pure_step_fupd`. -/
 theorem twp_lift_pure_det_step_of_pureStep
     {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (h : PureStep e₁ e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
-  -- The first reducibility witness gives us a non-value status.
   have hv : e₁.toVal? = none := Exp.toVal?_eq_none.mpr <| val_stuck <| h.safe default
   iapply twp_lift_pure_det_step hv h.safe
   intros σ e₂' σ₂ hp
@@ -271,12 +206,8 @@ theorem twp_lift_pure_det_step_of_pureStep
     intro heq
     cases heq
     exact hne ⟨rfl, rfl⟩
-  -- Determinacy: `primStep ⟨e₁,σ⟩ = dirac ⟨e₂,σ⟩`, so a positive-mass outcome must
-  -- *be* `⟨e₂,σ⟩` (via the measurability-free `dirac_singleton_pos'`), contradicting
-  -- `hother`.
   rw [hpt, possible_iff_pos, dirac_singleton_pos'] at hp
   exact hother hp.symm
-  -- exact absurd (hsum_le.trans htot) (_root_.not_le.mpr hsum_gt)
 
 theorem twp_pure_step_fupd
     {E : CoPset} {Φ : Val rT → IProp GF} {n : ℕ} {e₁ e₂ : Exp rT}

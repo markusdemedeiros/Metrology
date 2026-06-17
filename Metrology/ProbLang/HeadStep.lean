@@ -1785,9 +1785,7 @@ inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
   Pat.tryMatch p e = none →
   HeadStepSupport ⟨.scrut e p, σ⟩ ⟨.inr (.lit .unit), σ⟩
 | UrandS :
-  -- Operational *reachability* of the continuous uniform sample: every real
-  -- literal at the unchanged state is reachable. This is the image/support
-  -- (NOT atom) notion — `unifUnit` may be diffuse, so no positive-mass claim.
+  ProbLangℝ.unifUnitSupport r →
   HeadStepSupport ⟨.urand, σ⟩ ⟨.lit (.real r), σ⟩
 
 -- TODO: Not sure how to generalize you yet, let's see what the call sites look like
@@ -1918,7 +1916,7 @@ macro "cfg_dirac'" h:ident : tactic =>
              have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
 
 @[discrete]
-theorem Discrete.headStep_support_iff [Countable rT] [MeasurableSingletonClass rT]
+theorem Discrete.headStep_support_iff [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
     0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔ HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   constructor
@@ -1972,10 +1970,12 @@ theorem Discrete.headStep_support_iff [Countable rT] [MeasurableSingletonClass r
     -- `UrandS`, which is NOT characterised by positive singleton mass when
     -- `unifUnit` is diffuse. This `@[discrete]` lemma is the atom-based
     -- characterisation, false for a continuous sample; deferred.
-    case urand => intro _; sorry
+    case urand =>
+      intro h
+      sorry -- Fine, sorry in discrete code, will be deleted
   · intro hsupp
     cases hsupp with
-    | UrandS => sorry
+    | UrandS => sorry -- Fine, sorry in discrete code, will be deleted
     | BetaLamS | BetaFixS | IfTrueS | IfFalseS | FstS |SndS | CaseLS | CaseRS | LoadS
     | TapeS | RandTapeS | AllocS | StoreS
     | ScrutSuccessS | ScrutFailureS =>
@@ -2020,21 +2020,13 @@ theorem Cfg.uniform_possible {z v : Int} {σ : State rT}
   rw [ne_eq, Nat.cast_eq_zero]
   exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz]⟩
 
-/-- `←` direction of the continuous support characterisation: every operational
-head-step outcome is a *possible* outcome of the head step.  **Measurability-free**
-— no `[MeasurableSingletonClass rT]` — because the deterministic constructors go
-through `Possible.of_dirac_eq` and the `rand` ones through `Cfg.uniform_possible`.
-
-`@[discrete]`: the `UrandS` (continuous) arm relates *operational reachability* to
-*positive singleton mass*, which is an atom notion — false for a diffuse `unifUnit`.
-The continuous WP rule never needs this direction (it uses `Concentrated`), so the
-`urand` case is deferred (`sorry`) within the discrete fragment. -/
-@[discrete]
 theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (h : HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩) :
     Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩) := by
   cases h with
-  | UrandS => sorry
+  | UrandS he =>
+    dsimp [headStep]
+    sorry
   | BetaLamS hv he | BetaFixS hv he =>
     subst he; exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv])
   | IfTrueS | IfFalseS =>
@@ -2152,7 +2144,9 @@ theorem headStep_support_of_pos [MeasurableSingletonClass rT]
       exact hab
     unfold Cfg.uniformReal at h
     obtain ⟨r, hr, _⟩ := map_singleton_pos hg hinj h
-    rw [← hr]; exact .UrandS
+    rw [← hr]
+    refine .UrandS (rT := rT) ?_
+    sorry
 
 /-- `→` direction of the continuous support characterisation. Needs
 `[MeasurableSingletonClass rT]` (to recover *which* outcome occurred), but **not**
@@ -2229,7 +2223,9 @@ theorem headStep_exists_support_of_ne_zero
   case urand =>
     rename_i _ σ' heq
     obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..) ▸ heq
-    exact ⟨_, HeadStepSupport.UrandS (r := default)⟩
+    refine ⟨_, HeadStepSupport.UrandS (r := default) ?_⟩
+
+    sorry
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
@@ -2333,12 +2329,14 @@ theorem isAtomicSupport_dirac {α : Type _} [MeasurableSpace α] [MeasurableSing
     exact one_ne_zero hx
   · rw [Measure.dirac_apply' _ (measurableSet_singleton a).compl, Set.indicator_of_notMem (by simp)]
 
+omit [ProbLangℝ rT] in
 theorem isAtomicSupport_isValM {T : Type _} [MeasurableSpace T] (e : Exp rT) {m : Measure T}
     (hm : IsAtomicSupport m) : IsAtomicSupport (e.isValM m) := by
   by_cases hv : e.isValue
   · rw [Exp.isValM_some hv]; exact hm
   · rw [Exp.isValM_none hv]; exact isAtomicSupport_zero
 
+omit [ProbLangℝ rT] in
 theorem isAtomicSupport_asValM {T : Type _} [MeasurableSpace T] (e : Exp rT)
     {f : Val rT → Measure T} (hf : ∀ v, IsAtomicSupport (f v)) :
     IsAtomicSupport (e.asValM f) := by

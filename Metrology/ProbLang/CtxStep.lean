@@ -802,7 +802,6 @@ theorem measurableSet_primStep_support [ProbLangℝ rT] (e : Exp rT) (σ : State
 set of points it gives zero mass to. Transfers `headStep_atomic` through the
 injective pushforward `K.fillCfg` (so the co-support pulls back to `headStep`'s
 co-support, with no need for `fillCfg`-image measurability). -/
-@[discrete]
 theorem primStep_atomic [ProbLangℝ rT] (e : Exp rT) (σ : State rT) :
     IsAtomicSupport (primStep ⟨e, σ⟩) := by
   have hmeas : Measurable e.decomp.1.fillCfg := by measurability

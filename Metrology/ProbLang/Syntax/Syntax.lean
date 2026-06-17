@@ -106,6 +106,7 @@ abbrev Loc : Type := Int
 
 abbrev Lbl : Type := Int
 
+
 /-- Type of real numbers equipped with some base sigma algebra.
 ProbLang is parameterized by this type, and the type of expressions is discrete
 when the type of reals is also discrete.
@@ -114,14 +115,28 @@ This allows us to gradually port the development to use a continuous semantics. 
 class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, Inhabited T,
     MeasurableEq T where
   instDecidableEq : DecidableEq T
-  /-- The uniform probability distribution on the unit interval `[0,1]`. This is the
-  measure a continuous uniform sample (`Exp.urand`) draws from. -/
   unifUnit : MeasureTheory.Measure T
-  /-- `unifUnit` is a genuine probability measure (total mass `1`). -/
   unifUnit_isProbabilityMeasure : MeasureTheory.IsProbabilityMeasure unifUnit
+  unifUnitSupport : Set T
+  unifUnitSupportMeasurable : MeasurableSet unifUnitSupport
+  unifUnitIsConcentrated : unifUnit unifUnitSupportᶜ = 0
 
 attribute [reducible, instance] ProbLangℝ.instDecidableEq
 attribute [instance] ProbLangℝ.unifUnit_isProbabilityMeasure
+
+/-- The unit-interval sampling support is nonempty: `unifUnit` is a probability
+measure (`unifUnit univ = 1`) yet it is concentrated on `unifUnitSupport`
+(`unifUnit unifUnitSupportᶜ = 0`), so an empty support would force
+`unifUnit univ = 0`. -/
+theorem ProbLangℝ.unifUnitSupport_nonempty (T : Type _) [ProbLangℝ T] :
+    (ProbLangℝ.unifUnitSupport (T := T)).Nonempty := by
+  rw [Set.nonempty_iff_ne_empty]
+  rintro hempty
+  have h1 : ProbLangℝ.unifUnit (Set.univ : Set T) = 0 := by
+    have : (ProbLangℝ.unifUnitSupport (T := T))ᶜ = Set.univ := by rw [hempty]; simp
+    rw [← this]; exact ProbLangℝ.unifUnitIsConcentrated
+  rw [MeasureTheory.measure_univ] at h1
+  exact one_ne_zero h1
 
 /-- Type of base literals with a given type of reals. Countable etc when rT is. -/
 @[uncurriedProjections, curriedProjections, constructors]

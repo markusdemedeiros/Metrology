@@ -1115,7 +1115,9 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
           exact ⟨_, .RandTapeNonposEmptyS hz htape hzN⟩
       | randTapeNonposOther hz htape hzN =>
           exact ⟨_, .RandTapeNonposOtherS hz htape hzN⟩
-      | urand => exact ⟨_, .UrandS (r := default)⟩
+      | urand =>
+          refine ⟨_, .UrandS (r := default) ?_⟩
+          sorry
   · rintro ⟨ρ', hsupp⟩
     cases hsupp with
     | BetaLamS hv _ => exact .inl (.betaLam hv)

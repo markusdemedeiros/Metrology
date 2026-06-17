@@ -8,28 +8,14 @@ public import Metrology.Iris.SpecRules  -- for `ExtTreeMap.insert_eq_PartialMap_
 
 /-!
 # Total-correctness primitive WP laws
+-/
 
-Port of `clutch/theories/eris/total_primitive_laws.v`. Adapts the partial-WP
-versions in `Metrology/Approxis/PrimitiveLaws.lean` to `tglWp` by:
-
-* replacing `wp_lift_atomic_head_step` with `twp_lift_atomic_head_step`,
-* dropping the `▷` (no `iintro !>` needed since `tglWp` has no later guard).
-
-Notation `↦`, `↪ₐ`, `↯` comes from `Metrology/Iris/{AppProgram,ErrorCredits}`. -/
-
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
-  ProbLang.TotalEris.ErisWpGS
+open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris ProbLang.TotalEris.ErisWpGS
 open scoped AppGS
 
 namespace ProbLang
 
-
 variable {rT : Type _}
-
-/-! ### `toVal?` simp lemmas for head-step successor expressions
-
-Local re-statement so this file does not depend on Approxis's
-`PrimitiveLaws.lean` (eris should not need Approxis at all). -/
 
 @[simp] theorem Exp.toVal?_lit (b : BaseLit rT) :
     (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit⟩ := rfl
@@ -48,18 +34,17 @@ namespace TotalEris
 
 section Lifting
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [ProbLangℝ rT] [Countable rT] [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ProbLangℝ rT] [ErisGS rT hlc GF]
 
 /-! ## Heap operations -/
 
-/-- Allocation. Rocq: `twp_alloc`. -/
-theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
-    iprop(∀ (l : Loc), appHeapFrag l v -∗ Φ (⟨.lit (.loc l), IsVal.lit⟩ : Val rT))
+theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} : iprop%
+    (∀ (l : Loc), appHeapFrag l v -∗ Φ ⟨.lit (.loc l), .lit⟩)
       ⊢@{IProp GF} tglWp E (.alloc (.ofVal v)) Φ := by
   iintro HΦ
   have Hv : (Exp.alloc (Exp.ofVal v) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply (twp_lift_atomic_head_step Hv)
+  iapply twp_lift_atomic_head_step Hv
   iintro %σ₁ Hσ
   imodintro
   isplitr
@@ -70,25 +55,22 @@ theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
   cases Hstep with
   | AllocS hvd hl hσ =>
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hl; subst hσ
-    ihave HAlloc := app_state_heap_alloc (GF := GF) (σ := σ₁) v $$ Hσ
-    imod HAlloc with ⟨Hσ', Hl⟩
+    imod app_state_heap_alloc v $$ Hσ with ⟨Hσ', Hl⟩
     imodintro
     simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert,
       Exp.toVal?_lit]
-    isplitl [Hσ']; · iexact Hσ'
-    iapply HΦ $$ %σ₁.heap.fresh
-    iexact Hl
+    iframe Hσ'
+    iapply HΦ $$ %σ₁.heap.fresh Hl
 
 /-- Load. Rocq: `twp_load`. -/
-theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} :
-    iprop(appHeapFrag l v ∗ (appHeapFrag l v -∗ Φ v))
-      ⊢@{IProp GF} tglWp E (.load (.lit (.loc l))) Φ := by
+theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} : iprop%
+    (l ↦ v ∗ (l ↦ v -∗ Φ v)) ⊢@{IProp GF} tglWp E (.load (.lit (.loc l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   have Hv : (Exp.load (Exp.lit (.loc l)) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply (twp_lift_atomic_head_step Hv)
+  iapply twp_lift_atomic_head_step Hv
   iintro %σ₁ Hσ
-  ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
+  ihave %hlook := app_state_lookup_heap $$ Hσ Hl
   imodintro
   isplitr
   · ipureintro
@@ -100,18 +82,17 @@ theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} 
     rw [hlook] at hlook'; cases hlook'; subst hofv
     imodintro
     simp only [erisWpGS_stateInterp_eq, Exp.toVal?_ofVal]
-    isplitl [Hσ]; · iexact Hσ
-    iapply HΦ; iexact Hl
+    iframe Hσ
+    iapply HΦ $$ Hl
 
 /-- Store. Rocq: `twp_store`. -/
-theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp GF} :
-    iprop(appHeapFrag l v' ∗
-        (appHeapFrag l v -∗ Φ (⟨.lit .unit, IsVal.lit⟩ : Val rT)))
+theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp GF} : iprop%
+    l ↦ v' ∗ (l ↦ v -∗ Φ ⟨.lit .unit, .lit⟩)
       ⊢@{IProp GF} tglWp E (.store (.lit (.loc l)) (.ofVal v)) Φ := by
   iintro ⟨Hl, HΦ⟩
   have Hv : (Exp.store (Exp.lit (.loc l)) (Exp.ofVal v) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply (twp_lift_atomic_head_step Hv)
+  iapply twp_lift_atomic_head_step Hv
   iintro %σ₁ Hσ
   ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
@@ -127,22 +108,20 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
     ihave HUpd := app_state_update_heap (GF := GF) (σ := σ₁) (w := v) $$ Hσ Hl
     imod HUpd with ⟨Hσ', Hl'⟩
     imodintro
-    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert,
-      Exp.toVal?_lit]
-    isplitl [Hσ']; · iexact Hσ'
-    iapply HΦ; iexact Hl'
+    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
+    iframe Hσ'
+    iapply HΦ $$ Hl'
 
 /-! ## Tape operations -/
 
 /-- Allocate a fresh tape. Rocq: `twp_alloc_tape`. -/
 theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
-    iprop(∀ (l : Loc), appTapesFrag l (Tape.empty z) -∗
-        Φ (⟨.lit (.lbl l), IsVal.lit⟩ : Val rT))
+    (∀ (l : Loc), l ↪ₐ (Tape.empty z) -∗ Φ ⟨.lit (.lbl l), .lit⟩)
       ⊢@{IProp GF} tglWp E (.tape (.lit (.int z))) Φ := by
   iintro HΦ
   have Hv : (Exp.tape (Exp.lit (.int z)) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply (twp_lift_atomic_head_step Hv)
+  iapply twp_lift_atomic_head_step Hv
   iintro %σ₁ Hσ
   imodintro
   isplitr
@@ -153,26 +132,22 @@ theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
   cases Hstep with
   | TapeS hl hσ =>
     subst hl; subst hσ
-    ihave HAlloc := app_state_tape_alloc (GF := GF) (σ := σ₁) (Tape.empty z) $$ Hσ
-    imod HAlloc with ⟨Hσ', Hl⟩
+    imod app_state_tape_alloc (Tape.empty z) $$ Hσ with ⟨Hσ', Hl⟩
     imodintro
-    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert,
-      Exp.toVal?_lit]
-    isplitl [Hσ']; · iexact Hσ'
+    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
+    iframe Hσ'
     iapply HΦ $$ %σ₁.tapes.fresh
     iexact Hl
 
 /-! ## Random sampling -/
 
-/-- Uniform sample from `[0, z)`. Rocq: `twp_rand`. -/
-theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) :
-    iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
-        Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT))
+theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) : iprop%
+    (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ Φ ⟨.lit (.int n), .lit⟩)
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro HΦ
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply (twp_lift_atomic_head_step Hv)
+  iapply twp_lift_atomic_head_step Hv
   iintro %σ₁ Hσ
   imodintro
   isplitr
@@ -184,24 +159,20 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
   | RandNoTapeS _ Hv0 Hvz =>
     imodintro
     simp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
-    isplitl [Hσ]; · iexact Hσ
+    iframe Hσ
     iapply HΦ
     ipureintro
     exact ⟨Hv0, Hvz⟩
   | RandNonposS hnz => exact absurd Hz hnz
 
-/-- Read the head of a non-empty tape. Rocq: `twp_rand_tape`. -/
-theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int}
-    {n : { z' : Int // 0 ≤ z' ∧ z' < z }}
-    {ns : List { z' : Int // 0 ≤ z' ∧ z' < z }}
-    {Φ : Val rT → IProp GF} :
-    iprop(l ↪ₐ ⟨z, n :: ns⟩ ∗
-        (l ↪ₐ ⟨z, ns⟩ -∗ Φ (⟨.lit (.int n.val), IsVal.lit⟩ : Val rT)))
+theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : { z' : Int // 0 ≤ z' ∧ z' < z }}
+    {ns : List { z' : Int // 0 ≤ z' ∧ z' < z }} {Φ : Val rT → IProp GF} : iprop%
+    (l ↪ₐ ⟨z, n :: ns⟩ ∗ (l ↪ₐ ⟨z, ns⟩ -∗ Φ ⟨.lit (.int n.val), .lit⟩))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply (twp_lift_atomic_head_step Hv)
+  iapply twp_lift_atomic_head_step Hv
   iintro %σ₁ Hσ
   ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hl
   have Hzpos : 0 < z := _root_.lt_of_le_of_lt n.2.1 n.2.2
@@ -216,32 +187,25 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int}
     rw [hlook] at hlook'
     cases hlook'
     subst hσ; subst hv
-    ihave HUpd := app_state_update_tape (GF := GF) (σ := σ₁) (s := ⟨z, ns⟩) $$ Hσ Hl
-    imod HUpd with ⟨Hσ', Hl'⟩
+    imod app_state_update_tape (s := ⟨z, ns⟩) $$ Hσ Hl with ⟨Hσ', Hl'⟩
     imodintro
-    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert,
-      Exp.toVal?_lit]
-    isplitl [Hσ']; · iexact Hσ'
-    iapply HΦ; iexact Hl'
-  | RandTapeEmptyS _ hlook' _ _ _ _ =>
-    rw [hlook] at hlook'; cases hlook'
+    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
+    iframe Hσ'
+    iapply HΦ $$ Hl'
+  | RandTapeEmptyS _ hlook' _ _ _ _ => rw [hlook] at hlook'; cases hlook'
   | RandTapeOtherS _ hlook' hne _ _ _ =>
     rw [hlook] at hlook'; cases hlook'; exact absurd rfl hne
   | RandTapeNonposEmptyS hnz _ _ => exact absurd Hzpos hnz
   | RandTapeNonposOtherS hnz _ _ => exact absurd Hzpos hnz
 
-/-- Read from an empty tape: falls through to uniform sampling.
-Rocq: `twp_rand_tape_empty`. -/
 theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
-    {Φ : Val rT → IProp GF} (Hz : 0 < z) :
-    iprop(l ↪ₐ ⟨z, []⟩ ∗
-        (∀ (n : Int), l ↪ₐ ⟨z, []⟩ -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
+    {Φ : Val rT → IProp GF} (Hz : 0 < z) : iprop%
+    (l ↪ₐ ⟨z, []⟩ ∗ (∀ (n : Int), l ↪ₐ ⟨z, []⟩ -∗ (⌜0 ≤ n ∧ n < z⌝) -∗ Φ ⟨.lit (.int n), .lit⟩))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  iapply (twp_lift_atomic_head_step Hv)
+  iapply twp_lift_atomic_head_step Hv
   iintro %σ₁ Hσ
   ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
@@ -251,13 +215,12 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   iintro %e₂ %σ₂ %Hstep
   rw [headStep_possible_iff] at Hstep
   cases Hstep with
-  | RandTapeS hlook' _ _ _ =>
-    rw [hlook] at hlook'; cases hlook'
+  | RandTapeS hlook' _ _ _ => rw [hlook] at hlook'; cases hlook'
   | RandTapeEmptyS _ _ _ Hv0 Hvz hσ =>
     subst hσ
     imodintro
     simp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
-    isplitl [Hσ]; · iexact Hσ
+    iframe Hσ
     iapply HΦ $$ Hl
     ipureintro; exact ⟨Hv0, Hvz⟩
   | RandTapeOtherS _ hlook' hne _ _ _ =>
