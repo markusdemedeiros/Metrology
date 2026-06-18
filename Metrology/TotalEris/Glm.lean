@@ -29,27 +29,20 @@ namespace TotalEris
 
 @[expose]
 def Pgl {α : Type _} [MeasurableSpace α] (ε : ENNReal) (φ : α → Prop)
-  (μ : MeasureTheory.Measure α) : Prop :=
-  μ {x | ¬ φ x} ≤ ε
+  (μ : MeasureTheory.Measure α) : Prop := μ {x | ¬ φ x} ≤ ε
 
 namespace Pgl
 
 variable {α β : Type _} [MeasurableSpace α] [MeasurableSpace β]
 
-/-- Monotonicity in the error grade. -/
 theorem mono_grading {ε ε' : ENNReal} {φ : α → Prop} {μ : MeasureTheory.Measure α}
-    (hε : ε ≤ ε') (h : Pgl ε φ μ) : Pgl ε' φ μ :=
-  h.trans hε
+    (hε : ε ≤ ε') (h : Pgl ε φ μ) : Pgl ε' φ μ := h.trans hε
 
-/-- Monotonicity in the predicate (covariant). -/
 theorem mono_pred {ε : ENNReal} {φ ψ : α → Prop} {μ : MeasureTheory.Measure α}
     (hφψ : ∀ a, φ a → ψ a) (h : Pgl ε φ μ) : Pgl ε ψ μ := by
   refine .trans (MeasureTheory.measure_mono ?_) h
   intro x hx hxφ; exact hx (hφψ x hxφ)
 
-/-- On a countable measurable space, `Pgl 0` holds for the "positive mass"
-predicate: a measure assigns zero mass to the set of points it gives zero mass
-to (since that set is countable). -/
 @[discrete]
 theorem zero_positive [Countable α] (μ : MeasureTheory.Measure α) :
     Pgl 0 (fun a => 0 < μ {a}) μ := by
@@ -61,12 +54,6 @@ theorem zero_positive [Countable α] (μ : MeasureTheory.Measure α) :
     Set.Countable.mono (Set.subset_univ _) Set.countable_univ
   exact ((MeasureTheory.measure_null_iff_singleton hctble).mpr (fun _ hx => hx)).le
 
-/-- `Possible`-native `Pgl 0`: an *atomic* measure assigns zero mass to the
-complement of its `Possible`-support. This is the measurability-free /
-countability-free reformulation of `zero_positive`: instead of `[Countable α]`
-it takes `IsAtomicSupport μ` (the co-support `{x | μ{x}=0}` is null) and only
-needs measurable singletons. `IsAtomicSupport μ ↔ Pgl 0 (Possible · μ) μ`, so
-this is exactly the atomicity certificate the step rules feed to `glm'`. -/
 theorem zero_possible [MeasurableSingletonClass α] {μ : MeasureTheory.Measure α}
     (h : IsAtomicSupport μ) : Pgl 0 (fun a => Possible a μ) μ := by
   show μ {x | ¬ Possible x μ} ≤ 0
@@ -74,9 +61,6 @@ theorem zero_possible [MeasurableSingletonClass α] {μ : MeasureTheory.Measure 
     ext x; simp [possible_iff_pos, pos_iff_ne_zero]
   rw [hset]; exact h.le
 
-/-- `Pgl 0` is exactly concentration on the predicate's set: `Concentrated μ {φ}`
-gives the zero-error lifting `Pgl 0 φ μ`. This is the bridge by which the generic
-step rule consumes a `Concentrated` support certificate (atomic or diffuse). -/
 theorem of_concentrated {μ : MeasureTheory.Measure α} {φ : α → Prop}
     (h : Concentrated μ {x | φ x}) : Pgl 0 φ μ := by
   show μ {x | ¬ φ x} ≤ 0
