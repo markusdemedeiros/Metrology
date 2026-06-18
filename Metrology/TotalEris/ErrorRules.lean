@@ -5,183 +5,101 @@ public import Metrology.TotalEris.TotalPrimitiveLaws
 
 @[expose] public section
 
-/-!
-# Selective port of Eris error rules
+/-! # Error credit rules  -/
 
-Port of the *subset* of `clutch/theories/eris/error_rules.v` needed by the
-target examples. The error-credit ghost-state lemmas (`split`, `combine`,
-`weaken`, `contradict`, `zero`, amplification family) are already in
-`Metrology/Iris/ErrorCredits.lean` under the `ErrorCredit` namespace.
-
-This file just re-exports the relevant ones under conventional Rocq-style
-names (`ec_split`, `ec_combine`, …) so example proofs can stay close to the
-Rocq text. -/
-
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
-  ProbLang.TotalEris.ErisWpGS
+open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris ProbLang.TotalEris.ErisWpGS
 open scoped ENNReal AppGS
 
 namespace ProbLang
 
-
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
-/-- Measurability of an integer-literal reader
-`fun e => match e with | .lit (.int n) => g n | _ => 0` on `Exp rT`, for any
-`g : Int → ENNReal`. Countability-free: built from the `Exp`/`BaseLit` structural
-recursion measurability keystones (`measurable_struct_rec` / `BaseLit.measurable_rec`).
-Shared by the advanced-composition rules' integral side conditions
-(`twp_rand_adv_comp`, `twp_presample_adv_comp`). -/
-theorem measurable_litInt_elim (g : Int → ENNReal) :
-    Measurable (fun e : Exp rT => match e with
-      | .lit (.int n) => g n
-      | _ => (0 : ENNReal)) := by
-  -- The `.lit` branch's combinator, proved measurable via `BaseLit.measurable_rec`
-  -- after bridging the `match` to its `casesOn` normal form.
-  have hlit : Measurable (fun b : BaseLit rT =>
-      match b with | .int n => g n | _ => (0 : ENNReal)) := by
-    have heq : (fun b : BaseLit rT => match b with | .int n => g n | _ => (0 : ENNReal))
-        = (fun b : BaseLit rT => BaseLit.casesOn (motive := fun _ => ENNReal) b
-            g (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) (fun _ => 0)) := by
-      funext b; cases b <;> rfl
-    rw [heq]
-    exact BaseLit.measurable_rec g (fun _ => 0) (fun _ => 0) (fun _ => 0)
-      (fun _ => 0) (fun _ => 0) measurable_const
-  apply Exp.measurable_struct_rec
-    (f := fun e : Exp rT => match e with | .lit (.int n) => g n | _ => (0 : ENNReal))
-    (c_bvar := fun _ => 0) (c_fvar := fun _ => 0)
-    (c_lit := fun b => match b with | .int n => g n | _ => (0 : ENNReal))
-    (c_lam := fun _ => 0) (c_fix := fun _ => 0)
-    (c_app := fun _ _ => 0) (c_unop := fun _ _ => 0) (c_binop := fun _ _ _ => 0)
-    (c_cond := fun _ _ _ => 0) (c_pair := fun _ _ => 0)
-    (c_fst := fun _ => 0) (c_snd := fun _ => 0)
-    (c_inl := fun _ => 0) (c_inr := fun _ => 0) (c_case := fun _ _ _ => 0)
-    (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ _ => 0)
-    (c_tape := fun _ => 0) (c_rand := fun _ _ => 0) (c_fail := (0 : ENNReal))
-    (c_scrut := fun _ _ => 0)
-  all_goals first
-    | (intros; rfl)
-    | rfl
-    | exact hlit
-    | (intro b; cases b <;> rfl)
-    | fun_prop
+-- TODO: Move me
+def Exp.asLit (default : ℝ≥0∞) (value : BaseLit rT → ℝ≥0∞) : Exp rT → ℝ≥0∞ :=
+  (fun x => x.getD default) ∘ Option.map value ∘ Exp.lit.π
 
-/-- Continuous analogue of `measurable_litInt_elim`: the real-literal eliminator
-is measurable when its payload map `g : rT → ENNReal` is. Used to push the
-error-credit integrand through the `urand` pushforward `unifUnit.map (⟨.lit (.real ·), σ⟩)`. -/
+-- TODO: Move me
+-- TODO: Prove all of my siblings, for all measurable types
+@[fun_prop]
+theorem Exp.lit.π.measurable : Measurable (Exp.lit.π : Exp rT → Option (BaseLit rT)) := by
+  refine Measurable.option_of_cov (cov := Set.range (Exp.lit : BaseLit rT → Exp rT))
+    Exp.lit.measurableEmbedding.measurableSet_range ?_ ?_
+  · ext e; cases e <;> simp [Exp.lit.π]
+  · intro S hS
+    have h : (Exp.lit.π : Exp rT → Option (BaseLit rT)) ⁻¹' (some '' S) = Exp.lit '' S := by
+      ext e; cases e <;> simp [Exp.lit.π]
+    rw [h]; exact Exp.lit.measurableEmbedding.measurableSet_image' hS
+
+-- TODO: Move me
+@[fun_prop]
+theorem Exp.asValue_measurable (default : ℝ≥0∞) (value : BaseLit rT → ℝ≥0∞) (Hm : Measurable value) :
+    Measurable (Exp.asLit default value) :=
+  -- TODO: I should be by fun_prop
+  ((Option.measurable_getD default).comp (Measurable.option_map Hm)).comp Exp.lit.π.measurable
+
+def BaseLit.asInt (default : ℝ≥0∞) (value : Int → ℝ≥0∞) : BaseLit rT → ℝ≥0∞ :=
+  (fun x => x.getD default) ∘ Option.map value ∘ BaseLit.int.π
+
+@[fun_prop]
+theorem BaseLit.int.π.measurable : Measurable (BaseLit.int.π : BaseLit rT → Option Int) := by
+  refine Measurable.option_of_cov (cov := Set.range (BaseLit.int : Int → BaseLit rT))
+    BaseLit.int.measurableEmbedding.measurableSet_range ?_ ?_
+  · ext b; cases b <;> simp [BaseLit.int.π]
+  · intro S hS
+    have h : (BaseLit.int.π : BaseLit rT → Option Int) ⁻¹' (some '' S) = BaseLit.int '' S := by
+      ext b; cases b <;> simp [BaseLit.int.π]
+    rw [h]; exact BaseLit.int.measurableEmbedding.measurableSet_image' hS
+
+-- `value : Int → ℝ≥0∞` needs no measurability hypothesis: `Int` carries the `⊤` σ-algebra.
+@[fun_prop]
+theorem BaseLit.asInt_measurable (default : ℝ≥0∞) (value : Int → ℝ≥0∞) :
+    Measurable (BaseLit.asInt (rT := rT) default value) :=
+  ((Option.measurable_getD default).comp (Measurable.option_map measurable_from_top)).comp
+    BaseLit.int.π.measurable
+
+def BaseLit.asReal (default : ℝ≥0∞) (value : rT → ℝ≥0∞) : BaseLit rT → ℝ≥0∞ :=
+  (fun x => x.getD default) ∘ Option.map value ∘ BaseLit.real.π
+
+@[fun_prop]
+theorem BaseLit.real.π.measurable : Measurable (BaseLit.real.π : BaseLit rT → Option rT) := by
+  refine Measurable.option_of_cov (cov := Set.range (BaseLit.real : rT → BaseLit rT))
+    BaseLit.real.measurableEmbedding.measurableSet_range ?_ ?_
+  · ext b; cases b <;> simp [BaseLit.real.π]
+  · intro S hS
+    have h : (BaseLit.real.π : BaseLit rT → Option rT) ⁻¹' (some '' S) = BaseLit.real '' S := by
+      ext b; cases b <;> simp [BaseLit.real.π]
+    rw [h]; exact BaseLit.real.measurableEmbedding.measurableSet_image' hS
+
+@[fun_prop]
+theorem BaseLit.asReal_measurable (default : ℝ≥0∞) (value : rT → ℝ≥0∞) (hv : Measurable value) :
+    Measurable (BaseLit.asReal default value) :=
+  ((Option.measurable_getD default).comp (Measurable.option_map hv)).comp
+    BaseLit.real.π.measurable
+
+theorem measurable_litInt_elim (g : Int → ENNReal) :
+    Measurable (fun e : Exp rT => match e with | .lit (.int n) => g n | _ => 0) := by
+  convert_to Measurable (Exp.asLit 0 (BaseLit.asInt 0 g))
+  swap; fun_prop
+  ext e
+  cases e <;> try rfl
+  case lit b => cases b <;> rfl
+
 theorem measurable_litReal_elim (g : rT → ENNReal) (hg : Measurable g) :
-    Measurable (fun e : Exp rT => match e with
-      | .lit (.real r) => g r
-      | _ => (0 : ENNReal)) := by
-  have hlit : Measurable (fun b : BaseLit rT =>
-      match b with | .real r => g r | _ => (0 : ENNReal)) := by
-    have heq : (fun b : BaseLit rT => match b with | .real r => g r | _ => (0 : ENNReal))
-        = (fun b : BaseLit rT => BaseLit.casesOn (motive := fun _ => ENNReal) b
-            (fun _ => 0) (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) g) := by
-      funext b; cases b <;> rfl
-    rw [heq]
-    exact BaseLit.measurable_rec (fun _ => 0) (fun _ => 0) (fun _ => 0)
-      (fun _ => 0) (fun _ => 0) g hg
-  apply Exp.measurable_struct_rec
-    (f := fun e : Exp rT => match e with | .lit (.real r) => g r | _ => (0 : ENNReal))
-    (c_bvar := fun _ => 0) (c_fvar := fun _ => 0)
-    (c_lit := fun b => match b with | .real r => g r | _ => (0 : ENNReal))
-    (c_lam := fun _ => 0) (c_fix := fun _ => 0)
-    (c_app := fun _ _ => 0) (c_unop := fun _ _ => 0) (c_binop := fun _ _ _ => 0)
-    (c_cond := fun _ _ _ => 0) (c_pair := fun _ _ => 0)
-    (c_fst := fun _ => 0) (c_snd := fun _ => 0)
-    (c_inl := fun _ => 0) (c_inr := fun _ => 0) (c_case := fun _ _ _ => 0)
-    (c_alloc := fun _ => 0) (c_load := fun _ => 0) (c_store := fun _ _ => 0)
-    (c_tape := fun _ => 0) (c_rand := fun _ _ => 0) (c_fail := (0 : ENNReal))
-    (c_scrut := fun _ _ => 0)
-  all_goals first
-    | (intros; rfl)
-    | rfl
-    | exact hlit
-    | (intro b; cases b <;> rfl)
-    | fun_prop
+    Measurable (fun e : Exp rT => match e with | .lit (.real r) => g r | _ => 0) := by
+  convert_to Measurable (Exp.asLit 0 (BaseLit.asReal 0 g))
+  swap; fun_prop
+  ext e
+  cases e <;> try rfl
+  case lit r => cases r <;> rfl
+
+
+
+
+
 
 namespace TotalEris
 
-variable {hlc : HasLC} {GF : BundledGFunctors}
-
-section ECGSOnly
-
-variable [ECGS GF]
-
-/-! ## Error-credit re-exports
-
-These delegate to `Metrology.Iris.ErrorCredits` lemmas in the `ErrorCredit`
-namespace. The chosen names mirror Rocq (`ec_split`, …). -/
-
-/-- `↯(ε₁ + ε₂) ⊢ ↯ε₁ ∗ ↯ε₂`. Rocq: `ec_split`. -/
-theorem ec_split {ε₁ ε₂ : ENNReal} :
-    iprop(↯(ε₁ + ε₂)) ⊢@{IProp GF} iprop(↯ε₁ ∗ ↯ε₂) :=
-  ErrorCredit.split
-
-/-- `↯ε₁ ∗ ↯ε₂ ⊢ ↯(ε₁ + ε₂)`. Rocq: `ec_combine`. -/
-theorem ec_combine {ε₁ ε₂ : ENNReal} :
-    iprop(↯ε₁ ∗ ↯ε₂) ⊢@{IProp GF} iprop(↯(ε₁ + ε₂)) :=
-  ErrorCredit.combine
-
-/-- Definitional equality on credits. Rocq: `ec_eq`. -/
-theorem ec_eq {ε₁ ε₂ : ENNReal} (h : ε₁ = ε₂) :
-    iprop(↯ε₁) ⊢@{IProp GF} iprop(↯ε₂) :=
-  ErrorCredit.ext h
-
-/-- `1 ≤ ε → ↯ε ⊢ False`. Rocq: `ec_contradict`. -/
-theorem ec_contradict {ε : ENNReal} (h : 1 ≤ ε) :
-    iprop(↯ε) ⊢@{IProp GF} iprop(False : IProp GF) :=
-  ErrorCredit.contradict h
-
-/-- `ε₂ ≤ ε₁ → ↯ε₁ ⊢ ↯ε₂`. Rocq: `ec_weaken`. -/
-theorem ec_weaken {ε₁ ε₂ : ENNReal} (h : ε₂ ≤ ε₁) :
-    iprop(↯ε₁) ⊢@{IProp GF} iprop(↯ε₂) :=
-  ErrorCredit.weaken h
-
-/-- `⊢ |==> ↯0`. Rocq: `ec_zero`. -/
-theorem ec_zero : ⊢@{IProp GF} iprop(|==> ↯0) :=
-  ErrorCredit.zero
-
-/-- Error credits are valid: `↯ε ⊢ ⌜ε < 1⌝`. -/
-theorem ec_valid {ε : ENNReal} :
-    iprop(↯ε) ⊢@{IProp GF} iprop(⌜ε < 1⌝) :=
-  ErrorCredit.valid
-
-/-! ## Error induction
-
-These are re-exports from `Metrology/Iris/ErrorCredits.lean`'s
-`ErrorCredit.Induction` namespace, named to match Rocq's `eris_rules.v`. -/
-
-/-- Geometric-amplification induction: from a Lean-level rule that says
-"given the wand `↯(k*ε) -∗ P` and `↯ε`, you can prove `P`", conclude
-`↯ε ⊢ P`. Rocq: `ec_ind_simpl_external` (`error_credits.v:395`). -/
-theorem ec_ind_simpl_external {ε : ENNReal} {k : NNReal} {P : IProp GF}
-    (hε : 0 < ε) (hk : 1 < k)
-    (hamp : iprop((↯((k : ENNReal) * ε) -∗ P) ∗ ↯ε) ⊢@{IProp GF} P) :
-    iprop(↯ε) ⊢@{IProp GF} P :=
-  ErrorCredit.Induction.external_simple hε hk hamp
-
-/-- Linear-amplification induction: from "given the wand `↯ε' -∗ P` (where
-`ε' > ε`) and `↯ε`, you can prove `P`", conclude `↯ε ⊢ P`. Rocq:
-`ec_induction` (`eris_rules.v:173`). The Lean version requires `ε' : NNReal`
-(finite) and currently expresses the hypothesis at the iris-wand level. -/
-theorem ec_induction {ε : ENNReal} {ε' : NNReal} {P : IProp GF}
-    (hε : 0 < ε) (hε' : ε < ε') :
-    iprop(□ ((↯(ε' : ENNReal) -∗ P) ∗ ↯ε -∗ P)) ⊢@{IProp GF} iprop(↯ε -∗ P) :=
-  ErrorCredit.Induction.increasing hε hε'
-
-/-! ## Conjuring positive credits and expectation-preserving sampling
-
-These two lemmas are the remaining prerequisites for the `geometric_total`
-tutorial. Both are fully proved (no `sorry`). Downstream proofs in
-`Examples/GeometricTotal.lean` go through unconditionally. -/
-
-end ECGSOnly
-
-section ErisGSStubs
-
-variable [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 theorem errInterp_supply_decrease {εₛ ε : ENNReal} :
     iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε)
@@ -273,7 +191,7 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
   iintro Hwp
   iapply ErisWpGS.fupd_tglWp
   ihave HzBupd : iprop(|==> ↯0) $$ []
-  · iapply ec_zero
+  · iapply ErrorCredit.zero
   imod HzBupd with Herr
   imodintro
   iapply (twp_err_incr Hnv)
@@ -725,16 +643,14 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
     iapply Hcont $$ %n
     isplitr
     · ipureintro; exact Hn
-    iapply (ec_eq (show min (ε₂ n.toNat) 1 = ε₂ n.toNat from _root_.min_eq_left h))
+    iapply (ErrorCredit.ext (show min (ε₂ n.toNat) 1 = ε₂ n.toNat from _root_.min_eq_left h))
     iexact Hcr
   · -- `1 < ε₂ n`, so `min = 1` and `↯1` is contradictory.
     push Not at h
     iexfalso
-    iapply (ec_contradict (show (1 : ENNReal) ≤ 1 from _root_.le_refl _))
-    iapply (ec_eq (show min (ε₂ n.toNat) 1 = 1 from _root_.min_eq_right h.le))
+    iapply (ErrorCredit.contradict (show (1 : ENNReal) ≤ 1 from _root_.le_refl _))
+    iapply (ErrorCredit.ext (show min (ε₂ n.toNat) 1 = 1 from _root_.min_eq_right h.le))
     iexact Hcr
-
-end ErisGSStubs
 
 end TotalEris
 end ProbLang

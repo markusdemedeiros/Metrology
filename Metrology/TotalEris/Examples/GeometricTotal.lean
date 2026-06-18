@@ -72,7 +72,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
         (geoPost (rT := rT) (GF := GF)) := by
   -- Error induction via `ec_ind_simpl_external` with multiplier `k = 3/2`.
   -- Gives us an IH `↯((3/2) * ε) -∗ WP geometric()` together with `↯ε`.
-  refine ec_ind_simpl_external (k := (3/2 : NNReal)) hε (by norm_num) ?_
+  refine ErrorCredit.Induction.external_simple (k := (3/2 : NNReal)) hε (by norm_num) ?_
   iintro ⟨IH, Herr⟩
   -- β-reduce `geometric ()` via two pure steps (`app_fix`, `app_lam`).
   -- Unfold `geometric` and reduce the `Exp.close` from `pl(...)` into the
@@ -206,7 +206,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
     isplitl [Hcr IH]
     · iapply IH
       -- Bridge `↯ F (Int.toNat 1)` to `↯ ↑(3/2)*ε` (defeq) via `ec_eq`.
-      iapply (ec_eq (show F (Int.toNat 1) = ((3/2 : NNReal) : ENNReal) * ε from rfl))
+      iapply (ErrorCredit.ext (show F (Int.toNat 1) = ((3/2 : NNReal) : ENNReal) * ε from rfl))
       iexact Hcr
     -- Step G: pointwise continuation — given `geoPost w`, produce
     -- `tglWp E (binop plus (ofVal w) 1) geoPost`.

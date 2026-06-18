@@ -143,7 +143,7 @@ example [ECGS GF] (ε : ENNReal) (ε' : NNReal) (P : IProp GF)
     (hε : 0 < ε) (hε' : ε < ε') :
     ⊢@{IProp GF} iprop(□ ((↯(ε' : ENNReal) -∗ P) ∗ ↯ε -∗ P)) -∗ iprop(↯ε -∗ P) := by
   iintro Hamp
-  iapply (ec_induction hε hε')
+  iapply (ErrorCredit.Induction.increasing hε hε')
   iexact Hamp
 
 /-- `tglWp_bind`: full evaluation-context bind. -/
@@ -280,7 +280,7 @@ example (v : Val rT) (σ : State rT) :
     1 ≤ (limExec ⟨Exp.ofVal v, σ⟩) Set.univ := by
   have h : Tgl (limExec ⟨Exp.ofVal v, σ⟩) (fun _ => True) 0 := by
     refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ)
-      (φ := fun _ => True) (by simpa using MeasurableSet.univ) ?_
+      (φ := fun _ => True) (MeasurableSet.const True) ?_
     intro _; iintro _; iapply tglWp_value; ipureintro; trivial
   have := Tgl.termination_ineq h
   rwa [tsub_zero] at this
