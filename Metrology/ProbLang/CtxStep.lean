@@ -798,6 +798,13 @@ theorem measurableSet_primStep_support [ProbLangℝ rT] (e : Exp rT) (σ : State
     simpa only [id_eq, Set.setOf_eq_eq_singleton] using h
   exact hc.measurableSet
 
+theorem measurableSet_possible_support [ProbLangℝ rT] :
+    MeasurableSet {ρ | (fun σ₁ ρ ↦ Possible ρ (primStep (rT := rT) { expr := e₁, state := σ₁ })) σ₁ ρ} := by
+  have hset : {ρ : Cfg rT | Possible ρ (primStep ⟨e₁, σ₁⟩)} = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} :=
+    Set.ext fun ρ => possible_iff_pos
+  rw [hset]
+  exact measurableSet_primStep_support e₁ σ₁
+
 /-- **`primStep` is purely atomic** (countability-free): it gives zero mass to the
 set of points it gives zero mass to. Transfers `headStep_atomic` through the
 injective pushforward `K.fillCfg` (so the co-support pulls back to `headStep`'s
