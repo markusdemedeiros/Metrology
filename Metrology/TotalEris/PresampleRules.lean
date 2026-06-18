@@ -206,7 +206,7 @@ theorem presampleAdvCompX₂.measurable
       intro hcontra
       exact h ⟨n, hcontra⟩
   rw [hrw]
-  exact Measurable.ennreal_tsum fun n =>
+  exact Measurable.tsum fun n =>
     measurable_const.indicator (measurableSet_singleton _)
 
 /-- **Advanced-composition presample rule** (Rocq: `twp_presample_adv_comp`,

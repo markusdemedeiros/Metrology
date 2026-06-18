@@ -301,7 +301,7 @@ We package this as an a.e. statement for use in the induction step. -/
 
 This is a case analysis on `headStep`, but cleaner than the full commutation
 because we only track the bound, not the full tape content. -/
-theorem primStep_tape_persists_support [ProbLangℝ rT]
+theorem primStep_tape_persists_support
     {σ : (State rT)} {αloc : Loc} {e : (Exp rT)} {t : Tape} {ρ : (Cfg rT)}
     (h : σ.tapes[αloc]? = some t)
     (hρ : Possible ρ (primStep ⟨e, σ⟩)) :

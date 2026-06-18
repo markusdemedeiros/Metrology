@@ -26,13 +26,16 @@ def OpenInv (e : (Exp rT)) : Prop :=
 
 namespace OpenInv
 
+omit [Countable rT] in
 theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 E3 : CoPset} {P Q : IProp GF}
     (h : P ⊢ |={E2, E3}=> Q) : iprop(|={E1, E2}=> P) ⊢ |={E1, E3}=> Q := fupd_elim h
 
+omit [Countable rT] in
 theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 E3 : CoPset}
     {P R Q : IProp GF} (h : P ∗ R ⊢ |={E2, E3}=> Q) : (|={E1, E2}=> P) ∗ R ⊢ |={E1, E3}=> Q :=
   fupd_frame_right.trans (fupd_elim h)
 
+omit [Countable rT] in
 theorem specCoupl_atomic_bridge_some {hlc : HasLC} {GF : BundledGFunctors}
     [ApproxisWpGS (rT := rT) GF] [InvGS_gen hlc GF]
     {E1 E2 : CoPset}
@@ -50,6 +53,7 @@ theorem specCoupl_atomic_bridge_some {hlc : HasLC} {GF : BundledGFunctors}
   imod HΦc with HΦ
   iframe
 
+omit [Countable rT] in
 theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
     {e : (Exp rT)} (h : Atomic e) {E1 E2 : CoPset}
     {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)} {ε₁ : ENNReal}
@@ -130,6 +134,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
     iapply specCoupl_err_ge_1
     exact Hε1
 
+omit [Countable rT] in
 /-- Every syntactically atomic expression satisfies `OpenInv`. -/
 theorem of_atomic {e : (Exp rT)} (h : Atomic e) : OpenInv e := by
   intro GF _ E1 E2 Φ
@@ -178,6 +183,7 @@ theorem of_atomic {e : (Exp rT)} (h : Atomic e) : OpenInv e := by
 
 end OpenInv
 
+omit [Countable rT] in
 /-- User-facing WP rule for atomic (or logically-atomic) expressions:
 mask-shift around a single step. -/
 theorem wp_atomic {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
