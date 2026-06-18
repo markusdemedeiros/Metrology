@@ -42,7 +42,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ProbLangℝ rT] [ErisGS rT hlc G
 /-! ## Heap operations -/
 
 theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} : iprop%
-    (∀ (l : Loc), appHeapFrag l v -∗ Φ ⟨.lit (.loc l), .lit⟩)
+    (∀ (l : Loc), appHeapFrag l v -∗ Φ (.loc l))
       ⊢@{IProp GF} tglWp E (.alloc (.ofVal v)) Φ := by
   iintro HΦ
   iapply twp_lift_atomic_head_step solve_not_red
@@ -86,7 +86,7 @@ theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} 
 
 /-- Store. Rocq: `twp_store`. -/
 theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp GF} : iprop%
-    l ↦ v' ∗ (l ↦ v -∗ Φ ⟨.lit .unit, .lit⟩)
+    l ↦ v' ∗ (l ↦ v -∗ Φ .unit)
       ⊢@{IProp GF} tglWp E (.store (.lit (.loc l)) (.ofVal v)) Φ := by
   iintro ⟨Hl, HΦ⟩
   iapply twp_lift_atomic_head_step solve_not_red
@@ -113,7 +113,7 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
 
 /-- Allocate a fresh tape. Rocq: `twp_alloc_tape`. -/
 theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
-    (∀ (l : Loc), l ↪ₐ (Tape.empty z) -∗ Φ ⟨.lit (.lbl l), .lit⟩)
+    (∀ (l : Loc), l ↪ₐ (Tape.empty z) -∗ Φ (.lbl l))
       ⊢@{IProp GF} tglWp E (.tape (.lit (.int z))) Φ := by
   iintro HΦ
   iapply twp_lift_atomic_head_step solve_not_red
@@ -137,7 +137,7 @@ theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
 /-! ## Random sampling -/
 
 theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) : iprop%
-    (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ Φ ⟨.lit (.int n), .lit⟩)
+    (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ Φ (.int n))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro HΦ
   iapply twp_lift_atomic_head_step solve_not_red
@@ -160,7 +160,7 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
 
 theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : { z' : Int // 0 ≤ z' ∧ z' < z }}
     {ns : List { z' : Int // 0 ≤ z' ∧ z' < z }} {Φ : Val rT → IProp GF} : iprop%
-    (l ↪ₐ ⟨z, n :: ns⟩ ∗ (l ↪ₐ ⟨z, ns⟩ -∗ Φ ⟨.lit (.int n.val), .lit⟩))
+    (l ↪ₐ ⟨z, n :: ns⟩ ∗ (l ↪ₐ ⟨z, ns⟩ -∗ Φ (.int n.val)))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   iapply twp_lift_atomic_head_step solve_not_red
@@ -191,7 +191,7 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : { z' : Int // 0 ≤ 
 
 theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
     {Φ : Val rT → IProp GF} (Hz : 0 < z) : iprop%
-    (l ↪ₐ ⟨z, []⟩ ∗ (∀ (n : Int), l ↪ₐ ⟨z, []⟩ -∗ (⌜0 ≤ n ∧ n < z⌝) -∗ Φ ⟨.lit (.int n), .lit⟩))
+    (l ↪ₐ ⟨z, []⟩ ∗ (∀ (n : Int), l ↪ₐ ⟨z, []⟩ -∗ (⌜0 ≤ n ∧ n < z⌝) -∗ Φ (.int n)))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   iapply twp_lift_atomic_head_step solve_not_red

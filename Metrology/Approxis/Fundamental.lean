@@ -1495,7 +1495,7 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     iapply (refines_pure_r (K := []) (Hex := pureExec_unop_discrete) hφ)
     iapply refines_ret (e1 := Ectx.fill [] (Exp.lit (.int n.neg)))
       (e2 := Ectx.fill [] (Exp.lit (.int n.neg)))
-      (v1 := ⟨.lit (.int n.neg), IsVal.lit⟩) (v2 := ⟨.lit (.int n.neg), IsVal.lit⟩)
+      (v1 := .int n.neg) (v2 := .int n.neg)
       (hv1 := rfl) (hv2 := rfl)
     imodintro
     unfold lrel_int
@@ -1546,7 +1546,7 @@ theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     iapply (refines_pure_r (K := []) (Hex := pureExec_unop_discrete) hφ)
     iapply refines_ret (e1 := Ectx.fill [] (Exp.lit (.bool (¬b))))
       (e2 := Ectx.fill [] (Exp.lit (.bool (¬b))))
-      (v1 := ⟨.lit (.bool (¬b)), IsVal.lit⟩) (v2 := ⟨.lit (.bool (¬b)), IsVal.lit⟩)
+      (v1 := .bool (¬b)) (v2 := .bool (¬b))
       (hv1 := rfl) (hv2 := rfl)
     imodintro
     unfold lrel_bool
@@ -1645,8 +1645,8 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iapply refines_ret
     (e1 := Ectx.fill [] (Exp.lit (.bool (decide (l1 = l2)))))
     (e2 := Ectx.fill [] (Exp.lit (.bool (decide (l1' = l2')))))
-    (v1 := ⟨.lit (.bool (decide (l1 = l2))), IsVal.lit⟩)
-    (v2 := ⟨.lit (.bool (decide (l1' = l2'))), IsVal.lit⟩)
+    (v1 := .bool (decide (l1 = l2)))
+    (v2 := .bool (decide (l1' = l2')))
     (hv1 := rfl) (hv2 := rfl)
   imodintro
   rw [interp_bool]
@@ -1686,7 +1686,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     by_cases hzn : z = n
     · -- Match succeeds: tryMatch (.lit (.int z)) (.lit (.int n)) = some (.lit .unit) when z = n.
       iapply BI.or_intro_l
-      iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
+      iexists (.unit : Val _), (.unit : Val _)
       isplitr
       · ipureintro
         subst hzn
@@ -1714,7 +1714,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     ihave ⟨%b', %h⟩ := lrel_bool_unfold v v' $$ Hv
     by_cases hbb : b = b'
     · iapply BI.or_intro_l
-      iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
+      iexists (.unit : Val _), (.unit : Val _)
       isplitr
       · ipureintro
         subst hbb
@@ -1738,7 +1738,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     show iprop(⌜v.1 = .lit .unit ∧ v'.1 = .lit .unit⌝) ⊢ _
     iintro %h
     iapply BI.or_intro_l
-    iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
+    iexists (.unit : Val _), (.unit : Val _)
     isplitr
     · ipureintro
       refine ⟨?_, ?_⟩
@@ -1904,7 +1904,7 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
         lrel_sum (interp τb Δ) lrel_unit := rfl
     rw [hsum]
     unfold lrel_sum
-    iexists ⟨.lit .unit, IsVal.lit⟩, ⟨.lit .unit, IsVal.lit⟩
+    iexists (.unit : Val _), (.unit : Val _)
     iapply BI.or_intro_r
     isplitr; · ipureintro; rfl
     isplitr; · ipureintro; rfl
@@ -2031,7 +2031,7 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     unfold bin_log_related_ty bin_log_related
     iintro %vs _
     rw [Exp.substMap_lit, Exp.substMap_lit]
-    set v : Val rT := ⟨.lit (.int n), IsVal.lit⟩
+    set v : Val rT := .int n
     have hv : (Exp.lit (.int n) : Exp rT) = v.1 := rfl
     rw [hv]
     iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
@@ -2045,7 +2045,7 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     unfold bin_log_related_ty bin_log_related
     iintro %vs _
     rw [Exp.substMap_lit, Exp.substMap_lit]
-    set v : Val rT := ⟨.lit (.bool b), IsVal.lit⟩
+    set v : Val rT := .bool b
     have hv : (Exp.lit (.bool b) : Exp rT) = v.1 := rfl
     rw [hv]
     iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
@@ -2059,7 +2059,7 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     unfold bin_log_related_ty bin_log_related
     iintro %vs _
     rw [Exp.substMap_lit, Exp.substMap_lit]
-    set v : Val rT := ⟨.lit .unit, IsVal.lit⟩
+    set v : Val rT := .unit
     have hv : (Exp.lit .unit : Exp rT) = v.1 := rfl
     rw [hv]
     iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))

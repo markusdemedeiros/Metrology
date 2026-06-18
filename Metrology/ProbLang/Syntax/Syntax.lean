@@ -572,6 +572,25 @@ structure Val (α : Type _) where
   fst : Exp α
   snd : IsVal fst
 
+/-- Coerce a base literal to a value, dropping the `⟨.lit ·, .lit⟩` wrapper.
+This is what lets specs write a base literal where a `Val` is expected.
+Marked `@[reducible]` so it is definitionally transparent to the proof-mode
+unifier (`iapply` etc.), which matches at `reducible` transparency. -/
+@[reducible, coe] def Val.ofBaseLit (b : BaseLit rT) : Val rT := ⟨.lit b, .lit⟩
+
+instance : Coe (BaseLit rT) (Val rT) := ⟨Val.ofBaseLit⟩
+
+/-! Reducible per-constructor shorthands for the literal values. `abbrev` (rather
+than `def`) keeps them definitionally equal to the explicit `⟨.lit ·, .lit⟩` form,
+so existing proofs that `cases`/`simp` on the unfolded shape still go through, and
+dot-notation (`(.real r : Val _)`) resolves against the `Val` namespace. -/
+abbrev Val.int  (n : Int) : Val rT  := Val.ofBaseLit (.int n)
+abbrev Val.bool (b : Bool) : Val rT := Val.ofBaseLit (.bool b)
+abbrev Val.unit : Val rT            := Val.ofBaseLit .unit
+abbrev Val.loc  (l : Loc) : Val rT  := Val.ofBaseLit (.loc l)
+abbrev Val.lbl  (l : Lbl) : Val rT  := Val.ofBaseLit (.lbl l)
+abbrev Val.real (r : rT) : Val rT   := Val.ofBaseLit (.real r)
+
 namespace IsVal
 
 /-- Decidable check. -/

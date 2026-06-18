@@ -69,7 +69,7 @@ random key is observationally equivalent to a fresh random sample. -/
 theorem otp_refines (m N : Int) (HN : 0 < N) :
   ⊢@{IProp GF} refines (⊤ : CoPset) (otp_enc m N) (otp_ideal N) lrel_int := by
   simp only [otp_enc, otp_ideal, Exp.close, Exp.closeRec, ↓reduceIte]
-  let Kmod : Ectx := [EctxItem.binopL .mod ⟨.lit (.int N), IsVal.lit⟩]
+  let Kmod : Ectx := [EctxItem.binopL .mod (.int N)]
   show ⊢@{IProp GF} iprop(refines ⊤
     ((otpKLam m N).fill pl(rand(#(.int N), #(.unit))))
     (Ectx.fill ([] : Ectx) pl(rand(#(.int N), #(.unit)))) lrel_int)
@@ -103,8 +103,8 @@ theorem otp_refines (m N : Int) (HN : 0 < N) :
   rw [show (m + n) % N = addMod m N n by unfold addMod; ring_nf]
   show ⊢@{IProp GF}
     iprop(refines ⊤ pl(#(.int (addMod m N n))) pl(#(.int (addMod m N n))) lrel_int)
-  iapply (refines_ret (v1 := ⟨.lit (.int (addMod m N n)), IsVal.lit⟩)
-    (v2 := ⟨.lit (.int (addMod m N n)), IsVal.lit⟩)
+  iapply (refines_ret (v1 := .int (addMod m N n))
+    (v2 := .int (addMod m N n))
     (hv1 := rfl) (hv2 := rfl))
   imodintro
   unfold lrel_int
@@ -126,7 +126,7 @@ with a fresh random key. -/
 theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
     ⊢@{IProp GF} refines (⊤ : CoPset) (otp_ideal N) (otp_enc m N) lrel_int := by
   simp only [otp_enc, otp_ideal, Exp.close, Exp.closeRec, ↓reduceIte]
-  let Kmod : Ectx := [EctxItem.binopL .mod ⟨.lit (.int N), IsVal.lit⟩]
+  let Kmod : Ectx := [EctxItem.binopL .mod (.int N)]
   show ⊢@{IProp GF} iprop(refines ⊤
     (Ectx.fill ([] : Ectx) pl(rand(#(.int N), #(.unit))))
     ((otpKLam m N).fill pl(rand(#(.int N), #(.unit)))) lrel_int)
@@ -160,8 +160,8 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
   -- The RHS-reduced value is `(m + (n + (-m)) % N) % N = n` by addMod_neg_inv.
   rw [show (m + addMod (-m) N n) % N = n from addMod_neg_inv m N n Hn0 HnN]
   show ⊢@{IProp GF} iprop(refines ⊤ pl(#(.int n)) pl(#(.int n)) lrel_int)
-  iapply (refines_ret (v1 := ⟨.lit (.int n), IsVal.lit⟩)
-    (v2 := ⟨.lit (.int n), IsVal.lit⟩)
+  iapply (refines_ret (v1 := .int n)
+    (v2 := .int n)
     (hv1 := rfl) (hv2 := rfl))
   imodintro
   unfold lrel_int

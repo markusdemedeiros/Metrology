@@ -2480,7 +2480,7 @@ theorem plProbNatRec_bodyE_isEmbedding [SLangType T] [ProbLangEmbeddable T]
     have hBinop : DetStep_discrete
         ⟨.binop .plus (.fst (.pair (.lit (.int idx)) (as_expr acc))) (.lit (.int 1)), σ⟩
         ⟨.binop .plus (.lit (.int idx)) (.lit (.int 1)), σ⟩ :=
-      DetStep_discrete.fill [.binopL .plus ⟨.lit (.int 1), .lit⟩] hFst
+      DetStep_discrete.fill [.binopL .plus (.int 1)] hFst
     rw [limExec_pairL_step (as_expr_isVal acc') hBinop]
     -- Step 2: binop plus → lit (idx+1), under pairL.
     rw [limExec_pairL_step (as_expr_isVal acc')

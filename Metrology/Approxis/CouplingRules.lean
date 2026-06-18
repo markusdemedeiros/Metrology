@@ -227,7 +227,7 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
     iprop((⤇ K.fill (.rand (.lit (.int z)) (.lit .unit))) ∗
         (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
           (⤇ K.fill (.lit (.int (f n)))) -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro ⟨Hj, Hcnt⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
@@ -295,7 +295,7 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
   isplitl [Hσ]; · iexact Hσ
   isplitl [Hs']; · iexact Hs'
   isplitl [Hε]; · iexact Hε
-  iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+  iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   iapply Hcnt
   · ipureintro; exact ⟨hn0, hnz⟩
   · iexact Hj'
@@ -312,7 +312,7 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
         (∀ (n : Int),
           appNatTape α M xs ∗ specNatTape α' M ys ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl α))) Φ := by
   iintro ⟨Hα, Hα', Hj, Hcnt⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α)) : Exp rT).toVal? = none :=
@@ -400,7 +400,7 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
   isplitl [Hσ]; · iexact Hσ
   isplitl [Hs']; · iexact Hs'
   isplitl [Hε]; · iexact Hε
-  iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+  iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave HαNat := show (α ↪ₐ ⟨M, fs⟩) ⊢@{IProp GF} appNatTape α M xs by
     iintro Hb
     unfold appNatTape
@@ -431,7 +431,7 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
         (∀ (n : Int),
           appNatTape α z [] ∗ specNatTape α' z [] ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl α))) Φ := by
   iintro ⟨Hα, Hα', Hj, Hcnt⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α)) : Exp rT).toVal? = none :=
@@ -522,7 +522,7 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   isplitl [Hσ]; · iexact Hσ
   isplitl [Hs']; · iexact Hs'
   isplitl [Hε]; · iexact Hε
-  iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+  iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave HαNat := show (α ↪ₐ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} appNatTape α z [] by
     iintro Hb
     unfold appNatTape
@@ -554,7 +554,7 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
         (∀ (n : Int),
           appNatTape α z [] ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl α))) Φ := by
   iintro ⟨Hα, Hj, Hcnt⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl α)) : Exp rT).toVal? = none :=
@@ -634,7 +634,7 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
   isplitl [Hσ]; · iexact Hσ
   isplitl [Hs']; · iexact Hs'
   isplitl [Hε]; · iexact Hε
-  iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+  iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave HαNat := show (α ↪ₐ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} appNatTape α z [] by
     iintro Hb
     unfold appNatTape
@@ -657,7 +657,7 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
         (∀ (n : Int),
           specNatTape α' z [] ∗
             (⤇ K.fill (.lit (.int (f n)))) ∗ ⌜0 ≤ n ∧ n < z⌝ -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro ⟨Hα', Hj, Hcnt⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
@@ -737,7 +737,7 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
   isplitl [Hσ]; · iexact Hσ
   isplitl [Hs']; · iexact Hs'
   isplitl [Hε]; · iexact Hε
-  iapply (wp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+  iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave Hα'Nat := show (α' ↪ₛ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} specNatTape α' z [] by
     iintro Hb
     unfold specNatTape

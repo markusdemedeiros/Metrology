@@ -195,7 +195,7 @@ from position 1. Rocq: `unif_rw_1d_terminate`.
 this file for the full analysis. -/
 theorem unif_rw_1d_terminate (E : CoPset) :
     ⊢@{IProp GF} tglWp (rT := rT) E unifRw1d
-      (fun v => iprop(⌜v = ⟨.lit .unit, IsVal.lit⟩⌝)) := by
+      (fun v => iprop(⌜v = .unit⌝)) := by
   sorry
 
 end Examples

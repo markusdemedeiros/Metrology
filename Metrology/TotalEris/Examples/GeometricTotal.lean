@@ -59,7 +59,7 @@ def geometric : Exp rT :=
 /-- The result-postcondition shared by all geometric specs: the sampler
 returns a non-negative integer. -/
 abbrev geoPost : Val rT → IProp GF :=
-  fun w => iprop(∃ m : Int, ⌜w = ⟨.lit (.int m), IsVal.lit⟩ ∧ 0 ≤ m⌝)
+  fun w => iprop(∃ m : Int, ⌜w = .int m ∧ 0 ≤ m⌝)
 
 /-! ## Spec: `geo_nonneg_pos_err`
 
@@ -138,8 +138,8 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   · -- n = 0 branch. Reduce `cond (binop eq 0 0) 0 (…) → … → lit 0`.
     -- Step A: `twp_bind` focuses the `cond` discriminant (context `K = [condC …]`
     -- discovered automatically).
-    twp_bind (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩)
-      (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
+    twp_bind (Exp.binop .eq (Exp.ofVal (.int 0))
+      (Exp.ofVal (.int 0)))
     -- Step B: reduce `binop eq 0 0 → lit true` (pure step). `ofVal` is reducible;
     -- normalise so the goal exposes the literal form before invoking `PureExec_discrete`.
     simp only [Exp.ofVal]
@@ -154,7 +154,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
         from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
     -- Step C: value collapse — `tglWp E (lit true) (fun v => P v) ⊢ P (lit true)`.
     iapply (ErisWpGS.tglWp_value_of_toVal
-      (v := ⟨.lit (.bool true), IsVal.lit⟩) rfl)
+      (v := .bool true) rfl)
     -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true_discrete`.
     -- After C, the goal still has `cond (ofVal ⟨lit true, lit⟩) …`. The
     -- `PureExec_discrete`/`iapply` unifier won't reduce `ofVal` even though defeq —
@@ -167,14 +167,14 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
           (.lit (.int 1))))
       ↦ (.lit (.int 0))
     -- Step E: conclude `tglWp E (lit 0) geoPost` via the value rule.
-    iapply (ErisWpGS.tglWp_value_of_toVal (v := ⟨.lit (.int 0), IsVal.lit⟩) rfl)
+    iapply (ErisWpGS.tglWp_value_of_toVal (v := .int 0) rfl)
     iexists 0
     ipureintro
     exact ⟨rfl, _root_.le_refl _⟩
   · -- n = 1 branch: symmetric to n=0 up to step D, then recurses via `IH`.
     -- Step A: `twp_bind` focuses the `cond` discriminant.
-    twp_bind (Exp.binop .eq (Exp.ofVal ⟨.lit (.int 1), IsVal.lit⟩)
-      (Exp.ofVal ⟨.lit (.int 0), IsVal.lit⟩))
+    twp_bind (Exp.binop .eq (Exp.ofVal (.int 1))
+      (Exp.ofVal (.int 0)))
     -- Step B: reduce `binop eq 1 0 → lit false`.
     simp only [Exp.ofVal]
     iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
@@ -188,7 +188,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
         from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
     -- Step C: value collapse.
     iapply (ErisWpGS.tglWp_value_of_toVal
-      (v := ⟨.lit (.bool false), IsVal.lit⟩) rfl)
+      (v := .bool false) rfl)
     simp only
     -- Step D: `cond (lit false) et ef → ef` via `pureExec_cond_false_discrete`.
     twp_pure_at
@@ -228,7 +228,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
         from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
     -- Step J: value-collapse + close `geoPost` with `m + 1 ≥ 0`.
     iapply (ErisWpGS.tglWp_value_of_toVal
-      (v := ⟨.lit (.int (m + 1)), IsVal.lit⟩) rfl)
+      (v := .int (m + 1)) rfl)
     iexists (m + 1)
     ipureintro
     exact ⟨rfl, by omega⟩
@@ -254,7 +254,7 @@ theorem geo_nonneg (E : CoPset) :
 
 /-- Pure predicate version of `geoPost`. -/
 def geoPredicate (v : Val rT) : Prop :=
-  ∃ m : Int, v = ⟨.lit (.int m), IsVal.lit⟩ ∧ 0 ≤ m
+  ∃ m : Int, v = .int m ∧ 0 ≤ m
 
 /-- `{v | geoPredicate v}` is measurable: it is the countable set of integer
 literals `⟨.lit (.int m), _⟩` over `m : ℤ`. -/
@@ -262,7 +262,7 @@ theorem geoPredicate_measurableSet :
     MeasurableSet {v : Val rT | geoPredicate v} := by
   have hc : {v : Val rT | geoPredicate v}.Countable := by
     apply Set.Countable.mono
-      (s₂ := (fun m : Int => (⟨.lit (.int m), IsVal.lit⟩ : Val rT)) '' Set.univ)
+      (s₂ := (fun m : Int => (.int m : Val rT)) '' Set.univ)
     · rintro v ⟨m, rfl, _⟩; exact ⟨m, trivial, rfl⟩
     · exact (Set.countable_univ).image _
   exact hc.measurableSet

@@ -1503,15 +1503,15 @@ theorem State.prim_step_empty_tape [Countable rT] [MeasurableSingletonClass rT]
       = ([], .rand (.lit (.int z)) (.lit (.lbl α))) := by
     rw [Exp.decomp_unfold]
     simp only [Exp.decompItem]
-    have hlbl : (Exp.lit (rT := rT) (.lbl α)).toVal? = some ⟨.lit (.lbl α), .lit⟩ := rfl
-    have hint : (Exp.lit (rT := rT) (.int z)).toVal? = some ⟨.lit (.int z), .lit⟩ := rfl
+    have hlbl : (Exp.lit (rT := rT) (.lbl α)).toVal? = some (.lbl α) := rfl
+    have hint : (Exp.lit (rT := rT) (.int z)).toVal? = some (.int z) := rfl
     rw [hlbl, hint]
   have hdecomp_unit : (Exp.rand (rT := rT) (.lit (.int z)) (.lit .unit)).decomp
       = ([], .rand (.lit (.int z)) (.lit .unit)) := by
     rw [Exp.decomp_unfold]
     simp only [Exp.decompItem]
-    have hunit : (Exp.lit (rT := rT) .unit).toVal? = some ⟨.lit .unit, .lit⟩ := rfl
-    have hint : (Exp.lit (rT := rT) (.int z)).toVal? = some ⟨.lit (.int z), .lit⟩ := rfl
+    have hunit : (Exp.lit (rT := rT) .unit).toVal? = some .unit := rfl
+    have hint : (Exp.lit (rT := rT) (.int z)).toVal? = some (.int z) := rfl
     rw [hunit, hint]
   simp only [primStep, hdecomp_lbl, hdecomp_unit, Ectx.fillCfg_empty, MeasureTheory.Measure.map_id]
   simp only [headStep, _hmem]

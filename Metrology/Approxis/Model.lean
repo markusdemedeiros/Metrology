@@ -582,14 +582,14 @@ end SimpleLRels
 section SemtypesProperties
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-instance : Inhabited (Val rT) := ⟨⟨.lit .unit, .lit⟩⟩
+instance : Inhabited (Val rT) := ⟨.unit⟩
 
 /-- Reference type is functional in the program-side location: if `#l` is
 related to both `#l1` and `#l2` at `ref A`, then `l1 = l2`. -/
 theorem interp_ref_funct {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} (lrel_ref A).car ⟨.lit (.loc l), .lit⟩ ⟨.lit (.loc l1), .lit⟩ -∗
-        (lrel_ref A).car ⟨.lit (.loc l), .lit⟩ ⟨.lit (.loc l2), .lit⟩ -∗
+    ⊢@{IProp GF} (lrel_ref A).car (.loc l) (.loc l1) -∗
+        (lrel_ref A).car (.loc l) (.loc l2) -∗
         |={E}=> ⌜l1 = l2⌝ := by
   unfold lrel_ref
   iintro H1 H2
@@ -640,8 +640,8 @@ theorem interp_ref_funct {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
 and `#l2` are related to `#l` at `ref A`, then `l1 = l2`. -/
 theorem interp_ref_inj {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} (lrel_ref A).car ⟨.lit (.loc l1), .lit⟩ ⟨.lit (.loc l), .lit⟩ -∗
-        (lrel_ref A).car ⟨.lit (.loc l2), .lit⟩ ⟨.lit (.loc l), .lit⟩ -∗
+    ⊢@{IProp GF} (lrel_ref A).car (.loc l1) (.loc l) -∗
+        (lrel_ref A).car (.loc l2) (.loc l) -∗
         |={E}=> ⌜l1 = l2⌝ := by
   unfold lrel_ref
   iintro H1 H2
@@ -696,8 +696,8 @@ theorem interp_ref_inj {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
 /-- Tape type is functional in the program-side location. -/
 theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} (lrel_tape (rT := rT) (GF := GF)).car ⟨.lit (.lbl l), .lit⟩ ⟨.lit (.lbl l1), .lit⟩ -∗
-        (lrel_tape (rT := rT) (GF := GF)).car ⟨.lit (.lbl l), .lit⟩ ⟨.lit (.lbl l2), .lit⟩ -∗
+    ⊢@{IProp GF} (lrel_tape (rT := rT) (GF := GF)).car (.lbl l) (.lbl l1) -∗
+        (lrel_tape (rT := rT) (GF := GF)).car (.lbl l) (.lbl l2) -∗
         |={E}=> ⌜l1 = l2⌝ := by
   unfold lrel_tape
   iintro H1 H2
@@ -738,8 +738,8 @@ theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
 /-- Tape type is injective on the program-side location. -/
 theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
-    ⊢@{IProp GF} (lrel_tape (rT := rT) (GF := GF)).car ⟨.lit (.lbl l1), .lit⟩ ⟨.lit (.lbl l), .lit⟩ -∗
-        (lrel_tape (rT := rT) (GF := GF)).car ⟨.lit (.lbl l2), .lit⟩ ⟨.lit (.lbl l), .lit⟩ -∗
+    ⊢@{IProp GF} (lrel_tape (rT := rT) (GF := GF)).car (.lbl l1) (.lbl l) -∗
+        (lrel_tape (rT := rT) (GF := GF)).car (.lbl l2) (.lbl l) -∗
         |={E}=> ⌜l1 = l2⌝ := by
   unfold lrel_tape
   iintro H1 H2

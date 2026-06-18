@@ -447,7 +447,7 @@ theorem refines_alloctape {e e' : Exp rT} :
     simp only [approxisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert,
       Exp.toVal?_lit]
     isplitl [Hσ']; · iexact Hσ'
-    iexists ⟨.lit (.lbl l'), IsVal.lit⟩
+    iexists (.lbl l' : Val _)
     iexists ε
     isplitl [HKRes]; · iexact HKRes
     isplitl [Hna]; · iexact Hna
@@ -492,7 +492,7 @@ theorem refines_alloc {e e' : Exp rT} {A : lrel rT GF} :
   · iexact HInvBody
   iapply refines_ret (e1 := Ectx.fill [] (.lit (.loc l)))
     (e2 := Ectx.fill [] (.lit (.loc l')))
-    (v1 := ⟨.lit (.loc l), IsVal.lit⟩) (v2 := ⟨.lit (.loc l'), IsVal.lit⟩)
+    (v1 := .loc l) (v2 := .loc l')
     (hv1 := rfl) (hv2 := rfl)
   imodintro
   unfold lrel_ref
@@ -777,7 +777,7 @@ theorem refines_store {e1 e2 e1' e2' : Exp rT} {A : lrel rT GF} :
   iexists (Exp.lit .unit)
   isplitl [HKRes]; · iexact HKRes
   iapply (refines_ret (e1 := Ectx.fill [] (Exp.lit .unit)) (e2 := Exp.lit .unit)
-    (v1 := ⟨.lit .unit, IsVal.lit⟩) (v2 := ⟨.lit .unit, IsVal.lit⟩)
+    (v1 := .unit) (v2 := .unit)
     (hv1 := rfl) (hv2 := rfl))
   imodintro
   unfold lrel_unit
@@ -960,7 +960,7 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     isplitl [HKRes]; · iexact HKRes
     iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int n)))
       (e2 := Exp.lit (.int (id n)))
-      (v1 := ⟨.lit (.int n), IsVal.lit⟩) (v2 := ⟨.lit (.int (id n)), IsVal.lit⟩)
+      (v1 := .int n) (v2 := .int (id n))
       (hv1 := rfl) (hv2 := rfl))
     imodintro
     unfold lrel_nat
@@ -997,7 +997,7 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     isplitl [HKRes]; · iexact HKRes
     iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int n)))
       (e2 := Exp.lit (.int (id n)))
-      (v1 := ⟨.lit (.int n), IsVal.lit⟩) (v2 := ⟨.lit (.int (id n)), IsVal.lit⟩)
+      (v1 := .int n) (v2 := .int (id n))
       (hv1 := rfl) (hv2 := rfl))
     imodintro
     unfold lrel_nat
@@ -1022,21 +1022,21 @@ since callers already have positivity in practice. Conclusion stays at
 theorem refines_rand_unit {e e' : Exp rT} :
     iprop(refines ⊤ e e' lrel_pos_nat)
       ⊢@{IProp GF}
-        refines ⊤ (Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] e)
-          (Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] e')
+        refines ⊤ (Ectx.fill [EctxItem.randL (.unit : Val _)] e)
+          (Ectx.fill [EctxItem.randL (.unit : Val _)] e')
           lrel_nat := by
   iintro IH
   iapply (refines_bind
-    [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩]
-    [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩]
+    [EctxItem.randL (.unit : Val _)]
+    [EctxItem.randL (.unit : Val _)]
     (A := lrel_pos_nat)) $$ [IH]
   · iexact IH
   iintro %v %v' HPosNat
   ihave HPosNatEx := lrel_pos_nat_unfold v v' $$ HPosNat
   icases HPosNatEx with ⟨%n, %hn_pos, %Hv, %Hv'⟩
-  have hfillv : Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] v.1 =
+  have hfillv : Ectx.fill [EctxItem.randL (.unit : Val _)] v.1 =
       Exp.rand v.1 (.lit .unit) := rfl
-  have hfillv' : Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] v'.1 =
+  have hfillv' : Ectx.fill [EctxItem.randL (.unit : Val _)] v'.1 =
       Exp.rand v'.1 (.lit .unit) := rfl
   rw [hfillv, hfillv', Hv, Hv']
   · have hnpos : (0 : Int) < (n : Int) := by exact_mod_cast hn_pos
@@ -1053,7 +1053,7 @@ theorem refines_rand_unit {e e' : Exp rT} :
     have hfill2 : (Ectx.fill [] (Exp.lit (.int (id m))) : Exp rT) = Exp.lit (.int m) := rfl
     rw [hfill1, hfill2]
     iapply (refines_ret (e1 := Exp.lit (.int m)) (e2 := Exp.lit (.int m))
-      (v1 := ⟨.lit (.int m), IsVal.lit⟩) (v2 := ⟨.lit (.int m), IsVal.lit⟩)
+      (v1 := .int m) (v2 := .int m)
       (hv1 := rfl) (hv2 := rfl))
     imodintro
     unfold lrel_nat
@@ -1142,7 +1142,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       isplitl [HKRes]; · iexact HKRes
       iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int m)))
         (e2 := Exp.lit (.int (id m)))
-        (v1 := ⟨.lit (.int m), IsVal.lit⟩) (v2 := ⟨.lit (.int (id m)), IsVal.lit⟩)
+        (v1 := .int m) (v2 := .int (id m))
         (hv1 := rfl) (hv2 := rfl))
       imodintro
       unfold lrel_int
@@ -1175,7 +1175,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       isplitl [HKRes]; · iexact HKRes
       iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int m)))
         (e2 := Exp.lit (.int (id m)))
-        (v1 := ⟨.lit (.int m), IsVal.lit⟩) (v2 := ⟨.lit (.int (id m)), IsVal.lit⟩)
+        (v1 := .int m) (v2 := .int (id m))
         (hv1 := rfl) (hv2 := rfl))
       imodintro
       unfold lrel_int
@@ -1218,7 +1218,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
     isplitl [HKRes]; · iexact HKRes
     iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int (-1))))
       (e2 := Exp.lit (.int (-1)))
-      (v1 := ⟨.lit (.int (-1)), IsVal.lit⟩) (v2 := ⟨.lit (.int (-1)), IsVal.lit⟩)
+      (v1 := .int (-1)) (v2 := .int (-1))
       (hv1 := rfl) (hv2 := rfl))
     imodintro
     unfold lrel_int
@@ -1233,21 +1233,21 @@ nonpos uses degenerate dirac-(-1) coupling via `wp_rand_nonpos`/`_r`. -/
 theorem refines_rand_unit_int {e e' : Exp rT} :
     iprop(refines ⊤ e e' lrel_int)
       ⊢@{IProp GF}
-        refines ⊤ (Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] e)
-          (Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] e')
+        refines ⊤ (Ectx.fill [EctxItem.randL (.unit : Val _)] e)
+          (Ectx.fill [EctxItem.randL (.unit : Val _)] e')
           lrel_int := by
   iintro IH
   iapply (refines_bind
-    [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩]
-    [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩]
+    [EctxItem.randL (.unit : Val _)]
+    [EctxItem.randL (.unit : Val _)]
     (A := lrel_int)) $$ [IH]
   · iexact IH
   iintro %v %v' HInt
   ihave HIntEx := lrel_int_unfold v v' $$ HInt
   icases HIntEx with ⟨%n, %Hv, %Hv'⟩
-  have hfillv : Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] v.1 =
+  have hfillv : Ectx.fill [EctxItem.randL (.unit : Val _)] v.1 =
       Exp.rand v.1 (.lit .unit) := rfl
-  have hfillv' : Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit⟩] v'.1 =
+  have hfillv' : Ectx.fill [EctxItem.randL (.unit : Val _)] v'.1 =
       Exp.rand v'.1 (.lit .unit) := rfl
   rw [hfillv, hfillv', Hv, Hv']
   by_cases hnpos : 0 < n
@@ -1264,7 +1264,7 @@ theorem refines_rand_unit_int {e e' : Exp rT} :
     have hfill2 : (Ectx.fill [] (Exp.lit (.int (id m))) : Exp rT) = Exp.lit (.int m) := rfl
     rw [hfill1, hfill2]
     iapply (refines_ret (e1 := Exp.lit (.int m)) (e2 := Exp.lit (.int m))
-      (v1 := ⟨.lit (.int m), IsVal.lit⟩) (v2 := ⟨.lit (.int m), IsVal.lit⟩)
+      (v1 := .int m) (v2 := .int m)
       (hv1 := rfl) (hv2 := rfl))
     imodintro
     unfold lrel_int
@@ -1277,7 +1277,7 @@ theorem refines_rand_unit_int {e e' : Exp rT} :
     isplitl [HK]; · iexact HK
     iintro HK'
     iapply (wp_rand_nonpos hnpos)
-    iexists ⟨.lit (.int (-1)), IsVal.lit⟩
+    iexists (.int (-1) : Val _)
     iexists ε
     isplitl [HK']; · iexact HK'
     isplitl [Hna]; · iexact Hna

@@ -41,7 +41,7 @@ example (E : CoPset) (Φ : Val rT → IProp GF) :
 `fst`, reaching the value `#1`; `twp_value` then discharges the value postcondition. -/
 example (E : CoPset) :
     ⊢@{IProp GF} tglWp E pl(fst(((fun x, x) #1, #2)))
-      (fun w : Val rT => iprop(⌜w = ⟨.lit (.int 1), IsVal.lit⟩⌝)) := by
+      (fun w : Val rT => iprop(⌜w = .int 1⌝)) := by
   twp_pures
   twp_value
   ipureintro; rfl
@@ -50,7 +50,7 @@ example (E : CoPset) :
 via `BinOp.eval` (the side condition `… ∧ op.eval = some 3` is discharged by `rfl`). -/
 example (E : CoPset) :
     ⊢@{IProp GF} tglWp E pl(#1 + #2)
-      (fun w : Val rT => iprop(⌜w = ⟨.lit (.int 3), IsVal.lit⟩⌝)) := by
+      (fun w : Val rT => iprop(⌜w = .int 3⌝)) := by
   twp_pure pl(#1 + #2)
   twp_value
   ipureintro; rfl

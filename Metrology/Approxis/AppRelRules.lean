@@ -717,7 +717,7 @@ theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n
   ispecialize Hcnt $$ %Hn
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
+  have hfillN : Exp.ofVal (.int n : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
@@ -758,7 +758,7 @@ theorem refines_couple_TU {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
+  have hfillN : Exp.ofVal (.int n : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
@@ -799,7 +799,7 @@ theorem refines_couple_UT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
+  have hfillN : Exp.ofVal (.int n : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
@@ -841,7 +841,7 @@ theorem refines_couple_TT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
-  have hfillN : Exp.ofVal (⟨.lit (.int n), IsVal.lit⟩ : Val rT) =
+  have hfillN : Exp.ofVal (.int n : Val rT) =
       Exp.lit (.int n) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos

@@ -40,7 +40,7 @@ let-binding form. -/
 example (E : CoPset) (v : Val rT) :
     ⊢@{IProp GF} tglWp E (.alloc (.ofVal v))
       (fun w => iprop(∃ l : Loc,
-        ⌜w = ⟨.lit (.loc l), IsVal.lit⟩⌝ ∗ appHeapFrag l v)) := by
+        ⌜w = .loc l⌝ ∗ appHeapFrag l v)) := by
   iapply twp_alloc
   iintro %l Hl
   iexists l
@@ -55,7 +55,7 @@ example (E : CoPset) (l : Loc) (z : Int)
     (ns : List { z' : Int // 0 ≤ z' ∧ z' < z }) :
     ⊢@{IProp GF} l ↪ₐ ⟨z, n :: ns⟩ -∗
       tglWp E (.rand (.lit (.int z)) (.lit (.lbl l)))
-        (fun w : Val rT => iprop(⌜w = ⟨.lit (.int n.val), IsVal.lit⟩⌝ ∗ l ↪ₐ ⟨z, ns⟩)) := by
+        (fun w : Val rT => iprop(⌜w = .int n.val⌝ ∗ l ↪ₐ ⟨z, ns⟩)) := by
   iintro Hl
   iapply twp_rand_tape
   isplitl [Hl]
@@ -71,7 +71,7 @@ example (E : CoPset) (l : Loc) (z : Int) (Hz : 0 < z) :
     ⊢@{IProp GF} l ↪ₐ ⟨z, []⟩ -∗
       tglWp E (.rand (.lit (.int z)) (.lit (.lbl l)))
         (fun w : Val rT => iprop(∃ n : Int,
-          ⌜0 ≤ n ∧ n < z⌝ ∗ ⌜w = ⟨.lit (.int n), IsVal.lit⟩⌝ ∗ l ↪ₐ ⟨z, []⟩)) := by
+          ⌜0 ≤ n ∧ n < z⌝ ∗ ⌜w = .int n⌝ ∗ l ↪ₐ ⟨z, []⟩)) := by
   iintro Hl
   iapply (twp_rand_tape_empty Hz)
   isplitl [Hl]
@@ -226,7 +226,7 @@ example (E : CoPset) (ε : ENNReal) :
     ⊢@{IProp GF} ↯ε -∗
       tglWp E (.rand (.lit (.int 2)) (.lit .unit))
         (fun w : Val rT => iprop(∃ n : Int, ⌜0 ≤ n ∧ n < 2 ∧
-          w = ⟨.lit (.int n), IsVal.lit⟩⌝)) := by
+          w = .int n⌝)) := by
   iintro Hcr
   let F : ℕ → ENNReal := fun n => if n = 0 then 0 else ε
   iapply (twp_rand_exp (z := 2) (ε₁ := ε) (ε₂ := F)
@@ -247,7 +247,7 @@ The single outcome `n = 0` returns `↯0` to the continuation. -/
 example (E : CoPset) (ε : ENNReal) :
     ⊢@{IProp GF} ↯ε -∗
       tglWp E (.rand (.lit (.int 1)) (.lit .unit))
-        (fun w : Val rT => iprop(⌜w = ⟨.lit (.int 0), IsVal.lit⟩⌝)) := by
+        (fun w : Val rT => iprop(⌜w = .int 0⌝)) := by
   iintro Hε
   iapply (twp_rand_exp_nat (z := 1) (ε₁ := ε) (ε₂ := fun _ => 0)
     (Hz := by decide) (Hbd := fun _ => zero_le)

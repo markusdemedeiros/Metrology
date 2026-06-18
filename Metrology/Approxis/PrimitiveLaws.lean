@@ -93,7 +93,7 @@ section Lifting
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
 
 theorem wp_alloc {E : CoPset} {v : (Val rT)} {Φ : (Val rT) → IProp GF} :
-    iprop(∀ (l : Loc), appHeapFrag l v -∗ Φ (⟨.lit (.loc l), IsVal.lit⟩ : (Val rT)))
+    iprop(∀ (l : Loc), appHeapFrag l v -∗ Φ (.loc l : Val rT))
       ⊢@{IProp GF} wp E (.alloc (.ofVal v)) Φ := by
   iintro HΦ
   have Hv : (Exp.alloc (Exp.ofVal v)).toVal? = none :=
@@ -146,7 +146,7 @@ theorem wp_load {E : CoPset} {l : Loc} {v : (Val rT)} {Φ : (Val rT) → IProp G
 
 theorem wp_store {E : CoPset} {l : Loc} {v v' : (Val rT)} {Φ : (Val rT) → IProp GF} :
     iprop(appHeapFrag l v' ∗
-        (appHeapFrag l v -∗ Φ (⟨.lit .unit, IsVal.lit⟩ : (Val rT))))
+        (appHeapFrag l v -∗ Φ (.unit : Val rT)))
       ⊢@{IProp GF} wp E (.store (.lit (.loc l)) (.ofVal v)) Φ := by
   iintro ⟨Hl, HΦ⟩
   have Hv : (Exp.store (Exp.lit (.loc l)) (Exp.ofVal v)).toVal? = none :=
@@ -175,7 +175,7 @@ theorem wp_store {E : CoPset} {l : Loc} {v v' : (Val rT)} {Φ : (Val rT) → IPr
 
 theorem wp_alloctape {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} :
     iprop(∀ (l : Loc), appTapesFrag l (Tape.empty z) -∗
-        Φ (⟨.lit (.lbl l), IsVal.lit⟩ : (Val rT)))
+        Φ (.lbl l : Val rT))
       ⊢@{IProp GF} wp E (.tape (.lit (.int z))) Φ := by
   iintro HΦ
   have Hv : (Exp.tape (Exp.lit (.int z)) : Exp rT).toVal? = none :=
@@ -203,7 +203,7 @@ theorem wp_alloctape {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} :
 
 theorem wp_rand {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz : 0 < z) :
     iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
-        Φ (⟨.lit (.int n), IsVal.lit⟩ : (Val rT)))
+        Φ (.int n : Val rT))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro HΦ
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
@@ -230,7 +230,7 @@ theorem wp_rand {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz : 0 < z)
 
 /-- `rand z ()` for `z ≤ 0` is deterministic, returning the sentinel `-1`. -/
 theorem wp_rand_nonpos {E : CoPset} {z : Int} {Φ : (Val rT) → IProp GF} (Hz : ¬ 0 < z) :
-    iprop(Φ (⟨.lit (.int (-1)), IsVal.lit⟩ : (Val rT)))
+    iprop(Φ (.int (-1) : Val rT))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro HΦ
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
@@ -257,7 +257,7 @@ theorem wp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : Int} {ns : List Int}
     {Φ : (Val rT) → IProp GF} :
     iprop(appNatTape l z (n :: ns) ∗
         (appNatTape l z ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : (Val rT))))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).toVal? = none :=
@@ -303,7 +303,7 @@ theorem wp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
     {Φ : (Val rT) → IProp GF} (Hz : 0 < z) :
     iprop(appNatTape l z [] ∗
         (∀ (n : Int), appNatTape l z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : (Val rT))))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   ihave HlBack := app_natTape_to_empty (GF := GF) (l := l) (z := z) $$ Hl
@@ -341,7 +341,7 @@ theorem wp_rand_tape_wrong_bound {E : CoPset} {l : Loc} {z M : Int}
     (Hz : 0 < z) (HneM : z ≠ M) :
     iprop(appNatTape l M ns ∗
         (∀ (n : Int), appNatTape l M ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-          Φ (⟨.lit (.int n), IsVal.lit⟩ : (Val rT))))
+          Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   ihave HlEx := show appNatTape l M ns ⊢@{IProp GF}
@@ -442,7 +442,7 @@ emptiness is required. -/
 theorem wp_rand_lbl_nonpos {E : CoPset} {l : Loc} {z N : Int}
     {Φ : (Val rT) → IProp GF} (Hz : ¬ 0 < z) :
     iprop(appTapesFrag l ⟨N, []⟩ ∗
-        (appTapesFrag l ⟨N, []⟩ -∗ Φ (⟨.lit (.int (-1)), IsVal.lit⟩ : (Val rT))))
+        (appTapesFrag l ⟨N, []⟩ -∗ Φ (.int (-1) : Val rT)))
       ⊢@{IProp GF} wp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
   have Hv : (Exp.rand (Exp.lit (.int z)) (Exp.lit (.lbl l)) : Exp rT).toVal? = none :=

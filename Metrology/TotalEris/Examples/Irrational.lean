@@ -52,7 +52,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS ℝ hlc GF]
 /-- `urand` samples irrational values with probability 1 -/
 theorem twp_urand_irrational (E : CoPset) :
     ⊢@{IProp GF} tglWp E pl(urand)
-      (fun w => iprop% ⌜∃ r : ℝ, w = ⟨.lit (.real r), .lit⟩ ∧ Irrational r⌝) := by
+      (fun w => iprop% ⌜∃ r : ℝ, w = .real r ∧ Irrational r⌝) := by
   iapply twp_err_pos solve_not_red
   iintro %ε %Hε Herr
   iapply (twp_urand_exp irratErr_measurable irratErr_le_one (by simp [irratErr_lintegral_zero])) $$ Herr
@@ -68,8 +68,8 @@ end Wp
 /-! Adequacy -/
 
 theorem measurableSet_irrational_val :
-    MeasurableSet {v : Val ℝ | ∃ r : ℝ, v = ⟨.lit (.real r), IsVal.lit⟩ ∧ Irrational r} := by
-  rw [show {v : Val ℝ | ∃ r : ℝ, v = ⟨.lit (.real r), IsVal.lit⟩ ∧ Irrational r}
+    MeasurableSet {v : Val ℝ | ∃ r : ℝ, v = .real r ∧ Irrational r} := by
+  rw [show {v : Val ℝ | ∃ r : ℝ, v = .real r ∧ Irrational r}
         = Val.fst ⁻¹' {e : Exp ℝ | ∃ r : ℝ, e = .lit (.real r) ∧ Irrational r} by
       ext v; simp only [Set.mem_setOf_eq, Set.mem_preimage]
       constructor
@@ -84,10 +84,10 @@ theorem measurableSet_irrational_val :
     IsGδ.setOf_irrational.measurableSet
 
 theorem urand_irrational_pgl (σ : State ℝ) :
-    Pgl 0 (fun ρ => ∃ v : Val ℝ, ρ.expr = Exp.ofVal v ∧ ∃ r : ℝ, v = ⟨.lit (.real r), IsVal.lit⟩ ∧ Irrational r)
+    Pgl 0 (fun ρ => ∃ v : Val ℝ, ρ.expr = Exp.ofVal v ∧ ∃ r : ℝ, v = .real r ∧ Irrational r)
       (limExec ⟨pl(urand), σ⟩) := by
   refine twp_pgl_lim (GF := erisGF) (e := pl(urand)) (σ := σ)
-    (φ := fun v => ∃ r : ℝ, v = ⟨.lit (.real r), IsVal.lit⟩ ∧ Irrational r)
+    (φ := fun v => ∃ r : ℝ, v = .real r ∧ Irrational r)
     measurableSet_irrational_val ?_
   intro _; iintro _; iapply twp_urand_irrational
 

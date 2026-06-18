@@ -288,7 +288,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     (HSum : (∑' n : ℕ, if n < z.toNat then ε₂ n / z.toNat else 0) ≤ ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
       iprop((∀ (n : Int), ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
-        Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)) -∗
+        Φ (.int n : Val rT)) -∗
       tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
   iintro Herr Hcont
   have Hnv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none :=
@@ -513,7 +513,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     imod (errInterp_supply_increase hlt) $$ Hε_minus with ⟨Hε_new, Hcr⟩
     imod Hclose with _
     -- Feed `Hcr` + bounds into `Hcont` to obtain `Φ ⟨lit n, IsVal.lit⟩`.
-    ihave HΦ : iprop(Φ ⟨.lit (.int n), IsVal.lit⟩) $$ [Hcont Hcr]
+    ihave HΦ : iprop(Φ (.int n)) $$ [Hcont Hcr]
     · iapply Hcont $$ %n
       isplitr
       · ipureintro; exact ⟨Hn₁, Hn₂⟩
@@ -521,7 +521,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     imodintro
     isplitl [Hσ]; · iexact Hσ
     isplitl [Hε_new]; · iexact Hε_new
-    iapply (ErisWpGS.tglWp_value_of_toVal (v := ⟨.lit (.int n), IsVal.lit⟩) rfl)
+    iapply (ErisWpGS.tglWp_value_of_toVal (v := (.int n : Val rT)) rfl)
     iexact HΦ
 
 /-- **Continuous error-credit conditioning at a uniform sample.** Given an error
@@ -540,7 +540,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     (hε₂ : Measurable ε₂) (Hbd : ∀ r, ε₂ r ≤ 1)
     (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
-      iprop((∀ (r : rT), ↯(ε₂ r) -∗ Φ (⟨.lit (.real r), IsVal.lit⟩ : Val rT)) -∗
+      iprop((∀ (r : rT), ↯(ε₂ r) -∗ Φ (.real r)) -∗
       tglWp E Exp.urand Φ) := by
   iintro Herr Hcont
   have Hnv : (Exp.urand : Exp rT).toVal? = none :=
@@ -650,13 +650,13 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     iapply execStutter_free
     imod (errInterp_supply_increase hlt) $$ Hε_minus with ⟨Hε_new, Hcr⟩
     imod Hclose with _
-    ihave HΦ : iprop(Φ ⟨.lit (.real r), IsVal.lit⟩) $$ [Hcont Hcr]
+    ihave HΦ : iprop(Φ (.real r)) $$ [Hcont Hcr]
     · iapply Hcont $$ %r
       iexact Hcr
     imodintro
     isplitl [Hσ]; · iexact Hσ
     isplitl [Hε_new]; · iexact Hε_new
-    iapply (ErisWpGS.tglWp_value_of_toVal (v := ⟨.lit (.real r), IsVal.lit⟩) rfl)
+    iapply (ErisWpGS.tglWp_value_of_toVal (v := (.real r : Val rT)) rfl)
     iexact HΦ
 
 /-- **Demonstration of continuous error-credit conditioning at a uniform sample.**
@@ -667,7 +667,7 @@ by the **Lebesgue integral** `∫⁻ r, ε₁ ∂unifUnit = ε₁ · unifUnit(un
 discrete `rand` error conditioning — the average is a `∫⁻ … ∂unifUnit`. -/
 example {E : CoPset} {ε₁ : ENNReal} (hε₁ : ε₁ ≤ 1) {Φ : Val rT → IProp GF} :
     iprop(↯ε₁) ⊢@{IProp GF}
-      iprop((∀ (r : rT), ↯ε₁ -∗ Φ (⟨.lit (.real r), IsVal.lit⟩ : Val rT)) -∗
+      iprop((∀ (r : rT), ↯ε₁ -∗ Φ (.real r : Val rT)) -∗
       tglWp E Exp.urand Φ) :=
   twp_urand_exp measurable_const (fun _ => hε₁)
     (_root_.le_of_eq (by rw [MeasureTheory.lintegral_const, MeasureTheory.measure_univ, mul_one]))
@@ -681,7 +681,7 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
     (HSum : (∑ n ∈ Finset.range z.toNat, ε₂ n) ≤ z.toNat * ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
       iprop((∀ (n : Int), ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
-        Φ (⟨.lit (.int n), IsVal.lit⟩ : Val rT)) -∗
+        Φ (.int n : Val rT)) -∗
       tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
   -- Apply `twp_rand_exp_nat` with the clamped `F n := min (ε₂ n) 1`.
   iintro Herr Hcont
