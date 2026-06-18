@@ -98,8 +98,8 @@ variable {GF : BundledGFunctors} [IEC : ECGS GF]
 
 def ecAuth (ε : ℝ≥0∞) : IProp GF := iOwn (E := IEC.ec) IEC.γec (● ε)
 def ec (ε : ℝ≥0∞) : IProp GF := iOwn (E := IEC.ec) IEC.γec (◯ ε)
-notation "↯" r:50 => ec r
-notation "●↯" r:50 => ecAuth r
+notation "↯ " r:50 => ec r
+notation "●↯ " r:50 => ecAuth r
 
 instance : CMRA.Discrete (Auth ErrorCredit) := by infer_instance
 instance : OFE.DiscreteE (◯ r : Auth ErrorCredit) := Auth.frag_discrete (by infer_instance)
@@ -130,6 +130,12 @@ theorem combine {ε₁ ε₂} : ↯ε₁ ∗ ↯ε₂ ⊢@{IProp GF} ↯(ε₁ +
   iintro H
   ihave _ := iOwn_op (E := IEC.ec) |>.mpr $$ H
   simp [CMRA.op]
+
+/-- Lets `icombine` fold two error credits into their sum: `icombine H₁ H₂ as H`
+turns `↯ε₁` and `↯ε₂` into `↯(ε₁ + ε₂)`. Mirrors the later-credit instance
+`CombineSepAs (£ n) (£ m) (£ (n + m))`. -/
+instance {ε₁ ε₂} : Iris.ProofMode.CombineSepAs (↯ε₁ : IProp GF) (↯ε₂) (↯(ε₁ + ε₂)) where
+  combine_sep_as := combine
 
 theorem zero : ⊢@{IProp GF} |==> ↯0 := iOwn_unit
 

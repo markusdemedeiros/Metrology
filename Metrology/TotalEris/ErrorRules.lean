@@ -101,35 +101,36 @@ namespace TotalEris
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
-theorem errInterp_supply_decrease {εₛ ε : ENNReal} :
-    iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε)
-      ⊢@{IProp GF} iprop(|==> ErisWpGS.errInterp (rT := rT) (εₛ - ε)) := by
-  show iprop(ecAuth εₛ ∗ ↯ε) ⊢ iprop(|==> ecAuth (εₛ - ε))
-  iintro ⟨Hs, Hε⟩
-  iapply (ErrorCredit.supply_decrease (GF := GF)) $$ Hs Hε
+open ErrorCredit
 
-theorem errInterp_supply_bound {εₛ ε : ENNReal} :
-    iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε)
-      ⊢@{IProp GF} iprop(ErisWpGS.errInterp (rT := rT) εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝) := by
-  show iprop(ecAuth εₛ ∗ ↯ε) ⊢ iprop(ecAuth εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝)
+-- TODO: Delete me? trivial wrapper around supply_bound that changes sep for wand
+-- Only here for unfolding
+theorem errInterp_supply_decrease {εₛ ε : ENNReal} : iprop%
+    errInterp (rT := rT) εₛ ∗ ↯ε ⊢@{IProp GF} |==> errInterp (rT := rT) (εₛ - ε) := by
+  show iprop% ecAuth εₛ ∗ ↯ε ⊢ |==> ecAuth (εₛ - ε)
   iintro ⟨Hs, Hε⟩
-  ihave %hLe := ErrorCredit.supply_bound (GF := GF) $$ Hs Hε
-  isplitl [Hs]; · iexact Hs
-  isplitl [Hε]; · iexact Hε
-  ipureintro; exact hLe
+  iapply supply_decrease $$ Hs Hε
 
-theorem errInterp_supply_increase {ε δ : ENNReal} (h : ε + δ < 1) :
-    iprop(ErisWpGS.errInterp (rT := rT) ε)
-      ⊢@{IProp GF} iprop(|==> (ErisWpGS.errInterp (rT := rT) (ε + δ) ∗ ↯δ)) := by
-  simp only [erisWpGS_errInterp_eq]
-  exact ErrorCredit.supply_increase h
+-- TODO: Delete me? trivial wrapper around supply_bound that changes sep for wand
+-- Only here for unfolding
+theorem errInterp_supply_bound {εₛ ε : ENNReal} : iprop%
+    errInterp (rT := rT) εₛ ∗ ↯ε ⊢@{IProp GF} errInterp (rT := rT) εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝ := by
+  show iprop% ●↯ εₛ ∗ ↯ε ⊢ ●↯ εₛ ∗ ↯ε ∗ ⌜ε ≤ εₛ⌝
+  iintro ⟨Hs, Hε⟩
+  ihave %hLe := supply_bound $$ Hs Hε
+  iframe Hs Hε %hLe
+
+-- TODO: Delete me?
+-- Only here for unfolding
+theorem errInterp_supply_increase {ε δ : ENNReal} (h : ε + δ < 1) : iprop%
+    errInterp (rT := rT) ε ⊢@{IProp GF} |==> (errInterp (rT := rT) (ε + δ) ∗ ↯δ) :=
+  ErrorCredit.supply_increase h
 
 theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → IProp GF}
-    (Hnv : e.toVal? = none) :
-    iprop(↯ε ∗ ∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗ ↯ε' -∗ tglWp E e Φ)
-      ⊢@{IProp GF} tglWp E e Φ := by
+    (Hnv : e.toVal? = none) : iprop%
+    (↯ε ∗ ∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗ ↯ε' -∗ tglWp E e Φ) ⊢@{IProp GF} tglWp E e Φ := by
   iintro ⟨Herr, Hwp⟩
-  iapply (twp_lift_step_fupd_glm Hnv)
+  iapply twp_lift_step_fupd_glm Hnv
   iintro %σ₁ %ε₂ ⟨Hσ₁, Hε₂⟩
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
   imodintro
@@ -141,68 +142,38 @@ theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → I
     imodintro
     iapply execStutter_spend hlt
   case pos =>
-    have hle : ε₂ ≤ ε' := Hε'.le
-    have hbnd : ε₂ + (ε' - ε₂) < 1 := by
-      rw [add_tsub_cancel_of_le hle]; exact hlt
-    imod (errInterp_supply_increase hbnd) $$ Hε₂ with ⟨HsuppNew, Hfrag⟩
-    ihave Herr' : iprop(↯(ε + (ε' - ε₂))) $$ [Herr Hfrag]
-    · iapply ErrorCredit.combine (ε₁ := ε) (ε₂ := ε' - ε₂)
-      isplitl [Herr]; · iexact Herr
-      iexact Hfrag
-    ihave %hValid := ErrorCredit.valid $$ Herr'
-    have hsub_ne : (ε' - ε₂) ≠ 0 := by
-      rw [Ne, _root_.tsub_eq_zero_iff_le]; exact _root_.not_le.mpr Hε'
-    have hε_ne_top : ε ≠ (⊤ : ENNReal) := by
-      intro hε_top
-      rw [hε_top, _root_.top_add] at hValid
-      exact absurd hValid (by simp)
-    have hlt_hwp : ε < ε + (ε' - ε₂) := ENNReal.lt_add_right hε_ne_top hsub_ne
-    ihave HwpRes := Hwp $$ %(ε + (ε' - ε₂)) %hlt_hwp Herr'
-    ihave HwpUnfold := (BI.equiv_iff.mp tglWp_unfold).1 $$ HwpRes
-    have heqS := tglWpPre_eq_step (wp := tglWp) (E := E) (e := e) (Φ := Φ) Hnv
-    ihave HwpStep : iprop(∀ (σ : State rT) (ε : ENNReal),
-        (stateInterp σ ∗ errInterp (rT := rT) ε) -∗
-          |={E, ∅}=> glm' e σ ε (fun ρ ε₂ =>
-            iprop(|={∅, E}=>
-              stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ)))
-      $$ [HwpUnfold]
-    · rw [← heqS]; iexact HwpUnfold
-    -- Instantiate at σ₁ / (ε₂ + (ε' - ε₂)) using Hσ₁ and HsuppNew.
-    ispecialize HwpStep $$ %σ₁ %(ε₂ + (ε' - ε₂)) [Hσ₁ HsuppNew]
-    · isplitl [Hσ₁]; · iexact Hσ₁
-      iexact HsuppNew
-    -- Transition mask: ∅ → E via Hclose, then E → ∅ via HwpStep.
-    imod Hclose with _
-    imod HwpStep with HGlm
-    have heqEps : ε₂ + (ε' - ε₂) = ε' := add_tsub_cancel_of_le hle
-    ihave HGlm' : iprop(glm' e σ₁ ε'
-        (fun ρ ε₂ => iprop(|={∅, E}=>
-          stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E ρ.expr Φ))) $$ [HGlm]
-    · conv_rhs => rw [← heqEps]
-      iexact HGlm
+    imod Hclose with -
+    have hbnd : ε₂ + (ε' - ε₂) < 1 := by rw [add_tsub_cancel_of_le Hε'.le]; exact hlt
+    conv_rhs => rw [← add_tsub_cancel_of_le Hε'.le]
+    imod errInterp_supply_increase hbnd $$ Hε₂ with ⟨HsuppNew, Hfrag⟩
+    icombine Herr Hfrag as Herr'
+    ihave %hValid := valid $$ Herr'
+    ispecialize Hwp $$ %(ε + (ε' - ε₂)) %?bound Herr'
+    case bound =>
+      refine ENNReal.lt_add_right ?_ ?_
+      · intro hε_top; simp [hε_top] at hValid
+      · rw [Ne, _root_.tsub_eq_zero_iff_le]; exact _root_.not_le.mpr Hε'
+    ihave Hwp := (BI.equiv_iff.mp tglWp_unfold).1 $$ Hwp
+    rw (occs := [2]) [tglWpPre_eq_step Hnv]
+    imod Hwp $$ %σ₁ %(ε₂ + (ε' - ε₂)) [$] with HGlm
     imodintro
     iapply execStutter_free
-    iexact HGlm'
+    iexact HGlm
 
-theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
-    (Hnv : e.toVal? = none) :
-    iprop(∀ (ε : ENNReal), ⌜0 < ε⌝ -∗ ↯ε -∗ tglWp E e Φ)
-      ⊢@{IProp GF} tglWp E e Φ := by
+/-- Thin-air credit rule: A client is free to assume an arbitrarily small error credit. -/
+theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} (Hnv : e.toVal? = none) :
+    iprop% (∀ ε, ⌜0 < ε⌝ -∗ ↯ε -∗ tglWp E e Φ) ⊢@{IProp GF} tglWp E e Φ := by
   iintro Hwp
-  iapply ErisWpGS.fupd_tglWp
-  ihave HzBupd : iprop(|==> ↯0) $$ []
-  · iapply ErrorCredit.zero
-  imod HzBupd with Herr
+  iapply fupd_tglWp
+  imod zero with Herr
   imodintro
-  iapply (twp_err_incr Hnv)
-  isplitl [Herr]; · iexact Herr
-  iintro %ε' %Hε' Hcr
-  iapply Hwp; · ipureintro; exact Hε'
-  iexact Hcr
+  iapply twp_err_incr (ε := 0) Hnv
+  iframe
 
-theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
-    {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
-    (Hbd : ∀ n, ε₂ n ≤ 1)
+-- REFACTORING HERE
+
+theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → ENNReal}
+    {Φ : Val rT → IProp GF} (Hz : 0 < z) (Hbd : ∀ n, ε₂ n ≤ 1)
     (HSum : (∑' n : ℕ, if n < z.toNat then ε₂ n / z.toNat else 0) ≤ ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
       iprop((∀ (n : Int), ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
@@ -442,17 +413,6 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal}
     iapply (ErisWpGS.tglWp_value_of_toVal (v := (.int n : Val rT)) rfl)
     iexact HΦ
 
-/-- **Continuous error-credit conditioning at a uniform sample.** Given an error
-budget `ε₁` and a measurable per-outcome credit map `ε₂ : rT → ℝ≥0∞` whose
-**Lebesgue integral over the unit interval** `∫⁻ r, ε₂ r ∂unifUnit` is at most
-`ε₁`, the continuous uniform sample `urand` can spend `↯ε₁` to deliver `↯(ε₂ r)`
-at each real outcome `r`.
-
-This is the continuous analogue of `twp_rand_exp_nat` (where the discrete `∑`/`z`
-average is replaced by `∫⁻ … ∂unifUnit`). It uses NO atomicity: the support
-certificate is `Concentrated (primStep …) (real-image)` via `concentratedOn_map`,
-and the integral bound goes through `unifUnit.map (⟨.lit (.real ·), σ⟩)` change of
-variables (`lintegral_map`). -/
 theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     {ε₂ : rT → ENNReal} {Φ : Val rT → IProp GF}
     (hε₂ : Measurable ε₂) (Hbd : ∀ r, ε₂ r ≤ 1)
@@ -576,19 +536,6 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     isplitl [Hε_new]; · iexact Hε_new
     iapply (ErisWpGS.tglWp_value_of_toVal (v := (.real r : Val rT)) rfl)
     iexact HΦ
-
-/-- **Demonstration of continuous error-credit conditioning at a uniform sample.**
-A self-contained Total Eris proof: spend `↯ε₁` at a `urand` draw, where the
-per-outcome credit is the constant `ε₁`. The budget side-condition is discharged
-by the **Lebesgue integral** `∫⁻ r, ε₁ ∂unifUnit = ε₁ · unifUnit(univ) = ε₁`
-(`unifUnit` is a probability measure). This is exactly the continuous analogue of
-discrete `rand` error conditioning — the average is a `∫⁻ … ∂unifUnit`. -/
-example {E : CoPset} {ε₁ : ENNReal} (hε₁ : ε₁ ≤ 1) {Φ : Val rT → IProp GF} :
-    iprop(↯ε₁) ⊢@{IProp GF}
-      iprop((∀ (r : rT), ↯ε₁ -∗ Φ (.real r : Val rT)) -∗
-      tglWp E Exp.urand Φ) :=
-  twp_urand_exp measurable_const (fun _ => hε₁)
-    (_root_.le_of_eq (by rw [MeasureTheory.lintegral_const, MeasureTheory.measure_univ, mul_one]))
 
 /-- Tutorial wrapper around `twp_rand_exp_nat` matching the form used in
 `eris_rules.v:118` — phrases the sum as `∑ k < N+1, ε₂ k ≤ (N+1) * ε₁`.

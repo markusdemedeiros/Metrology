@@ -511,6 +511,7 @@ theorem glm'_erasable_step  {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg
   iright; iright
   iexact HES
 
+-- Thin-air credit rule
 theorem glm'_credit_bump
     {e : Exp rT} {σ : State rT} {ε : ENNReal} {Z : Cfg rT → ENNReal → IProp GF} :
     iprop(∀ (ε' : ENNReal), ⌜ε < ε'⌝ -∗
