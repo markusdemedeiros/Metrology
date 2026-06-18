@@ -232,6 +232,7 @@ example (E : CoPset) (ε : ENNReal) :
   iapply (twp_rand_exp (z := 2) (ε₁ := ε) (ε₂ := F)
     (Hz := by decide)
     (HSum := by
+      rw [ENNReal.div_le_iff' (by simp) (by simp)]
       simp only [F, show (2 : Int).toNat = 2 from rfl,
         Finset.sum_range_succ, Finset.sum_range_zero, zero_add,
         Nat.reduceEqDiff, ↓reduceIte]

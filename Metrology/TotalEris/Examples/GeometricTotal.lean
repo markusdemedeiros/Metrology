@@ -123,6 +123,9 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   let F : ℕ → ENNReal := fun n => if n = 0 then 0 else (3/2 : NNReal) * ε
   iapply (twp_rand_exp (z := 2) (ε₁ := ε) (ε₂ := F) (Hz := by decide)
     (HSum := by
+      -- New signature: `(∑ n ∈ range 2, F n) / 2 ≤ ε`. Convert to the multiplicative
+      -- form `∑ ≤ 2 * ε` via `div_le_iff'`, then the original bound applies.
+      rw [ENNReal.div_le_iff' (by simp) (by simp)]
       -- `∑ n ∈ range 2, F n = F 0 + F 1 = 0 + (3/2)*ε = (3/2)*ε ≤ 2 * ε`.
       simp only [F, show (2 : Int).toNat = 2 from rfl, Finset.sum_range_succ,
         Finset.sum_range_zero, zero_add, Nat.reduceEqDiff, ↓reduceIte]

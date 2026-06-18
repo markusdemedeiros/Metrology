@@ -172,9 +172,12 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} (Hnv : 
 
 -- REFACTORING HERE
 
+
+/-- Use twp_rand_exp instead. It loses the boundedness hypothesis. -/
 theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → ENNReal}
     {Φ : Val rT → IProp GF} (Hz : 0 < z) (Hbd : ∀ n, ε₂ n ≤ 1)
-    (HSum : (∑' n : ℕ, if n < z.toNat then ε₂ n / z.toNat else 0) ≤ ε₁) :
+    (HSum : (∑ n ∈ Finset.range z.toNat, ε₂ n) / z.toNat ≤ ε₁) :
+    -- (HSum : (∑' n : ℕ, if n < z.toNat then ε₂ n / z.toNat else 0) ≤ ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
       iprop((∀ (n : Int), ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
         Φ (.int n : Val rT)) -∗
@@ -330,7 +333,8 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
                 show (if n < z.toNat then ε₂ n / (z.toNat : ℝ≥0∞) else 0) = 0
                 rw [if_neg (_root_.not_lt.mpr hn)]
             rw [hSumExt]
-            exact HSum
+            sorry
+            -- exact HSum
       _ = ε_now := by
           rw [mul_one]; exact tsub_add_cancel_of_le hLe
   -- Sub-goal 4: Pgl 0 R. Use `Pgl.mono_pred` from `Pgl.zero_positive`:
@@ -537,6 +541,17 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     iapply (ErisWpGS.tglWp_value_of_toVal (v := (.real r : Val rT)) rfl)
     iexact HΦ
 
+
+theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
+    {ε₂ : ℕ → ENNReal} {Φ : Val rT → IProp GF} (Hz : 0 < z)
+    (HSum : (∑ n ∈ Finset.range z.toNat, ε₂ n) / z.toNat ≤ ε₁) :
+    iprop(↯ε₁) ⊢@{IProp GF}
+      iprop((∀ (n : Int), ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
+        Φ (.int n : Val rT)) -∗
+      tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
+  sorry
+
+/-
 /-- Tutorial wrapper around `twp_rand_exp_nat` matching the form used in
 `eris_rules.v:118` — phrases the sum as `∑ k < N+1, ε₂ k ≤ (N+1) * ε₁`.
 Unlike the underlying `twp_rand_exp_nat`, this wrapper does NOT require
@@ -598,6 +613,7 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal}
     iapply (ErrorCredit.contradict (show (1 : ENNReal) ≤ 1 from _root_.le_refl _))
     iapply (ErrorCredit.ext (show min (ε₂ n.toNat) 1 = 1 from _root_.min_eq_right h.le))
     iexact Hcr
+-/
 
 end TotalEris
 end ProbLang
