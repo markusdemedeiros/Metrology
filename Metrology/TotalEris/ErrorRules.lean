@@ -170,8 +170,28 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} (Hnv : 
   iapply twp_err_incr (ε := 0) Hnv
   iframe
 
--- REFACTORING HERE
-
+/-- Countability-free `lintegral` against `Cfg.uniform`: for a **measurable** `φ`,
+the integral is the `Ico`-average. Unlike `Cfg.lintegral_uniform`, measurability of `φ`
+is supplied rather than derived from discreteness, so no `[Countable rT]` is needed. -/
+theorem Cfg.lintegral_uniform' {z : Int} (Hz : 0 < z) (σ : State rT)
+    {φ : Cfg rT → ENNReal} (hφ : Measurable φ) :
+    ∫⁻ c, φ c ∂(Cfg.uniform z σ)
+      = (z.toNat : ENNReal)⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) z, φ ⟨.lit (.int n), σ⟩ := by
+  have Huniform : Cfg.uniform z σ
+      = ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z)
+          (Finset.nonempty_Ico.mpr Hz)).toMeasure).map
+            (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg rT)) := by
+    unfold Cfg.uniform Int.isPos; simp only [Hz, dite_true]
+  have hcard : (Finset.Ico (0 : Int) z).card = z.toNat := by rw [Int.card_Ico]; omega
+  rw [Huniform, MeasureTheory.lintegral_map hφ Measurable.of_discrete,
+      MeasureTheory.lintegral_countable',
+      tsum_eq_sum (s := Finset.Ico (0 : Int) z) fun n hn => by
+        rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
+            PMF.uniformOfFinset_apply_of_notMem _ hn, mul_zero],
+      Finset.mul_sum]
+  refine Finset.sum_congr rfl fun n hn => ?_
+  rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
+      PMF.uniformOfFinset_apply_of_mem _ hn, hcard, mul_comm]
 
 /-- Use twp_rand_exp instead. It loses the boundedness hypothesis. -/
 theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → ENNReal}
@@ -189,34 +209,34 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
   iintro %σ₁ %ε_now ⟨Hσ, Hε_now⟩
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
   imodintro
-  -- Extract `ε₁ ≤ ε_now` (the supply-bound) as a Lean hypothesis. This is
-  -- the key fact for the integral bound + per-outcome carried-supply trick.
   ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp (rT := rT) ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
       $$ [Hε_now Herr]
   · iapply errInterp_supply_bound
     isplitl [Hε_now]; · iexact Hε_now
     iexact Herr
+  -- Shared facts: `rand z ()` is head-reducible, and the support set is measurable.
+  have hhead : HeadReducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
+    (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).ne_zero
+  have hRmeas : MeasurableSet
+      {ρ : Cfg rT | ∃ n : Int, 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} := by
+    apply Set.Countable.measurableSet
+    apply Set.Countable.mono (s₂ := (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) '' Set.univ)
+    · rintro ρ ⟨n, _, _, rfl⟩; exact ⟨n, trivial, rfl⟩
+    · exact Set.countable_univ.image _
   iapply glm'_prim_step
-  iexists (fun ρ => ∃ (n : Int), 0 ≤ n ∧ n < z ∧
-    ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT))
+  iexists (fun ρ => ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT))
   iexists 0
   iexists (fun ρ : Cfg rT => (ε_now - ε₁) + match ρ.1 with
-    | .lit (.int n) =>
-        if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
+    | .lit (.int n) => if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
     | _ => 0)
   iexists ((ε_now - ε₁) + 1)
-  -- Sub-goal 1: Reducible, via the measurability-free `HeadStepSupport.ne_zero`.
+  -- (1) the redex is reducible
   isplitr
-  · ipureintro
-    exact Reducible.of_head (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).ne_zero
-  -- Sub-goal 1b: the support predicate is an explicit countable set of int-configs.
+  · ipureintro; exact Reducible.of_head hhead
+  -- (2) the support set is measurable
   isplitr
-  · ipureintro
-    have hctble : {ρ : Cfg rT | ∃ n : Int, 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)}.Countable := by
-      apply Set.Countable.mono (s₂ := (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) '' Set.univ)
-      · rintro ρ ⟨n, _, _, rfl⟩; exact ⟨n, trivial, rfl⟩
-      · exact (Set.countable_univ).image _
-    exact hctble.measurableSet
+  · ipureintro; exact hRmeas
+  -- (3) the per-outcome credit never exceeds the supplied bound
   isplitr
   · ipureintro
     intro ρ
@@ -229,8 +249,13 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
   · ipureintro
     rw [zero_add, MeasureTheory.lintegral_add_left measurable_const,
         MeasureTheory.lintegral_const]
-    -- `(ε_now - ε₁) * μ(univ) ≤ ε_now - ε₁` since `μ(univ) ≤ 1`.
-    have hμ_le_one : (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) Set.univ ≤ 1 := primStep_univ_le_one _
+    -- The variable credit is measurable, and `μ(univ) ≤ 1` lets `gcongr` discharge the
+    -- multiplicative part automatically.
+    have hφ : Measurable (fun a : Cfg rT => match a.expr with
+        | .lit (.int n) => if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
+        | _ => 0) := (measurable_litInt_elim _).comp Cfg.measurable_expr
+    have hμ_le_one : (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) Set.univ ≤ 1 :=
+      primStep_univ_le_one _
     calc (ε_now - ε₁) * (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) Set.univ +
             ∫⁻ (a : Cfg rT), (match a.expr with
                 | .lit (.int n) => if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
@@ -238,119 +263,29 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
               ∂primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩
         ≤ (ε_now - ε₁) * 1 + ε₁ := by
           gcongr
-          · -- Bound `∫ g dμ ≤ ε₁` from `HSum` by computing
-            -- `primStep ⟨rand z (), σ₁⟩` as `Cfg.uniform z σ₁`, pushing
-            -- the integral through `Measure.map`, restricting to the
-            -- `Finset.Ico 0 z` support, and reindexing `n : Int` ↦
-            -- `n.toNat : ℕ` to match HSum's form.
-            -- Reduce primStep to headStep (= Cfg.uniform on rand z ()).
-            have hhead : HeadReducible (.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
-              (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).ne_zero
-            rw [primStep_eq_headStep hhead]
-            -- headStep ⟨rand z (), σ⟩ definitionally equals Cfg.uniform z σ.
-            show ∫⁻ a, (match a.expr with
-                | .lit (.int n) => if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
-                | _ => 0) ∂(Cfg.uniform z σ₁) ≤ ε₁
-            -- Unfold Cfg.uniform using 0 < z.
-            have hCfgUniform :
-                Cfg.uniform z σ₁ =
-                  (PMF.uniformOfFinset (Finset.Ico (0:Int) z)
-                      (Finset.nonempty_Ico.mpr Hz)).toMeasure.map
-                    (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) := by
-              unfold Cfg.uniform
-              simp only [Int.isPos, dif_pos Hz]
-            rw [hCfgUniform]
-            -- Push the integral through `Measure.map`.
-            rw [MeasureTheory.lintegral_map ?G1 ?G2]
-            -- G1/G2: `Measurable` of the concrete integrand / the `Int → Cfg` map.
-            -- G1: the expr-match integrand, via the countability-free
-            -- `measurable_litInt_elim` composed with `Cfg.measurable_expr`.
-            case G1 => exact (measurable_litInt_elim _).comp Cfg.measurable_expr
-            case G2 => exact Measurable.of_discrete
-            have hCard : (Finset.Ico (0:Int) z).card = z.toNat := by
-              rw [Int.card_Ico, sub_zero]
-            have hLI :
-                ∫⁻ (n : Int), (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0)
-                  ∂((PMF.uniformOfFinset (Finset.Ico (0:Int) z)
-                      (Finset.nonempty_Ico.mpr Hz)).toMeasure)
-                = ∑ n ∈ Finset.Ico (0:Int) z, ε₂ n.toNat / (z.toNat : ℝ≥0∞) := by
-              -- First, restrict to the Finset support since integrand vanishes off it.
-              have hIndic : (fun n : Int => (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0))
-                  = ((Finset.Ico (0:Int) z) : Set Int).indicator
-                    (fun n : Int => (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0)) := by
-                funext n
-                by_cases hn : n ∈ Finset.Ico (0:Int) z
-                · rw [Set.indicator_of_mem]; exact hn
-                · rw [Set.indicator_of_notMem (by exact hn)]
-                  simp only [Finset.mem_Ico, not_and, _root_.not_lt] at hn
-                  by_cases h0 : 0 ≤ n
-                  · have hnz : ¬ n < z := _root_.not_lt.mpr (hn h0)
-                    rw [dif_neg]; exact fun ⟨_, h⟩ => hnz h
-                  · rw [dif_neg]; exact fun ⟨h, _⟩ => h0 h
-              rw [hIndic, MeasureTheory.lintegral_indicator
-                  ((Finset.Ico (0:Int) z).measurableSet)]
-              rw [MeasureTheory.lintegral_finset]
-              refine Finset.sum_congr rfl fun n hn => ?_
-              rw [PMF.toMeasure_apply_singleton _ _ (measurableSet_singleton n),
-                  PMF.uniformOfFinset_apply, if_pos hn, hCard]
-              simp only [Finset.mem_Ico] at hn
-              rw [dif_pos ⟨hn.1, hn.2⟩, ENNReal.div_eq_inv_mul, mul_comm]
-            rw [hLI]
-            -- Reindex Finset.Ico 0 z (over ℤ) as Finset.range z.toNat (over ℕ).
-            have hReindex : ∑ n ∈ Finset.Ico (0:Int) z, ε₂ n.toNat / (z.toNat : ℝ≥0∞)
-                = ∑ k ∈ Finset.range z.toNat, ε₂ k / (z.toNat : ℝ≥0∞) := by
-              refine Finset.sum_nbij' (i := fun n : Int => n.toNat)
-                (j := fun k : Nat => (k : Int)) ?_ ?_ ?_ ?_ ?_
-              · intro n hn
-                simp only [Finset.mem_Ico] at hn
-                simp only [Finset.mem_range]
-                have hnz : n < (z.toNat : Int) := by
-                  rw [Int.toNat_of_nonneg (_root_.le_of_lt Hz)]; exact hn.2
-                exact_mod_cast (Int.toNat_lt hn.1).mpr hnz
-              · intro k hk
-                simp only [Finset.mem_range] at hk
-                simp only [Finset.mem_Ico]
-                refine ⟨Int.natCast_nonneg _, ?_⟩
-                have : (k : Int) < (z.toNat : Int) := by exact_mod_cast hk
-                rwa [Int.toNat_of_nonneg (_root_.le_of_lt Hz)] at this
-              · intro n hn
-                simp only [Finset.mem_Ico] at hn
-                exact Int.toNat_of_nonneg hn.1
-              · intro k _
-                exact Int.toNat_natCast k
-              · intro n _
-                rfl
-            rw [hReindex]
-            -- Compare with HSum.
-            have hSumExt : ∑ k ∈ Finset.range z.toNat, ε₂ k / (z.toNat : ℝ≥0∞)
-                = ∑' n : ℕ, if n < z.toNat then ε₂ n / (z.toNat : ℝ≥0∞) else 0 := by
-              rw [tsum_eq_sum (s := Finset.range z.toNat) (f := fun n =>
-                  if n < z.toNat then ε₂ n / (z.toNat : ℝ≥0∞) else 0) ?_]
-              · refine Finset.sum_congr rfl fun k hk => ?_
-                rw [if_pos (Finset.mem_range.mp hk)]
-              · intro n hn
-                simp only [Finset.mem_range, _root_.not_lt] at hn
-                show (if n < z.toNat then ε₂ n / (z.toNat : ℝ≥0∞) else 0) = 0
-                rw [if_neg (_root_.not_lt.mpr hn)]
-            rw [hSumExt]
-            sorry
-            -- exact HSum
-      _ = ε_now := by
-          rw [mul_one]; exact tsub_add_cancel_of_le hLe
-  -- Sub-goal 4: Pgl 0 R. Use `Pgl.mono_pred` from `Pgl.zero_positive`:
-  -- every config in the positive-mass support of `primStep ⟨rand z (), σ₁⟩`
-  -- must be of the form `⟨lit n, σ₁⟩` with `0 ≤ n < z` (i.e., `R`).
+          rw [primStep_eq_headStep hhead]
+          show ∫⁻ a, (match a.expr with
+              | .lit (.int n) => if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0
+              | _ => 0) ∂(Cfg.uniform z σ₁) ≤ ε₁
+          -- Average over `Ico 0 z`; the `dif` is always taken there, so the sum is
+          -- exactly `(∑ k < z, ε₂ k) / z` — i.e. `HSum`.
+          rw [Cfg.lintegral_uniform' Hz σ₁ hφ, ← ENNReal.div_eq_inv_mul]
+          convert HSum using 2
+          refine Finset.sum_nbij' (i := fun n : Int => n.toNat) (j := (Nat.cast : ℕ → Int))
+            ?_ ?_ (fun n hn => Int.toNat_of_nonneg (Finset.mem_Ico.mp hn).1)
+            (fun k _ => Int.toNat_natCast k) ?_
+          · intro n hn; simp only [Finset.mem_Ico] at hn; simp only [Finset.mem_range]; omega
+          · intro k hk; simp only [Finset.mem_range] at hk; simp only [Finset.mem_Ico]; omega
+          · intro n hn
+            simp only [Finset.mem_Ico] at hn
+            show (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0) = ε₂ n.toNat
+            exact dif_pos ⟨hn.1, hn.2⟩
+      _ = ε_now := by rw [mul_one]; exact tsub_add_cancel_of_le hLe
   isplitr
   · ipureintro
-    -- `Pgl 0 R μ` means `μ {¬R} = 0`. Compute `μ = Cfg.uniform z σ₁` as the pushforward
-    -- of `PMF.uniformOfFinset (Ico 0 z)` under `n ↦ ⟨lit n, σ₁⟩`; its support is exactly
-    -- the `R`-states, so the complement has measure 0. Countability-free: the support
-    -- is a finite Finset, and `{¬R}` is measurable as the complement of a countable set.
     show (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩)
         {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} ≤ 0
     refine _root_.le_of_eq ?_
-    have hhead : HeadReducible (.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
-      (HeadStepSupport.RandNoTapeS Hz (_root_.le_refl _) Hz).ne_zero
     rw [primStep_eq_headStep hhead]
     show (Cfg.uniform z σ₁)
         {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} = 0
@@ -362,41 +297,24 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
       unfold Cfg.uniform; simp only [Int.isPos, dif_pos Hz]
     have hg : Measurable (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) := Measurable.of_discrete
     have hRc : MeasurableSet
-        {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} := by
-      refine MeasurableSet.compl ?_
-      have hctble : {ρ : Cfg rT | ∃ n : Int, 0 ≤ n ∧ n < z ∧
-          ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)}.Countable := by
-        apply Set.Countable.mono
-          (s₂ := (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) '' Set.univ)
-        · rintro ρ ⟨n, _, _, rfl⟩; exact ⟨n, trivial, rfl⟩
-        · exact (Set.countable_univ).image _
-      exact hctble.measurableSet
+        {ρ : Cfg rT | ¬ ∃ (n : Int), 0 ≤ n ∧ n < z ∧ ρ = (⟨.lit (.int n), σ₁⟩ : Cfg rT)} :=
+      hRmeas.compl
     rw [hCfgUniform, MeasureTheory.Measure.map_apply hg hRc,
-      PMF.toMeasure_apply_eq_zero_iff _ (hg hRc), PMF.support_uniformOfFinset, Set.disjoint_left]
+      PMF.toMeasure_apply_eq_zero_iff _ (hg hRc), PMF.support_uniformOfFinset,
+      Set.disjoint_left]
     intro n hn hcontra
     rw [Finset.mem_coe, Finset.mem_Ico] at hn
     exact hcontra ⟨n, hn.1, hn.2, rfl⟩
-  -- Sub-goal 5: per-outcome continuation.
   iintro %ρ %HRρ
   obtain ⟨n, Hn₁, Hn₂, Hρ_eq⟩ := HRρ
-  -- After substituting `ρ = ⟨.lit (.int n), σ₁⟩`, the `X₂ ρ` reduces to
-  -- `ε_now - ε₁ + ε₂ n.toNat` (the match arm fires; `dif_pos` discharges
-  -- the `0 ≤ n ∧ n < z` side condition).
   subst Hρ_eq
   simp only [dif_pos (And.intro Hn₁ Hn₂)]
-  -- Decrease supply: consume `↯ε₁` to drop supply from `ε_now` to
-  -- `ε_now - ε₁`. Mirrors Rocq's `ec_supply_decrease`. The outer
-  -- `|={∅}=>` absorbs the `|==>`.
   ihave Hsupp1 : iprop(|==> ErisWpGS.errInterp (rT := rT) (ε_now - ε₁)) $$ [Hε_now Herr]
   · iapply errInterp_supply_decrease
     isplitl [Hε_now]; · iexact Hε_now
     iexact Herr
   imod Hsupp1 with Hε_minus
   imodintro
-  -- Case-split on whether the new supply `(ε_now - ε₁) + ε₂ n.toNat`
-  -- still validates as a credit supply (< 1). If not, take the
-  -- `execStutter_spend` branch; otherwise take `execStutter_free` and
-  -- do the supply-increase to produce `↯(ε₂ n.toNat)`.
   by_cases hlt : (ε_now - ε₁) + ε₂ n.toNat < 1
   case neg =>
     push Not at hlt
@@ -405,7 +323,6 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
     iapply execStutter_free
     imod (errInterp_supply_increase hlt) $$ Hε_minus with ⟨Hε_new, Hcr⟩
     imod Hclose with _
-    -- Feed `Hcr` + bounds into `Hcont` to obtain `Φ ⟨lit n, IsVal.lit⟩`.
     ihave HΦ : iprop(Φ (.int n)) $$ [Hcont Hcr]
     · iapply Hcont $$ %n
       isplitr
