@@ -430,6 +430,34 @@ theorem inr.measurableEmbedding [MeasurableSpace rT] :
     (h_basic := by rintro _ ⟨c, hc, rfl⟩; exact flatten_measurable (.inr hc))
     (h_cov_meas := cover.inr.measurable _) (h_cov_range := cover.inr_univ_eq_range)
 
+/-! ### Uncurried-projection measurability. One `Pat.<ctor>.π.measurable` per
+field-carrying constructor (`wildcard` is nullary, so has no projection). Each is the
+generic `Stamp.proj_measurable` instantiated at that constructor's embedding. -/
+
+@[fun_prop] theorem lit.π.measurable [MeasurableSpace rT] :
+    Measurable (Pat.lit.π : Pat rT → Option (BaseLit rT)) :=
+  Stamp.proj_measurable lit.measurableEmbedding
+    (by ext p; cases p <;> simp [Pat.lit.π])
+    (fun S => by ext p; cases p <;> simp [Pat.lit.π])
+
+@[fun_prop] theorem pair.π.measurable [MeasurableSpace rT] :
+    Measurable (Pat.pair.π : Pat rT → Option (Pat rT × Pat rT)) :=
+  Stamp.proj_measurable pair.measurableEmbedding
+    (by ext p; cases p <;> simp [Pat.pair.π, Function.uncurry, Prod.exists])
+    (fun S => by ext p; cases p <;> simp [Pat.pair.π, Function.uncurry, Prod.exists])
+
+@[fun_prop] theorem inl.π.measurable [MeasurableSpace rT] :
+    Measurable (Pat.inl.π : Pat rT → Option (Pat rT)) :=
+  Stamp.proj_measurable inl.measurableEmbedding
+    (by ext p; cases p <;> simp [Pat.inl.π])
+    (fun S => by ext p; cases p <;> simp [Pat.inl.π])
+
+@[fun_prop] theorem inr.π.measurable [MeasurableSpace rT] :
+    Measurable (Pat.inr.π : Pat rT → Option (Pat rT)) :=
+  Stamp.proj_measurable inr.measurableEmbedding
+    (by ext p; cases p <;> simp [Pat.inr.π])
+    (fun S => by ext p; cases p <;> simp [Pat.inr.π])
+
 /-- Per-constructor cell family for the `casesOn` preimage decomposition. Each
 index maps to `<ctor>.ι '' (f_<ctor> ⁻¹' S)`; the decomposition is the
 `Fin`-indexed union of these. -/

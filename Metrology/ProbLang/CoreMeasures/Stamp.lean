@@ -477,6 +477,21 @@ theorem flatten_inter_data {α : Type _} {S₁ S₂ : Set α} {ι : α → T}
     (hι : Function.Injective ι) :
     ι '' S₁ ∩ ι '' S₂ = ι '' (S₁ ∩ S₂) := (Set.image_inter hι).symm
 
+/-- **Constructor-projection measurability (§36).** The uncurried projection
+`π : T → Option A` of a constructor with uncurried form `g : A → T` (the raw ctor for
+unary arguments, `Function.uncurry`/the tuple lambda for n-ary) is measurable, given
+that `g` is a measurable embedding and `π` is its `Option`-valued partial inverse:
+`none` exactly off `range g`, and `π ⁻¹' (some '' S) = g '' S`. Both side conditions
+are proved per-constructor by `ext t; cases t <;> simp [<ctor>.π]`. -/
+theorem proj_measurable {A : Type _} [MeasurableSpace A] [MeasurableSpace T]
+    {π : T → Option A} {g : A → T}
+    (hemb : MeasurableEmbedding g)
+    (h_none : π ⁻¹' ({none} : Set (Option A)) = (Set.range g)ᶜ)
+    (h_some : ∀ S : Set A, π ⁻¹' (some '' S) = g '' S) :
+    Measurable π :=
+  Measurable.option_of_cov hemb.measurableSet_range h_none
+    (fun S hS => by rw [h_some S]; exact hemb.measurableSet_image' hS)
+
 end Stamp
 
 end ProbLangMeasures

@@ -401,6 +401,40 @@ theorem real.measurableEmbedding [MeasurableSpace rT] :
   ⟨fun _ _ h => by injection h, BaseLit.real.ι.measurable,
     fun _ hS => flatten_measurable (.real _ hS)⟩
 
+/-! ### Uncurried-projection measurability. One `BaseLit.<ctor>.π.measurable` per
+field-carrying constructor (`unit` is nullary, so has no projection). Each is the
+generic `Stamp.proj_measurable` instantiated at that constructor's embedding. -/
+
+@[fun_prop] theorem int.π.measurable [MeasurableSpace rT] :
+    Measurable (BaseLit.int.π : BaseLit rT → Option Int) :=
+  Stamp.proj_measurable int.measurableEmbedding
+    (by ext b; cases b <;> simp [BaseLit.int.π])
+    (fun S => by ext b; cases b <;> simp [BaseLit.int.π])
+
+@[fun_prop] theorem bool.π.measurable [MeasurableSpace rT] :
+    Measurable (BaseLit.bool.π : BaseLit rT → Option Bool) :=
+  Stamp.proj_measurable bool.measurableEmbedding
+    (by ext b; cases b <;> simp [BaseLit.bool.π])
+    (fun S => by ext b; cases b <;> simp [BaseLit.bool.π])
+
+@[fun_prop] theorem loc.π.measurable [MeasurableSpace rT] :
+    Measurable (BaseLit.loc.π : BaseLit rT → Option Loc) :=
+  Stamp.proj_measurable loc.measurableEmbedding
+    (by ext b; cases b <;> simp [BaseLit.loc.π])
+    (fun S => by ext b; cases b <;> simp [BaseLit.loc.π])
+
+@[fun_prop] theorem lbl.π.measurable [MeasurableSpace rT] :
+    Measurable (BaseLit.lbl.π : BaseLit rT → Option Lbl) :=
+  Stamp.proj_measurable lbl.measurableEmbedding
+    (by ext b; cases b <;> simp [BaseLit.lbl.π])
+    (fun S => by ext b; cases b <;> simp [BaseLit.lbl.π])
+
+@[fun_prop] theorem real.π.measurable [MeasurableSpace rT] :
+    Measurable (BaseLit.real.π : BaseLit rT → Option rT) :=
+  Stamp.proj_measurable real.measurableEmbedding
+    (by ext b; cases b <;> simp [BaseLit.real.π])
+    (fun S => by ext b; cases b <;> simp [BaseLit.real.π])
+
 /-- Per-constructor cell family for the `casesOn` preimage decomposition. -/
 def decompCell
     {rT : Type _} {α : Type _} (S : Set α)

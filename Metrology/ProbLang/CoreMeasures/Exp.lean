@@ -1483,6 +1483,140 @@ theorem scrut.measurableEmbedding [MeasurableSpace rT] :
       exact flatten_measurable (.scrut _ hc hS))
     (h_cov_meas := cover.scrut.measurable _) (h_cov_range := cover.scrut_univ_eq_range)
 
+/-! ### Uncurried-projection measurability. One `Exp.<ctor>.π.measurable` per
+field-carrying constructor (`fail`/`urand` are nullary, so have no projection). Each is
+the generic `Stamp.proj_measurable` instantiated at that constructor's embedding; the
+two side conditions are `ext e; cases e <;> simp [<ctor>.π …]`. Unary constructors need
+only the projection's unfolding; `Function.uncurry`-based embeddings (binary `app`/…,
+mixed `unop`, `scrut`) add `Function.uncurry, Prod.exists`; tuple-lambda embeddings
+(ternary `cond`/`case`, mixed `binop`) add `Prod.exists`. -/
+
+@[fun_prop] theorem bvar.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.bvar.π : Exp rT → Option Nat) :=
+  Stamp.proj_measurable bvar.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.bvar.π])
+    (fun S => by ext e; cases e <;> simp [Exp.bvar.π])
+
+@[fun_prop] theorem fvar.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.fvar.π : Exp rT → Option Var) :=
+  Stamp.proj_measurable fvar.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.fvar.π])
+    (fun S => by ext e; cases e <;> simp [Exp.fvar.π])
+
+@[fun_prop] theorem lit.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.lit.π : Exp rT → Option (BaseLit rT)) :=
+  Stamp.proj_measurable lit.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.lit.π])
+    (fun S => by ext e; cases e <;> simp [Exp.lit.π])
+
+@[fun_prop] theorem lam.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.lam.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable lam.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.lam.π])
+    (fun S => by ext e; cases e <;> simp [Exp.lam.π])
+
+@[fun_prop] theorem fix.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.fix.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable fix.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.fix.π])
+    (fun S => by ext e; cases e <;> simp [Exp.fix.π])
+
+@[fun_prop] theorem app.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.app.π : Exp rT → Option (Exp rT × Exp rT)) :=
+  Stamp.proj_measurable app.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.app.π, Function.uncurry, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.app.π, Function.uncurry, Prod.exists])
+
+@[fun_prop] theorem unop.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.unop.π : Exp rT → Option (UnOp × Exp rT)) :=
+  Stamp.proj_measurable unop.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.unop.π, Function.uncurry, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.unop.π, Function.uncurry, Prod.exists])
+
+@[fun_prop] theorem binop.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.binop.π : Exp rT → Option (BinOp × Exp rT × Exp rT)) :=
+  Stamp.proj_measurable binop.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.binop.π, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.binop.π, Prod.exists])
+
+@[fun_prop] theorem cond.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.cond.π : Exp rT → Option (Exp rT × Exp rT × Exp rT)) :=
+  Stamp.proj_measurable cond.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.cond.π, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.cond.π, Prod.exists])
+
+@[fun_prop] theorem pair.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.pair.π : Exp rT → Option (Exp rT × Exp rT)) :=
+  Stamp.proj_measurable pair.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.pair.π, Function.uncurry, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.pair.π, Function.uncurry, Prod.exists])
+
+@[fun_prop] theorem fst.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.fst.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable fst.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.fst.π])
+    (fun S => by ext e; cases e <;> simp [Exp.fst.π])
+
+@[fun_prop] theorem snd.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.snd.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable snd.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.snd.π])
+    (fun S => by ext e; cases e <;> simp [Exp.snd.π])
+
+@[fun_prop] theorem inl.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.inl.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable inl.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.inl.π])
+    (fun S => by ext e; cases e <;> simp [Exp.inl.π])
+
+@[fun_prop] theorem inr.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.inr.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable inr.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.inr.π])
+    (fun S => by ext e; cases e <;> simp [Exp.inr.π])
+
+@[fun_prop] theorem case.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.case.π : Exp rT → Option (Exp rT × Exp rT × Exp rT)) :=
+  Stamp.proj_measurable case.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.case.π, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.case.π, Prod.exists])
+
+@[fun_prop] theorem alloc.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.alloc.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable alloc.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.alloc.π])
+    (fun S => by ext e; cases e <;> simp [Exp.alloc.π])
+
+@[fun_prop] theorem load.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.load.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable load.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.load.π])
+    (fun S => by ext e; cases e <;> simp [Exp.load.π])
+
+@[fun_prop] theorem store.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.store.π : Exp rT → Option (Exp rT × Exp rT)) :=
+  Stamp.proj_measurable store.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.store.π, Function.uncurry, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.store.π, Function.uncurry, Prod.exists])
+
+@[fun_prop] theorem tape.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.tape.π : Exp rT → Option (Exp rT)) :=
+  Stamp.proj_measurable tape.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.tape.π])
+    (fun S => by ext e; cases e <;> simp [Exp.tape.π])
+
+@[fun_prop] theorem rand.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.rand.π : Exp rT → Option (Exp rT × Exp rT)) :=
+  Stamp.proj_measurable rand.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.rand.π, Function.uncurry, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.rand.π, Function.uncurry, Prod.exists])
+
+@[fun_prop] theorem scrut.π.measurable [MeasurableSpace rT] :
+    Measurable (Exp.scrut.π : Exp rT → Option (Exp rT × Pat rT)) :=
+  Stamp.proj_measurable scrut.measurableEmbedding
+    (by ext e; cases e <;> simp [Exp.scrut.π, Function.uncurry, Prod.exists])
+    (fun S => by ext e; cases e <;> simp [Exp.scrut.π, Function.uncurry, Prod.exists])
+
 /-- Per-constructor cell family for the `casesOn` preimage decomposition. -/
 def decompCell
     {rT : Type _} {α : Type _} (S : Set α)

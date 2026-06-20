@@ -694,6 +694,17 @@ theorem quad.measurableEmbedding [MeasurableSpace rT] :
       exact flatten_measurable (.quad hc₁ hc₂ hc₃ hc₄))
     (h_cov_meas := cover.quad.measurable _) (h_cov_range := cover.quad_univ_eq_range)
 
+/-! ### Uncurried-projection measurability (§36).
+
+The four production CoreMeasures inductives (`BaseLit`/`Pat`/`Exp`/`EctxItem`) stamp one
+`<ctor>.π.measurable` per field-carrying constructor via `Stamp.proj_measurable` and
+`ext; cases <;> simp [<ctor>.π …]`. The toy `Probe` is declared **in this same module**,
+so `simp [Probe.<ctor>.π]` trips Lean's `enableRealizationsForConst` guard (the projection's
+equation lemmas are only realized for *imported* constants). Real stamping always imports
+its inductive from `Syntax.lean`, so this never bites in practice; the section is therefore
+omitted for the toy. See `Exp.<ctor>.π.measurable` (incl. ternary `cond`/`case`, mixed
+`unop`/`binop`, `scrut`) for the full worked battery the toy would otherwise mirror. -/
+
 /-! ### §26 casesOn_preimage_decomp -/
 
 /-- Per-constructor cell family for the `casesOn` preimage decomposition. -/
