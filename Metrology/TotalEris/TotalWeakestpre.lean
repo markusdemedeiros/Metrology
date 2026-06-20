@@ -169,6 +169,37 @@ theorem tglWp_value_inv_with_state {E : CoPset} {v : Val rT} {σ : State rT}
   isplitl [Hσ]; · iexact Hσ
   iexact Hε
 
+/-- `tglWp` absorbs a state-frame-preserving fupd: if from every `(σ, ε)` one can `|={E}=>`-return
+the state/error interpretation together with `tglWp E e Φ`, then `tglWp E e Φ` holds. -/
+theorem tglWp_of_frame_fupd {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+    iprop(∀ (σ : State rT) (ε : ENNReal),
+        stateInterp σ ∗ errInterp (rT := rT) ε -∗
+          |={E}=> stateInterp σ ∗ errInterp (rT := rT) ε ∗ tglWp E e Φ)
+      ⊢@{IProp GF} tglWp E e Φ := by
+  iintro HF
+  cases htv : e.toVal? with
+  | some v =>
+    obtain rfl : e = Exp.ofVal v := (Exp.ofVal_of_toVal_some htv).symm
+    iapply (BI.equiv_iff.mp tglWp_unfold_value).2
+    iintro %σ %ε ⟨Hσ, Hε⟩
+    ispecialize HF $$ %σ %ε [Hσ Hε]
+    · isplitl [Hσ]; · iexact Hσ
+      iexact Hε
+    imod HF with ⟨Hσ', Hε', HW⟩
+    iapply tglWp_value_inv_with_state
+    iframe HW Hσ' Hε'
+  | none =>
+    iapply (BI.equiv_iff.mp (tglWp_unfold_step htv)).2
+    iintro %σ %ε ⟨Hσ, Hε⟩
+    ispecialize HF $$ %σ %ε [Hσ Hε]
+    · isplitl [Hσ]; · iexact Hσ
+      iexact Hε
+    imod HF with ⟨Hσ', Hε', HW⟩
+    ihave HW' := (BI.equiv_iff.mp (tglWp_unfold_step htv)).1 $$ HW
+    iapply HW' $$ %σ %ε
+    isplitl [Hσ']; · iexact Hσ'
+    iexact Hε'
+
 /-! ## Induction principle -/
 
 theorem tglWp_ind_simple {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
@@ -387,41 +418,8 @@ theorem tglWp_bind {K : Ectx rT} {E : CoPset} {e : Exp rT} {Φ : Val rT → IPro
           |={E}=> stateInterp σ ∗ errInterp (rT := rT) ε ∗ tglWp E (K.fill (Exp.ofVal v)) Φ)
       $$ [HF]
     · rw [← heqV]; iexact HF
-    cases hKtv : (K.fill (Exp.ofVal v)).toVal? with
-    | some v' =>
-      have heq' : K.fill (Exp.ofVal v) = Exp.ofVal v' :=
-        (Exp.ofVal_of_toVal_some hKtv).symm
-      have key : tglWp E (K.fill (Exp.ofVal v)) Φ ≡
-                 iprop(∀ (σ' : State rT) (ε' : ENNReal),
-                   (stateInterp σ' ∗ errInterp (rT := rT) ε') -∗
-                     |={E}=> stateInterp σ' ∗ errInterp (rT := rT) ε' ∗ Φ v') := by
-        rw [heq']; exact tglWp_unfold_value
-      iapply (BI.equiv_iff.mp key).2
-      iintro %σ %ε ⟨Hσ, Hε⟩
-      ispecialize HF_red $$ %σ %ε [Hσ Hε]
-      · isplitl [Hσ]; · iexact Hσ
-        iexact Hε
-      imod HF_red with ⟨Hσ', Hε', HInner⟩
-      have key2 : tglWp E (K.fill (Exp.ofVal v)) Φ ≡
-                  iprop(∀ (σ'' : State rT) (ε'' : ENNReal),
-                    (stateInterp σ'' ∗ errInterp (rT := rT) ε'') -∗
-                      |={E}=> stateInterp σ'' ∗ errInterp (rT := rT) ε'' ∗ Φ v') := by
-        rw [heq']; exact tglWp_unfold_value
-      ihave HInner' := (BI.equiv_iff.mp key2).1 $$ HInner
-      iapply HInner' $$ %σ %ε
-      isplitl [Hσ']; · iexact Hσ'
-      iexact Hε'
-    | none =>
-      iapply (BI.equiv_iff.mp (tglWp_unfold_step hKtv)).2
-      iintro %σ %ε ⟨Hσ, Hε⟩
-      ispecialize HF_red $$ %σ %ε [Hσ Hε]
-      · isplitl [Hσ]; · iexact Hσ
-        iexact Hε
-      imod HF_red with ⟨Hσ', Hε', HInner⟩
-      ihave HInner' := (BI.equiv_iff.mp (tglWp_unfold_step hKtv)).1 $$ HInner
-      iapply HInner' $$ %σ %ε
-      isplitl [Hσ']; · iexact Hσ'
-      iexact Hε'
+    iapply tglWp_of_frame_fupd
+    iexact HF_red
   | none =>
     have hKtv : (K.fill e').toVal? = none :=
       Exp.toVal?_eq_none.mpr fun hKv =>

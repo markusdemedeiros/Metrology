@@ -365,6 +365,18 @@ theorem dbind_erasable
 
 end Tgl
 
+/-- An `execStutter` whose genuine leaves are `Tgl`-claims collapses to a single `Tgl`-claim:
+the vacuous `1 ≤ e` branch is `Tgl.of_ge_one`, and each leaf `P ε` entails `|={∅}=> ⌜Tgl μ φ ε⌝`
+via `hP` — the identity for a prim-step leaf, `∧`-left for a recursive one. -/
+theorem Tgl_of_execStutter [ErisGS rT .hasNoLC GF] {μ : MeasureTheory.Measure (Cfg rT)}
+    {φ : (Val rT) → Prop} {P : ENNReal → IProp GF} {e : ENNReal}
+    (hP : ∀ ε, P ε ⊢@{IProp GF} |={∅}=> ⌜Tgl μ φ ε⌝) :
+    execStutter P e ⊢@{IProp GF} |={∅}=> ⌜Tgl μ φ e⌝ := by
+  iintro H
+  icases H with ⟨%Hvac | HZ⟩
+  · imodintro; ipureintro; exact Tgl.of_ge_one Hvac
+  · iapply (hP e); iexact HZ
+
 /-- **Iris-side core**: extract a pure `Tgl` bound from a `glm` claim
 whose leaf body carries a per-leaf pure `Tgl` claim under `|={∅}=>`.
 Mirrors the inner induction of Rocq's `twp_step_fupd_tgl`. -/
@@ -391,10 +403,8 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
       · iintro %ε'' %hε
         ihave HE := HOT $$ %ε'' %hε
         imod HE with HS
-        icases HS with ⟨%Hvac | HZ⟩
-        · imodintro; ipureintro; exact Tgl.of_ge_one Hvac
-        · ihave HZ := and_elim_l $$ HZ
-          iexact HZ
+        iapply Tgl_of_execStutter (fun _ => and_elim_l)
+        iexact HS
       ihave Hf := iProp_fupd_plainly_forall_pure_impl_no_lc $$ Hfa
       imod Hf with %Hf
       imodintro
@@ -409,9 +419,8 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
         · iintro %ρ %hR
           ihave HC := HCont $$ %ρ %hR
           imod HC with HS
-          icases HS with ⟨%Hvac | HZ⟩
-          · imodintro; ipureintro; exact Tgl.of_ge_one Hvac
-          · iexact HZ
+          iapply Tgl_of_execStutter (P := Z ρ) (fun _ => by iintro h; iexact h)
+          iexact HS
         ihave Hf := iProp_fupd_plainly_forall_pure_impl_no_lc $$ Hfa
         imod Hf with %Hf
         imodintro
@@ -426,10 +435,8 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
         · iintro %σ'' %hR
           ihave HC := HCont $$ %σ'' %hR
           imod HC with HS
-          icases HS with ⟨%Hvac | HZ⟩
-          · imodintro; ipureintro; exact Tgl.of_ge_one Hvac
-          · ihave HZ := and_elim_l $$ HZ
-            iexact HZ
+          iapply Tgl_of_execStutter (fun _ => and_elim_l)
+          iexact HS
         ihave Hf := iProp_fupd_plainly_forall_pure_impl_no_lc $$ Hfa
         imod Hf with %Hf
         imodintro
