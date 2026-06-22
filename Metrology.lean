@@ -1,6 +1,6 @@
 module
 
-public import Metrology.Approxis
+-- public import Metrology.Approxis
 public import Metrology.Couplings
 public import Metrology.Iris
 public import Metrology.LibCrypto
