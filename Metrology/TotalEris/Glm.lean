@@ -20,13 +20,16 @@ open scoped ENNReal
 
 namespace ProbLang
 
-
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 namespace TotalEris
 
-/-! # `glm` graded lifting modality -/
+/-! # Graded lifting modality -/
 
+/-- A graded lift of a predicate.
+
+Given a predicate `φ` on a type `α`, `Pgl ε φ μ` represents the predicate that `φ` is invalidated
+with probility at most `ε` with respect to `μ`. -/
 @[expose]
 def Pgl {α : Type _} [MeasurableSpace α] (ε : ENNReal) (φ : α → Prop)
   (μ : MeasureTheory.Measure α) : Prop := μ {x | ¬ φ x} ≤ ε
@@ -43,16 +46,20 @@ theorem mono_pred {ε : ENNReal} {φ ψ : α → Prop} {μ : MeasureTheory.Measu
   refine .trans (MeasureTheory.measure_mono ?_) h
   intro x hx hxφ; exact hx (hφψ x hxφ)
 
+theorem zero_of_null (μ : MeasureTheory.Measure α) (Hnull : μ {x | ¬φ x} = 0) :
+    Pgl 0 φ μ := by
+  show μ {x | ¬ φ x} ≤ 0
+  rw [Hnull]
+
 @[discrete]
 theorem zero_positive [Countable α] (μ : MeasureTheory.Measure α) :
     Pgl 0 (fun a => 0 < μ {a}) μ := by
-  show μ {x | ¬ (0 < μ {x})} ≤ 0
+  apply zero_of_null
   have hset : {x : α | ¬ (0 < μ {x})} = {x | μ {x} = 0} := by
     ext x; simp [pos_iff_ne_zero]
   rw [hset]
-  have hctble : ({x : α | μ {x} = 0}).Countable :=
-    Set.Countable.mono (Set.subset_univ _) Set.countable_univ
-  exact ((MeasureTheory.measure_null_iff_singleton hctble).mpr (fun _ hx => hx)).le
+  refine ((MeasureTheory.measure_null_iff_singleton ?_).mpr (fun _ hx => hx))
+  exact Set.Countable.mono (Set.subset_univ _) Set.countable_univ
 
 theorem zero_possible [MeasurableSingletonClass α] {μ : MeasureTheory.Measure α}
     (h : IsAtomicSupport μ) : Pgl 0 (fun a => Possible a μ) μ := by
@@ -67,12 +74,6 @@ theorem of_concentrated {μ : MeasureTheory.Measure α} {φ : α → Prop}
   exact h.le
 
 end Pgl
-
-/-! ## `ErisWpGS` ghost-state class
-
-Resources required by the Eris weakest precondition: the invariant ghost
-state, a state interpretation, and an error-credit interpretation. Mirrors
-Rocq `erisWpGS`. No spec side — Eris is a unary logic.  -/
 
 class ErisWpGS (GF : BundledGFunctors) where
   hlc : HasLC

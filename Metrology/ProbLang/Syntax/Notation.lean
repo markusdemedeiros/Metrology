@@ -135,6 +135,10 @@ syntax:max "fail"                                               : pl_exp
 syntax:max "urand"                                              : pl_exp
 syntax:10 "let! " pl_pat " := " pl_exp:10 "; " pl_exp:1         : pl_exp
 syntax:100 "assert(" pl_exp ")"                                 : pl_exp
+-- Display-only: a raw de Bruijn index surfaced by operational stepping.
+-- `open'`/`openRec` substitution erases the binder name hints, leaving a bare
+-- `Exp.bvar n`; the sigil makes clear this is a leaked index, not source.
+syntax:max "⟪bvar " term:max "⟫"                                : pl_exp
 
 /-! ## Category parenthesizers
 
@@ -339,6 +343,7 @@ meta partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
       let chain ← buildCaseChain env st scrutAtom (#[p] ++ ps) (#[b] ++ bs)
       let lam ← closeAnonLam chain scrutAtom
       `(Exp.app $lam $(← elabPL env st e))
+  | `(pl_exp|⟪bvar $n⟫)          => `(Exp.bvar $n)
   | `(pl_exp|fail)               => `(Exp.fail)
   | `(pl_exp|urand)              => `(Exp.urand)
   | `(pl_exp|assert($e))         => do
@@ -740,10 +745,71 @@ meta def delabExpAnnotated : Delab := do
   else
     pure eStx
 
+/-! ### Recursive-constant refolding (`@[pl_fold]`)
+
+Operational stepping (`twp_pure`) substitutes the *unfolded* value of a recursive
+`Exp` definition for its self-reference and then normalizes it, so a recursive
+call prints as a raw `Exp.fix (Exp.lam (Exp.lam …))` body full of `Exp.bvar`s
+instead of the definition's name. `rw [← C]` cannot refold it (the substituted
+value is in opened de Bruijn form, not `C`'s stored closed form).
+
+`@[pl_fold]` registers such a constant; the `Exp.fix` delaborator below then
+recognises any `Exp.fix …` subterm that is *defeq* to a registered constant and
+prints it by name (e.g. `&GeometricTrial`). Display-only: no semantic effect. -/
+
+/-- Recursive `Exp` constants whose unfolded `Exp.fix …` form should be refolded
+to the constant name in the infoview. -/
+meta initialize plFoldExt : SimplePersistentEnvExtension Name NameSet ←
+  registerSimplePersistentEnvExtension {
+    addImportedFn := fun es => es.foldl (fun s arr => arr.foldl (·.insert ·) s) {}
+    addEntryFn    := fun s n => s.insert n
+    toArrayFn     := fun es => es.toArray
+  }
+
+syntax (name := pl_fold) "pl_fold" : attr
+
+meta initialize registerBuiltinAttribute {
+  name  := `pl_fold
+  descr := "Display this recursive `Exp` constant folded (by name) wherever it appears unfolded as an `Exp.fix …` body — e.g. recursive self-references exposed by `twp_pure` stepping."
+  add   := fun decl _stx _kind => do
+    modifyEnv fun env => plFoldExt.addEntry env decl
+}
+
+open Lean.PrettyPrinter.Delaborator Lean.Meta in
+/-- Refold an `Exp.fix …` subterm to a registered `@[pl_fold]` constant, so a
+recursive self-reference exposed by stepping prints as e.g. `&GeometricTrial`
+rather than its expanded `.lam.lam.fix` body. Falls through to the default
+rendering for anonymous fixes. -/
+@[delab app.ProbLang.Exp.fix]
+meta def delabExpFixFold : Delab := do
+  let e ← SubExpr.getExpr
+  let env ← getEnv
+  for c in (plFoldExt.getState env).toList do
+    let isMatch ← withNewMCtxDepth do
+      let cExpr ← mkConstWithFreshMVarLevels c
+      let (mvars, _, _) ← forallMetaTelescopeReducing (← inferType cExpr)
+      isDefEq e (mkAppN cExpr mvars)
+    if isMatch then
+      let short ← unresolveNameGlobal c
+      return ← `(pl(&$(mkIdent short)))
+  failure
+
 /-! ### Free-variable display
 
 Since `Var = String` and free identifiers elaborate to `Exp.fvar "x"`, we
 can recover the display name straight from the string literal. -/
+
+open Lean.PrettyPrinter.Delaborator in
+/-- Render a raw `Exp.bvar n` (a de Bruijn index leaked by operational stepping,
+where the binder name hint is gone) as `⟪bvar n⟫` rather than `Exp.bvar n`. -/
+@[delab app.ProbLang.Exp.bvar]
+meta def delabExpBvar : Delab := do
+  let e ← SubExpr.getExpr
+  -- `Exp.bvar : Nat → Exp rT` carries an implicit `rT`, so the application has
+  -- two arguments (`rT` and the index); the index is the last one.
+  guard <| e.getAppNumArgs == 2
+  let idxStx ← SubExpr.withAppArg delab
+  `(pl(⟪bvar $idxStx⟫))
 
 open Lean.PrettyPrinter.Delaborator in
 @[delab app.ProbLang.Exp.fvar]

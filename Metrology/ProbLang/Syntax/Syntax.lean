@@ -580,6 +580,8 @@ unifier (`iapply` etc.), which matches at `reducible` transparency. -/
 
 instance : Coe (BaseLit rT) (Val rT) := ⟨Val.ofBaseLit⟩
 
+instance : Coe (Val rT) (Exp rT) := ⟨Val.fst⟩
+
 /-! Reducible per-constructor shorthands for the literal values. `abbrev` (rather
 than `def`) keeps them definitionally equal to the explicit `⟨.lit ·, .lit⟩` form,
 so existing proofs that `cases`/`simp` on the unfolded shape still go through, and

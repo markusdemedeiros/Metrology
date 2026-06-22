@@ -7,7 +7,8 @@ public import Metrology.TotalEris.TotalPrimitiveLaws
 
 /-! # Error credit rules  -/
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris ProbLang.TotalEris.ErisWpGS
+open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
+  ProbLang.TotalEris.ErisWpGS
 open scoped ENNReal AppGS
 
 namespace ProbLang

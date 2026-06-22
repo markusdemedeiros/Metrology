@@ -11,9 +11,17 @@ namespace ProbLang
 
 variable {rT : Type _} [ProbLangℝ rT]
 
-/-- Atomic: an expression only primSteps to values -/
+-- FIXME: I think by this definition all real-returning operations are atomic?
+-- Since all atoms have measure zero... this seems very wrong.
+
+/-- Atomic: Each atom that can be prim-stepped to is a value. -/
 def Atomic (e : Exp rT) : Prop :=
   ∀ σ e' σ', 0 < primStep ⟨e, σ⟩ {⟨e', σ'⟩} → e'.isValue
+
+/-- Measurable version of atomicity?
+The set that we can PrimStep has mass concentrated on the set of value configurations. -/
+def Atomic' (e : Exp rT) : Prop :=
+  ∀ σ, Concentrated (primStep ⟨e, σ⟩) { ρ | ρ.1.isValue }
 
 namespace Atomic
 
@@ -37,6 +45,7 @@ theorem load (l : Loc) : Atomic (rT := rT) (.load (.lit (.loc l))) := by
     rename_i v _
     subst he'
     exact v.2.toIsValue
+
 
 theorem store (l : Loc) (v : Val rT) :
     Atomic (.store (.lit (.loc l)) v.1) := by
