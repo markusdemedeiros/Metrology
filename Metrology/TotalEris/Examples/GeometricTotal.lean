@@ -50,6 +50,7 @@ Definition geometric : val :=
   rec: "geo" "n" :=
     if: rand #2 = #0 then #0 else "geo" "n" + #1.
 ``` -/
+@[pl_names]
 def geometric : Exp rT :=
   pl% rec geo n :=
         if rand(#2, #.unit) = #0
@@ -74,45 +75,11 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   -- Gives us an IH `↯((3/2) * ε) -∗ WP geometric()` together with `↯ε`.
   refine ErrorCredit.Induction.external_simple (k := (3/2 : NNReal)) hε (by norm_num) ?_
   iintro ⟨IH, Herr⟩
-  -- β-reduce `geometric ()` via two pure steps (`app_fix`, `app_lam`).
-  -- Unfold `geometric` and reduce the `Exp.close` from `pl(...)` into the
-  -- raw `bvar` form so `twp_pure_step_fupd`'s explicit `e₁`/`e₂` match.
-  -- The `pl(rec geo n := …)` body wraps each binder in `Exp.close` over a
-  -- fresh atom; reduce all of these so the body becomes the explicit bvar
-  -- form that `twp_pure_step_fupd`'s `e₁`/`e₂` arguments expect.
-  simp only [geometric, Exp.close, Exp.closeRec, Nat.zero_add,
-    Var.internal.injEq, ↓reduceIte, reduceCtorEq]
-  set innerBody : Exp rT :=
-    Exp.cond
-      (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))
-      (Exp.lit (.int 0))
-      (Exp.binop .plus (Exp.app (Exp.bvar 1) (Exp.bvar 0)) (Exp.lit (.int 1)))
-    with hInner
-  -- Step 1: `app_fix`.
-  iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
-    (e₁ := Exp.app (Exp.fix (Exp.lam innerBody)) (Exp.lit .unit))
-    (e₂ := Exp.app (Exp.open' (Exp.lam innerBody) (Exp.fix (Exp.lam innerBody)))
-      (Exp.lit .unit))
-    (Exp.lit .unit : Exp rT).isValue ⟨IsVal.lit⟩)
-  -- Reduce the substitution `bvar 1 := geometric` (leaves the inner `lam`).
-  simp only [hInner, Exp.open', Exp.openRec, ↓reduceIte, Nat.reduceAdd,
-    Nat.reduceEqDiff]
-  -- Step 2: `app_lam` with argument `()`.
-  set reducedBody : Exp rT :=
-    Exp.cond
-      (Exp.binop .eq (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit)) (Exp.lit (.int 0)))
-      (Exp.lit (.int 0))
-      (Exp.binop .plus (Exp.app (Exp.fix (Exp.lam innerBody)) (Exp.bvar 0))
-        (Exp.lit (.int 1)))
-    with hReduced
-  iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
-    (e₁ := Exp.app (Exp.lam reducedBody) (Exp.lit .unit))
-    (e₂ := Exp.open' reducedBody (Exp.lit .unit))
-    (Exp.lit .unit : Exp rT).isValue ⟨IsVal.lit⟩)
-  simp only [hReduced, Exp.open', Exp.openRec, ↓reduceIte]
-  -- Collapse `openRec 2 () innerBody = innerBody` (innerBody has only
-  -- bvar 0/1, so a level-2 open is a no-op).
-  simp only [hInner, Exp.openRec, ↓reduceIte, Nat.reduceAdd, Nat.reduceEqDiff]
+  -- β/fix-reduce `geometric ()` to its body. `twp_pures` discovers each redex and
+  -- its surrounding evaluation context, and the shared `is_value` discharger closes
+  -- the `app_fix`/`app_lam` value side conditions automatically — no hand-written
+  -- `IsVal` witnesses, no explicit `Exp.close`/`open'` bookkeeping.
+  twp_pures
   -- Focus on `rand 2 ()` via `twp_bind`, which discovers the evaluation context
   -- `K = [binopL .eq 0, condC …]` automatically (replacing the explicit `tglWp_bind`).
   twp_bind (Exp.rand (Exp.lit (.int 2)) (Exp.lit .unit))
@@ -138,100 +105,37 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
   -- With `0 ≤ n < 2`, the sampled `n : ℤ` is either 0 or 1. Case-split.
   obtain ⟨Hn₁, Hn₂⟩ := Hn
   interval_cases n
-  · -- n = 0 branch. Reduce `cond (binop eq 0 0) 0 (…) → … → lit 0`.
-    -- Step A: `twp_bind` focuses the `cond` discriminant (context `K = [condC …]`
-    -- discovered automatically).
-    twp_bind (Exp.binop .eq (Exp.ofVal (.int 0))
-      (Exp.ofVal (.int 0)))
-    -- Step B: reduce `binop eq 0 0 → lit true` (pure step). `ofVal` is reducible;
-    -- normalise so the goal exposes the literal form before invoking `PureExec_discrete`.
-    simp only [Exp.ofVal]
-    iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
-      (e₁ := (Exp.binop .eq (Exp.lit (.int 0)) (Exp.lit (.int 0)) : Exp rT))
-      (e₂ := (Exp.lit (.bool true) : Exp rT))
-      _
-      (show (Exp.lit (.int 0) : Exp rT).isValue ∧
-            (Exp.lit (.int 0) : Exp rT).isValue ∧
-            BinOp.eval .eq (.lit (.int 0) : Exp rT) (.lit (.int 0))
-              = some (Exp.lit (.bool true) : Exp rT)
-        from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
-    -- Step C: value collapse — `tglWp E (lit true) (fun v => P v) ⊢ P (lit true)`.
-    iapply (ErisWpGS.tglWp_value_of_toVal
-      (v := .bool true) rfl)
-    -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true_discrete`.
-    -- After C, the goal still has `cond (ofVal ⟨lit true, lit⟩) …`. The
-    -- `PureExec_discrete`/`iapply` unifier won't reduce `ofVal` even though defeq —
-    -- so `simp only [Exp.ofVal]` makes the literal form syntactic.
-    simp only
-    -- Step D: `cond (lit true) et ef → et` via `pureExec_cond_true_discrete`.
-    twp_pure_at
-      (Exp.cond (.lit (.bool true)) (.lit (.int 0))
-        (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-          (.lit (.int 1))))
-      ↦ (.lit (.int 0))
-    -- Step E: conclude `tglWp E (lit 0) geoPost` via the value rule.
-    iapply (ErisWpGS.tglWp_value_of_toVal (v := .int 0) rfl)
+  · -- n = 0 branch. `twp_pures` takes the `binop eq 0 0 → true` and `cond true → 0`
+    -- steps — their value/evaluator side conditions discharged by `is_value` — and
+    -- `twp_value` closes the resulting value WP `tglWp E 0 geoPost`.
+    twp_pures
+    twp_value
     iexists 0
     ipureintro
     exact ⟨rfl, _root_.le_refl _⟩
-  · -- n = 1 branch: symmetric to n=0 up to step D, then recurses via `IH`.
-    -- Step A: `twp_bind` focuses the `cond` discriminant.
-    twp_bind (Exp.binop .eq (Exp.ofVal (.int 1))
-      (Exp.ofVal (.int 0)))
-    -- Step B: reduce `binop eq 1 0 → lit false`.
-    simp only [Exp.ofVal]
-    iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
-      (e₁ := (Exp.binop .eq (Exp.lit (.int 1)) (Exp.lit (.int 0)) : Exp rT))
-      (e₂ := (Exp.lit (.bool false) : Exp rT))
-      _
-      (show (Exp.lit (.int 1) : Exp rT).isValue ∧
-            (Exp.lit (.int 0) : Exp rT).isValue ∧
-            BinOp.eval .eq (.lit (.int 1) : Exp rT) (.lit (.int 0))
-              = some (Exp.lit (.bool false) : Exp rT)
-        from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
-    -- Step C: value collapse.
-    iapply (ErisWpGS.tglWp_value_of_toVal
-      (v := .bool false) rfl)
-    simp only
-    -- Step D: `cond (lit false) et ef → ef` via `pureExec_cond_false_discrete`.
-    twp_pure_at
-      (Exp.cond (.lit (.bool false)) (.lit (.int 0))
-        (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-          (.lit (.int 1))))
-      ↦ (.binop .plus (.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-          (.lit (.int 1)))
-    -- Step E: `twp_bind` focuses the recursive call (context `[binopL .plus 1]`).
-    twp_bind (Exp.app (Exp.fix (Exp.lam innerBody)) (.lit .unit))
-    -- Step F: invoke IH via `tglWp_wand` — IH's post is `geoPost`, but our
-    -- bound continuation expects `fun v => tglWp E (plus v 1) geoPost`. Use
-    -- `tglWp_wand` to weaken.
+  · -- n = 1 branch: `binop eq 1 0 → false` then `cond false → geo () + 1`. Step
+    -- exactly those two (NOT the recursive call, which `twp_pures` would unfold),
+    -- then bind the recursive call and recurse via `IH`.
+    twp_pure
+    twp_pure
+    -- Focus the recursive call (context `[binopL .plus 1]` discovered automatically).
+    twp_bind (Exp.app geometric (.lit .unit))
+    -- Invoke IH via `tglWp_wand` — IH's post is `geoPost`, but our bound continuation
+    -- expects `fun v => tglWp E (plus v 1) geoPost`. Use `tglWp_wand` to weaken.
     iapply (ErisWpGS.tglWp_wand (Φ := geoPost))
     isplitl [Hcr IH]
     · iapply IH
       -- Bridge `↯ F (Int.toNat 1)` to `↯ ↑(3/2)*ε` (defeq) via `ec_eq`.
       iapply (ErrorCredit.ext (show F (Int.toNat 1) = ((3/2 : NNReal) : ENNReal) * ε from rfl))
       iexact Hcr
-    -- Step G: pointwise continuation — given `geoPost w`, produce
-    -- `tglWp E (binop plus (ofVal w) 1) geoPost`.
+    -- Pointwise continuation — given `geoPost w`, produce `tglWp E (plus w 1) geoPost`.
     iintro %w Hgeo
-    -- Step H: destructure `Hgeo : ∃ m, ⌜w = ⟨lit m, lit⟩ ∧ 0 ≤ m⌝`.
     ihave ⟨%m, %Hmp⟩ := Hgeo
     obtain ⟨Hweq, Hmnn⟩ := Hmp
     subst Hweq
-    simp only [Exp.ofVal]
-    -- Step I: reduce `binop plus (lit m) (lit 1) → lit (m + 1)`.
-    iapply (ErisWpGS.twp_pure_step_fupd (n := 1)
-      (e₁ := (Exp.binop .plus (Exp.lit (.int m)) (Exp.lit (.int 1)) : Exp rT))
-      (e₂ := (Exp.lit (.int (m + 1)) : Exp rT))
-      _
-      (show (Exp.lit (.int m) : Exp rT).isValue ∧
-            (Exp.lit (.int 1) : Exp rT).isValue ∧
-            BinOp.eval .plus (.lit (.int m) : Exp rT) (.lit (.int 1))
-              = some (Exp.lit (.int (m+1)) : Exp rT)
-        from ⟨⟨IsVal.lit⟩, ⟨IsVal.lit⟩, rfl⟩))
-    -- Step J: value-collapse + close `geoPost` with `m + 1 ≥ 0`.
-    iapply (ErisWpGS.tglWp_value_of_toVal
-      (v := .int (m + 1)) rfl)
+    -- `binop plus (lit m) (lit 1) → lit (m + 1)`, then conclude with `m + 1 ≥ 0`.
+    twp_pures
+    twp_value
     iexists (m + 1)
     ipureintro
     exact ⟨rfl, by omega⟩

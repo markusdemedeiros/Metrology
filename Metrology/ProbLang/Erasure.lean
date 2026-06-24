@@ -7,65 +7,26 @@ public import Metrology.ProbLang.Metatheory
 
 /-!
 # Erasure: presampling on tapes is invisible
-
-Port of `theories/prob_lang/erasure.v` from Clutch, reformulated to avoid
-introducing a language-level `state_step` primitive.
-
-The headline theorem `execN_tape_presample_expr_eq` says: appending a
-uniformly-sampled value onto an *existing* tape `α` of `σ` does not change
-`execN m ⟨e, σ⟩` *at the expression level* (i.e. after projecting the
-post-configuration by `(·.expr)`). Equivalently, the local "uniform
-presample" distribution `tapePresample σ α` on `(State rT)` is `ErasableExpr`
-at `σ`.
-
-The full-`(Cfg rT)` version is false (presample genuinely changes the final tape
-content), but the projected version is exactly what the adequacy layer
-observes. All `state_step`-specialized corollaries of Clutch's `erasure.v`
-are dropped in favor of the general `ErasableExpr` wrappers, which take an
-arbitrary `μ : Measure (State rT)` and do the lifting. Clients construct
-`tapePresample` themselves and invoke `ErasableExpr.tapePresample` to get
-the witness.
 -/
 
 namespace ProbLang
-
 
 variable {rT : Type _} [ProbLangℝ rT]
 
 open MeasureTheory Measure
 
-/-! ## Local uniform-presample distribution
-
-These are file-local helpers used to *state* erasure, without adding any
-new primitives to the language. In particular, `tapePresample σ α` is
-**not** a language-level transition: it is just the `Measure (State rT)`
-obtained by "uniformly appending onto an existing tape `α`". Clients of
-erasure construct it when invoking the `ARcoupl` wrappers below.
--/
-
-/-- The uniform distribution on indices `{ z : Int // 0 ≤ z ∧ z < N }`.
-If `N ≤ 0`, the subtype is empty and we return the zero measure; the
-relevant erasure lemmas only apply to existing tapes, which always have a
-positive bound. -/
-noncomputable def tapeIndexUniform (N : Int) :
-    Measure { z : Int // 0 ≤ z ∧ z < N } :=
+/-! ## Local uniform-presample distribution -/
+noncomputable def tapeIndexUniform (N : Int) : Measure { z : Int // 0 ≤ z ∧ z < N } :=
   if h : (Finset.Ico 0 N).Nonempty then
-    -- Map the uniform distribution on `Finset.Ico 0 N` into the subtype.
     (PMF.uniformOfFinset (Finset.Ico 0 N) h).toMeasure.map
       (fun z =>
         if hz : 0 ≤ z ∧ z < N then ⟨z, hz⟩
         else ⟨0, by
-          -- Unreachable for `z` in the support, but we need a
-          -- `{ z // 0 ≤ z ∧ z < N }` to make the function total. If
-          -- `N ≤ 0` this branch is dead on the left already.
           rcases h with ⟨w, hw⟩
           simp [Finset.mem_Ico] at hw
           exact ⟨le_refl _, by omega⟩⟩)
   else 0
 
-/-- List of all currently allocated tape addresses in `σ`. Rocq:
-`get_active σ`. Used by the state-step disjunct of `glm` to enumerate
-the tapes that may be presampled at a given step. -/
 def getActive (σ : (State rT)) : List Loc := σ.tapes.keys
 
 omit [ProbLangℝ rT] in
@@ -2090,6 +2051,9 @@ theorem lim_exec
           = (execN n ⟨e, σ'⟩) ((·.expr) ⁻¹' S)
       from fun σ' => lintegral_indicator_one (hexpr hS)]
   exact hval
+
+
+
 
 end ErasableExpr
 

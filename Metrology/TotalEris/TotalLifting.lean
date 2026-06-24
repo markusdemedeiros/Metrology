@@ -179,8 +179,33 @@ theorem twp_lift_pure_det_step_of_pureStep {E : CoPset} {Φ : Val rT → IProp G
     rintro ⟨⟩; exact hne ⟨rfl, rfl⟩
   exact hother hp.symm
 
+/-- `is_value` discharges the side conditions of ProbLang pure reduction steps.
+
+A pure step's precondition `φ` is one of:
+* `e.isValue` (`Nonempty (IsVal e)`) — built structurally from the `IsVal`
+  constructors (`lit`/`lam`/`fix`/`inl`/`inr`/`pair`);
+* `True` (e.g. `cond`); or
+* the `∧`-conjunctions that `binop`/`unop`/`scrut`/`pair` steps carry — value-hood
+  facts together with an evaluator equation `op.eval … = some …` closed by `rfl`.
+
+This is the same logic the `twp_pure` elaborator runs inline; it is exposed here so
+it can serve as the `autoParam` discharger for `twp_pure_step_fupd`'s precondition
+(so explicit-endpoint pure steps need no hand-written `IsVal` witness), and so the
+escape-hatch tactics (`twp_pure_at`) can reuse it. -/
+syntax "is_value" : tactic
+macro_rules
+  | `(tactic| is_value) =>
+    `(tactic| first
+        | trivial
+        | repeat' (first
+            | rfl
+            | exact ProbLang.IsVal.lit | exact ProbLang.IsVal.lam | exact ProbLang.IsVal.fix
+            | apply ProbLang.IsVal.inl | apply ProbLang.IsVal.inr | apply ProbLang.IsVal.pair
+            | refine ⟨?_, ?_⟩    -- split `∧` (binop/unop/scrut side condition)
+            | refine ⟨?_⟩))      -- enter `Nonempty (IsVal …)`
+
 theorem twp_pure_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {n : ℕ} {e₁ e₂ : Exp rT}
-    (φ : Prop) [HEx : PureExec φ n e₁ e₂] (Hφ : φ) :
+    (φ : Prop) [HEx : PureExec φ n e₁ e₂] (Hφ : φ := by is_value) :
     tglWp E e₂ Φ ⊢@{IProp GF} tglWp E e₁ Φ := by
   have Hex := HEx.pure_exec Hφ
   clear HEx

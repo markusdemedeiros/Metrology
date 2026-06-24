@@ -687,6 +687,64 @@ meta def stripClose [Monad m] [MonadRef m] [MonadQuotation m]
   | `(Exp.close $body $_) => return body
   | _                     => return e
 
+/-! ### Named de Bruijn display for raw (post-step) binders
+
+Operational stepping (`open'`) strips the `plBinderName` mdata and renumbers
+binders, leaving raw `Exp.lam`/`Exp.fix` whose bodies reference `Exp.bvar n`.
+To render these with names instead of `(…).lam`/`⟪bvar n⟫`, the `Exp.lam`/`Exp.fix`
+delaborators push a fresh name (as a `PLBinderMarker` local) while delaborating
+the body, and the `Exp.bvar` delaborator looks the name up by de Bruijn index. -/
+
+/-- Sentinel type tagging a delaborator-introduced ProbLang binder local. -/
+def PLBinderMarker : Type := Unit
+
+open Lean Lean.PrettyPrinter.Delaborator in
+/-- PL binder names currently in scope, innermost first, recovered from the
+`PLBinderMarker` locals pushed by `withPLBinder`. -/
+meta def plBinderStack : DelabM (List Name) := do
+  let names := (← Lean.getLCtx).decls.toList.filterMap fun d? =>
+    d?.bind fun d =>
+      if d.type.isConstOf ``ProbLang.PLBinderMarker then some d.userName else none
+  return names.reverse
+
+open Lean Lean.Meta Lean.PrettyPrinter.Delaborator in
+/-- Run `k` with a fresh PL binder named `nm` in scope. -/
+meta def withPLBinder {α} (nm : Name) (k : DelabM α) : DelabM α :=
+  controlAt MetaM fun run =>
+    Lean.Meta.withLocalDeclD nm (Lean.mkConst ``ProbLang.PLBinderMarker) fun _ => run k
+
+open Lean Lean.PrettyPrinter.Delaborator in
+/-- A deterministic readable name for the PL binder at the current depth. -/
+meta def freshPLBinderName : DelabM Name := do
+  let pool := #["a", "b", "c", "d", "e", "g", "h", "i", "j", "k"]
+  let d := (← plBinderStack).length
+  return Name.mkSimple (if h : d < pool.size then pool[d] else s!"v{d}")
+
+/-! ### Source-name display for `close`-bound locally-nameless binders
+
+`pl%`/stepping keep binders in `Exp.close BODY atom` form, where `atom` is a fresh
+`Var` and the source name lives in the enclosing `plBinderName` mdata. To render the
+body's `Exp.fvar atom` occurrences by the source name, the binder delaborator records
+`atom ↦ name` in a `PLAtomMarker atom` local; the `Exp.fvar` delaborator looks it up. -/
+
+/-- Sentinel tagging a delaborator local that binds atom `a` to its display name. -/
+def PLAtomMarker (_ : Var) : Type := Unit
+
+open Lean Lean.Meta Lean.PrettyPrinter.Delaborator in
+/-- Run `k` with the source name `nm` recorded for the locally-nameless atom `atom`. -/
+meta def withAtomBinder {α} (nm : Name) (atom : Lean.Expr) (k : DelabM α) : DelabM α :=
+  controlAt MetaM fun run =>
+    Lean.Meta.withLocalDeclD nm (Lean.mkApp (Lean.mkConst ``ProbLang.PLAtomMarker) atom) fun _ => run k
+
+open Lean Lean.Meta Lean.PrettyPrinter.Delaborator in
+/-- The display name recorded for locally-nameless atom `atom`, if any. -/
+meta def atomName? (atom : Lean.Expr) : DelabM (Option Name) := do
+  for d in (← Lean.getLCtx) do
+    match d.type with
+    | .app (.const ``ProbLang.PLAtomMarker _) a => if ← isDefEq a atom then return some d.userName
+    | _ => pure ()
+  return none
+
 open Lean.PrettyPrinter.Delaborator in
 /-- Delaborator dispatched when the `mdata` contains exactly our
     `ProbLang.plBinderName` key. Lean routes via `mdata.<singleKey>`. -/
@@ -696,18 +754,27 @@ meta def delabPlBinderMeta : Delab := do
   let .mdata kv inner := e | failure
   let name := kv.getString plBinderNameKey ""
   if name.isEmpty then failure
-  -- The inner `Expr` is `Exp.lam <body>` or `Exp.fix <body>`. Delab its
-  -- argument under the `mdata → app → arg` path.
-  let delabBody : Delab := SubExpr.withMDataExpr (SubExpr.withAppArg delab)
+  let nm := Name.mkSimple name
   let arg ← buildArgFromName name
-  match inner with
-  | .app (.const ``Exp.lam _) _ => do
-      let bodyPL ← unpackPLExp (← stripClose (← delabBody))
-      `(pl(fun $arg, $bodyPL))
-  | .app (.const ``Exp.fix _) _ => do
-      let bodyPL ← unpackPLExp (← stripClose (← delabBody))
-      `(pl(rec $arg _ := $bodyPL))
-  | _ => failure
+  -- `inner = Exp.lam <a>` / `Exp.fix <a>` with `a = Exp.close BODY atom`; record
+  -- `atom ↦ name` so the body's `Exp.fvar atom` renders as `name`, then delaborate the
+  -- body (the `Exp.close` delaborator makes the close itself vanish).
+  let closeArg := inner.appArg!
+  let delabBody : Delab :=
+    if closeArg.isAppOf ``Exp.close then
+      withAtomBinder nm closeArg.appArg! (SubExpr.withMDataExpr (SubExpr.withAppArg delab))
+    else
+      withPLBinder nm (SubExpr.withMDataExpr (SubExpr.withAppArg delab))
+  -- NB: match via `isAppOf` — `@Exp.lam rT body` carries the implicit `rT`, so the
+  -- naive `.app (.const ``Exp.lam) _` pattern (no `rT`) never matched.
+  if inner.isAppOf ``Exp.lam then
+    `(pl(fun $arg, $(← unpackPLExp (← delabBody))))
+  else if inner.isAppOf ``Exp.fix then
+    -- Merge an immediately-nested binder so `rec f` + `fun x, …` prints `rec f x := …`.
+    match ← delabBody with
+    | `(pl(fun $a:pl_arg, $body)) => `(pl(rec $arg $a := $body))
+    | b => `(pl(rec $arg _ := $(← unpackPLExp b)))
+  else failure
 
 /-! ### Applications — special-cased for `let` and `;`
 
@@ -775,24 +842,144 @@ meta initialize registerBuiltinAttribute {
     modifyEnv fun env => plFoldExt.addEntry env decl
 }
 
+/-! ### Source-binder-name recovery (`@[pl_names]`)
+
+`@[pl_fold]` hides a recursive constant's body behind its name. When instead the
+body *is* shown unfolded (stepping into a non-folded recursive function such as
+`geometric`), we still want its **source** binder names (`geo`, `n`) rather than
+fresh `a`, `b`. `@[pl_names]` extracts the constant's `plBinderName` mdata hints
+once, and the `Exp.fix` delaborator, on a defeq match, renders `rec geo n := …`
+using them — recovering the names that `open'`/`close` reduction strips. -/
+
+/-- Binder names (outermost first) registered for a recursive `Exp` constant. -/
+meta initialize plBinderNamesExt :
+    SimplePersistentEnvExtension (Name × Array Name) (Lean.NameMap (Array Name)) ←
+  registerSimplePersistentEnvExtension {
+    addImportedFn := fun es => es.foldl (fun m arr => arr.foldl (fun m p => m.insert p.1 p.2) m) {}
+    addEntryFn    := fun m p => m.insert p.1 p.2
+    toArrayFn     := fun m => m.toArray
+  }
+
+/-- Collect `plBinderName` hints in binder order from a constant's elaborated
+value, descending through `mdata`/`Exp.fix`/`Exp.lam`/`Exp.close` wrappers. -/
+meta partial def collectBinderNames : Lean.Expr → Array Name → Array Name
+  | .mdata kv inner, acc =>
+      match kv.getString plBinderNameKey "" with
+      | "" => collectBinderNames inner acc
+      | s  => collectBinderNames inner (acc.push (Name.mkSimple s))
+  -- Pre-order over the whole value: every `plBinderName` hint appears in binder
+  -- order, so this is robust to wrapper arg-order (`Exp.close`, Lean `{rT}`, …).
+  | .app f a, acc => collectBinderNames a (collectBinderNames f acc)
+  | .lam _ t body _, acc => collectBinderNames body (collectBinderNames t acc)
+  | _, acc => acc
+
+syntax (name := pl_names) "pl_names" : attr
+
+meta initialize registerBuiltinAttribute {
+  name  := `pl_names
+  descr := "Display this recursive `Exp` constant's *unfolded* body using its source binder names (`rec geo n := …`) rather than fresh `a`/`b`."
+  add   := fun decl _stx _kind => do
+    let ci ← getConstInfo decl
+    let names := collectBinderNames ci.value! #[]
+    modifyEnv fun env => plBinderNamesExt.addEntry env (decl, names)
+}
+
+open Lean.PrettyPrinter.Delaborator Lean.Meta in
+/-- Render a raw `Exp.lam <body>` (post-step, mdata-stripped) as `pl(fun a, …)`
+with a fresh binder name, instead of the raw `(…).lam` projection. -/
+@[delab app.ProbLang.Exp.lam]
+meta def delabExpLam : Delab := do
+  let e ← SubExpr.getExpr
+  guard <| e.getAppNumArgs == 2
+  let nm ← freshPLBinderName
+  let arg ← buildArgFromName nm.toString
+  let bodyPL ← unpackPLExp (← withPLBinder nm (SubExpr.withAppArg delab))
+  `(pl(fun $arg, $bodyPL))
+
+open Lean.PrettyPrinter.Delaborator Lean.Meta in
+/-- Descend through consecutive `Exp.fix`/`Exp.lam` binders at the current
+`SubExpr`, naming each from `names` (falling back to a fresh name once `names`
+is exhausted), and return the collected binder args together with the
+delaborated innermost body. -/
+meta partial def descendNamed (names : List Name) :
+    DelabM (Array (TSyntax `pl_arg) × TSyntax `pl_exp) := do
+  let cur ← SubExpr.getExpr
+  -- A surviving `Exp.close BODY atom` wraps the binder body (stepping preserves it);
+  -- descend into BODY (2nd-to-last arg) without consuming a binder name.
+  if cur.isAppOf ``Exp.close then
+    return ← SubExpr.withAppFn (SubExpr.withAppArg (descendNamed names))
+  if cur.isAppOf ``Exp.fix || cur.isAppOf ``Exp.lam then
+    let nm ← match names with
+      | nm :: _ => pure nm
+      | []      => freshPLBinderName
+    let arg ← buildArgFromName nm.toString
+    let (args, body) ← withPLBinder nm (SubExpr.withAppArg (descendNamed names.tail))
+    return (#[arg] ++ args, body)
+  else
+    return (#[], ← unpackPLExp (← delab))
+
 open Lean.PrettyPrinter.Delaborator Lean.Meta in
 /-- Refold an `Exp.fix …` subterm to a registered `@[pl_fold]` constant, so a
 recursive self-reference exposed by stepping prints as e.g. `&GeometricTrial`
-rather than its expanded `.lam.lam.fix` body. Falls through to the default
-rendering for anonymous fixes. -/
+rather than its expanded `.lam.lam.fix` body. Otherwise, if it matches a
+`@[pl_names]` constant, render the body with that constant's source binder names
+(`rec geo n := …`); failing both, render with fresh binder names. -/
 @[delab app.ProbLang.Exp.fix]
-meta def delabExpFixFold : Delab := do
+meta def delabExpFix : Delab := do
   let e ← SubExpr.getExpr
   let env ← getEnv
+  let matchesConst (c : Name) : DelabM Bool := withNewMCtxDepth do
+    let cExpr ← mkConstWithFreshMVarLevels c
+    let (mvars, _, _) ← forallMetaTelescopeReducing (← inferType cExpr)
+    isDefEq e (mkAppN cExpr mvars)
   for c in (plFoldExt.getState env).toList do
-    let isMatch ← withNewMCtxDepth do
-      let cExpr ← mkConstWithFreshMVarLevels c
-      let (mvars, _, _) ← forallMetaTelescopeReducing (← inferType cExpr)
-      isDefEq e (mkAppN cExpr mvars)
-    if isMatch then
-      let short ← unresolveNameGlobal c
-      return ← `(pl(&$(mkIdent short)))
-  failure
+    if ← matchesConst c then
+      return ← `(pl(&$(mkIdent (← unresolveNameGlobal c))))
+  -- `@[pl_names]`: render the unfolded body with the constant's source names.
+  for (c, names) in (plBinderNamesExt.getState env).toList do
+    if ← matchesConst c then
+      let (args, body) ← descendNamed names.toList
+      if h : 2 ≤ args.size then
+        return ← `(pl(rec $(args[0]) $(args[1:])* := $body))
+  -- No registered match: render with fresh names. `fix (lam B)` is the usual
+  -- `rec f x := B` shape (merge both binders); otherwise `rec f _ := body`.
+  guard <| e.getAppNumArgs == 2
+  let fName ← freshPLBinderName
+  withPLBinder fName do
+    let fArg ← buildArgFromName fName.toString
+    if e.appArg!.isAppOf ``ProbLang.Exp.lam then
+      let xName ← freshPLBinderName
+      let xArg ← buildArgFromName xName.toString
+      let innerPL ← unpackPLExp (← withPLBinder xName (SubExpr.withAppArg (SubExpr.withAppArg delab)))
+      `(pl(rec $fArg $xArg := $innerPL))
+    else
+      let bodyPL ← unpackPLExp (← SubExpr.withAppArg delab)
+      `(pl(rec $fArg _ := $bodyPL))
+
+open Lean.PrettyPrinter.Delaborator in
+/-- Render a raw `Exp.case ec el er` (the sum eliminator, exposed by stepping
+surface `case`/`scrut`) via the `case` keyword rather than the `(ec).case …`
+projection. The branches `el`/`er` are the inl/inr handlers (functions). -/
+@[delab app.ProbLang.Exp.case]
+meta def delabExpCase : Delab := do
+  let e ← SubExpr.getExpr
+  guard <| e.getAppNumArgs == 4
+  let ecPL ← unpackPLExp (← SubExpr.withAppFn (SubExpr.withAppFn (SubExpr.withAppArg delab)))
+  let elPL ← unpackPLExp (← SubExpr.withAppFn (SubExpr.withAppArg delab))
+  let erPL ← unpackPLExp (← SubExpr.withAppArg delab)
+  let wild ← `(pl_pat|_)
+  `(pl(case $ecPL | $wild => $elPL | $wild => $erPL))
+
+open Lean.PrettyPrinter.Delaborator in
+/-- Collapse `Exp.ofVal ⟨e, _⟩` (a value spliced back into an expression by
+`twp_bind`) to just `e`, rather than the raw `{Exp.ofVal { fst := …, snd := … }}`
+record. Only fires on a literal `Val.mk`; an opaque value variable still escapes. -/
+@[delab app.ProbLang.Exp.ofVal]
+meta def delabExpOfVal : Delab := do
+  let e ← SubExpr.getExpr
+  guard <| e.getAppNumArgs == 2
+  guard <| e.appArg!.isAppOf ``ProbLang.Val.mk
+  SubExpr.withAppArg (SubExpr.withAppFn (SubExpr.withAppArg delab))
 
 /-! ### Free-variable display
 
@@ -800,16 +987,33 @@ Since `Var = String` and free identifiers elaborate to `Exp.fvar "x"`, we
 can recover the display name straight from the string literal. -/
 
 open Lean.PrettyPrinter.Delaborator in
-/-- Render a raw `Exp.bvar n` (a de Bruijn index leaked by operational stepping,
-where the binder name hint is gone) as `⟪bvar n⟫` rather than `Exp.bvar n`. -/
+/-- Render a raw `Exp.bvar n` by the name of the enclosing PL binder (pushed by
+`delabExpLam`/`delabExpFix`). Falls back to `⟪bvar n⟫` only if the index escapes
+the tracked binders (e.g. a genuinely open term). -/
 @[delab app.ProbLang.Exp.bvar]
 meta def delabExpBvar : Delab := do
   let e ← SubExpr.getExpr
   -- `Exp.bvar : Nat → Exp rT` carries an implicit `rT`, so the application has
   -- two arguments (`rT` and the index); the index is the last one.
   guard <| e.getAppNumArgs == 2
-  let idxStx ← SubExpr.withAppArg delab
-  `(pl(⟪bvar $idxStx⟫))
+  match e.appArg!.nat? with
+  | some idx =>
+    match (← plBinderStack)[idx]? with
+    | some nm => `(pl($(Lean.mkIdent nm):ident))
+    | none    => `(pl(⟪bvar $(Lean.quote idx)⟫))
+  | none =>
+    let idxStx ← SubExpr.withAppArg delab
+    `(pl(⟪bvar $idxStx⟫))
+
+open Lean.PrettyPrinter.Delaborator in
+/-- Make a surviving `Exp.close BODY atom` (locally-nameless binding form kept by
+stepping) vanish in display: render just `BODY`. The bound `atom` shows by its
+source name via `delabExpFvar`+`atomName?`. -/
+@[delab app.ProbLang.Exp.close]
+meta def delabExpClose : Delab := do
+  let e ← SubExpr.getExpr
+  guard <| e.getAppNumArgs == 3
+  SubExpr.withAppFn (SubExpr.withAppArg delab)
 
 open Lean.PrettyPrinter.Delaborator in
 @[delab app.ProbLang.Exp.fvar]
@@ -817,7 +1021,11 @@ meta def delabExpFvar : Delab := do
   let e ← SubExpr.getExpr
   -- `Exp.fvar : Var → Exp rT` carries an implicit `rT`, so the application
   -- has two arguments (`rT` and the `Var`); the variable is the last one.
-  let_expr Var.named sLit := e.appArg! | failure
+  let v := e.appArg!
+  -- A locally-nameless atom bound by an enclosing binder shows by its source name.
+  if let some nm ← atomName? v then
+    return ← `(pl($(Lean.mkIdent nm):ident))
+  let_expr Var.named sLit := v | failure
   let .lit (.strVal s) := sLit | failure
   `(pl($(Lean.mkIdent (Name.mkSimple s)):ident))
 

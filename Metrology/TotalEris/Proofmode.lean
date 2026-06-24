@@ -57,12 +57,13 @@ iapply (ErisWpGS.twp_pure_step_fupd
 pinned. Use when `twp_pure`'s implicit `PureExec_discrete` synthesis fails because
 typeclass search can't see through an opaque definition in the LHS. The
 precondition `φ` is left implicit (synthesized from the chosen
-`PureExec_discrete` instance) and `Hφ` is discharged via the `True.intro` term
-`trivial` — this works when the `PureExec_discrete` instance has `φ = True` (e.g.
-`pureExec_cond_true_discrete`, `pureExec_cond_false_discrete`). -/
+`PureExec_discrete` instance) and `Hφ` is discharged by the shared `is_value`
+tactic — covering `True` (e.g. `pureExec_cond_*_discrete`), value-hood
+(`pureExec_app_*`), and the binop/unop/scrut `∧`-conjunctions. Use the `by <h>`
+variant below only when the side condition is something `is_value` can't close. -/
 macro "twp_pure_at " e1:term:max " ↦ " e2:term:max : tactic =>
   `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
-      (n := 1) (e₁ := $e1) (e₂ := $e2) _ trivial))
+      (n := 1) (e₁ := $e1) (e₂ := $e2) _ (by is_value)))
 
 /-- `twp_pure_at <e₁> ↦ <e₂> by <hφ>` — variant with an explicit proof of
 the `PureExec_discrete` precondition (needed when `trivial` can't discharge it,
