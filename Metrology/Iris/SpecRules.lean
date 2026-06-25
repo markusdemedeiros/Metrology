@@ -125,7 +125,10 @@ theorem DetHeadStep_discrete.tape {z : Int} (σ : State rT) :
     DetHeadStep_discrete ⟨.tape (.lit (.int z)), σ⟩
       ⟨.lit (.lbl σ.tapes.fresh),
        σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ :=
-  .of_det_discrete _ _ (by simp [headStep])
+  .of_det_discrete _ _
+    (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.int z) : Exp rT)) ⟨.lit⟩;
+        simp [Exp.decompItem, hd])
+    (by simp [headStep])
 
 /-- Tape rand: with `σ.tapes[α] = some ⟨z, n :: ns⟩`, the random sample
 `rand z α` deterministically returns `n` and pops the head. -/
@@ -134,7 +137,11 @@ theorem DetHeadStep_discrete.rand_tape {z : Int} (l : Loc)
     {σ : State rT} (htape : σ.tapes[l]? = some ⟨z, n :: ns⟩) :
     DetHeadStep_discrete ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
       ⟨.lit (.int n), σ.update_tapes (·.insert l ⟨z, ns⟩)⟩ :=
-  .of_det_discrete _ _ (by simp [headStep, htape])
+  .of_det_discrete _ _
+    (by obtain ⟨_, hd1⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.lbl l) : Exp rT)) ⟨.lit⟩
+        obtain ⟨_, hd2⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.int z) : Exp rT)) ⟨.lit⟩
+        simp [Exp.decompItem, hd1, hd2])
+    (by simp [headStep, htape])
 
 /-! ## Stepping rules over the `Cfg.specAuth` interpretation. -/
 
@@ -164,7 +171,7 @@ theorem step_pure {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : �
 /-- Allocation under an evaluation context. -/
 theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
     ⤇ (K.fill (.alloc v)) ⊢@{IProp GF}
-      specUpdate rT E iprop(∃ (l : Loc), (⤇ (K.fill (.lit (.loc l)))) ∗ (l ↦ₛ ⟨v, hv⟩)) := by
+      specUpdate rT E iprop(∃ (l : Loc), (⤇ (K.fill (.lit (.loc l)))) ∗ (l ↦ₛ ⟨v, hv, hv.lc⟩)) := by
   iintro HK
   unfold specUpdate
   iintro %ρ Hρ
@@ -172,10 +179,10 @@ theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
   ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
   subst Heq
   set l := σ.heap.fresh with hl
-  set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l ⟨v, hv⟩)
+  set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l ⟨v, hv, hv.lc⟩)
     with hσ'
   imod specProg_update (e3 := K.fill (.lit (.loc l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
-  ihave HAlloc := spec_auth_heap_alloc (v := ⟨v, hv⟩) (GF := GF)
+  ihave HAlloc := spec_auth_heap_alloc (v := ⟨v, hv, hv.lc⟩) (GF := GF)
     (e := K.fill (.lit (.loc l))) $$ HρNew
   imod HAlloc with ⟨HρFinal, Hl⟩
   imodintro
@@ -184,7 +191,7 @@ theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
   · ipureintro
     refine pexecN_1_of_DetStep ?_
     have hstate_eq :
-        σ.update_heap (·.insert σ.heap.fresh ⟨v, hv⟩) = σ' := by
+        σ.update_heap (·.insert σ.heap.fresh ⟨v, hv, hv.lc⟩) = σ' := by
       simp [hσ', State.update_heap, ExtTreeMap.insert_eq_PartialMap_insert, hl]
     rw [← hstate_eq]
     exact ((DetHeadStep_discrete.alloc hv σ).toDetStep).fill K

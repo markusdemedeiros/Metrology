@@ -137,7 +137,7 @@ theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e�
   iexact H
 
 theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) : iprop%
+    (hv : e₁.toVal? = none) (hlc : e₁.IsLocallyClosed) : iprop%
     (∀ σ₁, stateInterp σ₁ -∗ |={E}=>
       ⌜HeadReducible e₁ σ₁⌝ ∗
       ∀ e₂ σ₂, ⌜Possible ⟨e₂, σ₂⟩ (headStep ⟨e₁, σ₁⟩)⌝ -∗ |={E}=>
@@ -148,8 +148,8 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   iintro %σ₁ Hσ
   ispecialize H $$ %σ₁ Hσ
   imod H with ⟨%Hhred, HCont⟩
-  rw [← primStep_eq_headStep Hhred]
-  replace Hhred := reducible_of_headReducible Hhred
+  rw [← primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible hlc Hhred)]
+  replace Hhred := reducible_of_headReducible hlc Hhred
   imodintro
   iframe %Hhred
   iintro %e₂ %σ₂ %Hpstep
@@ -157,13 +157,15 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
   exact Hpstep
 
 theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
-    (hv : e₁.toVal? = none)
+    (hlc : e₁.IsLocallyClosed) (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, Possible ρ (headStep ⟨e₁, σ₁⟩))
     (Hdet : ∀ σ₁ e₂' σ₂, Possible (⟨e₂', σ₂⟩ : Cfg rT) (headStep ⟨e₁, σ₁⟩) → σ₂ = σ₁ ∧ e₂' = e₂) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
-  iapply twp_lift_pure_det_step hv (Hsafe := fun σ => .of_head ((Hsafe σ).elim fun _ hρ => hρ.ne_zero))
+  iapply twp_lift_pure_det_step hv
+    (Hsafe := fun σ => .of_head hlc ((Hsafe σ).elim fun _ hρ => hρ.ne_zero))
   refine fun σ e₂' σ₂ hp => Hdet σ e₂' σ₂ ?_
-  rw [← primStep_eq_headStep ((Hsafe σ).elim fun _ hρ => hρ.ne_zero)]
+  rw [← primStep_eq_headStep
+    (Exp.decompItem_none_of_lc_headReducible hlc ((Hsafe σ).elim fun _ hρ => hρ.ne_zero))]
   exact hp
 
 /-! ## `PureExec_discrete` integration -/
@@ -179,19 +181,33 @@ theorem twp_lift_pure_det_step_of_pureStep {E : CoPset} {Φ : Val rT → IProp G
     rintro ⟨⟩; exact hne ⟨rfl, rfl⟩
   exact hother hp.symm
 
-/-- `is_value` discharges the side conditions of ProbLang pure reduction steps.
+/-- `is_lc` discharges `Exp.IsLocallyClosed e` goals. Runtime values and program
+fragments are locally closed; the proof is either a kernel computation of the decidable
+checker (`Exp.lcb_imp_lc (by rfl)`, for fully concrete closed subterms such as source
+`lam`/`fix` bodies), or a structural decomposition bottoming out at an abstract value's
+`Val.lc` field (`exact Val.lc _`) or a closedness hypothesis already in context. -/
+syntax "is_lc" : tactic
+macro_rules
+  | `(tactic| is_lc) =>
+    `(tactic| first
+        | assumption
+        | exact Exp.lcb_imp_lc (by rfl)
+        | repeat' (first
+            | assumption
+            | exact Exp.lcb_imp_lc (by rfl)
+            | exact Val.lc _
+            | exact Exp.IsLocallyClosed.lit _
+            | exact Exp.IsLocallyClosed.fail
+            | exact Exp.IsLocallyClosed.urand
+            | apply Exp.IsLocallyClosed.app | apply Exp.IsLocallyClosed.unop
+            | apply Exp.IsLocallyClosed.binop | apply Exp.IsLocallyClosed.cond
+            | apply Exp.IsLocallyClosed.pair | apply Exp.IsLocallyClosed.fst
+            | apply Exp.IsLocallyClosed.snd | apply Exp.IsLocallyClosed.inl
+            | apply Exp.IsLocallyClosed.inr | apply Exp.IsLocallyClosed.case
+            | apply Exp.IsLocallyClosed.alloc | apply Exp.IsLocallyClosed.load
+            | apply Exp.IsLocallyClosed.store | apply Exp.IsLocallyClosed.tape
+            | apply Exp.IsLocallyClosed.rand | apply Exp.IsLocallyClosed.scrut))
 
-A pure step's precondition `φ` is one of:
-* `e.isValue` (`Nonempty (IsVal e)`) — built structurally from the `IsVal`
-  constructors (`lit`/`lam`/`fix`/`inl`/`inr`/`pair`);
-* `True` (e.g. `cond`); or
-* the `∧`-conjunctions that `binop`/`unop`/`scrut`/`pair` steps carry — value-hood
-  facts together with an evaluator equation `op.eval … = some …` closed by `rfl`.
-
-This is the same logic the `twp_pure` elaborator runs inline; it is exposed here so
-it can serve as the `autoParam` discharger for `twp_pure_step_fupd`'s precondition
-(so explicit-endpoint pure steps need no hand-written `IsVal` witness), and so the
-escape-hatch tactics (`twp_pure_at`) can reuse it. -/
 syntax "is_value" : tactic
 macro_rules
   | `(tactic| is_value) =>
@@ -199,8 +215,22 @@ macro_rules
         | trivial
         | repeat' (first
             | rfl
-            | exact ProbLang.IsVal.lit | exact ProbLang.IsVal.lam | exact ProbLang.IsVal.fix
+            | assumption       -- a value-hood fact already in context (e.g. an abstract
+                               -- `Val`'s `v.isValue`), matched up to defeq
+            | exact Exp.lcb_imp_lc (by rfl)  -- a `(lam/fix …).IsLocallyClosed` side condition
+            | exact Val.lc _                 -- a value's closedness, from its `Val.lc` field
+            | exact ProbLang.IsVal.lit
+            | refine ProbLang.IsVal.lam ?_ | refine ProbLang.IsVal.fix ?_
             | apply ProbLang.IsVal.inl | apply ProbLang.IsVal.inr | apply ProbLang.IsVal.pair
+            | apply Exp.IsLocallyClosed.lit | apply Exp.IsLocallyClosed.app
+            | apply Exp.IsLocallyClosed.unop | apply Exp.IsLocallyClosed.binop
+            | apply Exp.IsLocallyClosed.cond | apply Exp.IsLocallyClosed.pair
+            | apply Exp.IsLocallyClosed.fst | apply Exp.IsLocallyClosed.snd
+            | apply Exp.IsLocallyClosed.inl | apply Exp.IsLocallyClosed.inr
+            | apply Exp.IsLocallyClosed.case | apply Exp.IsLocallyClosed.alloc
+            | apply Exp.IsLocallyClosed.load | apply Exp.IsLocallyClosed.store
+            | apply Exp.IsLocallyClosed.tape | apply Exp.IsLocallyClosed.rand
+            | apply Exp.IsLocallyClosed.scrut
             | refine ⟨?_, ?_⟩    -- split `∧` (binop/unop/scrut side condition)
             | refine ⟨?_⟩))      -- enter `Nonempty (IsVal …)`
 

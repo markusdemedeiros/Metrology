@@ -102,6 +102,7 @@ theorem geo_nonneg_pos_err (E : CoPset) (ε : ENNReal) (hε : 0 < ε) :
             rw [← ENNReal.coe_add]; norm_num, add_mul]
       exact le_add_right le_rfl)) $$ Herr
   iintro %n ⟨%Hn, Hcr⟩
+  simp only [Exp.ofVal]
   -- With `0 ≤ n < 2`, the sampled `n : ℤ` is either 0 or 1. Case-split.
   obtain ⟨Hn₁, Hn₂⟩ := Hn
   interval_cases n

@@ -244,34 +244,51 @@ theorem prim_step_mass [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
 
 /-! ## Bridge: headStep ↔ primStep -/
 
-theorem primStep_eq_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT} (hred : HeadReducible e σ) :
-    primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
-  suffices hd : e.decomp = ([], e) by simp [primStep, hd]
-  unfold Exp.decomp
-  cases H : e.decompItem
-  · simp
-  · rename_i redex
+/-- If `e` head-reduces and is locally closed, decomposition does not focus past the
+head: every focusing position is either a non-value (focus continues) or a genuine
+value. The only way this fails is a value-*shaped* but non-closed subterm (e.g. a
+non-closed `lam`/`fix`); local closedness rules that out. -/
+theorem Exp.decompItem_none_of_lc_headReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed) (hred : headStep ⟨e, σ⟩ ≠ 0) : e.decompItem = none := by
+  cases H : e.decompItem with
+  | none => rfl
+  | some redex =>
     obtain ⟨K, e'⟩ := redex
     obtain ⟨hfill, hne⟩ := Exp.decompItem_fill H
     exfalso
-    exact hne <| head_ctx_step_val (hfill ▸ hred)
+    -- `e'` is value-shaped (it is the hole of a head-redex) and locally closed (a subterm
+    -- of the locally-closed `e`), hence a genuine value — contradicting `hne`.
+    have he' : e'.IsLocallyClosed := EctxItem.fillItem_isLocallyClosed (hfill ▸ he)
+    exact hne (Exp.isValue_iff_isValueR.mpr ⟨head_ctx_step_val (hfill ▸ hred), Exp.lc_imp_lcb he'⟩)
+
+/-- When `e` is a head-redex (decomposition does not focus, `decompItem e = none`),
+`primStep` coincides with `headStep`. This is the precise hypothesis (weaker than full
+local closedness — e.g. the branches of an `if` need not be closed). -/
+theorem primStep_eq_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (hdec : e.decompItem = none) :
+    primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
+  suffices hd : e.decomp = ([], e) by simp [primStep, hd]
+  unfold Exp.decomp; rw [hdec]
 
 -- Use primStep_eq_headStep
 @[discrete]
 theorem primStep_eq_headStep_discrete [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) : primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
   obtain ⟨ρ, hρ⟩ := hred
-  exact primStep_eq_headStep (fun hz => by rw [hz] at hρ; simp at hρ)
+  exact primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible he (fun hz => by rw [hz] at hρ; simp at hρ))
 
 @[discrete]
 theorem primStep_pos_of_headStep_discrete [ProbLangℝ rT] {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
+    (he : e.IsLocallyClosed)
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) : 0 < primStep ⟨e, σ⟩ {ρ} :=
-  primStep_eq_headStep (fun hz => by rw [hz] at h; simp at h) ▸ h
+  primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible he (fun hz => by rw [hz] at h; simp at h)) ▸ h
 
 theorem reducible_of_headReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (h : HeadReducible e σ) : Reducible e σ := by
   unfold Reducible
-  rw [primStep_eq_headStep h]
+  rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible he h)]
   exact h
 
 /-! ## Context fill interaction with primStep -/
@@ -376,26 +393,30 @@ theorem Reducible.of_fill [ProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : Stat
 @[discrete]
 theorem Discrete.Reducible.of_head [ProbLangℝ rT]
     {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) :
     Discrete.Reducible e σ :=
   let ⟨ρ, hρ⟩ := hred
-  ⟨ρ, primStep_eq_headStep (fun hz => by rw [hz] at hρ; simp at hρ) ▸ hρ⟩
+  ⟨ρ, primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible he (fun hz => by rw [hz] at hρ; simp at hρ)) ▸ hρ⟩
 
-theorem Reducible.of_head [ProbLangℝ rT] {e : Exp rT} {σ : State rT} (hred : HeadReducible e σ) :
-    Reducible e σ := reducible_of_headReducible hred
+theorem Reducible.of_head [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed) (hred : HeadReducible e σ) :
+    Reducible e σ := reducible_of_headReducible he hred
 
 -- Reducible.of_head_fill
 @[discrete]
 theorem Discrete.Reducible.of_head_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ}) :
     Discrete.Reducible (K.fill e) σ :=
   Reducible_ReducibleM_iff.mpr (primStep_fill_pos
-    (reducible_of_headReducible (let ⟨ρ, hρ⟩ := hred; fun hz => by rw [hz] at hρ; simp at hρ)))
+    (reducible_of_headReducible he (let ⟨ρ, hρ⟩ := hred; fun hz => by rw [hz] at hρ; simp at hρ)))
 
 theorem Reducible.of_head_fill [ProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hred : HeadReducible e σ) : Reducible (K.fill e) σ :=
-  Reducible.of_head hred |>.fill K
+  Reducible.of_head he hred |>.fill K
 
 /-! ## Irreducible: contrapositives -/
 
@@ -426,15 +447,17 @@ theorem irreducible_fill_inv [ProbLangℝ rT]
 @[discrete]
 theorem Discrete.Reducible.headStep_zero [ProbLangℝ rT]
     {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hirr : ¬ Discrete.Reducible e σ) :
     ∀ ρ : Cfg rT, headStep ⟨e, σ⟩ {ρ} = 0 :=
   fun ρ => by
     by_contra h
-    exact hirr ⟨ρ, primStep_eq_headStep (fun hz => h (by rw [hz]; simp)) ▸ pos_iff_ne_zero.mpr h⟩
+    exact hirr ⟨ρ, primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible he (fun hz => h (by rw [hz]; simp))) ▸ pos_iff_ne_zero.mpr h⟩
 
-theorem Reducible.headStep_zero [ProbLangℝ rT] {e : Exp rT} {σ : State rT} (hirr : ¬ Reducible e σ) :
+theorem Reducible.headStep_zero [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed) (hirr : ¬ Reducible e σ) :
     headStep ⟨e, σ⟩ = 0 := by
-  by_contra h; exact hirr <| reducible_of_headReducible h
+  by_contra h; exact hirr <| reducible_of_headReducible he h
 
 /-! ## Context decomposition -/
 
@@ -443,26 +466,26 @@ theorem Reducible.headStep_zero [ProbLangℝ rT] {e : Exp rT} {σ : State rT} (h
 theorem head_ctx_step_val_ectx_discrete [ProbLangℝ rT]
     (K : Ectx rT) (e : Exp rT) (σ : State rT) (ρ : Cfg rT)
     (hstep : 0 < headStep ⟨K.fill e, σ⟩ {ρ}) :
-    e.isValue ∨ K = [] := by
+    e.isValueR ∨ K = [] := by
   replace hstep : headStep ⟨K.fill e, σ⟩ ≠ 0 := fun hz => by rw [hz] at hstep; simp at hstep
   rcases List.eq_nil_or_snoc K with rfl | ⟨K'', Ki, rfl⟩
   · exact .inr rfl
   · simp only [Ectx.fill_snoc] at hstep
-    exact .inl (Ectx.fill_isValue (head_ctx_step_val hstep))
+    exact .inl (Ectx.fill_isValueR (head_ctx_step_val hstep))
 
 theorem head_ctx_step_val_ectx [ProbLangℝ rT] (K : Ectx rT) (e : Exp rT) (σ : State rT)
-    (hstep : HeadReducible (K.fill e) σ) : e.isValue ∨ K = [] := by
+    (hstep : HeadReducible (K.fill e) σ) : e.isValueR ∨ K = [] := by
   rcases List.eq_nil_or_snoc K with rfl | ⟨K'', Ki, rfl⟩
   · exact .inr rfl
   · simp only [Ectx.fill_snoc] at hstep
-    exact .inl (Ectx.fill_isValue (head_ctx_step_val hstep))
+    exact .inl (Ectx.fill_isValueR (head_ctx_step_val hstep))
 
 -- step_by_val
 @[discrete]
 theorem step_by_val_discrete [ProbLangℝ rT]
     (K' K_redex : Ectx rT) (e1' e1_redex : Exp rT) (σ : State rT) (ρ : Cfg rT)
     (hfill : K'.fill e1' = K_redex.fill e1_redex)
-    (hv : ¬e1'.isValue)
+    (hv : ¬e1'.isValueR)
     (hstep : 0 < headStep ⟨e1_redex, σ⟩ {ρ}) :
     ∃ K'' : Ectx rT, K_redex = K'.comp K'' := by
   replace hstep : headStep ⟨e1_redex, σ⟩ ≠ 0 := fun hz => by rw [hz] at hstep; simp at hstep
@@ -473,16 +496,17 @@ theorem step_by_val_discrete [ProbLangℝ rT]
     rcases List.eq_nil_or_snoc K_redex with rfl | ⟨K_redex_rest, Ki_redex, rfl⟩
     · simp only [Ectx.fill, List.foldl_nil] at hfill
       subst hfill
-      exact absurd (Ectx.fill_isValue (head_ctx_step_val hstep)) hv
+      exact absurd (Ectx.fill_isValueR (head_ctx_step_val hstep)) hv
     · simp only [Ectx.fill_snoc] at hfill ⊢
-      have hKi := EctxItem.fillItem_noVal_inj (Ectx.fill_noVal hv) (Ectx.fill_noVal (val_head_stuck hstep)) hfill
+      have hKi := EctxItem.fillItem_noVal_inj (Ectx.fill_noVal (Exp.not_isValue_of_not_isValueR hv))
+        (Ectx.fill_noVal (val_head_stuck hstep)) hfill
       subst hKi
       obtain ⟨K'', hK''⟩ := ih K_redex_rest e1_redex (Ectx.fillItem_injective hfill) hstep
       exact ⟨K'', by rw [hK'']; simp [Ectx.comp, List.append_assoc]⟩
 
 theorem step_by_val [ProbLangℝ rT] (K' K_redex : Ectx rT) (e1' e1_redex : Exp rT) (σ : State rT)
     (hfill : K'.fill e1' = K_redex.fill e1_redex)
-    (hv : ¬e1'.isValue)
+    (hv : ¬e1'.isValueR)
     (hstep : HeadReducible e1_redex σ) :
     ∃ K'' : Ectx rT, K_redex = K'.comp K'' := by
   induction K' using List.reverseRecOn generalizing K_redex e1_redex with
@@ -492,9 +516,10 @@ theorem step_by_val [ProbLangℝ rT] (K' K_redex : Ectx rT) (e1' e1_redex : Exp 
     rcases List.eq_nil_or_snoc K_redex with rfl | ⟨K_redex_rest, Ki_redex, rfl⟩
     · simp only [Ectx.fill, List.foldl_nil] at hfill
       subst hfill
-      exact absurd (Ectx.fill_isValue (head_ctx_step_val hstep)) hv
+      exact absurd (Ectx.fill_isValueR (head_ctx_step_val hstep)) hv
     · simp only [Ectx.fill_snoc] at hfill ⊢
-      have hKi := EctxItem.fillItem_noVal_inj (Ectx.fill_noVal hv) (Ectx.fill_noVal (val_head_stuck hstep)) hfill
+      have hKi := EctxItem.fillItem_noVal_inj (Ectx.fill_noVal (Exp.not_isValue_of_not_isValueR hv))
+        (Ectx.fill_noVal (val_head_stuck hstep)) hfill
       subst hKi
       obtain ⟨K'', hK''⟩ := ih K_redex_rest e1_redex (Ectx.fillItem_injective hfill) hstep
       exact ⟨K'', by rw [hK'']; simp [Ectx.comp, List.append_assoc]⟩
@@ -524,13 +549,13 @@ theorem head_redex_unique_discrete [ProbLangℝ rT]
   obtain ⟨⟨e2', σ2'⟩, hρ'⟩ := hred'
   have hρ_ne : headStep ⟨e, σ⟩ ≠ 0 := fun hz => by rw [hz] at hρ; simp at hρ
   have hρ'_ne : headStep ⟨e', σ⟩ ≠ 0 := fun hz => by rw [hz] at hρ'; simp at hρ'
-  obtain ⟨K'', hK⟩ := step_by_val K' K e' e σ hfill.symm (val_head_stuck hρ'_ne) hρ_ne
+  obtain ⟨K'', hK⟩ := step_by_val K' K e' e σ hfill.symm (val_head_stuck_R hρ'_ne) hρ_ne
   subst hK
   rw [← Ectx.fill_comp] at hfill
   have he := Ectx.fill_injective K' hfill
   have hhead : headStep ⟨K''.fill e, σ⟩ ≠ 0 := by rw [he]; exact hρ'_ne
   rcases head_ctx_step_val_ectx K'' e σ hhead with hval | rfl
-  · exact absurd hval (val_head_stuck hρ_ne)
+  · exact absurd hval (val_head_stuck_R hρ_ne)
   · simp [Ectx.fill] at he
     exact ⟨rfl, he⟩
 
@@ -538,11 +563,11 @@ theorem head_redex_unique [ProbLangℝ rT] (K K' : Ectx rT) (e e' : Exp rT) (σ 
     (hfill : K.fill e = K'.fill e') (hred  : HeadReducible e σ) (hred' : HeadReducible e' σ) :
     -- FIXME: Make this just be K = K'
     K = K'.comp [] ∧ e = e' := by
-  obtain ⟨K'', rfl⟩ := step_by_val K K' e e' σ hfill (val_head_stuck hred) hred'
+  obtain ⟨K'', rfl⟩ := step_by_val K K' e e' σ hfill (val_head_stuck_R hred) hred'
   rw [← Ectx.fill_comp] at hfill
   have he := Ectx.fill_injective _ hfill
   rcases @head_ctx_step_val_ectx rT _ K'' e' σ (he ▸ hred) with hval | rfl
-  · exact absurd hval (val_head_stuck hred')
+  · exact absurd hval (val_head_stuck_R hred')
   · simp [Ectx.fill] at he
     exact ⟨rfl, he⟩
 
@@ -552,7 +577,7 @@ theorem head_redex_unique [ProbLangℝ rT] (K K' : Ectx rT) (e e' : Exp rT) (σ 
 -- TODO: Not yet sure...
 @[discrete]
 theorem prim_step_iff_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-    {e1 e2 : Exp rT} {σ1 σ2 : State rT} :
+    {e1 e2 : Exp rT} {σ1 σ2 : State rT} (he1 : e1.IsLocallyClosed) :
     0 < primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} ↔
     ∃ (K : Ectx rT) (e1' e2' : Exp rT),
       K.fill e1' = e1 ∧
@@ -567,46 +592,59 @@ theorem prim_step_iff_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingle
     exact ⟨K, e1', e2', Exp.decomp_fill hd.symm, heq.1, heq.2 ▸ hpos⟩
   · rintro ⟨K, e1', e2', rfl, rfl, hhs⟩
     rw [← primStep_fill_singleton (val_head_stuck (fun hz => by rw [hz] at hhs; simp at hhs))]
-    exact primStep_eq_headStep (fun hz => by rw [hz] at hhs; simp at hhs) ▸ hhs
+    exact primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (Ectx.fill_isLocallyClosed he1) (fun hz => by rw [hz] at hhs; simp at hhs)) ▸ hhs
+
+/-- Forward direction of `prim_step_iff`: any possible `primStep` result arises from a
+head step at the decomposition redex. Needs **no** local closedness (decomposition is
+always well-defined); only the reverse direction does. -/
+theorem prim_step_imp [ProbLangℝ rT]
+    {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+    (h : Possible (⟨e2, σ2⟩ : Cfg rT) (primStep ⟨e1, σ1⟩)) :
+    ∃ (K : Ectx rT) (e1' e2' : Exp rT),
+      K.fill e1' = e1 ∧
+      K.fill e2' = e2 ∧
+      Possible (⟨e2', σ2⟩ : Cfg rT) (headStep ⟨e1', σ1⟩) := by
+  rw [possible_iff_pos] at h
+  simp only [primStep] at h
+  set d := e1.decomp with hd; obtain ⟨K, e1'⟩ := d
+  obtain ⟨⟨e2', σ2'⟩, heq, hpos⟩ :=
+    map_singleton_pos (by measurability) (Ectx.fillCfg_injective K) h
+  simp [Ectx.fillCfg, Cfg.mk.injEq] at heq
+  exact ⟨K, e1', e2', Exp.decomp_fill hd.symm, heq.1, possible_iff_pos.mpr (heq.2 ▸ hpos)⟩
 
 /-- Countable-free version of `prim_step_iff_discrete`, stated with the
 measurability-free `Possible` predicate. Needs only `[ProbLangℝ rT]` (the
 `MeasurableSingletonClass (Cfg rT)` that `map_singleton_pos`/`possible_iff_pos`
 want is derivable from it), not the full discrete structure. -/
 theorem prim_step_iff [ProbLangℝ rT]
-    {e1 e2 : Exp rT} {σ1 σ2 : State rT} :
+    {e1 e2 : Exp rT} {σ1 σ2 : State rT} (he1 : e1.IsLocallyClosed) :
     Possible (⟨e2, σ2⟩ : Cfg rT) (primStep ⟨e1, σ1⟩) ↔
     ∃ (K : Ectx rT) (e1' e2' : Exp rT),
       K.fill e1' = e1 ∧
       K.fill e2' = e2 ∧
       Possible (⟨e2', σ2⟩ : Cfg rT) (headStep ⟨e1', σ1⟩) := by
+  refine ⟨prim_step_imp, ?_⟩
   simp only [possible_iff_pos]
-  constructor
-  · intro h
-    simp only [primStep] at h
-    set d := e1.decomp with hd; obtain ⟨K, e1'⟩ := d
-    obtain ⟨⟨e2', σ2'⟩, heq, hpos⟩ :=
-      map_singleton_pos (by measurability) (Ectx.fillCfg_injective K) h
-    simp [Ectx.fillCfg, Cfg.mk.injEq] at heq
-    exact ⟨K, e1', e2', Exp.decomp_fill hd.symm, heq.1, heq.2 ▸ hpos⟩
   · rintro ⟨K, e1', e2', rfl, rfl, hhs⟩
     rw [← primStep_fill_singleton (val_head_stuck (by intro h0; rw [h0] at hhs; simp at hhs))]
-    exact primStep_eq_headStep (fun hz => by rw [hz] at hhs; simp at hhs) ▸ hhs
+    exact primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (Ectx.fill_isLocallyClosed he1) (fun hz => by rw [hz] at hhs; simp at hhs)) ▸ hhs
 
 -- TODO: Blocked
 @[discrete]
 theorem prim_step_iff'_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hstep : Discrete.Reducible e σ) :
     ∃ (K : Ectx rT) (e' : Exp rT), K.fill e' = e ∧
       (∃ ρ : Cfg rT, 0 < headStep ⟨e', σ⟩ {ρ}) ∧
       primStep ⟨e, σ⟩ = (headStep ⟨e', σ⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩) := by
   obtain ⟨⟨e2, σ2⟩, h⟩ := hstep
-  obtain ⟨K, e1', e2', hfill1, _, hhs⟩ := prim_step_iff.mp (possible_iff_pos.mpr h)
+  obtain ⟨K, e1', e2', hfill1, _, hhs⟩ := (prim_step_iff he).mp (possible_iff_pos.mpr h)
   rw [possible_iff_pos] at hhs
   exact ⟨K, e1', hfill1, ⟨_, hhs⟩, by
     rw [← hfill1, primStep_fill (val_head_stuck (fun hz => by rw [hz] at hhs; simp at hhs)),
-        primStep_eq_headStep (fun hz => by rw [hz] at hhs; simp at hhs)]⟩
+        primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible
+          (Ectx.fill_isLocallyClosed (hfill1 ▸ he)) (fun hz => by rw [hz] at hhs; simp at hhs))]⟩
 
 -- TODO: Blocked
 @[discrete]
@@ -623,21 +661,22 @@ theorem prim_step_mass_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingl
 @[discrete]
 theorem Discrete.headStep_of_primStep_fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e1 : Exp rT} {σ1 : State rT} {e2 : Exp rT} {σ2 : State rT}
+    (hlc : (K.fill e1).IsLocallyClosed)
     (hred : ∃ ρ : Cfg rT, 0 < headStep ⟨e1, σ1⟩ {ρ})
     (hstep : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
     ∃ e2', e2 = K.fill e2' ∧ 0 < headStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} := by
-  obtain ⟨K', e1', e2', hfill1, hfill2, hhs⟩ := prim_step_iff.mp (possible_iff_pos.mpr hstep)
+  obtain ⟨K', e1', e2', hfill1, hfill2, hhs⟩ := (prim_step_iff hlc).mp (possible_iff_pos.mpr hstep)
   rw [possible_iff_pos] at hhs
   have hhs_ne : headStep ⟨e1', σ1⟩ ≠ 0 := fun hz => by rw [hz] at hhs; simp at hhs
   obtain ⟨ρ_red, hρ_red⟩ := hred
   have hred_ne : headStep ⟨e1, σ1⟩ ≠ 0 := fun hz => by rw [hz] at hρ_red; simp at hρ_red
-  obtain ⟨K'', hK''⟩ := step_by_val K' K e1' e1 σ1 hfill1 (_root_.ProbLang.val_head_stuck hhs_ne) hred_ne
+  obtain ⟨K'', hK''⟩ := step_by_val K' K e1' e1 σ1 hfill1 (_root_.ProbLang.val_head_stuck_R hhs_ne) hred_ne
   subst hK''
   simp only [Ectx.comp, fill_app] at hfill1
   have he1' := Ectx.fill_injective K' hfill1
   have hhead : headStep ⟨K''.fill e1, σ1⟩ ≠ 0 := by rw [← he1']; exact hhs_ne
   rcases head_ctx_step_val_ectx K'' e1 σ1 hhead with hval | rfl
-  · exact absurd hval (_root_.ProbLang.val_head_stuck hred_ne)
+  · exact absurd hval (_root_.ProbLang.val_head_stuck_R hred_ne)
   · simp only [Ectx.fill, List.foldl_nil] at he1' hfill2
     exact ⟨e2', hfill2.symm, he1' ▸ hhs⟩
 
@@ -645,10 +684,11 @@ theorem Discrete.headStep_of_primStep_fill [ProbLangℝ rT] [Countable rT] [Meas
 @[discrete]
 theorem headStep_of_primStep_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
+    (he : e.IsLocallyClosed)
     (hred : ∃ ρ' : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ'})
     (hstep : 0 < primStep ⟨e, σ⟩ {ρ}) : 0 < headStep ⟨e, σ⟩ {ρ} := by
   obtain ⟨_, σ₂⟩ := ρ
-  obtain ⟨e2', hfill, hhs⟩ := Discrete.headStep_of_primStep_fill [] hred hstep
+  obtain ⟨e2', hfill, hhs⟩ := Discrete.headStep_of_primStep_fill [] he hred hstep
   simp [Ectx.fill] at hfill; exact hfill ▸ hhs
 
 -- TODO: Blocked
@@ -666,10 +706,11 @@ theorem head_irreducible_zero_discrete [ProbLangℝ rT] [Countable rT] [Measurab
 @[discrete]
 theorem head_step_not_stuck_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {ρ : Cfg rT}
+    (he : e.IsLocallyClosed)
     (h : 0 < headStep ⟨e, σ⟩ {ρ}) :
     ¬e.isValue ∧ Discrete.Reducible e σ :=
   ⟨val_head_stuck (fun hz => by rw [hz] at h; simp at h),
-   Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (fun hz => by rw [hz] at h; simp at h))⟩
+   Reducible_ReducibleM_iff.mpr (reducible_of_headReducible he (fun hz => by rw [hz] at h; simp at h))⟩
 
 /-! ## subRedexesAreValues -/
 
@@ -689,10 +730,11 @@ theorem ectxi_language_subRedexesAreValues [ProbLangℝ rT] {e : Exp rT}
 @[discrete]
 theorem prim_head_reducible_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hred : Discrete.Reducible e σ) (hsub : subRedexesAreValues e) :
     ∃ ρ : Cfg rT, 0 < headStep ⟨e, σ⟩ {ρ} := by
   obtain ⟨⟨e2, σ2⟩, hstep⟩ := hred
-  obtain ⟨K, e1', e2', hfill1, _, hhs⟩ := prim_step_iff.mp (possible_iff_pos.mpr hstep)
+  obtain ⟨K, e1', e2', hfill1, _, hhs⟩ := (prim_step_iff he).mp (possible_iff_pos.mpr hstep)
   rw [possible_iff_pos] at hhs
   have hK := hsub K e1' hfill1.symm (val_head_stuck (fun hz => by rw [hz] at hhs; simp at hhs))
   subst hK
@@ -704,11 +746,12 @@ theorem prim_head_reducible_discrete [ProbLangℝ rT] [Countable rT] [Measurable
 @[discrete]
 theorem prim_head_irreducible_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hirr : ∀ ρ : Cfg rT, headStep ⟨e, σ⟩ {ρ} = 0)
     (hsub : subRedexesAreValues e) :
     ¬ Discrete.Reducible e σ :=
   fun hred => by
-    obtain ⟨ρ, hρ⟩ := prim_head_reducible_discrete hred hsub
+    obtain ⟨ρ, hρ⟩ := prim_head_reducible_discrete he hred hsub
     rw [hirr ρ] at hρ
     exact lt_irrefl 0 hρ
 
@@ -716,10 +759,11 @@ theorem prim_head_irreducible_discrete [ProbLangℝ rT] [Countable rT] [Measurab
 @[discrete]
 theorem head_stuck_stuck_discrete [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT}
+    (he : e.IsLocallyClosed)
     (hstuck : ¬e.isValue ∧ ∀ ρ : Cfg rT, headStep ⟨e, σ⟩ {ρ} = 0)
     (hsub : subRedexesAreValues e) :
     ¬e.isValue ∧ ¬ Discrete.Reducible e σ :=
-  ⟨hstuck.1, prim_head_irreducible_discrete hstuck.2 hsub⟩
+  ⟨hstuck.1, prim_head_irreducible_discrete he hstuck.2 hsub⟩
 
 /-! ## notStuck_discrete / stuck_discrete -/
 

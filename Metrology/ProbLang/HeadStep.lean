@@ -314,10 +314,10 @@ theorem Exp.isValM.measurable {T : Type _} [MeasurableSpace T] :
   -- (since `isValue ↔ isValueR` and `isValueR.measurable` is proved).
   have hpred : MeasurableSet {p : Exp rT × Measure T | p.1.isValue} := by
     have : {p : Exp rT × Measure T | p.1.isValue} =
-           {e : Exp rT | e.isValueR} ×ˢ (Set.univ : Set (Measure T)) := by
-      ext ⟨e, m⟩; simp [Exp.isValue_iff_isValueR]
+           ({e : Exp rT | e.isValueR} ∩ {e | Exp.lcb 0 e = true}) ×ˢ (Set.univ : Set (Measure T)) := by
+      ext ⟨e, m⟩; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff]
     rw [this]
-    exact (Exp.isValueR.measurable.setOf).prod MeasurableSet.univ
+    exact ((Exp.isValueR.measurable.setOf).inter Exp.lcb_zero.measurableSet).prod MeasurableSet.univ
   refine Measurable.ite hpred ?_ ?_
   · -- True branch: `fun p => p.2`. Measurable as `measurable_snd`.
     exact measurable_snd
@@ -329,10 +329,12 @@ both measurable (`isValueR` via the structural recursion, `expr` via
 `Cfg.measurable_expr`). -/
 @[fun_prop]
 theorem Cfg.isValue_measurable : Measurable (fun a : Cfg rT => a.expr.isValue) := by
-  have h : (fun a : Cfg rT => a.expr.isValue) = (fun e : Exp rT => e.isValueR) ∘ Cfg.expr := by
-    funext a; simp [Exp.isValue_iff_isValueR]
+  rw [← measurableSet_setOf]
+  have h : {a : Cfg rT | a.expr.isValue} =
+      Cfg.expr ⁻¹' ({e : Exp rT | e.isValueR} ∩ {e | Exp.lcb 0 e = true}) := by
+    ext a; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff]
   rw [h]
-  exact Exp.isValueR.measurable.comp Cfg.measurable_expr
+  exact Cfg.measurable_expr ((Exp.isValueR.measurable.setOf).inter Exp.lcb_zero.measurableSet)
 
 /-- The set of value configurations is measurable. This is the form consumed by
 `Measurable.ite` (e.g. in `execN`/`execExactN` measurability). -/
@@ -1661,26 +1663,43 @@ theorem Discrete.val_head_stuck {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
 theorem val_head_stuck {e : Exp rT} {σ : State rT} : headStep ⟨e, σ⟩ ≠ 0 → ¬e.isValue := by
   head_case <;> simp_all [Exp.isValue_iff_isValueR, Exp.isValueR]
 
+/-- A value-*shaped* term never head-steps (stronger than `val_head_stuck`, since
+`isValue → isValueR`). Used by the context-decomposition lemmas, which only need to
+rule out value shape, not closed-value-hood. -/
+theorem Discrete.val_head_stuck_R {e : Exp rT} {σ : State rT} {ρ : Cfg rT} :
+    0 < headStep ⟨e, σ⟩ {ρ} → ¬e.isValueR := by
+  head_case <;> simp_all [Exp.isValueR]
+
+theorem val_head_stuck_R {e : Exp rT} {σ : State rT} : headStep ⟨e, σ⟩ ≠ 0 → ¬e.isValueR := by
+  head_case <;> simp_all [Exp.isValueR]
+
 theorem Exp.toVal?_isValue {e : Exp α} : e.toVal? = some v → e.isValue := by
   intro h; by_contra hne; rw [Exp.toVal?_eq_none.mpr hne] at h; exact absurd h (by simp)
 
+theorem Exp.toVal?_isValueR {e : Exp α} (h : e.toVal? = some v) : e.isValueR :=
+  (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue h)).1
+
 set_option maxHeartbeats 4000000 in
+/-- If a single eval frame `Ki.fillItem e` head-steps, the hole `e` is value-*shaped*
+(`isValueR`). This is the closedness-free version: it does **not** assert `e.isValue`
+(which now additionally requires local closedness). Local closedness is recovered
+separately at `primStep_eq_headStep`, the only place that needs the full `isValue`. -/
 @[discrete]
 theorem Discrete.head_ctx_step_val {e : Exp rT} {σ : State rT} {ρ : Cfg rT} {Ki : EctxItem rT} :
-    0 < headStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValue := by
+    0 < headStep ⟨Ki.fillItem e, σ⟩ {ρ} → e.isValueR := by
   have Hzero : (0 < (0 : Measure (Cfg rT)) {ρ}) → False := by simp
   head_case
   all_goals try (exact fun H => (Hzero H).elim)
-  all_goals cases Ki <;> (intro _; simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR])
-  all_goals exact (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue ‹_›))
+  all_goals cases Ki <;> intro h <;>
+    simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR, Exp.isValueR, Exp.toVal?_isValueR]
 
 set_option maxHeartbeats 4000000 in
 theorem head_ctx_step_val {e : Exp rT} {σ : State rT} {Ki : EctxItem rT} :
-    headStep ⟨Ki.fillItem e, σ⟩ ≠ 0 → e.isValue := by
+    headStep ⟨Ki.fillItem e, σ⟩ ≠ 0 → e.isValueR := by
   head_case
   all_goals try · simp
-  all_goals cases Ki <;> (intro _; simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR])
-  all_goals exact (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue ‹_›))
+  all_goals cases Ki <;> intro h <;>
+    simp_all [EctxItem.fillItem, Exp.isValue_iff_isValueR, Exp.isValueR, Exp.toVal?_isValueR]
 
 inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
 | BetaLamS :

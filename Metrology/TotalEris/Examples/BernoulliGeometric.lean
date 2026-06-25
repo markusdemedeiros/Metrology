@@ -35,7 +35,7 @@ theorem twp_GeometricTrial (v : Val rT)
     ⊢@{IProp GF}
       ∀ (F : Bool → ℝ≥0∞),
       ↯ (γ * F true + (1 - γ) * F false) -∗
-      tglWp E pl(&GeometricTrial v #0) (fun (v : Val rT) => iprop%
+      tglWp E pl(&GeometricTrial &v.1 #0) (fun (v : Val rT) => iprop%
         ∃ b : Bool, ⌜ v.1 = .lit (.bool b) ⌝ ∗ ↯ (F b)) := by
   -- Each recursive call is guarded behind a probability γ event, therefore it terminates.
   iintro %F Hε_spec
@@ -49,19 +49,22 @@ theorem twp_GeometricTrial (v : Val rT)
   imodintro
   iintro ⟨IH, Hε_term⟩ Hε_spec
   rw (occs := [2]) [GeometricTrial]
-  have Hval : pl(v).isValue (rT := rT) := sorry
   twp_pures
-  -- The value/expression thing rises again...
-  -- Should I just make values a subtype of expressions?
-
-  -- twp_bind pl(&v #.unit)
-  -- New F, that includes the induction term, generic constructions
+  -- The substituted coin is the stuck `openRec 0 #0 v.fst`. Since `v` is a value it is
+  -- locally closed (`v.lc`, the `Val.lc` field), so opening is a no-op (`open_lc`) and the
+  -- coin folds back to `v.fst` — which is exactly what the spec `X` below is about.
+  rw [← Exp.open_lc 0 (Exp.lit (.int 0)) v.fst v.lc]
+  -- Instantiate the abstract Bernoulli spec at our `F`, consuming the available credit.
   ihave X := Hspec.spec (E := E) $$ %F [Hε_spec Hε_term]
-  · sorry
-  -- Apply the sampler spec `X` to the bound coin-flip via WP monotonicity.
-  -- iapply tglWp_wand
-  -- isplitl [X]
-  -- · iexact X
-  -- -- Continuation: case on the sampled boolean `b`, then finish each branch.
-  -- iintro %w Hpost
+  · sorry -- credit accounting: the provided `↯` must match the spec's precondition
+          -- (depends on the `k`/`Hk1` design constants — still `sorry`).
+  -- Apply the coin-flip spec `X` to the bound `v ()` via WP monotonicity.
+  twp_bind (Exp.app v.fst (Exp.lit .unit))
+  iapply (ErisWpGS.tglWp_wand (Φ := fun (w : Val rT) =>
+    iprop(∃ b : Bool, ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ F b)))
+  isplitl [X]
+  · iexact X
+  -- Continuation: given the sampled boolean `b`, finish each branch — recurse via `IH`
+  -- on `true`, return on `false`. (Still to do.)
+  iintro %w Hpost
   all_goals sorry

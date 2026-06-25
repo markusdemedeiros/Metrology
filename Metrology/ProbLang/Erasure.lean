@@ -268,7 +268,7 @@ theorem primStep_tape_persists_support
     (hρ : Possible ρ (primStep ⟨e, σ⟩)) :
     ∃ t' : Tape, ρ.state.tapes[αloc]? = some t' ∧ t'.bound = t.bound := by
   obtain ⟨e₂, σ₂⟩ := ρ
-  obtain ⟨K, e₁', e₂', _hfill1, _hfill2, hhs⟩ := prim_step_iff.mp hρ
+  obtain ⟨K, e₁', e₂', _hfill1, _hfill2, hhs⟩ := prim_step_imp hρ
   replace hhs := Possible.headStepSupport hhs
   -- Case-split on the `HeadStepSupport` constructor; in each case,
   -- determine what happens to tape α.

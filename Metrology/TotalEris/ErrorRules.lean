@@ -244,7 +244,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
   have hstate : ∀ {σ₁ : State rT} {ρ : Cfg rT}, R σ₁ ρ → ρ.state = σ₁ := by
     rintro σ₁ ρ ⟨n, _, _, rfl⟩; rfl
   have hred : ∀ σ₁, Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
-    fun σ₁ => Reducible.of_head (hhead σ₁)
+    fun σ₁ => Reducible.of_head (by is_lc) (hhead σ₁)
   have hrmeas : ∀ σ₁ : State rT, MeasurableSet {ρ : Cfg rT | R σ₁ ρ} := fun σ₁ => by
     apply Set.Countable.measurableSet
     apply Set.Countable.mono (s₂ := (fun n : Int => (⟨.lit (.int n), σ₁⟩ : Cfg rT)) '' Set.univ)
@@ -255,7 +255,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
       Pgl 0 (R σ₁) (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) := fun σ₁ => by
     show (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ : Cfg rT | ¬ R σ₁ ρ} ≤ 0
     refine _root_.le_of_eq ?_
-    rw [primStep_eq_headStep (hhead σ₁)]
+    rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))]
     show (Cfg.uniform z σ₁) {ρ : Cfg rT | ¬ R σ₁ ρ} = 0
     have hCfgUniform :
         Cfg.uniform z σ₁ =
@@ -275,7 +275,7 @@ theorem twp_rand_exp_nat {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ �
   have hint : ∀ σ₁ : State rT,
       (∫⁻ ρ, f ρ ∂(primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩)) ≤ ε₁ := fun σ₁ => by
     have hφ : Measurable f := (measurable_litInt_elim _).comp Cfg.measurable_expr
-    rw [primStep_eq_headStep (hhead σ₁)]
+    rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))]
     show (∫⁻ ρ, f ρ ∂(Cfg.uniform z σ₁)) ≤ ε₁
     rw [Cfg.lintegral_uniform' Hz σ₁ hφ, ← ENNReal.div_eq_inv_mul]
     convert HSum using 2
@@ -316,7 +316,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
   -- The real-literal injection: `primStep = uniformReal = unifUnit.map inj`, and `inj` embeds.
   have hps : ∀ σ₁ : State rT, primStep (⟨Exp.urand, σ₁⟩ : Cfg rT)
       = (ProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
-    fun σ₁ => primStep_eq_headStep (hhead σ₁)
+    fun σ₁ => primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))
   have hg : ∀ σ₁ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => Cfg.measurable_iff.mpr
       ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
@@ -348,7 +348,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
   have hstate : ∀ {σ₁ : State rT} {ρ : Cfg rT}, R σ₁ ρ → ρ.state = σ₁ := by
     rintro σ₁ ρ ⟨r, rfl⟩; rfl
   have hred : ∀ σ₁, Reducible (Exp.urand : Exp rT) σ₁ :=
-    fun σ₁ => reducible_of_headReducible (hhead σ₁)
+    fun σ₁ => reducible_of_headReducible (by is_lc) (hhead σ₁)
   have hrmeas : ∀ σ₁ : State rT, MeasurableSet {ρ : Cfg rT | R σ₁ ρ} := fun σ₁ => by
     rw [hrange σ₁, Set.image_univ]; exact (hgemb σ₁).measurableSet_range
   -- `Pgl 0`: the diffuse `uniformReal` is concentrated on the (co-null) image.

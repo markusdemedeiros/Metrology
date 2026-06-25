@@ -183,6 +183,51 @@ theorem isValueR.measurable [MeasurableSpace rT] :
     (c_scrut := fun _ _ => False)
   all_goals first | (intros; rfl) | fun_prop
 
+/-! ### `Exp.lcb` — decidable local-closedness check (level-indexed). -/
+
+theorem lcb.measurable [MeasurableSpace rT] :
+    Measurable (fun (q : Nat × Exp rT) => Exp.lcb q.1 q.2) := by
+  apply measurable_struct_rec_param_shift
+    (g := fun (b : Nat) (e : Exp rT) => Exp.lcb b e)
+    (c_bvar  := fun b j => decide (j < b))
+    (c_fvar  := fun _ _ => true)
+    (c_lit   := fun _ _ => true)
+    (c_lam   := fun _ b' => b')
+    (c_fix   := fun _ b' => b')
+    (c_app   := fun _ b1 b2 => b1 && b2)
+    (c_unop  := fun _ _ b' => b')
+    (c_binop := fun _ _ b1 b2 => b1 && b2)
+    (c_cond  := fun _ b0 b1 b2 => b0 && b1 && b2)
+    (c_pair  := fun _ b1 b2 => b1 && b2)
+    (c_fst   := fun _ b' => b')
+    (c_snd   := fun _ b' => b')
+    (c_inl   := fun _ b' => b')
+    (c_inr   := fun _ b' => b')
+    (c_case  := fun _ b0 b1 b2 => b0 && b1 && b2)
+    (c_alloc := fun _ b' => b')
+    (c_load  := fun _ b' => b')
+    (c_store := fun _ b1 b2 => b1 && b2)
+    (c_tape  := fun _ b' => b')
+    (c_rand  := fun _ b1 b2 => b1 && b2)
+    (c_fail  := fun _ => true)
+    (c_urand := fun _ => true)
+    (c_scrut := fun _ b' _ => b')
+    (t_lam   := fun b => b + 1)
+    (t_fix   := fun b => b + 1)
+  case h_bvar =>
+    -- `decide (j < b)` : `Nat × Nat → Bool` is measurable (countable domain).
+    exact measurable_of_countable _
+  case h_t_lam => fun_prop
+  case h_t_fix => fun_prop
+  all_goals first | (intros; rfl) | fun_prop
+
+/-- The set of locally-closed expressions (`lcb 0 e = true`) is measurable. -/
+theorem lcb_zero.measurableSet [MeasurableSpace rT] :
+    MeasurableSet {e : Exp rT | Exp.lcb 0 e = true} := by
+  have hm : Measurable (fun e : Exp rT => Exp.lcb 0 e) :=
+    lcb.measurable.comp (by fun_prop : Measurable (fun e : Exp rT => ((0 : Nat), e)))
+  exact hm (measurableSet_singleton true)
+
 /-! ### `Exp.fv` — free variables. Discrete codomain (`Finset Var`). -/
 
 /-- Discrete σ-algebra on `Finset Var` (since `Var` and `Finset` are countable). -/
@@ -655,7 +700,7 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
   intro mOpt
   -- Step 1: rewrite `toVal?` as a `dite`.
   have hrw : (Exp.toVal? : Exp rT → Option (Val rT)) =
-      fun e => if h : e.isValue then some (Val.mk e (Classical.choice h)) else none := by
+      fun e => if h : e.isValue then some (Val.mk e (Classical.choice h) (Classical.choice h).lc) else none := by
     funext e
     by_cases h : e.isValue
     · simp only [Exp.toVal?, dif_pos h]
@@ -686,13 +731,13 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
   -- `optionEquivSumPUnit none = .inr () ∈ Ssum` iff `() ∈ Sum.inr ⁻¹' Ssum`.
   -- That's a constant boolean depending on `Ssum`, so either `univ` or `∅` for non-values.
   have hMset : MeasurableSet {e : Exp rT | e.isValue} := by
-    have heq : {e : Exp rT | e.isValue} = {e | e.isValueR} := by
-      ext e; simp [Exp.isValue_iff_isValueR]
-    rw [heq]; exact isValueR.measurable.setOf
+    have heq : {e : Exp rT | e.isValue} = {e | e.isValueR} ∩ {e | Exp.lcb 0 e = true} := by
+      ext e; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff]
+    rw [heq]; exact (isValueR.measurable.setOf).inter lcb_zero.measurableSet
   set noneIn : Prop := ((⟨⟩ : PUnit) ∈ (Sum.inr ⁻¹' Ssum : Set PUnit)) with hNoneIn
   classical
   have hpreimage_eq :
-      (fun e : Exp rT => if h : e.isValue then some (Val.mk e (Classical.choice h)) else none) ⁻¹' S =
+      (fun e : Exp rT => if h : e.isValue then some (Val.mk e (Classical.choice h) (Classical.choice h).lc) else none) ⁻¹' S =
         ({e | e.isValue} ∩ Uval) ∪ (if noneIn then {e | ¬e.isValue} else ∅) := by
     ext e
     simp only [Set.mem_preimage, Set.mem_union, Set.mem_inter_iff, Set.mem_setOf_eq]
@@ -700,14 +745,14 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
     · simp only [dif_pos hv]
       rw [← hSeq]
       simp only [Set.mem_preimage]
-      have heqv : Equiv.optionEquivSumPUnit (Val rT) (some (Val.mk e (Classical.choice hv))) =
-          .inl (Val.mk e (Classical.choice hv)) := by
+      have heqv : Equiv.optionEquivSumPUnit (Val rT) (some (Val.mk e (Classical.choice hv) (Classical.choice hv).lc)) =
+          .inl (Val.mk e (Classical.choice hv) (Classical.choice hv).lc) := by
         simp [Equiv.optionEquivSumPUnit]
       rw [heqv]
-      have hmem_iff : (Sum.inl (Val.mk e (Classical.choice hv)) : Val rT ⊕ PUnit) ∈ Ssum ↔
-          (Val.mk e (Classical.choice hv) : Val rT) ∈ (Sum.inl ⁻¹' Ssum : Set (Val rT)) := Iff.rfl
+      have hmem_iff : (Sum.inl (Val.mk e (Classical.choice hv) (Classical.choice hv).lc) : Val rT ⊕ PUnit) ∈ Ssum ↔
+          (Val.mk e (Classical.choice hv) (Classical.choice hv).lc : Val rT) ∈ (Sum.inl ⁻¹' Ssum : Set (Val rT)) := Iff.rfl
       rw [hmem_iff, ← hUval_eq]
-      have hfeq : (Val.mk e (Classical.choice hv) : Val rT).fst = e := rfl
+      have hfeq : (Val.mk e (Classical.choice hv) (Classical.choice hv).lc : Val rT).fst = e := rfl
       simp only [Set.mem_preimage]
       constructor
       · intro hUe

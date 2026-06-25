@@ -441,6 +441,174 @@ attribute [scoped grind .]
   IsLocallyClosed.urand
   IsLocallyClosed.scrut
 
+/-- Syntactic height (used for well-founded recursion). -/
+@[simp]
+def height : Exp α → Nat
+  | bvar _ | fvar _ | lit _ => 1
+  | lam e => 1 + e.height
+  | fix e => 1 + e.height
+  | app e1 e2 => 1 + e1.height + e2.height
+  | binop _ e1 e2 => 1 + e1.height + e2.height
+  | pair e1 e2 => 1 + e1.height + e2.height
+  | store e1 e2 => 1 + e1.height + e2.height
+  | rand e1 e2 => 1 + e1.height + e2.height
+  | unop _ e => 1 + e.height
+  | fst e => 1 + e.height
+  | snd e => 1 + e.height
+  | inl e => 1 + e.height
+  | inr e => 1 + e.height
+  | alloc e => 1 + e.height
+  | load e => 1 + e.height
+  | tape e => 1 + e.height
+  | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+  | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
+  | scrut e _ => 1 + e.height
+  | fail => 1
+  | urand => 1
+
+/-- Decidable local-closedness checker: `lcb k e` is `true` iff every `bvar` index in
+`e` is bound — i.e. `< k` after accounting for the binders crossed. `lcb 0 e` decides
+whether `e` is locally closed (`lcb_imp_lc`). Used by `Exp.toVal?` to produce the
+`Val.lc` proof for a value without threading a closedness invariant. -/
+def lcb (k : Nat) : Exp α → Bool
+  | .bvar j => decide (j < k)
+  | .fvar _ | .lit _ | .fail | .urand => true
+  | .lam e | .fix e => lcb (k+1) e
+  | .app e1 e2 | .binop _ e1 e2 | .pair e1 e2 | .store e1 e2 | .rand e1 e2 =>
+      lcb k e1 && lcb k e2
+  | .cond e0 e1 e2 | .case e0 e1 e2 => lcb k e0 && lcb k e1 && lcb k e2
+  | .unop _ e | .fst e | .snd e | .inl e | .inr e | .alloc e | .load e | .tape e | .scrut e _ =>
+      lcb k e
+
+/-- Opening with a free variable at the outermost unbound level lowers the closedness
+level by one. -/
+theorem lcb_openRec_fvar (x : Var) : ∀ (k : Nat) (e : Exp α),
+    lcb (k+1) e = true → lcb k (openRec k (fvar x) e) = true := by
+  intro k e
+  induction e generalizing k with
+  | bvar j =>
+      intro h
+      simp only [lcb, decide_eq_true_eq] at h
+      simp only [openRec]
+      split
+      · rfl
+      · simp only [lcb, decide_eq_true_eq]; omega
+  | _ => intro h <;> simp_all [lcb, openRec, Nat.add_right_comm] <;> grind
+
+/-- `openRec` with a free variable preserves height (both `bvar` and `fvar` are leaves). -/
+theorem height_openRec_fvar (x : Var) : ∀ (k : Nat) (e : Exp α),
+    (openRec k (fvar x) e).height = e.height := by
+  intro k e
+  induction e generalizing k with
+  | bvar j => simp only [openRec]; split <;> rfl
+  | _ => simp_all [openRec, Exp.height]
+
+private theorem lcb_imp_lc_aux : ∀ (n : Nat) (e : Exp α), e.height ≤ n → lcb 0 e = true →
+    IsLocallyClosed e := by
+  intro n
+  induction n with
+  | zero => intro e he _; exfalso; cases e <;> simp [Exp.height] at he <;> omega
+  | succ n ih =>
+      intro e hle hlc
+      cases e with
+      | bvar j => simp [lcb] at hlc
+      | fvar x => exact .fvar x
+      | lit b => exact .lit b
+      | fail => exact .fail
+      | urand => exact .urand
+      | lam e =>
+          refine .lam ∅ e (fun x _ => ?_)
+          refine ih (open' e (fvar x)) ?_ ?_
+          · rw [open', height_openRec_fvar]; simp only [Exp.height] at hle; omega
+          · exact lcb_openRec_fvar x 0 e (by simpa [lcb] using hlc)
+      | fix e =>
+          refine .fix ∅ e (fun x _ => ?_)
+          refine ih (open' e (fvar x)) ?_ ?_
+          · rw [open', height_openRec_fvar]; simp only [Exp.height] at hle; omega
+          · exact lcb_openRec_fvar x 0 e (by simpa [lcb] using hlc)
+      | app e1 e2 =>
+          simp only [lcb, Bool.and_eq_true] at hlc; simp only [Exp.height] at hle
+          exact .app (ih e1 (by omega) hlc.1) (ih e2 (by omega) hlc.2)
+      | unop op e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .unop op (ih e (by omega) hlc)
+      | binop op e1 e2 =>
+          simp only [lcb, Bool.and_eq_true] at hlc; simp only [Exp.height] at hle
+          exact .binop op (ih e1 (by omega) hlc.1) (ih e2 (by omega) hlc.2)
+      | cond e0 e1 e2 =>
+          simp only [lcb, Bool.and_eq_true] at hlc; simp only [Exp.height] at hle
+          exact .cond (ih e0 (by omega) hlc.1.1) (ih e1 (by omega) hlc.1.2) (ih e2 (by omega) hlc.2)
+      | pair e1 e2 =>
+          simp only [lcb, Bool.and_eq_true] at hlc; simp only [Exp.height] at hle
+          exact .pair (ih e1 (by omega) hlc.1) (ih e2 (by omega) hlc.2)
+      | fst e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .fst (ih e (by omega) hlc)
+      | snd e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .snd (ih e (by omega) hlc)
+      | inl e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .inl (ih e (by omega) hlc)
+      | inr e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .inr (ih e (by omega) hlc)
+      | case e0 e1 e2 =>
+          simp only [lcb, Bool.and_eq_true] at hlc; simp only [Exp.height] at hle
+          exact .case (ih e0 (by omega) hlc.1.1) (ih e1 (by omega) hlc.1.2) (ih e2 (by omega) hlc.2)
+      | alloc e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .alloc (ih e (by omega) hlc)
+      | load e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .load (ih e (by omega) hlc)
+      | store e1 e2 =>
+          simp only [lcb, Bool.and_eq_true] at hlc; simp only [Exp.height] at hle
+          exact .store (ih e1 (by omega) hlc.1) (ih e2 (by omega) hlc.2)
+      | tape e =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .tape (ih e (by omega) hlc)
+      | rand e1 e2 =>
+          simp only [lcb, Bool.and_eq_true] at hlc; simp only [Exp.height] at hle
+          exact .rand (ih e1 (by omega) hlc.1) (ih e2 (by omega) hlc.2)
+      | scrut e p =>
+          simp only [lcb] at hlc; simp only [Exp.height] at hle
+          exact .scrut p (ih e (by omega) hlc)
+
+/-- A `true` decidable closedness check yields the (cofinite) `IsLocallyClosed` proof. -/
+theorem lcb_imp_lc {e : Exp α} (h : lcb 0 e = true) : IsLocallyClosed e :=
+  lcb_imp_lc_aux e.height e le_rfl h
+
+/-- Converse of `lcb_openRec_fvar`: opening the outermost level with a free variable
+preserves the level-`(k+1)` closedness fact. -/
+theorem lcb_openRec_fvar_rev (x : Var) : ∀ (k : Nat) (e : Exp α),
+    lcb k (openRec k (fvar x) e) = true → lcb (k+1) e = true := by
+  intro k e
+  induction e generalizing k with
+  | bvar j =>
+      intro h
+      simp only [openRec] at h
+      split at h
+      · next heq => simp only [lcb, decide_eq_true_eq]; omega
+      · next hne => simp only [lcb, decide_eq_true_eq] at h ⊢; omega
+  | _ => intro h <;> simp_all [lcb, openRec, Nat.add_right_comm] <;> grind
+
+/-- `IsLocallyClosed` implies the decidable check succeeds. The converse of `lcb_imp_lc`,
+so `lcb 0 e = true ↔ IsLocallyClosed e`. -/
+theorem lc_imp_lcb {e : Exp α} (h : IsLocallyClosed e) : lcb 0 e = true := by
+  induction h with
+  | lam L e' H ih =>
+      obtain ⟨x, hx⟩ := Cslib.HasFresh.fresh_exists L
+      have hx' := ih x hx
+      simp only [open'] at hx'
+      simpa [lcb] using lcb_openRec_fvar_rev x 0 e' hx'
+  | fix L e' H ih =>
+      obtain ⟨x, hx⟩ := Cslib.HasFresh.fresh_exists L
+      have hx' := ih x hx
+      simp only [open'] at hx'
+      simpa [lcb] using lcb_openRec_fvar_rev x 0 e' hx'
+  | _ => simp_all [lcb]
+
 end Exp
 
 instance [DecidableEq α] : DecidableEq (BaseLit α)
@@ -556,11 +724,22 @@ instance [Checkable F] [Checkable G] : Checkable (Both F G) where
     (also functions), and pair/inl/inr of values. -/
 inductive IsVal : Exp rT → Type
   | lit  : IsVal (.lit b)
-  | lam  : IsVal (.lam e)
-  | fix  : IsVal (.fix e)
+  -- `lam`/`fix` carry a local-closedness proof: a runtime value is a *closed* function,
+  -- so `IsVal e → IsLocallyClosed e` (`IsVal.lc`) and every `Val` is locally closed.
+  | lam  : Exp.IsLocallyClosed (.lam e) → IsVal (.lam e)
+  | fix  : Exp.IsLocallyClosed (.fix e) → IsVal (.fix e)
   | pair : IsVal e1 → IsVal e2 → IsVal (.pair e1 e2)
   | inl  : IsVal e → IsVal (.inl e)
   | inr  : IsVal e → IsVal (.inr e)
+
+/-- Every value is locally closed. -/
+def IsVal.lc : {e : Exp rT} → IsVal e → Exp.IsLocallyClosed e
+  | _, .lit => .lit _
+  | _, .lam h => h
+  | _, .fix h => h
+  | _, .pair w1 w2 => .pair w1.lc w2.lc
+  | _, .inl w => .inl w.lc
+  | _, .inr w => .inr w.lc
 
 /-- A value is an expression paired with a Type-valued witness.
 
@@ -571,12 +750,19 @@ than the (much coarser) `Sigma.instMeasurableSpace`. -/
 structure Val (α : Type _) where
   fst : Exp α
   snd : IsVal fst
+  /-- Runtime values are locally closed (no dangling de Bruijn indices). Values arise
+  from reducing well-formed programs, so this always holds; carrying it lets proofs
+  rewrite stuck `openRec`/`open'` on an abstract value to the value itself (`open_lc`),
+  e.g. when an abstract value flows under a binder. `IsVal` deliberately does NOT imply
+  this (`IsVal (lam e)` holds for any body `e`), so it is a separate field. -/
+  lc : fst.IsLocallyClosed
 
 /-- Coerce a base literal to a value, dropping the `⟨.lit ·, .lit⟩` wrapper.
 This is what lets specs write a base literal where a `Val` is expected.
 Marked `@[reducible]` so it is definitionally transparent to the proof-mode
 unifier (`iapply` etc.), which matches at `reducible` transparency. -/
-@[reducible, coe] def Val.ofBaseLit (b : BaseLit rT) : Val rT := ⟨.lit b, .lit⟩
+@[reducible, coe] def Val.ofBaseLit (b : BaseLit rT) : Val rT :=
+  ⟨.lit b, .lit, Exp.IsLocallyClosed.lit b⟩
 
 instance : Coe (BaseLit rT) (Val rT) := ⟨Val.ofBaseLit⟩
 
@@ -598,8 +784,10 @@ namespace IsVal
 /-- Decidable check. -/
 def check? : (e : Exp rT) → Option (IsVal e)
   | .lit _ => some .lit
-  | .lam _ => some .lam
-  | .fix _ => some .fix
+  -- `lam`/`fix` are values only when locally closed; the closedness check (`Exp.lcb`)
+  -- supplies the proof `IsVal.lam`/`fix` now carries.
+  | .lam e => if h : Exp.lcb 0 (.lam e) = true then some (.lam (Exp.lcb_imp_lc h)) else none
+  | .fix e => if h : Exp.lcb 0 (.fix e) = true then some (.fix (Exp.lcb_imp_lc h)) else none
   | .pair e1 e2 => do return .pair (← check? e1) (← check? e2)
   | .inl e => do return .inl (← check? e)
   | .inr e => do return .inr (← check? e)
@@ -607,8 +795,8 @@ def check? : (e : Exp rT) → Option (IsVal e)
 
 theorem subsingleton : (w1 w2 : IsVal e) → w1 = w2
   | .lit, .lit => rfl
-  | .lam, .lam => rfl
-  | .fix, .fix => rfl
+  | .lam _, .lam _ => rfl
+  | .fix _, .fix _ => rfl
   | .pair h1 h2, .pair h1' h2' => by rw [subsingleton h1 h1', subsingleton h2 h2']
   | .inl h, .inl h' => by rw [subsingleton h h']
   | .inr h, .inr h' => by rw [subsingleton h h']
@@ -627,8 +815,8 @@ noncomputable def IsVal.ofIsValue (h : e.isValue) : IsVal e := h.some
 
 theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .lit => ⟨.lit, rfl⟩
-  | .lam => ⟨.lam, rfl⟩
-  | .fix => ⟨.fix, rfl⟩
+  | .lam h => ⟨.lam h, by simp only [check?, dif_pos (Exp.lc_imp_lcb h)]⟩
+  | .fix h => ⟨.fix h, by simp only [check?, dif_pos (Exp.lc_imp_lcb h)]⟩
   | .pair h1 h2 => by
       obtain ⟨w1, hw1⟩ := check?_some h1; obtain ⟨w2, hw2⟩ := check?_some h2
       exact ⟨.pair w1 w2, by simp [check?, hw1, hw2]⟩
@@ -642,19 +830,37 @@ theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .inl e | .inr e => e.isValueR
   | _ => False
 
-theorem Exp.isValue_iff_isValueR {e : Exp α} : e.isValue ↔ e.isValueR := by
+/-- `e` is a value iff it is value-shaped **and** locally closed. (`IsVal` now carries
+local closedness, so value-shape alone — `isValueR` — is no longer sufficient.) -/
+theorem Exp.isValue_iff_isValueR {e : Exp α} :
+    e.isValue ↔ e.isValueR ∧ Exp.lcb 0 e = true := by
   constructor
-  · rintro ⟨w⟩; induction w with
+  · rintro ⟨w⟩
+    refine ⟨?_, Exp.lc_imp_lcb w.lc⟩
+    induction w with
     | lit | lam | fix => trivial
     | pair _ _ ih1 ih2 => exact ⟨ih1, ih2⟩
     | inl _ ih | inr _ ih => exact ih
-  · intro h; induction e with
-    | lit | lam | fix => exact ⟨by constructor⟩
-    | pair _ _ ih1 ih2 =>
-      obtain ⟨h1, h2⟩ := h; exact ⟨.pair (ih1 h1).some (ih2 h2).some⟩
-    | inl _ ih => exact ⟨.inl (ih h).some⟩
-    | inr _ ih => exact ⟨.inr (ih h).some⟩
-    | _ => exact absurd h id
+  · rintro ⟨hr, hl⟩
+    induction e with
+    | lit => exact ⟨.lit⟩
+    | lam e' _ => exact ⟨.lam (Exp.lcb_imp_lc hl)⟩
+    | fix e' _ => exact ⟨.fix (Exp.lcb_imp_lc hl)⟩
+    | pair e1 e2 ih1 ih2 =>
+        obtain ⟨hr1, hr2⟩ := hr
+        simp only [lcb, Bool.and_eq_true] at hl
+        exact ⟨.pair (ih1 hr1 hl.1).some (ih2 hr2 hl.2).some⟩
+    | inl e' ih => exact ⟨.inl (ih hr (by simpa only [lcb] using hl)).some⟩
+    | inr e' ih => exact ⟨.inr (ih hr (by simpa only [lcb] using hl)).some⟩
+    | _ => exact absurd hr id
+
+/-- A closed value is value-shaped. -/
+theorem Exp.isValueR_of_isValue {e : Exp α} (h : e.isValue) : e.isValueR :=
+  (Exp.isValue_iff_isValueR.mp h).1
+
+/-- Contrapositive: not value-shaped implies not a (closed) value. -/
+theorem Exp.not_isValue_of_not_isValueR {e : Exp α} (h : ¬e.isValueR) : ¬e.isValue :=
+  fun hv => h (Exp.isValueR_of_isValue hv)
 
 theorem IsVal.not_isValue_of_check?_none {e : Exp α} (h : IsVal.check? e = none) : ¬e.isValue :=
   fun ⟨w⟩ => by obtain ⟨_, hw⟩ := w.check?_some; simp_all
@@ -674,7 +880,7 @@ instance Exp.decIsValue (e : Exp α) : Decidable e.isValue :=
 /-- Two values are equal iff their expressions are equal (the `IsVal` witnesses
 are determined by `IsVal.subsingleton`). -/
 theorem Val.ext {v1 v2 : Val α} (h : v1.fst = v2.fst) : v1 = v2 := by
-  obtain ⟨e1, w1⟩ := v1; obtain ⟨e2, w2⟩ := v2
+  obtain ⟨e1, w1, h1⟩ := v1; obtain ⟨e2, w2, h2⟩ := v2
   simp at h; subst h; congr 1; exact IsVal.subsingleton w1 w2
 
 theorem Val.ext_iff {v1 v2 : Val α} : v1 = v2 ↔ v1.fst = v2.fst :=
@@ -699,8 +905,20 @@ instance instCountableExtTreeMapLoc {V : Type _} [Countable V] :
 
 def Exp.toVal? (e : Exp α) : Option (Val α) :=
   match IsVal.check? e with
-  | some w => some ⟨e, w⟩
+  -- `toVal?` is total over values: `IsVal` now carries the local-closedness proof
+  -- (`check?` only produces it for locally-closed `lam`/`fix`), so the `Val.lc` field is
+  -- just `w.lc` — no separate gate or `sorry`. `toVal?` stays in sync with `isValue`.
+  | some w => some ⟨e, w, w.lc⟩
   | none => none
+
+/-- A non-value is never recognised by `toVal?`. -/
+theorem Exp.toVal?_none_of_not_isValue {e : Exp α} (h : ¬e.isValue) : e.toVal? = none := by
+  simp only [toVal?, IsVal.check?_eq_none h]
+
+/-- A value is recognised by `toVal?`. -/
+theorem Exp.toVal?_eq_some_of_isValue {e : Exp α} (h : e.isValue) : ∃ v, e.toVal? = some v := by
+  obtain ⟨w, hw⟩ := h.some.check?_some
+  exact ⟨⟨e, w, w.lc⟩, by simp only [Exp.toVal?, hw]⟩
 
 @[simp] theorem Exp.toVal?_eq_none {e : Exp α} : e.toVal? = none ↔ ¬e.isValue := by
   constructor
@@ -736,11 +954,14 @@ structure State (α : Type _) where
   deriving Inhabited, Countable
 
 theorem Exp.toVal?_ofVal (v : Val α) : (Exp.ofVal v).toVal? = some v := by
-  obtain ⟨e, w⟩ := v
+  obtain ⟨e, w, hlc⟩ := v
   simp only [Exp.ofVal, Exp.toVal?]
   cases hc : IsVal.check? e with
   | none => exact absurd w.toIsValue (IsVal.not_isValue_of_check?_none hc)
   | some w' => exact congrArg some (Val.ext rfl)
+
+/-- `v.fst`-shaped form of `toVal?_ofVal` (matches goals after `Exp.ofVal` is unfolded). -/
+@[simp] theorem Val.toVal?_fst (v : Val α) : v.fst.toVal? = some v := Exp.toVal?_ofVal v
 
 theorem Exp.ofVal_of_toVal_some {e : Exp α} {v : Val α} (h : e.toVal? = some v) : Exp.ofVal v = e := by
   simp only [toVal?] at h
@@ -801,6 +1022,13 @@ inductive EctxItem (α : Type _)
   | .randL v2 => .rand e (.ofVal v2)
   | .randR e1 => .rand e1 e
   | .scrut p => .scrut e p
+
+/-- The hole of a locally-closed filled evaluation context is itself locally closed.
+No `EctxItem` introduces a binder, so this is just one layer of `IsLocallyClosed`
+inversion. -/
+theorem EctxItem.fillItem_isLocallyClosed {Ki : EctxItem α} {e : Exp α}
+    (h : (Ki.fillItem e).IsLocallyClosed) : e.IsLocallyClosed := by
+  cases Ki <;> (simp only [fillItem] at h; cases h <;> assumption)
 
 def Exp.decompItem (e : Exp α) : Option (EctxItem α × Exp α) :=
   match e with
@@ -926,48 +1154,26 @@ theorem EctxItem.fillItem_isValue {K : EctxItem α} : (K.fillItem e).isValue →
   rintro ⟨w⟩
   cases K <;> (simp only [EctxItem.fillItem] at w; cases w) <;> exact ‹IsVal e›.toIsValue
 
+/-- The value-*shape* (`isValueR`) analogue of `fillItem_isValue`: if a filled frame is
+value-shaped, so is its hole. (No `EctxItem` produces a binder, and only `pairL`/`pairR`/
+`inl`/`inr` produce value-shaped frames at all; the rest make the hypothesis vacuous.) -/
+theorem EctxItem.fillItem_isValueR {Ki : EctxItem α} {e : Exp α}
+    (h : (Ki.fillItem e).isValueR) : e.isValueR := by
+  cases Ki <;> simp_all [EctxItem.fillItem, Exp.isValueR, Exp.ofVal]
+
 theorem EctxItem.fillItem_noVal_inj {Ki1 Ki2 : EctxItem α} {e1 e2 : Exp α}
     (hv1 : ¬e1.isValue) (hv2 : ¬e2.isValue)
     (h : Ki1.fillItem e1 = Ki2.fillItem e2) : Ki1 = Ki2 := by
   cases Ki1 <;> cases Ki2 <;> simp_all [EctxItem.fillItem, Exp.ofVal] <;>
     grind [Val.ext_iff, Val.isValue, Exp.isValue_iff_isValueR]
 
-@[simp]
-def Exp.height : Exp α → Nat
-  | bvar _ | fvar _ | lit _ => 1
-  | lam e => 1 + e.height
-  | fix e => 1 + e.height
-  | app e1 e2 => 1 + e1.height + e2.height
-  | binop _ e1 e2 => 1 + e1.height + e2.height
-  | pair e1 e2 => 1 + e1.height + e2.height
-  | store e1 e2 => 1 + e1.height + e2.height
-  | rand e1 e2 => 1 + e1.height + e2.height
-  | unop _ e => 1 + e.height
-  | fst e => 1 + e.height
-  | snd e => 1 + e.height
-  | inl e => 1 + e.height
-  | inr e => 1 + e.height
-  | alloc e => 1 + e.height
-  | load e => 1 + e.height
-  | tape e => 1 + e.height
-  | .cond e0 e1 e2 => 1 + e0.height + e1.height + e2.height
-  | .case e0 e1 e2 => 1 + e0.height + e1.height + e2.height
-  | scrut e _ => 1 + e.height
-  | fail => 1
-  | urand => 1
-
-private theorem Exp.toVal?_of_isVal {e : Exp α} (w : IsVal e) : ∃ v : Val α, e.toVal? = some v ∧ v.1 = e :=
-  let ⟨w', hw'⟩ := w.check?_some; ⟨⟨e, w'⟩, by simp [toVal?, hw'], rfl⟩
-
 theorem EctxItem.decompItem_fillItem (Ki : EctxItem α) {e : Exp α} (hv : ¬e.isValue) :
     (Ki.fillItem e).decompItem = some (Ki, e) := by
   cases Ki with
   | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
-    obtain ⟨val, hval⟩ := v2
-    obtain ⟨v', hv', hv'e⟩ := Exp.toVal?_of_isVal hval
-    simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv,
-         hv', Exp.ofVal, Val.ext_iff, hv'e]
-  | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_eq_none.mpr hv]
+    simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_none_of_not_isValue hv,
+         Val.toVal?_fst, Exp.ofVal, Val.ext_iff]
+  | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_none_of_not_isValue hv]
 
 theorem Exp.decompItem_fill {e e' : Exp α} {Ki : EctxItem α}
     (h : e.decompItem = some (Ki, e')) : Ki.fillItem e' = e ∧ ¬e'.isValue := by
@@ -1017,6 +1223,18 @@ theorem Ectx.fill_noVal {K : Ectx α} {e : Exp α} (hv : ¬e.isValue) : ¬(K.fil
 
 theorem Ectx.fill_isValue {K : Ectx α} {e : Exp α} (hv : (K.fill e).isValue) : e.isValue :=
   if h : e.isValue then h else absurd hv (Ectx.fill_noVal h)
+
+theorem Ectx.fill_isValueR {K : Ectx α} {e : Exp α} (h : (K.fill e).isValueR) : e.isValueR := by
+  induction K generalizing e with
+  | nil => exact h
+  | cons Ki K ih => exact EctxItem.fillItem_isValueR (ih h)
+
+/-- The hole of a locally-closed filled evaluation context is locally closed. -/
+theorem Ectx.fill_isLocallyClosed {K : Ectx α} {e : Exp α}
+    (h : (K.fill e).IsLocallyClosed) : e.IsLocallyClosed := by
+  induction K generalizing e with
+  | nil => exact h
+  | cons Ki K ih => exact EctxItem.fillItem_isLocallyClosed (ih h)
 
 theorem Exp.decompItem_height {e : Exp α} (h : e.decompItem = some (Ki, e')) :
     e'.height < e.height := by

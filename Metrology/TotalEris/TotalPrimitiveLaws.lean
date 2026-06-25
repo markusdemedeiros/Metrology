@@ -17,14 +17,23 @@ namespace ProbLang
 
 variable {rT : Type _}
 
+-- `rfl` goes through despite the new `Val.lc` field: `lc` is a `Prop`, so any two
+-- proofs are definitionally equal (kernel proof irrelevance), and the `lit` branch's
+-- closedness proof is the real `lcb_imp_lc rfl` (`lcb 0 (lit b)` reduces to `true`).
 @[simp] theorem Exp.toVal?_lit (b : BaseLit rT) :
-    (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit⟩ := rfl
+    (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit, Exp.lcb_imp_lc rfl⟩ := rfl
 
-@[simp] theorem Exp.toVal?_lam (e : Exp rT) :
-    (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam⟩ := rfl
+-- `lam`/`fix` are values only when locally closed (`toVal?`/`check?` gate on `lcb`),
+-- so these carry the closedness hypothesis, which supplies both the `IsVal` witness and
+-- the `Val.lc` field. (`(IsVal.lam h).lc` is `h` definitionally, so this is `rfl` after
+-- reducing `check?`.)
+@[simp] theorem Exp.toVal?_lam (e : Exp rT) (h : (Exp.lam e).IsLocallyClosed) :
+    (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam h, h⟩ := by
+  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
 
-@[simp] theorem Exp.toVal?_fix (e : Exp rT) :
-    (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix⟩ := rfl
+@[simp] theorem Exp.toVal?_fix (e : Exp rT) (h : (Exp.fix e).IsLocallyClosed) :
+    (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix h, h⟩ := by
+  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
 
 macro "solve_not_red" : term =>
   `(Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w)
@@ -45,7 +54,7 @@ theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} : iprop%
     (∀ (l : Loc), appHeapFrag l v -∗ Φ (.loc l))
       ⊢@{IProp GF} tglWp E (.alloc (.ofVal v)) Φ := by
   iintro HΦ
-  iapply twp_lift_atomic_head_step solve_not_red
+  iapply twp_lift_atomic_head_step solve_not_red (by is_lc)
   iintro %σ₁ Hσ
   imodintro
   isplitr
@@ -67,7 +76,7 @@ theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} : iprop%
 theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} : iprop%
     (l ↦ v ∗ (l ↦ v -∗ Φ v)) ⊢@{IProp GF} tglWp E (.load (.lit (.loc l))) Φ := by
   iintro ⟨Hl, HΦ⟩
-  iapply twp_lift_atomic_head_step solve_not_red
+  iapply twp_lift_atomic_head_step solve_not_red (by is_lc)
   iintro %σ₁ Hσ
   ihave %hlook := app_state_lookup_heap $$ Hσ Hl
   imodintro
@@ -89,7 +98,7 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
     l ↦ v' ∗ (l ↦ v -∗ Φ .unit)
       ⊢@{IProp GF} tglWp E (.store (.lit (.loc l)) (.ofVal v)) Φ := by
   iintro ⟨Hl, HΦ⟩
-  iapply twp_lift_atomic_head_step solve_not_red
+  iapply twp_lift_atomic_head_step solve_not_red (by is_lc)
   iintro %σ₁ Hσ
   ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro
@@ -116,7 +125,7 @@ theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
     (∀ (l : Loc), l ↪ₐ (Tape.empty z) -∗ Φ (.lbl l))
       ⊢@{IProp GF} tglWp E (.tape (.lit (.int z))) Φ := by
   iintro HΦ
-  iapply twp_lift_atomic_head_step solve_not_red
+  iapply twp_lift_atomic_head_step solve_not_red (by is_lc)
   iintro %σ₁ Hσ
   imodintro
   isplitr
@@ -140,7 +149,7 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
     (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ Φ (.int n))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ := by
   iintro HΦ
-  iapply twp_lift_atomic_head_step solve_not_red
+  iapply twp_lift_atomic_head_step solve_not_red (by is_lc)
   iintro %σ₁ Hσ
   imodintro
   isplitr
@@ -163,7 +172,7 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : { z' : Int // 0 ≤ 
     (l ↪ₐ ⟨z, n :: ns⟩ ∗ (l ↪ₐ ⟨z, ns⟩ -∗ Φ (.int n.val)))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
-  iapply twp_lift_atomic_head_step solve_not_red
+  iapply twp_lift_atomic_head_step solve_not_red (by is_lc)
   iintro %σ₁ Hσ
   ihave %hlook := app_state_lookup_tape $$ Hσ Hl
   have Hzpos : 0 < z := _root_.lt_of_le_of_lt n.2.1 n.2.2
@@ -194,7 +203,7 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
     (l ↪ₐ ⟨z, []⟩ ∗ (∀ (n : Int), l ↪ₐ ⟨z, []⟩ -∗ (⌜0 ≤ n ∧ n < z⌝) -∗ Φ (.int n)))
       ⊢@{IProp GF} tglWp E (.rand (.lit (.int z)) (.lit (.lbl l))) Φ := by
   iintro ⟨Hl, HΦ⟩
-  iapply twp_lift_atomic_head_step solve_not_red
+  iapply twp_lift_atomic_head_step solve_not_red (by is_lc)
   iintro %σ₁ Hσ
   ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hl
   imodintro

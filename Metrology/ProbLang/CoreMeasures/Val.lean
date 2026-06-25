@@ -78,7 +78,7 @@ theorem _root_.ProbLang.Exp.ofVal.measurable {α : Type _} [MeasurableSpace α] 
 of `Sigma.fst : (Σ e, IsVal e) → Exp α` in the standard Sigma σ-alg on the source. -/
 @[fun_prop]
 theorem mk.measurable {α : Type _} [MeasurableSpace α] :
-    Measurable (fun (p : Σ e : Exp α, IsVal e) => (Val.mk p.1 p.2 : Val α)) := by
+    Measurable (fun (p : Σ e : Exp α, IsVal e) => (Val.mk p.1 p.2 p.2.lc : Val α)) := by
   intro T hT
   obtain ⟨U, hU, hUeq⟩ : ∃ U : Set (Exp α), MeasurableSet U ∧ Val.fst ⁻¹' U = T :=
     MeasurableSpace.measurableSet_comap.mp hT

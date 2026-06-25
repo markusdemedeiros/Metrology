@@ -299,10 +299,12 @@ theorem stepOrFinal_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) :
 theorem stepOrFinal.measurable [Inhabited rT] :
     Measurable (stepOrFinal : Cfg rT → Measure (Cfg rT)) := by
   have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
-    have : {ρ : Cfg rT | ρ.expr.isValue} = {ρ : Cfg rT | ρ.expr.isValueR} := by
-      ext ρ; exact Exp.isValue_iff_isValueR
+    -- `isValue` now also requires local closedness; `{isValue} = {isValueR} ∩ {lcb 0 = true}`.
+    have : {ρ : Cfg rT | ρ.expr.isValue}
+        = (fun ρ : Cfg rT => ρ.expr) ⁻¹' ({e | e.isValueR} ∩ {e | Exp.lcb 0 e = true}) := by
+      ext ρ; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff, Set.mem_preimage]
     rw [this]
-    exact (Exp.isValueR.measurable.comp Cfg.measurable_expr).setOf
+    exact Cfg.measurable_expr ((Exp.isValueR.measurable.setOf).inter Exp.lcb_zero.measurableSet)
   exact Measurable.ite hpred measurable_dirac primStep.measurable
 
 /-! ### Monotonicity (ported from `SampCert/SLang.lean`) -/

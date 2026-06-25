@@ -54,16 +54,20 @@ theorem measurableEmbedding_ofVal :
     MeasurableEmbedding (Exp.ofVal : Val rT → Exp rT) := by
   refine ⟨fun a b h => Val.ext h, Exp.ofVal.measurable, fun s hs => ?_⟩
   obtain ⟨U, hU, rfl⟩ := MeasurableSpace.measurableSet_comap.mp hs
-  have hrange : Set.range (Val.fst : Val rT → Exp rT) = {e : Exp rT | e.isValueR} := by
+  -- `Val` now carries local closedness, so the range of `Val.fst` is the set of *closed*
+  -- values (`isValue`), i.e. value-shaped **and** locally closed.
+  have hrange : Set.range (Val.fst : Val rT → Exp rT) = {e : Exp rT | e.isValue} := by
     ext e
     simp only [Set.mem_range, Set.mem_setOf_eq]
     constructor
-    · rintro ⟨v, rfl⟩; rw [← Exp.isValue_iff_isValueR]; exact Val.isValue v
-    · intro h
-      exact ⟨Val.mk e (IsVal.ofIsValue (Exp.isValue_iff_isValueR.mpr h)), rfl⟩
+    · rintro ⟨v, rfl⟩; exact Val.isValue v
+    · intro h; exact ⟨Val.mk e h.some h.some.lc, rfl⟩
   show MeasurableSet (Val.fst '' (Val.fst ⁻¹' U))
   rw [Set.image_preimage_eq_inter_range, hrange]
-  exact hU.inter Exp.isValueR.measurable.setOf
+  have hsplit : {e : Exp rT | e.isValue} = {e | e.isValueR} ∩ {e | Exp.lcb 0 e = true} := by
+    ext e; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff]
+  rw [hsplit]
+  exact hU.inter (Exp.isValueR.measurable.setOf.inter Exp.lcb_zero.measurableSet)
 
 /-- The pure post-condition, lifted to `Exp rT`, is a measurable set when
 `{v | φ v}` is — it is the image `Exp.ofVal '' {v | φ v}`. -/
