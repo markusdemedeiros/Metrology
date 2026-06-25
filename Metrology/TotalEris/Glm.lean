@@ -51,16 +51,6 @@ theorem zero_of_null (μ : MeasureTheory.Measure α) (Hnull : μ {x | ¬φ x} = 
   show μ {x | ¬ φ x} ≤ 0
   rw [Hnull]
 
-@[discrete]
-theorem zero_positive [Countable α] (μ : MeasureTheory.Measure α) :
-    Pgl 0 (fun a => 0 < μ {a}) μ := by
-  apply zero_of_null
-  have hset : {x : α | ¬ (0 < μ {x})} = {x | μ {x} = 0} := by
-    ext x; simp [pos_iff_ne_zero]
-  rw [hset]
-  refine ((MeasureTheory.measure_null_iff_singleton ?_).mpr (fun _ hx => hx))
-  exact Set.Countable.mono (Set.subset_univ _) Set.countable_univ
-
 theorem zero_possible [MeasurableSingletonClass α] {μ : MeasureTheory.Measure α}
     (h : IsAtomicSupport μ) : Pgl 0 (fun a => Possible a μ) μ := by
   show μ {x | ¬ Possible x μ} ≤ 0

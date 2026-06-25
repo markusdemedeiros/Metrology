@@ -343,15 +343,6 @@ theorem primStep_tape_persists_support
     -- Continuous sample leaves the state (hence all tapes) unchanged.
     exact ⟨t, h, rfl⟩
 
-/-- Discrete (positivity-phrased) wrapper around `primStep_tape_persists_support`. -/
-@[discrete]
-theorem Discrete.primStep_tape_persists_support [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {αloc : Loc} {e : (Exp rT)} {t : Tape} {ρ : (Cfg rT)}
-    (h : σ.tapes[αloc]? = some t)
-    (hρ : 0 < primStep ⟨e, σ⟩ {ρ}) :
-    ∃ t' : Tape, ρ.state.tapes[αloc]? = some t' ∧ t'.bound = t.bound :=
-  ProbLang.primStep_tape_persists_support h (possible_iff_pos.mpr hρ)
-
 /-- Tape persistence, a.e. form: the set of `ρ`s where tape `α` is either
 absent or has a different bound from `t` has measure 0 under `primStep ⟨e, σ⟩`.
 Derived from the support form via the fact that singletons outside the
@@ -428,12 +419,6 @@ theorem tapePresample_heap_eq
     obtain ⟨N, bs⟩ := t
     exact tapePresample_ae hsome (by measurability) fun _ => by simp [State.update_tapes]
 
-@[discrete]
-theorem Discrete.tapePresample_heap_eq [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α : Loc} :
-    ∀ᵐ σ' ∂(tapePresample σ α), σ'.heap = σ.heap :=
-  ProbLang.tapePresample_heap_eq
-
 /-- `tapePresample σ α` only touches tape `α`: for any other location
 `α_lbl ≠ α`, the lookup at `α_lbl` is a.e. unchanged. -/
 theorem tapePresample_tape_ne_ae
@@ -442,13 +427,6 @@ theorem tapePresample_tape_ne_ae
     ∀ᵐ σ' ∂(tapePresample σ α), σ'.tapes[α_lbl]? = σ.tapes[α_lbl]? := by
   obtain ⟨N, bs⟩ := t
   exact tapePresample_ae h (by measurability) fun _ => State.upd_diff_tape_tot hne
-
-@[discrete]
-theorem Discrete.tapePresample_tape_ne_ae [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α α_lbl : Loc} {t : Tape}
-    (h : σ.tapes[α]? = some t) (hne : α_lbl ≠ α) :
-    ∀ᵐ σ' ∂(tapePresample σ α), σ'.tapes[α_lbl]? = σ.tapes[α_lbl]? :=
-  ProbLang.tapePresample_tape_ne_ae h hne
 
 /-- **Heap-pull helper for tape-presample binds.**
 
@@ -530,13 +508,6 @@ theorem tapePresample_update_heap_comm
     -- (σ.update_heap f).update_tapes _ = (σ.update_tapes _).update_heap f
     simp [State.update_tapes, State.update_heap]
 
-@[discrete]
-theorem Discrete.tapePresample_update_heap_comm [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α : Loc} (f : Std.ExtTreeMap Loc (Val rT) compare → Std.ExtTreeMap Loc (Val rT) compare) :
-    tapePresample (σ.update_heap f) α =
-      (tapePresample σ α).map (·.update_heap f) :=
-  ProbLang.tapePresample_update_heap_comm f Measurable.of_discrete
-
 /-- Tape updates at keys other than `α` commute with tape presampling.
 `tapePresample (σ.update_tapes f) α = (tapePresample σ α).map (·.update_tapes f)`,
 provided `f` only modifies keys other than `α` in the sense that
@@ -573,13 +544,6 @@ theorem tapePresample_update_tapes_ne_comm
             (·.update_tapes (·.insert β v)) from by
       rw [Measure.map_dirac]; congr 1; exact State.upd_diff_tape_comm (Ne.symm hne)]
 
-@[discrete]
-theorem Discrete.tapePresample_update_tapes_ne_comm [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α β : Loc} {v : Tape} (hne : β ≠ α) :
-    tapePresample (σ.update_tapes (·.insert β v)) α =
-      (tapePresample σ α).map (·.update_tapes (·.insert β v)) :=
-  ProbLang.tapePresample_update_tapes_ne_comm hne
-
 /-- Lintegral over `tapePresample σ α` unfolds to a lintegral over
 `tapeIndexUniform N` against the presampled-state integrand. Combines the
 unfolding of `tapePresample` with `lintegral_bind` + `lintegral_dirac'` so
@@ -600,15 +564,6 @@ theorem tapePresample_lintegral
   rw [lintegral_bind hker hf.aemeasurable]
   simp_rw [lintegral_dirac]
 
-@[discrete]
-theorem Discrete.tapePresample_lintegral [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α : Loc} {N : Int}
-    {bs : List { z : Int // 0 ≤ z ∧ z < N }}
-    (h : σ.tapes[α]? = some ⟨N, bs⟩) (f : (State rT) → ENNReal) :
-    ∫⁻ σ', f σ' ∂tapePresample σ α
-      = ∫⁻ n, f (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)) ∂tapeIndexUniform N :=
-  ProbLang.tapePresample_lintegral h f Measurable.of_discrete
-
 /-- Lintegral form of `tapePresample_update_heap_comm`: integrating a
 state-dependent integrand `f` against `tapePresample σ α` after a heap
 update is the same as integrating `f` against `tapePresample` on the
@@ -626,15 +581,6 @@ theorem tapePresample_lintegral_update_heap
   rw [tapePresample_update_heap_comm g hg,
       lintegral_map hf hmap]
 
-@[discrete]
-theorem Discrete.tapePresample_lintegral_update_heap [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α : Loc}
-    (g : Std.ExtTreeMap Loc (Val rT) compare → Std.ExtTreeMap Loc (Val rT) compare)
-    (f : (State rT) → ENNReal) :
-    ∫⁻ σ', f (σ'.update_heap g) ∂tapePresample σ α
-      = ∫⁻ τ, f τ ∂tapePresample (σ.update_heap g) α :=
-  ProbLang.tapePresample_lintegral_update_heap g Measurable.of_discrete f Measurable.of_discrete
-
 /-- Lintegral form of `tapePresample_update_tapes_ne_comm`. -/
 theorem tapePresample_lintegral_update_tapes_ne
     {σ : (State rT)} {α β : Loc} {v : Tape} (hne : β ≠ α)
@@ -647,14 +593,6 @@ theorem tapePresample_lintegral_update_tapes_ne
     State.measurable_iff.mpr ⟨State.measurable_heap, hins.comp State.measurable_tapes⟩
   rw [tapePresample_update_tapes_ne_comm hne,
       lintegral_map hf hmap]
-
-@[discrete]
-theorem Discrete.tapePresample_lintegral_update_tapes_ne [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α β : Loc} {v : Tape} (hne : β ≠ α)
-    (f : (State rT) → ENNReal) :
-    ∫⁻ σ', f (σ'.update_tapes (·.insert β v)) ∂tapePresample σ α
-      = ∫⁻ τ, f τ ∂tapePresample (σ.update_tapes (·.insert β v)) α :=
-  ProbLang.tapePresample_lintegral_update_tapes_ne hne f Measurable.of_discrete
 
 /-- `Cfg.uniform` as a bind over a PMF measure, with explicit state fiber. -/
 theorem Cfg.uniform_eq_bind {z : Int} {σ : (State rT)} (hz : 0 < z) :
@@ -778,15 +716,6 @@ theorem tapePresample_bind_cfgUniform_comm
             (fun σ'' => Measure.dirac (⟨ρ'.expr, σ''⟩ : (Cfg rT))))
           hk2]
 
-@[discrete]
-theorem Discrete.tapePresample_bind_cfgUniform_comm [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α : Loc} (z : Int) :
-    (tapePresample σ α).bind (fun σ' => Cfg.uniform z σ') =
-      (Cfg.uniform z σ).bind (fun ρ' =>
-        (tapePresample ρ'.state α).bind
-          (fun σ'' => Measure.dirac (⟨ρ'.expr, σ''⟩ : (Cfg rT)))) :=
-  ProbLang.tapePresample_bind_cfgUniform_comm z
-
 /-! ## Core: presampling is invisible to `execN` at the expression level
 
 The honest statement — the one we can actually prove in our port — is that
@@ -855,15 +784,6 @@ theorem tapeIndexUniform_lintegral_eq_cfg_uniform
       rwa [PMF.mem_support_uniformOfFinset_iff] at ha
     have hab : 0 ≤ a ∧ a < N := Finset.mem_Ico.mp hmem
     simp [dif_pos hab]
-
-@[discrete]
-theorem Discrete.tapeIndexUniform_lintegral_eq_cfg_uniform [Countable rT] [MeasurableSingletonClass rT]
-    {N : Int} (hN : 0 < N) (σ : (State rT))
-    (f : (Cfg rT) → ENNReal) :
-    ∫⁻ (a : { z : Int // 0 ≤ z ∧ z < N }),
-        f ⟨.lit (.int ↑a), σ⟩ ∂tapeIndexUniform N
-      = ∫⁻ (ρ : (Cfg rT)), f ρ ∂Cfg.uniform N σ :=
-  ProbLang.tapeIndexUniform_lintegral_eq_cfg_uniform hN σ f Measurable.of_discrete
 
 /-! ## Case-closing helpers for the main erasure induction
 
@@ -1879,14 +1799,6 @@ theorem limExec_tape_presample_expr_eq
           = (execN n ⟨e, σ'⟩) ((·.expr) ⁻¹' S)
       from fun σ' => lintegral_indicator_one (Cfg.measurable_expr hS)]
   exact hval
-
-@[discrete]
-theorem Discrete.limExec_tape_presample_expr_eq [Countable rT] [MeasurableSingletonClass rT]
-    {σ : (State rT)} {α : Loc} {t : Tape} {e : (Exp rT)}
-    (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
-    asExpr ((tapePresample σ α).bind (fun σ' => limExec ⟨e, σ'⟩)) =
-      limExecV ⟨e, σ⟩ :=
-  ProbLang.limExec_tape_presample_expr_eq h hN
 
 /-! ## `ErasableExpr`: the weak erasability notion
 

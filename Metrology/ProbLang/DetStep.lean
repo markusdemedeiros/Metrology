@@ -62,14 +62,6 @@ structure PureHeadStep (e1 e2 : Exp rT) : Prop where
   dec  : e1.decompItem = none
 
 -- PureHeadStep.toPureStep
-@[discrete]
-theorem PureHeadStep_discrete.toPureStep {e1 e2 : Exp rT} (h : PureHeadStep_discrete e1 e2) :
-   PureStep_discrete e1 e2 :=
-  ⟨fun σ =>
-    let ⟨ρ, hρ⟩ := h.safe σ
-    ⟨ρ, primStep_eq_headStep h.dec ▸ hρ⟩,
-   fun σ => primStep_eq_headStep h.dec ▸ h.det σ⟩
-
 theorem PureHeadStep.toPureStep {e1 e2 : Exp rT} (h : PureHeadStep e1 e2) :
    PureStep e1 e2 :=
   ⟨fun σ => by rw [Reducible, primStep_eq_headStep h.dec]; exact h.safe σ,
@@ -131,13 +123,6 @@ theorem PureExec.fill (K : Ectx rT) {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
   pure_exec hφ := PureStep.fill_nsteps K (h.pure_exec hφ)
 
 -- PureExec.reducible
-@[discrete]
-theorem PureExec_discrete.reducible {σ : State rT} {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
-    (hφ : φ) [h : PureExec_discrete φ (n + 1) e1 e2] :
-    Discrete.Reducible e1 σ := by
-  obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
-  exact hstep.safe σ
-
 theorem PureExec.reducible {σ : State rT} {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     Reducible e1 σ := by
@@ -145,14 +130,6 @@ theorem PureExec.reducible {σ : State rT} {φ : Prop} {n : ℕ} {e1 e2 : Exp rT
   exact hstep.safe σ
 
 -- PureExec.not_val
-@[discrete]
-theorem PureExec_discrete.not_val [Countable rT] [MeasurableSingletonClass rT] {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
-    (hφ : φ) [h : PureExec_discrete φ (n + 1) e1 e2] :
-    ¬e1.isValue := by
-  obtain ⟨_, hstep, _⟩ := h.pure_exec hφ
-  obtain ⟨ρ, hρ⟩ := hstep.safe default
-  exact val_stuck (fun hz => by rw [hz] at hρ; simp at hρ)
-
 theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
     (hφ : φ) [h : PureExec φ (n + 1) e1 e2] :
     ¬e1.isValue := by
@@ -160,20 +137,6 @@ theorem PureExec.not_val {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
   exact val_stuck (hstep.safe default)
 
 -- rtc_pure_step_val
-@[discrete]
-theorem rtc_pure_step_val_discrete [Countable rT] [MeasurableSingletonClass rT] {n : ℕ} {v : Val rT} {e : Exp rT}
-    (h : nsteps PureStep_discrete n v.1 e) :
-    e.toVal? = some v := by
-  induction n generalizing e with
-  | zero =>
-    simp [nsteps] at h
-    subst h
-    exact Exp.toVal?_ofVal v
-  | succ n ih =>
-    obtain ⟨c, hstep, hrest⟩ := h
-    obtain ⟨ρ, hρ⟩ := hstep.safe default
-    exact absurd v.2.toIsValue (val_stuck (fun hz => by rw [hz] at hρ; simp at hρ))
-
 theorem rtc_pure_step_val {n : ℕ} {v : Val rT} {e : Exp rT}
     (h : nsteps PureStep n v.1 e) :
     e.toVal? = some v := by
@@ -186,24 +149,7 @@ theorem rtc_pure_step_val {n : ℕ} {v : Val rT} {e : Exp rT}
     obtain ⟨c, hstep, hrest⟩ := h
     exact absurd v.2.toIsValue (val_stuck (hstep.safe default))
 
-@[discrete]
-theorem as_val_isSome_discrete {e : Exp α} (h : ∃ v : Val α, v.1 = e) : e.isValue := by
-  obtain ⟨⟨_, hv⟩, rfl⟩ := h
-  exact hv.toIsValue
-
-
 -- PureHeadStep.of_det
-/-- Build a `PureHeadStep_discrete e1 e2` from a proof that `headStep` always maps
-    omit [Countable rT] [MeasurableSingletonClass rT] in
-    `⟨e1, σ⟩` to `dirac ⟨e2, σ⟩`. The `safe` field is derived automatically. -/
-@[discrete]
-theorem PureHeadStep_discrete.of_det (e1 e2 : Exp rT)
-    (hdec : e1.decompItem = none)
-    (hdet : ∀ σ, headStep ⟨e1, σ⟩ {⟨e2, σ⟩} = 1) :
-    PureHeadStep_discrete e1 e2 := by
-  refine ⟨fun σ => ⟨⟨e2, σ⟩, ?_⟩, hdet, hdec⟩
-  have h1 := hdet σ; positivity
-
 /-- Build a `PureHeadStep e1 e2` from a proof that `headStep` always maps `⟨e1, σ⟩`
 to `dirac ⟨e2, σ⟩`. The `safe` field is derived automatically. -/
 theorem PureHeadStep.of_det (e1 e2 : Exp rT)
@@ -212,12 +158,6 @@ theorem PureHeadStep.of_det (e1 e2 : Exp rT)
     PureHeadStep e1 e2 := by
   refine ⟨fun σ => ?_, hdet, hdec⟩
   unfold HeadReducible; rw [hdet σ]; simp
-
-/-- One step followed by n steps gives n+1 steps. -/
-@[discrete]
-theorem nsteps_succ_intro_discrete {r : α → α → Prop} {n : ℕ} {a c b : α}
-    (h1 : r a c) (h2 : nsteps r n c b) : nsteps r (n + 1) a b :=
-  ⟨c, h1, h2⟩
 
 -- DetHeadStep
 /-- A single deterministic head step at a fixed state `σ`.
@@ -354,15 +294,6 @@ theorem DetHeadStep.cond_false (et ef : Exp rT) (σ : State rT) :
   .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool false) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, hd]) (by simp [headStep])
 
 -- DetHeadStep.app_lam
-@[discrete]
-theorem DetHeadStep_discrete.app_lam {body v : Exp rT}
-    (hlam : (Exp.lam body).IsLocallyClosed) (hv : IsVal v) (σ : State rT) :
-    DetHeadStep_discrete ⟨.app (.lam body) v, σ⟩ ⟨Exp.open' body v, σ⟩ :=
-  .of_det_discrete _ _ (by
-    obtain ⟨_, ha⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue)
-    obtain ⟨_, hb⟩ := Exp.toVal?_eq_some_of_isValue (⟨.lam hlam⟩ : (Exp.lam body).isValue)
-    simp [Exp.decompItem, ha, hb]) (by simp [headStep, Exp.isValM_some' hv])
-
 theorem DetHeadStep.app_lam {body v : Exp rT}
     (hlam : (Exp.lam body).IsLocallyClosed) (hv : IsVal v) (σ : State rT) :
     DetHeadStep ⟨.app (.lam body) v, σ⟩ ⟨Exp.open' body v, σ⟩ :=
@@ -372,16 +303,6 @@ theorem DetHeadStep.app_lam {body v : Exp rT}
     simp [Exp.decompItem, ha, hb]) (by simp [headStep, Exp.isValM_some' hv])
 
 -- PureHeadStep.app_lam
-/-- `PureHeadStep_discrete` for `(λ. body) v` when `v` is a value. -/
-@[discrete]
-theorem PureHeadStep_discrete.app_lam {body v : Exp rT}
-    (hlam : (Exp.lam body).IsLocallyClosed) (hv : IsVal v) :
-    PureHeadStep_discrete (.app (.lam body) v) (Exp.open' body v) :=
-  .of_det _ _ (by
-    obtain ⟨_, h1⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue)
-    obtain ⟨_, h2⟩ := Exp.toVal?_eq_some_of_isValue (⟨.lam hlam⟩ : (Exp.lam body).isValue)
-    simp [Exp.decompItem, h1, h2]) fun σ => by simp [headStep, Exp.isValM_some' hv]
-
 /-- `PureHeadStep` for `(λ. body) v` when `v` is a value and the lambda is closed. -/
 theorem PureHeadStep.app_lam {body v : Exp rT}
     (hlam : (Exp.lam body).IsLocallyClosed) (hv : IsVal v) :
@@ -391,14 +312,6 @@ theorem PureHeadStep.app_lam {body v : Exp rT}
     obtain ⟨_, h2⟩ := Exp.toVal?_eq_some_of_isValue (⟨.lam hlam⟩ : (Exp.lam body).isValue)
     simp [Exp.decompItem, h1, h2]) fun σ => by simp [headStep, Exp.isValM_some' hv]
 
-/-- `PureExec_discrete` instance: `(λ. body) v` beta-reduces in 1 step when `v` is a value
-and the lambda is locally closed. -/
-@[discrete]
-instance pureExec_app_lam_discrete {body v : Exp rT} :
-    PureExec_discrete (v.isValue ∧ (Exp.lam body).IsLocallyClosed) 1
-      (.app (.lam body) v) (Exp.open' body v) where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.app_lam h.2 h.1.some).toPureStep, rfl⟩
-
 /-- `PureExec` instance: `(λ. body) v` beta-reduces in 1 step when `v` is a value
 and the lambda is locally closed. -/
 instance pureExec_app_lam {body v : Exp rT} :
@@ -407,139 +320,66 @@ instance pureExec_app_lam {body v : Exp rT} :
   pure_exec h := ⟨_, (PureHeadStep.app_lam h.2 h.1.some).toPureStep, rfl⟩
 
 -- PureHeadStep.cond_true
-/-- `PureHeadStep_discrete` for `if true then et else ef → et`. -/
-@[discrete]
-theorem PureHeadStep_discrete.cond_true (et ef : Exp rT) :
-    PureHeadStep_discrete (.cond (.lit (.bool true)) et ef) et :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool true) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, h]) fun σ => by simp [headStep]
-
 /-- `PureHeadStep` for `if true then et else ef → et`. -/
 theorem PureHeadStep.cond_true (et ef : Exp rT) :
     PureHeadStep (.cond (.lit (.bool true)) et ef) et :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool true) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, h]) fun σ => by simp [headStep]
 
 -- PureHeadStep.cond_false
-/-- `PureHeadStep_discrete` for `if false then et else ef → ef`. -/
-@[discrete]
-theorem PureHeadStep_discrete.cond_false (et ef : Exp rT) :
-    PureHeadStep_discrete (.cond (.lit (.bool false)) et ef) ef :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool false) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, h]) fun σ => by simp [headStep]
-
 /-- `PureHeadStep` for `if false then et else ef → ef`. -/
 theorem PureHeadStep.cond_false (et ef : Exp rT) :
     PureHeadStep (.cond (.lit (.bool false)) et ef) ef :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool false) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, h]) fun σ => by simp [headStep]
 
-@[discrete]
-instance pureExec_cond_true_discrete {et ef : Exp rT} :
-    PureExec_discrete True 1 (.cond (.lit (.bool true)) et ef) et where
-  pure_exec _ := ⟨_, (PureHeadStep_discrete.cond_true et ef).toPureStep, rfl⟩
-
 instance pureExec_cond_true {et ef : Exp rT} :
     PureExec True 1 (.cond (.lit (.bool true)) et ef) et where
   pure_exec _ := ⟨_, (PureHeadStep.cond_true et ef).toPureStep, rfl⟩
-
-@[discrete]
-instance pureExec_cond_false_discrete {et ef : Exp rT} :
-    PureExec_discrete True 1 (.cond (.lit (.bool false)) et ef) ef where
-  pure_exec _ := ⟨_, (PureHeadStep_discrete.cond_false et ef).toPureStep, rfl⟩
 
 instance pureExec_cond_false {et ef : Exp rT} :
     PureExec True 1 (.cond (.lit (.bool false)) et ef) ef where
   pure_exec _ := ⟨_, (PureHeadStep.cond_false et ef).toPureStep, rfl⟩
 
 -- PureHeadStep.fst_pair
-/-- `PureHeadStep_discrete` for `fst (v1, v2) → v1` when both are values. -/
-@[discrete]
-theorem PureHeadStep_discrete.fst_pair {e1 e2 : Exp rT} (h1 : IsVal e1) (h2 : IsVal e2) :
-    PureHeadStep_discrete (.fst (.pair e1 e2)) e1 :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.pair h1 h2⟩ : (Exp.pair e1 e2).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2]
-
 /-- `PureHeadStep` for `fst (v1, v2) → v1` when both are values. -/
 theorem PureHeadStep.fst_pair {e1 e2 : Exp rT} (h1 : IsVal e1) (h2 : IsVal e2) :
     PureHeadStep (.fst (.pair e1 e2)) e1 :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.pair h1 h2⟩ : (Exp.pair e1 e2).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2]
 
 -- PureHeadStep.snd_pair
-/-- `PureHeadStep_discrete` for `snd (v1, v2) → v2`. -/
-@[discrete]
-theorem PureHeadStep_discrete.snd_pair {e1 e2 : Exp rT} (h1 : IsVal e1) (h2 : IsVal e2) :
-    PureHeadStep_discrete (.snd (.pair e1 e2)) e2 :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.pair h1 h2⟩ : (Exp.pair e1 e2).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2]
-
 /-- `PureHeadStep` for `snd (v1, v2) → v2`. -/
 theorem PureHeadStep.snd_pair {e1 e2 : Exp rT} (h1 : IsVal e1) (h2 : IsVal e2) :
     PureHeadStep (.snd (.pair e1 e2)) e2 :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.pair h1 h2⟩ : (Exp.pair e1 e2).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2]
 
-@[discrete]
-instance pureExec_fst_pair_discrete {e1 e2 : Exp rT} :
-    PureExec_discrete (e1.isValue ∧ e2.isValue) 1 (.fst (.pair e1 e2)) e1 where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.fst_pair h.1.some h.2.some).toPureStep, rfl⟩
-
 instance pureExec_fst_pair {e1 e2 : Exp rT} :
     PureExec (e1.isValue ∧ e2.isValue) 1 (.fst (.pair e1 e2)) e1 where
   pure_exec h := ⟨_, (PureHeadStep.fst_pair h.1.some h.2.some).toPureStep, rfl⟩
-
-@[discrete]
-instance pureExec_snd_pair_discrete {e1 e2 : Exp rT} :
-    PureExec_discrete (e1.isValue ∧ e2.isValue) 1 (.snd (.pair e1 e2)) e2 where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.snd_pair h.1.some h.2.some).toPureStep, rfl⟩
 
 instance pureExec_snd_pair {e1 e2 : Exp rT} :
     PureExec (e1.isValue ∧ e2.isValue) 1 (.snd (.pair e1 e2)) e2 where
   pure_exec h := ⟨_, (PureHeadStep.snd_pair h.1.some h.2.some).toPureStep, rfl⟩
 
 -- PureHeadStep.case_inl
-/-- `PureHeadStep_discrete` for `case (inl v) el er → el v`. -/
-@[discrete]
-theorem PureHeadStep_discrete.case_inl {v el er : Exp rT} (hv : IsVal v) :
-    PureHeadStep_discrete (.case (.inl v) el er) (el.app v) :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.inl hv⟩ : (Exp.inl v).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv]
-
 /-- `PureHeadStep` for `case (inl v) el er → el v`. -/
 theorem PureHeadStep.case_inl {v el er : Exp rT} (hv : IsVal v) :
     PureHeadStep (.case (.inl v) el er) (el.app v) :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.inl hv⟩ : (Exp.inl v).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv]
 
 -- PureHeadStep.case_inr
-@[discrete]
-theorem PureHeadStep_discrete.case_inr {v el er : Exp rT} (hv : IsVal v) :
-    PureHeadStep_discrete (.case (.inr v) el er) (er.app v) :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.inr hv⟩ : (Exp.inr v).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv]
-
 /-- `PureHeadStep` for `case (inr v) el er → er v`. -/
 theorem PureHeadStep.case_inr {v el er : Exp rT} (hv : IsVal v) :
     PureHeadStep (.case (.inr v) el er) (er.app v) :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨.inr hv⟩ : (Exp.inr v).isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv]
 
-@[discrete]
-instance pureExec_case_inl_discrete {v el er : Exp rT} :
-    PureExec_discrete v.isValue 1 (.case (.inl v) el er) (el.app v) where
-  pure_exec hv := ⟨_, (PureHeadStep_discrete.case_inl hv.some).toPureStep, rfl⟩
-
 instance pureExec_case_inl {v el er : Exp rT} :
     PureExec v.isValue 1 (.case (.inl v) el er) (el.app v) where
   pure_exec hv := ⟨_, (PureHeadStep.case_inl hv.some).toPureStep, rfl⟩
-
-@[discrete]
-instance pureExec_case_inr_discrete {v el er : Exp rT} :
-    PureExec_discrete v.isValue 1 (.case (.inr v) el er) (er.app v) where
-  pure_exec hv := ⟨_, (PureHeadStep_discrete.case_inr hv.some).toPureStep, rfl⟩
 
 instance pureExec_case_inr {v el er : Exp rT} :
     PureExec v.isValue 1 (.case (.inr v) el er) (er.app v) where
   pure_exec hv := ⟨_, (PureHeadStep.case_inr hv.some).toPureStep, rfl⟩
 
 -- PureHeadStep.binop
-/-- `PureHeadStep_discrete` for `binop op v1 v2 → r` when both are values and eval succeeds. -/
-@[discrete]
-theorem PureHeadStep_discrete.binop {op : BinOp} {e1 e2 r : Exp rT}
-    (h1 : IsVal e1) (h2 : IsVal e2) (heval : op.eval e1 e2 = some r) :
-    PureHeadStep_discrete (.binop op e1 e2) r :=
-  .of_det _ _ (by obtain ⟨_, hb1⟩ := Exp.toVal?_eq_some_of_isValue (⟨h1⟩ : e1.isValue); obtain ⟨_, hb2⟩ := Exp.toVal?_eq_some_of_isValue (⟨h2⟩ : e2.isValue); simp [Exp.decompItem, hb1, hb2]) fun σ => by
-    simp [headStep, Option.unwrapM, Exp.isValM_some' h1, Exp.isValM_some' h2, heval]
-
 /-- `PureHeadStep` for `binop op v1 v2 → r` when both are values and eval succeeds. -/
 theorem PureHeadStep.binop {op : BinOp} {e1 e2 r : Exp rT}
     (h1 : IsVal e1) (h2 : IsVal e2) (heval : op.eval e1 e2 = some r) :
@@ -547,26 +387,12 @@ theorem PureHeadStep.binop {op : BinOp} {e1 e2 r : Exp rT}
   .of_det _ _ (by obtain ⟨_, hb1⟩ := Exp.toVal?_eq_some_of_isValue (⟨h1⟩ : e1.isValue); obtain ⟨_, hb2⟩ := Exp.toVal?_eq_some_of_isValue (⟨h2⟩ : e2.isValue); simp [Exp.decompItem, hb1, hb2]) fun σ => by
     simp [headStep, Option.unwrapM, Exp.isValM_some' h1, Exp.isValM_some' h2, heval]
 
-@[discrete]
-instance pureExec_binop_discrete {op : BinOp} {e1 e2 r : Exp rT} :
-    PureExec_discrete (e1.isValue ∧ e2.isValue ∧ op.eval e1 e2 = some r) 1
-      (.binop op e1 e2) r where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.binop h.1.some h.2.1.some h.2.2).toPureStep, rfl⟩
-
 instance pureExec_binop {op : BinOp} {e1 e2 r : Exp rT} :
     PureExec (e1.isValue ∧ e2.isValue ∧ op.eval e1 e2 = some r) 1
       (.binop op e1 e2) r where
   pure_exec h := ⟨_, (PureHeadStep.binop h.1.some h.2.1.some h.2.2).toPureStep, rfl⟩
 
 -- PureHeadStep.unop
-/-- `PureHeadStep_discrete` for `unop op v → r`. -/
-@[discrete]
-theorem PureHeadStep_discrete.unop {op : UnOp} {e r : Exp rT}
-    (hv : IsVal e) (heval : op.eval e = some r) :
-    PureHeadStep_discrete (.unop op e) r :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : e.isValue); simp [Exp.decompItem, h]) fun σ => by
-    simp [headStep, Option.unwrapM, Exp.isValM_some' hv, heval]
-
 /-- `PureHeadStep` for `unop op v → r`. -/
 theorem PureHeadStep.unop {op : UnOp} {e r : Exp rT}
     (hv : IsVal e) (heval : op.eval e = some r) :
@@ -574,26 +400,11 @@ theorem PureHeadStep.unop {op : UnOp} {e r : Exp rT}
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : e.isValue); simp [Exp.decompItem, h]) fun σ => by
     simp [headStep, Option.unwrapM, Exp.isValM_some' hv, heval]
 
-@[discrete]
-instance pureExec_unop_discrete {op : UnOp} {e r : Exp rT} :
-    PureExec_discrete (e.isValue ∧ op.eval e = some r) 1 (.unop op e) r where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.unop h.1.some h.2).toPureStep, rfl⟩
-
 instance pureExec_unop {op : UnOp} {e r : Exp rT} :
     PureExec (e.isValue ∧ op.eval e = some r) 1 (.unop op e) r where
   pure_exec h := ⟨_, (PureHeadStep.unop h.1.some h.2).toPureStep, rfl⟩
 
 -- PureHeadStep.app_fix
-/-- `PureHeadStep_discrete` for `(fix body) v → (open' body (fix body)) v`. -/
-@[discrete]
-theorem PureHeadStep_discrete.app_fix {body v : Exp rT}
-    (hfix : (Exp.fix body).IsLocallyClosed) (hv : IsVal v) :
-    PureHeadStep_discrete (.app (.fix body) v) (Exp.app (Exp.open' body (.fix body)) v) :=
-  .of_det _ _ (by
-    obtain ⟨_, h1⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue)
-    obtain ⟨_, h2⟩ := Exp.toVal?_eq_some_of_isValue (⟨.fix hfix⟩ : (Exp.fix body).isValue)
-    simp [Exp.decompItem, h1, h2]) fun σ => by simp [headStep, Exp.isValM_some' hv]
-
 /-- `PureHeadStep` for `(fix body) v → (open' body (fix body)) v` when `v` is a value
 and the fixpoint is closed. -/
 theorem PureHeadStep.app_fix {body v : Exp rT}
@@ -604,25 +415,12 @@ theorem PureHeadStep.app_fix {body v : Exp rT}
     obtain ⟨_, h2⟩ := Exp.toVal?_eq_some_of_isValue (⟨.fix hfix⟩ : (Exp.fix body).isValue)
     simp [Exp.decompItem, h1, h2]) fun σ => by simp [headStep, Exp.isValM_some' hv]
 
-@[discrete]
-instance pureExec_app_fix_discrete {body v : Exp rT} :
-    PureExec_discrete (v.isValue ∧ (Exp.fix body).IsLocallyClosed) 1
-      (.app (.fix body) v) (Exp.app (Exp.open' body (.fix body)) v) where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.app_fix h.2 h.1.some).toPureStep, rfl⟩
-
 instance pureExec_app_fix {body v : Exp rT} :
     PureExec (v.isValue ∧ (Exp.fix body).IsLocallyClosed) 1
       (.app (.fix body) v) (Exp.app (Exp.open' body (.fix body)) v) where
   pure_exec h := ⟨_, (PureHeadStep.app_fix h.2 h.1.some).toPureStep, rfl⟩
 
 -- PureHeadStep.scrut_some
-/-- `PureHeadStep_discrete` for `scrut v p` when match succeeds. -/
-@[discrete]
-theorem PureHeadStep_discrete.scrut_some {v : Exp rT} {p : Pat rT} {b : Exp rT}
-    (hv : IsVal v) (hmatch : Pat.tryMatch p v = some b) :
-    PureHeadStep_discrete (.scrut v p) (.inl b) :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv, hmatch]
-
 /-- `PureHeadStep` for `scrut v p` when match succeeds. -/
 theorem PureHeadStep.scrut_some {v : Exp rT} {p : Pat rT} {b : Exp rT}
     (hv : IsVal v) (hmatch : Pat.tryMatch p v = some b) :
@@ -630,48 +428,21 @@ theorem PureHeadStep.scrut_some {v : Exp rT} {p : Pat rT} {b : Exp rT}
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv, hmatch]
 
 -- PureHeadStep.scrut_none
-/-- `PureHeadStep_discrete` for `scrut v p` when match fails. -/
-@[discrete]
-theorem PureHeadStep_discrete.scrut_none {v : Exp rT} {p : Pat rT}
-    (hv : IsVal v) (hmatch : Pat.tryMatch p v = none) :
-    PureHeadStep_discrete (.scrut v p) (.inr (.lit .unit)) :=
-  .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv, hmatch]
-
 /-- `PureHeadStep` for `scrut v p` when match fails. -/
 theorem PureHeadStep.scrut_none {v : Exp rT} {p : Pat rT}
     (hv : IsVal v) (hmatch : Pat.tryMatch p v = none) :
     PureHeadStep (.scrut v p) (.inr (.lit .unit)) :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv, hmatch]
 
-@[discrete]
-instance pureExec_scrut_some_discrete {v : Exp rT} {p : Pat rT} {b : Exp rT} :
-    PureExec_discrete (v.isValue ∧ Pat.tryMatch p v = some b) 1 (.scrut v p) (.inl b) where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.scrut_some h.1.some h.2).toPureStep, rfl⟩
-
 instance pureExec_scrut_some {v : Exp rT} {p : Pat rT} {b : Exp rT} :
     PureExec (v.isValue ∧ Pat.tryMatch p v = some b) 1 (.scrut v p) (.inl b) where
   pure_exec h := ⟨_, (PureHeadStep.scrut_some h.1.some h.2).toPureStep, rfl⟩
-
-@[discrete]
-instance pureExec_scrut_none_discrete {v : Exp rT} {p : Pat rT} :
-    PureExec_discrete (v.isValue ∧ Pat.tryMatch p v = none) 1 (.scrut v p) (.inr (.lit .unit)) where
-  pure_exec h := ⟨_, (PureHeadStep_discrete.scrut_none h.1.some h.2).toPureStep, rfl⟩
 
 instance pureExec_scrut_none {v : Exp rT} {p : Pat rT} :
     PureExec (v.isValue ∧ Pat.tryMatch p v = none) 1 (.scrut v p) (.inr (.lit .unit)) where
   pure_exec h := ⟨_, (PureHeadStep.scrut_none h.1.some h.2).toPureStep, rfl⟩
 
 -- DetHeadStep.app_fix
-@[discrete]
-theorem DetHeadStep_discrete.app_fix {body v : Exp rT}
-    (hfix : (Exp.fix body).IsLocallyClosed) (hv : IsVal v) (σ : State rT) :
-    DetHeadStep_discrete ⟨.app (.fix body) v, σ⟩
-      ⟨Exp.app (Exp.open' body (.fix body)) v, σ⟩ :=
-  .of_det_discrete _ _ (by
-    obtain ⟨_, ha⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue)
-    obtain ⟨_, hb⟩ := Exp.toVal?_eq_some_of_isValue (⟨.fix hfix⟩ : (Exp.fix body).isValue)
-    simp [Exp.decompItem, ha, hb]) (by simp [headStep, Exp.isValM_some' hv])
-
 theorem DetHeadStep.app_fix {body v : Exp rT}
     (hfix : (Exp.fix body).IsLocallyClosed) (hv : IsVal v) (σ : State rT) :
     DetHeadStep ⟨.app (.fix body) v, σ⟩

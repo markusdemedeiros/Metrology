@@ -85,29 +85,6 @@ theorem dret' (σ : State rT) : Erasable (Measure.dirac σ) σ := by
   intro e m
   rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) (by measurability)]
 
-/-- Erasable distributions compose under `bind`. If `μ₁` is erasable at `σ`
-and `μ₂ σ'` is erasable at `σ'` for every `σ'` in the support of `μ₁`,
-then `μ₁ >>= μ₂` is erasable at `σ`.
-
-Clutch's proof has a support-conditional hypothesis (`μ₁ σ' > 0`). For
-measures we strengthen it to an unconditional hypothesis; the
-conditional form follows because any kernel can be modified on a null
-set without changing the bind. -/
-@[discrete] -- dbind'
-theorem dbind [Countable rT] [MeasurableSingletonClass rT]
-    {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
-    (h₁ : Erasable μ₁ σ) (h₂ : ∀ σ', Erasable (μ₂ σ') σ') :
-    Erasable (μ₁.bind μ₂) σ := by
-  intro e m
-  rw [Measure.bind_bind
-        (Measurable.aemeasurable .of_discrete)
-        (Measurable.aemeasurable .of_discrete)]
-  conv_lhs =>
-    rw [show (fun σ' => (μ₂ σ').bind (fun σ'' => execN m ⟨e, σ''⟩))
-            = (fun σ' => execN m ⟨e, σ'⟩) from by
-          funext σ'; exact h₂ σ' e m]
-  exact h₁ e m
-
 theorem dbind'
     {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
     (h₁ : Erasable μ₁ σ) (h₂ : ∀ σ', Erasable (μ₂ σ') σ') (hm₂ : AEMeasurable μ₂ μ₁) :

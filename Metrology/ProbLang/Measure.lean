@@ -313,30 +313,7 @@ theorem MeasurableSet.cover_inter_preimage_of_subtype
   rw [← Set.inter_self cov, Set.inter_assoc, ← Subtype.image_preimage_coe]
   exact MeasurableSet.subtype_image hcov ((subtype_preimage_eq f G) ▸ h hG)
 
-@[discrete]
-theorem Discrete.measure_pos_of_singleton_pos {α : Type _} [MeasurableSpace α] [MeasurableSingletonClass α]
-    [Countable α] (μ : Measure α) (S : Set α) (hS : 0 < μ S) :
-    ∃ x ∈ S, 0 < μ {x} := by
-  by_contra! h
-  have : μ (⋃ x ∈ S, {x}) = 0 :=
-    (measure_biUnion_null_iff (Set.to_countable S)).mpr fun x _ =>
-      nonpos_iff_eq_zero.mp (h x ‹_›)
-  rw [Set.biUnion_of_singleton] at this
-  exact absurd this (ne_of_gt hS)
-
 -- I think there's no good continuous version of this...
-@[discrete]
-theorem Discrete.map_singleton_pos {α β : Type _}
-    [MeasurableSpace α] [MeasurableSpace β]
-    [DiscreteMeasurableSpace α] [DiscreteMeasurableSpace β] [Countable α]
-    {f : α → β} {μ : Measure α} {b : β}
-    (h : 0 < (μ.map f) {b}) :
-    ∃ a, f a = b ∧ 0 < μ {a} := by
-  rw [Measure.map_apply (by measurability) (by measurability)] at h
-  obtain ⟨a, ha, hpos⟩ := Discrete.measure_pos_of_singleton_pos μ _ h
-  simp [Set.mem_preimage, Set.mem_singleton_iff] at ha
-  exact ⟨a, ha, hpos⟩
-
 /-- Continuous variant of `Discrete.map_singleton_pos`. For an *injective* `f` the
 fiber `f ⁻¹' {b}` is at most a single point, so positive pushforward mass on `{b}`
 forces positive mass on that unique preimage — no countability/atoms needed. (The
@@ -383,10 +360,6 @@ theorem Measure.bind_map_comm {α β γ : Type*}
   simp_rw [Measure.map_apply Hf hS]
 
 abbrev count (f : α → ENNReal) [MeasurableSpace α] := Measure.count.withDensity f
-
-@[discrete]
-theorem Discrete.count_singleton [MeasurableSpace T] [MeasurableSingletonClass T]
-    (f : T → ENNReal) (t : T) : count f {t} = f t := by simp
 
 /-! ### Building `MeasurableEmbedding` from a π-system of rectangles.
 
