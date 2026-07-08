@@ -306,7 +306,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     (hε₂ : Measurable ε₂) (Hbd : ∀ r, ε₂ r ≤ 1)
     (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
-      iprop((∀ (r : rT), ↯(ε₂ r) -∗ Φ (.real r)) -∗
+      iprop((∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
       tglWp E Exp.urand Φ) := by
   -- `urand` is a non-value, head-reducible at every state (`primStep = uniformReal`).
   have Hnv : (Exp.urand : Exp rT).toVal? = none :=
@@ -330,33 +330,36 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
       ((measurableEmbedding_prod_mk_right σ₁).comp
         (Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding))
   -- Reach predicate `R` (the real-literal image) and per-outcome credit `f`.
-  set R : State rT → Cfg rT → Prop := fun σ₁ ρ => ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT)
+  set R : State rT → Cfg rT → Prop :=
+    fun σ₁ ρ => ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT) ∧ r ∈ ProbLangℝ.unifUnitSupport
     with hR
   set f : Cfg rT → ENNReal := fun ρ => match ρ.expr with
     | .lit (.real r) => ε₂ r
     | _ => 0 with hf
   -- The reach set is exactly the image of the injection (used by `hrmeas` and `hpgl`).
   have hrange : ∀ σ₁ : State rT, {ρ : Cfg rT | R σ₁ ρ}
-      = (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) '' Set.univ := fun σ₁ => by
-    rw [Set.image_univ]; ext ρ; simp only [Set.mem_range, Set.mem_setOf_eq, hR]
-    exact ⟨fun ⟨r, h⟩ => ⟨r, h.symm⟩, fun ⟨r, h⟩ => ⟨r, h.symm⟩⟩
+      = (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) '' ProbLangℝ.unifUnitSupport := fun σ₁ => by
+    ext ρ; simp only [Set.mem_image, Set.mem_setOf_eq, hR]
+    exact ⟨fun ⟨r, h, hr⟩ => ⟨r, hr, h.symm⟩, fun ⟨r, hr, h⟩ => ⟨r, h.symm, hr⟩⟩
   -- Discharge the six `twp_glm_spend` obligations, in signature order.
   have hbd : ∀ ρ : Cfg rT, f ρ ≤ 1 := by
     intro ρ; simp only [hf]; split
     · exact Hbd _
     · exact zero_le
   have hstate : ∀ {σ₁ : State rT} {ρ : Cfg rT}, R σ₁ ρ → ρ.state = σ₁ := by
-    rintro σ₁ ρ ⟨r, rfl⟩; rfl
+    rintro σ₁ ρ ⟨r, rfl, _⟩; rfl
   have hred : ∀ σ₁, Reducible (Exp.urand : Exp rT) σ₁ :=
     fun σ₁ => reducible_of_headReducible (by is_lc) (hhead σ₁)
   have hrmeas : ∀ σ₁ : State rT, MeasurableSet {ρ : Cfg rT | R σ₁ ρ} := fun σ₁ => by
-    rw [hrange σ₁, Set.image_univ]; exact (hgemb σ₁).measurableSet_range
+    rw [hrange σ₁]
+    exact (hgemb σ₁).measurableSet_image.mpr ProbLangℝ.unifUnitSupportMeasurable
   -- `Pgl 0`: the diffuse `uniformReal` is concentrated on the (co-null) image.
   have hpgl : ∀ σ₁ : State rT, Pgl 0 (R σ₁) (primStep ⟨Exp.urand, σ₁⟩) := fun σ₁ => by
     apply Pgl.of_concentrated
     rw [hps σ₁, hrange σ₁]
     exact concentratedOn_map (hg σ₁)
-      (by rw [Set.image_univ]; exact (hgemb σ₁).measurableSet_range) Concentrated.univ
+      ((hgemb σ₁).measurableSet_image.mpr ProbLangℝ.unifUnitSupportMeasurable)
+      ProbLangℝ.unifUnitIsConcentrated
   -- Integral budget: push `f` through the real-literal map onto `unifUnit`, then `HInt`.
   have hint : ∀ σ₁ : State rT,
       (∫⁻ ρ, f ρ ∂(primStep ⟨Exp.urand, σ₁⟩)) ≤ ε₁ := fun σ₁ => by
@@ -367,11 +370,13 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
   iapply (twp_glm_spend (R := R) (f := f) Hnv hbd hstate hred hrmeas hpgl hint) $$ Herr
   -- The reached value is `.real r`, carrying `↯(ε₂ r)`; hand it to `Hcont`.
   iintro %σ₁ %ρ %HRρ Hcr
-  obtain ⟨r, rfl⟩ := HRρ
+  obtain ⟨r, rfl, hrsupp⟩ := HRρ
   have hfe : f (⟨.lit (.real r), σ₁⟩ : Cfg rT) = ε₂ r := by simp only [hf]
   iapply (ErisWpGS.tglWp_value_of_toVal (v := (.real r : Val rT)) rfl)
   iapply Hcont $$ %r
-  rw [← hfe]; iexact Hcr
+  isplitr [Hcr]
+  · ipureintro; exact hrsupp
+  · rw [← hfe]; iexact Hcr
 
 /-- Bound-free `urand` error rule: applies `twp_urand_exp` with the clamped credit
 `F r := min (ε₂ r) 1`. Clamping only shrinks the integral, so `HInt` still holds;
@@ -382,7 +387,7 @@ theorem twp_urand_exp' {E : CoPset} {ε₁ : ENNReal}
     (hε₂ : Measurable ε₂)
     (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
     iprop(↯ε₁) ⊢@{IProp GF}
-      iprop((∀ (r : rT), ↯(ε₂ r) -∗ Φ (.real r)) -∗
+      iprop((∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
       tglWp E Exp.urand Φ) := by
   iintro Herr Hcont
   -- Clamping shrinks the integrand pointwise, so the budget `HInt` survives.
@@ -391,12 +396,14 @@ theorem twp_urand_exp' {E : CoPset} {ε₁ : ENNReal}
   iapply (twp_urand_exp (ε₂ := fun r => min (ε₂ r) 1) (hε₂.min measurable_const)
     (fun r => _root_.min_le_right _ _) hint) $$ Herr
   -- Continuation: case-split on whether `ε₂ r` is already `≤ 1`.
-  iintro %r Hcr
+  iintro %r ⟨%hrsupp, Hcr⟩
   by_cases h : ε₂ r ≤ 1
   · -- `min (ε₂ r) 1 = ε₂ r`: rewrite the credit and feed `Hcont`.
     iapply Hcont $$ %r
-    iapply (ErrorCredit.ext (show min (ε₂ r) 1 = ε₂ r from _root_.min_eq_left h))
-    iexact Hcr
+    isplitr [Hcr]
+    · ipureintro; exact hrsupp
+    · iapply (ErrorCredit.ext (show min (ε₂ r) 1 = ε₂ r from _root_.min_eq_left h))
+      iexact Hcr
   · -- `1 < ε₂ r`, so the clamp gives `↯1`, which is contradictory.
     push Not at h
     iexfalso

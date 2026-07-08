@@ -450,7 +450,7 @@ example : ⊢@{IProp GF} tglWp E (Exp.app Examples.geometric (.lit .unit)) Φ :=
 
 -- 25b. `GeometricTrial f #0` — `@[pl_fold]` ⇒ recursive call folds to
 -- `&Examples.GeometricTrial`; stalls at the abstract `f #()` discriminant. ✓
-/-- info: ⊢ tglWp E pl(if f #() then &Examples.GeometricTrial (#0 + #1) else #0) Φ -/
+/-- info: ⊢ tglWp E pl(if f #() then &Examples.GeometricTrial f (#0 + #1) else #0) Φ -/
 #guard_msgs (info) in
 example : ⊢@{IProp GF} tglWp E pl(&Examples.GeometricTrial f #0) Φ := by
   twp_pures; show_goal_render; all_goals sorry

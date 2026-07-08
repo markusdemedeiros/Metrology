@@ -113,7 +113,7 @@ theorem twp_GeometricTrial {γ : ↑unitInterval} (shift : Int) (v : Val rT)
       ∀ (F : Int → ℝ≥0∞),
       ↯ (shiftGeometricPMF_expectation γ shift F) -∗
       tglWp E pl(&GeometricTrial &v.1 #(.int shift)) (fun (v : Val rT) => iprop%
-        ∃ z : ℤ, ⌜ v.1 = .lit (.int z) ⌝ ∗ ↯ (F z)) := by
+        ∃ z : ℤ, ⌜ v.1 = .lit (.int z) ⌝ ∗ ⌜ shift ≤ z ⌝ ∗ ↯ (F z)) := by
   iintro %F Hε_spec
   -- Use fresh thin-air credit for termination proof
   iapply twp_err_pos solve_not_red
@@ -152,8 +152,11 @@ theorem twp_GeometricTrial {γ : ↑unitInterval} (shift : Int) (v : Val rT)
     imodintro
     simp only [Exp.lit.injEq, BaseLit.int.injEq, Famp]
     iexists shift
-    iframe Hε
-    itrivial
+    isplitr [Hε]
+    · ipureintro; rfl
+    · isplitr [Hε]
+      · ipureintro; exact _root_.le_refl shift
+      · iexact Hε
   · -- Recursive case: step the `if`/arithmetic so only the recursive call remains,
     -- then refocus it onto the *named* `GeometricTrial` constant via `twp_bind` (the
     -- stepped goal otherwise holds the unfolded `rec` value, which does not unify with
@@ -163,7 +166,7 @@ theorem twp_GeometricTrial {γ : ↑unitInterval} (shift : Int) (v : Val rT)
     twp_bind pl(&GeometricTrial &v.1 #(.int (shift + 1)))
     -- Bridge the trivial bind-continuation to the induction hypothesis' post via `wand`.
     iapply (tglWp_wand (Φ := fun (v : Val rT) => iprop%
-      ∃ z : ℤ, ⌜ v.1 = .lit (.int z) ⌝ ∗ ↯ (F z)))
+      ∃ z : ℤ, ⌜ v.1 = .lit (.int z) ⌝ ∗ ⌜ shift + 1 ≤ z ⌝ ∗ ↯ (F z)))
     isplitl [Hε IH]
     · -- Split the `Famp … true` credit `↯(exp(shift+1) + (1/γ)·ε_term)` into the
       -- shifted expectation (for the recursive spec) and the amplified termination
@@ -178,7 +181,13 @@ theorem twp_GeometricTrial {γ : ↑unitInterval} (shift : Int) (v : Val rT)
       -- The recursive call now unifies syntactically with `IH` (both named).
       iapply IH $$ Hterm
       iexact Hexp
-    -- Value continuation: the recursive call already returns a witnessed value.
-    iintro %w Hpost
+    -- Value continuation: the recursive call already returns a witnessed value;
+    -- weaken its bound `shift + 1 ≤ z` to `shift ≤ z`.
+    iintro %w ⟨%z, %hzeq, %hzle, Hf⟩
     iapply tglWp_value
-    iexact Hpost
+    iexists z
+    isplitr [Hf]
+    · ipureintro; exact hzeq
+    · isplitr [Hf]
+      · ipureintro; omega
+      · iexact Hf

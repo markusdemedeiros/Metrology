@@ -59,7 +59,7 @@ theorem twp_urand_irrational (E : CoPset) :
   iintro %ε %Hε Herr
   iapply (twp_urand_exp irratErr_measurable irratErr_le_one ?Gexp) $$ Herr
   case Gexp => simp [irratErr_lintegral_zero]
-  iintro %r Hcr
+  iintro %r ⟨%_hr, Hcr⟩
   by_cases h : Irrational r
   · ipureintro; exact ⟨r, rfl, h⟩
   · iexfalso

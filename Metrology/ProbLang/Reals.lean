@@ -26,12 +26,23 @@ public noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
     constructor
     rw [Measure.restrict_apply_univ, Real.volume_Icc]
     simp
-  unifUnitSupport := Set.Icc (0 : ℝ) 1
-  unifUnitSupportMeasurable := by measurability
-  -- `Uniform[0,1]` puts no mass outside `[0,1]`: restricting to `[0,1]` measures
-  -- `· ∩ [0,1]`, and `[0,1]ᶜ ∩ [0,1] = ∅`.
+  -- Concentration set: the *open* interval `(0,1)`. `unifUnitSupport` need only be a
+  -- measurable set on whose complement the measure vanishes; the two endpoints carry no
+  -- `volume`, so `(0,1)` qualifies and gives callers the strict range `0 < r < 1`.
+  unifUnitSupport := Set.Ioo (0 : ℝ) 1
+  unifUnitSupportMeasurable := measurableSet_Ioo
+  -- `Uniform[0,1]` puts no mass outside `(0,1)`: restricting to `[0,1]` measures
+  -- `· ∩ [0,1]`, and `(0,1)ᶜ ∩ [0,1] ⊆ {0, 1}`, a null (countable) set.
   unifUnitIsConcentrated := by
-    rw [Measure.restrict_apply' measurableSet_Icc, Set.compl_inter_self, measure_empty]
+    rw [Measure.restrict_apply' measurableSet_Icc]
+    refine measure_mono_null (t := ({0, 1} : Set ℝ)) ?_ ?_
+    · rintro x ⟨hx, h0, h1⟩
+      simp only [Set.mem_compl_iff, Set.mem_Ioo, not_and, not_lt] at hx
+      simp only [Set.mem_insert_iff, Set.mem_singleton_iff]
+      rcases eq_or_lt_of_le h0 with h | h
+      · exact Or.inl h.symm
+      · exact Or.inr (le_antisymm h1 (hx h))
+    · exact ((Set.finite_singleton (1 : ℝ)).insert 0).countable.measure_zero volume
   -- Real comparison is classical decidable `<`/`≤`; measurable since `{p | p.1 < p.2}`
   -- and `{p | p.1 ≤ p.2}` are Borel-measurable in `ℝ × ℝ`.
   realLt a b := decide (a < b)
@@ -48,5 +59,11 @@ public noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
         = {p : ℝ × ℝ | p.1 ≤ p.2} := by
       ext p; simp [Function.uncurry, decide_eq_true_eq]
     rw [h]; exact measurableSet_le measurable_fst measurable_snd
+
+/-- For the `ℝ` instance, `unifUnitSupport` is the open interval `(0,1)`, so membership
+unpacks to the strict range `0 < r < 1`. Used by `urand` samplers to read off sample
+bounds from the strengthened `twp_urand_exp'` continuation. -/
+public theorem mem_unifUnitSupport_real {r : ℝ} :
+    r ∈ ProbLangℝ.unifUnitSupport (T := ℝ) ↔ 0 < r ∧ r < 1 := Set.mem_Ioo
 
 end ProbLang

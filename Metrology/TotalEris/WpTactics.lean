@@ -327,6 +327,21 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
     match c0 with
     | ~q(Exp.lit (.bool true))  => return some (q(Exp.cond $c0 $et $ef), et, #[])
     | ~q(Exp.lit (.bool false)) => return some (q(Exp.cond $c0 $et $ef), ef, #[])
+    -- A concrete-but-unreduced discriminant (e.g. `decide (0 = 0)` produced by
+    -- rewriting a symbolic `decide (Int.ofNat n % 2 = 0)` at its integer operand):
+    -- `whnf` only touches the `Exp.lit` head, and `~q`'s `isDefEq` will not fully
+    -- reduce the underlying `Decidable` instance. So fully `reduce` the bool and fire
+    -- only when it lands on a `true`/`false` constructor; a genuinely symbolic bool
+    -- (e.g. `ProbLangℝ.realLt y x`) reduces to a stuck term and stays put (`none`), so
+    -- a sampler proof can still `rcases hb : …` on the discriminant.
+    | ~q(Exp.lit (.bool $b))    => do
+        let b' : Q(Bool) ← Lean.Meta.reduce b
+        if b'.isConstOf ``Bool.true then
+          return some (q(Exp.cond (Exp.lit (.bool $b')) $et $ef), et, #[])
+        else if b'.isConstOf ``Bool.false then
+          return some (q(Exp.cond (Exp.lit (.bool $b')) $et $ef), ef, #[])
+        else
+          return none
     | _                         => return none
   | ~q(.fst $p)                           => do
     let p0 : Q(Exp $α) ← whnf p
@@ -350,9 +365,17 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
     -- A boolean result (`b₁ && b₂`, `decide (z₁ < z₂)`, …) has no reducing simproc in
     -- this toolchain, so reduce it to a `true`/`false` constructor here (defeq, so the
     -- side condition closes by `rfl`, and exposing the constructor lets `cond` fire).
+    -- BUT only keep the reduced form when it actually lands on a concrete `true`/`false`:
+    -- a *symbolic* boolean like `ProbLangℝ.realLt y x` (real comparison on abstract reals)
+    -- would `reduce` to a stuck `Decidable.rec … (Classical.choice …)` that no
+    -- `cases`/`rcases`/`rw` can branch on. Keep the folded `b` there, so a sampler proof
+    -- can `rcases hb : ProbLangℝ.realLt y x` on the `cond` discriminant.
     | ~q(some (Exp.lit (.bool $b))) => do
         let b' : Q(Bool) ← Lean.Meta.reduce b
-        return some (e, q(Exp.lit (.bool $b')), #[])
+        if b'.isConstOf ``Bool.true || b'.isConstOf ``Bool.false then
+          return some (e, q(Exp.lit (.bool $b')), #[])
+        else
+          return some (e, q(Exp.lit (.bool $b)), #[])
     | ~q(some $res)                 => return some (e, res, #[])
     | _                             => return none
   | ~q(.unop $op $e1)                     => do
