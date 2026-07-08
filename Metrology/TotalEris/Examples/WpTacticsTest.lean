@@ -20,22 +20,28 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-- `twp_bind` auto-discovers the evaluation context `K = [.fst]` and refocuses the
 goal onto the inner `alloc` redex — no explicit `K` supplied. -/
-example (E : CoPset) (Φ : Val rT → IProp GF) :
+-- The stepped goal is closed by `hcont`, a hypothesis of exactly the refocused
+-- type: this both discharges the goal without `sorry` and (via `exact`'s defeq
+-- check) *is* the assertion that `twp_bind` landed on the expected form.
+example (E : CoPset) (Φ : Val rT → IProp GF)
+    (hcont : ⊢@{IProp GF} tglWp E pl(alloc(#1))
+      (fun w => tglWp E pl(fst({Exp.ofVal w})) Φ)) :
     ⊢@{IProp GF} tglWp E pl(fst(alloc(#1))) Φ := by
   twp_bind pl(alloc(#1))
   -- `twp_bind` discovered `K = [.fst]` and refocused; the goal is now defeq to
   -- `tglWp E (alloc #1) (fun w => tglWp E (fst (ofVal w)) Φ)`, as this `show` checks.
   show ⊢@{IProp GF} tglWp E pl(alloc(#1))
     (fun w => tglWp E pl(fst({Exp.ofVal w})) Φ)
-  sorry
+  exact hcont
 
 /-- `twp_pure` β-reduces `(fun x, x) #1` at the top level (`K = []`) and auto-cleans the
 `open'`, leaving `tglWp E #1 Φ`. -/
-example (E : CoPset) (Φ : Val rT → IProp GF) :
+example (E : CoPset) (Φ : Val rT → IProp GF)
+    (hcont : ⊢@{IProp GF} tglWp E pl(#1) Φ) :
     ⊢@{IProp GF} tglWp E pl((fun x, x) #1) Φ := by
   twp_pure pl((fun x, x) #1)
   show ⊢@{IProp GF} tglWp E pl(#1) Φ
-  sorry
+  exact hcont
 
 /-- End-to-end (no `sorry`): `twp_pures` β-reduces `(fun x, x) #1` and evaluates the
 `fst`, reaching the value `#1`; `twp_value` then discharges the value postcondition. -/
