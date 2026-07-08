@@ -2,10 +2,10 @@ module
 
 public import Metrology.TotalEris
 public import Metrology.ProbLang.Reals
-public import Metrology.TotalEris.Examples.Gaussian.HalfBernNegExp
-public import Metrology.TotalEris.Examples.Gaussian.BernGeo
-public import Metrology.TotalEris.Examples.Gaussian.BernIter
-public import Metrology.TotalEris.Examples.Gaussian.Selector
+public import Metrology.TotalEris.Examples.Samplers.HalfBernNegExp
+public import Metrology.TotalEris.Examples.Samplers.BernoulliGeometric
+public import Metrology.TotalEris.Examples.Samplers.BernIter
+public import Metrology.TotalEris.Examples.Samplers.Selector
 
 @[expose] public section
 
@@ -13,14 +13,14 @@ public import Metrology.TotalEris.Examples.Gaussian.Selector
 # Discrete/continuous Gaussian sampler — port of `gauss.v`
 
 * `G1 ()` samples a non-negative integer `k` from the (half-)discrete Gaussian
-  `G1_μ k = exp(-k²/2) / Norm1`, via a geometric trial (`GeoTrial BNEHalf`)
+  `G1_μ k = exp(-k²/2) / Norm1`, via a geometric trial (`GeometricTrial BNEHalf`)
   followed by an accept/reject iteration (`IterTrial BNEHalf`).
 * `G2 ()` extends `G1` to a full continuous Gaussian on `[k, k+1)`, returning a
   pair `(x, k)` of fractional real `x ∈ [0,1)` and integer `k`, with density
   `G2_μ k x = exp(-(x+k)²/2) / Norm2`; the accept step uses the selector `B`.
 
 This is the apex of the Gauss tower — it composes `BNEHalf`
-(`HalfBernNegExp`), `GeoTrial`/`IterTrial` (`BernGeo`/`BernIter`), and `B`
+(`HalfBernNegExp`), `GeometricTrial`/`IterTrial` (`BernoulliGeometric`/`BernIter`), and `B`
 (`Selector`).
 
 **Status: stub.** Programs and specifications only; every proof is `sorry`.
@@ -97,7 +97,7 @@ def G2_f (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) : ℝ≥0∞ :=
 Rocq:
 ```
 G1 := rec: "trial" "_" :=
-  let: "k" := GeoTrial BNEHalf #0 in
+  let: "k" := GeometricTrial BNEHalf #0 in
   if: IterTrial BNEHalf ("k" * ("k" - #1)) then "k" else "trial" #().
 G2 := rec: "trial" "_" :=
   let: "k" := G1 #() in
@@ -108,7 +108,7 @@ G2 := rec: "trial" "_" :=
 @[pl_fold]
 def G1 : Exp ℝ := pl%
   rec trial u :=
-    let k := &GeoTrial &BNEHalf #0;
+    let k := &GeometricTrial &BNEHalf #0;
     if &IterTrial &BNEHalf (k * (k - #1)) then k else trial #.unit
 
 @[pl_fold]

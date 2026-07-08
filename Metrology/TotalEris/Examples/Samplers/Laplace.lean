@@ -2,7 +2,7 @@ module
 
 public import Metrology.TotalEris
 public import Metrology.ProbLang.Reals
-public import Metrology.TotalEris.Examples.Gaussian.NegExp
+public import Metrology.TotalEris.Examples.Samplers.NegExp
 
 @[expose] public section
 

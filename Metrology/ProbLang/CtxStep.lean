@@ -544,11 +544,13 @@ theorem measurableSet_possible_support [ProbLangℝ rT] :
   rw [hset]
   exact measurableSet_primStep_support e₁ σ₁
 
-/-- **`primStep` is purely atomic** (countability-free): it gives zero mass to the
-set of points it gives zero mass to. Transfers `headStep_atomic` through the
+/-- **`primStep` is purely atomic** (countability-free) whenever the focused
+redex is not the diffuse sampler `urand`: it gives zero mass to the set of
+points it gives zero mass to. Transfers `headStep_atomic` through the
 injective pushforward `K.fillCfg` (so the co-support pulls back to `headStep`'s
 co-support, with no need for `fillCfg`-image measurability). -/
-theorem primStep_atomic [ProbLangℝ rT] (e : Exp rT) (σ : State rT) :
+theorem primStep_atomic [ProbLangℝ rT] (e : Exp rT) (σ : State rT)
+    (hne : e.decomp.2 ≠ .urand) :
     IsAtomicSupport (primStep ⟨e, σ⟩) := by
   have hmeas : Measurable e.decomp.1.fillCfg := by measurability
   have hinj : Function.Injective e.decomp.1.fillCfg := Ectx.fillCfg_injective _
@@ -576,7 +578,7 @@ theorem primStep_atomic [ProbLangℝ rT] (e : Exp rT) (σ : State rT) :
       = {ρ' : Cfg rT | (headStep ⟨e.decomp.2, σ⟩) {ρ'} = 0} := by
     ext ρ'; simp only [Set.mem_preimage, Set.mem_setOf_eq, hsingle ρ']
   rw [hpre]
-  exact headStep_atomic e.decomp.2 σ
+  exact headStep_atomic e.decomp.2 σ hne
 
 end ProbLang
 end

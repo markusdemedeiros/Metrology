@@ -64,7 +64,8 @@ theorem twp_lift_step_fupd_gen {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : E
   iframe
 
 theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) : iprop%
+    (hv : e₁.toVal? = none)
+    (hatom : ∀ σ₁, IsAtomicSupport (primStep ⟨e₁, σ₁⟩)) : iprop%
     (∀ σ₁, stateInterp σ₁ -∗ |={E, ∅}=>
       ⌜Reducible e₁ σ₁⌝ ∗
       ∀ e₂ σ₂, ⌜Possible ⟨e₂, σ₂⟩ (primStep ⟨e₁, σ₁⟩)⌝ -∗
@@ -76,18 +77,18 @@ theorem twp_lift_step_fupd {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
     (fun σ₁ => by
       have hset : {ρ : Cfg rT | Possible ρ (primStep ⟨e₁, σ₁⟩)}
           = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} := Set.ext fun ρ => possible_iff_pos
-      -- TODO: Make primStep_atomic use Possible instead
-      rw [hset]; exact (primStep_atomic e₁ σ₁).concentrated_atoms)
+      rw [hset]; exact (hatom σ₁).concentrated_atoms)
 
 theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) : iprop%
+    (hv : e₁.toVal? = none)
+    (hatom : ∀ σ₁, IsAtomicSupport (primStep ⟨e₁, σ₁⟩)) : iprop%
     (∀ σ₁, stateInterp σ₁ -∗ |={E₁}=>
       ⌜Reducible e₁ σ₁⌝ ∗
       ∀ e₂ σ₂, ⌜Possible ⟨e₂, σ₂⟩ (primStep ⟨e₁, σ₁⟩)⌝ -∗ |={E₁}=>
           stateInterp σ₂ ∗ match e₂.toVal? with | some v => Φ v | none => iprop% False)
       ⊢@{IProp GF} tglWp E₁ e₁ Φ := by
   iintro H
-  iapply twp_lift_step_fupd hv
+  iapply twp_lift_step_fupd hv hatom
   iintro %σ₁ Hσ
   imod H $$ %σ₁ Hσ with ⟨%Hred, HCont⟩
   imod BIFUpdate.subset Std.LawfulSet.empty_subset with Hclose
@@ -104,12 +105,14 @@ theorem twp_lift_atomic_step_fupd {E₁ : CoPset} {Φ : Val rT → IProp GF} {e�
   | none => iexfalso; iexact HΦv
 
 theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (hv : e₁.toVal? = none)
+    (hatom : ∀ σ₁, IsAtomicSupport (primStep ⟨e₁, σ₁⟩))
+    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
     (Hstep : ∀ σ₁ e₂ σ₂, Possible (⟨e₂, σ₂⟩ : Cfg rT) (primStep ⟨e₁, σ₁⟩) → σ₂ = σ₁) : iprop%
     (|={E}=> ∀ e₂ σ, ⌜Possible ⟨e₂, σ⟩ (primStep ⟨e₁, σ⟩)⌝ -∗ tglWp E e₂ Φ)
     ⊢@{IProp GF} tglWp E e₁ Φ := by
   iintro H
-  iapply twp_lift_step_fupd hv
+  iapply twp_lift_step_fupd hv hatom
   iintro %σ₁ Hσ
   imod H
   imod BIFUpdate.subset Std.LawfulSet.empty_subset with Hclose
@@ -125,11 +128,13 @@ theorem twp_lift_pure_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp r
   iapply H $$ %_ %_ %Hstep'
 
 theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
-    (hv : e₁.toVal? = none) (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
+    (hv : e₁.toVal? = none)
+    (hatom : ∀ σ₁, IsAtomicSupport (primStep ⟨e₁, σ₁⟩))
+    (Hsafe : ∀ σ₁, Reducible e₁ σ₁)
     (Hpuredet : ∀ σ₁ e₂' σ₂, Possible ⟨e₂', σ₂⟩ (primStep ⟨e₁, σ₁⟩) → σ₂ = σ₁ ∧ e₂' = e₂) : iprop%
     (|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   iintro H
-  iapply twp_lift_pure_step hv Hsafe (fun σ e₂' σ₂ hstep => (Hpuredet σ e₂' σ₂ hstep).1)
+  iapply twp_lift_pure_step hv hatom Hsafe (fun σ e₂' σ₂ hstep => (Hpuredet σ e₂' σ₂ hstep).1)
   imod H
   imodintro
   iintro %e₂' %σ %Hstep
@@ -137,7 +142,9 @@ theorem twp_lift_pure_det_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e�
   iexact H
 
 theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}
-    (hv : e₁.toVal? = none) (hlc : e₁.IsLocallyClosed) : iprop%
+    (hv : e₁.toVal? = none) (hlc : e₁.IsLocallyClosed)
+    (hd : e₁.decompItem = none := by simp [Exp.decompItem, Exp.toVal?_lit, Exp.toVal?_ofVal])
+    (hne : e₁ ≠ .urand := by nofun) : iprop%
     (∀ σ₁, stateInterp σ₁ -∗ |={E}=>
       ⌜HeadReducible e₁ σ₁⌝ ∗
       ∀ e₂ σ₂, ⌜Possible ⟨e₂, σ₂⟩ (headStep ⟨e₁, σ₁⟩)⌝ -∗ |={E}=>
@@ -145,10 +152,11 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
       ⊢@{IProp GF} tglWp E e₁ Φ := by
   iintro H
   iapply twp_lift_atomic_step_fupd hv
+    (fun σ => by rw [primStep_eq_headStep hd]; exact headStep_atomic e₁ σ hne)
   iintro %σ₁ Hσ
   ispecialize H $$ %σ₁ Hσ
   imod H with ⟨%Hhred, HCont⟩
-  rw [← primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible hlc Hhred)]
+  rw [← primStep_eq_headStep hd]
   replace Hhred := reducible_of_headReducible hlc Hhred
   imodintro
   iframe %Hhred
@@ -159,9 +167,13 @@ theorem twp_lift_atomic_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ 
 theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (hlc : e₁.IsLocallyClosed) (hv : e₁.toVal? = none)
     (Hsafe : ∀ σ₁, ∃ ρ : Cfg rT, Possible ρ (headStep ⟨e₁, σ₁⟩))
-    (Hdet : ∀ σ₁ e₂' σ₂, Possible (⟨e₂', σ₂⟩ : Cfg rT) (headStep ⟨e₁, σ₁⟩) → σ₂ = σ₁ ∧ e₂' = e₂) :
+    (Hdet : ∀ σ₁ e₂' σ₂, Possible (⟨e₂', σ₂⟩ : Cfg rT) (headStep ⟨e₁, σ₁⟩) → σ₂ = σ₁ ∧ e₂' = e₂)
+    (hne : e₁ ≠ .urand := by nofun) :
     iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
+  have hd : e₁.decompItem = none :=
+    Exp.decompItem_none_of_lc_headReducible hlc ((Hsafe default).elim fun _ hρ => hρ.ne_zero)
   iapply twp_lift_pure_det_step hv
+    (hatom := fun σ => by rw [primStep_eq_headStep hd]; exact headStep_atomic e₁ σ hne)
     (Hsafe := fun σ => .of_head hlc ((Hsafe σ).elim fun _ hρ => hρ.ne_zero))
   refine fun σ e₂' σ₂ hp => Hdet σ e₂' σ₂ ?_
   rw [← primStep_eq_headStep
@@ -173,7 +185,8 @@ theorem twp_lift_pure_det_head_step {E : CoPset} {Φ : Val rT → IProp GF} {e�
 theorem twp_lift_pure_det_step_of_pureStep {E : CoPset} {Φ : Val rT → IProp GF} {e₁ e₂ : Exp rT}
     (h : PureStep e₁ e₂) : iprop(|={E}=> tglWp E e₂ Φ) ⊢@{IProp GF} tglWp E e₁ Φ := by
   have hv : e₁.toVal? = none := Exp.toVal?_eq_none.mpr <| val_stuck <| h.safe default
-  iapply twp_lift_pure_det_step hv h.safe
+  iapply twp_lift_pure_det_step hv
+    (hatom := fun σ => by rw [h.det σ]; exact isAtomicSupport_dirac _) (Hsafe := h.safe)
   intros σ e₂' σ₂ hp
   by_contra hne
   rw [h.det σ, possible_iff_pos, dirac_singleton_pos'] at hp

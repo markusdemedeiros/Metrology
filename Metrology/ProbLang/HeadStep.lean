@@ -2246,13 +2246,12 @@ theorem isAtomicSupport_uniform (z : Int) (σ : State rT) :
     rw [hrw]; exact isAtomicSupport_dirac _
 
 set_option maxHeartbeats 1000000 in
-/-- **`headStep` is purely atomic** for the *discrete* fragment. `@[discrete]`:
-atomicity is a discrete notion — it is FALSE for the continuous sampler `urand`
-(`Cfg.uniformReal` is diffuse when `unifUnit` is). The continuous WP path never
-uses atomicity; it uses the `Concentrated`-on-image certificate instead. The
-`urand` arm is therefore deferred (`sorry`) within the discrete fragment. -/
-@[discrete]
-theorem headStep_atomic (e : Exp rT) (σ : State rT) :
+/-- **`headStep` is purely atomic** away from `urand`. Atomicity is a discrete
+notion — it is FALSE for the continuous sampler `urand` (`Cfg.uniformReal` is
+diffuse when `unifUnit` is), hence the `e ≠ .urand` hypothesis. The continuous
+WP path never uses atomicity; it uses the `Concentrated`-on-image certificate
+instead. -/
+theorem headStep_atomic (e : Exp rT) (σ : State rT) (hne : e ≠ .urand) :
     IsAtomicSupport (headStep ⟨e, σ⟩) := by
   show IsAtomicSupport (headStep ⟨e, σ⟩)
   unfold headStep
@@ -2293,7 +2292,9 @@ theorem headStep_atomic (e : Exp rT) (σ : State rT) :
   case _ => -- scrut
     apply isAtomicSupport_isValM
     split <;> exact isAtomicSupport_dirac _
-  case _ => sorry -- urand: Cfg.uniformReal is diffuse; atomicity false (discrete fragment)
+  case _ => -- urand: excluded by `hne` (atomicity is false for it)
+    rename_i heq
+    exact absurd (congrArg Cfg.expr heq) hne
   case _ => exact isAtomicSupport_zero -- default
 
 /-! ### `Concentrated`: the unary support-lifting

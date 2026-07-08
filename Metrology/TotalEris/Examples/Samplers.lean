@@ -1,13 +1,13 @@
 module
 
-public import Metrology.TotalEris.Examples.Gaussian.RealDecrTrial
-public import Metrology.TotalEris.Examples.Gaussian.HalfBernNegExp
-public import Metrology.TotalEris.Examples.Gaussian.BernGeo
-public import Metrology.TotalEris.Examples.Gaussian.BernIter
-public import Metrology.TotalEris.Examples.Gaussian.NegExp
-public import Metrology.TotalEris.Examples.Gaussian.Selector
-public import Metrology.TotalEris.Examples.Gaussian.Gauss
-public import Metrology.TotalEris.Examples.Gaussian.Laplace
+public import Metrology.TotalEris.Examples.Samplers.BernoulliGeometric
+public import Metrology.TotalEris.Examples.Samplers.RealDecrTrial
+public import Metrology.TotalEris.Examples.Samplers.HalfBernNegExp
+public import Metrology.TotalEris.Examples.Samplers.BernIter
+public import Metrology.TotalEris.Examples.Samplers.NegExp
+public import Metrology.TotalEris.Examples.Samplers.Selector
+public import Metrology.TotalEris.Examples.Samplers.Gauss
+public import Metrology.TotalEris.Examples.Samplers.Laplace
 
 @[expose] public section
 
@@ -23,9 +23,9 @@ Dependency layering (bottom-up):
 RealDecrTrial ── decreasing trial (init→urand, cmp→real <, presample→twp_urand_exp)
   ├── HalfBernNegExp (LeHalf, BNEHalf)        ── concrete base-½ Bernoulli
   └── NegExp                                   ── Laplace magnitude sampler
-BernGeo (GeoTrial) / BernIter (IterTrial)      ── generic combinators over AbstractBernoulli
+BernoulliGeometric (GeometricTrial) / BernIter (IterTrial)  ── generic combinators over AbstractBernoulli
 Selector (C, Bii, S, S0, B)                    ── integer-part selection
-Gauss   (G1, G2)   ← BNEHalf, GeoTrial, IterTrial, B
+Gauss   (G1, G2)   ← BNEHalf, GeometricTrial, IterTrial, B
 Laplace (Laplace0, Laplace) ← NegExp
 ```
 

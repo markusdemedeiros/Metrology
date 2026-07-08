@@ -2,7 +2,7 @@ module
 
 public import Metrology.TotalEris
 public import Metrology.TotalEris.Examples.GeometricTotal
-public import Metrology.TotalEris.Examples.BernoulliGeometric
+public import Metrology.TotalEris.Examples.Samplers.BernoulliGeometric
 
 @[expose] public section
 
