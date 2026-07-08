@@ -63,7 +63,7 @@ theorem twp_urand_irrational (E : CoPset) :
   by_cases h : Irrational r
   · ipureintro; exact ⟨r, rfl, h⟩
   · iexfalso
-    iapply ec_contradict $$ Hcr
+    iapply ErrorCredit.contradict $$ Hcr
     rw [irratErr_rat h]
 
 end Wp

@@ -979,7 +979,9 @@ meta def delabExpOfVal : Delab := do
   let e ← SubExpr.getExpr
   guard <| e.getAppNumArgs == 2
   guard <| e.appArg!.isAppOf ``ProbLang.Val.mk
-  SubExpr.withAppArg (SubExpr.withAppFn (SubExpr.withAppArg delab))
+  -- `Val.mk α fst snd lc` has THREE fields, so `fst` is `withAppFn`×2 then `withAppArg`
+  -- (skip `lc`, then `snd`); the earlier nav landed on `snd`, printing `&IsVal.lit`.
+  SubExpr.withAppArg (SubExpr.withAppFn (SubExpr.withAppFn (SubExpr.withAppArg delab)))
 
 /-! ### Free-variable display
 

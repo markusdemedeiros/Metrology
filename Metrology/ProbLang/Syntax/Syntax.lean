@@ -120,6 +120,14 @@ class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, In
   unifUnitSupport : Set T
   unifUnitSupportMeasurable : MeasurableSet unifUnitSupport
   unifUnitIsConcentrated : unifUnit unifUnitSupportᶜ = 0
+  /-- Decidable strict comparison of two reals, as `Bool`-valued *data* (not an
+  order instance, to avoid `DecidableEq`/`LE` diamonds with the fields above).
+  Powers the `.lt` case of `BinOp.eval` on real literals. -/
+  realLt : T → T → Bool
+  /-- Decidable `≤` comparison of two reals. Powers `.le` in `BinOp.eval`. -/
+  realLe : T → T → Bool
+  measurable_realLt : Measurable (Function.uncurry realLt)
+  measurable_realLe : Measurable (Function.uncurry realLe)
 
 attribute [reducible, instance] ProbLangℝ.instDecidableEq
 attribute [instance] ProbLangℝ.unifUnit_isProbabilityMeasure
@@ -1101,6 +1109,9 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp rT) : Option (Exp rT) :=
   | eq,    .inr (.lit _),   .inl (.lit _)   => some <| .lit <| .bool false
   | lt,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 < z2))
   | le,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 ≤ z2))
+  -- Real comparison, via the `ProbLangℝ` `realLt`/`realLe` comparison data.
+  | lt,    .lit (.real r1), .lit (.real r2) => some <| .lit <| .bool (ProbLangℝ.realLt r1 r2)
+  | le,    .lit (.real r1), .lit (.real r2) => some <| .lit <| .bool (ProbLangℝ.realLe r1 r2)
   -- Bit shifts on integers. Shift amount is converted to Nat via `toNat`
   -- (negative shift amounts treat as 0 — caller's responsibility to ensure non-negative).
   | shl,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 * 2 ^ z2.toNat)

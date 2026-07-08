@@ -1653,6 +1653,26 @@ theorem _root_.ProbLang.BaseLit.boolExtract.measurable
     ?_
   exact measurable_const
 
+/-- Extract the real payload from `.real r`, else `none`. Unlike `intExtract`/
+`boolExtract` this lands in the (non-discrete) real type `rT`. -/
+def _root_.ProbLang.BaseLit.realExtract (l : BaseLit rT) : Option rT :=
+  match l with | .real r => some r | _ => none
+
+theorem _root_.ProbLang.BaseLit.realExtract.measurable
+    [MeasurableSpace rT] [Inhabited rT] :
+    let _ : MeasurableSpace (Option rT) := instLocalOption
+    Measurable (BaseLit.realExtract : BaseLit rT → Option rT) := by
+  intro _
+  have hrw : BaseLit.realExtract (rT := rT) = fun l =>
+      BaseLit.casesOn (motive := fun _ => Option rT) l
+        (fun _ => none) (fun _ => none) none (fun _ => none) (fun _ => none) (fun r => some r) := by
+    funext l; cases l <;> rfl
+  rw [hrw]
+  refine BaseLit.measurable_rec (rT := rT)
+    (f_int := fun _ => none) (f_bool := fun _ => none) (f_unit := fun _ => none)
+    (f_loc := fun _ => none) (f_lbl := fun _ => none) (f_real := fun r => some r) ?_
+  exact MeasurableEmbedding.some_mk.measurable
+
 /-! ### `liftBin` — generic homogeneous binary lifter.
 
 Most `BinOp.eval` arms have the same shape: extract a literal from each side,
@@ -1735,6 +1755,38 @@ theorem liftIB.measurable [MeasurableSpace rT] [Inhabited rT] (f : Int → Int �
   liftBin.measurable _ _ BaseLit.intExtract.measurable
     (Measurable.of_discrete.comp (Measurable.of_discrete (α := Int × Int) (β := Bool)
       (f := Function.uncurry f)))
+
+/-- Lift a real comparison `rT → rT → Bool` (`.lt`/`.le` on real literals):
+both inputs real literals, output boolean literal. -/
+@[reducible] def liftRB (f : rT → rT → Bool) : Exp rT × Exp rT → Option (Exp rT) :=
+  liftBin BaseLit.realExtract (fun r1 r2 => .bool (f r1 r2))
+
+theorem liftRB.measurable [MeasurableSpace rT] [Inhabited rT] (f : rT → rT → Bool)
+    (hf : Measurable (Function.uncurry f)) :
+    Measurable (liftRB (rT := rT) f) := by
+  refine liftBin.measurable _ _ BaseLit.realExtract.measurable ?_
+  show Measurable (Function.uncurry (fun r1 r2 : rT => BaseLit.bool (f r1 r2)))
+  exact BaseLit.bool.measurable.comp hf
+
+/-- Comparison lifter for `.lt`/`.le`: dispatches on integer *or* real literal
+operands — integers via `liftIB`, reals via `liftRB`. The two are disjoint
+(a literal is never both), so `orElse` picks whichever fires. -/
+@[reducible] def liftLtLe (fi : Int → Int → Bool) (f : rT → rT → Bool) :
+    Exp rT × Exp rT → Option (Exp rT) :=
+  fun p => (liftIB fi p).orElse (fun _ => liftRB f p)
+
+theorem liftLtLe.measurable [MeasurableSpace rT] [Inhabited rT]
+    (fi : Int → Int → Bool) (f : rT → rT → Bool) (hf : Measurable (Function.uncurry f)) :
+    Measurable (liftLtLe (rT := rT) fi f) := by
+  have hrw : liftLtLe (rT := rT) fi f
+      = fun p => Option.casesOn (motive := fun _ => Option (Exp rT)) (liftIB fi p)
+          (liftRB f p) (fun x => some x) := by
+    funext p
+    show (liftIB fi p).orElse (fun _ => liftRB f p) = _
+    cases liftIB fi p <;> rfl
+  rw [hrw]
+  exact Option.measurable_elim_param (liftIB.measurable fi) (liftRB.measurable f hf)
+    (MeasurableEmbedding.some_mk.measurable.comp measurable_snd)
 
 /-! ### `liftEq` — bespoke lifter for `.eq` (5 patterns). -/
 
@@ -2193,6 +2245,60 @@ private theorem liftIB_def_eq (f : Int → Int → Bool) (v1 v2 : Exp rT) :
   rename_i l2
   cases l2 <;> simp
 
+private theorem liftRB_def_eq [ProbLangℝ rT] (f : rT → rT → Bool) (v1 v2 : Exp rT) :
+    liftRB f (v1, v2) =
+      (match v1, v2 with
+       | .lit (.real r1), .lit (.real r2) => some (Exp.lit (.bool (f r1 r2)))
+       | _, _ => none) := by
+  unfold liftRB liftBin
+  cases v1 <;> simp [Exp.litExtract, BaseLit.realExtract, Option.bind]
+  rename_i l1
+  cases l1 <;> simp; cases v2 <;>
+    simp [BaseLit.realExtract]
+  rename_i l2
+  cases l2 <;> simp
+
+private theorem liftLtLe_def_eq [ProbLangℝ rT] (fi : Int → Int → Bool) (f : rT → rT → Bool)
+    (v1 v2 : Exp rT) :
+    liftLtLe fi f (v1, v2) =
+      (match v1, v2 with
+       | .lit (.int z1), .lit (.int z2) => some (Exp.lit (.bool (fi z1 z2)))
+       | .lit (.real r1), .lit (.real r2) => some (Exp.lit (.bool (f r1 r2)))
+       | _, _ => none) := by
+  show (liftIB fi (v1, v2)).orElse (fun _ => liftRB f (v1, v2)) = _
+  rw [liftIB_def_eq, liftRB_def_eq]
+  cases v1 <;> first
+    | rfl
+    | (rename_i l1; cases l1 <;> first
+        | rfl
+        | (cases v2 <;> first
+            | rfl
+            | (rename_i l2; cases l2 <;> rfl)))
+
+/-- Helper for the `lt` arm of `BinOp.eval_eq_lift`. -/
+private theorem BinOp.eval_lt_eq_liftLtLe [ProbLangℝ rT] (v1 v2 : Exp rT) :
+    BinOp.eval .lt v1 v2 = liftLtLe (decide <| · < ·) ProbLangℝ.realLt (v1, v2) := by
+  rw [liftLtLe_def_eq]
+  cases v1 <;> first
+    | rfl
+    | (rename_i l1; cases l1 <;> first
+        | rfl
+        | (cases v2 <;> first
+            | rfl
+            | (rename_i l2; cases l2 <;> rfl)))
+
+/-- Helper for the `le` arm of `BinOp.eval_eq_lift`. -/
+private theorem BinOp.eval_le_eq_liftLtLe [ProbLangℝ rT] (v1 v2 : Exp rT) :
+    BinOp.eval .le v1 v2 = liftLtLe (decide <| · ≤ ·) ProbLangℝ.realLe (v1, v2) := by
+  rw [liftLtLe_def_eq]
+  cases v1 <;> first
+    | rfl
+    | (rename_i l1; cases l1 <;> first
+        | rfl
+        | (cases v2 <;> first
+            | rfl
+            | (rename_i l2; cases l2 <;> rfl)))
+
 /-- Helper for the `eq` arm of `BinOp.eval_eq_lift`: `BinOp.eval .eq v1 v2 = liftEq (v1, v2)`.
 Split as a separate lemma so its proof time is bounded and doesn't blow the
 parent's heartbeat budget. -/
@@ -2219,8 +2325,8 @@ theorem BinOp.eval_eq_lift [ProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
        | .and   => liftBB (· && ·)
        | .or    => liftBB (· || ·)
        | .xor   => liftBB (· ^^ ·)
-       | .lt    => liftIB (decide <| · < ·)
-       | .le    => liftIB (decide <| · ≤ ·)
+       | .lt    => liftLtLe (decide <| · < ·) ProbLangℝ.realLt
+       | .le    => liftLtLe (decide <| · ≤ ·) ProbLangℝ.realLe
        | .eq    => liftEq) (v1, v2) := by
   cases op
   all_goals
@@ -2240,13 +2346,8 @@ theorem BinOp.eval_eq_lift [ProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
               | (cases v2 <;> first
                   | rfl
                   | (rename_i l2; cases l2 <;> rfl))))
-      | (rw [liftIB_def_eq]; cases v1 <;> first
-          | rfl
-          | (rename_i l1; cases l1 <;> first
-              | rfl
-              | (cases v2 <;> first
-                  | rfl
-                  | (rename_i l2; cases l2 <;> rfl))))
+      | exact BinOp.eval_lt_eq_liftLtLe v1 v2
+      | exact BinOp.eval_le_eq_liftLtLe v1 v2
       | exact BinOp.eval_eq_eq_liftEq v1 v2
 
 theorem BinOp_eval.measurable [ProbLangℝ rT] :
@@ -2264,8 +2365,8 @@ theorem BinOp_eval.measurable [ProbLangℝ rT] :
            | .and   => liftBB (· && ·)
            | .or    => liftBB (· || ·)
            | .xor   => liftBB (· ^^ ·)
-           | .lt    => liftIB (decide <| · < ·)
-           | .le    => liftIB (decide <| · ≤ ·)
+           | .lt    => liftLtLe (decide <| · < ·) ProbLangℝ.realLt
+           | .le    => liftLtLe (decide <| · ≤ ·) ProbLangℝ.realLe
            | .eq    => liftEq) (q.2.1, q.2.2) := by
     funext q; exact BinOp.eval_eq_lift q.1 q.2.1 q.2.2
   rw [hrw]
@@ -2282,8 +2383,8 @@ theorem BinOp_eval.measurable [ProbLangℝ rT] :
   · exact liftBB.measurable _
   · exact liftBB.measurable _
   · exact liftEq.measurable
-  · exact liftIB.measurable _
-  · exact liftIB.measurable _
+  · exact liftLtLe.measurable _ _ ProbLangℝ.measurable_realLt
+  · exact liftLtLe.measurable _ _ ProbLangℝ.measurable_realLe
   · exact liftII.measurable _
   · exact liftII.measurable _
 

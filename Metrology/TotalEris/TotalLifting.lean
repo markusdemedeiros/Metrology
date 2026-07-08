@@ -196,9 +196,24 @@ macro_rules
             | assumption
             | exact Exp.lcb_imp_lc (by rfl)
             | exact Val.lc _
+            | exact Exp.IsLocallyClosed.fvar _
             | exact Exp.IsLocallyClosed.lit _
             | exact Exp.IsLocallyClosed.fail
             | exact Exp.IsLocallyClosed.urand
+            -- Binders: introduce a fresh opening variable (cofinite, `L := ∅`) and
+            -- reduce the `open'` so the body's constructors are exposed to the descent.
+            -- `openRec`/`open'` are `@[simp]`, so `simp only` distributes them and
+            -- decides the `bvar`→`fvar` substitution; it leaves an `openRec _ _ e₀`
+            -- stuck on each opaque leaf `e₀` (a `Val` projection or a closed constant),
+            -- cleared below by `← Exp.open_lc`.
+            | (refine Exp.IsLocallyClosed.lam ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            | (refine Exp.IsLocallyClosed.fix ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            -- Clear an `openRec k t e₀` stuck on a closed leaf `e₀`: rewrite it back to
+            -- `e₀` (the side goal `e₀.IsLocallyClosed` is then closed by the recursion —
+            -- `Val.lc` for a value, `lcb_imp_lc (by rfl)` for a closed constant).
+            | rw [← Exp.open_lc]
             | apply Exp.IsLocallyClosed.app | apply Exp.IsLocallyClosed.unop
             | apply Exp.IsLocallyClosed.binop | apply Exp.IsLocallyClosed.cond
             | apply Exp.IsLocallyClosed.pair | apply Exp.IsLocallyClosed.fst
@@ -217,11 +232,24 @@ macro_rules
             | rfl
             | assumption       -- a value-hood fact already in context (e.g. an abstract
                                -- `Val`'s `v.isValue`), matched up to defeq
-            | exact Exp.lcb_imp_lc (by rfl)  -- a `(lam/fix …).IsLocallyClosed` side condition
+            | exact Val.snd _                -- `IsVal v.fst` for an abstract `Val v`
+            | exact Val.isValue _            -- `v.fst.isValue` (`Nonempty (IsVal v.fst)`)
+            | exact Exp.lcb_imp_lc (by rfl)  -- a closed `(lam/fix …).IsLocallyClosed` subterm
             | exact Val.lc _                 -- a value's closedness, from its `Val.lc` field
             | exact ProbLang.IsVal.lit
             | refine ProbLang.IsVal.lam ?_ | refine ProbLang.IsVal.fix ?_
             | apply ProbLang.IsVal.inl | apply ProbLang.IsVal.inr | apply ProbLang.IsVal.pair
+            -- A `(lam/fix …).IsLocallyClosed` side condition whose body is *not* closed
+            -- (e.g. it mentions an abstract `Val` projection): introduce the cofinite
+            -- opening variable, reduce `open'`, and let the descent below finish — see
+            -- `is_lc` for the full rationale (`← Exp.open_lc` clears the `openRec`
+            -- stuck on each opaque leaf).
+            | (refine Exp.IsLocallyClosed.lam ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            | (refine Exp.IsLocallyClosed.fix ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            | rw [← Exp.open_lc]
+            | apply Exp.IsLocallyClosed.fvar
             | apply Exp.IsLocallyClosed.lit | apply Exp.IsLocallyClosed.app
             | apply Exp.IsLocallyClosed.unop | apply Exp.IsLocallyClosed.binop
             | apply Exp.IsLocallyClosed.cond | apply Exp.IsLocallyClosed.pair

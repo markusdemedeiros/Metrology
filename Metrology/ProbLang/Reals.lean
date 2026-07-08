@@ -32,5 +32,21 @@ public noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
   -- `· ∩ [0,1]`, and `[0,1]ᶜ ∩ [0,1] = ∅`.
   unifUnitIsConcentrated := by
     rw [Measure.restrict_apply' measurableSet_Icc, Set.compl_inter_self, measure_empty]
+  -- Real comparison is classical decidable `<`/`≤`; measurable since `{p | p.1 < p.2}`
+  -- and `{p | p.1 ≤ p.2}` are Borel-measurable in `ℝ × ℝ`.
+  realLt a b := decide (a < b)
+  realLe a b := decide (a ≤ b)
+  measurable_realLt := by
+    apply measurable_to_bool
+    have h : (Function.uncurry (fun a b : ℝ => decide (a < b)) ⁻¹' {true})
+        = {p : ℝ × ℝ | p.1 < p.2} := by
+      ext p; simp [Function.uncurry, decide_eq_true_eq]
+    rw [h]; exact measurableSet_lt measurable_fst measurable_snd
+  measurable_realLe := by
+    apply measurable_to_bool
+    have h : (Function.uncurry (fun a b : ℝ => decide (a ≤ b)) ⁻¹' {true})
+        = {p : ℝ × ℝ | p.1 ≤ p.2} := by
+      ext p; simp [Function.uncurry, decide_eq_true_eq]
+    rw [h]; exact measurableSet_le measurable_fst measurable_snd
 
 end ProbLang

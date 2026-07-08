@@ -218,6 +218,13 @@ elab "twp_bind" colGt ppSpace focus:term:max : tactic =>
     let transPf ← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, bindPf]
     mvar.assign transPf
 
+/-- Opening any expression of a `Val` is the identity — values are locally closed.
+Lets `reduceExp` discharge the stuck `openRec k u v.fst` that a step leaves on an
+abstract value (which `openRec`'s recursion can't reduce, since `v.fst` is opaque),
+so proofs no longer need a manual `rw [← Exp.open_lc … v.lc]`. -/
+public theorem openRec_val_fst {α : Type _} (k : Nat) (t : Exp α) (v : Val α) :
+    Exp.openRec k t v.fst = v.fst := (Exp.open_lc k t v.fst v.lc).symm
+
 /-- Reduce a stepped `Exp` with the same lemmas as `twp_expr_simp` (unfold
 `open'`/`close`/`ofVal`, normalize Int/Nat/ite/ctor). All rewrites are computational,
 so the result is defeq to the input. `mdata` is stripped (re-attached by `reattachNames`). -/
@@ -238,6 +245,10 @@ meta def reduceExp {α : Q(Type)} (e : Q(Exp $α)) : MetaM Q(Exp $α) := do
     procs ← procs.add p (post := true)
   let ctx ← Simp.mkContext (simpTheorems := #[thms]) (congrTheorems := ← getSimpCongrTheorems)
   let ⟨res, _⟩ ← Lean.Meta.simp e ctx (simprocs := #[procs])
+  -- NB: only defeq-preserving reductions here (the result must be defeq to the synthesis
+  -- form `e₂syn` for the `PureExec` instance to apply). The stuck `openRec _ _ v.fst` on
+  -- an abstract value is NOT defeq to `v.fst` (needs the `open_lc` proof), so it is
+  -- cleared by a *propositional* `simp only [openRec_val_fst]` in `twp_pure`/`twp_pures`.
   return res.expr
 
 /-- Pre-order re-attach source binder names (from `collectBinderNames` of the redex
@@ -296,12 +307,43 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
       | ~q(Exp.fix $body) => let (s, ns) ← betaFix body v; return some (q(Exp.app (Exp.fix $body) $v), s, ns)
       | ~q(Exp.lam $body) => let (s, ns) ← beta body v;    return some (q(Exp.app (Exp.lam $body) $v), s, ns)
       | _ => return none
-  | ~q(.cond (.lit (.bool true)) $et $ef) => return some (e, et, #[])
-  | ~q(.cond (.lit (.bool false)) $et $ef)=> return some (e, ef, #[])
-  | ~q(.fst (.pair $e1 $_e2))             => return some (e, e1, #[])
-  | ~q(.snd (.pair $_e1 $e2))             => return some (e, e2, #[])
-  | ~q(.case (.inl $v) $el $_er)          => return some (e, q(Exp.app $el $v), #[])
-  | ~q(.case (.inr $v) $_el $er)          => return some (e, q(Exp.app $er $v), #[])
+  -- `cond`/`fst`/`snd`/`case` fire once their scrutinee is a value. That value may be
+  -- `Exp.ofVal`-wrapped (e.g. a `Val` plugged back in by `twp_bind`'s continuation, or a
+  -- destructured hypothesis), which is only *defeq* to the raw `.lit`/`.pair`/`.inl`
+  -- constructor — Qq's `~q` match is syntactic and won't see through it. So `whnf` the
+  -- scrutinee (unfolds `Exp.ofVal v` to `v.fst` and projects a concrete `Val`) before
+  -- matching; an abstract value stays stuck and falls through to `none` (no step).
+  -- `cond`/`fst`/`snd`/`case` fire once their scrutinee is a value. That value may be
+  -- `Exp.ofVal`-wrapped (e.g. a `Val` plugged back in by `twp_bind`'s continuation, or a
+  -- destructured hypothesis), which is only *defeq* to the raw `.lit`/`.pair`/`.inl`
+  -- constructor. So `whnf` the scrutinee (unfolds `Exp.ofVal v` to `v.fst`, projects a
+  -- concrete `Val`) and rebuild the redex `e₁'` with the *normalized* scrutinee — the
+  -- returned `e₁'` is still defeq to `e`, but `PureExec` instance synthesis is indexed by
+  -- the head constructor (a discrimination tree, which does NOT see through `ofVal`), so
+  -- it must see the literal `.lit`/`.pair`/`.inl` to find the instance. An abstract value
+  -- stays stuck under `whnf` and falls through to `none` (no step).
+  | ~q(.cond $c $et $ef)                  => do
+    let c0 : Q(Exp $α) ← whnf c
+    match c0 with
+    | ~q(Exp.lit (.bool true))  => return some (q(Exp.cond $c0 $et $ef), et, #[])
+    | ~q(Exp.lit (.bool false)) => return some (q(Exp.cond $c0 $et $ef), ef, #[])
+    | _                         => return none
+  | ~q(.fst $p)                           => do
+    let p0 : Q(Exp $α) ← whnf p
+    match p0 with
+    | ~q(Exp.pair $e1 $_e2) => return some (q(Exp.fst $p0), e1, #[])
+    | _                     => return none
+  | ~q(.snd $p)                           => do
+    let p0 : Q(Exp $α) ← whnf p
+    match p0 with
+    | ~q(Exp.pair $_e1 $e2) => return some (q(Exp.snd $p0), e2, #[])
+    | _                     => return none
+  | ~q(.case $s $el $er)                  => do
+    let s0 : Q(Exp $α) ← whnf s
+    match s0 with
+    | ~q(Exp.inl $v) => return some (q(Exp.case $s0 $el $er), q(Exp.app $el $v), #[])
+    | ~q(Exp.inr $v) => return some (q(Exp.case $s0 $el $er), q(Exp.app $er $v), #[])
+    | _              => return none
   | ~q(.binop $op $e1 $e2)                => do
     let r : Q(Option (Exp $α)) ← whnf q(@BinOp.eval $α $instPL $op $e1 $e2)
     match r with
@@ -444,11 +486,13 @@ macro "twp_expr_simp" : tactic =>
       Int.reduceNeg, Int.reducePow,
       Var.internal.injEq, reduceCtorEq])
 
-/-- `twp_pure [e]` takes one pure step. `twp_pure_core` now reduces and re-attaches
-source binder names internally (`reduceExp`/`reattachNames`), so no trailing
-`twp_expr_simp` is run — a `simp` here would strip the recovered names. -/
+/-- `twp_pure [e]` takes one pure step. `twp_pure_core` reduces + re-attaches source
+binder names internally; the trailing `simp only [openRec_val_fst]` is a *propositional*
+rewrite (not defeq, so it can't be in `reduceExp`) that clears a stuck `openRec _ _ v.fst`
+left when a substitution flows over an abstract value — replacing a manual
+`rw [← Exp.open_lc … v.lc]`. -/
 macro "twp_pure" focus:(ppSpace colGt term:max)? : tactic =>
-  `(tactic| twp_pure_core $[$focus]?)
+  `(tactic| (twp_pure_core $[$focus]?; try simp only [openRec_val_fst]))
 
 /-- `twp_lam` β-reduces a `(λ. _) v` application — an alias for `twp_pure`. -/
 macro "twp_lam" : tactic => `(tactic| twp_pure)
@@ -466,6 +510,7 @@ macro "twp_finish" : tactic =>
   `(tactic| (try twp_value))
 
 /-- `twp_pures` repeatedly takes pure steps (cleaning up after each) until none apply. -/
-macro "twp_pures" : tactic => `(tactic| repeat twp_pure_core)
+macro "twp_pures" : tactic =>
+  `(tactic| ((repeat twp_pure_core); try simp only [openRec_val_fst]))
 
 end ProbLang.TotalEris

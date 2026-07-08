@@ -88,5 +88,9 @@ instance instProbLangℝInt : ProbLang.ProbLangℝ Int where
   unifUnitIsConcentrated := by
     rw [PMF.toMeasure_apply_eq_zero_iff _ (.of_discrete), PMF.support_uniformOfFinset]
     exact disjoint_compl_right
+  realLt a b := decide (a < b)
+  realLe a b := decide (a ≤ b)
+  measurable_realLt := .of_discrete
+  measurable_realLe := .of_discrete
 
 end ProbLangDiscrete
