@@ -86,9 +86,7 @@ transparently unfolds to `BNEHalf` for the proof-mode unifier (`iapply`). -/
 
 /-- Success bias of `BNEHalf`: `exp(-½) ∈ (0,1)`. -/
 noncomputable def γBNE : ↑unitInterval :=
-  ⟨Real.exp (-1 / 2), (Real.exp_pos _).le, by
-    have := Real.exp_le_exp.mpr (show (-1 / 2 : ℝ) ≤ 0 by norm_num)
-    rwa [Real.exp_zero] at this⟩
+  ⟨Real.exp (-1 / 2), (Real.exp_pos _).le, Real.exp_le_one_iff.mpr (by norm_num)⟩
 
 /-- `(γBNE : ℝ) = exp(-½)`. -/
 theorem γBNE_coe : (γBNE : ℝ) = Real.exp (-1 / 2) := rfl
@@ -98,7 +96,7 @@ theorem γBNE_pos : (0 : ℝ) < (γBNE : ℝ) := Real.exp_pos _
 theorem γBNE_nonneg : (0 : ℝ) ≤ (γBNE : ℝ) := γBNE_pos.le
 
 theorem γBNE_lt_one : (γBNE : ℝ) < 1 := by
-  rw [γBNE_coe, ← Real.exp_zero]; exact Real.exp_lt_exp.mpr (by norm_num)
+  rw [γBNE_coe]; exact Real.exp_lt_one_iff.mpr (by norm_num)
 
 /-- Credit-shape bridge: the `AbstractBernoulli` credit is exactly `BNEHalfCreditV`. -/
 theorem γBNE_credit_eq (F : Bool → ℝ≥0∞) :
@@ -106,11 +104,11 @@ theorem γBNE_credit_eq (F : Bool → ℝ≥0∞) :
       = BNEHalfCreditV F := by
   have ht : BNEHalfμ true = ENNReal.ofReal (Real.exp (-1 / 2)) := rfl
   have hf : BNEHalfμ false = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := rfl
-  simp only [BNEHalfCreditV, ht, hf]
-  rw [γBNE_coe,
-      show (1 : ℝ≥0∞) - ENNReal.ofReal (Real.exp (-1 / 2))
-            = ENNReal.ofReal (1 - Real.exp (-1 / 2)) from by
-        rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ (Real.exp_pos _).le]]
+  simp only [BNEHalfCreditV, ht, hf, γBNE_coe]
+  have h1 : (1 : ℝ≥0∞) - ENNReal.ofReal (Real.exp (-1 / 2))
+      = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := by
+    rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ (Real.exp_pos _).le]
+  rw [h1]
   ring
 
 /-- `BNEHalf` satisfies the `AbstractBernoulli` interface (`Bool`-indexed `F` is always
@@ -221,14 +219,13 @@ theorem Norm1_reject_lt_one : (1 - (γBNE : ℝ)) * Norm1 < 1 := by
 /-- `G1` reject-loop amplification factor `= 1/reject`, `reject = 1 - (1-γ)·Norm1`. -/
 noncomputable def G1Factor : ℝ≥0 :=
   ⟨1 / (1 - (1 - (γBNE : ℝ)) * Norm1),
-    div_nonneg zero_le_one (by have := Norm1_reject_lt_one; linarith)⟩
+    div_nonneg zero_le_one (by linarith [Norm1_reject_lt_one])⟩
 
 /-- `1 < G1Factor` (the `G1` reject mass `(1-γ)·Norm1` is strictly positive). -/
 theorem one_lt_G1Factor : 1 < G1Factor := by
   rw [← NNReal.coe_lt_coe, NNReal.coe_one]
   show (1 : ℝ) < 1 / (1 - (1 - (γBNE : ℝ)) * Norm1)
-  have hrpos : 0 < 1 - (1 - (γBNE : ℝ)) * Norm1 := by
-    have := Norm1_reject_lt_one; linarith
+  have hrpos : 0 < 1 - (1 - (γBNE : ℝ)) * Norm1 := linarith [Norm1_reject_lt_one]
   rw [one_lt_div hrpos]
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   have : 0 < (1 - (γBNE : ℝ)) * Norm1 := mul_pos (by linarith) Norm1_pos
@@ -238,8 +235,9 @@ theorem one_lt_G1Factor : 1 < G1Factor := by
 theorem geometricPMF_tsum : ∑' k : ℕ, GeometricPMF γBNE k = 1 := by
   have hγ0 : (0 : ℝ) ≤ (γBNE : ℝ) := γBNE_nonneg
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
-  rw [show (fun k : ℕ => GeometricPMF γBNE k)
-        = fun k => ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) from by funext k; rfl,
+  have hdef : (fun k : ℕ => GeometricPMF γBNE k)
+      = fun k => ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) := by funext k; rfl
+  rw [hdef,
       ← ENNReal.ofReal_tsum_of_nonneg (fun k => mul_nonneg (by positivity) (by linarith))
         ((summable_geometric_of_lt_one hγ0 hγ1).mul_right _),
       tsum_mul_right, tsum_geometric_of_lt_one hγ0 hγ1,
@@ -252,17 +250,19 @@ theorem geom_iterN_tsum :
       = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Norm1) := by
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   have hterm : ∀ k : ℕ, GeometricPMF γBNE k * ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)
-      = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Real.exp (-(k : ℝ) ^ 2 / 2)) := fun k => by
-    rw [show GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) from rfl,
-        ← ENNReal.ofReal_mul (mul_nonneg (pow_nonneg γBNE.2.1 k) (by linarith))]
+      = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Real.exp (-(k : ℝ) ^ 2 / 2)) := by
+    intro k
+    have hpmf : GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) := rfl
+    rw [hpmf, ← ENNReal.ofReal_mul (mul_nonneg (pow_nonneg γBNE.2.1 k) (by linarith))]
     congr 1
     have hkk : k + IterN k = k ^ 2 := by
-      unfold IterN; cases k with
+      unfold IterN
+      cases k with
       | zero => rfl
       | succ n => rw [Nat.succ_sub_one]; ring
-    rw [show (γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ IterN k
-          = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (k + IterN k) from by rw [pow_add]; ring, hkk,
-      γBNE_coe, ← Real.exp_nat_mul]
+    have hmul : (γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ IterN k
+        = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (k + IterN k) := by rw [pow_add]; ring
+    rw [hmul, hkk, γBNE_coe, ← Real.exp_nat_mul]
     congr 2; push_cast; ring
   rw [tsum_congr hterm,
       ← ENNReal.ofReal_tsum_of_nonneg (fun k => mul_nonneg (by linarith) (Real.exp_pos _).le)
@@ -276,39 +276,45 @@ theorem G1_geo_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
     shiftGeometricPMF_expectation γBNE 0 (G1_geoCredit F ((G1Factor : ℝ≥0∞) * ε))
       = G1_CreditV F + ε := by
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
-  have hrej : (0 : ℝ) < 1 - (1 - (γBNE : ℝ)) * Norm1 := by have := Norm1_reject_lt_one; linarith
+  have hrej : (0 : ℝ) < 1 - (1 - (γBNE : ℝ)) * Norm1 := by linarith [Norm1_reject_lt_one]
   set c := (G1Factor : ℝ≥0∞) * ε with hc
   set R := ENNReal.ofReal ((1 - (γBNE : ℝ)) * Norm1) with hR
   have hR1 : R ≤ 1 := by
     rw [hR, ← ENNReal.ofReal_one]
-    exact ENNReal.ofReal_le_ofReal (by have := Norm1_reject_lt_one; linarith)
+    exact ENNReal.ofReal_le_ofReal (by linarith [Norm1_reject_lt_one])
   have hak1 : ∀ k, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) ≤ 1 := fun k => by
     rw [← ENNReal.ofReal_one]; exact ENNReal.ofReal_le_ofReal (pow_le_one₀ γBNE.2.1 hγ1.le)
+  have hpmf (k : ℕ) : GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) := rfl
+  have hkk (k : ℕ) : IterN k + k = k ^ 2 := by
+    unfold IterN
+    cases k with
+    | zero => rfl
+    | succ n => rw [Nat.succ_sub_one]; ring
   -- per-term accept mass · `G1μ`.
   have hpterm : ∀ k, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k = R * G1μ k := by
     intro k
-    have hkk : IterN k + k = k ^ 2 := by
-      unfold IterN; cases k with
-      | zero => rfl
-      | succ n => rw [Nat.succ_sub_one]; ring
-    rw [hR, G1μ, show GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) from rfl,
+    rw [hR, G1μ, hpmf k,
         ← ENNReal.ofReal_mul (pow_nonneg γBNE.2.1 _),
         ← ENNReal.ofReal_mul (mul_nonneg (by linarith) Norm1_pos.le)]
     congr 1
-    rw [show (γBNE : ℝ) ^ IterN k * ((γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)))
-          = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (IterN k + k) from by rw [pow_add]; ring, hkk,
-        show (γBNE : ℝ) ^ k ^ 2 = Real.exp (-(k : ℝ) ^ 2 / 2) from by
-          rw [γBNE_coe, ← Real.exp_nat_mul]; congr 1; push_cast; ring]
+    have hmul : (γBNE : ℝ) ^ IterN k * ((γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)))
+        = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (IterN k + k) := by rw [pow_add]; ring
+    have hexp : (γBNE : ℝ) ^ k ^ 2 = Real.exp (-(k : ℝ) ^ 2 / 2) := by
+      rw [γBNE_coe, ← Real.exp_nat_mul]; congr 1; push_cast; ring
+    rw [hmul, hkk k, hexp]
     field_simp [ne_of_gt Norm1_pos]
   have hRfin : (∑' k : ℕ, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k) = R := by
     rw [tsum_congr fun k => mul_comm _ _]; exact geom_iterN_tsum
   -- the reject mass sums to `1 - R`.
   have hrejsum : (∑' k : ℕ, (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k)
       = 1 - R := by
-    rw [show (fun k : ℕ => (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k)
+    have hfun :
+        (fun k : ℕ => (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k)
           = fun k => GeometricPMF γBNE k
-              - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k from by
-        funext k; rw [ENNReal.sub_mul (fun _ _ => by simp [GeometricPMF]), one_mul],
+              - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k := by
+      funext k
+      rw [ENNReal.sub_mul (fun _ _ => by simp [GeometricPMF]), one_mul]
+    rw [hfun,
       ENNReal.tsum_sub (by rw [hRfin, hR]; exact ENNReal.ofReal_ne_top)
         (fun k => by
           nth_rewrite 2 [← one_mul (GeometricPMF γBNE k)]
@@ -319,34 +325,36 @@ theorem G1_geo_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
       = R * G1μ k * F k
         + (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k * (G1_CreditV F + c) := by
     intro k
-    rw [show (0 : ℤ) + (k : ℤ) = (k : ℤ) from by ring,
-        show G1_geoCredit F c (k : ℤ) = ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * F k
-            + (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * (G1_CreditV F + c) from rfl,
-        add_mul, ← hpterm k]
+    have h0 : (0 : ℤ) + (k : ℤ) = (k : ℤ) := by ring
+    have hgc : G1_geoCredit F c (k : ℤ)
+        = ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * F k
+            + (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * (G1_CreditV F + c) := rfl
+    rw [h0, hgc, add_mul, ← hpterm k]
     ring
   unfold shiftGeometricPMF_expectation
-  rw [tsum_congr hgeo, ENNReal.tsum_add,
-      show (∑' k : ℕ, R * G1μ k * F k) = R * G1_CreditV F from by
-        rw [G1_CreditV, ← ENNReal.tsum_mul_left]; exact tsum_congr fun k => by rw [mul_assoc],
-      show (∑' k : ℕ, (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k
-              * (G1_CreditV F + c))
-          = (G1_CreditV F + c) * (1 - R) from by
-        rw [ENNReal.tsum_mul_right, hrejsum, mul_comm]]
+  have hacc : (∑' k : ℕ, R * G1μ k * F k) = R * G1_CreditV F := by
+    rw [G1_CreditV, ← ENNReal.tsum_mul_left]; exact tsum_congr fun k => by rw [mul_assoc]
+  have hrej' : (∑' k : ℕ, (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k
+        * (G1_CreditV F + c))
+      = (G1_CreditV F + c) * (1 - R) := by
+    rw [ENNReal.tsum_mul_right, hrejsum, mul_comm]
+  rw [tsum_congr hgeo, ENNReal.tsum_add, hacc, hrej']
   -- rejection algebra: `R·X + (X+c)·(1-R) = X + c·(1-R)`, and `c·(1-R) = ε`.
-  rw [show R * G1_CreditV F + (G1_CreditV F + c) * (1 - R)
-        = G1_CreditV F * (R + (1 - R)) + c * (1 - R) from by ring,
-      add_tsub_cancel_of_le hR1, mul_one]
+  have halg : R * G1_CreditV F + (G1_CreditV F + c) * (1 - R)
+      = G1_CreditV F * (R + (1 - R)) + c * (1 - R) := by ring
+  rw [halg, add_tsub_cancel_of_le hR1, mul_one]
   congr 1
   -- `c·(1-R) = ε`, using `G1Factor · reject = 1`.
   have h1R : (1 : ℝ≥0∞) - R = ENNReal.ofReal (1 - (1 - (γBNE : ℝ)) * Norm1) := by
     rw [hR, ENNReal.ofReal_sub _ (mul_nonneg (by linarith) Norm1_pos.le), ENNReal.ofReal_one]
-  rw [hc, h1R, mul_right_comm,
-      show (↑G1Factor : ℝ≥0∞) * ENNReal.ofReal (1 - (1 - (γBNE : ℝ)) * Norm1) = 1 from by
-        rw [show (↑G1Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - (1 - (γBNE : ℝ)) * Norm1)) from by
-              rw [G1Factor, ← ENNReal.ofReal_coe_nnreal]; rfl,
-            ← ENNReal.ofReal_mul (by positivity), one_div_mul_cancel (ne_of_gt hrej),
-            ENNReal.ofReal_one],
-      one_mul]
+  have hFac : (↑G1Factor : ℝ≥0∞)
+      = ENNReal.ofReal (1 / (1 - (1 - (γBNE : ℝ)) * Norm1)) := by
+    rw [G1Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
+  have hcancel : (↑G1Factor : ℝ≥0∞)
+      * ENNReal.ofReal (1 - (1 - (γBNE : ℝ)) * Norm1) = 1 := by
+    rw [hFac, ← ENNReal.ofReal_mul (by positivity), one_div_mul_cancel (ne_of_gt hrej),
+      ENNReal.ofReal_one]
+  rw [hc, h1R, mul_right_comm, hcancel, one_mul]
 
 /-! ### Specification
 
@@ -390,13 +398,14 @@ theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀
   twp_bind pl(&IterTrial &BNEHalf (#(.int z) * (#(.int z) - #1)))
   twp_pure
   twp_pure
-  rw [show (z * (z - 1)) = ((IterN z.toNat : ℕ) : ℤ) from by
-        rw [IterN]
-        obtain ⟨k, rfl⟩ : ∃ k : ℕ, z = (k : ℤ) := ⟨z.toNat, (Int.toNat_of_nonneg hz0).symm⟩
-        simp only [Int.toNat_natCast]
-        cases k with
-        | zero => simp
-        | succ k => push_cast; ring]
+  have hzn : (z * (z - 1)) = ((IterN z.toNat : ℕ) : ℤ) := by
+    rw [IterN]
+    obtain ⟨k, rfl⟩ : ∃ k : ℕ, z = (k : ℤ) := ⟨z.toNat, (Int.toNat_of_nonneg hz0).symm⟩
+    simp only [Int.toNat_natCast]
+    cases k with
+    | zero => simp
+    | succ k => push_cast; ring
+  rw [hzn]
   iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
     ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (G1_h_amp F ((kf : ℝ≥0∞) * ε_term) z.toNat b) ∗ ⌜True⌝)))
   isplitl [Hck]
@@ -420,7 +429,8 @@ theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀
     iexists z.toNat
     isplitr [Hcb]
     · ipureintro
-      rw [show Int.ofNat z.toNat = z from Int.toNat_of_nonneg hz0]
+      have hz : Int.ofNat z.toNat = z := Int.toNat_of_nonneg hz0
+      rw [hz]
     · rw [← hcb]; iexact Hcb
   | false =>
     -- reject: recurse `trial ()`, cost `G1_CreditV F + k·ε_term`.
@@ -488,8 +498,9 @@ theorem abstractBernoulliI_Bkx (k : ℕ) (x : ℝ) (hx : 0 ≤ x ∧ x ≤ 1) (I
     iintro %F ⟨Hε, HI⟩
     twp_pure
     -- the closure β left an `open`/`close` tower around the closed `B`; collapse it.
-    rw [show (Exp.openRec 0 (Exp.lit .unit) (Exp.closeRec 0 (Var.internal 0) B) : Exp ℝ) = B
-          from rfl]
+    have hβ :
+        (Exp.openRec 0 (Exp.lit .unit) (Exp.closeRec 0 (Var.internal 0) B) : Exp ℝ) = B := rfl
+    rw [hβ]
     iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
       ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b))))
     isplitl [Hε]
@@ -610,9 +621,8 @@ theorem Norm2_lt_Norm1 : Norm2 < Norm1 := by
 
 /-- `G2` reject-loop amplification factor `= 1/reject`, `reject = 1 - Norm2/Norm1`. -/
 noncomputable def G2Factor : ℝ≥0 :=
-  ⟨1 / (1 - Norm2 / Norm1), div_nonneg zero_le_one (by
-    have h := Norm2_lt_Norm1; have := Norm1_pos
-    rw [sub_nonneg, div_le_one Norm1_pos]; linarith)⟩
+  ⟨1 / (1 - Norm2 / Norm1),
+    div_nonneg zero_le_one (by rw [sub_nonneg, div_le_one Norm1_pos]; exact Norm2_lt_Norm1.le)⟩
 
 /-- `1 < G2Factor` (the `G2` reject mass `Norm2/Norm1` is strictly positive). -/
 theorem one_lt_G2Factor : 1 < G2Factor := by
@@ -651,12 +661,12 @@ feed the `G2` amplification collapse `G2_g1_collapse`. -/
 /-- `G1μ` is a PMF: `∑ₖ exp(-k²/2)/Norm1 = Norm1/Norm1 = 1`. -/
 theorem G1μ_tsum : ∑' k : ℕ, G1μ k = 1 := by
   simp only [G1μ]
+  have hsum : (∑' k : ℕ, Real.exp (-(k : ℝ) ^ 2 / 2) / Norm1) = 1 := by
+    rw [tsum_div_const, ← Norm1, div_self (ne_of_gt Norm1_pos)]
   rw [← ENNReal.ofReal_tsum_of_nonneg
         (fun k => div_nonneg (Real.exp_pos _).le Norm1_pos.le)
         (summable_normTerm.div_const _),
-      show (∑' k : ℕ, Real.exp (-(k : ℝ) ^ 2 / 2) / Norm1) = 1 from by
-        rw [tsum_div_const, ← Norm1, div_self (ne_of_gt Norm1_pos)],
-      ENNReal.ofReal_one]
+      hsum, ENNReal.ofReal_one]
 
 open MeasureTheory in
 /-- The `x`-integral of `G2μ k` over the fresh sample. -/
@@ -708,10 +718,10 @@ theorem G1μ_mul_accept (k : ℕ) {x : ℝ} (hx : 0 ≤ x) :
   rw [hpow, ← ENNReal.ofReal_mul (div_nonneg (Real.exp_pos _).le Norm1_pos.le),
       ← ENNReal.ofReal_mul (div_nonneg Norm2_pos.le Norm1_pos.le)]
   congr 1
-  rw [show Real.exp (-(k : ℝ) ^ 2 / 2) / Norm1 * Real.exp (-x * (2 * k + x) / 2)
-        = Real.exp (-(k : ℝ) ^ 2 / 2) * Real.exp (-x * (2 * k + x) / 2) / Norm1 from by ring,
-      ← Real.exp_add,
-      show -(k : ℝ) ^ 2 / 2 + -x * (2 * k + x) / 2 = -((x + k) ^ 2) / 2 from by ring]
+  have hrr : Real.exp (-(k : ℝ) ^ 2 / 2) / Norm1 * Real.exp (-x * (2 * k + x) / 2)
+      = Real.exp (-(k : ℝ) ^ 2 / 2) * Real.exp (-x * (2 * k + x) / 2) / Norm1 := by ring
+  have hadd : -(k : ℝ) ^ 2 / 2 + -x * (2 * k + x) / 2 = -((x + k) ^ 2) / 2 := by ring
+  rw [hrr, ← Real.exp_add, hadd]
   field_simp [ne_of_gt Norm1_pos, ne_of_gt Norm2_pos]
 
 open MeasureTheory in
@@ -758,14 +768,17 @@ theorem G2_g1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable
     rw [MeasureTheory.lintegral_sub (G2p_measurable k) (ne_top_of_le_ne_top ENNReal.one_ne_top (hq1 k))
           (Filter.Eventually.of_forall (fun x => G2p_le_one k x)), unifUnit_lintegral_one]
   -- reject mass sums to `1 - Norm2/Norm1`.
+  have hfun :
+      (fun k : ℕ => (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1μ k)
+        = fun k => G1μ k
+            - ENNReal.ofReal (Norm2 / Norm1)
+              * ∫⁻ x, G2μ k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
+    funext k
+    rw [ENNReal.sub_mul (fun _ _ => by rw [G1μ]; exact ENNReal.ofReal_ne_top), one_mul,
+        mul_comm (∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) (G1μ k), G2_accept_mass k]
   have hrejsum : (∑' k : ℕ, (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1μ k)
       = 1 - ENNReal.ofReal (Norm2 / Norm1) := by
-    rw [show (fun k : ℕ => (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1μ k)
-          = fun k => G1μ k
-              - ENNReal.ofReal (Norm2 / Norm1) * ∫⁻ x, G2μ k x ∂(ProbLangℝ.unifUnit (T := ℝ)) from by
-        funext k
-        rw [ENNReal.sub_mul (fun _ _ => by rw [G1μ]; exact ENNReal.ofReal_ne_top), one_mul,
-            mul_comm (∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) (G1μ k), G2_accept_mass k],
+    rw [hfun,
       ENNReal.tsum_sub
         (by rw [ENNReal.tsum_mul_left, G2μ_total, mul_one]
             exact ne_top_of_le_ne_top ENNReal.one_ne_top hρ_le) hgm_mul,
@@ -780,31 +793,30 @@ theorem G2_g1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable
       = ENNReal.ofReal (Norm2 / Norm1) * (∫⁻ x, G2μ k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)))
         + (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1μ k * (G2_CreditV F + c) := by
     intro k
-    rw [G2_g1Credit,
-        show (fun x => G2_g_amp F c k x)
-            = fun x => G2p k x * F k x + (1 - G2p k x) * (G2_CreditV F + c) from by
-          funext x; rw [G2_g_amp, IterCreditV]; rfl,
+    have hamp : (fun x => G2_g_amp F c k x)
+        = fun x => G2p k x * F k x + (1 - G2p k x) * (G2_CreditV F + c) := by
+      funext x; rw [G2_g_amp, IterCreditV]; rfl
+    rw [G2_g1Credit, hamp,
         lintegral_add_left ((G2p_measurable k).mul (hFm k)),
         lintegral_mul_const _ ((G2p_measurable k).const_sub 1),
         mul_add, G2_accept_lintegral F k, h1mp k]
     ring
   rw [G1_CreditV, tsum_congr hsplit, ENNReal.tsum_add, haccsum, ENNReal.tsum_mul_right, hrejsum]
   -- rejection algebra: `ρ·X + (X+c)·(1-ρ) = X + c·(1-ρ)`, and `c·(1-ρ) = ε`.
-  rw [show ENNReal.ofReal (Norm2 / Norm1) * G2_CreditV F
+  have halg : ENNReal.ofReal (Norm2 / Norm1) * G2_CreditV F
         + (1 - ENNReal.ofReal (Norm2 / Norm1)) * (G2_CreditV F + c)
-        = G2_CreditV F * (ENNReal.ofReal (Norm2 / Norm1) + (1 - ENNReal.ofReal (Norm2 / Norm1)))
-          + c * (1 - ENNReal.ofReal (Norm2 / Norm1)) from by ring,
-      add_tsub_cancel_of_le hρ_le, mul_one]
+      = G2_CreditV F * (ENNReal.ofReal (Norm2 / Norm1) + (1 - ENNReal.ofReal (Norm2 / Norm1)))
+        + c * (1 - ENNReal.ofReal (Norm2 / Norm1)) := by ring
+  rw [halg, add_tsub_cancel_of_le hρ_le, mul_one]
   congr 1
   have h1ρ : (1 : ℝ≥0∞) - ENNReal.ofReal (Norm2 / Norm1) = ENNReal.ofReal (1 - Norm2 / Norm1) := by
     rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ (div_nonneg Norm2_pos.le Norm1_pos.le)]
-  rw [hc, h1ρ, mul_right_comm,
-      show (↑G2Factor : ℝ≥0∞) * ENNReal.ofReal (1 - Norm2 / Norm1) = 1 from by
-        rw [show (↑G2Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - Norm2 / Norm1)) from by
-              rw [G2Factor, ← ENNReal.ofReal_coe_nnreal]; rfl,
-            ← ENNReal.ofReal_mul (div_nonneg zero_le_one hrej_pos.le),
-            one_div_mul_cancel (ne_of_gt hrej_pos), ENNReal.ofReal_one],
-      one_mul]
+  have hFac : (↑G2Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - Norm2 / Norm1)) := by
+    rw [G2Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
+  have hcancel : (↑G2Factor : ℝ≥0∞) * ENNReal.ofReal (1 - Norm2 / Norm1) = 1 := by
+    rw [hFac, ← ENNReal.ofReal_mul (div_nonneg zero_le_one hrej_pos.le),
+        one_div_mul_cancel (ne_of_gt hrej_pos), ENNReal.ofReal_one]
+  rw [hc, h1ρ, mul_right_comm, hcancel, one_mul]
 
 /-! ### Specification
 
@@ -843,10 +855,10 @@ theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞)
                 ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
               apply MeasureTheory.lintegral_mono_ae
               filter_upwards [MeasureTheory.ae_restrict_mem measurableSet_Icc] with x hx
-              rw [G2_g_amp, IterCreditV,
-                  show G2_s_amp F ((kf : ℝ≥0∞) * ε_term) n x true = F n x from by simp [G2_s_amp],
-                  show G2_s_amp F ((kf : ℝ≥0∞) * ε_term) n x false
-                      = G2_CreditV F + (kf : ℝ≥0∞) * ε_term from by simp [G2_s_amp]]
+              have ht : G2_s_amp F ((kf : ℝ≥0∞) * ε_term) n x true = F n x := by simp [G2_s_amp]
+              have hf : G2_s_amp F ((kf : ℝ≥0∞) * ε_term) n x false
+                  = G2_CreditV F + (kf : ℝ≥0∞) * ε_term := by simp [G2_s_amp]
+              rw [G2_g_amp, IterCreditV, ht, hf]
               exact add_le_add
                 ((mul_le_mul' (G2p_le_one n x) (Hnn x n hx.1 hx.2)).trans
                   (_root_.le_of_eq (one_mul M)))
@@ -867,8 +879,10 @@ theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞)
   twp_bind pl(urand)
   iapply (twp_urand_exp' (ε₂ := G2_g_amp F ((kf : ℝ≥0∞) * ε_term) k)
     (G2_g_amp_measurable F hFm ((kf : ℝ≥0∞) * ε_term) k) ?hint) $$ Hck
-  case hint => rw [show G2_g1Credit F ((kf : ℝ≥0∞) * ε_term) k
-      = ∫⁻ x, G2_g_amp F ((kf : ℝ≥0∞) * ε_term) k x ∂(ProbLangℝ.unifUnit (T := ℝ)) from rfl]
+  case hint =>
+    have hdef : G2_g1Credit F ((kf : ℝ≥0∞) * ε_term) k
+        = ∫⁻ x, G2_g_amp F ((kf : ℝ≥0∞) * ε_term) k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := rfl
+    rw [hdef]
   iintro %x ⟨%Hxm, Hcx⟩
   have Hx01 : 0 < x ∧ x < 1 := mem_unifUnitSupport_real.mp Hxm
   have Hxr : 0 ≤ x ∧ x ≤ 1 := ⟨Hx01.1.le, Hx01.2.le⟩
@@ -876,7 +890,8 @@ theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞)
   twp_pure
   twp_bind pl(&IterTrial &(BkxVal k x).1 (#(.int (k : ℤ)) + #1))
   twp_pure
-  rw [show ((k : ℤ) + 1) = ((k + 1 : ℕ) : ℤ) from by push_cast; ring]
+  have hk1 : ((k : ℤ) + 1) = ((k + 1 : ℕ) : ℤ) := by push_cast; ring
+  rw [hk1]
   have hck : G2_g_amp F ((kf : ℝ≥0∞) * ε_term) k x
       = IterCreditV (G2_s_amp F ((kf : ℝ≥0∞) * ε_term) k x) (γBkx k x) (k + 1) := rfl
   iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,

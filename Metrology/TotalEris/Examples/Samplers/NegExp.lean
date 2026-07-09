@@ -52,14 +52,16 @@ def NegExpρ (L k : ℕ) (x : ℝ) : ℝ≥0∞ :=
 /-- On `[0,1]`, `NegExpρ0 0 x` is `exp(-x)` (the `0 ≤ x ≤ 1` guard fires, `x + 0 = x`). -/
 theorem NegExpρ0_zero {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
     NegExpρ0 0 x = ENNReal.ofReal (Real.exp (-x)) := by
-  unfold NegExpρ0; rw [if_pos ⟨hx0, hx1⟩]; congr 2; push_cast; ring
+  unfold NegExpρ0
+  rw [if_pos ⟨hx0, hx1⟩, Nat.cast_zero, add_zero]
 
 /-- On `[0,1]`, `NegExpρ0 (j+1)` factors an `exp(-1)` off `NegExpρ0 j`. -/
 theorem NegExpρ0_succ {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (j : ℕ) :
     NegExpρ0 (j + 1) x = ENNReal.ofReal (Real.exp (-1)) * NegExpρ0 j x := by
   unfold NegExpρ0
-  rw [if_pos ⟨hx0, hx1⟩, if_pos ⟨hx0, hx1⟩, ← ENNReal.ofReal_mul (Real.exp_pos _).le, ← Real.exp_add]
-  congr 2; push_cast; ring
+  rw [if_pos ⟨hx0, hx1⟩, if_pos ⟨hx0, hx1⟩, ← ENNReal.ofReal_mul (Real.exp_pos _).le,
+    ← Real.exp_add]
+  gcongr; push_cast; ring
 
 open MeasureTheory in
 /-- Credit expectation `∑ₖ ∫₀¹ NegExpρ L k x · F k x dx`. -/
@@ -74,17 +76,16 @@ theorem NegExpCreditV_reindex (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
   rw [← (add_right_injective L).tsum_eq
         (f := fun k => ∫⁻ x, NegExpρ L k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))) ?supp]
   · exact tsum_congr fun j => lintegral_congr fun x => by
-      rw [show NegExpρ L (L + j) x = NegExpρ0 j x from by
-        simp only [NegExpρ, if_pos (Nat.le_add_right L j), Nat.add_sub_cancel_left]]
+      simp only [NegExpρ, if_pos (Nat.le_add_right L j), Nat.add_sub_cancel_left]
   · intro k hk
     simp only [Function.mem_support, ne_eq] at hk
     have hkL : L ≤ k := by
       by_contra h
       apply hk
       have hz : ∀ x, NegExpρ L k x * F k x = 0 := fun x => by
-        rw [show NegExpρ L k x = 0 from by simp only [NegExpρ, if_neg h], zero_mul]
+        simp only [NegExpρ, if_neg h, zero_mul]
       simp only [hz, lintegral_zero]
-    exact ⟨k - L, by show L + (k - L) = k; omega⟩
+    exact ⟨k - L, Nat.add_sub_of_le hkL⟩
 
 open MeasureTheory in
 /-- `NegExpCreditV` one-step recurrence: peel the `j = 0` answer term, factor `exp(-1)`
@@ -102,12 +103,10 @@ theorem NegExpCreditV_recurrence (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
       (fun x hx => by rw [NegExpρ0_zero hx.1 hx.2])
   · rw [NegExpCreditV_reindex F (L + 1), ← ENNReal.tsum_mul_left]
     refine tsum_congr fun j => ?_
-    rw [show (∫⁻ x, NegExpρ0 (j + 1) x * F (L + (j + 1)) x ∂(ProbLangℝ.unifUnit (T := ℝ)))
-          = ∫⁻ x, ENNReal.ofReal (Real.exp (-1)) * (NegExpρ0 j x * F (L + 1 + j) x)
-              ∂(ProbLangℝ.unifUnit (T := ℝ)) from
-        setLIntegral_congr_fun measurableSet_Icc (fun x hx => by
-          rw [NegExpρ0_succ hx.1 hx.2, show L + (j + 1) = L + 1 + j from by omega, mul_assoc]),
-      lintegral_const_mul' _ _ ENNReal.ofReal_ne_top]
+    rw [← lintegral_const_mul' _ _ ENNReal.ofReal_ne_top]
+    refine setLIntegral_congr_fun measurableSet_Icc (fun x hx => ?_)
+    have hidx : L + (j + 1) = L + 1 + j := by omega
+    rw [NegExpρ0_succ hx.1 hx.2, hidx, mul_assoc]
 
 /-- Per-iteration **rejection** (odd-parity) probability `= exp (-1)`: the
 closed form of the odd-indexed `DecrTrial` mass. -/
@@ -122,19 +121,17 @@ def NegExpFactor : ℝ≥0 := ⟨Real.exp 1, (Real.exp_pos 1).le⟩
 theorem one_lt_NegExpFactor : 1 < NegExpFactor := by
   rw [← NNReal.coe_lt_coe, NNReal.coe_one]
   show (1 : ℝ) < Real.exp 1
-  have := Real.add_one_le_exp (1 : ℝ)
-  linarith
+  linarith [Real.add_one_le_exp (1 : ℝ)]
 
 /-- `exp (-1) · exp 1 = 1`: the reject probability times the amplification factor
 collapses to one, exactly as `γ · (1/γ) = 1` does in `BernoulliGeometric`. -/
 theorem NegExpRejectProb_mul_NegExpFactor :
     NegExpRejectProb * (NegExpFactor : ℝ≥0∞) = 1 := by
-  unfold NegExpRejectProb
-  rw [← ENNReal.ofReal_coe_nnreal (p := NegExpFactor), ← ENNReal.ofReal_mul (Real.exp_pos _).le]
-  have h : Real.exp (-1) * (NegExpFactor : ℝ) = 1 := by
-    show Real.exp (-1) * Real.exp 1 = 1
-    rw [← Real.exp_add]; norm_num
-  rw [h, ENNReal.ofReal_one]
+  rw [NegExpRejectProb, ← ENNReal.ofReal_coe_nnreal (p := NegExpFactor),
+      ← ENNReal.ofReal_mul (Real.exp_pos _).le]
+  show ENNReal.ofReal (Real.exp (-1) * Real.exp 1) = 1
+  rw [← Real.exp_add]
+  norm_num
 
 /-- Amplified per-`DecrTrial`-result credit: on an **even** result (accept) the
 answer cost `F L x`; on an **odd** result (reject/recurse) the continuation cost
@@ -148,17 +145,18 @@ open MeasureTheory in
 theorem NegExpReject_lintegral :
     ∫⁻ x, ENNReal.ofReal (1 - Real.exp (-x)) ∂(ProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (Real.exp (-1)) := by
+  have h_exp : ∫ x in (0 : ℝ)..1, Real.exp (-x) = 1 - Real.exp (-1) := by
+    rw [intervalIntegral.integral_comp_neg fun t => Real.exp t, integral_exp]
+    simp only [neg_zero, Real.exp_zero]
   show ∫⁻ x in Set.Icc (0 : ℝ) 1, ENNReal.ofReal (1 - Real.exp (-x)) ∂volume = _
   rw [lintegral_ofReal_Icc (by norm_num) (by fun_prop) (fun x hx => by
-        have : Real.exp (-x) ≤ 1 := Real.exp_le_one_iff.mpr (by linarith [hx.1]); linarith),
-    show (∫ x in (0 : ℝ)..1, (1 - Real.exp (-x))) = Real.exp (-1) from by
-      rw [intervalIntegral.integral_sub intervalIntegrable_const
-            (Continuous.intervalIntegrable (by fun_prop) _ _),
-          intervalIntegral.integral_const,
-          show (∫ x in (0 : ℝ)..1, Real.exp (-x)) = 1 - Real.exp (-1) from by
-            rw [intervalIntegral.integral_comp_neg fun t => Real.exp t]
-            simp only [neg_zero]; rw [integral_exp, Real.exp_zero]]
-      simp only [smul_eq_mul, mul_one, sub_zero]; ring]
+        have : Real.exp (-x) ≤ 1 := Real.exp_le_one_iff.mpr (by linarith [hx.1]); linarith)]
+  congr 1
+  rw [intervalIntegral.integral_sub intervalIntegrable_const
+        (Continuous.intervalIntegrable (by fun_prop) _ _),
+      intervalIntegral.integral_const, h_exp]
+  simp only [smul_eq_mul, mul_one, sub_zero]
+  ring
 
 open MeasureTheory in
 /-- The `NegExp` credit recurrence: integrating the amplified `DecrTrial` budget
@@ -168,12 +166,13 @@ theorem NegExp_credit_recurrence (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) (c :
     ∫⁻ x, RealDecrTrialCreditV (NegExpAmp F x L c) 0 x ∂(ProbLangℝ.unifUnit (T := ℝ))
       = NegExpCreditV F L + NegExpRejectProb * c := by
   -- Parity closed form of the integrand on `[0,1]`.
-  rw [show (∫⁻ x, RealDecrTrialCreditV (NegExpAmp F x L c) 0 x ∂(ProbLangℝ.unifUnit (T := ℝ)))
-        = ∫⁻ x, (ENNReal.ofReal (Real.exp (-x)) * F L x
-            + ENNReal.ofReal (1 - Real.exp (-x)) * (NegExpCreditV F (L + 1) + c))
-            ∂(ProbLangℝ.unifUnit (T := ℝ)) from
-      setLIntegral_congr_fun measurableSet_Icc (fun x hx => by
-        exact RealDecrTrialCreditV_parity (F L x) (NegExpCreditV F (L + 1) + c) hx.1 hx.2)]
+  have key : ∫⁻ x, RealDecrTrialCreditV (NegExpAmp F x L c) 0 x ∂(ProbLangℝ.unifUnit (T := ℝ))
+      = ∫⁻ x, (ENNReal.ofReal (Real.exp (-x)) * F L x
+          + ENNReal.ofReal (1 - Real.exp (-x)) * (NegExpCreditV F (L + 1) + c))
+          ∂(ProbLangℝ.unifUnit (T := ℝ)) :=
+    setLIntegral_congr_fun measurableSet_Icc (fun x hx => by
+      exact RealDecrTrialCreditV_parity (F L x) (NegExpCreditV F (L + 1) + c) hx.1 hx.2)
+  rw [key]
   -- Split off the reject term (right summand is `x`-measurable).
   have hmof : Measurable (fun x : ℝ => ENNReal.ofReal (1 - Real.exp (-x))) :=
     ENNReal.measurable_ofReal.comp (by fun_prop)
@@ -181,7 +180,7 @@ theorem NegExp_credit_recurrence (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) (c :
       ENNReal.ofReal (1 - Real.exp (-x)) * (NegExpCreditV F (L + 1) + c)) := hmof.mul_const _
   rw [lintegral_add_right _ hmg, lintegral_mul_const _ hmof,
       NegExpReject_lintegral, NegExpCreditV_recurrence F L]
-  unfold NegExpRejectProb
+  simp only [NegExpRejectProb]
   ring
 
 open MeasureTheory in
@@ -191,7 +190,7 @@ theorem NegExpAmp_measurable (F : ℕ → ℝ → ℝ≥0∞) (hF : ∀ a, Measu
     (L : ℕ) (c : ℝ≥0∞) :
     Measurable (fun x => RealDecrTrialCreditV (NegExpAmp F x L c) 0 x) := by
   unfold RealDecrTrialCreditV
-  refine Measurable.ennreal_tsum fun n => (RealDecrTrialμ_measurable 0 n).mul ?_
+  refine Measurable.tsum fun n => (RealDecrTrialμ_measurable 0 n).mul ?_
   -- `NegExpAmp F x L c n` is `F L x` on even `n` (needs `hF`), else a constant.
   unfold NegExpAmp
   by_cases h : n % 2 = 0
@@ -258,7 +257,9 @@ theorem twp_NegExp (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞
   twp_pures
   rcases Nat.mod_two_eq_zero_or_one n with hpar | hpar
   · -- `n` even (accept): `#0 = #0 → #true`, returns the pair `(L, x)`, credit `F L x`.
-    rw [show (Int.ofNat n % 2 : ℤ) = 0 from by simp only [Int.ofNat_eq_natCast]; omega]
+    have hmod : (Int.ofNat n % 2 : ℤ) = 0 := by
+      simp only [Int.ofNat_eq_natCast]; omega
+    rw [hmod]
     twp_pures
     twp_value
     imodintro
@@ -272,7 +273,9 @@ theorem twp_NegExp (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞
       · ipureintro; exact ⟨Hx01.1.le, Hx01.2⟩
       · iexact Hcn
   · -- `n` odd (reject): `#1 = #0 → #false`, recurse `trial (L+1)` via `IH`.
-    rw [show (Int.ofNat n % 2 : ℤ) = 1 from by simp only [Int.ofNat_eq_natCast]; omega]
+    have hmod : (Int.ofNat n % 2 : ℤ) = 1 := by
+      simp only [Int.ofNat_eq_natCast]; omega
+    rw [hmod]
     have hcn : NegExpAmp F x L ((k : ℝ≥0∞) * ε_term) n
         = NegExpCreditV F (L + 1) + (k : ℝ≥0∞) * ε_term := by
       simp only [NegExpAmp]; rw [if_neg (by omega)]
@@ -281,7 +284,8 @@ theorem twp_NegExp (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞
     ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcn'
     twp_pure
     twp_pure
-    rw [show ((L : ℤ) + 1) = ((L + 1 : ℕ) : ℤ) from by push_cast; ring]
+    have hL : ((L : ℤ) + 1) = ((L + 1 : ℕ) : ℤ) := by push_cast; ring
+    rw [hL]
     twp_bind pl(&NegExp #(.int ((L + 1 : ℕ) : ℤ)))
     iapply (tglWp_wand (Φ := fun p : Val ℝ => iprop(∃ (vz : ℕ) (vr : ℝ),
       ⌜p.1 = .pair (.lit (.int (Int.ofNat vz))) (.lit (.real vr))⌝ ∗

@@ -80,22 +80,37 @@ theorem BNEHalfg_measurable (F : Bool → ℝ≥0∞) : Measurable (BNEHalfg F) 
   · exact Measurable.ite measurableSet_Iic.compl measurable_const measurable_const
 
 open MeasureTheory in
+/-- The `if → Set.indicator → set-integral` bridge over `unifUnit = volume.restrict [0,1]`:
+factors out the `(fun r => if _ then _ else 0) = S.indicator _` machinery shared by the two
+addends of `BNEHalfg`, so `BNEHalfg_lintegral` need not spell out the `Set.indicator`
+conversion in each branch. -/
+theorem lintegral_unifUnit_indicator {s : Set ℝ} (hs : MeasurableSet s) (f : ℝ → ℝ≥0∞) :
+    ∫⁻ r, s.indicator f r ∂(volume.restrict (Set.Icc (0 : ℝ) 1))
+      = ∫⁻ r in s ∩ Set.Icc 0 1, f r ∂volume := by
+  rw [lintegral_indicator hs, Measure.restrict_restrict hs]
+
+open MeasureTheory in
 /-- Credit conservation: `∫ BNEHalfg F = BNEHalfCreditV F` over the
 uniform-unit measure — consumed by `twp_urand_exp` at the `x ← urand` step. -/
 theorem BNEHalfg_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : ∀ b, F b ≤ M) :
     ∫⁻ r, BNEHalfg F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
+  -- `LiftF F` in parity form: even index → `F false`, odd index → `F true`.
   have hlift : LiftF F = fun n => if n % 2 = 0 then F false else F true := by
-    funext n; rcases Nat.mod_two_eq_zero_or_one n with h | h <&> simp [LiftF, h]
+    funext n
+    rcases Nat.mod_two_eq_zero_or_one n with h | h
+    · simp [LiftF, h]
+    · simp [LiftF, h]
   -- `∫₀^½ exp(-r) dr = 1 - exp(-½)`.
-  have hexphalf : ∫ r in (0 : ℝ)..(1 / 2), Real.exp (-r) = 1 - Real.exp (-(1 / 2)) := by
-    rw [intervalIntegral.integral_comp_neg fun x => Real.exp x]
-    simp only [neg_zero]; rw [integral_exp, Real.exp_zero]
+  have hexphalf : ∫ r in (0 : ℝ)..(1 / 2), Real.exp (-r) = 1 - Real.exp (-1 / 2) := by
+    rw [intervalIntegral.integral_comp_neg fun x => Real.exp x, neg_zero,
+        integral_exp, Real.exp_zero]
+    ring
   have hsetA : Set.Iic (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Icc 0 (1 / 2) := by
     ext r; simp only [Set.mem_inter_iff, Set.mem_Iic, Set.mem_Icc]
-    exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, _root_.le_trans h2 (by norm_num)⟩⟩
+    exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, by linarith⟩⟩
   have hsetB : Set.Ioi (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Ioc (1 / 2) 1 := by
     ext r; simp only [Set.mem_inter_iff, Set.mem_Ioi, Set.mem_Icc, Set.mem_Ioc]
-    exact ⟨fun ⟨h2, _, h1⟩ => ⟨h2, h1⟩, fun ⟨h2, h1⟩ => ⟨h2, _root_.le_trans (by norm_num) h2.le, h1⟩⟩
+    exact ⟨fun ⟨h2, _, h1⟩ => ⟨h2, h1⟩, fun ⟨h2, h1⟩ => ⟨h2, by linarith, h1⟩⟩
   show ∫⁻ r, BNEHalfg F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
   simp only [BNEHalfg]
   rw [lintegral_add_left (Measurable.ite measurableSet_Iic
@@ -103,52 +118,49 @@ theorem BNEHalfg_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : 
   -- Part B: the `[¬ r ≤ ½]·F true` term integrates to `ofReal(½)·F true`.
   have hB : (∫⁻ r, (if ¬ r ≤ 1 / 2 then F true else 0) ∂(volume.restrict (Set.Icc (0 : ℝ) 1)))
       = ENNReal.ofReal (1 / 2) * F true := by
-    rw [show (fun r => if ¬ r ≤ 1 / 2 then F true else 0)
-          = (Set.Ioi (1 / 2 : ℝ)).indicator (fun _ => F true) from by
-        ext r; simp only [Set.indicator_apply, Set.mem_Ioi, _root_.not_le],
-      lintegral_indicator measurableSet_Ioi, setLIntegral_const,
-      Measure.restrict_apply measurableSet_Ioi, hsetB, Real.volume_Ioc]
-    rw [mul_comm]; norm_num
-  -- Part A: the `[r ≤ ½]·CreditV(LiftF F) 0 r` term, via the parity closed form.
+    have hind : (fun r => if ¬ r ≤ 1 / 2 then F true else 0)
+        = (Set.Ioi (1 / 2 : ℝ)).indicator (fun _ => F true) := by
+      ext r; simp only [Set.indicator_apply, Set.mem_Ioi, not_le]
+    rw [hind, lintegral_unifUnit_indicator measurableSet_Ioi (fun _ => F true), hsetB,
+        setLIntegral_const, Real.volume_Ioc, mul_comm]
+    norm_num
+  -- Part A: the `[r ≤ ½]·CreditV (LiftF F) 0 r` term, via the parity closed form.
   have hA : (∫⁻ r, (if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0)
         ∂(volume.restrict (Set.Icc (0 : ℝ) 1)))
-      = ENNReal.ofReal (1 - Real.exp (-(1 / 2))) * F false
-        + ENNReal.ofReal (Real.exp (-(1 / 2)) - 1 / 2) * F true := by
-    rw [show (fun r => if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0)
-          = (Set.Iic (1 / 2 : ℝ)).indicator (RealDecrTrialCreditV (LiftF F) 0) from by
-        ext r; rw [Set.indicator_apply]; simp [Set.mem_Iic],
-      lintegral_indicator measurableSet_Iic, Measure.restrict_restrict measurableSet_Iic, hsetA]
-    rw [setLIntegral_congr_fun measurableSet_Icc (fun r hr => by
+      = ENNReal.ofReal (1 - Real.exp (-1 / 2)) * F false
+        + ENNReal.ofReal (Real.exp (-1 / 2) - 1 / 2) * F true := by
+    have hind : (fun r => if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0)
+        = (Set.Iic (1 / 2 : ℝ)).indicator (RealDecrTrialCreditV (LiftF F) 0) := by
+      ext r; simp only [Set.indicator_apply, Set.mem_Iic]
+    rw [hind, lintegral_unifUnit_indicator measurableSet_Iic (RealDecrTrialCreditV (LiftF F) 0),
+        hsetA, setLIntegral_congr_fun measurableSet_Icc fun r hr => by
         rw [hlift]
-        exact RealDecrTrialCreditV_parity (F false) (F true) hr.1
-          (_root_.le_trans hr.2 (by norm_num)) :
-      Set.EqOn (RealDecrTrialCreditV (LiftF F) 0)
-        (fun r => ENNReal.ofReal (Real.exp (-r)) * F false
-          + ENNReal.ofReal (1 - Real.exp (-r)) * F true) (Set.Icc 0 (1 / 2)))]
+        exact RealDecrTrialCreditV_parity (F false) (F true) hr.1 (hr.2.trans (by norm_num))]
     have hmexp : Measurable (fun r : ℝ => ENNReal.ofReal (Real.exp (-r))) :=
       ENNReal.measurable_ofReal.comp (by fun_prop)
     have hmexp' : Measurable (fun r : ℝ => ENNReal.ofReal (1 - Real.exp (-r))) :=
       ENNReal.measurable_ofReal.comp (by fun_prop)
+    have hintsub : ∫ r in (0 : ℝ)..(1 / 2), (1 - Real.exp (-r)) = Real.exp (-1 / 2) - 1 / 2 := by
+      rw [intervalIntegral.integral_sub intervalIntegrable_const
+            (Continuous.intervalIntegrable (by fun_prop) _ _),
+          intervalIntegral.integral_const, hexphalf]
+      simp only [smul_eq_mul, mul_one, sub_zero]
+      ring
     rw [lintegral_add_left (hmexp.mul_const _), lintegral_mul_const _ hmexp,
-      lintegral_mul_const _ hmexp',
-      lintegral_ofReal_Icc (by norm_num) (by fun_prop) (fun r _ => (Real.exp_pos _).le), hexphalf,
-      lintegral_ofReal_Icc (by norm_num) (by fun_prop) (fun r hr => by
-        have : Real.exp (-r) ≤ 1 := Real.exp_le_one_iff.mpr (by linarith [hr.1]); linarith),
-      show (∫ r in (0 : ℝ)..(1 / 2), (1 - Real.exp (-r))) = Real.exp (-(1 / 2)) - 1 / 2 from by
-        rw [intervalIntegral.integral_sub intervalIntegrable_const
-              (Continuous.intervalIntegrable (by fun_prop) _ _),
-            intervalIntegral.integral_const, hexphalf]
-        simp only [smul_eq_mul, mul_one, sub_zero]; ring]
+        lintegral_mul_const _ hmexp',
+        lintegral_ofReal_Icc (by norm_num) (by fun_prop) fun r _ => (Real.exp_pos _).le,
+        hexphalf,
+        lintegral_ofReal_Icc (by norm_num) (by fun_prop) fun r hr =>
+          sub_nonneg.mpr (Real.exp_le_one_iff.mpr (neg_nonpos.mpr hr.1)),
+        hintsub]
   rw [hA, hB]
   -- Combine the two `F true` contributions: `ofReal(exp(-½)-½) + ofReal(½) = ofReal(exp(-½))`.
-  have hexp_ge : (1 / 2 : ℝ) ≤ Real.exp (-(1 / 2)) := by
-    have := Real.add_one_le_exp (-(1 / 2 : ℝ)); linarith
-  have ht : BNEHalfμ true = ENNReal.ofReal (Real.exp (-(1 / 2))) := by
-    rw [show (-(1 / 2) : ℝ) = -1 / 2 from by norm_num]; rfl
-  have hf : BNEHalfμ false = ENNReal.ofReal (1 - Real.exp (-(1 / 2))) := by
-    rw [show (-(1 / 2) : ℝ) = -1 / 2 from by norm_num]; rfl
+  have hexp_ge : (0 : ℝ) ≤ Real.exp (-1 / 2) - 1 / 2 := by
+    have := Real.add_one_le_exp (-1 / 2 : ℝ); linarith
+  have ht : BNEHalfμ true = ENNReal.ofReal (Real.exp (-1 / 2)) := rfl
+  have hf : BNEHalfμ false = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := rfl
   rw [BNEHalfCreditV, ht, hf, add_assoc, ← add_mul,
-      ← ENNReal.ofReal_add (by linarith) (by norm_num)]
+      ← ENNReal.ofReal_add hexp_ge (by norm_num)]
   ring_nf
 
 /-! ## Specifications -/
@@ -239,7 +251,8 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
     twp_pures
     rcases Nat.mod_two_eq_zero_or_one n with hpar | hpar
     · -- `n` even: `#0 = #1 → #false`, returning `b = false`.
-      rw [show (Int.ofNat n % 2 : ℤ) = 0 from by simp only [Int.ofNat_eq_natCast]; omega]
+      have hmod : (Int.ofNat n : ℤ) % 2 = 0 := by push_cast; omega
+      rw [hmod]
       twp_value
       imodintro
       iexists false
@@ -248,7 +261,8 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
       iframe Hcrn
       itrivial
     · -- `n` odd: `#1 = #1 → #true`, returning `b = true`.
-      rw [show (Int.ofNat n % 2 : ℤ) = 1 from by simp only [Int.ofNat_eq_natCast]; omega]
+      have hmod : (Int.ofNat n : ℤ) % 2 = 1 := by push_cast; omega
+      rw [hmod]
       twp_pures
       twp_value
       imodintro

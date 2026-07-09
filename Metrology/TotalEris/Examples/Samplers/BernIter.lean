@@ -69,6 +69,12 @@ def Iterg (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : ℕ) : Bool → 
   | true => IterCreditV F γ N
   | false => F false
 
+/-- In `ℝ≥0∞`, truncated subtraction `1 - ofReal x` agrees with `ofReal (1 - x)`
+whenever `0 ≤ x` (both sides truncate to `0` for `1 ≤ x`). -/
+lemma one_sub_ofReal {x : ℝ} (hx : 0 ≤ x) :
+    (1 : ℝ≥0∞) - ENNReal.ofReal x = ENNReal.ofReal (1 - x) := by
+  rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ hx]
+
 /-- One-step recurrence: `IterCreditV F γ (N+1)` splits across the next Bernoulli
 trial into `γ · Iterg F γ N true + (1 - γ) · Iterg F γ N false`. -/
 theorem IterCreditV_succ (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : ℕ) :
@@ -76,28 +82,24 @@ theorem IterCreditV_succ (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : �
       .ofReal γ * Iterg F γ N true + (1 - .ofReal γ) * Iterg F γ N false := by
   have hγ0 : (0:ℝ) ≤ (γ:ℝ) := γ.2.1
   have hγ1 : (γ:ℝ) ≤ 1 := γ.2.2
-  have hpN : (0:ℝ) ≤ (γ:ℝ) ^ N := by positivity
-  have hpN1 : (γ:ℝ) ^ N ≤ 1 := pow_le_one₀ hγ0 hγ1
-  have hpSN : (0:ℝ) ≤ (γ:ℝ) ^ (N + 1) := by positivity
-  -- Turn every truncated `1 - ofReal _` into `ofReal (1 - _)` so the goal becomes
-  -- subtraction-free (a plain commutative-semiring identity).
-  have e1 : (1 : ℝ≥0∞) - ENNReal.ofReal ((γ:ℝ) ^ N) = ENNReal.ofReal (1 - (γ:ℝ) ^ N) := by
-    rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ hpN]
-  have e2 : (1 : ℝ≥0∞) - ENNReal.ofReal (γ:ℝ) = ENNReal.ofReal (1 - (γ:ℝ)) := by
-    rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ hγ0]
-  have e3 : (1 : ℝ≥0∞) - ENNReal.ofReal ((γ:ℝ) ^ (N + 1))
-      = ENNReal.ofReal (1 - (γ:ℝ) ^ (N + 1)) := by
-    rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ hpSN]
-  have ct : ENNReal.ofReal ((γ:ℝ) ^ (N + 1))
-      = ENNReal.ofReal (γ:ℝ) * ENNReal.ofReal ((γ:ℝ) ^ N) := by
-    rw [← ENNReal.ofReal_mul hγ0]; congr 1; rw [pow_succ]; ring
-  have cf : ENNReal.ofReal (γ:ℝ) * ENNReal.ofReal (1 - (γ:ℝ) ^ N) + ENNReal.ofReal (1 - (γ:ℝ))
+  have hγN1 : (γ:ℝ) ^ N ≤ 1 := pow_le_one₀ hγ0 hγ1
+  -- Coefficient of `F true`: `ofReal (γ^(N+1)) = ofReal γ * ofReal (γ^N)`.
+  have hT : ENNReal.ofReal ((γ:ℝ) ^ (N + 1)) =
+      ENNReal.ofReal (γ:ℝ) * ENNReal.ofReal ((γ:ℝ) ^ N) := by
+    rw [ENNReal.ofReal_pow hγ0, ENNReal.ofReal_pow hγ0, pow_succ]; ring
+  -- Coefficient of `F false`: `ofReal γ · ofReal (1-γ^N) + ofReal (1-γ) = ofReal (1-γ^(N+1))`.
+  have hF : ENNReal.ofReal (γ:ℝ) * ENNReal.ofReal (1 - (γ:ℝ) ^ N) + ENNReal.ofReal (1 - (γ:ℝ))
       = ENNReal.ofReal (1 - (γ:ℝ) ^ (N + 1)) := by
     rw [← ENNReal.ofReal_mul hγ0,
         ← ENNReal.ofReal_add (mul_nonneg hγ0 (by linarith)) (by linarith)]
     congr 1; ring
+  -- Unfold and convert every `1 - ofReal _` to `ofReal (1 - _)`, leaving a
+  -- subtraction-free commutative-semiring identity for `ring`.
   simp only [IterCreditV, Iterg]
-  rw [e1, e2, e3, ct, ← cf]
+  rw [one_sub_ofReal (x := (γ:ℝ) ^ (N + 1)) (by positivity)]
+  rw [one_sub_ofReal (x := (γ:ℝ) ^ N) (by positivity)]
+  rw [one_sub_ofReal (x := (γ:ℝ)) hγ0]
+  rw [hT, ← hF]
   ring
 
 /-! ## Specification -/
@@ -148,20 +150,21 @@ theorem twp_IterTrial (E : CoPset) (v : Val ℝ) (γ : ↑unitInterval) (I : IPr
       twp_value
       imodintro
       iexists false
-      rw [show F false = Iterg F γ N false from rfl]
+      rw [Iterg]
       iframe Hcrb HIb
       itrivial
     · -- `true`: recurse `iter v (k-1)` at `k-1 = N`, discharged by `IH`.
       twp_pure
       twp_pure
-      rw [show ((N + 1 : ℕ) : ℤ) - 1 = (N : ℤ) from by push_cast; ring]
+      have hk : ((N + 1 : ℕ) : ℤ) - 1 = (N : ℤ) := by omega
+      rw [hk]
       twp_bind pl(&IterTrial {v.fst} #(.int (N : ℤ)))
       iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
         ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b) ∗ I)))
       isplitl [Hcrb HIb]
       · iapply IH
         isplitl [Hcrb]
-        · rw [show IterCreditV F γ N = Iterg F γ N true from rfl]
+        · rw [Iterg]
           iexact Hcrb
         · iexact HIb
       iintro %w Hpost

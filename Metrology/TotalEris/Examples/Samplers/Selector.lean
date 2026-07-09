@@ -17,8 +17,12 @@ Combinators that pick the integer part of a Gaussian sample.
   uniform `x` against fresh `urand` draws.
 -/
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE MeasureTheory ProbLang
+open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
   ProbLang.TotalEris ProbLang.TotalEris.ErisWpGS
+open MeasureTheory (lintegral_add_left lintegral_const lintegral_const_mul'
+  lintegral_indicator lintegral_mul_const lintegral_piecewise lintegral_tsum
+  setLIntegral_congr_fun setLIntegral_const volume measure_univ)
+open MeasureTheory.Measure (restrict_apply restrict_restrict)
 open scoped AppGS ENNReal NNReal
 
 namespace ProbLang
@@ -54,8 +58,8 @@ theorem C_credit_sum (F : ℕ → ℝ≥0∞) (m : ℕ) :
   induction m with
   | zero => simp [Finset.sum_range_succ, C_credit]
   | succ k ih =>
-    rw [show k + 1 + 2 = (k + 2) + 1 from rfl, Finset.sum_range_succ, ih,
-      show C_credit F (k + 2) = F 2 from by simp [C_credit]]
+    have hk2 : C_credit F (k + 2) = F 2 := by simp [C_credit]
+    rw [add_right_comm, Finset.sum_range_succ, ih, hk2]
     push_cast; ring
 
 /-- The `HSum` obligation of `twp_rand_exp` for `C`: the averaged per-outcome
@@ -67,7 +71,8 @@ theorem C_HSum (F : ℕ → ℝ≥0∞) (m : ℕ) :
   have hz : ((m : ℤ) + 2).toNat = m + 2 := by omega
   have hpos : (0 : ℝ) < (m : ℝ) + 2 := by positivity
   have hd : ENNReal.ofReal ((m : ℝ) + 2) = ((m + 2 : ℕ) : ℝ≥0∞) := by
-    rw [show (m : ℝ) + 2 = ((m + 2 : ℕ) : ℝ) from by push_cast; ring, ENNReal.ofReal_natCast]
+    have h : (m : ℝ) + 2 = ((m + 2 : ℕ) : ℝ) := by push_cast; ring
+    rw [h, ENNReal.ofReal_natCast]
   have hinv : ENNReal.ofReal (1 / ((m : ℝ) + 2)) = ((m + 2 : ℕ) : ℝ≥0∞)⁻¹ := by
     rw [one_div, ENNReal.ofReal_inv_of_pos hpos, hd]
   have hmm : ENNReal.ofReal ((m : ℝ) / ((m : ℝ) + 2))
@@ -105,13 +110,15 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
   twp_pures
   by_cases h0 : n = 0
   · -- `n = 0`: return `#0`, credit `C_credit F 0 = F 0`.
-    rw [show decide ((BaseLit.int n : BaseLit ℝ) = BaseLit.int 0) = true from
-          decide_eq_true (by rw [h0])]
+    have hd0 : decide ((BaseLit.int n : BaseLit ℝ) = BaseLit.int 0) = true :=
+      decide_eq_true (by rw [h0])
+    rw [hd0]
     twp_pures
     twp_value
     imodintro
     iexists 0
-    have hc : C_credit F n.toNat = F 0 := by rw [show n.toNat = 0 from by omega]; rfl
+    have hn0 : n.toNat = 0 := by omega
+    have hc : C_credit F n.toNat = F 0 := by rw [hn0]; rfl
     rw [← hc]
     isplitr [Hcr]
     · ipureintro; rfl
@@ -217,8 +224,8 @@ theorem BiiCCredit_one (F : Bool → ℝ≥0∞) {x : ℝ} (hx0 : 0 ≤ x) (hx1 
       · simp [Set.indicator_apply, h, _root_.not_lt.mp h],
     lintegral_add_left ((measurable_const.indicator measurableSet_Ioi)),
     lintegral_indicator measurableSet_Ioi, lintegral_indicator measurableSet_Iic,
-    setLIntegral_const, setLIntegral_const, Measure.restrict_apply measurableSet_Ioi,
-    Measure.restrict_apply measurableSet_Iic, hsetT, hsetF, Real.volume_Ioc, Real.volume_Icc,
+    setLIntegral_const, setLIntegral_const, restrict_apply measurableSet_Ioi,
+    restrict_apply measurableSet_Iic, hsetT, hsetF, Real.volume_Ioc, Real.volume_Icc,
     sub_zero]
 
 /-- Credit conservation for the `C`-composition: distributing `Bii_CreditV` through
@@ -537,8 +544,8 @@ theorem SgAmp_lintegral_eq (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (N : ℕ
         simp only [Bool.false_eq_true, if_false, if_true]
         ring,
     lintegral_piecewise measurableSet_Ioi, Set.compl_Ioi,
-    setLIntegral_const, Measure.restrict_apply measurableSet_Ioi, hset_ioi, Real.volume_Ioc,
-    Measure.restrict_restrict measurableSet_Iic, hset_iic,
+    setLIntegral_const, restrict_apply measurableSet_Ioi, hset_ioi, Real.volume_Ioc,
+    restrict_restrict measurableSet_Iic, hset_iic,
     lintegral_add_left ((S_CreditV_measurable F k x (N + 1)).const_mul _),
     lintegral_const_mul' _ _ ENNReal.ofReal_ne_top, S_CreditV_q_setLIntegral F k hx0 hx1 hy0 hy1,
     setLIntegral_const, Real.volume_Icc, sub_zero, S_CreditV_peel F k x y N]
@@ -605,7 +612,7 @@ theorem twp_S_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (hnn :
   iapply (twp_urand_exp' (ε₂ := SgAmp F k x N y ((kf : ℝ≥0∞) * ε_term))
     (SgAmp_measurable F k x N y _) ?hint) $$ Hε
   case hint =>
-    have hy1 : y ≤ 1 := _root_.le_of_lt (_root_.lt_of__root_.le_of_lt HyB hB1)
+    have hy1 : y ≤ 1 := by linarith
     have hBkf : ENNReal.ofReal B * (↑kf * ε_term) = ε_term := by
       rw [← mul_assoc, show (↑kf : ℝ≥0∞) = ENNReal.ofReal (1 / B) from by
             rw [hkf_def, ← ENNReal.ofReal_coe_nnreal]; rfl,

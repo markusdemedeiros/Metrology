@@ -3,6 +3,7 @@ module
 public import Metrology.TotalEris
 public import Metrology.ProbLang.Reals
 public import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Series
 
 @[expose] public section
 
@@ -102,7 +103,7 @@ theorem RealDecrTrialμ_measurable (i n : ℕ) :
 /-- `CreditV F i x` is Borel measurable in `x` (a `tsum` of measurable terms). -/
 theorem RealDecrTrialCreditV_measurable (F : ℕ → ℝ≥0∞) (i : ℕ) :
     Measurable (fun x : ℝ => RealDecrTrialCreditV F i x) :=
-  Measurable.ennreal_tsum fun n => (RealDecrTrialμ_measurable i n).mul_const (F n)
+  Measurable.tsum fun n => (RealDecrTrialμ_measurable i n).mul_const (F n)
 
 /-- `g F i x` is Borel measurable (interval indicators glued to `CreditV`). -/
 theorem RealDecrTrialg_measurable (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
@@ -148,28 +149,35 @@ theorem RealDecrTrialCreditV_reindex (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ
     have hin : i ≤ n := by
       by_contra h
       exact hn (by rw [RealDecrTrialμ_not_supp (by omega), zero_mul])
-    exact ⟨n - i, by show i + (n - i) = n; omega⟩
+    exact ⟨n - i, Nat.add_sub_cancel' hin⟩
 
 open MeasureTheory in
 /-- The `μ0` interval integral: `∫₀ᵗ (yᵐ/m! − y^{m+1}/(m+1)!) dy = t^{m+1}/(m+1)! − t^{m+2}/(m+2)!`. -/
 theorem RealDecrTrialμ0_real_integral (m : ℕ) (t : ℝ) :
     ∫ y in (0 : ℝ)..t, (y ^ m / (m.factorial : ℝ) - y ^ (m + 1) / ((m + 1).factorial : ℝ))
       = t ^ (m + 1) / ((m + 1).factorial : ℝ) - t ^ (m + 2) / ((m + 2).factorial : ℝ) := by
-  have h0 : (m.factorial : ℝ) ≠ 0 := Nat.cast_ne_zero.mpr (Nat.factorial_ne_zero _)
-  have e3 : ((m : ℝ) + 1) ≠ 0 := by positivity
-  have e4 : ((m : ℝ) + 2) ≠ 0 := by positivity
   rw [intervalIntegral.integral_sub (Continuous.intervalIntegrable (by fun_prop) _ _)
         (Continuous.intervalIntegrable (by fun_prop) _ _),
       intervalIntegral.integral_div, intervalIntegral.integral_div,
-      integral_pow, integral_pow, zero_pow (by omega), zero_pow (by omega),
-      show ((m + 1).factorial : ℝ) = ((m : ℝ) + 1) * (m.factorial : ℝ) by
-        rw [Nat.factorial_succ]; push_cast; ring,
-      show ((m + 2).factorial : ℝ) = ((m : ℝ) + 2) * (((m : ℝ) + 1) * (m.factorial : ℝ)) by
-        rw [show m + 2 = (m + 1) + 1 from rfl, Nat.factorial_succ, Nat.factorial_succ];
-        push_cast; ring]
+      integral_pow, integral_pow]
+  simp only [Nat.factorial_succ]
   push_cast
   field_simp
   ring
+
+/-- Each `μ0` real value is nonnegative on `[0,1]` (`y^m/m!` dominates `y^{m+1}/(m+1)!`). -/
+theorem RealDecrTrialμ0_real_nonneg {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (n : ℕ) :
+    0 ≤ x ^ n / (n.factorial : ℝ) - x ^ (n + 1) / ((n + 1).factorial : ℝ) := by
+  have hfact : ((n + 1).factorial : ℝ) = ((n : ℝ) + 1) * (n.factorial : ℝ) := by
+    rw [Nat.factorial_succ]; push_cast; ring
+  have hrw : x ^ (n + 1) / ((n + 1).factorial : ℝ)
+      = (x ^ n / (n.factorial : ℝ)) * (x / ((n : ℝ) + 1)) := by
+    rw [hfact, pow_succ]; field_simp
+  rw [sub_nonneg, hrw]
+  have hnn1 : 0 ≤ x ^ n / (n.factorial : ℝ) := by positivity
+  have hyle : x / ((n : ℝ) + 1) ≤ 1 := by
+    rw [div_le_one (by positivity)]; linarith [Nat.cast_nonneg (α := ℝ) n]
+  exact mul_le_of_le_one_right hnn1 hyle
 
 open MeasureTheory in
 /-- The `μ0` Lebesgue integral over `[0,x]`: it advances the index by one. -/
@@ -179,24 +187,30 @@ theorem RealDecrTrialμ0_setLIntegral {x : ℝ} (hx : 0 ≤ x ∧ x ≤ 1) (m : 
       y ^ m / (m.factorial : ℝ) - y ^ (m + 1) / ((m + 1).factorial : ℝ) := by fun_prop
   have hnn : 0 ≤ᵐ[volume.restrict (Set.Icc 0 x)]
       fun y : ℝ => y ^ m / (m.factorial : ℝ) - y ^ (m + 1) / ((m + 1).factorial : ℝ) := by
-    refine ae_restrict_of_forall_mem measurableSet_Icc (fun y hy => ?_)
-    show (0 : ℝ) ≤ y ^ m / (m.factorial : ℝ) - y ^ (m + 1) / ((m + 1).factorial : ℝ)
-    have hy0 : 0 ≤ y := hy.1
-    have hy1 : y ≤ 1 := _root_.le_trans hy.2 hx.2
-    have hf1 : ((m + 1).factorial : ℝ) = ((m : ℝ) + 1) * (m.factorial : ℝ) := by
-      rw [Nat.factorial_succ]; push_cast; ring
-    have hrw : y ^ (m + 1) / ((m + 1).factorial : ℝ)
-        = (y ^ m / (m.factorial : ℝ)) * (y / ((m : ℝ) + 1)) := by
-      rw [hf1, pow_succ]; field_simp
-    rw [sub_nonneg, hrw]
-    have hnn1 : 0 ≤ y ^ m / (m.factorial : ℝ) := by positivity
-    have hyle : y / ((m : ℝ) + 1) ≤ 1 := by
-      rw [div_le_one (by positivity)]; linarith [Nat.cast_nonneg (α := ℝ) m]
-    exact mul_le_of_le_one_right hnn1 hyle
+    refine ae_restrict_of_forall_mem measurableSet_Icc fun y hy => ?_
+    exact RealDecrTrialμ0_real_nonneg hy.1 (hy.2.trans hx.2) m
   simp only [RealDecrTrialμ0]
   rw [← ofReal_integral_eq_lintegral_ofReal (hcont.integrableOn_Icc) hnn,
       integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le hx.1,
       RealDecrTrialμ0_real_integral]
+
+open MeasureTheory in
+/-- Bridge lemmas: the `if y ◁ x then f y else 0` integrands are interval indicators.
+Used to feed `lintegral_indicator` from the `if` form written in `g`/`gAmp`. -/
+@[simp]
+theorem indicator_Iic_eq (x : ℝ) (f : ℝ → ℝ≥0∞) :
+    (Set.Iic x).indicator f = fun y => if y ≤ x then f y else 0 := by
+  ext y; simp only [Set.indicator_apply, Set.mem_Iic]
+
+@[simp]
+theorem indicator_Ici_eq (x : ℝ) (f : ℝ → ℝ≥0∞) :
+    (Set.Ici x).indicator f = fun y => if x ≤ y then f y else 0 := by
+  ext y; simp only [Set.indicator_apply, Set.mem_Ici]
+
+@[simp]
+theorem indicator_Iio_eq (x : ℝ) (f : ℝ → ℝ≥0∞) :
+    (Set.Iio x).indicator f = fun y => if y < x then f y else 0 := by
+  ext y; simp only [Set.indicator_apply, Set.mem_Iio]
 
 open MeasureTheory in
 /-- Credit conservation, as a `lintegral` over the uniform-unit measure — exactly
@@ -209,45 +223,42 @@ theorem RealDecrTrialg_lintegral {F : ℕ → ℝ≥0∞} {M : ℝ≥0∞} {N : 
   obtain ⟨hx0, hx1⟩ := hx
   have hset2 : Set.Ici x ∩ Set.Icc (0 : ℝ) 1 = Set.Icc x 1 := by
     ext y; simp only [Set.mem_inter_iff, Set.mem_Ici, Set.mem_Icc]
-    exact ⟨fun ⟨h1, _, h2⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h1, _root_.le_trans hx0 h1, h2⟩⟩
+    exact ⟨fun ⟨h1, _, h2⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h1, hx0.trans h1, h2⟩⟩
   have hset1 : Set.Iic x ∩ Set.Icc (0 : ℝ) 1 = Set.Icc 0 x := by
     ext y; simp only [Set.mem_inter_iff, Set.mem_Iic, Set.mem_Icc]
-    exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, _root_.le_trans h2 hx1⟩⟩
+    exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, h2.trans hx1⟩⟩
   show ∫⁻ y, RealDecrTrialg F N x y ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
   simp only [RealDecrTrialg]
   rw [lintegral_add_left
-        (Measurable.ite measurableSet_Iic (RealDecrTrialCreditV_measurable F (N + 1))
-          measurable_const)]
+      (Measurable.ite measurableSet_Iic (RealDecrTrialCreditV_measurable F (N + 1)) measurable_const)]
   -- Part 2: the `[x ≤ y]·F N` term integrates to `F N · ofReal (1-x) = F N · μ0 x 0`.
   have hpart2 : (∫⁻ y, (if x ≤ y then F N else 0) ∂(volume.restrict (Set.Icc (0 : ℝ) 1)))
       = F N * RealDecrTrialμ0 x 0 := by
-    rw [show (fun y => if x ≤ y then F N else 0)
-          = (Set.Ici x).indicator (fun _ => F N) from by
-        ext y; rw [Set.indicator_apply]; simp [Set.mem_Ici],
-      lintegral_indicator measurableSet_Ici, setLIntegral_const,
+    rw [← indicator_Ici_eq, lintegral_indicator measurableSet_Ici, setLIntegral_const,
       Measure.restrict_apply measurableSet_Ici, hset2, Real.volume_Icc]
     rw [RealDecrTrialμ0]; norm_num
   -- Part 1: the `[y ≤ x]·CreditV F (N+1) y` term.
   have hpart1 : (∫⁻ y, (if y ≤ x then RealDecrTrialCreditV F (N + 1) y else 0)
         ∂(volume.restrict (Set.Icc (0 : ℝ) 1)))
       = ∑' m : ℕ, RealDecrTrialμ0 x (m + 1) * F (N + 1 + m) := by
-    rw [show (fun y => if y ≤ x then RealDecrTrialCreditV F (N + 1) y else 0)
-          = (Set.Iic x).indicator (RealDecrTrialCreditV F (N + 1)) from by
-        ext y; rw [Set.indicator_apply]; simp [Set.mem_Iic],
-      lintegral_indicator measurableSet_Iic,
+    rw [← indicator_Iic_eq, lintegral_indicator measurableSet_Iic,
       Measure.restrict_restrict measurableSet_Iic, hset1]
     simp only [RealDecrTrialCreditV_reindex]
-    rw [lintegral_tsum (fun m => ((RealDecrTrialμ0_measurable m).mul_const (F (N + 1 + m))).aemeasurable)]
+    rw [lintegral_tsum fun m =>
+        ((RealDecrTrialμ0_measurable m).mul_const (F (N + 1 + m))).aemeasurable]
     exact tsum_congr fun m => by
       rw [lintegral_mul_const _ (RealDecrTrialμ0_measurable m),
         RealDecrTrialμ0_setLIntegral ⟨hx0, hx1⟩ m]
-  rw [hpart1, hpart2, RealDecrTrialCreditV_reindex,
-      tsum_eq_zero_add' (f := fun m => RealDecrTrialμ0 x m * F (N + m)) ENNReal.summable,
-      Nat.add_zero,
-      add_comm (∑' m : ℕ, RealDecrTrialμ0 x (m + 1) * F (N + 1 + m)) (F N * RealDecrTrialμ0 x 0),
+  rw [hpart1, hpart2, RealDecrTrialCreditV_reindex]
+  have hsplit : (∑' m, RealDecrTrialμ0 x m * F (N + m))
+      = RealDecrTrialμ0 x 0 * F N + ∑' m, RealDecrTrialμ0 x (m + 1) * F (N + (m + 1)) := by
+    rw [tsum_eq_zero_add' ENNReal.summable, Nat.add_zero]
+  rw [hsplit]
+  have hkey : (∑' m, RealDecrTrialμ0 x (m + 1) * F (N + 1 + m))
+      = ∑' m, RealDecrTrialμ0 x (m + 1) * F (N + (m + 1)) :=
+    tsum_congr fun m => by rw [← Nat.add_assoc, Nat.add_right_comm]
+  rw [hkey, add_comm (∑' m, RealDecrTrialμ0 x (m + 1) * F (N + (m + 1))) (F N * RealDecrTrialμ0 x 0),
       mul_comm (F N) (RealDecrTrialμ0 x 0)]
-  congr 1
-  exact tsum_congr fun m => by rw [show N + (m + 1) = N + 1 + m from by omega]
 
 open MeasureTheory in
 /-- The amplified integral: the extra `[y < x]·c` term contributes `c · ofReal x`
@@ -259,15 +270,13 @@ theorem RealDecrTrialgAmp_lintegral {F : ℕ → ℝ≥0∞} {M : ℝ≥0∞} {N
   obtain ⟨hx0, hx1⟩ := hx
   have hset : Set.Iio x ∩ Set.Icc (0 : ℝ) 1 = Set.Ico 0 x := by
     ext y; simp only [Set.mem_inter_iff, Set.mem_Iio, Set.mem_Icc, Set.mem_Ico]
-    exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, _root_.le_trans h2.le hx1⟩⟩
+    exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, h2.le.trans hx1⟩⟩
   show ∫⁻ y, RealDecrTrialgAmp F N x c y ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
   simp only [RealDecrTrialgAmp]
   rw [lintegral_add_left (RealDecrTrialg_measurable F N x)]
   congr 1
   · exact RealDecrTrialg_lintegral ⟨hx0, hx1⟩ hbound
-  · rw [show (fun y => if y < x then c else 0) = (Set.Iio x).indicator (fun _ => c) from by
-          ext y; rw [Set.indicator_apply]; simp [Set.mem_Iio],
-        lintegral_indicator measurableSet_Iio, setLIntegral_const,
+  · rw [← indicator_Iio_eq, lintegral_indicator measurableSet_Iio, setLIntegral_const,
         Measure.restrict_apply measurableSet_Iio, hset, Real.volume_Ico, sub_zero]
 
 /-! ## Parity of the `DecrTrial` result
@@ -277,77 +286,33 @@ The `DecrTrial` process started at `0` returns an **even** count with probabilit
 telescoping `μ0` densities are the `cosh ∓ sinh = exp(∓x)` series. This is the closed form
 (`Hclosed`) consumed by `NegExp`/`HalfBernNegExp`. -/
 
-/-- Each `μ0` real value is nonnegative on `[0,1]` (`y^m/m!` dominates `y^{m+1}/(m+1)!`). -/
-theorem RealDecrTrialμ0_real_nonneg {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (n : ℕ) :
-    0 ≤ x ^ n / (n.factorial : ℝ) - x ^ (n + 1) / ((n + 1).factorial : ℝ) := by
-  have hf1 : ((n + 1).factorial : ℝ) = ((n : ℝ) + 1) * (n.factorial : ℝ) := by
-    rw [Nat.factorial_succ]; push_cast; ring
-  have hrw : x ^ (n + 1) / ((n + 1).factorial : ℝ)
-      = (x ^ n / (n.factorial : ℝ)) * (x / ((n : ℝ) + 1)) := by
-    rw [hf1, pow_succ]; field_simp
-  rw [sub_nonneg, hrw]
-  have hnn1 : 0 ≤ x ^ n / (n.factorial : ℝ) := by positivity
-  have hyle : x / ((n : ℝ) + 1) ≤ 1 := by
-    rw [div_le_one (by positivity)]; linarith [Nat.cast_nonneg (α := ℝ) n]
-  exact mul_le_of_le_one_right hnn1 hyle
-
 /-- Even- and odd-indexed telescoping sums of `μ0` real values: `exp(-x)` and `1 - exp(-x)`. -/
 theorem RealDecrTrialμ0_real_parity (x : ℝ) :
     (∑' k : ℕ, (x ^ (2 * k) / ((2 * k).factorial : ℝ) - x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ))
       = Real.exp (-x))
     ∧ (∑' k : ℕ, (x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ)
         - x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ)) = 1 - Real.exp (-x)) := by
-  have hexp : ∀ y : ℝ, ∑' n, y ^ n / (n.factorial : ℝ) = Real.exp y := fun y => by
-    rw [Real.exp_eq_exp_ℝ, NormedSpace.exp_eq_tsum_div]
-  have hinj2 : Function.Injective (fun k : ℕ => 2 * k) := fun i j h => by first | omega | (dsimp only at h; omega)
-  have hinj2' : Function.Injective (fun k : ℕ => 2 * k + 1) := fun i j h => by
-    first | omega | (dsimp only at h; omega)
-  have he : Summable (fun k => x ^ (2 * k) / ((2 * k).factorial : ℝ)) :=
-    (Real.summable_pow_div_factorial x).comp_injective hinj2
-  have ho : Summable (fun k => x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ)) :=
-    (Real.summable_pow_div_factorial x).comp_injective hinj2'
-  -- `C - S = exp (-x)` (only the difference is needed).
-  have hsub : (∑' k, x ^ (2 * k) / ((2 * k).factorial : ℝ))
-      - (∑' k, x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ)) = Real.exp (-x) := by
-    have hbe : Summable (fun k => (-x) ^ (2 * k) / ((2 * k).factorial : ℝ)) :=
-      (Real.summable_pow_div_factorial (-x)).comp_injective hinj2
-    have hbo : Summable (fun k => (-x) ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ)) :=
-      (Real.summable_pow_div_factorial (-x)).comp_injective hinj2'
-    have key : (∑' k, (-x) ^ (2 * k) / ((2 * k).factorial : ℝ))
-        + (∑' k, (-x) ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ)) = Real.exp (-x) := by
-      rw [← hexp (-x)]
-      exact tsum_even_add_odd (f := fun n => (-x) ^ n / (n.factorial : ℝ)) hbe hbo
-    have hE : (∑' k, (-x) ^ (2 * k) / ((2 * k).factorial : ℝ))
-        = ∑' k, x ^ (2 * k) / ((2 * k).factorial : ℝ) :=
-      tsum_congr fun k => by rw [Even.neg_pow (⟨k, by ring⟩ : Even (2 * k)) x]
-    have hO : (∑' k, (-x) ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ))
-        = - ∑' k, x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ) := by
-      rw [← tsum_neg]; exact tsum_congr fun k => by
-        rw [Odd.neg_pow (⟨k, by ring⟩ : Odd (2 * k + 1)) x]; ring
-    rw [hE, hO] at key; linarith
-  have ho2' : Summable (fun k => x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ)) :=
-    (Real.summable_pow_div_factorial x).comp_injective (fun i j h => by first | omega | (dsimp only at h; omega))
+  have hCe := x.hasSum_cosh.summable
+  have hCo := x.hasSum_sinh.summable
   refine ⟨?_, ?_⟩
-  · have hsplit : (∑' k : ℕ, (x ^ (2 * k) / ((2 * k).factorial : ℝ)
-          - x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ)))
-        = (∑' k, x ^ (2 * k) / ((2 * k).factorial : ℝ))
-          - ∑' k, x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ) := he.tsum_sub ho
-    rw [hsplit]; linarith [hsub]
-  · -- odd telescoping: `S - (C - a₀) = 1 - exp(-x)`, with `a₀ = 1`.
-    have hshift : (∑' k, x ^ (2 * k) / ((2 * k).factorial : ℝ))
-        = 1 + ∑' k, x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ) := by
-      rw [show (∑' k, x ^ (2 * k) / ((2 * k).factorial : ℝ))
-            = x ^ (2 * 0) / ((2 * 0).factorial : ℝ)
-              + ∑' k, x ^ (2 * (k + 1)) / ((2 * (k + 1)).factorial : ℝ) from he.tsum_eq_zero_add,
-          show (∑' k, x ^ (2 * (k + 1)) / ((2 * (k + 1)).factorial : ℝ))
-            = ∑' k, x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ)
-          from tsum_congr fun k => by rw [show 2 * (k + 1) = 2 * k + 2 from by ring]]
-      norm_num
-    have hsplit : (∑' k : ℕ, (x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ)
-          - x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ)))
-        = (∑' k, x ^ (2 * k + 1) / ((2 * k + 1).factorial : ℝ))
-          - ∑' k, x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ) := ho.tsum_sub ho2'
-    rw [hsplit]; linarith [hshift, hsub]
+  · -- Even: `∑' (aₖ − bₖ) = cosh x − sinh x = exp(-x)`.
+    rw [hCe.tsum_sub hCo, ← Real.cosh_eq_tsum, ← Real.sinh_eq_tsum, Real.cosh_sub_sinh]
+  · -- Odd: `∑' (bₖ − cₖ) = sinh x − (cosh x − 1) = 1 − exp(-x)`,
+    -- using `∑' cₖ = cosh x − 1` (peel the leading `x⁰/₀! = 1`).
+    have hinj3 : Function.Injective (fun k : ℕ => 2 * k + 2) := by
+      intro i j h; dsimp only at h; omega
+    have hC2_summ : Summable (fun k => x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ)) :=
+      (Real.summable_pow_div_factorial x).comp_injective hinj3
+    have hC2 : (∑' k, x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ)) = Real.cosh x - 1 := by
+      have hsplit := hCe.tsum_eq_zero_add
+      simp only [Nat.mul_zero, Nat.factorial_zero, pow_zero] at hsplit
+      have hreindex : (∑' n, x ^ (2 * (n + 1)) / ((2 * (n + 1)).factorial : ℝ))
+          = ∑' k, x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ) :=
+        tsum_congr fun k => by rw [Nat.mul_succ]
+      rw [Real.cosh_eq_tsum]
+      linarith
+    rw [hCo.tsum_sub hC2_summ, ← Real.sinh_eq_tsum, hC2]
+    linarith [Real.cosh_sub_sinh x]
 
 /-- Parity credit: `DecrTrial` from `0` charges `A` on even results (prob `exp(-x)`) and
 `B` on odd (prob `1 - exp(-x)`). -/
@@ -355,33 +320,34 @@ theorem RealDecrTrialCreditV_parity (A B : ℝ≥0∞) {x : ℝ} (hx0 : 0 ≤ x)
     RealDecrTrialCreditV (fun n => if n % 2 = 0 then A else B) 0 x
       = ENNReal.ofReal (Real.exp (-x)) * A + ENNReal.ofReal (1 - Real.exp (-x)) * B := by
   obtain ⟨hpe, hpo⟩ := RealDecrTrialμ0_real_parity x
-  have hinj2 : Function.Injective (fun k : ℕ => 2 * k) := fun i j h => by first | omega | (dsimp only at h; omega)
-  have hinj2' : Function.Injective (fun k : ℕ => 2 * k + 1) := fun i j h => by
-    first | omega | (dsimp only at h; omega)
-  have hinj2'' : Function.Injective (fun k : ℕ => 2 * k + 2) := fun i j h => by
-    first | omega | (dsimp only at h; omega)
+  have hCe := x.hasSum_cosh.summable
+  have hCo := x.hasSum_sinh.summable
+  have hinj3 : Function.Injective (fun k : ℕ => 2 * k + 2) := by
+    intro i j h; dsimp only at h; omega
+  have hC2_summ : Summable (fun k => x ^ (2 * k + 2) / ((2 * k + 2).factorial : ℝ)) :=
+    (Real.summable_pow_div_factorial x).comp_injective hinj3
   -- The ℝ≥0∞ even/odd `μ0` sums are `ofReal` of the real telescoping sums.
-  have hEven : (∑' k : ℕ, RealDecrTrialμ0 x (2 * k)) = ENNReal.ofReal (Real.exp (-x)) := by
+  have hEven : (∑' k, RealDecrTrialμ0 x (2 * k)) = ENNReal.ofReal (Real.exp (-x)) := by
     rw [← hpe, ENNReal.ofReal_tsum_of_nonneg (fun k => RealDecrTrialμ0_real_nonneg hx0 hx1 (2 * k))
-      (((Real.summable_pow_div_factorial x).comp_injective hinj2).sub
-        ((Real.summable_pow_div_factorial x).comp_injective hinj2'))]
+        (hCe.sub hCo)]
     rfl
-  have hOdd : (∑' k : ℕ, RealDecrTrialμ0 x (2 * k + 1)) = ENNReal.ofReal (1 - Real.exp (-x)) := by
-    rw [← hpo, ENNReal.ofReal_tsum_of_nonneg (fun k => RealDecrTrialμ0_real_nonneg hx0 hx1 (2 * k + 1))
-      (((Real.summable_pow_div_factorial x).comp_injective hinj2').sub
-        ((Real.summable_pow_div_factorial x).comp_injective hinj2''))]
+  have hOdd : (∑' k, RealDecrTrialμ0 x (2 * k + 1)) = ENNReal.ofReal (1 - Real.exp (-x)) := by
+    rw [← hpo,
+      ENNReal.ofReal_tsum_of_nonneg (fun k => RealDecrTrialμ0_real_nonneg hx0 hx1 (2 * k + 1))
+        (hCo.sub hC2_summ)]
     rfl
   unfold RealDecrTrialCreditV
   simp only [RealDecrTrialμ_base]
   rw [← tsum_even_add_odd (f := fun n => RealDecrTrialμ0 x n * if n % 2 = 0 then A else B)
-        ENNReal.summable ENNReal.summable]
+      ENNReal.summable ENNReal.summable]
   congr 1
-  · rw [tsum_congr (fun k => by rw [if_pos (show (2 * k) % 2 = 0 by omega)] :
-          ∀ k : ℕ, RealDecrTrialμ0 x (2 * k) * (if (2 * k) % 2 = 0 then A else B)
-            = RealDecrTrialμ0 x (2 * k) * A), ENNReal.tsum_mul_right, hEven]
-  · rw [tsum_congr (fun k => by rw [if_neg (show ¬ (2 * k + 1) % 2 = 0 by omega)] :
-          ∀ k : ℕ, RealDecrTrialμ0 x (2 * k + 1) * (if (2 * k + 1) % 2 = 0 then A else B)
-            = RealDecrTrialμ0 x (2 * k + 1) * B), ENNReal.tsum_mul_right, hOdd]
+  · have heq : ∀ k, RealDecrTrialμ0 x (2 * k) * (if (2 * k) % 2 = 0 then A else B)
+        = RealDecrTrialμ0 x (2 * k) * A := fun k => by rw [if_pos (by omega : (2 * k) % 2 = 0)]
+    rw [tsum_congr heq, ENNReal.tsum_mul_right, hEven]
+  · have heq : ∀ k, RealDecrTrialμ0 x (2 * k + 1) * (if (2 * k + 1) % 2 = 0 then A else B)
+        = RealDecrTrialμ0 x (2 * k + 1) * B := fun k => by
+      rw [if_neg (by omega : ¬ (2 * k + 1) % 2 = 0)]
+    rw [tsum_congr heq, ENNReal.tsum_mul_right, hOdd]
 
 /-! ## Termination -/
 
@@ -424,15 +390,15 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞
   case hint =>
     rw [RealDecrTrialgAmp_lintegral ⟨Hx0, _root_.le_trans HxB hB1.le⟩ hnn]
     have hkx : (↑k : ℝ≥0∞) * ENNReal.ofReal x ≤ 1 := by
-      rw [show (↑k : ℝ≥0∞) = ENNReal.ofReal (1 / B) from by
-            rw [hk_def, ← ENNReal.ofReal_coe_nnreal]; rfl,
-          ← ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_le_one,
-          div_mul_eq_mul_div, one_mul, div_le_one hB0]
+      have hkcast : (↑k : ℝ≥0∞) = ENNReal.ofReal (1 / B) := by
+        rw [hk_def, ← ENNReal.ofReal_coe_nnreal]; rfl
+      rw [hkcast, ← ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_le_one,
+        div_mul_eq_mul_div, one_mul, div_le_one hB0]
       exact HxB
     gcongr
     calc (↑k * ε_term) * ENNReal.ofReal x
         = ε_term * ((↑k : ℝ≥0∞) * ENNReal.ofReal x) := by ring
-      _ ≤ ε_term * 1 := mul_le_mul_left' hkx ε_term
+      _ ≤ ε_term * 1 := mul_le_mul_right hkx ε_term
       _ = ε_term := mul_one _
   iintro %y ⟨%Hym, Hcy⟩
   have Hym01 : 0 < y ∧ y < 1 := mem_unifUnitSupport_real.mp Hym
@@ -458,14 +424,15 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞
     have hlt' : y < x := of_decide_eq_true hb
     twp_pure
     ihave Hcy' : iprop(↯ (RealDecrTrialCreditV F (N + 1) y + (k : ℝ≥0∞) * ε_term)) $$ [Hcy]
-    · rw [show RealDecrTrialCreditV F (N + 1) y + (k : ℝ≥0∞) * ε_term
-            = RealDecrTrialgAmp F N x ((k : ℝ≥0∞) * ε_term) y from by
-          unfold RealDecrTrialgAmp RealDecrTrialg
-          rw [if_pos hlt'.le, if_neg (_root_.not_le.mpr hlt'), if_pos hlt', add_zero]]  -- `gAmp` reshaping at `y < x`
-      iexact Hcy
+    · -- `gAmp` reshaping at `y < x`: the indicators all collapse.
+      have heq : RealDecrTrialCreditV F (N + 1) y + (k : ℝ≥0∞) * ε_term
+          = RealDecrTrialgAmp F N x ((k : ℝ≥0∞) * ε_term) y := by
+        unfold RealDecrTrialgAmp RealDecrTrialg
+        rw [if_pos hlt'.le, if_neg (_root_.not_le.mpr hlt'), if_pos hlt', add_zero]
+      rw [heq]; iexact Hcy
     ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcy'
     twp_pure
-    rw [show ((N : ℤ) + 1) = ((N + 1 : ℕ) : ℤ) from by push_cast; ring]
+    rw [← Nat.cast_add_one]
     twp_bind pl(&DecrTrial #(.int ((N + 1 : ℕ) : ℤ)) #(.real y))
     iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
       ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))))
@@ -518,14 +485,15 @@ theorem twp_DecrTrial (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hn
     have hlt' : y < x := of_decide_eq_true hb
     twp_pure
     ihave Hcy' : iprop(↯ (RealDecrTrialCreditV F (N + 1) y)) $$ [Hcy]
-    · rw [show RealDecrTrialCreditV F (N + 1) y = RealDecrTrialg F N x y from by
-          unfold RealDecrTrialg
-          rw [if_pos hlt'.le, if_neg (_root_.not_le.mpr hlt'), add_zero]]  -- `g y = CreditV F (N+1) y` at `y < x`
-      iexact Hcy
+    · -- `g y = CreditV F (N+1) y` at `y < x`: the indicators collapse.
+      have heq : RealDecrTrialCreditV F (N + 1) y = RealDecrTrialg F N x y := by
+        unfold RealDecrTrialg
+        rw [if_pos hlt'.le, if_neg (_root_.not_le.mpr hlt'), add_zero]
+      rw [heq]; iexact Hcy
     have hy1 : y < 1 := _root_.lt_of_lt_of_le hlt' Hx.2
     have hy0 : 0 < y := Hym01.1
     twp_pure
-    rw [show ((N : ℤ) + 1) = ((N + 1 : ℕ) : ℤ) from by push_cast; ring]
+    rw [← Nat.cast_add_one]
     twp_bind pl(&DecrTrial #(.int ((N + 1 : ℕ) : ℤ)) #(.real y))
     iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
       ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))))

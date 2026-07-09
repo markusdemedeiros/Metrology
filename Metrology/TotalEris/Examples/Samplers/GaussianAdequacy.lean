@@ -55,13 +55,11 @@ theorem measurable_gaussOfExp : Measurable gaussOfExp :=
 @[simp]
 theorem gaussOfExp_pair (x : ℝ) (m : ℤ) :
     gaussOfExp (Exp.pair (Exp.lit (.real x)) (Exp.lit (.int m))) = x + (m : ℝ) := by
-  show Function.extend pairEmb (fun p => p.1 + (p.2 : ℝ)) (fun _ => 0) (pairEmb (x, m)) = _
-  rw [measurableEmbedding_pairEmb.injective.extend_apply]
+  simp only [gaussOfExp, measurableEmbedding_pairEmb.injective.extend_apply]
 
 /-! ## The target Gaussian measure -/
 
-theorem measurable_G2μ (k : ℕ) : Measurable (G2μ k) := by
-  unfold G2μ; fun_prop
+theorem measurable_G2μ (k : ℕ) : Measurable (G2μ k) := by fun_prop
 
 /-- The law of the `G2` sample `x + k`: the mixture of `unifUnit`-weighted-by-`G2μ k`
 laws pushed forward along `x ↦ x + k`. A probability measure on `[0,∞)`. -/
@@ -72,12 +70,8 @@ noncomputable def gaussMeasure : Measure ℝ :=
 instance : IsProbabilityMeasure gaussMeasure := by
   constructor
   rw [gaussMeasure, Measure.sum_apply _ MeasurableSet.univ]
-  have hk : ∀ k : ℕ,
-      (((ProbLangℝ.unifUnit (T := ℝ)).withDensity (G2μ k)).map (fun x => x + (k : ℝ))) Set.univ
-        = ∫⁻ x, G2μ k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := fun k => by
-    rw [Measure.map_apply (by fun_prop) MeasurableSet.univ, Set.preimage_univ,
-      withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ]
-  simp_rw [hk]
+  simp_rw [Measure.map_apply (by fun_prop) MeasurableSet.univ, Set.preimage_univ,
+    withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ]
   exact G2μ_total
 
 /-- Change of variables: the credit `∫⁻ · ∂gaussMeasure` is the `G2` mixture credit
@@ -85,10 +79,9 @@ instance : IsProbabilityMeasure gaussMeasure := by
 theorem gauss_credit_eq (F : ℝ → ℝ≥0∞) (hFm : Measurable F) :
     ∫⁻ y, F y ∂gaussMeasure = G2_CreditV (fun k r => F (r + k)) := by
   rw [gaussMeasure, lintegral_sum_measure, G2_CreditV]
-  refine tsum_congr (fun k => ?_)
-  rw [lintegral_map hFm (by fun_prop),
-    lintegral_withDensity_eq_lintegral_mul _ (measurable_G2μ k) (by fun_prop)]
-  rfl
+  refine tsum_congr fun k => by
+    rw [lintegral_map hFm (by fun_prop),
+      lintegral_withDensity_eq_lintegral_mul _ (measurable_G2μ k) (by fun_prop)]
 
 /-! ## Adequacy -/
 
@@ -110,7 +103,7 @@ theorem gauss_distSpec :
   · -- Weakening branch: the pair postcondition ⇒ `↯(F (gaussOfExp v.fst))`.
     iintro %v ⟨%k, %r, %hrange, %hpair, Hcr⟩
     have hg : gaussOfExp v.fst = r + (k : ℝ) := by
-      rw [hpair, gaussOfExp_pair]; simp [Int.ofNat_eq_natCast]
+      simp only [hpair, gaussOfExp_pair, Int.ofNat_eq_natCast]
     rw [hg]
     iexact Hcr
 
