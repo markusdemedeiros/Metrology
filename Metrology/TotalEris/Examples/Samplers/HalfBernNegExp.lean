@@ -8,20 +8,13 @@ public import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
 @[expose] public section
 
 /-!
-# Bernoulli with base-½ negative-exponential bias — continuous-uniform port
+# Bernoulli with base-½ negative-exponential bias
 
-Port of `clutch/theories/eris/examples/half_bern_neg_exp.v`, on `urand`
-(see `RealDecrTrial.lean` for the redesign conventions).
-
-`LeHalf x` tests whether a sampled real `x` is `≤ ½`. In the Rocq lazy-real
-development this inspects the leading bit of the tape; under `urand` the value
-*is* the real, so it is simply the comparison `x ≤ ½`.
-
+`LeHalf x` tests whether a sampled real `x` is `≤ ½`.
 `BNEHalf ()` is a Bernoulli whose `true`-probability is `exp (-½)`: sample
 `x ← urand`; if `x ≤ ½` run a `DecrTrial` from `x` and return the parity of
 its result, else return `true`.
 
-**Status: stub.** Programs and specifications only; every proof is `sorry`.
 Fixed at `rT = ℝ` (real analysis is irreducibly `ℝ`-based).
 -/
 
@@ -37,46 +30,62 @@ noncomputable section
 
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
-/-! ## PMF / credits -/
+/-! ## Programs -/
 
-/-- Base-½ negative-exponential Bernoulli PMF. Rocq `BNEHalf_μ`:
+/-- `LeHalf (.real r)` returns `true` iff `r ≤ ½`. -/
+def LeHalfSpec (r : ℝ) : Bool := decide (r ≤ 1 / 2)
+
+@[pl_fold]
+def LeHalf : Exp ℝ := pl% fun x, x <= #(.real (1 / 2 : ℝ))
+
+/-- `BNEHalf ()`: draw `x ← urand`; if `x ≤ ½` run `DecrTrial 0 x` and return
+its parity, else return `true`. -/
+@[pl_fold]
+def BNEHalf : Exp ℝ := pl%
+  fun _u,
+    let x := urand;
+    if &LeHalf x then
+      let y := &DecrTrial #0 x;
+      (y % #2 = #1)
+    else #true
+
+/-! ## PMF and credit distribution -/
+
+/-- Base-½ negative-exponential Bernoulli PMF:
 `μ true = exp (-½)`, `μ false = 1 - exp (-½)`. -/
 def BNEHalfμ (b : Bool) : ℝ≥0∞ :=
   if b then .ofReal (Real.exp (-1 / 2)) else .ofReal (1 - Real.exp (-1 / 2))
 
-/-- Rocq `BNEHalf_CreditV`: `F true · μ true + F false · μ false`. -/
+/-- Expected credit: `F true · μ true + F false · μ false`. -/
 def BNEHalfCreditV (F : Bool → ℝ≥0∞) : ℝ≥0∞ :=
   F true * BNEHalfμ true + F false * BNEHalfμ false
 
-/-- Lift a `Bool`-indexed credit function to a `ℕ`-indexed one by parity of the
-argument. Rocq `LiftF`: `LiftF F n = F (n % 2 == 1)`. -/
+/-- Lift a `Bool`-indexed credit function to a `ℕ`-indexed one by parity:
+`LiftF F n = F (n % 2 == 1)`. -/
 def LiftF (F : Bool → ℝ≥0∞) : ℕ → ℝ≥0∞ := fun n => F (n % 2 == 1)
 
-/-- Per-sample credit-distribution function. Rocq `g` (local):
+/-- Per-sample credit-distribution function:
 `[r ≤ ½] · RealDecrTrialCreditV (LiftF F) 0 r  +  [¬ r ≤ ½] · F true`. -/
-def HalfBerng (F : Bool → ℝ≥0∞) : ℝ → ℝ≥0∞ := fun r =>
+def BNEHalfg (F : Bool → ℝ≥0∞) : ℝ → ℝ≥0∞ := fun r =>
   (if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0) +
   (if ¬ r ≤ 1 / 2 then F true else 0)
 
-/-- `HalfBerng F` is measurable: an `Iic`-indicator of the measurable
+/-- `BNEHalfg F` is measurable: an `Iic`-indicator of the measurable
 `RealDecrTrialCreditV (LiftF F) 0` plus a complementary constant indicator. -/
-theorem HalfBerng_measurable (F : Bool → ℝ≥0∞) : Measurable (HalfBerng F) := by
-  unfold HalfBerng
+theorem BNEHalfg_measurable (F : Bool → ℝ≥0∞) : Measurable (BNEHalfg F) := by
+  unfold BNEHalfg
   refine Measurable.add ?_ ?_
   · exact Measurable.ite measurableSet_Iic
       (RealDecrTrialCreditV_measurable (LiftF F) 0) measurable_const
   · exact Measurable.ite measurableSet_Iic.compl measurable_const measurable_const
 
-section Wp
-
 open MeasureTheory in
-/-- Credit conservation (Rocq `g_expectation` composed with `RInt_poke`):
-`∫ HalfBerng F = BNEHalfCreditV F` over the uniform-unit measure — consumed by
-`twp_urand_exp` at the `x ← urand` step of `BNEHalf`. -/
-theorem HalfBerng_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (Hbound : ∀ b, F b ≤ M) :
-    ∫⁻ r, HalfBerng F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
+/-- Credit conservation: `∫ BNEHalfg F = BNEHalfCreditV F` over the
+uniform-unit measure — consumed by `twp_urand_exp` at the `x ← urand` step. -/
+theorem BNEHalfg_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : ∀ b, F b ≤ M) :
+    ∫⁻ r, BNEHalfg F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
   have hlift : LiftF F = fun n => if n % 2 = 0 then F false else F true := by
-    funext n; rcases Nat.mod_two_eq_zero_or_one n with h | h <;> simp [LiftF, h]
+    funext n; rcases Nat.mod_two_eq_zero_or_one n with h | h <&> simp [LiftF, h]
   -- `∫₀^½ exp(-r) dr = 1 - exp(-½)`.
   have hexphalf : ∫ r in (0 : ℝ)..(1 / 2), Real.exp (-r) = 1 - Real.exp (-(1 / 2)) := by
     rw [intervalIntegral.integral_comp_neg fun x => Real.exp x]
@@ -87,8 +96,8 @@ theorem HalfBerng_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (Hbound :
   have hsetB : Set.Ioi (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Ioc (1 / 2) 1 := by
     ext r; simp only [Set.mem_inter_iff, Set.mem_Ioi, Set.mem_Icc, Set.mem_Ioc]
     exact ⟨fun ⟨h2, _, h1⟩ => ⟨h2, h1⟩, fun ⟨h2, h1⟩ => ⟨h2, _root_.le_trans (by norm_num) h2.le, h1⟩⟩
-  show ∫⁻ r, HalfBerng F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
-  simp only [HalfBerng]
+  show ∫⁻ r, BNEHalfg F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
+  simp only [BNEHalfg]
   rw [lintegral_add_left (Measurable.ite measurableSet_Iic
         (RealDecrTrialCreditV_measurable (LiftF F) 0) measurable_const)]
   -- Part B: the `[¬ r ≤ ½]·F true` term integrates to `ofReal(½)·F true`.
@@ -109,7 +118,6 @@ theorem HalfBerng_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (Hbound :
           = (Set.Iic (1 / 2 : ℝ)).indicator (RealDecrTrialCreditV (LiftF F) 0) from by
         ext r; rw [Set.indicator_apply]; simp [Set.mem_Iic],
       lintegral_indicator measurableSet_Iic, Measure.restrict_restrict measurableSet_Iic, hsetA]
-    -- Replace the integrand by its parity closed form on `[0,½]`.
     rw [setLIntegral_congr_fun measurableSet_Icc (fun r hr => by
         rw [hlift]
         exact RealDecrTrialCreditV_parity (F false) (F true) hr.1
@@ -143,41 +151,9 @@ theorem HalfBerng_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (Hbound :
       ← ENNReal.ofReal_add (by linarith) (by norm_num)]
   ring_nf
 
-end Wp
-
-/-! ## Programs
-
-Rocq:
-```
-LeHalf  := λ "x", let "c1n" := get_chunk (Fst "x") (Snd "x") in
-                  let "res" := cmpZ (Fst "c1n") #0 in "res" = #0.
-BNEHalf := λ "_", let "x" := init #() in
-             if: LeHalf "x" then let: "y" := lazyDecrR #0 "x" in ("y" `rem` #2 = #1)
-                            else #true.
-```
-Under `urand`, `LeHalf "x"` is the real comparison `x ≤ ½` and `init ()`
-is `urand`. -/
-
-/-- Decidable spec of `LeHalf`. Rocq `LeHalf_spec r := bool_decide (r ≤ ½)`. -/
-def LeHalfSpec (r : ℝ) : Bool := decide (r ≤ 1 / 2)
-
-@[pl_fold]
-def LeHalf : Exp ℝ := pl% fun x, x <= #(.real (1 / 2 : ℝ))
-
-@[pl_fold]
-def BNEHalf : Exp ℝ := pl%
-  fun _u,
-    let x := urand;
-    if &LeHalf x then
-      let y := &DecrTrial #0 x;
-      (y % #2 = #1)
-    else #true
-
 /-! ## Specifications -/
 
-/-- Rocq `wp_LeHalf`: on a sampled real `r ≠ ½`, `LeHalf (.real r)` returns
-`bool_decide (r ≤ ½)`. (The lazy-real `lazy_real v r` framing vanishes under
-`urand`.) -/
+/-- `LeHalf (.real r)` returns `LeHalfSpec r` (i.e. `decide (r ≤ ½)`). -/
 theorem twp_LeHalf (E : CoPset) (r : ℝ) :
     ⊢@{IProp GF} tglWp E pl(&LeHalf #(.real r))
       (fun v : Val ℝ => iprop(⌜v.1 = .lit (.bool (LeHalfSpec r))⌝)) := by
@@ -187,8 +163,8 @@ theorem twp_LeHalf (E : CoPset) (r : ℝ) :
   ipureintro
   rfl
 
-/-- Rocq `wp_BNEHalf`: `BNEHalf ()` is a Bernoulli returning `b` with the
-base-½ negative-exponential law, threading credit `F b`. -/
+/-- `BNEHalf ()` is a Bernoulli returning `b` with the base-½
+negative-exponential law, threading credit `F b`. -/
 theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀ b, F b ≤ M) :
     ⊢@{IProp GF} ↯ (BNEHalfCreditV F) -∗
       tglWp E pl(&BNEHalf #.unit)
@@ -200,10 +176,10 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
   twp_pure
   twp_bind pl(urand)
   -- Sample `x ← urand`, distributing `↯(BNEHalfCreditV F)` via the credit
-  -- function `HalfBerng F` (integral conservation is `HalfBerng_lintegral`).
-  iapply (twp_urand_exp' (ε₂ := HalfBerng F) ?hmeas ?hint) $$ Hε
-  case hmeas => exact HalfBerng_measurable F
-  case hint => rw [HalfBerng_lintegral (M := M) Hnn]
+  -- function `BNEHalfg F` (integral conservation is `BNEHalfg_lintegral`).
+  iapply (twp_urand_exp' (ε₂ := BNEHalfg F) ?hmeas ?hint) $$ Hε
+  case hmeas => exact BNEHalfg_measurable F
+  case hint => rw [BNEHalfg_lintegral (M := M) Hnn]
   iintro %r ⟨%Hrm, Hcr⟩
   -- The sampled real lies in `(0,1)` (the strengthened `twp_urand_exp'` continuation
   -- exposes `r ∈ unifUnitSupport = Ioo 0 1`); weaken to the closed range.
@@ -232,17 +208,17 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
     twp_value
     imodintro
     iexists true
-    have hcr : HalfBerng F r = F true := by
-      simp only [HalfBerng, hle, if_false, if_true, not_false_iff, zero_add]
+    have hcr : BNEHalfg F r = F true := by
+      simp only [BNEHalfg, hle, if_false, if_true, not_false_iff, zero_add]
     -- Rewrite the *goal*'s credit (rw cannot target the iris hyp `Hcr`).
     rw [← hcr]
     iframe Hcr
     itrivial
   · -- `LeHalfSpec r = true`, i.e. `r ≤ ½`: run `DecrTrial 0 x`, return the parity.
     have hle : r ≤ 1 / 2 := of_decide_eq_true hbdef
-    have hcr : HalfBerng F r = RealDecrTrialCreditV (LiftF F) 0 r := by
-      simp only [HalfBerng, hle, if_true, not_true, if_false, add_zero]
-    -- Convert the iris credit `Hcr : ↯(HalfBerng F r)` to the shape `twp_DecrTrial`
+    have hcr : BNEHalfg F r = RealDecrTrialCreditV (LiftF F) 0 r := by
+      simp only [BNEHalfg, hle, if_true, not_true, if_false, add_zero]
+    -- Convert the iris credit `Hcr : ↯(BNEHalfg F r)` to the shape `twp_DecrTrial`
     -- consumes, via the eq-bridge (rw on the sub-proof's Lean-prop goal).
     ihave Hcr' : iprop(↯ (RealDecrTrialCreditV (LiftF F) 0 r)) $$ [Hcr]
     · rw [← hcr]; iexact Hcr
@@ -264,7 +240,6 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
     rcases Nat.mod_two_eq_zero_or_one n with hpar | hpar
     · -- `n` even: `#0 = #1 → #false`, returning `b = false`.
       rw [show (Int.ofNat n % 2 : ℤ) = 0 from by simp only [Int.ofNat_eq_natCast]; omega]
-      twp_pures
       twp_value
       imodintro
       iexists false

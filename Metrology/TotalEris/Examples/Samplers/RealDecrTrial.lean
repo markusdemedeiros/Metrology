@@ -7,42 +7,13 @@ public import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
 @[expose] public section
 
 /-!
-# Real decreasing trial — continuous-uniform port
+# Real decreasing trial — continuous-uniform sampler
 
-Port of `clutch/theories/eris/examples/real_decr_trial.v`, redesigned to use
-the total continuous-Eris uniform sampler `urand` (see `Examples/Irrational.lean`)
-instead of lazy reals / infinite tapes.
-
-In the Rocq development a *lazy real* `lazy_real v r` is a heap value `v`
-holding a chunked binary tape whose infinite binary expansion is the real
-`r ∈ [0,1)`; `init ()` samples such a real one bit at a time and `cmp`
-compares two of them lazily. Because continuous Eris can sample a real in a
-single step, the whole lazy-real apparatus collapses:
-
-  * `init ()`                          ⟶  `urand`
-  * `cmp y x = #(-1)`  (i.e. `y < x`)  ⟶  the real comparison `y < x`
-  * `wp_lazy_real_presample_adv_comp`  ⟶  `twp_urand_exp`
-  * the predicate `lazy_real v r`      ⟶  the value **is** the real: `.real r`
-
-Consequently a "lazy real argument" `(x, rx)` with `lazy_real x rx` becomes a
-single real value `x : ℝ` (its own denotation), and the `0 ≤ rx ≤ 1` side
-condition is kept as a hypothesis.
-
-We work at the concrete real type `rT = ℝ` (as `Examples/Irrational.lean`
-does): the specifications mention `0 ≤ x ≤ 1` and the program compares reals,
-both of which need an order on the real type. Generalising to an abstract
-`rT` requires the planned `ProbLangℝ` real-order extension.
-
-**Status: stub.** Programs and specifications only; every proof is `sorry`.
-The math definitions (`RealDecrTrialμ`, `RealDecrTrialCreditV`,
-`RealDecrTrialg`) are written out; the supporting analytic lemmas and the WP
-specs are `sorry`.
-
-⚠️ The program uses the real comparison `y < x`, whose *operational* rule
-(`BinOp.eval` on `.real` operands) does not exist yet — it is proof-phase
-task #1 (extend `ProbLangℝ` with a decidable/measurable order and add the
-`BinOp.eval` real cases). The stub still elaborates because `pl%` maps `<` to
-`Exp.binop .lt` without needing the evaluator.
+`DecrTrial N x` draws `y ← urand` and recurses while `y < x`, returning the
+count `N` on the first `y ≥ x`. Specs are stated at the concrete real type
+`rT = ℝ`, since the program compares reals and needs `0 ≤ x ≤ 1`. The real
+comparison `y < x` is resolved by `ProbLangℝ.realLt`, so each `if` branch is
+selected by `rcases`-ing on its result.
 -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
@@ -57,77 +28,55 @@ noncomputable section
 
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
-/-! ## PMF -/
+/-! ## Program -/
 
-/-- PMF for `DecrTrial` started at `N = 0`. Rocq `RealDecrTrial_μ0`:
-`x^n / n! - x^(n+1) / (n+1)!`. -/
-def RealDecrTrialμ0 (x : ℝ) (n : ℕ) : ℝ≥0∞ :=
-  .ofReal (x ^ n / n.factorial - x ^ (n + 1) / (n + 1).factorial)
-
-/-- PMF for `DecrTrial` started at `N = i`. Rocq `RealDecrTrial_μ`:
-`[i ≤ n] · μ0 x (n - i)`. -/
-def RealDecrTrialμ (x : ℝ) (i n : ℕ) : ℝ≥0∞ :=
-  if i ≤ n then RealDecrTrialμ0 x (n - i) else 0
-
-/-- Rocq `RealDecrTrial_μ_not_supp`. -/
-theorem RealDecrTrialμ_not_supp {x : ℝ} {i n : ℕ} (H : n < i) :
-    RealDecrTrialμ x i n = 0 := by
-  simp only [RealDecrTrialμ, if_neg (Nat.not_le.mpr H)]
-
-/-- Rocq `RealDecrTrial_μ_supp`. -/
-theorem RealDecrTrialμ_supp {x : ℝ} {i n : ℕ} (H : i ≤ n) :
-    RealDecrTrialμ x i n = RealDecrTrialμ0 x (n - i) := by
-  simp only [RealDecrTrialμ, if_pos H]
-
-/-- Rocq `RealDecrTrial_μ_base`. -/
-theorem RealDecrTrialμ_base {x : ℝ} {n : ℕ} :
-    RealDecrTrialμ x 0 n = RealDecrTrialμ0 x n := by
-  simp only [RealDecrTrialμ, Nat.zero_le, if_pos, Nat.sub_zero]
-
-/-! ## Credits -/
-
-/-- Expected number of credits to run `DecrTrial i x`. Rocq
-`RealDecrTrial_CreditV`: `∑ₙ μ x i n · F n`. -/
-def RealDecrTrialCreditV (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) : ℝ≥0∞ :=
-  ∑' n : ℕ, RealDecrTrialμ x i n * F n
-
-/-- Per-sample credit-distribution function. Rocq `g`:
-`[y ≤ x] · CreditV F (i+1) y  +  [y ≥ x] · F i`. -/
-def RealDecrTrialg (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) : ℝ → ℝ≥0∞ := fun y =>
-  (if y ≤ x then RealDecrTrialCreditV F (i + 1) y else 0) +
-  (if x ≤ y then F i else 0)
-
-/-- Rocq `CreditV_nonneg` — trivial in `ℝ≥0∞`, kept for parity. -/
-theorem RealDecrTrialCreditV_nonneg (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
-    0 ≤ RealDecrTrialCreditV F i x := zero_le'
-
-/-! ## Program
-
-Rocq `lazyDecrR`:
-```
-rec: "trial" "N" "x" :=
-  let: "y" := init #() in
-  if: (cmp "y" "x" = #(-1)) then "trial" ("N" + #1) "y"   (* y < x *)
-                            else "N".
-```
-Under `urand`, `init ()` becomes `urand` and `cmp y x = -1` becomes `y < x`. -/
+/-- `DecrTrial N x` draws `y ← urand` and recurses while `y < x`, returning the
+count `N` on the first `y ≥ x`. -/
 @[pl_fold]
 def DecrTrial : Exp ℝ := pl%
   rec trial N x :=
     let y := urand;
     if y < x then trial (N + #1) y else N
 
-/-! ## Specification
+/-! ## PMF -/
 
-Rocq `wp_lazyDecrR_gen`:
-```
-∀ N x rx, lazy_real x rx ∗ ⌜0 ≤ rx ≤ 1⌝ ∗ ↯(CreditV F N rx) -∗
-  WP lazyDecrR #N x {{ z, ∃ n, ⌜z = #n⌝ ∗ ↯(F n) ∗ lazy_real x rx }}
-```
-Under `urand` the `lazy_real x rx` predicate disappears (the value is the real
-`x`), so both it and the returned copy drop out of the triple. -/
-/-- The amplified per-sample credit: the ordinary `RealDecrTrialg` plus a
-termination top-up `k·ε_term` on the recursion region `{y < x}`. -/
+/-- PMF for `DecrTrial` started at `N = 0`: `x^n/n! − x^(n+1)/(n+1)!`. -/
+def RealDecrTrialμ0 (x : ℝ) (n : ℕ) : ℝ≥0∞ :=
+  .ofReal (x ^ n / n.factorial - x ^ (n + 1) / (n + 1).factorial)
+
+/-- PMF for `DecrTrial` started at `N = i`: `[i ≤ n] · μ0 x (n - i)`. -/
+def RealDecrTrialμ (x : ℝ) (i n : ℕ) : ℝ≥0∞ :=
+  if i ≤ n then RealDecrTrialμ0 x (n - i) else 0
+
+theorem RealDecrTrialμ_not_supp {x : ℝ} {i n : ℕ} (h : n < i) :
+    RealDecrTrialμ x i n = 0 := by
+  simp only [RealDecrTrialμ, if_neg (Nat.not_le.mpr h)]
+
+theorem RealDecrTrialμ_supp {x : ℝ} {i n : ℕ} (h : i ≤ n) :
+    RealDecrTrialμ x i n = RealDecrTrialμ0 x (n - i) := by
+  simp only [RealDecrTrialμ, if_pos h]
+
+theorem RealDecrTrialμ_base {x : ℝ} {n : ℕ} :
+    RealDecrTrialμ x 0 n = RealDecrTrialμ0 x n := by
+  simp only [RealDecrTrialμ, Nat.zero_le, if_pos, Nat.sub_zero]
+
+/-! ## Credit distribution -/
+
+/-- Expected credit to run `DecrTrial i x`: `∑ₙ μ x i n · F n`. -/
+def RealDecrTrialCreditV (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) : ℝ≥0∞ :=
+  ∑' n : ℕ, RealDecrTrialμ x i n * F n
+
+theorem RealDecrTrialCreditV_nonneg (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
+    0 ≤ RealDecrTrialCreditV F i x := zero_le'
+
+/-- Per-sample credit-distribution function: on a fresh draw `y`, charge
+`CreditV F (i+1) y` when `y ≤ x` (recurse) and `F i` when `y ≥ x` (stop). -/
+def RealDecrTrialg (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) : ℝ → ℝ≥0∞ := fun y =>
+  (if y ≤ x then RealDecrTrialCreditV F (i + 1) y else 0) +
+  (if x ≤ y then F i else 0)
+
+/-- Amplified per-sample credit: the ordinary `RealDecrTrialg` plus a
+termination top-up `c` on the recursion region `{y < x}`. -/
 def RealDecrTrialgAmp (F : ℕ → ℝ≥0∞) (N : ℕ) (x : ℝ) (c : ℝ≥0∞) : ℝ → ℝ≥0∞ :=
   fun y => RealDecrTrialg F N x y + (if y < x then c else 0)
 
@@ -137,10 +86,12 @@ The credit-distribution functions fed to `twp_urand_exp'` are Borel measurable:
 `μ0` is `ofReal` of a polynomial, `μ` toggles it by an `x`-independent guard, `CreditV`
 is a `tsum` of such terms, and `g`/`gAmp` glue them with interval indicators. -/
 
+/-- `μ0 x n` is Borel measurable in `x` (`ofReal` of a polynomial). -/
 theorem RealDecrTrialμ0_measurable (n : ℕ) :
     Measurable (fun x : ℝ => RealDecrTrialμ0 x n) :=
   ENNReal.measurable_ofReal.comp (by fun_prop)
 
+/-- `μ x i n` is Borel measurable in `x` (its support guard is `x`-independent). -/
 theorem RealDecrTrialμ_measurable (i n : ℕ) :
     Measurable (fun x : ℝ => RealDecrTrialμ x i n) := by
   unfold RealDecrTrialμ
@@ -148,10 +99,12 @@ theorem RealDecrTrialμ_measurable (i n : ℕ) :
   · simpa only [h, if_true] using RealDecrTrialμ0_measurable (n - i)
   · simpa only [h, if_false] using measurable_const
 
+/-- `CreditV F i x` is Borel measurable in `x` (a `tsum` of measurable terms). -/
 theorem RealDecrTrialCreditV_measurable (F : ℕ → ℝ≥0∞) (i : ℕ) :
     Measurable (fun x : ℝ => RealDecrTrialCreditV F i x) :=
   Measurable.ennreal_tsum fun n => (RealDecrTrialμ_measurable i n).mul_const (F n)
 
+/-- `g F i x` is Borel measurable (interval indicators glued to `CreditV`). -/
 theorem RealDecrTrialg_measurable (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
     Measurable (RealDecrTrialg F i x) := by
   unfold RealDecrTrialg
@@ -160,6 +113,7 @@ theorem RealDecrTrialg_measurable (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
       measurable_const
   · exact Measurable.ite measurableSet_Ici measurable_const measurable_const
 
+/-- `gAmp F N x c` is Borel measurable. -/
 theorem RealDecrTrialgAmp_measurable (F : ℕ → ℝ≥0∞) (N : ℕ) (x : ℝ) (c : ℝ≥0∞) :
     Measurable (RealDecrTrialgAmp F N x c) :=
   (RealDecrTrialg_measurable F N x).add
@@ -171,17 +125,16 @@ continuous `g`). The reusable `lintegral ↔ intervalIntegral` bridge. -/
 theorem lintegral_ofReal_Icc {t : ℝ} (ht : 0 ≤ t) {g : ℝ → ℝ} (hg : Continuous g)
     (hgn : ∀ r ∈ Set.Icc (0 : ℝ) t, 0 ≤ g r) :
     ∫⁻ r in Set.Icc 0 t, ENNReal.ofReal (g r) ∂volume = ENNReal.ofReal (∫ r in (0 : ℝ)..t, g r) := by
-  rw [← MeasureTheory.ofReal_integral_eq_lintegral_ofReal hg.integrableOn_Icc
+  rw [← ofReal_integral_eq_lintegral_ofReal hg.integrableOn_Icc
         (ae_restrict_of_forall_mem measurableSet_Icc hgn),
-      MeasureTheory.integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le ht]
+      integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le ht]
 
-/-! ## Credit conservation (`g_expectation`)
+/-! ## Credit conservation
 
 The single analytic fact behind `DecrTrial`: the uniform average of `g` over the
-fresh sample equals the credit `CreditV`. The Rocq proof is `is_RInt (g F N x) 0 1
-(CreditV F N x)`; here it is a `lintegral` over `unifUnit = volume.restrict [0,1]`.
-Everything is `ENNReal.ofReal` of a polynomial, so the load-bearing steps are Tonelli
-(`lintegral_tsum`) and one interval integral of `μ0`. -/
+fresh sample equals the credit `CreditV`, as a `lintegral` over `unifUnit =
+volume.restrict [0,1]`. Everything is `ENNReal.ofReal` of a polynomial, so the
+load-bearing steps are Tonelli (`lintegral_tsum`) and one interval integral of `μ0`. -/
 
 /-- `CreditV` reindexed as a shift: drop the `i ≤ n` guard by summing over `m = n - i`. -/
 theorem RealDecrTrialCreditV_reindex (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
@@ -224,10 +177,9 @@ theorem RealDecrTrialμ0_setLIntegral {x : ℝ} (hx : 0 ≤ x ∧ x ≤ 1) (m : 
     ∫⁻ y in Set.Icc 0 x, RealDecrTrialμ0 y m ∂volume = RealDecrTrialμ0 x (m + 1) := by
   have hcont : Continuous fun y : ℝ =>
       y ^ m / (m.factorial : ℝ) - y ^ (m + 1) / ((m + 1).factorial : ℝ) := by fun_prop
-  have hm0 : (0 : ℝ) < (m.factorial : ℝ) := by exact_mod_cast Nat.factorial_pos m
   have hnn : 0 ≤ᵐ[volume.restrict (Set.Icc 0 x)]
       fun y : ℝ => y ^ m / (m.factorial : ℝ) - y ^ (m + 1) / ((m + 1).factorial : ℝ) := by
-    refine MeasureTheory.ae_restrict_of_forall_mem measurableSet_Icc (fun y hy => ?_)
+    refine ae_restrict_of_forall_mem measurableSet_Icc (fun y hy => ?_)
     show (0 : ℝ) ≤ y ^ m / (m.factorial : ℝ) - y ^ (m + 1) / ((m + 1).factorial : ℝ)
     have hy0 : 0 ≤ y := hy.1
     have hy1 : y ≤ 1 := _root_.le_trans hy.2 hx.2
@@ -242,20 +194,19 @@ theorem RealDecrTrialμ0_setLIntegral {x : ℝ} (hx : 0 ≤ x ∧ x ≤ 1) (m : 
       rw [div_le_one (by positivity)]; linarith [Nat.cast_nonneg (α := ℝ) m]
     exact mul_le_of_le_one_right hnn1 hyle
   simp only [RealDecrTrialμ0]
-  rw [← MeasureTheory.ofReal_integral_eq_lintegral_ofReal (hcont.integrableOn_Icc) hnn,
-      MeasureTheory.integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le hx.1,
+  rw [← ofReal_integral_eq_lintegral_ofReal (hcont.integrableOn_Icc) hnn,
+      integral_Icc_eq_integral_Ioc, ← intervalIntegral.integral_of_le hx.1,
       RealDecrTrialμ0_real_integral]
 
 open MeasureTheory in
-/-- Credit conservation. Rocq `g_expectation` states `is_RInt (g F N x) 0 1
-(CreditV F N x)`; restated here as a `lintegral` over the uniform-unit measure —
-exactly the hypothesis `twp_urand_exp` consumes when distributing
-`↯(CreditV F N x)` across the freshly sampled real. -/
+/-- Credit conservation, as a `lintegral` over the uniform-unit measure — exactly
+the hypothesis `twp_urand_exp` consumes when distributing `↯(CreditV F N x)`
+across the freshly sampled real. -/
 theorem RealDecrTrialg_lintegral {F : ℕ → ℝ≥0∞} {M : ℝ≥0∞} {N : ℕ} {x : ℝ}
-    (Hx : 0 ≤ x ∧ x ≤ 1) (Hbound : ∀ n, F n ≤ M) :
+    (hx : 0 ≤ x ∧ x ≤ 1) (hbound : ∀ n, F n ≤ M) :
     ∫⁻ y, RealDecrTrialg F N x y ∂(ProbLangℝ.unifUnit (T := ℝ)) =
       RealDecrTrialCreditV F N x := by
-  obtain ⟨hx0, hx1⟩ := Hx
+  obtain ⟨hx0, hx1⟩ := hx
   have hset2 : Set.Ici x ∩ Set.Icc (0 : ℝ) 1 = Set.Icc x 1 := by
     ext y; simp only [Set.mem_inter_iff, Set.mem_Ici, Set.mem_Icc]
     exact ⟨fun ⟨h1, _, h2⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h1, _root_.le_trans hx0 h1, h2⟩⟩
@@ -302,10 +253,10 @@ open MeasureTheory in
 /-- The amplified integral: the extra `[y < x]·c` term contributes `c · ofReal x`
 (the measure of the recursion region `[0,x)`). -/
 theorem RealDecrTrialgAmp_lintegral {F : ℕ → ℝ≥0∞} {M : ℝ≥0∞} {N : ℕ} {x : ℝ} {c : ℝ≥0∞}
-    (Hx : 0 ≤ x ∧ x ≤ 1) (Hbound : ∀ n, F n ≤ M) :
+    (hx : 0 ≤ x ∧ x ≤ 1) (hbound : ∀ n, F n ≤ M) :
     ∫⁻ y, RealDecrTrialgAmp F N x c y ∂(ProbLangℝ.unifUnit (T := ℝ)) =
       RealDecrTrialCreditV F N x + c * ENNReal.ofReal x := by
-  obtain ⟨hx0, hx1⟩ := Hx
+  obtain ⟨hx0, hx1⟩ := hx
   have hset : Set.Iio x ∩ Set.Icc (0 : ℝ) 1 = Set.Ico 0 x := by
     ext y; simp only [Set.mem_inter_iff, Set.mem_Iio, Set.mem_Icc, Set.mem_Ico]
     exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, _root_.le_trans h2.le hx1⟩⟩
@@ -313,13 +264,13 @@ theorem RealDecrTrialgAmp_lintegral {F : ℕ → ℝ≥0∞} {M : ℝ≥0∞} {N
   simp only [RealDecrTrialgAmp]
   rw [lintegral_add_left (RealDecrTrialg_measurable F N x)]
   congr 1
-  · exact RealDecrTrialg_lintegral ⟨hx0, hx1⟩ Hbound
+  · exact RealDecrTrialg_lintegral ⟨hx0, hx1⟩ hbound
   · rw [show (fun y => if y < x then c else 0) = (Set.Iio x).indicator (fun _ => c) from by
           ext y; rw [Set.indicator_apply]; simp [Set.mem_Iio],
         lintegral_indicator measurableSet_Iio, setLIntegral_const,
         Measure.restrict_apply measurableSet_Iio, hset, Real.volume_Ico, sub_zero]
 
-/-! ### Parity of the `DecrTrial` result
+/-! ## Parity of the `DecrTrial` result
 
 The `DecrTrial` process started at `0` returns an **even** count with probability
 `exp(-x)` and an **odd** count with probability `1 - exp(-x)`: the even/odd sums of the
@@ -432,10 +383,12 @@ theorem RealDecrTrialCreditV_parity (A B : ℝ≥0∞) {x : ℝ} (hx0 : 0 ≤ x)
           ∀ k : ℕ, RealDecrTrialμ0 x (2 * k + 1) * (if (2 * k + 1) % 2 = 0 then A else B)
             = RealDecrTrialμ0 x (2 * k + 1) * B), ENNReal.tsum_mul_right, hOdd]
 
+/-! ## Termination -/
+
 /-- Fixed-factor tail of `DecrTrial`: once the threshold `x` is capped by some
 `B < 1`, the recursion probability `≤ B`, so a single amplification factor
 `k = 1/B > 1` drives the termination induction (à la `BernoulliGeometric`). -/
-theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀ n, F n ≤ M)
+theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (hnn : ∀ n, F n ≤ M)
     (B : ℝ) (hB0 : 0 < B) (hB1 : B < 1) :
     ⊢@{IProp GF} ∀ (N : ℕ) (x : ℝ), ⌜0 ≤ x⌝ -∗ ⌜x ≤ B⌝ -∗
       ↯ (RealDecrTrialCreditV F N x) -∗
@@ -469,7 +422,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞
     (ε₂ := RealDecrTrialgAmp F N x ((k : ℝ≥0∞) * ε_term)) ?hmeas ?hint) $$ Hε
   case hmeas => exact RealDecrTrialgAmp_measurable F N x _
   case hint =>
-    rw [RealDecrTrialgAmp_lintegral ⟨Hx0, _root_.le_trans HxB hB1.le⟩ Hnn]
+    rw [RealDecrTrialgAmp_lintegral ⟨Hx0, _root_.le_trans HxB hB1.le⟩ hnn]
     have hkx : (↑k : ℝ≥0∞) * ENNReal.ofReal x ≤ 1 := by
       rw [show (↑k : ℝ≥0∞) = ENNReal.ofReal (1 / B) from by
             rw [hk_def, ← ENNReal.ofReal_coe_nnreal]; rfl,
@@ -484,9 +437,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞
   iintro %y ⟨%Hym, Hcy⟩
   have Hym01 : 0 < y ∧ y < 1 := mem_unifUnitSupport_real.mp Hym
   have Hyr : 0 ≤ y ∧ y ≤ 1 := ⟨Hym01.1.le, Hym01.2.le⟩
-  -- Reduce the `let` and evaluate `y < x` to `.bool (realLt y x)` — the stepper now keeps
-  -- `realLt` folded (a symbolic real comparison no longer over-reduces to an opaque
-  -- classical `Decidable.rec`), so we can just `rcases` on it; each branch fires the `cond`.
+  -- Evaluate `y < x` to `.bool (realLt y x)` and split on it.
   twp_pures
   rcases hb : ProbLangℝ.realLt y x with _ | _
   · -- `realLt y x = false`, i.e. `¬ y < x`: terminal branch returns `N`, credit `F N`.
@@ -527,6 +478,9 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞
     iapply tglWp_value
     iexact Hpost
 
+/-- Total correctness of `DecrTrial N x`: `↯(CreditV F N x)` covers the run and
+the result is charged `F n`. The first draw is peeled unamplified, then the
+`< 1` threshold is handed to the fixed-factor tail `twp_DecrTrial_tail`. -/
 theorem twp_DecrTrial (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀ n, F n ≤ M)
     (N : ℕ) (x : ℝ) (Hx : 0 ≤ x ∧ x ≤ 1) :
     ⊢@{IProp GF} ↯ (RealDecrTrialCreditV F N x) -∗

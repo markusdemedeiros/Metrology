@@ -10,21 +10,14 @@ public import Metrology.TotalEris.Examples.Samplers.Selector
 @[expose] public section
 
 /-!
-# Discrete/continuous Gaussian sampler — port of `gauss.v`
+# Discrete/continuous Gaussian sampler
 
 * `G1 ()` samples a non-negative integer `k` from the (half-)discrete Gaussian
-  `G1_μ k = exp(-k²/2) / Norm1`, via a geometric trial (`GeometricTrial BNEHalf`)
+  `G1μ k = exp(-k²/2) / Norm1`, via a geometric trial (`GeometricTrial BNEHalf`)
   followed by an accept/reject iteration (`IterTrial BNEHalf`).
 * `G2 ()` extends `G1` to a full continuous Gaussian on `[k, k+1)`, returning a
   pair `(x, k)` of fractional real `x ∈ [0,1)` and integer `k`, with density
-  `G2_μ k x = exp(-(x+k)²/2) / Norm2`; the accept step uses the selector `B`.
-
-This is the apex of the Gauss tower — it composes `BNEHalf`
-(`HalfBernNegExp`), `GeometricTrial`/`IterTrial` (`BernoulliGeometric`/`BernIter`), and `B`
-(`Selector`).
-
-**Status: complete.** All specifications (`twp_G1`, `twp_G2`) are proved, sorry-free.
-Fixed at `rT = ℝ`.
+  `G2μ k x = exp(-(x+k)²/2) / Norm2`; the accept step uses the selector `B`.
 -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
@@ -41,70 +34,33 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
 /-! ## PMF -/
 
-/-- Normalising constant of the discrete Gaussian. Rocq `Norm1`. -/
+/-- Normalising constant of the discrete Gaussian. -/
 def Norm1 : ℝ := ∑' k : ℕ, Real.exp (-(k : ℝ) ^ 2 / 2)
 
-/-- Discrete-Gaussian PMF. Rocq `G1_μ`: `exp(-k²/2) / Norm1`. -/
+/-- Discrete-Gaussian PMF: `exp(-k²/2) / Norm1`. -/
 def G1μ (k : ℕ) : ℝ≥0∞ := .ofReal (Real.exp (-(k : ℝ) ^ 2 / 2) / Norm1)
 
 open MeasureTheory in
-/-- Normalising constant of the continuous Gaussian on `[k, k+1)`. Rocq `Norm2`:
+/-- Normalising constant of the continuous Gaussian on `[k, k+1)`:
 `∫₀¹ ∑ₖ exp(-(x+k)²/2) dx`. -/
 def Norm2 : ℝ := ∫ x in (0 : ℝ)..1, ∑' k : ℕ, Real.exp (-((x + k) ^ 2) / 2)
 
-/-- Continuous-Gaussian density. Rocq `G2_μ`: `exp(-(x+k)²/2) / Norm2`. -/
+/-- Continuous-Gaussian density: `exp(-(x+k)²/2) / Norm2`. -/
 def G2μ (k : ℕ) (x : ℝ) : ℝ≥0∞ := .ofReal (Real.exp (-((x + k) ^ 2) / 2) / Norm2)
 
 /-! ## Credits -/
 
-/-- Rocq `G1_CreditV`: `∑ₖ G1_μ k · F k`. -/
+/-- Credit under the discrete-Gaussian PMF: `∑ₖ G1μ k · F k`. -/
 def G1_CreditV (F : ℕ → ℝ≥0∞) : ℝ≥0∞ := ∑' k : ℕ, G1μ k * F k
 
 open MeasureTheory in
-/-- Rocq `G2_CreditV`: `∑ₖ ∫₀¹ G2_μ k x · F k x dx`. -/
+/-- Credit under the continuous-Gaussian density:
+`∑ₖ ∫₀¹ G2μ k x · F k x dx`. -/
 def G2_CreditV (F : ℕ → ℝ → ℝ≥0∞) : ℝ≥0∞ :=
   ∑' k : ℕ, ∫⁻ x, G2μ k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
 
-/-- Rocq `G1_h`: iteration continuation — `true ↦ F k`, `false ↦ G1_CreditV F`. -/
-def G1_h (F : ℕ → ℝ≥0∞) (k : ℕ) : Bool → ℝ≥0∞
-  | true => F k
-  | false => G1_CreditV F
+/-! ## Programs -/
 
-/-- Rocq `G1_f`: the geometric-trial credit function.
-`exp(-(k(k-1))/2) · G1_h true + (1 - exp(…)) · G1_h false`. -/
-def G1_f (F : ℕ → ℝ≥0∞) (k : ℕ) : ℝ≥0∞ :=
-  .ofReal (Real.exp (-(↑(k * (k - 1)) : ℝ) / 2)) * G1_h F k true +
-  (1 - .ofReal (Real.exp (-(↑(k * (k - 1)) : ℝ) / 2))) * G1_h F k false
-
-/-- Rocq `G2_s`: `true ↦ F k x`, `false ↦ G2_CreditV F`. -/
-def G2_s (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) (x : ℝ) : Bool → ℝ≥0∞
-  | true => F k x
-  | false => G2_CreditV F
-
-/-- Rocq `G2_g`:
-`exp(-x(2k+x)/2) · G2_s true + (1 - exp(…)) · G2_s false`. -/
-def G2_g (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) (x : ℝ) : ℝ≥0∞ :=
-  .ofReal (Real.exp (-x * (2 * k + x) / 2)) * G2_s F k x true +
-  (1 - .ofReal (Real.exp (-x * (2 * k + x) / 2))) * G2_s F k x false
-
-open MeasureTheory in
-/-- Rocq `G2_f`: `∫₀¹ G2_g F k x dx`, the `G1`-level credit for `G2`. -/
-def G2_f (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) : ℝ≥0∞ :=
-  ∫⁻ x, G2_g F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
-
-/-! ## Programs
-
-Rocq:
-```
-G1 := rec: "trial" "_" :=
-  let: "k" := GeometricTrial BNEHalf #0 in
-  if: IterTrial BNEHalf ("k" * ("k" - #1)) then "k" else "trial" #().
-G2 := rec: "trial" "_" :=
-  let: "k" := G1 #() in
-  let: "x" := init #() in
-  if: IterTrial (λ: "_", B "k" "x") ("k" + #1) then ("x", "k") else "trial" #().
-```
--/
 @[pl_fold]
 def G1 : Exp ℝ := pl%
   rec trial u :=
@@ -134,6 +90,16 @@ noncomputable def γBNE : ↑unitInterval :=
     have := Real.exp_le_exp.mpr (show (-1 / 2 : ℝ) ≤ 0 by norm_num)
     rwa [Real.exp_zero] at this⟩
 
+/-- `(γBNE : ℝ) = exp(-½)`. -/
+theorem γBNE_coe : (γBNE : ℝ) = Real.exp (-1 / 2) := rfl
+
+theorem γBNE_pos : (0 : ℝ) < (γBNE : ℝ) := Real.exp_pos _
+
+theorem γBNE_nonneg : (0 : ℝ) ≤ (γBNE : ℝ) := γBNE_pos.le
+
+theorem γBNE_lt_one : (γBNE : ℝ) < 1 := by
+  rw [γBNE_coe, ← Real.exp_zero]; exact Real.exp_lt_exp.mpr (by norm_num)
+
 /-- Credit-shape bridge: the `AbstractBernoulli` credit is exactly `BNEHalfCreditV`. -/
 theorem γBNE_credit_eq (F : Bool → ℝ≥0∞) :
     ENNReal.ofReal (γBNE : ℝ) * F true + (1 - ENNReal.ofReal (γBNE : ℝ)) * F false
@@ -141,7 +107,7 @@ theorem γBNE_credit_eq (F : Bool → ℝ≥0∞) :
   have ht : BNEHalfμ true = ENNReal.ofReal (Real.exp (-1 / 2)) := rfl
   have hf : BNEHalfμ false = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := rfl
   simp only [BNEHalfCreditV, ht, hf]
-  rw [show (γBNE : ℝ) = Real.exp (-1 / 2) from rfl,
+  rw [γBNE_coe,
       show (1 : ℝ≥0∞) - ENNReal.ofReal (Real.exp (-1 / 2))
             = ENNReal.ofReal (1 - Real.exp (-1 / 2)) from by
         rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ (Real.exp_pos _).le]]
@@ -208,41 +174,44 @@ series: `exp(-k²/2) ≤ exp(-½)^k` (as `k ≤ k²`), hence
 `Norm1 < ∑ₖ exp(-½)^k = (1-exp(-½))⁻¹`, i.e. `(1-γ)·Norm1 < 1` (strict: the `k=2`
 term `exp(-2) < exp(-1)` is a strict drop). -/
 
-theorem summable_normTerm : Summable (fun k : ℕ => Real.exp (-(k : ℝ) ^ 2 / 2)) := by
-  have hγ0 : (0 : ℝ) ≤ Real.exp (-1 / 2) := (Real.exp_pos _).le
-  have hγ1 : Real.exp (-1 / 2) < 1 := by
-    rw [← Real.exp_zero]; exact Real.exp_lt_exp.mpr (by norm_num)
-  refine Summable.of_nonneg_of_le (fun k => (Real.exp_pos _).le) (fun k => ?_)
-    (summable_geometric_of_lt_one hγ0 hγ1)
+/-- `exp(-k²/2) ≤ exp(-½)^k`, since `k ≤ k²`. Dominates the Gaussian tail by a
+geometric series. -/
+lemma normTerm_le_geometric (k : ℕ) :
+    Real.exp (-(k : ℝ) ^ 2 / 2) ≤ Real.exp (-1 / 2) ^ k := by
   rw [← Real.exp_nat_mul]
   refine Real.exp_le_exp.mpr ?_
   have hnat : (k : ℝ) ≤ (k : ℝ) ^ 2 := by exact_mod_cast Nat.le_self_pow (by norm_num) k
   linarith [hnat]
 
+/-- `∑' k, exp(-k²/2)` converges: dominated by the geometric series `∑ exp(-½)^k`. -/
+theorem summable_normTerm : Summable (fun k : ℕ => Real.exp (-(k : ℝ) ^ 2 / 2)) := by
+  have hγ0 : (0 : ℝ) ≤ Real.exp (-1 / 2) := γBNE_nonneg
+  have hγ1 : Real.exp (-1 / 2) < 1 := γBNE_lt_one
+  exact Summable.of_nonneg_of_le (fun k => (Real.exp_pos _).le)
+    (fun k => normTerm_le_geometric k) (summable_geometric_of_lt_one hγ0 hγ1)
+
+/-- `0 < Norm1` (the `k = 0` summand is `exp 0 = 1`). -/
 theorem Norm1_pos : 0 < Norm1 := by
   unfold Norm1
   calc (0 : ℝ) < Real.exp (-((0 : ℕ) : ℝ) ^ 2 / 2) := Real.exp_pos _
     _ ≤ _ := summable_normTerm.le_tsum 0 (fun b _ => (Real.exp_pos _).le)
 
+/-- `Norm1 < (1 - exp(-½))⁻¹`: the discrete-Gaussian tail is strictly dominated by
+the geometric series `∑ exp(-½)^k` (strict at `k = 2`). -/
 theorem Norm1_bound : Norm1 < (1 - Real.exp (-1 / 2))⁻¹ := by
-  have hγ0 : (0 : ℝ) ≤ Real.exp (-1 / 2) := (Real.exp_pos _).le
-  have hγ1 : Real.exp (-1 / 2) < 1 := by
-    rw [← Real.exp_zero]; exact Real.exp_lt_exp.mpr (by norm_num)
+  have hγ0 : (0 : ℝ) ≤ Real.exp (-1 / 2) := γBNE_nonneg
+  have hγ1 : Real.exp (-1 / 2) < 1 := γBNE_lt_one
   rw [Norm1, ← tsum_geometric_of_lt_one hγ0 hγ1]
-  refine Summable.tsum_lt_tsum_of_nonneg (i := 2) (fun k => (Real.exp_pos _).le) (fun k => ?_) ?_
-    (summable_geometric_of_lt_one hγ0 hγ1)
-  · rw [← Real.exp_nat_mul]
-    refine Real.exp_le_exp.mpr ?_
-    have hnat : (k : ℝ) ≤ (k : ℝ) ^ 2 := by exact_mod_cast Nat.le_self_pow (by norm_num) k
-    linarith [hnat]
+  refine Summable.tsum_lt_tsum_of_nonneg (i := 2) (fun k => (Real.exp_pos _).le)
+    (fun k => normTerm_le_geometric k) ?_ (summable_geometric_of_lt_one hγ0 hγ1)
   · show Real.exp (-((2 : ℕ) : ℝ) ^ 2 / 2) < Real.exp (-1 / 2) ^ 2
     rw [← Real.exp_nat_mul]; exact Real.exp_lt_exp.mpr (by norm_num)
 
+/-- `(1 - γBNE) · Norm1 < 1`: the `G1` reject loop's per-iteration accept mass is
+strictly below `1` (so the amplification factor is finite). -/
 theorem Norm1_reject_lt_one : (1 - (γBNE : ℝ)) * Norm1 < 1 := by
-  have hg : (γBNE : ℝ) = Real.exp (-1 / 2) := rfl
-  rw [hg]
-  have hγ1 : Real.exp (-1 / 2) < 1 := by
-    rw [← Real.exp_zero]; exact Real.exp_lt_exp.mpr (by norm_num)
+  rw [γBNE_coe]
+  have hγ1 : Real.exp (-1 / 2) < 1 := γBNE_lt_one
   have h1γ : (0 : ℝ) < 1 - Real.exp (-1 / 2) := by linarith
   calc (1 - Real.exp (-1 / 2)) * Norm1
       < (1 - Real.exp (-1 / 2)) * (1 - Real.exp (-1 / 2))⁻¹ :=
@@ -254,24 +223,21 @@ noncomputable def G1Factor : ℝ≥0 :=
   ⟨1 / (1 - (1 - (γBNE : ℝ)) * Norm1),
     div_nonneg zero_le_one (by have := Norm1_reject_lt_one; linarith)⟩
 
+/-- `1 < G1Factor` (the `G1` reject mass `(1-γ)·Norm1` is strictly positive). -/
 theorem one_lt_G1Factor : 1 < G1Factor := by
   rw [← NNReal.coe_lt_coe, NNReal.coe_one]
   show (1 : ℝ) < 1 / (1 - (1 - (γBNE : ℝ)) * Norm1)
   have hrpos : 0 < 1 - (1 - (γBNE : ℝ)) * Norm1 := by
     have := Norm1_reject_lt_one; linarith
   rw [one_lt_div hrpos]
-  have hγ1 : (γBNE : ℝ) < 1 := by
-    rw [show (γBNE : ℝ) = Real.exp (-1 / 2) from rfl, ← Real.exp_zero]
-    exact Real.exp_lt_exp.mpr (by norm_num)
+  have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   have : 0 < (1 - (γBNE : ℝ)) * Norm1 := mul_pos (by linarith) Norm1_pos
   linarith
 
 /-- The shift-`0` geometric distribution is a probability distribution. -/
 theorem geometricPMF_tsum : ∑' k : ℕ, GeometricPMF γBNE k = 1 := by
-  have hγ0 : (0 : ℝ) ≤ (γBNE : ℝ) := γBNE.2.1
-  have hγ1 : (γBNE : ℝ) < 1 := by
-    rw [show (γBNE : ℝ) = Real.exp (-1 / 2) from rfl, ← Real.exp_zero]
-    exact Real.exp_lt_exp.mpr (by norm_num)
+  have hγ0 : (0 : ℝ) ≤ (γBNE : ℝ) := γBNE_nonneg
+  have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   rw [show (fun k : ℕ => GeometricPMF γBNE k)
         = fun k => ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) from by funext k; rfl,
       ← ENNReal.ofReal_tsum_of_nonneg (fun k => mul_nonneg (by positivity) (by linarith))
@@ -284,9 +250,7 @@ weight of the discrete Gaussian before normalisation). Here `P(accept k) = γ^{k
 theorem geom_iterN_tsum :
     ∑' k : ℕ, GeometricPMF γBNE k * ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)
       = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Norm1) := by
-  have hγ1 : (γBNE : ℝ) < 1 := by
-    rw [show (γBNE : ℝ) = Real.exp (-1 / 2) from rfl, ← Real.exp_zero]
-    exact Real.exp_lt_exp.mpr (by norm_num)
+  have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   have hterm : ∀ k : ℕ, GeometricPMF γBNE k * ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)
       = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Real.exp (-(k : ℝ) ^ 2 / 2)) := fun k => by
     rw [show GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) from rfl,
@@ -298,7 +262,7 @@ theorem geom_iterN_tsum :
       | succ n => rw [Nat.succ_sub_one]; ring
     rw [show (γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ IterN k
           = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (k + IterN k) from by rw [pow_add]; ring, hkk,
-      show (γBNE : ℝ) = Real.exp (-1 / 2) from rfl, ← Real.exp_nat_mul]
+      γBNE_coe, ← Real.exp_nat_mul]
     congr 2; push_cast; ring
   rw [tsum_congr hterm,
       ← ENNReal.ofReal_tsum_of_nonneg (fun k => mul_nonneg (by linarith) (Real.exp_pos _).le)
@@ -311,9 +275,7 @@ theorem geom_iterN_tsum :
 theorem G1_geo_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
     shiftGeometricPMF_expectation γBNE 0 (G1_geoCredit F ((G1Factor : ℝ≥0∞) * ε))
       = G1_CreditV F + ε := by
-  have hγ1 : (γBNE : ℝ) < 1 := by
-    rw [show (γBNE : ℝ) = Real.exp (-1 / 2) from rfl, ← Real.exp_zero]
-    exact Real.exp_lt_exp.mpr (by norm_num)
+  have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   have hrej : (0 : ℝ) < 1 - (1 - (γBNE : ℝ)) * Norm1 := by have := Norm1_reject_lt_one; linarith
   set c := (G1Factor : ℝ≥0∞) * ε with hc
   set R := ENNReal.ofReal ((1 - (γBNE : ℝ)) * Norm1) with hR
@@ -336,8 +298,7 @@ theorem G1_geo_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
     rw [show (γBNE : ℝ) ^ IterN k * ((γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)))
           = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (IterN k + k) from by rw [pow_add]; ring, hkk,
         show (γBNE : ℝ) ^ k ^ 2 = Real.exp (-(k : ℝ) ^ 2 / 2) from by
-          rw [show (γBNE : ℝ) = Real.exp (-1 / 2) from rfl, ← Real.exp_nat_mul]
-          congr 1; push_cast; ring]
+          rw [γBNE_coe, ← Real.exp_nat_mul]; congr 1; push_cast; ring]
     field_simp [ne_of_gt Norm1_pos]
   have hRfin : (∑' k : ℕ, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k) = R := by
     rw [tsum_congr fun k => mul_comm _ _]; exact geom_iterN_tsum
@@ -387,21 +348,17 @@ theorem G1_geo_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
             ENNReal.ofReal_one],
       one_mul]
 
-/-! ## Specifications -/
+/-! ### Specification
 
-/-- Rocq `wp_G1`: `G1 ()` samples `n` from the discrete Gaussian. -/
+/-- `G1 ()` samples `n` from the discrete Gaussian. -/
 theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀ n, F n ≤ M) :
     ⊢@{IProp GF} ↯ (G1_CreditV F) -∗
       tglWp E pl(&G1 #.unit)
         (fun v : Val ℝ => iprop(∃ n : ℕ, ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))) := by
-  have hγ0 : (0 : ℝ) < (γBNE : ℝ) := Real.exp_pos _
-  have hγ1 : (γBNE : ℝ) < 1 := by
-    have := Real.exp_lt_exp.mpr (show (-1 / 2 : ℝ) < 0 by norm_num)
-    rwa [Real.exp_zero] at this
   iintro Hε_spec
   iapply twp_err_pos solve_not_red
   iintro %ε_term %Hε_pos Hε_term
-  set kf : ℝ≥0 := G1Factor with hkf
+  set kf : ℝ≥0 := G1Factor
   have Hk1 : 1 < kf := one_lt_G1Factor
   irevert Hε_spec
   iapply ErrorCredit.Induction.simple (k := kf) Hε_pos Hk1 $$ [] Hε_term
@@ -417,7 +374,8 @@ theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ z : ℤ,
     ⌜v.1 = .lit (.int z)⌝ ∗ ⌜(0 : ℤ) ≤ z⌝ ∗ ↯ (G1_geoCredit F ((kf : ℝ≥0∞) * ε_term) z))))
   isplitl [Hε]
-  · iapply (twp_GeometricTrial (γ := γBNE) 0 BNEHalfVal hγ0 hγ1 abstractBernoulli_BNEHalf)
+  · iapply (twp_GeometricTrial (γ := γBNE) 0 BNEHalfVal γBNE_pos γBNE_lt_one
+        abstractBernoulli_BNEHalf)
       $$ %(G1_geoCredit F ((kf : ℝ≥0∞) * ε_term))
     iapply (ErrorCredit.ext (G1_geo_collapse F ε_term).symm)
     iexact Hε
@@ -484,11 +442,12 @@ theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀
     iapply tglWp_value
     iexact Hpost
 
-/-! ## `G2` termination machinery
+/-! ## `B k x` as an abstract Bernoulli
 
-`G2` draws `k` (via `G1`) and a fractional `x` (via `urand`), then accepts iff
-`IterTrial (λ_, B k x) (k+1)` returns `true`. The per-iteration Bernoulli is the
-closure `λ_, B k x` (bias `exp(-x(2k+x)/(2k+2))`), supplied by `twp_B`. -/
+`G2`'s accept step calls `IterTrial (λ_, B k x) (k+1)`, i.e. the geometric-style
+iteration over the selector closure `λ_, B k x` from `Selector` (bias
+`exp(-x(2k+x)/(2k+2))`). As with `BNEHalf` for `G1`, we package it as a
+`γBkx`-biased `AbstractBernoulliI` so that `twp_IterTrial` applies. -/
 
 /-- Bias of the per-`(k,x)` selector Bernoulli `B k x`: `exp(-x(2k+x)/(2k+2))`.
 The exponent is clamped at `0` (`min 0 …`) so the value is `≤ 1` for **every** real
@@ -503,24 +462,26 @@ noncomputable def γBkx (k : ℕ) (x : ℝ) : ↑unitInterval :=
 @[reducible] def BkxVal (k : ℕ) (x : ℝ) : Val ℝ :=
   ⟨pl% (fun _u, &B #(.int (k : ℤ)) #(.real x)), IsVal.lam (by is_lc), by is_lc⟩
 
-/-- Credit-shape bridge: `B_CreditV` is the `AbstractBernoulli` credit at bias `γBkx`. -/
-theorem γBkx_credit_eq (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx : 0 ≤ x) :
-    ENNReal.ofReal (γBkx k x : ℝ) * F true + (1 - ENNReal.ofReal (γBkx k x : ℝ)) * F false
-      = B_CreditV F k x := by
-  -- On `x ≥ 0` the clamped exponent is a no-op, so the bias is the raw `exp(…)`.
+/-- On `x ≥ 0` the clamped exponent of `γBkx` is a no-op, so the bias is the raw `exp(…)`. -/
+theorem γBkx_coe (k : ℕ) {x : ℝ} (hx : 0 ≤ x) :
+    (γBkx k x : ℝ) = Real.exp (-x * (2 * k + x) / (2 * k + 2)) := by
   have harg : -x * (2 * (k : ℝ) + x) / (2 * k + 2) ≤ 0 := by
     rw [neg_mul, neg_div]
     exact neg_nonpos.mpr
       (div_nonneg (mul_nonneg hx (by linarith [Nat.cast_nonneg (α := ℝ) k])) (by positivity))
-  have hco : (γBkx k x : ℝ) = Real.exp (-x * (2 * k + x) / (2 * k + 2)) := by
-    show Real.exp (min 0 (-x * (2 * k + x) / (2 * k + 2)))
-        = Real.exp (-x * (2 * k + x) / (2 * k + 2))
-    rw [min_eq_right harg]
-  rw [hco]; rfl
+  show Real.exp (min 0 (-x * (2 * (k : ℝ) + x) / (2 * k + 2)))
+      = Real.exp (-x * (2 * k + x) / (2 * k + 2))
+  rw [min_eq_right harg]
+
+/-- Credit-shape bridge: `B_CreditV` is the `AbstractBernoulli` credit at bias `γBkx`. -/
+theorem γBkx_credit_eq (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx : 0 ≤ x) :
+    ENNReal.ofReal (γBkx k x : ℝ) * F true + (1 - ENNReal.ofReal (γBkx k x : ℝ)) * F false
+      = B_CreditV F k x := by
+  rw [γBkx_coe k hx]; rfl
 
 /-- `λ_, B k x` satisfies `AbstractBernoulliI`: β-reduce the closure, apply `twp_B`,
 frame the invariant. -/
-theorem abstractBernoulliI_Bkx (k : ℕ) (x : ℝ) (Hx : 0 ≤ x ∧ x ≤ 1) (I : IProp GF) :
+theorem abstractBernoulliI_Bkx (k : ℕ) (x : ℝ) (hx : 0 ≤ x ∧ x ≤ 1) (I : IProp GF) :
     AbstractBernoulliI (hlc := hlc) (GF := GF) (BkxVal k x) (γBkx k x) I where
   spec := by
     intro E
@@ -533,14 +494,21 @@ theorem abstractBernoulliI_Bkx (k : ℕ) (x : ℝ) (Hx : 0 ≤ x ∧ x ≤ 1) (I
       ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b))))
     isplitl [Hε]
     · iapply (twp_B E F (F true + F false)
-        (by intro b; cases b <;> first | exact le_self_add | exact le_add_self) k x Hx)
-      iapply (ErrorCredit.ext (γBkx_credit_eq F k x Hx.1))
+        (by intro b; cases b <;> first | exact le_self_add | exact le_add_self) k x hx)
+      iapply (ErrorCredit.ext (γBkx_credit_eq F k x hx.1))
       iexact Hε
     iintro %w ⟨%b, %hb, Hfb⟩
     iexists b
     isplitr [Hfb HI]
     · ipureintro; exact hb
     · iframe Hfb HI
+
+/-! ## `G2` termination machinery
+
+`G2` is a reject loop over `G1` (draw `k`) + `urand` (draw `x`) + the `B k x`
+selector accept. The per-iteration accept mass is `Norm2/Norm1`, so a single
+amplification factor `G2Factor = 1/reject` drives termination, threaded into the
+reject branch of the iteration continuation — mirroring `G1`. -/
 
 /-- Amplified accept/reject continuation for `G2`. -/
 def G2_s_amp (F : ℕ → ℝ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) (x : ℝ) : Bool → ℝ≥0∞ :=
@@ -555,10 +523,16 @@ open MeasureTheory in
 def G2_g1Credit (F : ℕ → ℝ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) : ℝ≥0∞ :=
   ∫⁻ x, G2_g_amp F c k x ∂(ProbLangℝ.unifUnit (T := ℝ))
 
+/-! ### Norm2 bounds
+
+The `G2` reject-loop factor is `1 / reject` with `reject = 1 - Norm2 / Norm1`, so we
+need `0 < Norm2 < Norm1`. Fubini swaps the defining interval-integral/series; the
+summand bound `∫₀¹ exp(-(x+k)²/2) ≤ exp(-k²/2)` (strict at `k = 0`) yields both
+summability (dominated by `Norm1`) and `Norm2 < Norm1`. -/
+
 open MeasureTheory in
-/-- Fubini/Tonelli for `Norm2`: swap the interval integral and the series (Rocq
-`FubiniIntegralSeries_Strong`). Each summand is continuous, and the integral-norm series
-is dominated by `Norm1`. -/
+/-- Fubini/Tonelli for `Norm2`: swap the interval integral and the series. Each
+summand is continuous, and the integral-norm series is dominated by `Norm1`. -/
 theorem Norm2_eq_tsum : Norm2 = ∑' k : ℕ, ∫ x in (0 : ℝ)..1, Real.exp (-((x + (k : ℝ)) ^ 2) / 2) := by
   have hpk : ∀ k : ℕ, (∫⁻ x in Set.Ioc (0 : ℝ) 1, ‖Real.exp (-((x + (k : ℝ)) ^ 2) / 2)‖ₑ ∂volume)
       ≤ ENNReal.ofReal (Real.exp (-(k : ℝ) ^ 2 / 2)) := by
@@ -599,12 +573,14 @@ theorem Norm2_summand_le (k : ℕ) :
   rwa [intervalIntegral.integral_const, sub_zero, smul_eq_mul, one_mul] at h
 
 open MeasureTheory in
+/-- The `Norm2` summand series converges (dominated termwise by the `Norm1` summand). -/
 theorem Norm2_summand_summable :
     Summable (fun k : ℕ => ∫ x in (0 : ℝ)..1, Real.exp (-((x + (k : ℝ)) ^ 2) / 2)) := by
   apply Summable.of_nonneg_of_le (fun k => intervalIntegral.integral_nonneg (by norm_num)
     (fun x _ => (Real.exp_pos _).le)) Norm2_summand_le summable_normTerm
 
 open MeasureTheory in
+/-- `0 < Norm2` (the `k = 0` summand is strictly positive on `(0,1)`). -/
 theorem Norm2_pos : 0 < Norm2 := by
   rw [Norm2_eq_tsum]
   refine _root_.lt_of_lt_of_le ?_ (Norm2_summand_summable.le_tsum 0
@@ -613,6 +589,7 @@ theorem Norm2_pos : 0 < Norm2 := by
     (Continuous.intervalIntegrable (by fun_prop) _ _) (fun x _ => Real.exp_pos _) (by norm_num)
 
 open MeasureTheory in
+/-- `Norm2 < Norm1` (strict at `k = 0`: `∫₀¹ exp(-x²/2) dx < exp(-0²/2) = 1`). -/
 theorem Norm2_lt_Norm1 : Norm2 < Norm1 := by
   rw [Norm2_eq_tsum, Norm1]
   refine Norm2_summand_summable.tsum_lt_tsum (i := 0) Norm2_summand_le ?_ summable_normTerm
@@ -637,6 +614,7 @@ noncomputable def G2Factor : ℝ≥0 :=
     have h := Norm2_lt_Norm1; have := Norm1_pos
     rw [sub_nonneg, div_le_one Norm1_pos]; linarith)⟩
 
+/-- `1 < G2Factor` (the `G2` reject mass `Norm2/Norm1` is strictly positive). -/
 theorem one_lt_G2Factor : 1 < G2Factor := by
   rw [← NNReal.coe_lt_coe, NNReal.coe_one]
   show (1 : ℝ) < 1 / (1 - Norm2 / Norm1)
@@ -664,7 +642,13 @@ theorem G2_g_amp_measurable (F : ℕ → ℝ → ℝ≥0∞) (hF : ∀ a, Measur
 /-- Accept probability of the `(k,x)` selector after `k+1` iterations: `ofReal(γBkx^(k+1))`. -/
 def G2p (k : ℕ) (x : ℝ) : ℝ≥0∞ := ENNReal.ofReal ((γBkx k x : ℝ) ^ (k + 1))
 
-/-- `G1_μ` is a PMF: `∑ₖ exp(-k²/2)/Norm1 = Norm1/Norm1 = 1`. -/
+/-! ### `G2μ` distribution and accept-mass identities
+
+PMF/normalisation facts for `G1μ`/`G2μ`, bounds on the accept probability `G2p`,
+and the accept-mass identities (`G1μ k · ∫ G2p·F = (Norm2/Norm1) · ∫ G2μ·F`) that
+feed the `G2` amplification collapse `G2_g1_collapse`. -/
+
+/-- `G1μ` is a PMF: `∑ₖ exp(-k²/2)/Norm1 = Norm1/Norm1 = 1`. -/
 theorem G1μ_tsum : ∑' k : ℕ, G1μ k = 1 := by
   simp only [G1μ]
   rw [← ENNReal.ofReal_tsum_of_nonneg
@@ -675,7 +659,7 @@ theorem G1μ_tsum : ∑' k : ℕ, G1μ k = 1 := by
       ENNReal.ofReal_one]
 
 open MeasureTheory in
-/-- The `x`-integral of `G2_μ k` over the fresh sample. -/
+/-- The `x`-integral of `G2μ k` over the fresh sample. -/
 theorem G2μ_setLIntegral (k : ℕ) :
     ∫⁻ x, G2μ k x ∂(ProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (∫ x in (0 : ℝ)..1, Real.exp (-((x + k) ^ 2) / 2) / Norm2) := by
@@ -685,7 +669,7 @@ theorem G2μ_setLIntegral (k : ℕ) :
     (fun r _ => div_nonneg (Real.exp_pos _).le Norm2_pos.le)
 
 open MeasureTheory in
-/-- `G2_μ` integrates to `1`: `∑ₖ ∫₀¹ exp(-(x+k)²/2)/Norm2 = Norm2/Norm2 = 1`. -/
+/-- `G2μ` integrates to `1`: `∑ₖ ∫₀¹ exp(-(x+k)²/2)/Norm2 = Norm2/Norm2 = 1`. -/
 theorem G2μ_total : ∑' k : ℕ, ∫⁻ x, G2μ k x ∂(ProbLangℝ.unifUnit (T := ℝ)) = 1 := by
   simp_rw [G2μ_setLIntegral, intervalIntegral.integral_div]
   rw [← ENNReal.ofReal_tsum_of_nonneg
@@ -711,20 +695,12 @@ theorem unifUnit_lintegral_one :
   show ∫⁻ _x : ℝ, (1 : ℝ≥0∞) ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = 1
   rw [lintegral_one, Measure.restrict_apply_univ, Real.volume_Icc]; norm_num
 
-/-- Density identity: `G1_μ k · G2p k x = (Norm2/Norm1) · G2_μ k x` for `x ≥ 0`, since
+/-- Density identity: `G1μ k · G2p k x = (Norm2/Norm1) · G2μ k x` for `x ≥ 0`, since
 `γBkx^(k+1) = exp(-x(2k+x)/2)` and `exp(-k²/2)·exp(-x(2k+x)/2) = exp(-(x+k)²/2)`. -/
 theorem G1μ_mul_accept (k : ℕ) {x : ℝ} (hx : 0 ≤ x) :
     G1μ k * G2p k x = ENNReal.ofReal (Norm2 / Norm1) * G2μ k x := by
-  have harg : -x * (2 * (k : ℝ) + x) / (2 * k + 2) ≤ 0 := by
-    rw [neg_mul, neg_div]
-    exact neg_nonpos.mpr (div_nonneg (mul_nonneg hx (by linarith [Nat.cast_nonneg (α := ℝ) k]))
-      (by positivity))
   have hpow : (γBkx k x : ℝ) ^ (k + 1) = Real.exp (-x * (2 * k + x) / 2) := by
-    have hco : (γBkx k x : ℝ) = Real.exp (-x * (2 * (k : ℝ) + x) / (2 * k + 2)) := by
-      show Real.exp (min 0 (-x * (2 * (k : ℝ) + x) / (2 * k + 2)))
-          = Real.exp (-x * (2 * (k : ℝ) + x) / (2 * k + 2))
-      rw [min_eq_right harg]
-    rw [hco, ← Real.exp_nat_mul]
+    rw [γBkx_coe k hx, ← Real.exp_nat_mul]
     congr 1
     have h2 : (2 * (k : ℝ) + 2) ≠ 0 := by positivity
     push_cast; field_simp
@@ -739,7 +715,7 @@ theorem G1μ_mul_accept (k : ℕ) {x : ℝ} (hx : 0 ≤ x) :
   field_simp [ne_of_gt Norm1_pos, ne_of_gt Norm2_pos]
 
 open MeasureTheory in
-/-- The accept contribution of the drawn `k`: `G1_μ k · ∫ G2p·F = (Norm2/Norm1) · ∫ G2_μ·F`. -/
+/-- The accept contribution of the drawn `k`: `G1μ k · ∫ G2p·F = (Norm2/Norm1) · ∫ G2μ·F`. -/
 theorem G2_accept_lintegral (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) :
     G1μ k * ∫⁻ x, G2p k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (Norm2 / Norm1)
@@ -752,7 +728,7 @@ theorem G2_accept_lintegral (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) :
   rw [← mul_assoc, G1μ_mul_accept k hx.1, mul_assoc]
 
 open MeasureTheory in
-/-- The accept mass of the drawn `k`: `G1_μ k · ∫ G2p = (Norm2/Norm1) · ∫ G2_μ`. -/
+/-- The accept mass of the drawn `k`: `G1μ k · ∫ G2p = (Norm2/Norm1) · ∫ G2μ`. -/
 theorem G2_accept_mass (k : ℕ) :
     G1μ k * ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (Norm2 / Norm1) * ∫⁻ x, G2μ k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
@@ -760,9 +736,8 @@ theorem G2_accept_mass (k : ℕ) :
   simpa only [mul_one] using h
 
 open MeasureTheory in
-/-- Amplification collapse at the `G1` level (Rocq `G2_f_expectation` + the reject top-up).
-Accept mass `Norm2/Norm1` recovers `G2_CreditV F`; reject mass `1 - Norm2/Norm1` cancels via
-`G2Factor · reject = 1`. -/
+/-- Amplification collapse at the `G1` level: accept mass `Norm2/Norm1` recovers
+`G2_CreditV F`, and reject mass `1 - Norm2/Norm1` cancels via `G2Factor · reject = 1`. -/
 theorem G2_g1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable (F a)) (ε : ℝ≥0∞) :
     G1_CreditV (G2_g1Credit F ((G2Factor : ℝ≥0∞) * ε)) = G2_CreditV F + ε := by
   set c : ℝ≥0∞ := (G2Factor : ℝ≥0∞) * ε with hc
@@ -800,7 +775,7 @@ theorem G2_g1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable
       * ∫⁻ x, G2μ k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)))
       = ENNReal.ofReal (Norm2 / Norm1) * G2_CreditV F := by
     rw [ENNReal.tsum_mul_left]; rfl
-  -- per-`k` split of `G1_μ k · G2_g1Credit` into accept + reject.
+  -- per-`k` split of `G1μ k · G2_g1Credit` into accept + reject.
   have hsplit : ∀ k : ℕ, G1μ k * G2_g1Credit F c k
       = ENNReal.ofReal (Norm2 / Norm1) * (∫⁻ x, G2μ k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)))
         + (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1μ k * (G2_CreditV F + c) := by
@@ -831,10 +806,9 @@ theorem G2_g1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable
             one_div_mul_cancel (ne_of_gt hrej_pos), ENNReal.ofReal_one],
       one_mul]
 
-/-! ## Specification -/
+/-! ### Specification
 
-/-- Rocq `wp_G2`: `G2 ()` returns `(x, k)` from the continuous Gaussian. The
-lazy-real result `ℓ`/`lazy_real ℓ r` becomes the real value `.real r`. -/
+/-- `G2 ()` returns `(x, k)` from the continuous Gaussian. -/
 theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞)
     (Hnn : ∀ x k, 0 ≤ x → x ≤ 1 → F k x ≤ M) (hFm : ∀ a, Measurable (F a)) :
     ⊢@{IProp GF} ↯ (G2_CreditV F) -∗
@@ -846,7 +820,7 @@ theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞)
   iintro Hε_spec
   iapply twp_err_pos solve_not_red
   iintro %ε_term %Hε_pos Hε_term
-  set kf : ℝ≥0 := G2Factor with hkf
+  set kf : ℝ≥0 := G2Factor
   irevert Hε_spec
   iapply ErrorCredit.Induction.simple (k := kf) Hε_pos Hk1 $$ [] Hε_term
   imodintro
