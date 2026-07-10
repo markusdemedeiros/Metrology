@@ -30,7 +30,8 @@ noncomputable section
 
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
-/-! ## Programs -/
+/-! ## Program -/
+section program
 
 /-- `LeHalf (.real r)` returns `true` iff `r ≤ ½`. -/
 def LeHalfSpec (r : ℝ) : Bool := decide (r ≤ 1 / 2)
@@ -49,16 +50,29 @@ def BNEHalf : Exp ℝ := pl%
       (y % #2 = #1)
     else #true
 
-/-! ## PMF and credit distribution -/
+end program
+
+/-! ## Distribution -/
+section distribution
 
 /-- Base-½ negative-exponential Bernoulli PMF:
 `μ true = exp (-½)`, `μ false = 1 - exp (-½)`. -/
-def BNEHalfμ (b : Bool) : ℝ≥0∞ :=
+def BNEHalfPMF (b : Bool) : ℝ≥0∞ :=
   if b then .ofReal (Real.exp (-1 / 2)) else .ofReal (1 - Real.exp (-1 / 2))
+
+end distribution
+
+/-! ## Credit expectation -/
+section creditExpectation
 
 /-- Expected credit: `F true · μ true + F false · μ false`. -/
 def BNEHalfCreditV (F : Bool → ℝ≥0∞) : ℝ≥0∞ :=
-  F true * BNEHalfμ true + F false * BNEHalfμ false
+  F true * BNEHalfPMF true + F false * BNEHalfPMF false
+
+end creditExpectation
+
+/-! ## Credit kernel -/
+section creditKernel
 
 /-- Lift a `Bool`-indexed credit function to a `ℕ`-indexed one by parity:
 `LiftF F n = F (n % 2 == 1)`. -/
@@ -66,34 +80,44 @@ def LiftF (F : Bool → ℝ≥0∞) : ℕ → ℝ≥0∞ := fun n => F (n % 2 ==
 
 /-- Per-sample credit-distribution function:
 `[r ≤ ½] · RealDecrTrialCreditV (LiftF F) 0 r  +  [¬ r ≤ ½] · F true`. -/
-def BNEHalfg (F : Bool → ℝ≥0∞) : ℝ → ℝ≥0∞ := fun r =>
+def BNEHalfCredit (F : Bool → ℝ≥0∞) : ℝ → ℝ≥0∞ := fun r =>
   (if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0) +
   (if ¬ r ≤ 1 / 2 then F true else 0)
 
-/-- `BNEHalfg F` is measurable: an `Iic`-indicator of the measurable
+end creditKernel
+
+/-! ## Measurability -/
+section measurability
+
+/-- `BNEHalfCredit F` is measurable: an `Iic`-indicator of the measurable
 `RealDecrTrialCreditV (LiftF F) 0` plus a complementary constant indicator. -/
-theorem BNEHalfg_measurable (F : Bool → ℝ≥0∞) : Measurable (BNEHalfg F) := by
-  unfold BNEHalfg
+theorem measurable_bneHalfCredit (F : Bool → ℝ≥0∞) : Measurable (BNEHalfCredit F) := by
+  unfold BNEHalfCredit
   refine Measurable.add ?_ ?_
   · exact Measurable.ite measurableSet_Iic
-      (RealDecrTrialCreditV_measurable (LiftF F) 0) measurable_const
+      (measurable_realDecrTrialCreditV (LiftF F) 0) measurable_const
   · exact Measurable.ite measurableSet_Iic.compl measurable_const measurable_const
 
 open MeasureTheory in
 /-- The `if → Set.indicator → set-integral` bridge over `unifUnit = volume.restrict [0,1]`:
 factors out the `(fun r => if _ then _ else 0) = S.indicator _` machinery shared by the two
-addends of `BNEHalfg`, so `BNEHalfg_lintegral` need not spell out the `Set.indicator`
+addends of `BNEHalfCredit`, so `BNEHalfCredit_lintegral` need not spell out the `Set.indicator`
 conversion in each branch. -/
 theorem lintegral_unifUnit_indicator {s : Set ℝ} (hs : MeasurableSet s) (f : ℝ → ℝ≥0∞) :
     ∫⁻ r, s.indicator f r ∂(volume.restrict (Set.Icc (0 : ℝ) 1))
       = ∫⁻ r in s ∩ Set.Icc 0 1, f r ∂volume := by
   rw [lintegral_indicator hs, Measure.restrict_restrict hs]
 
+end measurability
+
+/-! ## Credit conservation -/
+section conservation
+
 open MeasureTheory in
-/-- Credit conservation: `∫ BNEHalfg F = BNEHalfCreditV F` over the
+/-- Credit conservation: `∫ BNEHalfCredit F = BNEHalfCreditV F` over the
 uniform-unit measure — consumed by `twp_urand_exp` at the `x ← urand` step. -/
-theorem BNEHalfg_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : ∀ b, F b ≤ M) :
-    ∫⁻ r, BNEHalfg F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
+theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : ∀ b, F b ≤ M) :
+    ∫⁻ r, BNEHalfCredit F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
   -- `LiftF F` in parity form: even index → `F false`, odd index → `F true`.
   have hlift : LiftF F = fun n => if n % 2 = 0 then F false else F true := by
     funext n
@@ -111,10 +135,10 @@ theorem BNEHalfg_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : 
   have hsetB : Set.Ioi (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Ioc (1 / 2) 1 := by
     ext r; simp only [Set.mem_inter_iff, Set.mem_Ioi, Set.mem_Icc, Set.mem_Ioc]
     exact ⟨fun ⟨h2, _, h1⟩ => ⟨h2, h1⟩, fun ⟨h2, h1⟩ => ⟨h2, by linarith, h1⟩⟩
-  show ∫⁻ r, BNEHalfg F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
-  simp only [BNEHalfg]
+  show ∫⁻ r, BNEHalfCredit F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
+  simp only [BNEHalfCredit]
   rw [lintegral_add_left (Measurable.ite measurableSet_Iic
-        (RealDecrTrialCreditV_measurable (LiftF F) 0) measurable_const)]
+        (measurable_realDecrTrialCreditV (LiftF F) 0) measurable_const)]
   -- Part B: the `[¬ r ≤ ½]·F true` term integrates to `ofReal(½)·F true`.
   have hB : (∫⁻ r, (if ¬ r ≤ 1 / 2 then F true else 0) ∂(volume.restrict (Set.Icc (0 : ℝ) 1)))
       = ENNReal.ofReal (1 / 2) * F true := by
@@ -157,13 +181,16 @@ theorem BNEHalfg_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : 
   -- Combine the two `F true` contributions: `ofReal(exp(-½)-½) + ofReal(½) = ofReal(exp(-½))`.
   have hexp_ge : (0 : ℝ) ≤ Real.exp (-1 / 2) - 1 / 2 := by
     have := Real.add_one_le_exp (-1 / 2 : ℝ); linarith
-  have ht : BNEHalfμ true = ENNReal.ofReal (Real.exp (-1 / 2)) := rfl
-  have hf : BNEHalfμ false = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := rfl
+  have ht : BNEHalfPMF true = ENNReal.ofReal (Real.exp (-1 / 2)) := rfl
+  have hf : BNEHalfPMF false = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := rfl
   rw [BNEHalfCreditV, ht, hf, add_assoc, ← add_mul,
       ← ENNReal.ofReal_add hexp_ge (by norm_num)]
   ring_nf
 
-/-! ## Specifications -/
+end conservation
+
+/-! ## Specification -/
+section specification
 
 /-- `LeHalf (.real r)` returns `LeHalfSpec r` (i.e. `decide (r ≤ ½)`). -/
 theorem twp_LeHalf (E : CoPset) (r : ℝ) :
@@ -188,10 +215,10 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
   twp_pure
   twp_bind pl(urand)
   -- Sample `x ← urand`, distributing `↯(BNEHalfCreditV F)` via the credit
-  -- function `BNEHalfg F` (integral conservation is `BNEHalfg_lintegral`).
-  iapply (twp_urand_exp' (ε₂ := BNEHalfg F) ?hmeas ?hint) $$ Hε
-  case hmeas => exact BNEHalfg_measurable F
-  case hint => rw [BNEHalfg_lintegral (M := M) Hnn]
+  -- function `BNEHalfCredit F` (integral conservation is `BNEHalfCredit_lintegral`).
+  iapply (twp_urand_exp' (ε₂ := BNEHalfCredit F) ?hmeas ?hint) $$ Hε
+  case hmeas => exact measurable_bneHalfCredit F
+  case hint => rw [BNEHalfCredit_lintegral (M := M) Hnn]
   iintro %r ⟨%Hrm, Hcr⟩
   -- The sampled real lies in `(0,1)` (the strengthened `twp_urand_exp'` continuation
   -- exposes `r ∈ unifUnitSupport = Ioo 0 1`); weaken to the closed range.
@@ -220,17 +247,17 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
     twp_value
     imodintro
     iexists true
-    have hcr : BNEHalfg F r = F true := by
-      simp only [BNEHalfg, hle, if_false, if_true, not_false_iff, zero_add]
+    have hcr : BNEHalfCredit F r = F true := by
+      simp only [BNEHalfCredit, hle, if_false, if_true, not_false_iff, zero_add]
     -- Rewrite the *goal*'s credit (rw cannot target the iris hyp `Hcr`).
     rw [← hcr]
     iframe Hcr
     itrivial
   · -- `LeHalfSpec r = true`, i.e. `r ≤ ½`: run `DecrTrial 0 x`, return the parity.
     have hle : r ≤ 1 / 2 := of_decide_eq_true hbdef
-    have hcr : BNEHalfg F r = RealDecrTrialCreditV (LiftF F) 0 r := by
-      simp only [BNEHalfg, hle, if_true, not_true, if_false, add_zero]
-    -- Convert the iris credit `Hcr : ↯(BNEHalfg F r)` to the shape `twp_DecrTrial`
+    have hcr : BNEHalfCredit F r = RealDecrTrialCreditV (LiftF F) 0 r := by
+      simp only [BNEHalfCredit, hle, if_true, not_true, if_false, add_zero]
+    -- Convert the iris credit `Hcr : ↯(BNEHalfCredit F r)` to the shape `twp_DecrTrial`
     -- consumes, via the eq-bridge (rw on the sub-proof's Lean-prop goal).
     ihave Hcr' : iprop(↯ (RealDecrTrialCreditV (LiftF F) 0 r)) $$ [Hcr]
     · rw [← hcr]; iexact Hcr
@@ -271,6 +298,8 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
       rw [← hlf]
       iframe Hcrn
       itrivial
+
+end specification
 
 end
 end Examples

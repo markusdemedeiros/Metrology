@@ -31,6 +31,9 @@ noncomputable section
 
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
+/-! ## Program -/
+section program
+
 /-- A Bernoulli sampler `v` with success bias `γ`, whose specification threads a
 persistent invariant `I` through the call (used by the Gaussian composition). -/
 structure AbstractBernoulliI (v : Val ℝ) (γ : ↑unitInterval) (I : IProp GF) where
@@ -40,8 +43,6 @@ structure AbstractBernoulliI (v : Val ℝ) (γ : ↑unitInterval) (I : IProp GF)
       tglWp E pl(&v.1 #.unit)
         (fun w : Val ℝ => iprop% ∃ b : Bool, ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b) ∗ I)
 
-/-! ## Program -/
-
 /-- Bounded Bernoulli iteration: `IterTrial b k` returns `true` iff `k`
 consecutive calls to `b` succeed, and `#false` on the first failure. -/
 @[pl_fold]
@@ -50,24 +51,42 @@ def IterTrial : Exp ℝ := pl%
     if k = #0 then #true
     else if b #.unit then iter b (k - #1) else #false
 
-/-! ## Iteration distribution and credits -/
+end program
+
+/-! ## Distribution -/
+section distribution
 
 /-- Iteration PMF: `μ true = γ^N` (all `N` trials succeed),
 `μ false = 1 - γ^N`. -/
-def Iterμ (γ : ↑unitInterval) (N : ℕ) : Bool → ℝ≥0∞
+def IterPMF (γ : ↑unitInterval) (N : ℕ) : Bool → ℝ≥0∞
   | true => .ofReal ((γ : ℝ) ^ N)
   | false => 1 - .ofReal ((γ : ℝ) ^ N)
+
+end distribution
+
+/-! ## Credit expectation -/
+section creditExpectation
 
 /-- Iteration credit: `γ^N · F true + (1 - γ^N) · F false`. -/
 def IterCreditV (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : ℕ) : ℝ≥0∞ :=
   .ofReal ((γ : ℝ) ^ N) * F true + (1 - .ofReal ((γ : ℝ) ^ N)) * F false
 
+end creditExpectation
+
+/-! ## Credit kernel -/
+section creditKernel
+
 /-- Per-trial continuation credit, split by the Bernoulli outcome: the `true`
 branch carries the remaining iteration credit `IterCreditV F γ N`, the `false`
 branch carries the terminal credit `F false`. -/
-def Iterg (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : ℕ) : Bool → ℝ≥0∞
+def IterCont (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : ℕ) : Bool → ℝ≥0∞
   | true => IterCreditV F γ N
   | false => F false
+
+end creditKernel
+
+/-! ## Measurability -/
+section measurability
 
 /-- In `ℝ≥0∞`, truncated subtraction `1 - ofReal x` agrees with `ofReal (1 - x)`
 whenever `0 ≤ x` (both sides truncate to `0` for `1 ≤ x`). -/
@@ -75,11 +94,16 @@ lemma one_sub_ofReal {x : ℝ} (hx : 0 ≤ x) :
     (1 : ℝ≥0∞) - ENNReal.ofReal x = ENNReal.ofReal (1 - x) := by
   rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ hx]
 
+end measurability
+
+/-! ## Credit expectation -/
+section creditExpectation
+
 /-- One-step recurrence: `IterCreditV F γ (N+1)` splits across the next Bernoulli
-trial into `γ · Iterg F γ N true + (1 - γ) · Iterg F γ N false`. -/
+trial into `γ · IterCont F γ N true + (1 - γ) · IterCont F γ N false`. -/
 theorem IterCreditV_succ (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : ℕ) :
     IterCreditV F γ (N + 1) =
-      .ofReal γ * Iterg F γ N true + (1 - .ofReal γ) * Iterg F γ N false := by
+      .ofReal γ * IterCont F γ N true + (1 - .ofReal γ) * IterCont F γ N false := by
   have hγ0 : (0:ℝ) ≤ (γ:ℝ) := γ.2.1
   have hγ1 : (γ:ℝ) ≤ 1 := γ.2.2
   have hγN1 : (γ:ℝ) ^ N ≤ 1 := pow_le_one₀ hγ0 hγ1
@@ -95,14 +119,17 @@ theorem IterCreditV_succ (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : �
     congr 1; ring
   -- Unfold and convert every `1 - ofReal _` to `ofReal (1 - _)`, leaving a
   -- subtraction-free commutative-semiring identity for `ring`.
-  simp only [IterCreditV, Iterg]
+  simp only [IterCreditV, IterCont]
   rw [one_sub_ofReal (x := (γ:ℝ) ^ (N + 1)) (by positivity)]
   rw [one_sub_ofReal (x := (γ:ℝ) ^ N) (by positivity)]
   rw [one_sub_ofReal (x := (γ:ℝ)) hγ0]
   rw [hT, ← hF]
   ring
 
+end creditExpectation
+
 /-! ## Specification -/
+section specification
 
 /-- Total weakest-precondition specification of `IterTrial`: from
 `↯(IterCreditV F γ N) ∗ I`, the iteration delivers `↯(F b) ∗ I` for the
@@ -131,12 +158,12 @@ theorem twp_IterTrial (E : CoPset) (v : Val ℝ) (γ : ↑unitInterval) (I : IPr
     -- `k = N+1 ≠ 0`, so step to `if v () then iter v (k-1) else #false`.
     twp_pures
     -- Run the Bernoulli `v ()` via its spec, reshaping the credit through
-    -- `IterCreditV_succ` into `γ · g true + (1-γ) · g false` with `g = Iterg F γ N`.
+    -- `IterCreditV_succ` into `γ · g true + (1-γ) · g false` with `g = IterCont F γ N`.
     twp_bind pl({v.fst} #.unit)
     iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-      ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (Iterg F γ N b) ∗ I)))
+      ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (IterCont F γ N b) ∗ I)))
     isplitl [Hcr HI]
-    · iapply (Hspec.spec (E := E)) $$ %(Iterg F γ N)
+    · iapply (Hspec.spec (E := E)) $$ %(IterCont F γ N)
       isplitl [Hcr]
       · rw [← IterCreditV_succ]; iexact Hcr
       · iexact HI
@@ -145,12 +172,12 @@ theorem twp_IterTrial (E : CoPset) (v : Val ℝ) (γ : ↑unitInterval) (I : IPr
     simp only at hret
     subst hret
     cases b
-    · -- `false`: short-circuit to `#false`, credit `Iterg F γ N false = F false`.
+    · -- `false`: short-circuit to `#false`, credit `IterCont F γ N false = F false`.
       twp_pures
       twp_value
       imodintro
       iexists false
-      rw [Iterg]
+      rw [IterCont]
       iframe Hcrb HIb
       itrivial
     · -- `true`: recurse `iter v (k-1)` at `k-1 = N`, discharged by `IH`.
@@ -164,12 +191,14 @@ theorem twp_IterTrial (E : CoPset) (v : Val ℝ) (γ : ↑unitInterval) (I : IPr
       isplitl [Hcrb HIb]
       · iapply IH
         isplitl [Hcrb]
-        · rw [Iterg]
+        · rw [IterCont]
           iexact Hcrb
         · iexact HIb
       iintro %w Hpost
       iapply tglWp_value
       iexact Hpost
+
+end specification
 
 end
 end Examples

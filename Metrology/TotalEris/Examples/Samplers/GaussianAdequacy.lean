@@ -15,7 +15,7 @@ into its fractional and integer parts). The meta-level extraction
 `gaussOfExp : Exp ℝ → ℝ` recovers `x + k`.
 
 The target law `gaussMeasure` is the pushforward of the `G2`-mixture along
-`x ↦ x + k`: a probability measure on `[0,∞)` (total mass `1` by `G2μ_total`).
+`x ↦ x + k`: a probability measure on `[0,∞)` (total mass `1` by `G2pdf_total`).
 The final corollary `gauss_distributed` states that the limiting execution of
 `G2 ()`, projected through `gaussOfExp`, is exactly `gaussMeasure`.
 -/
@@ -30,7 +30,9 @@ namespace ProbLang
 namespace TotalEris
 namespace Examples
 
-/-! ## The Gaussian real extraction `(x, k) ↦ x + k` -/
+/-! ## Real extraction -/
+
+section extraction
 
 def intEmb : ℤ → Exp ℝ := fun m => Exp.lit (.int m)
 
@@ -57,33 +59,41 @@ theorem gaussOfExp_pair (x : ℝ) (m : ℤ) :
     gaussOfExp (Exp.pair (Exp.lit (.real x)) (Exp.lit (.int m))) = x + (m : ℝ) := by
   simp only [gaussOfExp, measurableEmbedding_pairEmb.injective.extend_apply]
 
-/-! ## The target Gaussian measure -/
+end extraction
 
-theorem measurable_G2μ (k : ℕ) : Measurable (G2μ k) := by fun_prop
+/-! ## Target Gaussian measure -/
 
-/-- The law of the `G2` sample `x + k`: the mixture of `unifUnit`-weighted-by-`G2μ k`
+section targetMeasure
+
+theorem measurable_g2pdf (k : ℕ) : Measurable (G2pdf k) := by fun_prop
+
+/-- The law of the `G2` sample `x + k`: the mixture of `unifUnit`-weighted-by-`G2pdf k`
 laws pushed forward along `x ↦ x + k`. A probability measure on `[0,∞)`. -/
 noncomputable def gaussMeasure : Measure ℝ :=
   Measure.sum fun k : ℕ =>
-    ((ProbLangℝ.unifUnit (T := ℝ)).withDensity (G2μ k)).map (fun x => x + (k : ℝ))
+    ((ProbLangℝ.unifUnit (T := ℝ)).withDensity (G2pdf k)).map (fun x => x + (k : ℝ))
 
 instance : IsProbabilityMeasure gaussMeasure := by
   constructor
   rw [gaussMeasure, Measure.sum_apply _ MeasurableSet.univ]
   simp_rw [Measure.map_apply (by fun_prop) MeasurableSet.univ, Set.preimage_univ,
     withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ]
-  exact G2μ_total
+  exact G2pdf_total
 
 /-- Change of variables: the credit `∫⁻ · ∂gaussMeasure` is the `G2` mixture credit
-`G2_CreditV` of `F' k r := F (r + k)`. -/
+`G2CreditV` of `F' k r := F (r + k)`. -/
 theorem gauss_credit_eq (F : ℝ → ℝ≥0∞) (hFm : Measurable F) :
-    ∫⁻ y, F y ∂gaussMeasure = G2_CreditV (fun k r => F (r + k)) := by
-  rw [gaussMeasure, lintegral_sum_measure, G2_CreditV]
+    ∫⁻ y, F y ∂gaussMeasure = G2CreditV (fun k r => F (r + k)) := by
+  rw [gaussMeasure, lintegral_sum_measure, G2CreditV]
   refine tsum_congr fun k => by
     rw [lintegral_map hFm (by fun_prop),
-      lintegral_withDensity_eq_lintegral_mul _ (measurable_G2μ k) (by fun_prop)]
+      lintegral_withDensity_eq_lintegral_mul _ (measurable_g2pdf k) (by fun_prop)]
+
+end targetMeasure
 
 /-! ## Adequacy -/
+
+section adequacy
 
 variable {GF : BundledGFunctors.{0,0,0}}
 
@@ -114,6 +124,8 @@ theorem gauss_distributed [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] (σ : Sta
     (limExec ⟨pl(&G2 #.unit), σ⟩).map (fun ρ => gaussOfExp ρ.expr) = gaussMeasure :=
   twp_dist_adequacyG (GF := GF) measurable_gaussOfExp (pl(&G2 #.unit)) σ gaussMeasure
     (gauss_distSpec (GF := GF))
+
+end adequacy
 
 end Examples
 end TotalEris
