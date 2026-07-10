@@ -66,7 +66,7 @@ theorem NegExppdf₀_succ {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (j : ℕ) :
   unfold NegExppdf₀
   rw [if_pos ⟨hx0, hx1⟩, if_pos ⟨hx0, hx1⟩, ← ENNReal.ofReal_mul (Real.exp_pos _).le,
     ← Real.exp_add]
-  gcongr; push_cast; ring
+  congr 2; push_cast; ring
 
 /-- Per-iteration **rejection** (odd-parity) probability `= exp (-1)`: the
 closed form of the odd-indexed `DecrTrial` mass. -/
@@ -129,7 +129,7 @@ theorem NegExpCreditV_reindex (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
   rw [← (add_right_injective L).tsum_eq
         (f := fun k => ∫⁻ x, NegExppdf L k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))) ?supp]
   · exact tsum_congr fun j => lintegral_congr fun x => by
-      simp only [NegExppdf, if_pos (Nat.le_add_right L j), Nat.add_sub_cancelleft]
+      simp only [NegExppdf, if_pos (Nat.le_add_right L j), Nat.add_sub_cancel_left]
   · intro k hk
     simp only [Function.mem_support, ne_eq] at hk
     have hkL : L ≤ k := by

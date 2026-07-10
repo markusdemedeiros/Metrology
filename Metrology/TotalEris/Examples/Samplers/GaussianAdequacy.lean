@@ -57,7 +57,7 @@ theorem measurable_gaussOfExp : Measurable gaussOfExp :=
 @[simp]
 theorem gaussOfExp_pair (x : ℝ) (m : ℤ) :
     gaussOfExp (Exp.pair (Exp.lit (.real x)) (Exp.lit (.int m))) = x + (m : ℝ) := by
-  simp only [gaussOfExp, measurableEmbedding_pairEmb.injective.extend_apply]
+  exact measurableEmbedding_pairEmb.injective.extend_apply _ _ (x, m)
 
 end extraction
 
@@ -65,7 +65,7 @@ end extraction
 
 section targetMeasure
 
-theorem measurable_g2pdf (k : ℕ) : Measurable (G2pdf k) := by fun_prop
+theorem measurable_g2pdf (k : ℕ) : Measurable (G2pdf k) := by unfold G2pdf; fun_prop
 
 /-- The law of the `G2` sample `x + k`: the mixture of `unifUnit`-weighted-by-`G2pdf k`
 laws pushed forward along `x ↦ x + k`. A probability measure on `[0,∞)`. -/
@@ -75,10 +75,10 @@ noncomputable def gaussMeasure : Measure ℝ :=
 
 instance : IsProbabilityMeasure gaussMeasure := by
   constructor
-  rw [gaussMeasure, Measure.sum_apply _ MeasurableSet.univ]
-  simp_rw [Measure.map_apply (by fun_prop) MeasurableSet.univ, Set.preimage_univ,
+  rw [gaussMeasure, Measure.sum_apply _ MeasurableSet.univ, ← G2pdf_total]
+  refine tsum_congr fun k => ?_
+  rw [Measure.map_apply (by fun_prop) MeasurableSet.univ, Set.preimage_univ,
     withDensity_apply _ MeasurableSet.univ, Measure.restrict_univ]
-  exact G2pdf_total
 
 /-- Change of variables: the credit `∫⁻ · ∂gaussMeasure` is the `G2` mixture credit
 `G2CreditV` of `F' k r := F (r + k)`. -/
@@ -88,6 +88,7 @@ theorem gauss_credit_eq (F : ℝ → ℝ≥0∞) (hFm : Measurable F) :
   refine tsum_congr fun k => by
     rw [lintegral_map hFm (by fun_prop),
       lintegral_withDensity_eq_lintegral_mul _ (measurable_g2pdf k) (by fun_prop)]
+    simp only [Pi.mul_apply]
 
 end targetMeasure
 
@@ -113,7 +114,7 @@ theorem gauss_distSpec :
   · -- Weakening branch: the pair postcondition ⇒ `↯(F (gaussOfExp v.fst))`.
     iintro %v ⟨%k, %r, %hrange, %hpair, Hcr⟩
     have hg : gaussOfExp v.fst = r + (k : ℝ) := by
-      simp only [hpair, gaussOfExp_pair, Int.ofNat_eq_natCast]
+      simp only [hpair, gaussOfExp_pair, Int.ofNat_eq_natCast, Int.cast_natCast]
     rw [hg]
     iexact Hcr
 

@@ -7,6 +7,7 @@ public import Metrology.TotalEris.Examples.Samplers.BernIter
 public import Metrology.TotalEris.Examples.Samplers.NegExp
 public import Metrology.TotalEris.Examples.Samplers.Selector
 public import Metrology.TotalEris.Examples.Samplers.Gauss
+public import Metrology.TotalEris.Examples.Samplers.GaussianAdequacy
 
 @[expose] public section
 

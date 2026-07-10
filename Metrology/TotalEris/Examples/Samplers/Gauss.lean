@@ -357,7 +357,7 @@ noncomputable def G1Factor : ℝ≥0 :=
 theorem one_lt_G1Factor : 1 < G1Factor := by
   rw [← NNReal.coe_lt_coe, NNReal.coe_one]
   show (1 : ℝ) < 1 / (1 - (1 - (γBNE : ℝ)) * Norm1)
-  have hrpos : 0 < 1 - (1 - (γBNE : ℝ)) * Norm1 := linarith [Norm1_reject_lt_one]
+  have hrpos : 0 < 1 - (1 - (γBNE : ℝ)) * Norm1 := by linarith [Norm1_reject_lt_one]
   rw [one_lt_div hrpos]
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   have : 0 < (1 - (γBNE : ℝ)) * Norm1 := mul_pos (by linarith) Norm1_pos

@@ -128,7 +128,7 @@ theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbou
   have hexphalf : ∫ r in (0 : ℝ)..(1 / 2), Real.exp (-r) = 1 - Real.exp (-1 / 2) := by
     rw [intervalIntegral.integral_comp_neg fun x => Real.exp x, neg_zero,
         integral_exp, Real.exp_zero]
-    ring
+    norm_num
   have hsetA : Set.Iic (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Icc 0 (1 / 2) := by
     ext r; simp only [Set.mem_inter_iff, Set.mem_Iic, Set.mem_Icc]
     exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, by linarith⟩⟩
@@ -144,7 +144,7 @@ theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbou
       = ENNReal.ofReal (1 / 2) * F true := by
     have hind : (fun r => if ¬ r ≤ 1 / 2 then F true else 0)
         = (Set.Ioi (1 / 2 : ℝ)).indicator (fun _ => F true) := by
-      ext r; simp only [Set.indicator_apply, Set.mem_Ioi, not_le]
+      ext r; simp only [Set.indicator_apply, Set.mem_Ioi, _root_.not_le]
     rw [hind, lintegral_unifUnit_indicator measurableSet_Ioi (fun _ => F true), hsetB,
         setLIntegral_const, Real.volume_Ioc, mul_comm]
     norm_num
@@ -157,7 +157,8 @@ theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbou
         = (Set.Iic (1 / 2 : ℝ)).indicator (RealDecrTrialCreditV (LiftF F) 0) := by
       ext r; simp only [Set.indicator_apply, Set.mem_Iic]
     rw [hind, lintegral_unifUnit_indicator measurableSet_Iic (RealDecrTrialCreditV (LiftF F) 0),
-        hsetA, setLIntegral_congr_fun measurableSet_Icc fun r hr => by
+        hsetA, setLIntegral_congr_fun (g := fun x => ENNReal.ofReal (Real.exp (-x)) * F false
+          + ENNReal.ofReal (1 - Real.exp (-x)) * F true) measurableSet_Icc fun r hr => by
         rw [hlift]
         exact RealDecrTrialCreditV_parity (F false) (F true) hr.1 (hr.2.trans (by norm_num))]
     have hmexp : Measurable (fun r : ℝ => ENNReal.ofReal (Real.exp (-r))) :=
@@ -278,7 +279,9 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
     twp_pures
     rcases Nat.mod_two_eq_zero_or_one n with hpar | hpar
     · -- `n` even: `#0 = #1 → #false`, returning `b = false`.
-      have hmod : (Int.ofNat n : ℤ) % 2 = 0 := by push_cast; omega
+      have hmod : (Int.ofNat n : ℤ) % 2 = 0 := by
+        have h2 : ((n : ℤ)) % 2 = ((n % 2 : ℕ) : ℤ) := by push_cast [Int.natCast_mod]; ring
+        simp [Int.ofNat_eq_natCast, h2, hpar]
       rw [hmod]
       twp_value
       imodintro
@@ -288,7 +291,9 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn
       iframe Hcrn
       itrivial
     · -- `n` odd: `#1 = #1 → #true`, returning `b = true`.
-      have hmod : (Int.ofNat n : ℤ) % 2 = 1 := by push_cast; omega
+      have hmod : (Int.ofNat n : ℤ) % 2 = 1 := by
+        have h2 : ((n : ℤ)) % 2 = ((n % 2 : ℕ) : ℤ) := by push_cast [Int.natCast_mod]; ring
+        simp [Int.ofNat_eq_natCast, h2, hpar]
       rw [hmod]
       twp_pures
       twp_value
