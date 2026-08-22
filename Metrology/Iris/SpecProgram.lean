@@ -17,21 +17,17 @@ open Std Iris Iris.Std COFE ProbLang
 
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
-instance : COFE (Exp rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : COFE (Exp rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (Exp rT) := ⟨id⟩
 instance (x : Exp rT) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-instance : COFE Tape := COFE.ofDiscrete _ Eq_Equivalence
+instance : COFE Tape := COFE.ofDiscrete _
 instance : OFE.Discrete Tape := ⟨id⟩
 instance (x : Tape) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-instance : COFE (Val rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : COFE (Val rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (Val rT) := ⟨id⟩
 instance (x : Val rT) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
-
-instance : OFE.Leibniz (Exp rT) := ⟨id⟩
-instance : OFE.Leibniz Tape := ⟨id⟩
-instance : OFE.Leibniz (Val rT) := ⟨id⟩
 
 abbrev SpecProg (α : Type _) [ProbLang.ProbLangℝ α] :=
   Auth (Option (Excl (Exp α)))
@@ -54,8 +50,7 @@ theorem LocHeap.asAgree_get? [OFE V] (h : LocHeap V) (l : Loc) :
 theorem LocHeap.asAgree_insert [OFE V] (h : LocHeap V) (l : Loc) (v : V) :
     LocHeap.asAgree (PartialMap.insert h l v) =
       PartialMap.insert (LocHeap.asAgree h) l (toAgree v) := by
-  apply ExtensionalPartialMap.equiv_iff_eq.mp
-  intro k
+  refine LawfulPartialMap.equiv_iff_eq.mp fun k => ?_
   by_cases hk : l = k
   · subst hk
     rw [LocHeap.asAgree_get?, LawfulPartialMap.get?_insert_eq rfl,
@@ -175,7 +170,7 @@ theorem spec_auth_lookup_heap {e : Exp rT} {σ : State rT} {l : Loc} {v : Val rT
     simp only [Option.map_some, Option.some.injEq] at Hlookup
     -- Hlookup : toAgree w = v'
     have Hinc' : toAgree v ≼ toAgree w := Hlookup ▸ Hinc
-    have : v = w := Agree.toAgree_included_L.mp Hinc'
+    have : v = w := Agree.toAgree_included.mp Hinc'
     exact this ▸ rfl
 
 theorem spec_auth_update_heap {e : Exp rT} {σ : State rT} {l : Loc} {v w : Val rT} :
@@ -187,7 +182,7 @@ theorem spec_auth_update_heap {e : Exp rT} {σ : State rT} {l : Loc} {v w : Val 
   unfold specAuth specHeapAuth specHeapFrag
   ihave ⟨He, Hh, Ht⟩ := Ha
   have Hval_toAgree : ✓ (toAgree w : Agree (Val rT)) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.heap) •
         HeapView.Frag (H := LocHeap) l (.own 1) (toAgree v) ~~>
@@ -221,7 +216,7 @@ theorem spec_auth_heap_alloc {e : Exp rT} {σ : State rT} (v : Val rT) :
     show (σ.heap[σ.heap.fresh]?).map toAgree = none
     rw [ExtTreeMap.fresh_get?]; rfl
   have Hval_toAgree : ✓ (toAgree v : Agree (Val rT)) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.heap) ~~>
       HeapView.Auth (.own 1)
@@ -255,7 +250,7 @@ theorem spec_auth_lookup_tape {e : Exp rT} {σ : State rT} {l : Loc} {t : Tape} 
     rw [Hcase] at Hlookup
     simp only [Option.map_some, Option.some.injEq] at Hlookup
     have Hinc' : toAgree t ≼ toAgree w := Hlookup ▸ Hinc
-    have : t = w := Agree.toAgree_included_L.mp Hinc'
+    have : t = w := Agree.toAgree_included.mp Hinc'
     exact this ▸ rfl
 
 theorem spec_auth_update_tape {e : Exp rT} {σ : State rT} {l : Loc} {t s : Tape} :
@@ -267,7 +262,7 @@ theorem spec_auth_update_tape {e : Exp rT} {σ : State rT} {l : Loc} {t s : Tape
   unfold specAuth specTapesAuth specTapesFrag
   ihave ⟨He, Hh, Ht⟩ := Ha
   have Hval_toAgree : ✓ (toAgree s : Agree Tape) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.tapes) •
         HeapView.Frag (H := LocHeap) l (.own 1) (toAgree t) ~~>
@@ -299,7 +294,7 @@ theorem spec_auth_tape_alloc {e : Exp rT} {σ : State rT} (t : Tape) :
     show (σ.tapes[σ.tapes.fresh]?).map toAgree = none
     rw [ExtTreeMap.fresh_get?]; rfl
   have Hval_toAgree : ✓ (toAgree t : Agree Tape) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.tapes) ~~>
       HeapView.Auth (.own 1)

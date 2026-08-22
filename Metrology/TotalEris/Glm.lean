@@ -30,7 +30,6 @@ namespace TotalEris
 
 Given a predicate `φ` on a type `α`, `Pgl ε φ μ` represents the predicate that `φ` is invalidated
 with probility at most `ε` with respect to `μ`. -/
-@[expose]
 def Pgl {α : Type _} [MeasurableSpace α] (ε : ENNReal) (φ : α → Prop)
   (μ : MeasureTheory.Measure α) : Prop := μ {x | ¬ φ x} ≤ ε
 
@@ -77,7 +76,6 @@ namespace ErisWpGS
 variable {GF : BundledGFunctors}
 
 -- TODO Should be a def
-@[expose]
 abbrev execStutter (P : ENNReal → IProp GF) (ε : ENNReal) : IProp GF := iprop%
   ⌜1 ≤ ε⌝ ∨ P ε
 
@@ -103,12 +101,10 @@ theorem execStutter_mono_pred {P Q : ENNReal → IProp GF} {ε : ENNReal} :
 
 variable [ErisWpGS (rT := rT) GF]
 
-@[expose]
 abbrev GlmState (rT : Type _) [ProbLang.ProbLangℝ rT] : Type _ := Cfg rT × ENNReal
 
-instance : COFE (GlmState rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : COFE (GlmState rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (GlmState rT) := ⟨id⟩
-instance : OFE.Leibniz (GlmState rT) := ⟨id⟩
 
 abbrev glmPrimStep' (e₁ : Exp rT) (σ₁ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF := iprop%
@@ -191,7 +187,7 @@ instance glmPre'_mono {Z : Cfg rT → ENNReal → IProp GF} : BIMonoPred (glmPre
 
 theorem glm'_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
-    glm' (GF := GF) e σ ε Z ≡
+    glm' (GF := GF) e σ ε Z =
       glmPre' (GF := GF) Z
         (fun s => glm' s.1.expr s.1.state s.2 Z)
         ((⟨e, σ⟩, ε) : GlmState rT) :=
@@ -216,7 +212,7 @@ theorem glm'_strong_mono
   letI : NonExpansive Ψ := by
     constructor
     intro n s s' hd
-    have : s = s' := OFE.Leibniz.eq_of_eqv (OFE.Discrete.discrete_0 hd)
+    have : s = s' := eq_of_dist_discrete_leibniz hd
     subst this; exact .of_eq rfl
   -- Apply the iter to derive `Ψ ⟨..., ε⟩` from `HG`.
   ihave HΨ : iprop(Ψ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]

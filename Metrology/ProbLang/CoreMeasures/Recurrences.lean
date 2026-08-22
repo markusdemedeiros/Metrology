@@ -3136,6 +3136,7 @@ theorem tryMatch.measurable_joint [ProbLangℝ rT] :
             rw [this]
             exact MeasurableSet.preimage hih2_univ (by fun_prop)
           convert h1.inter h2 using 1
+          measurability
         · -- Countable union case
           intro F _ _ IH
           show MeasurableSet (Joint (⋃ i, F i))
@@ -3179,6 +3180,7 @@ theorem tryMatch.measurable_joint [ProbLangℝ rT] :
               rw [this]
               exact MeasurableSet.preimage hih2_univ (by fun_prop)
             convert h1.inter h2 using 1
+            measurability
         · have hB_eq2 : {q : Exp rT × Pat rT × Pat rT |
                 q.1 ∉ Set.range (Function.uncurry (Exp.pair : Exp rT → Exp rT → Exp rT)) ∧
                 Pat.shape q.2.1 = s1 ∧ Pat.shape q.2.2 = s2 ∧ (none : Option (Exp rT)) ∈ U} = ∅ := by

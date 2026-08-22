@@ -95,7 +95,6 @@ The Rocq form is `1 - ε ≤ prob μ φ` where `prob μ φ = μ {ρ | φ ρ}`
 restricted to value outcomes. Here we phrase it directly using the
 predicate `∃ v, ρ.expr = .ofVal v ∧ φ v` which lifts `φ : (Val rT) → Prop`
 to a `(Cfg rT) → Prop`. -/
-@[expose]
 def Tgl (μ : MeasureTheory.Measure (Cfg rT)) (φ : (Val rT) → Prop) (ε : ENNReal) : Prop :=
   1 - ε ≤ μ {ρ : (Cfg rT) | ∃ v : (Val rT), ρ.expr = Exp.ofVal v ∧ φ v}
 
@@ -489,7 +488,7 @@ theorem twp_step_fupd_tgl [ErisGS rT .hasNoLC GF]
       -- convert `e'` to `Exp.ofVal v`.
       have heq : e' = Exp.ofVal v := (Exp.ofVal_of_toVal_some htv).symm
       subst heq
-      exact Tgl.mono_grading (zero_le') (Tgl.of_limExec_val hφ)
+      exact Tgl.mono_grading (zero_le) (Tgl.of_limExec_val hφ)
     | none =>
       -- Non-value case: cast HBody to its reduced form, then transform
       -- the glm body via `glm_strong_mono` to fit `glm_implies_tgl`.

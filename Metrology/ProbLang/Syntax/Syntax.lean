@@ -501,7 +501,7 @@ theorem lcb_openRec_fvar (x : Var) : ∀ (k : Nat) (e : Exp α),
       split
       · rfl
       · simp only [lcb, decide_eq_true_eq]; omega
-  | _ => intro h <;> simp_all [lcb, openRec, Nat.add_right_comm] <;> grind
+  | _ => intro h ; simp_all [lcb, openRec]
 
 /-- `openRec` with a free variable preserves height (both `bvar` and `fvar` are leaves). -/
 theorem height_openRec_fvar (x : Var) : ∀ (k : Nat) (e : Exp α),
@@ -515,7 +515,7 @@ private theorem lcb_imp_lc_aux : ∀ (n : Nat) (e : Exp α), e.height ≤ n → 
     IsLocallyClosed e := by
   intro n
   induction n with
-  | zero => intro e he _; exfalso; cases e <;> simp [Exp.height] at he <;> omega
+  | zero => intro e he _; exfalso; cases e <;> simp [Exp.height] at he
   | succ n ih =>
       intro e hle hlc
       cases e with
@@ -599,7 +599,7 @@ theorem lcb_openRec_fvar_rev (x : Var) : ∀ (k : Nat) (e : Exp α),
       split at h
       · next heq => simp only [lcb, decide_eq_true_eq]; omega
       · next hne => simp only [lcb, decide_eq_true_eq] at h ⊢; omega
-  | _ => intro h <;> simp_all [lcb, openRec, Nat.add_right_comm] <;> grind
+  | _ => intro h ; simp_all [lcb, openRec]
 
 /-- `IsLocallyClosed` implies the decidable check succeeds. The converse of `lcb_imp_lc`,
 so `lcb 0 e = true ↔ IsLocallyClosed e`. -/
@@ -663,7 +663,7 @@ theorem BaseLit.beq_self_true (l : BaseLit rT) : (l == l) = true := by
 
 /-- `LawfulBEq` for `BaseLit rT` lifted from `LawfulBEq rT`. The derived BEq is
 structural; equality of components implies equality. -/
-instance instLawfulBEqBaseLit [LawfulBEq rT] : LawfulBEq (BaseLit rT) where
+instance instLawfulBEqBaseLit : LawfulBEq (BaseLit rT) where
   eq_of_beq {l1 l2} h := by
     cases l1 <;> cases l2 <;> simp_all <;>
       first
@@ -740,8 +740,9 @@ inductive IsVal : Exp rT → Type
   | inl  : IsVal e → IsVal (.inl e)
   | inr  : IsVal e → IsVal (.inr e)
 
+omit [ProbLangℝ rT] in
 /-- Every value is locally closed. -/
-def IsVal.lc : {e : Exp rT} → IsVal e → Exp.IsLocallyClosed e
+theorem IsVal.lc : {e : Exp rT} → IsVal e → Exp.IsLocallyClosed e
   | _, .lit => .lit _
   | _, .lam h => h
   | _, .fix h => h
@@ -817,7 +818,7 @@ instance : Checkable (@IsVal rT) where check? := IsVal.check?
 
 def Exp.isValue (e : Exp rT) : Prop := Nonempty (IsVal e)
 
-def IsVal.toIsValue (w : IsVal e) : e.isValue := ⟨w⟩
+theorem IsVal.toIsValue (w : IsVal e) : e.isValue := ⟨w⟩
 
 noncomputable def IsVal.ofIsValue (h : e.isValue) : IsVal e := h.some
 
@@ -1036,7 +1037,7 @@ No `EctxItem` introduces a binder, so this is just one layer of `IsLocallyClosed
 inversion. -/
 theorem EctxItem.fillItem_isLocallyClosed {Ki : EctxItem α} {e : Exp α}
     (h : (Ki.fillItem e).IsLocallyClosed) : e.IsLocallyClosed := by
-  cases Ki <;> (simp only [fillItem] at h; cases h <;> assumption)
+  cases Ki <;> (simp only [fillItem] at h; cases h; assumption)
 
 def Exp.decompItem (e : Exp α) : Option (EctxItem α × Exp α) :=
   match e with
@@ -1183,7 +1184,7 @@ theorem EctxItem.decompItem_fillItem (Ki : EctxItem α) {e : Exp α} (hv : ¬e.i
   cases Ki with
   | appL v2 | binopL _ v2 | pairL v2 | storeL v2 | randL v2 =>
     simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_none_of_not_isValue hv,
-         Val.toVal?_fst, Exp.ofVal, Val.ext_iff]
+         Val.toVal?_fst, Exp.ofVal]
   | _ => simp [EctxItem.fillItem, Exp.decompItem, Exp.toVal?_none_of_not_isValue hv]
 
 theorem Exp.decompItem_fill {e e' : Exp α} {Ki : EctxItem α}

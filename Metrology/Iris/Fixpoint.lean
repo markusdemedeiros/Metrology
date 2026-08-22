@@ -33,10 +33,10 @@ Used throughout the TotalEris stack to discharge `NonExpansive Q` for `Q :
 Exp → IProp GF` (and similar) postconditions threaded through fixpoint
 iteration. -/
 theorem nonExpansive_of_discrete_leibniz {T : Type _} [COFE T] [OFE.Discrete T]
-    [OFE.Leibniz T] {P : Type _} [OFE P] (f : T → P) : NonExpansive f := by
+     {P : Type _} [OFE P] (f : T → P) : NonExpansive f := by
   constructor
   intro n x y hd
-  have : x = y := OFE.Leibniz.eq_of_eqv (OFE.Discrete.discrete hd)
+  have : x = y := (OFE.Discrete.discrete hd)
   subst this; exact .of_eq rfl
 
 /-- Distance at level `n` in a Leibniz-discrete OFE collapses to syntactic
@@ -44,5 +44,5 @@ equality. Useful for inline use inside `BIMonoPred.mono_pred_ne` and similar
 `NonExpansive` field-witness proofs where `nonExpansive_of_discrete_leibniz`
 doesn't apply (the function-shape doesn't match). -/
 theorem eq_of_dist_discrete_leibniz {T : Type _} [COFE T] [OFE.Discrete T]
-    [OFE.Leibniz T] {n : Nat} {x y : T} (hd : x ≡{n}≡ y) : x = y :=
-  OFE.Leibniz.eq_of_eqv (OFE.Discrete.discrete hd)
+    {n : Nat} {x y : T} (hd : x ≡{n}≡ y) : x = y :=
+  (OFE.Discrete.discrete hd)

@@ -455,18 +455,18 @@ open Lean Lean.PrettyPrinter
 /-- Strip the `pl(...)` wrapper to get a raw `pl_exp`. For an escaped Lean
     term, use the terser `&t` form when it is an atom (identifier) and fall
     back to the brace-delimited `{t}` for compound terms. -/
-meta def unpackPLExp [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
+meta def unpackPLExp [Monad m] [MonadQuotation m] : Term → m (TSyntax `pl_exp)
   | `(pl($e))     => `(pl_exp|$e)
   | `($i:ident)   => `(pl_exp|&$i)
   | `($t)         => `(pl_exp|{$t})
 
 /-- Strip the `pl_ty(...)` wrapper to get a raw `pl_ty`. -/
-meta def unpackPLTy [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
+meta def unpackPLTy [Monad m] [MonadQuotation m] : Term → m (TSyntax `pl_ty)
   | `(pl_ty($τ)) => pure τ
   | `($_)        => panic! "unknown type"
 
 /-- Strip the `pl_pat(...)` wrapper to get a raw `pl_pat`. -/
-meta def unpackPLPat [Monad m] [MonadRef m] [MonadQuotation m] : Term → m (TSyntax `pl_pat)
+meta def unpackPLPat [Monad m] [MonadQuotation m] : Term → m (TSyntax `pl_pat)
   | `(pl_pat($p)) => pure p
   | `($_)         => panic! "unknown pattern"
 
@@ -671,7 +671,7 @@ meta def unexpScrut : Unexpander
 
 /-- Construct a `pl_arg` from a name-hint string. Monad-polymorphic so it
     works in both `UnexpandM` and `DelabM`. -/
-meta def buildArgFromName [Monad m] [MonadRef m] [MonadQuotation m]
+meta def buildArgFromName [Monad m] [MonadQuotation m]
     (name : String) : m (TSyntax `pl_arg) := do
   if name = "_" then
     `(pl_arg|_)
@@ -681,7 +681,7 @@ meta def buildArgFromName [Monad m] [MonadRef m] [MonadQuotation m]
 
 /-- Strip a leading `Exp.close ... <atom>` so the lam body renders without
     explicit closing. -/
-meta def stripClose [Monad m] [MonadRef m] [MonadQuotation m]
+meta def stripClose [Monad m] [MonadQuotation m]
     (e : Term) : m Term := do
   match e with
   | `(Exp.close $body $_) => return body

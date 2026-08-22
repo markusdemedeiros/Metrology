@@ -158,7 +158,7 @@ theorem specUpdate_frame_l {E : CoPset} {R P : IProp GF} :
     iprop(R ∗ specUpdate rT E P) ⊢@{IProp GF} specUpdate rT E iprop(P ∗ R) := by
   iintro ⟨HR, HP⟩
   iapply specUpdate_mono
-  iframe
+  iframe HP
   iintro _
   iframe
 

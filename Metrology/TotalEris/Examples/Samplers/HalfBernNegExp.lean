@@ -84,7 +84,7 @@ section conservation
 
 open MeasureTheory in
 
-theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (hbound : ∀ b, F b ≤ M) :
+theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (_hbound : ∀ b, F b ≤ M) :
     ∫⁻ r, BNEHalfCredit F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
 
   have hlift : LiftF F = fun n => if n % 2 = 0 then F false else F true := by

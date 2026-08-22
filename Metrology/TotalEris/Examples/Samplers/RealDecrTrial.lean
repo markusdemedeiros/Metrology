@@ -127,7 +127,7 @@ def RealDecrTrialCreditV (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) : ℝ≥0�
   ∑' n : ℕ, RealDecrTrialPMF x i n * F n
 
 theorem RealDecrTrialCreditV_nonneg (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
-    0 ≤ RealDecrTrialCreditV F i x := zero_le'
+    0 ≤ RealDecrTrialCreditV F i x := zero_le
 
 theorem RealDecrTrialCreditV_reindex (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
     RealDecrTrialCreditV F i x = ∑' m : ℕ, RealDecrTrialPMF₀ x m * F (i + m) := by
@@ -251,7 +251,7 @@ section conservation
 open MeasureTheory in
 
 theorem RealDecrTrialCredit_lintegral {F : ℕ → ℝ≥0∞} {M : ℝ≥0∞} {N : ℕ} {x : ℝ}
-    (hx : 0 ≤ x ∧ x ≤ 1) (hbound : ∀ n, F n ≤ M) :
+    (hx : 0 ≤ x ∧ x ≤ 1) (_hbound : ∀ n, F n ≤ M) :
     ∫⁻ y, RealDecrTrialCredit F N x y ∂(ProbLangℝ.unifUnit (T := ℝ)) =
       RealDecrTrialCreditV F N x := by
   obtain ⟨hx0, hx1⟩ := hx

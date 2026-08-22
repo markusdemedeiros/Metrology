@@ -157,7 +157,6 @@ theorem mass
     fun σ' => execN_succ_isValue (ρ := ⟨.lit .unit, σ'⟩) hv.toIsValue 0
   have h1 := h (.lit .unit) 1
   have hboth := congrArg (fun ν => ν (Set.univ : Set (Cfg rT))) h1
-  simp only at hboth
   rw [hstep σ] at hboth
   rw [Measure.dirac_apply' _ .univ] at hboth
   simp at hboth

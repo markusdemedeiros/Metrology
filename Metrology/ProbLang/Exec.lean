@@ -180,7 +180,7 @@ theorem stepOrFinal.measurable [Inhabited rT] :
     -- `isValue` now also requires local closedness; `{isValue} = {isValueR} ∩ {lcb 0 = true}`.
     have : {ρ : Cfg rT | ρ.expr.isValue}
         = (fun ρ : Cfg rT => ρ.expr) ⁻¹' ({e | e.isValueR} ∩ {e | Exp.lcb 0 e = true}) := by
-      ext ρ; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff, Set.mem_preimage]
+      ext ρ; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff]
     rw [this]
     exact Cfg.measurable_expr ((Exp.isValueR.measurable.setOf).inter Exp.lcb_zero.measurableSet)
   exact Measurable.ite hpred measurable_dirac primStep.measurable
@@ -290,7 +290,7 @@ def pexecN (n : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   | n + 1 => (stepOrFinal ρ).bind (pexecN n)
 
 @[fun_prop]
-def pexecN_measurable {n : Nat} : Measurable (pexecN (rT := rT) n) := by
+theorem pexecN_measurable {n : Nat} : Measurable (pexecN (rT := rT) n) := by
   induction n
   · simp [pexecN]
     measurability

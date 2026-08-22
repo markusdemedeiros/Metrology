@@ -510,7 +510,7 @@ theorem G1Geometric_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
       ENNReal.tsum_sub (by rw [hRfin, hR]; exact ENNReal.ofReal_ne_top)
         (fun k => by
           nth_rewrite 2 [← one_mul (GeometricPMF γBNE k)]
-          exact mul_le_mul_right' (hak1 k) _),
+          exact mul_le_mul_left (hak1 k) _),
       geometricPMF_tsum, hRfin]
 
   have hgeo : ∀ k : ℕ, G1GeometricCredit F c (0 + (k : ℤ)) * GeometricPMF γBNE k
@@ -563,7 +563,7 @@ theorem G2G1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable 
   have hgm_mul : ∀ k, ENNReal.ofReal (Norm2 / Norm1)
       * ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) ≤ G1PMF k := fun k => by
     rw [← G2_accept_mass k]
-    exact (mul_le_mul_left' (hq1 k) (G1PMF k)).trans (_root_.le_of_eq (mul_one _))
+    exact (mul_le_mul_right (hq1 k) (G1PMF k)).trans (_root_.le_of_eq (mul_one _))
 
   have h1mp : ∀ k, (∫⁻ x, (1 - G2p k x) ∂(ProbLangℝ.unifUnit (T := ℝ)))
       = 1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := fun k => by
@@ -599,7 +599,7 @@ theorem G2G1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable 
         = fun x => G2p k x * F k x + (1 - G2p k x) * (G2CreditV F + c) := by
       funext x; rw [G2CreditAmp, IterCreditV]; rfl
     rw [G2G1Credit, hamp,
-        lintegral_add_left ((measurable_G2p k).mul (hFm k)),
+        lintegral_add_left (f := fun x => G2p k x * F k x) ((measurable_G2p k).mul (hFm k)),
         lintegral_mul_const _ ((measurable_G2p k).const_sub 1),
         mul_add, G2_accept_lintegral F k, h1mp k]
     ring
@@ -624,7 +624,7 @@ end conservation
 
 section specification
 
-theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀ n, F n ≤ M) :
+theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (_Hnn : ∀ n, F n ≤ M) :
     ⊢@{IProp GF} ↯ (G1CreditV F) -∗
       tglWp E pl(&G1 #.unit)
         (fun v : Val ℝ => iprop(∃ n : ℕ, ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))) := by

@@ -39,7 +39,7 @@ theorem Measure.eq_dirac_of_singleton_mass_one {α : Type _}
   by_cases ha : a ∈ s
   · rw [MeasureTheory.Measure.dirac_apply_of_mem ha]
     have hsplit : μ s = μ (s ∩ {a}) + μ (s ∩ {a}ᶜ) := by
-      rw [← MeasureTheory.measure_inter_add_diff s (measurableSet_singleton _)]; rfl
+      rw [← MeasureTheory.measure_inter_add_sdiff s (measurableSet_singleton _)]; rfl
     have hzero : μ (s ∩ {a}ᶜ) = 0 :=
       MeasureTheory.measure_mono_null Set.inter_subset_right hcompl
     have hinter : s ∩ {a} = {a} :=

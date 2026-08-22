@@ -110,7 +110,7 @@ theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → I
       · intro hε_top; simp [hε_top] at hValid
       · rw [Ne, _root_.tsub_eq_zero_iff_le]; exact _root_.not_le.mpr Hε'
     ihave Hwp := (BI.equiv_iff.mp tglWp_unfold).1 $$ Hwp
-    rw (occs := [2]) [tglWpPre_eq_step Hnv]
+    rw [tglWpPre_eq_step Hnv]
     imod Hwp $$ %σ₁ %(ε₂ + (ε' - ε₂)) [$] with HGlm
     imodintro
     iapply execStutter_free

@@ -158,7 +158,7 @@ meta structure TglWpGoal where
 
 /-- Run `k` against the current goal, requiring it to be `ehyps ⊢ tglWp E e Φ`. -/
 meta def runTacticTglWp {β : Type} (k : MVarId → TglWpGoal → ProofModeM β) : TacticM β := do
-  ProofModeM.runTactic fun mvar {u, prop, bi, hyps, goal, ..} => do
+  ProofModeM.runTactic `tglWp fun mvar {u, prop, bi, hyps, goal, ..} => do
     let .defEq _ ← isLevelDefEqQ u 0
       | throwError "the goal {goal} must be an `IProp` at universe level 0"
     -- Binding `$GF` here refines `prop` to `IProp GF`, so `hyps`' carrier is concrete
@@ -479,7 +479,7 @@ elab "twp_value" : tactic =>
     let Q' : Q(IProp $GF) ← mkFreshExprMVarQ q(IProp $GF)
     let useNoFupd : Bool ←
       if (← ProofModeM.trySynthInstanceQ
-            q(ElimModal $c false $p' iprop(|={$E}=> $goal) $A' $goal $Q')).isSome then
+            q(ElimModal $c false .out $p' iprop(|={$E}=> $goal) $A' $goal $Q')).isSome then
         pure (← observing? (iSolveSidecondition c)).isSome
       else pure false
     if useNoFupd then

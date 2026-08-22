@@ -20,15 +20,13 @@ namespace ErisWpGS
 
 variable {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
 
-instance : COFE (Exp rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : COFE (Exp rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (Exp rT) := ⟨id⟩
-instance : OFE.Leibniz (Exp rT) := ⟨id⟩
 
 abbrev TglWpState (rT : Type _) : Type _ := CoPset × Exp rT
 
-instance : COFE (TglWpState rT) := COFE.ofDiscrete _ Eq_Equivalence
+instance : COFE (TglWpState rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (TglWpState rT) := ⟨id⟩
-instance : OFE.Leibniz (TglWpState rT) := ⟨id⟩
 
 abbrev tglWpPre -- [Countable rT] [MeasurableSingletonClass rT]
     (wp : CoPset → Exp rT → (Val rT → IProp GF) → IProp GF)
@@ -77,17 +75,17 @@ instance tglWpPreFixed_mono {Φ : Val rT → IProp GF} :
   mono_pred_ne.ne {_ s s'} hd := by
     have := eq_of_dist_discrete_leibniz hd; subst this; exact .of_eq rfl
 
-@[reducible, expose]
+@[reducible]
 noncomputable def tglWp (E : CoPset) (e : Exp rT) (Φ : Val rT → IProp GF) : IProp GF :=
   bi_least_fixpoint (tglWpPreFixed (rT := rT) (GF := GF) Φ) ⟨E, e⟩
 
 /-- Fixpoint unfolding for `tglWp`. -/
 theorem tglWp_unfold {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
-    tglWp (rT := rT) (GF := GF) E e Φ ≡ tglWpPre (tglWp (rT := rT) (GF := GF)) E e Φ :=
+    tglWp (rT := rT) (GF := GF) E e Φ = tglWpPre (tglWp (rT := rT) (GF := GF)) E e Φ :=
   least_fixpoint_unfold (F := tglWpPreFixed (rT := rT) (GF := GF) Φ) (x := ⟨E, e⟩)
 
 theorem tglWp_unfold_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
-    tglWp E (Exp.ofVal v) Φ ≡
+    tglWp E (Exp.ofVal v) Φ =
       iprop(∀ (σ : State rT) (ε : ENNReal),
         (stateInterp σ ∗ errInterp (rT := rT) ε) -∗
           |={E}=> stateInterp σ ∗ errInterp (rT := rT) ε ∗ Φ v) := by
@@ -97,7 +95,7 @@ theorem tglWp_unfold_value {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} 
 
 theorem tglWp_unfold_step {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
     (Hv : e.toVal? = none) :
-    tglWp E e Φ ≡
+    tglWp E e Φ =
       iprop(∀ (σ : State rT) (ε : ENNReal),
         (stateInterp σ ∗ errInterp (rT := rT) ε) -∗
           |={E, ∅}=> glm' e σ ε (fun ρ ε₂ =>
@@ -434,7 +432,7 @@ theorem tglWp_bind {K : Ectx rT} {E : CoPset} {e : Exp rT} {Φ : Val rT → IPro
               stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ tglWp E (K.fill ρ.expr) Φ)))
       $$ [HF]
     · rw [← heqS]; iexact HF
-    have key : tglWp E (K.fill e') Φ ≡
+    have key : tglWp E (K.fill e') Φ =
                iprop(∀ (σ' : State rT) (ε' : ENNReal),
                  (stateInterp σ' ∗ errInterp (rT := rT) ε') -∗
                    |={E, ∅}=> glm' (K.fill e') σ' ε' (fun ρ ε₂ =>
@@ -466,7 +464,7 @@ theorem tglWp_bind_value {K : Ectx rT} {E : CoPset} {v : Val rT} {Φ : Val rT �
   cases htv : (K.fill (Exp.ofVal v)).toVal? with
   | some v' =>
     have heq : K.fill (Exp.ofVal v) = Exp.ofVal v' := (Exp.ofVal_of_toVal_some htv).symm
-    have key : tglWp E (K.fill (Exp.ofVal v)) Φ ≡
+    have key : tglWp E (K.fill (Exp.ofVal v)) Φ =
                iprop(∀ (σ' : State rT) (ε' : ENNReal),
                  (stateInterp σ' ∗ errInterp (rT := rT) ε') -∗
                    |={E}=> stateInterp σ' ∗ errInterp (rT := rT) ε' ∗ Φ v') := by

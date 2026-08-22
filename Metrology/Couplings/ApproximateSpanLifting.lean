@@ -19,8 +19,6 @@ structure Span (α β Φ : Type _) [MeasurableSpace α] [MeasurableSpace β] [Me
   leftMeasurable : Measurable left
   rightMeasurable : Measurable right
 
-attribute [instance] Span.leftMeasurable Span.rightMeasurable
-
 structure SpanMap [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace Φ] [MeasurableSpace α']
   [MeasurableSpace β'] [MeasurableSpace Φ'] (s₁ : Span α β Φ) (s₂ : Span α' β' Φ') where
   leftMap : α → α'

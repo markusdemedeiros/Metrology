@@ -17,7 +17,7 @@ open scoped ENNReal NNReal
 
 abbrev ErrorCredit : Type _ := ℝ≥0∞
 
-instance : COFE ErrorCredit := COFE.ofDiscrete _ Eq_Equivalence
+instance : COFE ErrorCredit := COFE.ofDiscrete _
 instance : OFE.Discrete ErrorCredit := ⟨id⟩
 instance (x : ErrorCredit) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
@@ -34,7 +34,7 @@ instance : CMRA ErrorCredit where
   validN_op_left {n x y} H := lt_of_add_lt_of_nonneg_left H (zero_le)
   assoc {_ _ _} := (add_assoc ..).symm
   comm {_ _} := (add_comm ..).symm
-  pcore_op_left {_ _} := by rintro ⟨rfl⟩; simp [OFE.Equiv]
+  pcore_op_left {_ _} := by rintro ⟨rfl⟩; simp
   pcore_idem := by simp
   pcore_op_mono {_ _} := by rintro ⟨rfl⟩ _; exists 0; simp
   extend _ h := ⟨_, _, OFE.discrete h, .rfl, .rfl⟩
@@ -82,7 +82,7 @@ theorem ErrorCredit.localUpdate {ε₁ ε₂ ε₁' ε₂' : ErrorCredit} (h1 : 
 instance : Iris.IsUnit (◯ 0 : Auth ErrorCredit) where
   unit_valid := Auth.frag_valid.mpr (by simp [CMRA.Valid])
   unit_left_id := by simp [CMRA.op]
-  pcore_unit := .rfl
+  pcore_unit := by simp [CMRA.pcore, CMRA.core]
 
 class ECPreGS (GF : BundledGFunctors) where
   ec : ElemG GF (constOF (Auth ErrorCredit))
@@ -102,7 +102,7 @@ notation "↯ " r:50 => ec r
 notation "●↯ " r:50 => ecAuth r
 
 instance : CMRA.Discrete (Auth ErrorCredit) := by infer_instance
-instance : OFE.DiscreteE (◯ r : Auth ErrorCredit) := Auth.frag_discrete (by infer_instance)
+instance : OFE.DiscreteE (◯ r : Auth ErrorCredit) := Auth.frag_discrete
 
 end Resources
 
@@ -119,6 +119,7 @@ theorem split {ε₁ ε₂} : ↯(ε₁ + ε₂) ⊢@{IProp GF} ↯ε₁ ∗ ↯
   iintro Hε
   iapply iOwn_op
   simp [CMRA.op]
+  iexact Hε
 
 theorem difference {ε₁ ε₂} (Hwf : ε₁ ≤ ε₂) : ↯ε₂ ⊢@{IProp GF} ↯ε₁ ∗ ↯(ε₂ - ε₁) := by
   iintro H
@@ -127,9 +128,9 @@ theorem difference {ε₁ ε₂} (Hwf : ε₁ ≤ ε₂) : ↯ε₂ ⊢@{IProp G
 
 theorem combine {ε₁ ε₂} : ↯ε₁ ∗ ↯ε₂ ⊢@{IProp GF} ↯(ε₁ + ε₂) := by
   unfold ec
-  iintro H
-  ihave _ := iOwn_op (E := IEC.ec) |>.mpr $$ H
-  simp [CMRA.op]
+  iintro ⟨H1, H2⟩
+  icombine H1 H2 as Hε
+  iexact Hε
 
 /-- Lets `icombine` fold two error credits into their sum: `icombine H₁ H₂ as H`
 turns `↯ε₁` and `↯ε₂` into `↯(ε₁ + ε₂)`. Mirrors the later-credit instance
@@ -165,7 +166,7 @@ theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
   unfold ec ecAuth
   have Hupd : (● ε₁) ~~> (● ε₁ + ε₂) • (◯ ε₂ : Auth ℝ≥0∞) := by
     refine Auth.auth_update_alloc <| (local_update_unital_discrete ..).mpr ?_
-    simp only [CMRA.Valid, OFE.Equiv, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
+    simp only [CMRA.Valid, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
     exact fun _ => ⟨h, add_comm _ _⟩
   iintro Hε
   -- FIXME: Is this fixed by the last update to master?
@@ -244,10 +245,12 @@ theorem simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk
     iapply haux _ le_rfl
   iintro %ε' %Hhle #Hamp Hε
   obtain ⟨n, Hn⟩ := err_amp_mult hε Hhle hk
-  induction n generalizing ε'
-  next =>
-    iexfalso; simp at Hn; iapply contradict Hn $$ Hε
-  next n IH =>
+  iinduction n generalizing %ε' %Hhle %Hn Hε with
+  | zero =>
+    iexfalso
+    simp at Hn
+    iapply contradict Hn $$ Hε
+  | succ n IH =>
     have hk1 : (1 : ℝ≥0∞) ≤ (k : ℝ≥0∞) := by exact_mod_cast hk.le
     have Hkε : (k : ℝ≥0∞) * ε = ((k : ℝ≥0∞) - 1) * ε + ε := by
       conv_lhs => rw [← tsub_add_cancel_of_le hk1, add_mul, one_mul]
@@ -267,10 +270,8 @@ theorem simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk
     iintro Hε
     ihave Hε₃ := combine (GF := GF) $$ [Hε₁ Hε]
     · isplitl [Hε₁] <;> iassumption
-    iapply IH ε'' (Hhle.trans le_self_add) Hn'
-    isplitr [Hε₃]
-    · iexact Hamp
-    · iapply ext (GF := GF) Hε''eq $$ Hε₃
+    iapply IH $$ %ε'' %(Hhle.trans le_self_add) %Hn'
+    iapply ext (GF := GF) Hε''eq $$ Hε₃
 
 theorem external_simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k)
     (hamp : (↯(k * ε) -∗ P) ∗ ↯ε ⊢ P) : ↯ε ⊢ P := by
@@ -307,21 +308,18 @@ theorem amplifying {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε)
     ⊢@{IProp GF} ↯ε -∗ P := by
   iintro #Hamp Hε
   obtain ⟨n, Hn⟩ := err_amp_power hε hk
-  induction n generalizing ε
-  next =>
+  iinduction n generalizing %ε %hε %Hn Hε with
+  | zero =>
     iexfalso
     simp at Hn
     iapply contradict Hn $$ Hε
-  next n ih =>
+  | succ n ih =>
     iapply Hamp $$ %_ %hε [] Hε
     imodintro
     iintro Hε
-    iapply ih (ε := k * ε)
-    · exact ENNReal.mul_pos_iff.mpr ⟨ENNReal.coe_pos.mpr (pos_of_gt hk), pos_of_gt hε⟩
-    · refine Hn.trans ?_
-      ring_nf
-      exact le_rfl
-    · isplitr <;> first | iexact Hamp | iexact Hε
+    iapply ih $$ %(k * ε)
+      %(ENNReal.mul_pos_iff.mpr ⟨ENNReal.coe_pos.mpr (pos_of_gt hk), pos_of_gt hε⟩)
+      %(Hn.trans (_root_.le_of_eq (by ring))) Hε
 
 theorem amp_external {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF}
     (hε : 0 < ε) (hk : 1 < k)

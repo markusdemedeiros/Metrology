@@ -186,7 +186,7 @@ partial def eval (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : 
     eval σ e'
 
 /-- Run an expression from an empty initial heap. -/
-@[expose] def run (e : Exp rT) : IO (Val rT) := do
+def run (e : Exp rT) : IO (Val rT) := do
   let σ ← IO.mkRef (∅ : ExtTreeMap Loc (Val rT) compare)
   eval σ e
 

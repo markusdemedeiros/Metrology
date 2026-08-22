@@ -139,8 +139,7 @@ Used in the compl-case of σ-algebra induction over `Option α`-valued projectio
 theorem Set.image_compl_some {α : Type _} (G : Set α) :
     (some : α → Option α) '' Gᶜ
       = ({none} : Set (Option α))ᶜ \ (some '' G) := by
-  rw [← Set.image_univ_some, Set.compl_eq_univ_diff,
-      Set.image_diff (Option.some_injective α)]
+  rw [← Set.image_univ_some, Set.compl_eq_univ_sdiff, Set.image_sdiff (Option.some_injective α)]
 
 /-- `{none} ⊆ Option α` is measurable. -/
 @[measurability]
@@ -282,7 +281,7 @@ theorem MeasurableSet.cover_inter_preimage_of_gen
   | basic G' hG' => exact hgen G' hG'
   | empty => simp
   | compl G' _ ih =>
-    rw [Set.preimage_compl, ← Set.diff_eq, ← Set.diff_self_inter]
+    rw [Set.preimage_compl, ← Set.sdiff_eq, ← Set.sdiff_self_inter]
     exact hcov.diff ih
   | iUnion G' _ ih =>
     rw [Set.preimage_iUnion, Set.inter_iUnion]
@@ -384,7 +383,7 @@ theorem measurableEmbedding_of_piSystem₁
       h_gen h_pi ?_ h_basic ?_ ?_ S hS
   · simp
   · intro T _ ih
-    rw [Set.compl_eq_univ_diff, Set.image_diff h_inj, Set.image_univ, ← h_cov_range]
+    rw [Set.compl_eq_univ_sdiff, Set.image_sdiff h_inj, Set.image_univ, ← h_cov_range]
     exact h_cov_meas.diff ih
   · intro f _ _ ih
     rw [Set.image_iUnion]
@@ -407,7 +406,7 @@ theorem measurableEmbedding_of_piSystem₂
   · simp
   · rintro _ ⟨_, hA, _, hB, rfl⟩; exact h_basic hA hB
   · intro T _ ih
-    rw [Set.compl_eq_univ_diff, Set.image_diff h_inj, Set.image_univ, ← h_cov_range]
+    rw [Set.compl_eq_univ_sdiff, Set.image_sdiff h_inj, Set.image_univ, ← h_cov_range]
     exact h_cov_meas.diff ih
   · intro f _ _ ih
     rw [Set.image_iUnion]
@@ -707,6 +706,7 @@ theorem cell_ternary
   suffices h : ∀ S, MeasurableSet S → MeasurableSet (Joint S) by
     have hS : MeasurableSet ((fun (q : α × α × α) => c q.1 q.2.1 q.2.2) ⁻¹' U) := h_c hU
     convert h _ hS
+    rfl
   intro S hS
   -- Decompose the ternary cell into the binary cell × extra-shape-cell, then
   -- apply the cell_binary machinery twice. The codomain α × α × α is treated as
@@ -829,6 +829,7 @@ theorem cell_quaternary
     have hS : MeasurableSet ((fun (q : α × α × α × α) => c q.1 q.2.1 q.2.2.1 q.2.2.2) ⁻¹' U) :=
       h_c hU
     convert h _ hS
+    rfl
   intro S hS
   -- π-system on α × (α × α × α): rectangles V × W where W ⊆ α × α × α measurable.
   have hgen : (Prod.instMeasurableSpace : MeasurableSpace (α × α × α × α))
@@ -1240,6 +1241,7 @@ theorem cell_unary_param {ctor : T → T} {s s' : Sh}
   suffices h : ∀ V, MeasurableSet V → MeasurableSet (Joint V) by
     have hV : MeasurableSet (Function.uncurry c ⁻¹' U) := h_c hU
     convert h _ hV
+    rfl
   intro V hV
   have hgen : (Prod.instMeasurableSpace : MeasurableSpace (β × α))
       = .generateFrom (Set.image2 (· ×ˢ ·) {S : Set β | MeasurableSet S}
@@ -1472,6 +1474,7 @@ theorem cell_unary_param_shift {ctor : T → T} {s s' : Sh}
   suffices h : ∀ V, MeasurableSet V → MeasurableSet (Joint V) by
     have hV : MeasurableSet (Function.uncurry c ⁻¹' U) := h_c hU
     convert h _ hV
+    rfl
   intro V hV
   have hgen : (Prod.instMeasurableSpace : MeasurableSpace (β × α))
       = .generateFrom (Set.image2 (· ×ˢ ·) {S : Set β | MeasurableSet S}

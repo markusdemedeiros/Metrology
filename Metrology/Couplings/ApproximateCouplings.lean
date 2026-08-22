@@ -21,7 +21,7 @@ public import Mathlib.Analysis.Real.OfDigits
 def BoundedFunction {α : Type _} (f : α → ENNReal) : Prop :=
   ∀ a, f a ≤ 1
 
-@[expose] def CouplingFunction (α : Type _) [MeasurableSpace α] :=
+def CouplingFunction (α : Type _) [MeasurableSpace α] :=
   { f : α → ENNReal // Measurable f ∧ BoundedFunction f}
 
 theorem CouplingFunction.measurable {α : Type} [MeasurableSpace α] (f : CouplingFunction α) :

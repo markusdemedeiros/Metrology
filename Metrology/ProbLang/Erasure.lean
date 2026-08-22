@@ -1723,7 +1723,6 @@ theorem execN_tapePresampleIter_expr_eq [Countable rT] [MeasurableSingletonClass
           simp_rw [Measure.map_apply Measurable.of_discrete hS]
       _ = (execN m ⟨e, σ⟩).map (·.expr) S := by
           have h_ih := ih h
-          unfold asExpr at h_ih
           rw [h_ih, Measure.map_apply Measurable.of_discrete hS]
 
 theorem execN_iterM_tape_presample_expr_eq [Countable rT] [MeasurableSingletonClass rT]

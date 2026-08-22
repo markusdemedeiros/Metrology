@@ -551,7 +551,6 @@ theorem twp_Bii (E : CoPset) (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx0 
     twp_pures
     rcases hb : ProbLangℝ.realLt x r with _ | _
     ·
-      twp_pures
       twp_value
       imodintro
       iexists false
@@ -562,7 +561,6 @@ theorem twp_Bii (E : CoPset) (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx0 
       · ipureintro; rfl
       · iexact Hcr
     ·
-      twp_pures
       twp_value
       imodintro
       iexists true
@@ -584,7 +582,7 @@ theorem twp_Bii (E : CoPset) (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx0 
     · ipureintro; rfl
     · iexact Hcr
 
-theorem twp_S_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (hnn : ∀ n, F n ≤ M)
+theorem twp_S_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (_hnn : ∀ n, F n ≤ M)
     (k : ℕ) (x : ℝ) (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (B : ℝ) (hB0 : 0 < B) (hB1 : B < 1) :
     ⊢@{IProp GF} ∀ (N : ℕ) (y : ℝ), ⌜0 ≤ y⌝ -∗ ⌜y ≤ B⌝ -∗
       ↯ (SCreditV F k x y N) -∗
@@ -886,7 +884,6 @@ theorem twp_B (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀
   ·
     have hmod : (Int.ofNat n % 2 : ℤ) = 1 := by simp only [Int.ofNat_eq_natCast]; omega
     rw [hmod]
-    twp_pures
     twp_value
     imodintro
     iexists false

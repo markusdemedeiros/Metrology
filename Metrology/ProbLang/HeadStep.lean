@@ -2048,7 +2048,7 @@ theorem headStep_support_of_pos [MeasurableSingletonClass rT]
     -- `r` carries positive `unifUnit`-mass, so it lies in `unifUnitSupport`:
     -- otherwise `{r} ⊆ unifUnitSupportᶜ` would force `unifUnit {r} = 0`.
     by_contra hr_notin
-    have hsub : ({r} : Set rT) ⊆ (ProbLangℝ.unifUnitSupport)ᶜ := by simpa using hr_notin
+    have hsub : ({r} : Set rT) ⊆ (ProbLangℝ.unifUnitSupport)ᶜ := Set.singleton_subset_iff.mpr hr_notin
     exact (ne_of_gt hpos)
       (le_zero_iff.mp ((measure_mono hsub).trans_eq ProbLangℝ.unifUnitIsConcentrated))
 

@@ -123,7 +123,7 @@ theorem app_state_lookup_heap {σ : State rT} {l : Loc} {v : Val rT} :
     rw [Hcase] at Hlookup
     simp only [Option.map_some, Option.some.injEq] at Hlookup
     have Hinc' : toAgree v ≼ toAgree w := Hlookup ▸ Hinc
-    have : v = w := Agree.toAgree_included_L.mp Hinc'
+    have : v = w := Agree.toAgree_included.mp Hinc'
     exact this ▸ rfl
 
 theorem app_state_update_heap {σ : State rT} {l : Loc} {v w : Val rT} :
@@ -135,7 +135,7 @@ theorem app_state_update_heap {σ : State rT} {l : Loc} {v w : Val rT} :
   unfold appStateAuth appHeapAuth appHeapFrag
   ihave ⟨Hh, Ht⟩ := Ha
   have Hval_toAgree : ✓ (toAgree w : Agree (Val rT)) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.heap) •
         HeapView.Frag (H := LocHeap) l (.own 1) (toAgree v) ~~>
@@ -166,7 +166,7 @@ theorem app_state_heap_alloc {σ : State rT} (v : Val rT) :
     show (σ.heap[σ.heap.fresh]?).map toAgree = none
     rw [ExtTreeMap.fresh_get?]; rfl
   have Hval_toAgree : ✓ (toAgree v : Agree (Val rT)) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.heap) ~~>
       HeapView.Auth (.own 1)
@@ -199,7 +199,7 @@ theorem app_state_lookup_tape {σ : State rT} {l : Loc} {t : Tape} :
     rw [Hcase] at Hlookup
     simp only [Option.map_some, Option.some.injEq] at Hlookup
     have Hinc' : toAgree t ≼ toAgree w := Hlookup ▸ Hinc
-    have : t = w := Agree.toAgree_included_L.mp Hinc'
+    have : t = w := Agree.toAgree_included.mp Hinc'
     exact this ▸ rfl
 
 theorem app_state_update_tape {σ : State rT} {l : Loc} {t s : Tape} :
@@ -211,7 +211,7 @@ theorem app_state_update_tape {σ : State rT} {l : Loc} {t s : Tape} :
   unfold appStateAuth appTapesAuth appTapesFrag
   ihave ⟨Hh, Ht⟩ := Ha
   have Hval_toAgree : ✓ (toAgree s : Agree Tape) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.tapes) •
         HeapView.Frag (H := LocHeap) l (.own 1) (toAgree t) ~~>
@@ -242,7 +242,7 @@ theorem app_state_tape_alloc {σ : State rT} (t : Tape) :
     show (σ.tapes[σ.tapes.fresh]?).map toAgree = none
     rw [ExtTreeMap.fresh_get?]; rfl
   have Hval_toAgree : ✓ (toAgree t : Agree Tape) := by
-    intro n; simp [Agree.validN_iff, toAgree]
+    intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.tapes) ~~>
       HeapView.Auth (.own 1)

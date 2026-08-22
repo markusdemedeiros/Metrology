@@ -21,10 +21,9 @@ noncomputable section
 -- fraction algebra is no longer parameterised by `ℕ+`.
 
 instance authMeasureOFE [MeasurableSpace α] : OFE (Measure α) where
-  Equiv x y := x = y
   Dist _ x y := x = y
   dist_eqv := ⟨fun _ => rfl, (Eq.symm ·), (Eq.trans · ·)⟩
-  equiv_dist := .symm <| forall_const _
+  eq_dist' := .symm <| forall_const _
   dist_lt H _ := H
 
 -- CMRA of subprobability distributions with addition
@@ -45,7 +44,7 @@ instance [MeasurableSpace α] : CMRA (Measure α) where
   pcore_idem := by simp
   pcore_op_mono {_ _} := by
     rintro ⟨rfl⟩ Y
-    exact ⟨0, .of_eq <| Option.some_inj.mpr (zero_add 0).symm⟩
+    exact ⟨0, Option.some_inj.mpr (zero_add 0).symm⟩
   extend {_ _ y1 y2} _ := (⟨y1, y2, ·, rfl, rfl⟩)
 
 instance [MeasurableSpace α] : UCMRA (Measure α) where
@@ -53,7 +52,7 @@ instance [MeasurableSpace α] : UCMRA (Measure α) where
   unit_valid := by simp [CMRA.Valid]
   unit_left_id := by
     intro μ
-    refine .of_eq (zero_add _)
+    refine (zero_add _)
   pcore_unit := by simp [CMRA.pcore]
 
 
