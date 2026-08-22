@@ -7,7 +7,6 @@ public import Metrology.TotalEris.TotalLifting
 public import Metrology.TotalEris.ErisGS
 public import Metrology.TotalEris.TotalPrimitiveLaws
 public import Metrology.TotalEris.ErrorRules
-public import Metrology.TotalEris.Proofmode
 public import Metrology.TotalEris.WpTactics
 public import Metrology.TotalEris.TotalAdequacy
 public import Metrology.TotalEris.PresampleRules
@@ -17,6 +16,6 @@ public import Metrology.TotalEris.PresampleRules
 /-!
 # TotalEris
 
-Lean 4 port of the total-correctness fragment of Eris (`clutch/theories/eris/`).
-See `Metrology/TotalEris/WISHLIST.md` for the porting roadmap.
+The total-correctness weakest-precondition calculus for ProbLang: its model, lifting
+lemmas, error-credit rules, adequacy theorems, and `twp_*` proof tactics.
 -/

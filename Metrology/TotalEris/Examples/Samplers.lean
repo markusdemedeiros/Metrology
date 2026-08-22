@@ -12,26 +12,25 @@ public import Metrology.TotalEris.Examples.Samplers.GaussianAdequacy
 @[expose] public section
 
 /-!
-# Gaussian / Laplace samplers — scaffolding (continuous-uniform port)
+# Gaussian samplers
 
-Aggregator for the `urand`-based port of the Gauss sampler stack from
-`clutch/theories/eris/examples/gauss.v` (branch `elementary-infinite`).
+Aggregator for the `urand`-based Gauss sampler stack.
 
 Dependency layering (bottom-up):
 
 ```
-RealDecrTrial ── decreasing trial (init→urand, cmp→real <, presample→twp_urand_exp)
-  ├── HalfBernNegExp (LeHalf, BNEHalf)        ── concrete base-½ Bernoulli
-  └── NegExp                                   ── negative-exponential sampler
-BernoulliGeometric (GeometricTrial) / BernIter (IterTrial)  ── generic combinators over AbstractBernoulli
-Selector (C, Bii, S, S0, B)                    ── integer-part selection
-Gauss   (G1, G2)   ← BNEHalf, GeometricTrial, IterTrial, B
+RealDecrTrial ── decreasing trial (urand init, real `<` compare, twp_urand_exp presample)
+  ├── HalfBernNegExp (LeHalf, BNEHalf)  ── concrete base-½ Bernoulli
+  ├── NegExp                            ── negative-exponential sampler
+  └── Selector (C, Bii, S, S0, B)       ── integer-part selection
+BernoulliGeometric (AbstractBernoulli, GeometricTrial)
+  └── BernIter (AbstractBernoulliI, IterTrial, AbstractBernoulli.toAbstractBernoulliI)
+Gauss (G1, G2)  ← BNEHalf, GeometricTrial, IterTrial, B
+  └── GaussianAdequacy  ← DistributionAdequacy
 ```
 
-**Status:** every WP spec is Iris-complete; remaining `sorry`s are the deferred
-MATH side-conditions (PMF/lintegral/measurability/ENNReal-arithmetic). Fixed at
-`rT = ℝ`.
+Every WP spec here is complete and `sorry`-free, and fixed at `rT = ℝ`.
 
-(Laplace was dropped: its value-reconstruction/scaling need real-arithmetic and
-real-power-of-two `BinOp.eval` extensions not yet in the language.)
+Laplace is not included: its value reconstruction and scaling need real-arithmetic
+and real-power-of-two `BinOp.eval` extensions the language does not yet have.
 -/

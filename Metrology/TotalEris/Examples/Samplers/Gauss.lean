@@ -1,4 +1,3 @@
--- Discrete/continuous Gaussian sampler
 module
 
 public import Metrology.TotalEris
@@ -10,8 +9,9 @@ public import Metrology.TotalEris.Examples.Samplers.Selector
 
 @[expose] public section
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
-  ProbLang.TotalEris.ErisWpGS
+/-! # Discrete/continuous Gaussian sampler -/
+
+open Iris Iris.BI Iris.ProofMode ProbLang ProbLang.TotalEris ProbLang.TotalEris.ErisWpGS
 open scoped AppGS ENNReal NNReal
 
 namespace ProbLang
@@ -48,7 +48,6 @@ def Norm1 : ℝ := ∑' k : ℕ, Real.exp (-(k : ℝ) ^ 2 / 2)
 def G1PMF (k : ℕ) : ℝ≥0∞ := .ofReal (Real.exp (-(k : ℝ) ^ 2 / 2) / Norm1)
 
 open MeasureTheory in
-
 def Norm2 : ℝ := ∫ x in (0 : ℝ)..1, ∑' k : ℕ, Real.exp (-((x + k) ^ 2) / 2)
 
 def G2pdf (k : ℕ) (x : ℝ) : ℝ≥0∞ := .ofReal (Real.exp (-((x + k) ^ 2) / 2) / Norm2)
@@ -60,7 +59,6 @@ section creditExpectation
 def G1CreditV (F : ℕ → ℝ≥0∞) : ℝ≥0∞ := ∑' k : ℕ, G1PMF k * F k
 
 open MeasureTheory in
-
 def G2CreditV (F : ℕ → ℝ → ℝ≥0∞) : ℝ≥0∞ :=
   ∑' k : ℕ, ∫⁻ x, G2pdf k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
 
@@ -68,7 +66,7 @@ end creditExpectation
 
 section creditKernel
 
-@[reducible] def BNEHalfVal : Val ℝ := ⟨BNEHalf, IsVal.lam (by is_lc), by is_lc⟩
+abbrev BNEHalfVal : Val ℝ := ⟨BNEHalf, IsVal.lam (by is_lc), by is_lc⟩
 
 noncomputable def γBNE : ↑unitInterval :=
   ⟨Real.exp (-1 / 2), (Real.exp_pos _).le, Real.exp_le_one_iff.mpr (by norm_num)⟩
@@ -87,39 +85,20 @@ theorem γBNE_credit_eq (F : Bool → ℝ≥0∞) :
       = BNEHalfCreditV F := by
   have ht : BNEHalfPMF true = ENNReal.ofReal (Real.exp (-1 / 2)) := rfl
   have hf : BNEHalfPMF false = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := rfl
-  simp only [BNEHalfCreditV, ht, hf, γBNE_coe]
-  have h1 : (1 : ℝ≥0∞) - ENNReal.ofReal (Real.exp (-1 / 2))
-      = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := by
-    rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ (Real.exp_pos _).le]
-  rw [h1]
+  simp only [BNEHalfCreditV, ht, hf, γBNE_coe, ENNReal.one_sub_ofReal (Real.exp_pos (-1 / 2)).le]
   ring
 
 theorem abstractBernoulli_BNEHalf : AbstractBernoulli (GF := GF) BNEHalfVal γBNE where
   spec := by
     intro E
     iintro %F Hε
-    iapply (twp_BNEHalf E F (F true + F false)
-      (by intro b; cases b <;> first | exact le_self_add | exact le_add_self))
+    iapply (twp_BNEHalf E F)
     iapply (ErrorCredit.ext (γBNE_credit_eq F))
     iexact Hε
 
 theorem abstractBernoulliI_BNEHalf (I : IProp GF) :
-    AbstractBernoulliI (hlc := hlc) (GF := GF) BNEHalfVal γBNE I where
-  spec := by
-    intro E
-    iintro %F ⟨Hε, HI⟩
-    iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-      ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b))))
-    isplitl [Hε]
-    · iapply (twp_BNEHalf E F (F true + F false)
-        (by intro b; cases b <;> first | exact le_self_add | exact le_add_self))
-      iapply (ErrorCredit.ext (γBNE_credit_eq F))
-      iexact Hε
-    iintro %w ⟨%b, %hb, Hfb⟩
-    iexists b
-    isplitr [Hfb HI]
-    · ipureintro; exact hb
-    · iframe Hfb HI
+    AbstractBernoulliI (hlc := hlc) (GF := GF) BNEHalfVal γBNE I :=
+  abstractBernoulli_BNEHalf.toAbstractBernoulliI I
 
 def G1IterContAmp (F : ℕ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) : Bool → ℝ≥0∞ :=
   fun b => if b then F k else G1CreditV F + c
@@ -131,7 +110,7 @@ noncomputable def γBkx (k : ℕ) (x : ℝ) : ↑unitInterval :=
   ⟨Real.exp (min 0 (-x * (2 * k + x) / (2 * k + 2))), (Real.exp_pos _).le,
     Real.exp_le_one_iff.mpr (min_le_left _ _)⟩
 
-@[reducible] def BkxVal (k : ℕ) (x : ℝ) : Val ℝ :=
+abbrev BkxVal (k : ℕ) (x : ℝ) : Val ℝ :=
   ⟨pl% (fun _u, &B #(.int (k : ℤ)) #(.real x)), IsVal.lam (by is_lc), by is_lc⟩
 
 theorem γBkx_coe (k : ℕ) {x : ℝ} (hx : 0 ≤ x) :
@@ -149,28 +128,22 @@ theorem γBkx_credit_eq (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx : 0 �
       = BCreditV F k x := by
   rw [γBkx_coe k hx]; rfl
 
-theorem abstractBernoulliI_Bkx (k : ℕ) (x : ℝ) (hx : 0 ≤ x ∧ x ≤ 1) (I : IProp GF) :
-    AbstractBernoulliI (hlc := hlc) (GF := GF) (BkxVal k x) (γBkx k x) I where
+theorem abstractBernoulli_Bkx (k : ℕ) (x : ℝ) (hx : 0 ≤ x ∧ x ≤ 1) :
+    AbstractBernoulli (GF := GF) (BkxVal k x) (γBkx k x) where
   spec := by
     intro E
-    iintro %F ⟨Hε, HI⟩
+    iintro %F Hε
     twp_pure
-
     have hβ :
         (Exp.openRec 0 (Exp.lit .unit) (Exp.closeRec 0 (Var.internal 0) B) : Exp ℝ) = B := rfl
     rw [hβ]
-    iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-      ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b))))
-    isplitl [Hε]
-    · iapply (twp_B E F (F true + F false)
-        (by intro b; cases b <;> first | exact le_self_add | exact le_add_self) k x hx)
-      iapply (ErrorCredit.ext (γBkx_credit_eq F k x hx.1))
-      iexact Hε
-    iintro %w ⟨%b, %hb, Hfb⟩
-    iexists b
-    isplitr [Hfb HI]
-    · ipureintro; exact hb
-    · iframe Hfb HI
+    iapply (twp_B E F k x hx)
+    iapply (ErrorCredit.ext (γBkx_credit_eq F k x hx.1))
+    iexact Hε
+
+theorem abstractBernoulliI_Bkx (k : ℕ) (x : ℝ) (hx : 0 ≤ x ∧ x ≤ 1) (I : IProp GF) :
+    AbstractBernoulliI (hlc := hlc) (GF := GF) (BkxVal k x) (γBkx k x) I :=
+  (abstractBernoulli_Bkx k x hx).toAbstractBernoulliI I
 
 def G2IterContAmp (F : ℕ → ℝ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) (x : ℝ) : Bool → ℝ≥0∞ :=
   fun b => if b then F k x else G2CreditV F + c
@@ -179,7 +152,6 @@ def G2CreditAmp (F : ℕ → ℝ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) (x :
   IterCreditV (G2IterContAmp F c k x) (γBkx k x) (k + 1)
 
 open MeasureTheory in
-
 def G2G1Credit (F : ℕ → ℝ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) : ℝ≥0∞ :=
   ∫⁻ x, G2CreditAmp F c k x ∂(ProbLangℝ.unifUnit (T := ℝ))
 
@@ -189,73 +161,101 @@ end creditKernel
 
 section measurability
 open MeasureTheory in
+theorem measurable_g2p (k : ℕ) : Measurable (G2p k) :=
+  ENNReal.measurable_ofReal.comp
+    ((Real.measurable_exp.comp (by fun_prop)).pow_const (k + 1))
 
 theorem measurable_g2CreditAmp (F : ℕ → ℝ → ℝ≥0∞) (hF : ∀ a, Measurable (F a))
     (c : ℝ≥0∞) (k : ℕ) :
     Measurable (G2CreditAmp F c k) := by
-
   have hγ : Measurable (fun x : ℝ => ENNReal.ofReal ((γBkx k x : ℝ) ^ (k + 1))) :=
-    ENNReal.measurable_ofReal.comp
-      ((Real.measurable_exp.comp (by fun_prop)).pow_const (k + 1))
-
+    measurable_g2p k
   show Measurable (fun x : ℝ => ENNReal.ofReal ((γBkx k x : ℝ) ^ (k + 1)) * F k x
       + (1 - ENNReal.ofReal ((γBkx k x : ℝ) ^ (k + 1))) * (G2CreditV F + c))
   exact (hγ.mul (hF k)).add ((hγ.const_sub 1).mul measurable_const)
+
+end measurability
+
+section unifUnit
+
+open MeasureTheory in
+theorem unifUnit_univ : (ProbLangℝ.unifUnit (T := ℝ)) Set.univ = 1 := by
+  show (volume.restrict (Set.Icc (0 : ℝ) 1)) Set.univ = 1
+  rw [Measure.restrict_apply_univ, Real.volume_Icc]; norm_num
+
+open MeasureTheory in
+theorem unifUnit_lintegral_one :
+    ∫⁻ _x : ℝ, (1 : ℝ≥0∞) ∂(ProbLangℝ.unifUnit (T := ℝ)) = 1 := by
+  rw [lintegral_one, unifUnit_univ]
+
+end unifUnit
+
+section bounds
 
 theorem G2p_le_one (k : ℕ) (x : ℝ) : G2p k x ≤ 1 := by
   rw [G2p, ← ENNReal.ofReal_one]
   exact ENNReal.ofReal_le_ofReal (pow_le_one₀ (γBkx k x).2.1 (γBkx k x).2.2)
 
-theorem measurable_G2p (k : ℕ) : Measurable (G2p k) :=
-  ENNReal.measurable_ofReal.comp
-    ((Real.measurable_exp.comp (by fun_prop)).pow_const (k + 1))
-
 open MeasureTheory in
+theorem G2G1Credit_le (F : ℕ → ℝ → ℝ≥0∞) {M : ℝ≥0∞}
+    (Hbd : ∀ x k, 0 ≤ x → x ≤ 1 → F k x ≤ M) (c : ℝ≥0∞) (n : ℕ) :
+    G2G1Credit F c n ≤ M + G2CreditV F + c := by
+  rw [G2G1Credit]
+  calc ∫⁻ x, G2CreditAmp F c n x ∂(ProbLangℝ.unifUnit (T := ℝ))
+      ≤ ∫⁻ _x, (M + (G2CreditV F + c)) ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
+        apply lintegral_mono_ae
+        filter_upwards [ae_restrict_mem measurableSet_Icc] with x hx
+        have ht : G2IterContAmp F c n x true = F n x := by simp [G2IterContAmp]
+        have hf : G2IterContAmp F c n x false = G2CreditV F + c := by simp [G2IterContAmp]
+        rw [G2CreditAmp, IterCreditV, ht, hf]
+        refine add_le_add ?_ ?_
+        · exact (mul_le_mul' (G2p_le_one n x) (Hbd x n hx.1 hx.2)).trans (one_mul M).le
+        · exact (mul_le_mul' tsub_le_self le_rfl).trans (one_mul _).le
+    _ = M + (G2CreditV F + c) := by rw [lintegral_const, unifUnit_univ, mul_one]
+    _ = M + G2CreditV F + c := (add_assoc _ _ _).symm
 
-theorem unifUnit_lintegral_one :
-    ∫⁻ _x : ℝ, (1 : ℝ≥0∞) ∂(ProbLangℝ.unifUnit (T := ℝ)) = 1 := by
-  show ∫⁻ _x : ℝ, (1 : ℝ≥0∞) ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = 1
-  rw [lintegral_one, Measure.restrict_apply_univ, Real.volume_Icc]; norm_num
-
-end measurability
+end bounds
 
 section conservation
 
-lemma normTerm_le_geometric (k : ℕ) :
+theorem normTerm_le_geometric (k : ℕ) :
     Real.exp (-(k : ℝ) ^ 2 / 2) ≤ Real.exp (-1 / 2) ^ k := by
   rw [← Real.exp_nat_mul]
-  refine Real.exp_le_exp.mpr ?_
   have hnat : (k : ℝ) ≤ (k : ℝ) ^ 2 := by exact_mod_cast Nat.le_self_pow (by norm_num) k
-  linarith [hnat]
+  exact Real.exp_le_exp.mpr (by linarith)
 
-theorem summable_normTerm : Summable (fun k : ℕ => Real.exp (-(k : ℝ) ^ 2 / 2)) := by
-  have hγ0 : (0 : ℝ) ≤ Real.exp (-1 / 2) := γBNE_nonneg
-  have hγ1 : Real.exp (-1 / 2) < 1 := γBNE_lt_one
-  exact Summable.of_nonneg_of_le (fun k => (Real.exp_pos _).le)
-    (fun k => normTerm_le_geometric k) (summable_geometric_of_lt_one hγ0 hγ1)
+theorem exp_neg_half_lt_one : Real.exp (-1 / 2) < 1 := γBNE_lt_one
 
-theorem Norm1_pos : 0 < Norm1 := by
-  unfold Norm1
-  calc (0 : ℝ) < Real.exp (-((0 : ℕ) : ℝ) ^ 2 / 2) := Real.exp_pos _
-    _ ≤ _ := summable_normTerm.le_tsum 0 (fun b _ => (Real.exp_pos _).le)
+theorem summable_geometric_exp_neg_half : Summable fun k : ℕ => Real.exp (-1 / 2) ^ k :=
+  summable_geometric_of_lt_one (Real.exp_pos _).le exp_neg_half_lt_one
+
+theorem summable_normTerm : Summable (fun k : ℕ => Real.exp (-(k : ℝ) ^ 2 / 2)) :=
+  Summable.of_nonneg_of_le (fun _ => (Real.exp_pos _).le) normTerm_le_geometric
+    summable_geometric_exp_neg_half
+
+theorem Norm1_pos : 0 < Norm1 :=
+  (Real.exp_pos (-((0 : ℕ) : ℝ) ^ 2 / 2)).trans_le
+    (summable_normTerm.le_tsum 0 fun _ _ => (Real.exp_pos _).le)
 
 theorem Norm1_bound : Norm1 < (1 - Real.exp (-1 / 2))⁻¹ := by
-  have hγ0 : (0 : ℝ) ≤ Real.exp (-1 / 2) := γBNE_nonneg
-  have hγ1 : Real.exp (-1 / 2) < 1 := γBNE_lt_one
-  rw [Norm1, ← tsum_geometric_of_lt_one hγ0 hγ1]
-  refine Summable.tsum_lt_tsum_of_nonneg (i := 2) (fun k => (Real.exp_pos _).le)
-    (fun k => normTerm_le_geometric k) ?_ (summable_geometric_of_lt_one hγ0 hγ1)
-  · show Real.exp (-((2 : ℕ) : ℝ) ^ 2 / 2) < Real.exp (-1 / 2) ^ 2
-    rw [← Real.exp_nat_mul]; exact Real.exp_lt_exp.mpr (by norm_num)
+  rw [Norm1, ← tsum_geometric_of_lt_one (Real.exp_pos _).le exp_neg_half_lt_one]
+  refine Summable.tsum_lt_tsum_of_nonneg (i := 2) (fun _ => (Real.exp_pos _).le)
+    normTerm_le_geometric ?_ summable_geometric_exp_neg_half
+  show Real.exp (-((2 : ℕ) : ℝ) ^ 2 / 2) < Real.exp (-1 / 2) ^ 2
+  rw [← Real.exp_nat_mul]
+  exact Real.exp_lt_exp.mpr (by norm_num)
 
 theorem Norm1_reject_lt_one : (1 - (γBNE : ℝ)) * Norm1 < 1 := by
   rw [γBNE_coe]
-  have hγ1 : Real.exp (-1 / 2) < 1 := γBNE_lt_one
-  have h1γ : (0 : ℝ) < 1 - Real.exp (-1 / 2) := by linarith
+  have h1γ : (0 : ℝ) < 1 - Real.exp (-1 / 2) := by linarith [exp_neg_half_lt_one]
   calc (1 - Real.exp (-1 / 2)) * Norm1
       < (1 - Real.exp (-1 / 2)) * (1 - Real.exp (-1 / 2))⁻¹ :=
         mul_lt_mul_of_pos_left Norm1_bound h1γ
-    _ = 1 := mul_inv_cancel₀ (ne_of_gt h1γ)
+    _ = 1 := mul_inv_cancel₀ h1γ.ne'
+
+theorem one_lt_one_div_one_sub {r : ℝ} (h0 : 0 < r) (h1 : r < 1) : 1 < 1 / (1 - r) := by
+  rw [one_lt_div (by linarith)]
+  linarith
 
 noncomputable def G1Factor : ℝ≥0 :=
   ⟨1 / (1 - (1 - (γBNE : ℝ)) * Norm1),
@@ -264,21 +264,38 @@ noncomputable def G1Factor : ℝ≥0 :=
 theorem one_lt_G1Factor : 1 < G1Factor := by
   rw [← NNReal.coe_lt_coe, NNReal.coe_one]
   show (1 : ℝ) < 1 / (1 - (1 - (γBNE : ℝ)) * Norm1)
-  have hrpos : 0 < 1 - (1 - (γBNE : ℝ)) * Norm1 := by linarith [Norm1_reject_lt_one]
-  rw [one_lt_div hrpos]
-  have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
-  have : 0 < (1 - (γBNE : ℝ)) * Norm1 := mul_pos (by linarith) Norm1_pos
-  linarith
+  exact one_lt_one_div_one_sub (mul_pos (by linarith [γBNE_lt_one]) Norm1_pos)
+    Norm1_reject_lt_one
+
+theorem geometricPMF_γBNE (k : ℕ) :
+    GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) := rfl
+
+theorem IterN_add_self (k : ℕ) : IterN k + k = k ^ 2 := by
+  unfold IterN
+  cases k with
+  | zero => rfl
+  | succ n => rw [Nat.succ_sub_one]; ring
+
+theorem IterN_toNat_cast {z : ℤ} (hz : 0 ≤ z) : z * (z - 1) = ((IterN z.toNat : ℕ) : ℤ) := by
+  rw [IterN]
+  obtain ⟨k, rfl⟩ : ∃ k : ℕ, z = (k : ℤ) := ⟨z.toNat, (Int.toNat_of_nonneg hz).symm⟩
+  simp only [Int.toNat_natCast]
+  cases k with
+  | zero => simp
+  | succ k => push_cast; ring
+
+theorem γBNE_pow_sq (k : ℕ) : (γBNE : ℝ) ^ k ^ 2 = Real.exp (-(k : ℝ) ^ 2 / 2) := by
+  rw [γBNE_coe, ← Real.exp_nat_mul]
+  congr 1
+  push_cast
+  ring
 
 theorem geometricPMF_tsum : ∑' k : ℕ, GeometricPMF γBNE k = 1 := by
-  have hγ0 : (0 : ℝ) ≤ (γBNE : ℝ) := γBNE_nonneg
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
-  have hdef : (fun k : ℕ => GeometricPMF γBNE k)
-      = fun k => ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) := by funext k; rfl
-  rw [hdef,
-      ← ENNReal.ofReal_tsum_of_nonneg (fun k => mul_nonneg (by positivity) (by linarith))
-        ((summable_geometric_of_lt_one hγ0 hγ1).mul_right _),
-      tsum_mul_right, tsum_geometric_of_lt_one hγ0 hγ1,
+  rw [tsum_congr geometricPMF_γBNE,
+      ← ENNReal.ofReal_tsum_of_nonneg (fun k => mul_nonneg (pow_nonneg γBNE_nonneg k) (by linarith))
+        ((summable_geometric_of_lt_one γBNE_nonneg hγ1).mul_right _),
+      tsum_mul_right, tsum_geometric_of_lt_one γBNE_nonneg hγ1,
       inv_mul_cancel₀ (sub_pos.mpr hγ1).ne', ENNReal.ofReal_one]
 
 theorem geom_iterN_tsum :
@@ -286,20 +303,12 @@ theorem geom_iterN_tsum :
       = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Norm1) := by
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
   have hterm : ∀ k : ℕ, GeometricPMF γBNE k * ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)
-      = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Real.exp (-(k : ℝ) ^ 2 / 2)) := by
-    intro k
-    have hpmf : GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) := rfl
-    rw [hpmf, ← ENNReal.ofReal_mul (mul_nonneg (pow_nonneg γBNE.2.1 k) (by linarith))]
+      = ENNReal.ofReal ((1 - (γBNE : ℝ)) * Real.exp (-(k : ℝ) ^ 2 / 2)) := fun k => by
+    rw [geometricPMF_γBNE, ← ENNReal.ofReal_mul (mul_nonneg (pow_nonneg γBNE.2.1 k) (by linarith))]
     congr 1
-    have hkk : k + IterN k = k ^ 2 := by
-      unfold IterN
-      cases k with
-      | zero => rfl
-      | succ n => rw [Nat.succ_sub_one]; ring
-    have hmul : (γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ IterN k
-        = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (k + IterN k) := by rw [pow_add]; ring
-    rw [hmul, hkk, γBNE_coe, ← Real.exp_nat_mul]
-    congr 2; push_cast; ring
+    have hregroup : (γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ IterN k
+        = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (IterN k + k) := by rw [pow_add]; ring
+    rw [hregroup, IterN_add_self, γBNE_pow_sq]
   rw [tsum_congr hterm,
       ← ENNReal.ofReal_tsum_of_nonneg (fun k => mul_nonneg (by linarith) (Real.exp_pos _).le)
         (summable_normTerm.mul_left _),
@@ -307,8 +316,8 @@ theorem geom_iterN_tsum :
   rfl
 
 open MeasureTheory in
-
-theorem Norm2_eq_tsum : Norm2 = ∑' k : ℕ, ∫ x in (0 : ℝ)..1, Real.exp (-((x + (k : ℝ)) ^ 2) / 2) := by
+theorem Norm2_eq_tsum :
+    Norm2 = ∑' k : ℕ, ∫ x in (0 : ℝ)..1, Real.exp (-((x + (k : ℝ)) ^ 2) / 2) := by
   have hpk : ∀ k : ℕ, (∫⁻ x in Set.Ioc (0 : ℝ) 1, ‖Real.exp (-((x + (k : ℝ)) ^ 2) / 2)‖ₑ ∂volume)
       ≤ ENNReal.ofReal (Real.exp (-(k : ℝ) ^ 2 / 2)) := by
     intro k
@@ -334,7 +343,6 @@ theorem Norm2_eq_tsum : Norm2 = ∑' k : ℕ, ∫ x in (0 : ℝ)..1, Real.exp (-
   exact tsum_congr fun k => (intervalIntegral.integral_of_le (by norm_num)).symm
 
 open MeasureTheory in
-
 theorem Norm2_summand_le (k : ℕ) :
     (∫ x in (0 : ℝ)..1, Real.exp (-((x + (k : ℝ)) ^ 2) / 2)) ≤ Real.exp (-(k : ℝ) ^ 2 / 2) := by
   have h := intervalIntegral.integral_mono_on (μ := volume) (by norm_num : (0 : ℝ) ≤ 1)
@@ -348,28 +356,24 @@ theorem Norm2_summand_le (k : ℕ) :
   rwa [intervalIntegral.integral_const, sub_zero, smul_eq_mul, one_mul] at h
 
 open MeasureTheory in
-
 theorem Norm2_summand_summable :
     Summable (fun k : ℕ => ∫ x in (0 : ℝ)..1, Real.exp (-((x + (k : ℝ)) ^ 2) / 2)) := by
   apply Summable.of_nonneg_of_le (fun k => intervalIntegral.integral_nonneg (by norm_num)
     (fun x _ => (Real.exp_pos _).le)) Norm2_summand_le summable_normTerm
 
 open MeasureTheory in
-
 theorem Norm2_pos : 0 < Norm2 := by
   rw [Norm2_eq_tsum]
-  refine _root_.lt_of_lt_of_le ?_ (Norm2_summand_summable.le_tsum 0
+  refine lt_of_lt_of_le ?_ (Norm2_summand_summable.le_tsum 0
     (fun b _ => intervalIntegral.integral_nonneg (by norm_num) (fun x _ => (Real.exp_pos _).le)))
   exact intervalIntegral.intervalIntegral_pos_of_pos_on
     (Continuous.intervalIntegrable (by fun_prop) _ _) (fun x _ => Real.exp_pos _) (by norm_num)
 
 open MeasureTheory in
-
 theorem Norm2_lt_Norm1 : Norm2 < Norm1 := by
   rw [Norm2_eq_tsum, Norm1]
   refine Norm2_summand_summable.tsum_lt_tsum (i := 0) Norm2_summand_le ?_ summable_normTerm
   simp only [Nat.cast_zero, add_zero]
-
   have key : (0 : ℝ) < ∫ x in (0 : ℝ)..1,
       (Real.exp (-(0 : ℝ) ^ 2 / 2) - Real.exp (-x ^ 2 / 2)) := by
     apply intervalIntegral.intervalIntegral_pos_of_pos_on
@@ -383,31 +387,44 @@ theorem Norm2_lt_Norm1 : Norm2 < Norm1 := by
       sub_zero, smul_eq_mul, one_mul] at key
   linarith
 
+theorem Norm2_div_Norm1_lt_one : Norm2 / Norm1 < 1 := (div_lt_one Norm1_pos).mpr Norm2_lt_Norm1
+
 noncomputable def G2Factor : ℝ≥0 :=
   ⟨1 / (1 - Norm2 / Norm1),
-    div_nonneg zero_le_one (by rw [sub_nonneg, div_le_one Norm1_pos]; exact Norm2_lt_Norm1.le)⟩
+    div_nonneg zero_le_one (by linarith [Norm2_div_Norm1_lt_one])⟩
 
 theorem one_lt_G2Factor : 1 < G2Factor := by
   rw [← NNReal.coe_lt_coe, NNReal.coe_one]
   show (1 : ℝ) < 1 / (1 - Norm2 / Norm1)
-  have h := Norm2_lt_Norm1
-  have hNorm1 := Norm1_pos
-  have hrpos : 0 < 1 - Norm2 / Norm1 := by rw [sub_pos, div_lt_one hNorm1]; exact h
-  rw [one_lt_div hrpos]
-  have : 0 < Norm2 / Norm1 := div_pos Norm2_pos hNorm1
-  linarith
+  exact one_lt_one_div_one_sub (div_pos Norm2_pos Norm1_pos) Norm2_div_Norm1_lt_one
+
+theorem G1Factor_coe :
+    (G1Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - (1 - (γBNE : ℝ)) * Norm1)) := by
+  rw [G1Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
+
+theorem G1Factor_mul_reject :
+    (G1Factor : ℝ≥0∞) * ENNReal.ofReal (1 - (1 - (γBNE : ℝ)) * Norm1) = 1 := by
+  have hrej : (0 : ℝ) < 1 - (1 - (γBNE : ℝ)) * Norm1 := by linarith [Norm1_reject_lt_one]
+  rw [G1Factor_coe, ← ENNReal.ofReal_mul (by positivity), one_div_mul_cancel hrej.ne',
+    ENNReal.ofReal_one]
+
+theorem G2Factor_coe : (G2Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - Norm2 / Norm1)) := by
+  rw [G2Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
+
+theorem G2Factor_mul_reject :
+    (G2Factor : ℝ≥0∞) * ENNReal.ofReal (1 - Norm2 / Norm1) = 1 := by
+  have hrej : (0 : ℝ) < 1 - Norm2 / Norm1 := by linarith [Norm2_div_Norm1_lt_one]
+  rw [G2Factor_coe, ← ENNReal.ofReal_mul (by positivity), one_div_mul_cancel hrej.ne',
+    ENNReal.ofReal_one]
 
 theorem G1PMF_tsum : ∑' k : ℕ, G1PMF k = 1 := by
   simp only [G1PMF]
-  have hsum : (∑' k : ℕ, Real.exp (-(k : ℝ) ^ 2 / 2) / Norm1) = 1 := by
-    rw [tsum_div_const, ← Norm1, div_self (ne_of_gt Norm1_pos)]
   rw [← ENNReal.ofReal_tsum_of_nonneg
         (fun k => div_nonneg (Real.exp_pos _).le Norm1_pos.le)
         (summable_normTerm.div_const _),
-      hsum, ENNReal.ofReal_one]
+      tsum_div_const, ← Norm1, div_self Norm1_pos.ne', ENNReal.ofReal_one]
 
 open MeasureTheory in
-
 theorem G2pdf_setLIntegral (k : ℕ) :
     ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (∫ x in (0 : ℝ)..1, Real.exp (-((x + k) ^ 2) / 2) / Norm2) := by
@@ -417,7 +434,6 @@ theorem G2pdf_setLIntegral (k : ℕ) :
     (fun r _ => div_nonneg (Real.exp_pos _).le Norm2_pos.le)
 
 open MeasureTheory in
-
 theorem G2pdf_total : ∑' k : ℕ, ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) = 1 := by
   simp_rw [G2pdf_setLIntegral, intervalIntegral.integral_div]
   rw [← ENNReal.ofReal_tsum_of_nonneg
@@ -444,7 +460,6 @@ theorem G1PMF_mul_accept (k : ℕ) {x : ℝ} (hx : 0 ≤ x) :
   field_simp [ne_of_gt Norm1_pos, ne_of_gt Norm2_pos]
 
 open MeasureTheory in
-
 theorem G2_accept_lintegral (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) :
     G1PMF k * ∫⁻ x, G2p k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (Norm2 / Norm1)
@@ -457,7 +472,6 @@ theorem G2_accept_lintegral (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) :
   rw [← mul_assoc, G1PMF_mul_accept k hx.1, mul_assoc]
 
 open MeasureTheory in
-
 theorem G2_accept_mass (k : ℕ) :
     G1PMF k * ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (Norm2 / Norm1) * ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
@@ -468,7 +482,6 @@ theorem G1Geometric_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
     shiftGeometricPMFCreditV γBNE 0 (G1GeometricCredit F ((G1Factor : ℝ≥0∞) * ε))
       = G1CreditV F + ε := by
   have hγ1 : (γBNE : ℝ) < 1 := γBNE_lt_one
-  have hrej : (0 : ℝ) < 1 - (1 - (γBNE : ℝ)) * Norm1 := by linarith [Norm1_reject_lt_one]
   set c := (G1Factor : ℝ≥0∞) * ε with hc
   set R := ENNReal.ofReal ((1 - (γBNE : ℝ)) * Norm1) with hR
   have hR1 : R ≤ 1 := by
@@ -476,28 +489,18 @@ theorem G1Geometric_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
     exact ENNReal.ofReal_le_ofReal (by linarith [Norm1_reject_lt_one])
   have hak1 : ∀ k, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) ≤ 1 := fun k => by
     rw [← ENNReal.ofReal_one]; exact ENNReal.ofReal_le_ofReal (pow_le_one₀ γBNE.2.1 hγ1.le)
-  have hpmf (k : ℕ) : GeometricPMF γBNE k = ENNReal.ofReal ((γBNE : ℝ) ^ k * (1 - γBNE)) := rfl
-  have hkk (k : ℕ) : IterN k + k = k ^ 2 := by
-    unfold IterN
-    cases k with
-    | zero => rfl
-    | succ n => rw [Nat.succ_sub_one]; ring
-
-  have hpterm : ∀ k, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k = R * G1PMF k := by
-    intro k
-    rw [hR, G1PMF, hpmf k,
+  have hpterm : ∀ k, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k
+      = R * G1PMF k := fun k => by
+    rw [hR, G1PMF, geometricPMF_γBNE,
         ← ENNReal.ofReal_mul (pow_nonneg γBNE.2.1 _),
         ← ENNReal.ofReal_mul (mul_nonneg (by linarith) Norm1_pos.le)]
     congr 1
-    have hmul : (γBNE : ℝ) ^ IterN k * ((γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)))
+    have hregroup : (γBNE : ℝ) ^ IterN k * ((γBNE : ℝ) ^ k * (1 - (γBNE : ℝ)))
         = (1 - (γBNE : ℝ)) * (γBNE : ℝ) ^ (IterN k + k) := by rw [pow_add]; ring
-    have hexp : (γBNE : ℝ) ^ k ^ 2 = Real.exp (-(k : ℝ) ^ 2 / 2) := by
-      rw [γBNE_coe, ← Real.exp_nat_mul]; congr 1; push_cast; ring
-    rw [hmul, hkk k, hexp]
-    field_simp [ne_of_gt Norm1_pos]
+    rw [hregroup, IterN_add_self, γBNE_pow_sq]
+    field_simp [Norm1_pos.ne']
   have hRfin : (∑' k : ℕ, ENNReal.ofReal ((γBNE : ℝ) ^ IterN k) * GeometricPMF γBNE k) = R := by
     rw [tsum_congr fun k => mul_comm _ _]; exact geom_iterN_tsum
-
   have hrejsum : (∑' k : ℕ, (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k)
       = 1 - R := by
     have hfun :
@@ -512,10 +515,10 @@ theorem G1Geometric_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
           nth_rewrite 2 [← one_mul (GeometricPMF γBNE k)]
           exact mul_le_mul_left (hak1 k) _),
       geometricPMF_tsum, hRfin]
-
   have hgeo : ∀ k : ℕ, G1GeometricCredit F c (0 + (k : ℤ)) * GeometricPMF γBNE k
       = R * G1PMF k * F k
-        + (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k * (G1CreditV F + c) := by
+        + (1 - ENNReal.ofReal ((γBNE : ℝ) ^ IterN k)) * GeometricPMF γBNE k
+          * (G1CreditV F + c) := by
     intro k
     have h0 : (0 : ℤ) + (k : ℤ) = (k : ℤ) := by ring
     have hgc : G1GeometricCredit F c (k : ℤ)
@@ -531,45 +534,32 @@ theorem G1Geometric_collapse (F : ℕ → ℝ≥0∞) (ε : ℝ≥0∞) :
       = (G1CreditV F + c) * (1 - R) := by
     rw [ENNReal.tsum_mul_right, hrejsum, mul_comm]
   rw [tsum_congr hgeo, ENNReal.tsum_add, hacc, hrej']
-
   have halg : R * G1CreditV F + (G1CreditV F + c) * (1 - R)
       = G1CreditV F * (R + (1 - R)) + c * (1 - R) := by ring
   rw [halg, add_tsub_cancel_of_le hR1, mul_one]
   congr 1
-
   have h1R : (1 : ℝ≥0∞) - R = ENNReal.ofReal (1 - (1 - (γBNE : ℝ)) * Norm1) := by
-    rw [hR, ENNReal.ofReal_sub _ (mul_nonneg (by linarith) Norm1_pos.le), ENNReal.ofReal_one]
-  have hFac : (↑G1Factor : ℝ≥0∞)
-      = ENNReal.ofReal (1 / (1 - (1 - (γBNE : ℝ)) * Norm1)) := by
-    rw [G1Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
-  have hcancel : (↑G1Factor : ℝ≥0∞)
-      * ENNReal.ofReal (1 - (1 - (γBNE : ℝ)) * Norm1) = 1 := by
-    rw [hFac, ← ENNReal.ofReal_mul (by positivity), one_div_mul_cancel (ne_of_gt hrej),
-      ENNReal.ofReal_one]
-  rw [hc, h1R, mul_right_comm, hcancel, one_mul]
+    rw [hR, ENNReal.one_sub_ofReal (mul_nonneg (by linarith) Norm1_pos.le)]
+  rw [hc, h1R, mul_right_comm, G1Factor_mul_reject, one_mul]
 
 open MeasureTheory in
-
 theorem G2G1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable (F a)) (ε : ℝ≥0∞) :
     G1CreditV (G2G1Credit F ((G2Factor : ℝ≥0∞) * ε)) = G2CreditV F + ε := by
   set c : ℝ≥0∞ := (G2Factor : ℝ≥0∞) * ε with hc
-  have hrej_pos : (0 : ℝ) < 1 - Norm2 / Norm1 := by
-    rw [sub_pos, div_lt_one Norm1_pos]; exact Norm2_lt_Norm1
   have hρ_le : ENNReal.ofReal (Norm2 / Norm1) ≤ 1 := by
     rw [← ENNReal.ofReal_one]
-    exact ENNReal.ofReal_le_ofReal (by rw [div_le_one Norm1_pos]; exact Norm2_lt_Norm1.le)
+    exact ENNReal.ofReal_le_ofReal Norm2_div_Norm1_lt_one.le
   have hq1 : ∀ k, (∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) ≤ 1 := fun k =>
-    _root_.le_trans (lintegral_mono (fun x => G2p_le_one k x)) unifUnit_lintegral_one.le
+    (lintegral_mono (fun x => G2p_le_one k x)).trans unifUnit_lintegral_one.le
   have hgm_mul : ∀ k, ENNReal.ofReal (Norm2 / Norm1)
       * ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) ≤ G1PMF k := fun k => by
     rw [← G2_accept_mass k]
-    exact (mul_le_mul_right (hq1 k) (G1PMF k)).trans (_root_.le_of_eq (mul_one _))
-
+    exact (mul_le_mul_right (hq1 k) (G1PMF k)).trans (le_of_eq (mul_one _))
   have h1mp : ∀ k, (∫⁻ x, (1 - G2p k x) ∂(ProbLangℝ.unifUnit (T := ℝ)))
       = 1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := fun k => by
-    rw [MeasureTheory.lintegral_sub (measurable_G2p k) (ne_top_of_le_ne_top ENNReal.one_ne_top (hq1 k))
+    rw [MeasureTheory.lintegral_sub (measurable_g2p k)
+          (ne_top_of_le_ne_top ENNReal.one_ne_top (hq1 k))
           (Filter.Eventually.of_forall (fun x => G2p_le_one k x)), unifUnit_lintegral_one]
-
   have hfun :
       (fun k : ℕ => (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1PMF k)
         = fun k => G1PMF k
@@ -585,12 +575,10 @@ theorem G2G1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable 
         (by rw [ENNReal.tsum_mul_left, G2pdf_total, mul_one]
             exact ne_top_of_le_ne_top ENNReal.one_ne_top hρ_le) hgm_mul,
       G1PMF_tsum, ENNReal.tsum_mul_left, G2pdf_total, mul_one]
-
   have haccsum : (∑' k : ℕ, ENNReal.ofReal (Norm2 / Norm1)
       * ∫⁻ x, G2pdf k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)))
       = ENNReal.ofReal (Norm2 / Norm1) * G2CreditV F := by
     rw [ENNReal.tsum_mul_left]; rfl
-
   have hsplit : ∀ k : ℕ, G1PMF k * G2G1Credit F c k
       = ENNReal.ofReal (Norm2 / Norm1) * (∫⁻ x, G2pdf k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)))
         + (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1PMF k * (G2CreditV F + c) := by
@@ -599,239 +587,156 @@ theorem G2G1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable 
         = fun x => G2p k x * F k x + (1 - G2p k x) * (G2CreditV F + c) := by
       funext x; rw [G2CreditAmp, IterCreditV]; rfl
     rw [G2G1Credit, hamp,
-        lintegral_add_left (f := fun x => G2p k x * F k x) ((measurable_G2p k).mul (hFm k)),
-        lintegral_mul_const _ ((measurable_G2p k).const_sub 1),
+        lintegral_add_left (f := fun x => G2p k x * F k x) ((measurable_g2p k).mul (hFm k)),
+        lintegral_mul_const _ ((measurable_g2p k).const_sub 1),
         mul_add, G2_accept_lintegral F k, h1mp k]
     ring
   rw [G1CreditV, tsum_congr hsplit, ENNReal.tsum_add, haccsum, ENNReal.tsum_mul_right, hrejsum]
-
   have halg : ENNReal.ofReal (Norm2 / Norm1) * G2CreditV F
         + (1 - ENNReal.ofReal (Norm2 / Norm1)) * (G2CreditV F + c)
       = G2CreditV F * (ENNReal.ofReal (Norm2 / Norm1) + (1 - ENNReal.ofReal (Norm2 / Norm1)))
         + c * (1 - ENNReal.ofReal (Norm2 / Norm1)) := by ring
   rw [halg, add_tsub_cancel_of_le hρ_le, mul_one]
   congr 1
-  have h1ρ : (1 : ℝ≥0∞) - ENNReal.ofReal (Norm2 / Norm1) = ENNReal.ofReal (1 - Norm2 / Norm1) := by
-    rw [← ENNReal.ofReal_one, ← ENNReal.ofReal_sub _ (div_nonneg Norm2_pos.le Norm1_pos.le)]
-  have hFac : (↑G2Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - Norm2 / Norm1)) := by
-    rw [G2Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
-  have hcancel : (↑G2Factor : ℝ≥0∞) * ENNReal.ofReal (1 - Norm2 / Norm1) = 1 := by
-    rw [hFac, ← ENNReal.ofReal_mul (div_nonneg zero_le_one hrej_pos.le),
-        one_div_mul_cancel (ne_of_gt hrej_pos), ENNReal.ofReal_one]
-  rw [hc, h1ρ, mul_right_comm, hcancel, one_mul]
+  rw [hc, ENNReal.one_sub_ofReal (div_nonneg Norm2_pos.le Norm1_pos.le), mul_right_comm,
+    G2Factor_mul_reject, one_mul]
 
 end conservation
 
 section specification
 
-theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) (M : ℝ≥0∞) (_Hnn : ∀ n, F n ≤ M) :
+theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) :
     ⊢@{IProp GF} ↯ (G1CreditV F) -∗
       tglWp E pl(&G1 #.unit)
         (fun v : Val ℝ => iprop(∃ n : ℕ, ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))) := by
   iintro Hε_spec
-  iapply twp_err_pos solve_not_red
+  iapply twp_err_pos solve_not_value
   iintro %ε_term %Hε_pos Hε_term
-  set kf : ℝ≥0 := G1Factor
-  have Hk1 : 1 < kf := one_lt_G1Factor
   irevert Hε_spec
-  iapply ErrorCredit.Induction.simple (k := kf) Hε_pos Hk1 $$ [] Hε_term
-  imodintro
-  iintro ⟨IH, Hε_term⟩ Hε_spec
-
+  iapply ErrorCredit.Induction.simple (k := G1Factor) Hε_pos one_lt_G1Factor $$ [] Hε_term
+  iintro !> ⟨IH, Hε_term⟩ Hε_spec
+  set c : ℝ≥0∞ := (G1Factor : ℝ≥0∞) * ε_term
   twp_pure
   twp_pure
   twp_bind pl(&GeometricTrial &BNEHalfVal.1 #(.int (0 : ℤ)))
   icombine Hε_spec Hε_term as Hε
-
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ z : ℤ,
-    ⌜v.1 = .lit (.int z)⌝ ∗ ⌜(0 : ℤ) ≤ z⌝ ∗ ↯ (G1GeometricCredit F ((kf : ℝ≥0∞) * ε_term) z))))
+    ⌜v.1 = .lit (.int z)⌝ ∗ ⌜(0 : ℤ) ≤ z⌝ ∗ ↯ (G1GeometricCredit F c z))))
   isplitl [Hε]
-  · iapply (twp_GeometricTrial (γ := γBNE) 0 BNEHalfVal γBNE_pos γBNE_lt_one
-        abstractBernoulli_BNEHalf)
-      $$ %(G1GeometricCredit F ((kf : ℝ≥0∞) * ε_term))
+  · iapply (twp_GeometricTrial E (γ := γBNE) 0 BNEHalfVal γBNE_pos γBNE_lt_one
+      abstractBernoulli_BNEHalf) $$ %(G1GeometricCredit F c)
     iapply (ErrorCredit.ext (G1Geometric_collapse F ε_term).symm)
     iexact Hε
   iintro %vk ⟨%z, %hz, %hz0, Hck⟩
-  rcases vk with ⟨wk, hwlck⟩
-  simp only at hz; subst hz
-
+  obtain ⟨wk, _⟩ := vk
+  dsimp only at hz; subst hz
   twp_pure
-  have hck : G1GeometricCredit F ((kf : ℝ≥0∞) * ε_term) z
-      = IterCreditV (G1IterContAmp F ((kf : ℝ≥0∞) * ε_term) z.toNat) γBNE (IterN z.toNat) := rfl
+  have hck : G1GeometricCredit F c z
+      = IterCreditV (G1IterContAmp F c z.toNat) γBNE (IterN z.toNat) := rfl
   twp_bind pl(&IterTrial &BNEHalf (#(.int z) * (#(.int z) - #1)))
   twp_pure
   twp_pure
-  have hzn : (z * (z - 1)) = ((IterN z.toNat : ℕ) : ℤ) := by
-    rw [IterN]
-    obtain ⟨k, rfl⟩ : ∃ k : ℕ, z = (k : ℤ) := ⟨z.toNat, (Int.toNat_of_nonneg hz0).symm⟩
-    simp only [Int.toNat_natCast]
-    cases k with
-    | zero => simp
-    | succ k => push_cast; ring
-  rw [hzn]
+  rw [IterN_toNat_cast hz0]
   iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-    ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (G1IterContAmp F ((kf : ℝ≥0∞) * ε_term) z.toNat b) ∗ ⌜True⌝)))
+    ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (G1IterContAmp F c z.toNat b) ∗ ⌜True⌝)))
   isplitl [Hck]
   · iapply (twp_IterTrial E BNEHalfVal γBNE (iprop(⌜True⌝))
       (abstractBernoulliI_BNEHalf (iprop(⌜True⌝)))
-      (G1IterContAmp F ((kf : ℝ≥0∞) * ε_term) z.toNat) (IterN z.toNat))
-    isplitl [Hck]
-    · rw [← hck]; iexact Hck
-    · ipureintro; trivial
-  iintro %vb ⟨%b, %hb, Hcb, %_ht⟩
-  rcases vb with ⟨wb, hwlcb⟩
-  simp only at hb; subst hb
+      (G1IterContAmp F c z.toNat) (IterN z.toNat))
+    rw [← hck]
+    iframe Hck
+  iintro %vb ⟨%b, %hb, Hcb, -⟩
+  obtain ⟨wb, _⟩ := vb
+  dsimp only at hb; subst hb
   cases b with
   | true =>
-
-    have hcb : G1IterContAmp F ((kf : ℝ≥0∞) * ε_term) z.toNat true = F z.toNat := by
-      simp [G1IterContAmp]
+    have hcb : G1IterContAmp F c z.toNat true = F z.toNat := by simp [G1IterContAmp]
     twp_pures
     twp_value
     imodintro
     iexists z.toNat
-    isplitr [Hcb]
-    · ipureintro
-      have hz : Int.ofNat z.toNat = z := Int.toNat_of_nonneg hz0
-      rw [hz]
-    · rw [← hcb]; iexact Hcb
+    rw [← hcb, show Int.ofNat z.toNat = z from Int.toNat_of_nonneg hz0]
+    iframe Hcb
+    itrivial
   | false =>
-
-    have hcb : G1IterContAmp F ((kf : ℝ≥0∞) * ε_term) z.toNat false
-        = G1CreditV F + (kf : ℝ≥0∞) * ε_term := by simp [G1IterContAmp]
-    ihave Hcb' : iprop(↯ (G1CreditV F + (kf : ℝ≥0∞) * ε_term)) $$ [Hcb]
-    · rw [← hcb]; iexact Hcb
-    ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcb'
-
+    have hcb : G1IterContAmp F c z.toNat false = G1CreditV F + c := by simp [G1IterContAmp]
+    isimp only [hcb] at Hcb
+    ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcb
     twp_pure
     twp_bind pl(&G1 #.unit)
-    iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-      ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))))
-    isplitl [Hexp Hterm IH]
-    · iapply IH $$ Hterm
-      iexact Hexp
-    iintro %w Hpost
-    iapply tglWp_value
-    iexact Hpost
+    iapply (tglWp_mono fun _ => tglWp_value)
+    iapply IH $$ Hterm Hexp
 
-theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (M : ℝ≥0∞)
-    (Hnn : ∀ x k, 0 ≤ x → x ≤ 1 → F k x ≤ M) (hFm : ∀ a, Measurable (F a)) :
+theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable (F a)) :
     ⊢@{IProp GF} ↯ (G2CreditV F) -∗
       tglWp E pl(&G2 #.unit)
         (fun p : Val ℝ => iprop(∃ (k : ℕ) (r : ℝ),
           ⌜0 ≤ r ∧ r < 1⌝ ∗
           ⌜p.1 = .pair (.lit (.real r)) (.lit (.int (Int.ofNat k)))⌝ ∗ ↯ (F k r))) := by
-  have Hk1 : 1 < G2Factor := one_lt_G2Factor
   iintro Hε_spec
-  iapply twp_err_pos solve_not_red
+  iapply twp_err_pos solve_not_value
   iintro %ε_term %Hε_pos Hε_term
-  set kf : ℝ≥0 := G2Factor
   irevert Hε_spec
-  iapply ErrorCredit.Induction.simple (k := kf) Hε_pos Hk1 $$ [] Hε_term
-  imodintro
-  iintro ⟨IH, Hε_term⟩ Hε_spec
+  iapply ErrorCredit.Induction.simple (k := G2Factor) Hε_pos one_lt_G2Factor $$ [] Hε_term
+  iintro !> ⟨IH, Hε_term⟩ Hε_spec
+  set c : ℝ≥0∞ := (G2Factor : ℝ≥0∞) * ε_term
   twp_pure
   twp_pure
   twp_bind pl(&G1 #.unit)
   icombine Hε_spec Hε_term as Hε
-
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-    ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (G2G1Credit F ((kf : ℝ≥0∞) * ε_term) n))))
+    ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (G2G1Credit F c n))))
   isplitl [Hε]
-  · iapply (twp_G1 E (G2G1Credit F ((kf : ℝ≥0∞) * ε_term))
-      (M + G2CreditV F + (kf : ℝ≥0∞) * ε_term)
-      (by
-        intro n
-        rw [G2G1Credit]
-        calc ∫⁻ x, G2CreditAmp F ((kf : ℝ≥0∞) * ε_term) n x ∂(ProbLangℝ.unifUnit (T := ℝ))
-            ≤ ∫⁻ _x, (M + (G2CreditV F + (kf : ℝ≥0∞) * ε_term))
-                ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
-              apply MeasureTheory.lintegral_mono_ae
-              filter_upwards [MeasureTheory.ae_restrict_mem measurableSet_Icc] with x hx
-              have ht : G2IterContAmp F ((kf : ℝ≥0∞) * ε_term) n x true = F n x := by simp [G2IterContAmp]
-              have hf : G2IterContAmp F ((kf : ℝ≥0∞) * ε_term) n x false
-                  = G2CreditV F + (kf : ℝ≥0∞) * ε_term := by simp [G2IterContAmp]
-              rw [G2CreditAmp, IterCreditV, ht, hf]
-              exact add_le_add
-                ((mul_le_mul' (G2p_le_one n x) (Hnn x n hx.1 hx.2)).trans
-                  (_root_.le_of_eq (one_mul M)))
-                ((mul_le_mul' tsub_le_self le_rfl).trans (_root_.le_of_eq (one_mul _)))
-          _ = M + (G2CreditV F + (kf : ℝ≥0∞) * ε_term) := by
-              rw [MeasureTheory.lintegral_const]
-              show _ * (MeasureTheory.volume.restrict (Set.Icc (0 : ℝ) 1)) Set.univ = _
-              rw [MeasureTheory.Measure.restrict_apply_univ, Real.volume_Icc, sub_zero,
-                ENNReal.ofReal_one, mul_one]
-          _ = M + G2CreditV F + (kf : ℝ≥0∞) * ε_term := (add_assoc _ _ _).symm))
+  · iapply (twp_G1 E (G2G1Credit F c))
     iapply (ErrorCredit.ext (G2G1_collapse F hFm ε_term).symm)
     iexact Hε
   iintro %vk ⟨%k, %hk, Hck⟩
-  rcases vk with ⟨wk, hwlck⟩
-  simp only at hk; subst hk
-
+  obtain ⟨wk, _⟩ := vk
+  dsimp only at hk; subst hk
   twp_pure
   twp_bind pl(urand)
-  iapply (twp_urand_exp' (ε₂ := G2CreditAmp F ((kf : ℝ≥0∞) * ε_term) k)
-    (measurable_g2CreditAmp F hFm ((kf : ℝ≥0∞) * ε_term) k) ?hint) $$ Hck
-  case hint =>
-    have hdef : G2G1Credit F ((kf : ℝ≥0∞) * ε_term) k
-        = ∫⁻ x, G2CreditAmp F ((kf : ℝ≥0∞) * ε_term) k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := rfl
-    rw [hdef]
+  iapply (twp_urand_exp' (ε₂ := G2CreditAmp F c k)
+    (measurable_g2CreditAmp F hFm c k) ?hint) $$ Hck
+  case hint => exact le_rfl
   iintro %x ⟨%Hxm, Hcx⟩
   have Hx01 : 0 < x ∧ x < 1 := mem_unifUnitSupport_real.mp Hxm
   have Hxr : 0 ≤ x ∧ x ≤ 1 := ⟨Hx01.1.le, Hx01.2.le⟩
-
   twp_pure
   twp_bind pl(&IterTrial &(BkxVal k x).1 (#(.int (k : ℤ)) + #1))
   twp_pure
-  have hk1 : ((k : ℤ) + 1) = ((k + 1 : ℕ) : ℤ) := by push_cast; ring
-  rw [hk1]
-  have hck : G2CreditAmp F ((kf : ℝ≥0∞) * ε_term) k x
-      = IterCreditV (G2IterContAmp F ((kf : ℝ≥0∞) * ε_term) k x) (γBkx k x) (k + 1) := rfl
+  rw [← Nat.cast_add_one]
+  have hck : G2CreditAmp F c k x
+      = IterCreditV (G2IterContAmp F c k x) (γBkx k x) (k + 1) := rfl
   iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-    ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (G2IterContAmp F ((kf : ℝ≥0∞) * ε_term) k x b) ∗ ⌜True⌝)))
+    ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (G2IterContAmp F c k x b) ∗ ⌜True⌝)))
   isplitl [Hcx]
   · iapply (twp_IterTrial E (BkxVal k x) (γBkx k x) (iprop(⌜True⌝))
       (abstractBernoulliI_Bkx k x Hxr (iprop(⌜True⌝)))
-      (G2IterContAmp F ((kf : ℝ≥0∞) * ε_term) k x) (k + 1))
-    isplitl [Hcx]
-    · rw [← hck]; iexact Hcx
-    · ipureintro; trivial
-  iintro %vb ⟨%b, %hb, Hcb, %_ht⟩
-  rcases vb with ⟨wb, hwlcb⟩
-  simp only at hb; subst hb
+      (G2IterContAmp F c k x) (k + 1))
+    rw [← hck]
+    iframe Hcx
+  iintro %vb ⟨%b, %hb, Hcb, -⟩
+  obtain ⟨wb, _⟩ := vb
+  dsimp only at hb; subst hb
   cases b with
   | true =>
-
-    have hcb : G2IterContAmp F ((kf : ℝ≥0∞) * ε_term) k x true = F k x := by simp [G2IterContAmp]
+    have hcb : G2IterContAmp F c k x true = F k x := by simp [G2IterContAmp]
     have Hx1 : 0 ≤ x ∧ x < 1 := ⟨Hx01.1.le, Hx01.2⟩
     twp_pures
     twp_value
     imodintro
     iexists k, x
     rw [← hcb]
-    isplitr [Hcb]
-    · ipureintro; exact Hx1
-    · isplitr [Hcb]
-      · ipureintro; rfl
-      · iexact Hcb
+    iframe %Hx1 Hcb
+    itrivial
   | false =>
-
-    have hcb : G2IterContAmp F ((kf : ℝ≥0∞) * ε_term) k x false
-        = G2CreditV F + (kf : ℝ≥0∞) * ε_term := by simp [G2IterContAmp]
-    ihave Hcb' : iprop(↯ (G2CreditV F + (kf : ℝ≥0∞) * ε_term)) $$ [Hcb]
-    · rw [← hcb]; iexact Hcb
-    ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcb'
+    have hcb : G2IterContAmp F c k x false = G2CreditV F + c := by simp [G2IterContAmp]
+    isimp only [hcb] at Hcb
+    ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcb
     twp_pure
     twp_bind pl(&G2 #.unit)
-    iapply (tglWp_wand (Φ := fun p : Val ℝ => iprop(∃ (k : ℕ) (r : ℝ),
-      ⌜0 ≤ r ∧ r < 1⌝ ∗
-      ⌜p.1 = .pair (.lit (.real r)) (.lit (.int (Int.ofNat k)))⌝ ∗ ↯ (F k r))))
-    isplitl [Hexp Hterm IH]
-    · iapply IH $$ Hterm
-      iexact Hexp
-    iintro %w Hpost
-    iapply tglWp_value
-    iexact Hpost
+    iapply (tglWp_mono fun _ => tglWp_value)
+    iapply IH $$ Hterm Hexp
 
 end specification
 

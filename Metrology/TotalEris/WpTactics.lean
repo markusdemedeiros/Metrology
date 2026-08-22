@@ -10,10 +10,8 @@ public import Qq
 /-!
 # Elaborator-based `twp_*` tactics for `tglWp`
 
-Port of iris-lean's `HeapLang/Tactic.lean` + `HeapLang/ProofMode.lean`,
-specialised to ProbLang's `tglWp`. Unlike the previous macro layer (which
-expanded to a single `iapply` and required the user to supply the evaluation
-context `K` by hand), these are real `elab` tactics that:
+These `elab` tactics discover the evaluation context themselves, so no `K` has to be
+supplied by hand. They:
 
 * destructure the `tglWp E e Φ` goal once into a typed `TglWpGoal` (`runTacticTglWp`);
 * mechanically decompose `e` into a list of `EctxItem`s and search for a redex
@@ -37,17 +35,17 @@ evaluation context `K` via `PureExec.fill`, so the tactic can step a redex in pl
 Total WP has no `▷`, so there is no later-credit accounting to thread. -/
 
 section
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
+variable {rT : Type _} [ProbLangℝ rT] {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
 
 public theorem ErisWpGS.twp_pure_step_ctx (K : Ectx rT) (φ : Prop) {n : ℕ} {e₁ e₂ : Exp rT}
     [PureExec φ n e₁ e₂] (Hφ : φ) {E : CoPset} {Φ : Val rT → IProp GF} :
-    tglWp E (K.fill e₂) Φ ⊢@{IProp GF} tglWp E (K.fill e₁) Φ := by
+    tglWp E (K.fill e₂) Φ ⊢ tglWp E (K.fill e₁) Φ := by
   letI : PureExec φ n (K.fill e₁) (K.fill e₂) := PureExec.fill K
   exact twp_pure_step_fupd (n := n) φ Hφ
 
 end
 
-/-! ## Evaluation-context engine (mirrors `HeapLang/Tactic.lean`)
+/-! ## Evaluation-context engine
 
 `extractEctxItem e` peels the outermost evaluation-context frame off `e`,
 returning the frame and the sub-expression in its hole (mirrors
@@ -58,7 +56,7 @@ sub-expression satisfying a predicate. -/
 sub-expression in its hole, or `(none, e)` if `e` is not decomposable. This *reflects*
 ProbLang's `Exp.decompItem` (whnf + read off the result), so it uses the language's own
 semantic value test (`toVal?`) rather than a syntactic `.ofVal` check — ProbLang values
-are raw `.lit`/`.lam`/…, not `.ofVal`-wrapped as in HeapLang. -/
+are raw `.lit`/`.lam`/…, not `.ofVal`-wrapped. -/
 meta def extractEctxItem {α : Q(Type)} (e : Q(Exp $α)) :
     MetaM (Option Q(EctxItem $α) × Q(Exp $α)) := do
   let r : Q(Option (EctxItem $α × Exp $α)) ← whnf q(Exp.decompItem $e)
@@ -132,7 +130,7 @@ where
     let Ki :: Kis' := Kis | return none
     go (← fillItem e Ki) Kis'
 
-/-! ## WP-goal runner (mirrors `runTacticWp`)
+/-! ## WP-goal runner
 
 Destructures an iris proof-mode goal `ehyps ⊢ tglWp E e Φ` into its typed
 components. ProbLang has no language hierarchy, so we match the concrete
@@ -225,12 +223,12 @@ so proofs no longer need a manual `rw [← Exp.open_lc … v.lc]`. -/
 public theorem openRec_val_fst {α : Type _} (k : Nat) (t : Exp α) (v : Val α) :
     Exp.openRec k t v.fst = v.fst := (Exp.open_lc k t v.fst v.lc).symm
 
-/-- Reduce a stepped `Exp` with the same lemmas as `twp_expr_simp` (unfold
-`open'`/`close`/`ofVal`, normalize Int/Nat/ite/ctor). All rewrites are computational,
-so the result is defeq to the input. `mdata` is stripped (re-attached by `reattachNames`). -/
+/-- Reduce a stepped `Exp`: unfold `open'`/`close`/`ofVal` and normalize Int/Nat/ite/ctor.
+All rewrites are computational, so the result is defeq to the input. `mdata` is stripped
+(re-attached by `reattachNames`). -/
 meta def reduceExp {α : Q(Type)} (e : Q(Exp $α)) : MetaM Q(Exp $α) := do
-  -- Exactly `twp_expr_simp`'s set (no broader default simprocs, which would over-reduce
-  -- e.g. `Exp.ofVal`/heap forms that the heap rules still need to see).
+  -- Exactly this set, and no broader default simprocs: those would over-reduce e.g.
+  -- `Exp.ofVal`/heap forms that the heap rules still need to see.
   let mut thms : SimpTheorems := {}
   for d in [``ProbLang.Exp.open', ``ProbLang.Exp.openRec, ``ProbLang.Exp.close,
             ``ProbLang.Exp.closeRec, ``ProbLang.Exp.ofVal] do
@@ -283,12 +281,11 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
   -- form so the `PureExec` instance matches syntactically), and the source binder
   -- `names` to re-attach to the reduced result (β only — the surviving binders of the
   -- lambda body, in pre-order; empty otherwise, e.g. fix relies on `@[pl_names]`).
-  let beta (body v : Q(Exp $α)) : MetaM (Q(Exp $α) × Array Name) := do
-    let syn : Q(Exp $α) := q(Exp.open' $body $v)
-    return (syn, ProbLang.collectBinderNames body #[])
-  let betaFix (body v : Q(Exp $α)) : MetaM (Q(Exp $α) × Array Name) := do
-    let syn : Q(Exp $α) := q(Exp.app (Exp.open' $body (.fix $body)) $v)
-    return (syn, #[])
+  let beta (body v : Q(Exp $α)) : Q(Exp $α) × Q(Exp $α) × Array Name :=
+    (q(Exp.app (Exp.lam $body) $v), q(Exp.open' $body $v),
+      ProbLang.collectBinderNames body #[])
+  let betaFix (body v : Q(Exp $α)) : Q(Exp $α) × Q(Exp $α) × Array Name :=
+    (q(Exp.app (Exp.fix $body) $v), q(Exp.app (Exp.open' $body (.fix $body)) $v), #[])
   match e with
   | ~q(.app $f $v)                        => do
     -- Strip only the *outer* binder-name mdata of the function (the binder being
@@ -296,23 +293,17 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
     -- inner `close`/`mdata`/`fvar` structure is preserved for name-recovery.
     let f0 : Q(Exp $α) ← pure f.consumeMData
     match f0 with
-    | ~q(Exp.lam $body) => let (s, ns) ← beta body v;    return some (q(Exp.app (Exp.lam $body) $v), s, ns)
-    | ~q(Exp.fix $body) => let (s, ns) ← betaFix body v; return some (q(Exp.app (Exp.fix $body) $v), s, ns)
+    | ~q(Exp.lam $body) => return some (beta body v)
+    | ~q(Exp.fix $body) => return some (betaFix body v)
     | _ => do
       -- Head recursive constant: `&loopFolded #2`/`geometric ()`. `whnf` (default
       -- transparency) unfolds the `def` to expose its `Exp.fix`/`Exp.lam`.
       let fw : Q(Exp $α) ← whnf f
       let f1 : Q(Exp $α) ← pure fw.consumeMData
       match f1 with
-      | ~q(Exp.fix $body) => let (s, ns) ← betaFix body v; return some (q(Exp.app (Exp.fix $body) $v), s, ns)
-      | ~q(Exp.lam $body) => let (s, ns) ← beta body v;    return some (q(Exp.app (Exp.lam $body) $v), s, ns)
+      | ~q(Exp.fix $body) => return some (betaFix body v)
+      | ~q(Exp.lam $body) => return some (beta body v)
       | _ => return none
-  -- `cond`/`fst`/`snd`/`case` fire once their scrutinee is a value. That value may be
-  -- `Exp.ofVal`-wrapped (e.g. a `Val` plugged back in by `twp_bind`'s continuation, or a
-  -- destructured hypothesis), which is only *defeq* to the raw `.lit`/`.pair`/`.inl`
-  -- constructor — Qq's `~q` match is syntactic and won't see through it. So `whnf` the
-  -- scrutinee (unfolds `Exp.ofVal v` to `v.fst` and projects a concrete `Val`) before
-  -- matching; an abstract value stays stuck and falls through to `none` (no step).
   -- `cond`/`fst`/`snd`/`case` fire once their scrutinee is a value. That value may be
   -- `Exp.ofVal`-wrapped (e.g. a `Val` plugged back in by `twp_bind`'s continuation, or a
   -- destructured hypothesis), which is only *defeq* to the raw `.lit`/`.pair`/`.inl`
@@ -398,6 +389,18 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
 
 /-! ## `twp_pure` — take a pure step at a redex, auto-discovering its context -/
 
+/-- The pure step found at one redex: `e₁` is the redex actually stepped, `e₂syn` its
+reduct in the form the `PureExec` instance `inst` (with precondition `φ` and step count
+`n`) matches syntactically, and `names` are the source binder names to re-attach to the
+reduced result. -/
+meta structure PureStepAt (α : Q(Type)) (instPL : Q(ProbLang.ProbLangℝ $α)) where
+  e₁ : Q(Exp $α)
+  e₂syn : Q(Exp $α)
+  names : Array Name
+  φ : Q(Prop)
+  n : Q(Nat)
+  inst : Q(ProbLang.PureExec $φ $n $e₁ $e₂syn)
+
 /-- `twp_pure_core e` takes a single pure (`PureExec`) reduction step at the redex `e`,
 discovering the surrounding evaluation context `K` automatically. The pure-step side
 condition `φ` (e.g. value-hood) is discharged if trivial, else left as a goal. Leaves the
@@ -417,30 +420,28 @@ elab "twp_pure_core" focus:(ppSpace colGt term:max)? : tactic =>
       let n : Q(Nat) ← mkFreshExprMVarQ q(Nat)
       let some inst ← ProofModeM.trySynthInstanceQ q(ProbLang.PureExec $φ $n $e₁' $e₂syn)
         | failure
-      return (φ, n, e₁', e₂syn, names, inst)
+      return ({ e₁ := e₁', e₂syn, names, φ, n, inst } : PureStepAt α instPL)
       | throwTacticEx `twp_pure mvar m!"no pure step applies"
     have K : Q(Ectx $α) := res.K
-    let φ : Q(Prop) ← instantiateMVars res.result.1
-    let n : Q(Nat) ← instantiateMVars res.result.2.1
-    let e₁ : Q(Exp $α) ← instantiateMVars res.result.2.2.1
-    let e₂syn : Q(Exp $α) ← instantiateMVars res.result.2.2.2.1
-    let names : Array Name := res.result.2.2.2.2.1
-    let inst := res.result.2.2.2.2.2
+    let step := res.result
+    let φ : Q(Prop) ← instantiateMVars step.φ
+    let n : Q(Nat) ← instantiateMVars step.n
+    let e₁ : Q(Exp $α) ← instantiateMVars step.e₁
+    let e₂syn : Q(Exp $α) ← instantiateMVars step.e₂syn
     -- `e₂` is the *display* form: reduce `e₂syn` (defeq — the rewrites are computational)
-    -- and re-attach the source binder `names` to the surviving binders, so the goal shows
+    -- and re-attach the source binder names to the surviving binders, so the goal shows
     -- `fun y, …`/`rec geo n := …` rather than raw bvars or fresh `a`. `inst` proves the
     -- step to `e₂syn`; it is accepted for `e₂` by defeq.
     let e₂ : Q(Exp $α) ← do
       let cleaned ← reduceExp e₂syn
-      if names.isEmpty then pure cleaned else pure (← reattachNames names 0 cleaned).1
+      if step.names.isEmpty then pure cleaned
+      else pure (← reattachNames step.names 0 cleaned).1
     -- New goal: `tglWp E (K.fill e₂) Φ`, but with `K` filled at the meta level so the
     -- goal shows the clean stepped expression (not a `Ectx.fill` redex that would hide
     -- the next redex from `twp_pures`). Defeq to `Ectx.fill K e₂`.
     let inner : Q(Exp $α) ← fill K e₂
     let pf ← addBIGoal hyps
       q(@ProbLang.TotalEris.ErisWpGS.tglWp $α $instPL $GF $instWp $E $inner $Φ)
-    -- Discharge the pure-step side condition (`True`, value-hood, …); leave it as a
-    -- goal if non-trivial. Unlike `iSolveSidecondition`, this never throws.
     let HΦ : Q($φ) ← mkFreshExprSyntheticOpaqueMVar q($φ)
     -- Discharge the pure-step side condition with the shared `is_value` tactic
     -- (`TotalLifting.lean`); leave it as a goal if non-trivial. The `try` ensures
@@ -449,7 +450,7 @@ elab "twp_pure_core" focus:(ppSpace colGt term:max)? : tactic =>
       HΦ.mvarId!
     gs.forM addMVarGoal
     let stepPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.twp_pure_step_ctx
-      (#[α, instPL, GF, instWp, K, φ, n, e₁, e₂, inst, HΦ, E, Φ].map some)
+      (#[α, instPL, GF, instWp, K, φ, n, e₁, e₂, step.inst, HΦ, E, Φ].map some)
     let transPf ← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, stepPf]
     mvar.assign transPf
 
@@ -457,8 +458,7 @@ elab "twp_pure_core" focus:(ppSpace colGt term:max)? : tactic =>
 
 /-- `twp_value` closes a goal `tglWp E e Φ` when `e` is a value `v` (detected via
 `e.toVal?`, so it works on raw `.lit`/`.lam`/… values, not just `Exp.ofVal v`),
-reducing it to the postcondition `Φ v`. The TotalEris analogue of iris's
-`wp_value_head`. -/
+reducing it to the postcondition `Φ v`. -/
 elab "twp_value" : tactic =>
   runTacticTglWp fun mvar { α, GF, instPL, instWp, hyps, E, e, Φ, .. } => do
     let tv : Q(Option (Val $α)) ← whnf q(Exp.toVal? $e)
@@ -482,32 +482,14 @@ elab "twp_value" : tactic =>
             q(ElimModal $c false .out $p' iprop(|={$E}=> $goal) $A' $goal $Q')).isSome then
         pure (← observing? (iSolveSidecondition c)).isSome
       else pure false
-    if useNoFupd then
-      let pf ← addBIGoal hyps goal
-      let valPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.tglWp_value_of_toVal
-        (#[α, instPL, GF, instWp, E, e, v, Φ, hproof].map some)
-      mvar.assign (← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, valPf])
-    else
-      let pf ← addBIGoal hyps q(iprop(|={$E}=> $goal))
-      let valPf ← mkAppOptM ``ProbLang.TotalEris.ErisWpGS.tglWp_value_fupd_of_toVal
-        (#[α, instPL, GF, instWp, E, e, v, Φ, hproof].map some)
-      mvar.assign (← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, valPf])
-
-/-- `wp_value` — Rocq-facing alias for `twp_value`. -/
-macro "wp_value" : tactic => `(tactic| twp_value)
+    have target : Q(IProp $GF) := if useNoFupd then goal else q(iprop(|={$E}=> $goal))
+    let valLemma := if useNoFupd then ``ProbLang.TotalEris.ErisWpGS.tglWp_value_of_toVal
+      else ``ProbLang.TotalEris.ErisWpGS.tglWp_value_fupd_of_toVal
+    let pf ← addBIGoal hyps target
+    let valPf ← mkAppOptM valLemma (#[α, instPL, GF, instWp, E, e, v, Φ, hproof].map some)
+    mvar.assign (← mkAppM ``Iris.BI.BIBase.Entails.trans #[pf, valPf])
 
 /-! ## Cleanup + composite tactics -/
-
-/-- `twp_expr_simp` reduces the substitutions left by a pure step (`open'`/`openRec`)
-and the surrounding boolean/arithmetic redexes, recovering a clean WP goal. The
-TotalEris analogue of iris's `wp_expr_simp` (named `twp_*` to avoid the clash with
-iris-lean's HeapLang `wp_expr_simp`). -/
-macro "twp_expr_simp" : tactic =>
-  `(tactic| simp only [Exp.open', Exp.openRec, Exp.close, Exp.closeRec, Exp.ofVal,
-      ↓reduceIte, Nat.reduceAdd, Nat.reduceSub, Nat.reduceEqDiff, Nat.zero_add,
-      Int.reduceAdd, Int.reduceSub, Int.reduceMul, Int.reduceDiv, Int.reduceMod,
-      Int.reduceNeg, Int.reducePow,
-      Var.internal.injEq, reduceCtorEq])
 
 /-- `twp_pure [e]` takes one pure step. `twp_pure_core` reduces + re-attaches source
 binder names internally; the trailing `simp only [openRec_val_fst]` is a *propositional*
@@ -517,20 +499,20 @@ left when a substitution flows over an abstract value — replacing a manual
 macro "twp_pure" focus:(ppSpace colGt term:max)? : tactic =>
   `(tactic| (twp_pure_core $[$focus]?; try simp only [openRec_val_fst]))
 
-/-- `twp_lam` β-reduces a `(λ. _) v` application — an alias for `twp_pure`. -/
-macro "twp_lam" : tactic => `(tactic| twp_pure)
+/-- `twp_pure_at <e₁> ↦ <e₂>` — explicit pure step with both endpoints pinned. Use when
+`twp_pure`'s implicit `PureExec` synthesis fails because typeclass search can't see
+through an opaque definition in the LHS. The precondition `φ` stays implicit (synthesized
+from the chosen `PureExec` instance) and is discharged by the shared `is_value` tactic,
+which covers `True`, value-hood, and the binop/unop/scrut `∧`-conjunctions. -/
+macro "twp_pure_at " e1:term:max " ↦ " e2:term:max : tactic =>
+  `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
+      (n := 1) (e₁ := $e1) (e₂ := $e2) _ (by is_value)))
 
-/-- `wp_lam` — Rocq-facing alias for `twp_lam`. -/
-macro "wp_lam" : tactic => `(tactic| twp_lam)
-
-/-- `twp_rec` unfolds a recursive call `(rec f x := e) v` — `twp_pure` already handles
-the `app_fix` step, so this is an alias. -/
-macro "twp_rec" : tactic => `(tactic| twp_pure)
-
-/-- `twp_finish` cleans up after a step: reduce leftover substitutions, then close the
-goal if it has become a value WP. The TotalEris analogue of iris's `wp_finish`. -/
-macro "twp_finish" : tactic =>
-  `(tactic| (try twp_value))
+/-- `twp_pure_at <e₁> ↦ <e₂> by <hφ>` — variant with an explicit proof of the `PureExec`
+precondition, for a side condition `is_value` cannot close. -/
+macro "twp_pure_at " e1:term:max " ↦ " e2:term:max " by " h:term : tactic =>
+  `(tactic| iapply (ErisWpGS.twp_pure_step_fupd
+      (n := 1) (e₁ := $e1) (e₂ := $e2) _ $h))
 
 /-- `twp_pures` repeatedly takes pure steps (cleaning up after each) until none apply. -/
 macro "twp_pures" : tactic =>

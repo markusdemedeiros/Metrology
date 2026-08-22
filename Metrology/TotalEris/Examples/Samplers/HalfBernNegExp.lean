@@ -1,4 +1,3 @@
--- Bernoulli with base-½ negative-exponential bias
 module
 
 public import Metrology.TotalEris
@@ -8,9 +7,10 @@ public import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
 
 @[expose] public section
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
-  ProbLang.TotalEris.ErisWpGS
-open scoped AppGS ENNReal NNReal
+/-! # Bernoulli with base-½ negative-exponential bias -/
+
+open Iris Iris.BI Iris.ProofMode ProbLang ProbLang.TotalEris ProbLang.TotalEris.ErisWpGS
+open scoped ENNReal NNReal
 
 namespace ProbLang
 namespace TotalEris
@@ -54,10 +54,14 @@ end creditExpectation
 
 section creditKernel
 
-def LiftF (F : Bool → ℝ≥0∞) : ℕ → ℝ≥0∞ := fun n => F (n % 2 == 1)
+def LiftParity (F : Bool → ℝ≥0∞) : ℕ → ℝ≥0∞ := fun n => F (n % 2 = 1)
+
+theorem LiftParity_eq_ite (F : Bool → ℝ≥0∞) (n : ℕ) :
+    LiftParity F n = if n % 2 = 0 then F false else F true := by
+  rcases Nat.mod_two_eq_zero_or_one n with h | h <;> simp [LiftParity, h]
 
 def BNEHalfCredit (F : Bool → ℝ≥0∞) : ℝ → ℝ≥0∞ := fun r =>
-  (if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0) +
+  (if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftParity F) 0 r else 0) +
   (if ¬ r ≤ 1 / 2 then F true else 0)
 
 end creditKernel
@@ -66,33 +70,28 @@ section measurability
 
 theorem measurable_bneHalfCredit (F : Bool → ℝ≥0∞) : Measurable (BNEHalfCredit F) := by
   unfold BNEHalfCredit
-  refine Measurable.add ?_ ?_
-  · exact Measurable.ite measurableSet_Iic
-      (measurable_realDecrTrialCreditV (LiftF F) 0) measurable_const
-  · exact Measurable.ite measurableSet_Iic.compl measurable_const measurable_const
-
-open MeasureTheory in
-
-theorem lintegral_unifUnit_indicator {s : Set ℝ} (hs : MeasurableSet s) (f : ℝ → ℝ≥0∞) :
-    ∫⁻ r, s.indicator f r ∂(volume.restrict (Set.Icc (0 : ℝ) 1))
-      = ∫⁻ r in s ∩ Set.Icc 0 1, f r ∂volume := by
-  rw [lintegral_indicator hs, Measure.restrict_restrict hs]
+  exact (Measurable.ite measurableSet_Iic (measurable_realDecrTrialCreditV (LiftParity F) 0)
+      measurable_const).add
+    (Measurable.ite measurableSet_Iic.compl measurable_const measurable_const)
 
 end measurability
+
+section lintegral
+
+open MeasureTheory in
+theorem lintegral_indicator_restrict {s t : Set ℝ} (hs : MeasurableSet s) (f : ℝ → ℝ≥0∞) :
+    ∫⁻ r, s.indicator f r ∂(volume.restrict t) = ∫⁻ r in s ∩ t, f r ∂volume := by
+  rw [lintegral_indicator hs, Measure.restrict_restrict hs]
+
+end lintegral
 
 section conservation
 
 open MeasureTheory in
-
-theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (_hbound : ∀ b, F b ≤ M) :
+theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} :
     ∫⁻ r, BNEHalfCredit F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
-
-  have hlift : LiftF F = fun n => if n % 2 = 0 then F false else F true := by
-    funext n
-    rcases Nat.mod_two_eq_zero_or_one n with h | h
-    · simp [LiftF, h]
-    · simp [LiftF, h]
-
+  have hlift : LiftParity F = fun n => if n % 2 = 0 then F false else F true :=
+    funext (LiftParity_eq_ite F)
   have hexphalf : ∫ r in (0 : ℝ)..(1 / 2), Real.exp (-r) = 1 - Real.exp (-1 / 2) := by
     rw [intervalIntegral.integral_comp_neg fun x => Real.exp x, neg_zero,
         integral_exp, Real.exp_zero]
@@ -106,25 +105,21 @@ theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (_hbo
   show ∫⁻ r, BNEHalfCredit F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
   simp only [BNEHalfCredit]
   rw [lintegral_add_left (Measurable.ite measurableSet_Iic
-        (measurable_realDecrTrialCreditV (LiftF F) 0) measurable_const)]
-
+        (measurable_realDecrTrialCreditV (LiftParity F) 0) measurable_const)]
   have hB : (∫⁻ r, (if ¬ r ≤ 1 / 2 then F true else 0) ∂(volume.restrict (Set.Icc (0 : ℝ) 1)))
       = ENNReal.ofReal (1 / 2) * F true := by
     have hind : (fun r => if ¬ r ≤ 1 / 2 then F true else 0)
         = (Set.Ioi (1 / 2 : ℝ)).indicator (fun _ => F true) := by
-      ext r; simp only [Set.indicator_apply, Set.mem_Ioi, _root_.not_le]
-    rw [hind, lintegral_unifUnit_indicator measurableSet_Ioi (fun _ => F true), hsetB,
+      ext r; simp only [Set.indicator_apply, Set.mem_Ioi, not_le]
+    rw [hind, lintegral_indicator_restrict measurableSet_Ioi (fun _ => F true), hsetB,
         setLIntegral_const, Real.volume_Ioc, mul_comm]
     norm_num
-
-  have hA : (∫⁻ r, (if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0)
+  have hA : (∫⁻ r, (if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftParity F) 0 r else 0)
         ∂(volume.restrict (Set.Icc (0 : ℝ) 1)))
       = ENNReal.ofReal (1 - Real.exp (-1 / 2)) * F false
         + ENNReal.ofReal (Real.exp (-1 / 2) - 1 / 2) * F true := by
-    have hind : (fun r => if r ≤ 1 / 2 then RealDecrTrialCreditV (LiftF F) 0 r else 0)
-        = (Set.Iic (1 / 2 : ℝ)).indicator (RealDecrTrialCreditV (LiftF F) 0) := by
-      ext r; simp only [Set.indicator_apply, Set.mem_Iic]
-    rw [hind, lintegral_unifUnit_indicator measurableSet_Iic (RealDecrTrialCreditV (LiftF F) 0),
+    rw [← indicator_Iic_eq,
+        lintegral_indicator_restrict measurableSet_Iic (RealDecrTrialCreditV (LiftParity F) 0),
         hsetA, setLIntegral_congr_fun (g := fun x => ENNReal.ofReal (Real.exp (-x)) * F false
           + ENNReal.ofReal (1 - Real.exp (-x)) * F true) measurableSet_Icc fun r hr => by
         rw [hlift]
@@ -147,9 +142,8 @@ theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} {M : ℝ≥0∞} (_hbo
           sub_nonneg.mpr (Real.exp_le_one_iff.mpr (neg_nonpos.mpr hr.1)),
         hintsub]
   rw [hA, hB]
-
   have hexp_ge : (0 : ℝ) ≤ Real.exp (-1 / 2) - 1 / 2 := by
-    have := Real.add_one_le_exp (-1 / 2 : ℝ); linarith
+    linarith [Real.add_one_le_exp (-1 / 2 : ℝ)]
   have ht : BNEHalfPMF true = ENNReal.ofReal (Real.exp (-1 / 2)) := rfl
   have hf : BNEHalfPMF false = ENNReal.ofReal (1 - Real.exp (-1 / 2)) := rfl
   rw [BNEHalfCreditV, ht, hf, add_assoc, ← add_mul,
@@ -169,90 +163,60 @@ theorem twp_LeHalf (E : CoPset) (r : ℝ) :
   ipureintro
   rfl
 
-theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) (M : ℝ≥0∞) (Hnn : ∀ b, F b ≤ M) :
+theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
     ⊢@{IProp GF} ↯ (BNEHalfCreditV F) -∗
       tglWp E pl(&BNEHalf #.unit)
         (fun v : Val ℝ => iprop(∃ b : Bool, ⌜v.1 = .lit (.bool b)⌝ ∗ ↯ (F b))) := by
   iintro Hε
-
   twp_pure
   twp_bind pl(urand)
-
-  iapply (twp_urand_exp' (ε₂ := BNEHalfCredit F) ?hmeas ?hint) $$ Hε
-  case hmeas => exact measurable_bneHalfCredit F
-  case hint => rw [BNEHalfCredit_lintegral (M := M) Hnn]
+  iapply (twp_urand_exp' (ε₂ := BNEHalfCredit F) (measurable_bneHalfCredit F) ?hint) $$ Hε
+  case hint => rw [BNEHalfCredit_lintegral]
   iintro %r ⟨%Hrm, Hcr⟩
-
-  have Hr01 : 0 < r ∧ r < 1 := mem_unifUnitSupport_real.mp Hrm
-  have Hr : 0 ≤ r ∧ r ≤ 1 := ⟨Hr01.1.le, Hr01.2.le⟩
-
+  have Hr := mem_unifUnitSupport_real_le Hrm
   twp_pure
   twp_bind pl(&LeHalf #(.real r))
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(⌜v.1 = .lit (.bool (LeHalfSpec r))⌝)))
   isplitl []
   · iapply twp_LeHalf
-  iintro %v %hv
-  rcases v with ⟨w, hwlc⟩
-  simp only at hv
-
+  iintro %⟨w, _⟩ %hv
+  dsimp only at hv
   generalize hbdef : LeHalfSpec r = b at hv
   subst hv
-  rcases b with _ | _
-  ·
-    have hle : ¬ r ≤ 1 / 2 := of_decide_eq_false hbdef
+  obtain _ | _ := b
+  · have hle : ¬ r ≤ 1 / 2 := of_decide_eq_false hbdef
     twp_pures
     twp_value
     imodintro
     iexists true
-    have hcr : BNEHalfCredit F r = F true := by
-      simp only [BNEHalfCredit, hle, if_false, if_true, not_false_iff, zero_add]
-
-    rw [← hcr]
+    isimp only [BNEHalfCredit, if_neg hle, if_pos hle, zero_add] at Hcr
     iframe Hcr
     itrivial
-  ·
-    have hle : r ≤ 1 / 2 := of_decide_eq_true hbdef
-    have hcr : BNEHalfCredit F r = RealDecrTrialCreditV (LiftF F) 0 r := by
-      simp only [BNEHalfCredit, hle, if_true, not_true, if_false, add_zero]
-
-    ihave Hcr' : iprop(↯ (RealDecrTrialCreditV (LiftF F) 0 r)) $$ [Hcr]
-    · rw [← hcr]; iexact Hcr
-
+  · have hle : r ≤ 1 / 2 := of_decide_eq_true hbdef
+    isimp only [BNEHalfCredit, if_pos hle, if_neg (not_not_intro hle), add_zero] at Hcr
     twp_pure
     twp_bind pl(&DecrTrial #(.int (0 : ℤ)) #(.real r))
     iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-      ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (LiftF F n))))
-    isplitl [Hcr']
-    · iapply (twp_DecrTrial E (LiftF F) M (fun n => Hnn _) 0 r Hr) $$ Hcr'
-    iintro %w' ⟨%n, %hn, Hcrn⟩
-    rcases w' with ⟨w', hwlc'⟩
-    simp only at hn; subst hn
-
+      ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (LiftParity F n))))
+    isplitl [Hcr]
+    · iapply (twp_DecrTrial E (LiftParity F) 0 r Hr) $$ Hcr
+    iintro %⟨w', _⟩ ⟨%n, %hn, Hcrn⟩
+    dsimp only at hn; subst hn
     twp_pures
-    rcases Nat.mod_two_eq_zero_or_one n with hpar | hpar
-    ·
-      have hmod : (Int.ofNat n : ℤ) % 2 = 0 := by
-        have h2 : ((n : ℤ)) % 2 = ((n % 2 : ℕ) : ℤ) := by push_cast [Int.natCast_mod]; ring
-        simp [Int.ofNat_eq_natCast, h2, hpar]
-      rw [hmod]
+    obtain hpar | hpar := Nat.mod_two_eq_zero_or_one n
+    · rw [intOfNat_emod_two_eq_zero hpar]
       twp_value
       imodintro
       iexists false
-      have hlf : LiftF F n = F false := by simp only [LiftF, hpar]; rfl
-      rw [← hlf]
+      isimp only [LiftParity_eq_ite, if_pos hpar] at Hcrn
       iframe Hcrn
       itrivial
-    ·
-      have hmod : (Int.ofNat n : ℤ) % 2 = 1 := by
-        have h2 : ((n : ℤ)) % 2 = ((n % 2 : ℕ) : ℤ) := by push_cast [Int.natCast_mod]; ring
-        simp [Int.ofNat_eq_natCast, h2, hpar]
-      rw [hmod]
+    · rw [intOfNat_emod_two_eq_one hpar]
       twp_pures
       twp_value
       imodintro
       iexists true
-      have hlf : LiftF F n = F true := by simp only [LiftF, hpar]; rfl
-      rw [← hlf]
+      isimp only [LiftParity_eq_ite, if_neg (show ¬ n % 2 = 0 by omega)] at Hcrn
       iframe Hcrn
       itrivial
 

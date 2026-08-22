@@ -17,7 +17,7 @@ measurable `[0,1]`-bounded `F : ℝ → ℝ≥0∞`, gives
 
 where `g v` extracts a real out of the returned value `v` — then `e` is
 distributed as `μ`: the pushforward of its limiting execution measure along `g`
-equals `μ` (`twp_dist_adequacyG`).
+equals `μ` (`twp_dist_adequacy'`).
 
 The extraction `g` is an arbitrary *measurable* function `Exp ℝ → ℝ` of the
 returned expression; it need **not** be an operation of the object language.
@@ -39,8 +39,8 @@ equalities — pinning the CDF of `g(result)` to that of `μ`.
 
 @[expose] public section
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
-  ProbLang.TotalEris.ErisWpGS MeasureTheory HeapView Auth
+open Iris Iris.Std Iris.BI Iris.ProofMode OFE ProbLang ProbLang.TotalEris
+  ProbLang.TotalEris.ErisWpGS
 open scoped AppGS ENNReal
 
 namespace ProbLang
@@ -57,55 +57,51 @@ variable (gExp : Exp ℝ → ℝ)
 
 /-- The set of configurations that have terminated at a value whose extracted
 real `gExp v.fst` lies in `S`. This is exactly the set inside `Tgl _ (· ∈ S) _`. -/
-def RSetG (S : Set ℝ) : Set (Cfg ℝ) :=
+def RSet' (S : Set ℝ) : Set (Cfg ℝ) :=
   {ρ : Cfg ℝ | ∃ v : Val ℝ, ρ.expr = Exp.ofVal v ∧ gExp v.fst ∈ S}
 
+open MeasureTheory in
 /-- A distribution specification of `e` against `μ` with extraction `gExp`: for
 every measurable `[0,1]`-bounded `F`, the expected-value credit `↯(∫⁻ F dμ)`
 proves a total triple returning a value `v` with residual credit `↯(F (gExp v.fst))`. -/
-def IsDistSpecG (e : Exp ℝ) (μ : Measure ℝ) : Prop :=
+def IsDistSpec' (e : Exp ℝ) (μ : Measure ℝ) : Prop :=
   ∀ (F : ℝ → ℝ≥0∞), Measurable F → (∀ x, F x ≤ 1) →
     ∀ [ErisGS ℝ .hasNoLC GF], iprop(↯ (∫⁻ y, F y ∂μ)) ⊢@{IProp GF}
       tglWp ⊤ e (fun (v : Val ℝ) => iprop(↯ (F (gExp v.fst))))
 
 variable {gExp}
 
-theorem measurableSet_φG (hgExp : Measurable gExp) {S : Set ℝ} (hS : MeasurableSet S) :
+theorem measurableSet_gExp_mem (hgExp : Measurable gExp) {S : Set ℝ} (hS : MeasurableSet S) :
     MeasurableSet {v : Val ℝ | gExp v.fst ∈ S} :=
   Val.fst.measurable (hgExp hS)
 
-theorem measurableSet_RSetG (hgExp : Measurable gExp) {S : Set ℝ} (hS : MeasurableSet S) :
-    MeasurableSet (RSetG gExp S) :=
-  measurableSet_TglCfgSet (measurableSet_φG hgExp hS)
+theorem measurableSet_RSet' (hgExp : Measurable gExp) {S : Set ℝ} (hS : MeasurableSet S) :
+    MeasurableSet (RSet' gExp S) :=
+  measurableSet_TglCfgSet (measurableSet_gExp_mem hgExp hS)
 
-theorem RSetG_union (A B : Set ℝ) : RSetG gExp (A ∪ B) = RSetG gExp A ∪ RSetG gExp B := by
+theorem RSet'_union (A B : Set ℝ) : RSet' gExp (A ∪ B) = RSet' gExp A ∪ RSet' gExp B := by
   ext ρ
-  simp only [RSetG, Set.mem_setOf_eq, Set.mem_union]
-  constructor
-  · rintro ⟨v, he, hr | hr⟩
-    · exact Or.inl ⟨v, he, hr⟩
-    · exact Or.inr ⟨v, he, hr⟩
-  · rintro (⟨v, he, hr⟩ | ⟨v, he, hr⟩)
-    · exact ⟨v, he, Or.inl hr⟩
-    · exact ⟨v, he, Or.inr hr⟩
+  simp only [RSet', Set.mem_setOf_eq, Set.mem_union]
+  grind
 
-/-- `RSetG S = (gExp ∘ ·.expr)⁻¹'(S) ∩ {returns a value}`: on value configs the
+/-- `RSet' S = (gExp ∘ ·.expr)⁻¹'(S) ∩ {returns a value}`: on value configs the
 config-level extraction `gExp ρ.expr` agrees with `gExp v.fst`. -/
-theorem RSetG_eq_preimage (S : Set ℝ) :
-    RSetG gExp S = (fun ρ : Cfg ℝ => gExp ρ.expr) ⁻¹' S ∩ RSetG gExp Set.univ := by
+theorem RSet'_eq_preimage (S : Set ℝ) :
+    RSet' gExp S = (fun ρ : Cfg ℝ => gExp ρ.expr) ⁻¹' S ∩ RSet' gExp Set.univ := by
   ext ρ
-  simp only [RSetG, Set.mem_setOf_eq, Set.mem_inter_iff, Set.mem_preimage, Set.mem_univ, and_true]
+  simp only [RSet', Set.mem_setOf_eq, Set.mem_inter_iff, Set.mem_preimage, Set.mem_univ, and_true]
   constructor
   · rintro ⟨v, he, hr⟩
     exact ⟨by rw [he]; exact hr, v, he⟩
   · rintro ⟨hmem, v, he⟩
     exact ⟨v, he, by rw [he] at hmem; exact hmem⟩
 
-/-- **Ray instance.** Instantiating `IsDistSpecG` at `F = 𝟙_{Sᶜ}` and collapsing
+open MeasureTheory in
+/-- **Ray instance.** Instantiating `IsDistSpec'` at `F = 𝟙_{Sᶜ}` and collapsing
 the residual credit `↯(𝟙_{Sᶜ}(gExp v.fst))` via `↯1 ⊢ False` gives a pure total
 triple: starting from `↯(μ Sᶜ)`, `e` terminates at a value with `gExp v.fst ∈ S`. -/
-theorem ray_pure_wpG (e : Exp ℝ) (μ : Measure ℝ)
-    (Hg2 : IsDistSpecG (GF := GF) gExp e μ) {S : Set ℝ} (hS : MeasurableSet S) :
+theorem ray_pure_wp' (e : Exp ℝ) (μ : Measure ℝ)
+    (hspec : IsDistSpec' (GF := GF) gExp e μ) {S : Set ℝ} (hS : MeasurableSet S) :
     ∀ [ErisGS ℝ .hasNoLC GF], iprop(↯ (μ Sᶜ)) ⊢@{IProp GF}
       tglWp ⊤ e (fun (v : Val ℝ) => iprop(⌜gExp v.fst ∈ S⌝)) := by
   intro _
@@ -119,109 +115,100 @@ theorem ray_pure_wpG (e : Exp ℝ) (μ : Measure ℝ)
     · ipureintro; exact hr
     · iexfalso
       iapply ErrorCredit.contradict $$ Hcr
-      have hmem : gExp v.fst ∈ Sᶜ := by simpa using hr
-      simp [Set.indicator_of_mem hmem]
-  have hInt : ∫⁻ y, Sᶜ.indicator (fun _ => 1) y ∂μ = μ Sᶜ := by
-    rw [lintegral_indicator_const hS.compl, one_mul]
-  iapply (Hg2 (Sᶜ.indicator (fun _ => 1)) (measurable_const.indicator hS.compl) ?le1)
+      simp [Set.indicator_of_mem (show gExp v.fst ∈ Sᶜ from hr)]
+  iapply (hspec (Sᶜ.indicator (fun _ => 1)) (measurable_const.indicator hS.compl) ?le1)
   case le1 => intro x; by_cases hx : x ∈ Sᶜ <;> simp [Set.indicator, hx]
-  rw [hInt]
+  rw [lintegral_indicator_const hS.compl, one_mul]
   iexact Hε
 
+open MeasureTheory in
 /-- **General distribution adequacy.** A distribution spec against a probability
 measure `μ` on `ℝ`, with a measurable real extraction `gExp`, forces the limiting
 execution of `e` to be distributed as `μ`: the pushforward of `limExec` along
 `gExp ∘ (·.expr)` equals `μ`. -/
-theorem twp_dist_adequacyG [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF]
+theorem twp_dist_adequacy' [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF]
     (hgExp : Measurable gExp) (e : Exp ℝ) (σ : State ℝ) (μ : Measure ℝ)
-    [IsProbabilityMeasure μ] (Hg2 : IsDistSpecG (GF := GF) gExp e μ) :
+    [IsProbabilityMeasure μ] (hspec : IsDistSpec' (GF := GF) gExp e μ) :
     (limExec ⟨e, σ⟩).map (fun ρ => gExp ρ.expr) = μ := by
   have hmg : Measurable (fun ρ : Cfg ℝ => gExp ρ.expr) := hgExp.comp Cfg.measurable_expr
   have hUniv_le : (limExec ⟨e, σ⟩) Set.univ ≤ 1 :=
     limExec_leq_mass (fun n => execN_univ_le_one n ⟨e, σ⟩)
   -- **Ray lower bound**: for any measurable `S`, `μ S ≤ Pr[gExp(result) ∈ S]`.
-  have lb : ∀ (S : Set ℝ), MeasurableSet S → μ S ≤ (limExec ⟨e, σ⟩) (RSetG gExp S) := by
+  have hlower : ∀ (S : Set ℝ), MeasurableSet S → μ S ≤ (limExec ⟨e, σ⟩) (RSet' gExp S) := by
     intro S hS
     have htgl : Tgl (limExec ⟨e, σ⟩) (fun v => gExp v.fst ∈ S) (μ Sᶜ) :=
-      twp_tgl (σ := σ) (measurableSet_φG hgExp hS) (ray_pure_wpG e μ Hg2 hS)
-    have hsum : μ S + μ Sᶜ = 1 := by rw [measure_add_measure_compl hS, measure_univ]
+      twp_tgl (σ := σ) (measurableSet_gExp_mem hgExp hS) (ray_pure_wp' e μ hspec hS)
+    have hsum : μ S + μ Sᶜ = 1 := prob_add_prob_compl hS
     have hcompl : (1 : ℝ≥0∞) - μ Sᶜ = μ S := by
       rw [← hsum, ENNReal.add_sub_cancel_right (measure_ne_top _ _)]
-    have h1 : 1 - μ Sᶜ ≤ (limExec ⟨e, σ⟩) (RSetG gExp S) := htgl
+    have h1 : 1 - μ Sᶜ ≤ (limExec ⟨e, σ⟩) (RSet' gExp S) := htgl
     rwa [hcompl] at h1
+  have hRSetUniv1 : (limExec ⟨e, σ⟩) (RSet' gExp Set.univ) = 1 := by
+    refine le_antisymm ((measure_mono (Set.subset_univ _)).trans hUniv_le) ?_
+    have := hlower Set.univ MeasurableSet.univ
+    rwa [measure_univ] at this
   -- **Pinning**: the complementary lower bounds are forced to equalities.
-  have pin : ∀ (S : Set ℝ), MeasurableSet S → (limExec ⟨e, σ⟩) (RSetG gExp S) = μ S := by
+  have hpin : ∀ (S : Set ℝ), MeasurableSet S → (limExec ⟨e, σ⟩) (RSet' gExp S) = μ S := by
     intro S hS
-    have hle1 := lb S hS
-    have hle2 := lb Sᶜ hS.compl
-    have hmeas2 : MeasurableSet (RSetG gExp Sᶜ) := measurableSet_RSetG hgExp hS.compl
-    have hdisj : Disjoint (RSetG gExp S) (RSetG gExp Sᶜ) := by
+    have hle1 := hlower S hS
+    have hle2 := hlower Sᶜ hS.compl
+    have hmeas2 : MeasurableSet (RSet' gExp Sᶜ) := measurableSet_RSet' hgExp hS.compl
+    have hdisj : Disjoint (RSet' gExp S) (RSet' gExp Sᶜ) := by
       rw [Set.disjoint_left]
       rintro ρ ⟨v, he, hs⟩ ⟨v', he', hs'⟩
-      have h1 : gExp ρ.expr ∈ S := by rw [he]; exact hs
-      have h2 : gExp ρ.expr ∈ Sᶜ := by rw [he']; exact hs'
-      exact h2 h1
-    have hunion : RSetG gExp S ∪ RSetG gExp Sᶜ = RSetG gExp Set.univ := by
-      rw [← RSetG_union, Set.union_compl_self]
-    have hsum_lim : (limExec ⟨e, σ⟩) (RSetG gExp S) + (limExec ⟨e, σ⟩) (RSetG gExp Sᶜ)
-        = (limExec ⟨e, σ⟩) (RSetG gExp Set.univ) := by
+      exact (show gExp ρ.expr ∈ Sᶜ by rw [he']; exact hs') (by rw [he]; exact hs)
+    have hunion : RSet' gExp S ∪ RSet' gExp Sᶜ = RSet' gExp Set.univ := by
+      rw [← RSet'_union, Set.union_compl_self]
+    have hsum_lim : (limExec ⟨e, σ⟩) (RSet' gExp S) + (limExec ⟨e, σ⟩) (RSet' gExp Sᶜ)
+        = (limExec ⟨e, σ⟩) (RSet' gExp Set.univ) := by
       rw [← measure_union hdisj hmeas2, hunion]
-    have huniv1 : (limExec ⟨e, σ⟩) (RSetG gExp Set.univ) = 1 := by
-      refine _root_.le_antisymm ((measure_mono (Set.subset_univ _)).trans hUniv_le) ?_
-      have := lb Set.univ MeasurableSet.univ; rwa [measure_univ] at this
-    have hxy1 : (limExec ⟨e, σ⟩) (RSetG gExp S) + (limExec ⟨e, σ⟩) (RSetG gExp Sᶜ) = 1 := by
-      rw [hsum_lim, huniv1]
-    have hy_ne : (limExec ⟨e, σ⟩) (RSetG gExp Sᶜ) ≠ (⊤ : ℝ≥0∞) :=
+    have hsum_one : (limExec ⟨e, σ⟩) (RSet' gExp S) + (limExec ⟨e, σ⟩) (RSet' gExp Sᶜ) = 1 := by
+      rw [hsum_lim, hRSetUniv1]
+    have hy_ne : (limExec ⟨e, σ⟩) (RSet' gExp Sᶜ) ≠ (⊤ : ℝ≥0∞) :=
       ne_top_of_le_ne_top ENNReal.one_ne_top ((measure_mono (Set.subset_univ _)).trans hUniv_le)
-    have hμsum : μ S + μ Sᶜ = 1 := by rw [measure_add_measure_compl hS, measure_univ]
-    have hx_le : (limExec ⟨e, σ⟩) (RSetG gExp S) ≤ μ S := by
-      have step : (limExec ⟨e, σ⟩) (RSetG gExp S) + (limExec ⟨e, σ⟩) (RSetG gExp Sᶜ)
-          ≤ μ S + (limExec ⟨e, σ⟩) (RSetG gExp Sᶜ) := by
-        rw [hxy1]
+    have hμsum : μ S + μ Sᶜ = 1 := prob_add_prob_compl hS
+    have hx_le : (limExec ⟨e, σ⟩) (RSet' gExp S) ≤ μ S := by
+      have hsum_le : (limExec ⟨e, σ⟩) (RSet' gExp S) + (limExec ⟨e, σ⟩) (RSet' gExp Sᶜ)
+          ≤ μ S + (limExec ⟨e, σ⟩) (RSet' gExp Sᶜ) := by
+        rw [hsum_one]
         calc (1 : ℝ≥0∞) = μ S + μ Sᶜ := hμsum.symm
-          _ ≤ μ S + (limExec ⟨e, σ⟩) (RSetG gExp Sᶜ) := by gcongr
-      exact (ENNReal.add_le_add_iff_right hy_ne).mp step
-    exact _root_.le_antisymm hx_le hle1
+          _ ≤ μ S + (limExec ⟨e, σ⟩) (RSet' gExp Sᶜ) := by gcongr
+      exact (ENNReal.add_le_add_iff_right hy_ne).mp hsum_le
+    exact le_antisymm hx_le hle1
   -- The execution measure is proper.
-  have hRSetUniv1 : (limExec ⟨e, σ⟩) (RSetG gExp Set.univ) = 1 := by
-    have := pin Set.univ MeasurableSet.univ; rwa [measure_univ] at this
   haveI hprob : IsProbabilityMeasure (limExec ⟨e, σ⟩) := by
-    refine ⟨_root_.le_antisymm hUniv_le ?_⟩
-    calc (1 : ℝ≥0∞) = (limExec ⟨e, σ⟩) (RSetG gExp Set.univ) := hRSetUniv1.symm
+    refine ⟨le_antisymm hUniv_le ?_⟩
+    calc (1 : ℝ≥0∞) = (limExec ⟨e, σ⟩) (RSet' gExp Set.univ) := hRSetUniv1.symm
       _ ≤ (limExec ⟨e, σ⟩) Set.univ := measure_mono (Set.subset_univ _)
   -- The non-returning configs are null.
-  have hnull : (limExec ⟨e, σ⟩) (RSetG gExp Set.univ)ᶜ = 0 := by
-    rw [measure_compl (measurableSet_RSetG hgExp MeasurableSet.univ) (measure_ne_top _ _),
+  have hnull : (limExec ⟨e, σ⟩) (RSet' gExp Set.univ)ᶜ = 0 := by
+    rw [measure_compl (measurableSet_RSet' hgExp MeasurableSet.univ) (measure_ne_top _ _),
       measure_univ, hRSetUniv1, tsub_self]
   -- Intersecting with the conull "returns a value" set is measure-preserving.
   have hconull : ∀ (A : Set ℝ),
-      (limExec ⟨e, σ⟩) ((fun ρ => gExp ρ.expr) ⁻¹' A ∩ RSetG gExp Set.univ)
+      (limExec ⟨e, σ⟩) ((fun ρ => gExp ρ.expr) ⁻¹' A ∩ RSet' gExp Set.univ)
         = (limExec ⟨e, σ⟩) ((fun ρ => gExp ρ.expr) ⁻¹' A) := by
     intro A
-    refine _root_.le_antisymm (measure_mono Set.inter_subset_left) ?_
-    set P := (fun ρ : Cfg ℝ => gExp ρ.expr) ⁻¹' A with hP
-    have hsub : P ⊆ (P ∩ RSetG gExp Set.univ) ∪ (P ∩ (RSetG gExp Set.univ)ᶜ) := by
-      intro x hx
-      by_cases h : x ∈ RSetG gExp Set.univ
-      · exact Or.inl ⟨hx, h⟩
-      · exact Or.inr ⟨hx, h⟩
+    refine le_antisymm (measure_mono Set.inter_subset_left) ?_
+    set P := (fun ρ : Cfg ℝ => gExp ρ.expr) ⁻¹' A
+    have hsub : P ⊆ (P ∩ RSet' gExp Set.univ) ∪ (P ∩ (RSet' gExp Set.univ)ᶜ) := by
+      simp [← Set.inter_union_distrib_left]
     calc (limExec ⟨e, σ⟩) P
-        ≤ (limExec ⟨e, σ⟩) ((P ∩ RSetG gExp Set.univ) ∪ (P ∩ (RSetG gExp Set.univ)ᶜ)) :=
+        ≤ (limExec ⟨e, σ⟩) ((P ∩ RSet' gExp Set.univ) ∪ (P ∩ (RSet' gExp Set.univ)ᶜ)) :=
           measure_mono hsub
-      _ ≤ (limExec ⟨e, σ⟩) (P ∩ RSetG gExp Set.univ)
-            + (limExec ⟨e, σ⟩) (P ∩ (RSetG gExp Set.univ)ᶜ) := measure_union_le _ _
-      _ = (limExec ⟨e, σ⟩) (P ∩ RSetG gExp Set.univ) + 0 := by
-          rw [measure_mono_null Set.inter_subset_right hnull]
-      _ = (limExec ⟨e, σ⟩) (P ∩ RSetG gExp Set.univ) := add_zero _
+      _ ≤ (limExec ⟨e, σ⟩) (P ∩ RSet' gExp Set.univ)
+            + (limExec ⟨e, σ⟩) (P ∩ (RSet' gExp Set.univ)ᶜ) := measure_union_le _ _
+      _ = (limExec ⟨e, σ⟩) (P ∩ RSet' gExp Set.univ) := by
+          rw [measure_mono_null Set.inter_subset_right hnull, add_zero]
   -- CDF equality of the pushforward and `μ`.
-  have key : ∀ b : ℝ,
+  have hIic : ∀ b : ℝ,
       ((limExec ⟨e, σ⟩).map (fun ρ => gExp ρ.expr)) (Set.Iic b) = μ (Set.Iic b) := by
     intro b
-    rw [Measure.map_apply hmg measurableSet_Iic, ← hconull (Set.Iic b), ← RSetG_eq_preimage]
-    exact pin (Set.Iic b) measurableSet_Iic
+    rw [Measure.map_apply hmg measurableSet_Iic, ← hconull (Set.Iic b), ← RSet'_eq_preimage]
+    exact hpin (Set.Iic b) measurableSet_Iic
   haveI : IsProbabilityMeasure ((limExec ⟨e, σ⟩).map (fun ρ => gExp ρ.expr)) :=
     Measure.isProbabilityMeasure_map hmg.aemeasurable
-  exact Measure.ext_of_Iic _ _ key
+  exact Measure.ext_of_Iic _ _ hIic
 
 end General
 
@@ -234,6 +221,7 @@ the natural extraction. -/
 /-- The real-literal embedding `r ↦ .lit (.real r)` into expressions. -/
 def realEmb : ℝ → Exp ℝ := fun r => Exp.lit (.real r)
 
+open MeasureTheory in
 theorem measurableEmbedding_realEmb : MeasurableEmbedding realEmb :=
   Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding
 
@@ -241,6 +229,7 @@ theorem measurableEmbedding_realEmb : MeasurableEmbedding realEmb :=
 as a measurable extension of the identity along `realEmb`. -/
 noncomputable def realOfExp : Exp ℝ → ℝ := Function.extend realEmb id (fun _ => 0)
 
+open MeasureTheory in
 theorem measurable_realOfExp : Measurable realOfExp :=
   measurableEmbedding_realEmb.measurable_extend measurable_id measurable_const
 
@@ -249,13 +238,14 @@ theorem realOfExp_real (r : ℝ) : realOfExp (Exp.lit (.real r)) = r := by
   show Function.extend realEmb id (fun _ => 0) (realEmb r) = r
   rw [measurableEmbedding_realEmb.injective.extend_apply]; rfl
 
+open MeasureTheory in
 /-- **Distribution adequacy (bare-real case).** If `e`'s returned value is a real
 literal `.real r` carrying credit `↯(F r)`, `e` is distributed as `μ`. -/
 theorem twp_dist_adequacy [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF]
     (e : Exp ℝ) (σ : State ℝ) (μ : Measure ℝ) [IsProbabilityMeasure μ]
-    (Hg2 : IsDistSpecG (GF := GF) realOfExp e μ) :
+    (hspec : IsDistSpec' (GF := GF) realOfExp e μ) :
     (limExec ⟨e, σ⟩).map (fun ρ => realOfExp ρ.expr) = μ :=
-  twp_dist_adequacyG measurable_realOfExp e σ μ Hg2
+  twp_dist_adequacy' measurable_realOfExp e σ μ hspec
 
 end TotalEris
 end ProbLang

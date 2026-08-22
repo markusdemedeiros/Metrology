@@ -10,7 +10,7 @@ public import Iris.Algebra.Auth
 
 /-! # Eris Ghost State Definitions -/
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang Auth
+open Iris Auth
 
 namespace ProbLang
 
@@ -27,7 +27,7 @@ attribute [reducible, instance] ErisGS.appGS ErisGS.ecGS ErisGS.invGS
 
 section ErisInstance
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT]
+variable {rT : Type _} [ProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 @[reducible]
@@ -47,8 +47,7 @@ noncomputable instance erisWpGS_of_components : ErisWpGS (rT := rT) GF where
 
 end ErisInstance
 
-noncomputable def erisGF : BundledGFunctors.{0,0,0} := fun n =>
-  match n with
+noncomputable def erisGF : BundledGFunctors.{0,0,0} := fun
   | 0 => ⟨InvMapF, by infer_instance⟩
   | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
   | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
@@ -76,7 +75,6 @@ instance : ECPreGS erisGF where
 instance : AppPreGS ℝ erisGF where
   heap := { τ := 5, transp := by unfold erisGF; rfl }
   tapes := { τ := 6, transp := by unfold erisGF; rfl }
-
 
 end TotalEris
 end ProbLang

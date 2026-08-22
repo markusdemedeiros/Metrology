@@ -3,15 +3,11 @@ module
 public import Metrology.TotalEris
 public import Metrology.ProbLang.Reals
 public import Mathlib.Topology.Instances.Irrational
-public import Iris.Instances.Lib.WSat
-public import Iris.Instances.Lib.LaterCredits
-public import Iris.Instances.Lib.Invariants
 
 @[expose] public section
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.TotalEris
-  ProbLang.TotalEris.ErisWpGS MeasureTheory HeapView Auth
-open scoped AppGS ENNReal
+open Iris Iris.BI Iris.ProofMode ProbLang ProbLang.TotalEris ProbLang.TotalEris.ErisWpGS
+open scoped ENNReal
 
 namespace ProbLang
 namespace TotalEris
@@ -20,31 +16,32 @@ noncomputable def irratErr : ℝ → ℝ≥0∞ :=
   {r : ℝ | ¬ Irrational r}.indicator (fun _ => 1)
 
 @[simp]
-theorem irratErr_irr {r : ℝ} (h : Irrational r) : irratErr r = 0 := by
+theorem irratErr_of_irrational {r : ℝ} (h : Irrational r) : irratErr r = 0 := by
   rw [irratErr, Set.indicator_of_notMem (by simpa using h)]
 
 @[simp]
-theorem irratErr_rat {r : ℝ} (h : ¬ Irrational r) : irratErr r = 1 := by
+theorem irratErr_of_not_irrational {r : ℝ} (h : ¬ Irrational r) : irratErr r = 1 := by
   rw [irratErr, Set.indicator_of_mem h]
 
 theorem measurableSet_not_irrational : MeasurableSet {r : ℝ | ¬ Irrational r} :=
   (IsGδ.setOf_irrational.measurableSet).compl.congr (by ext r; simp)
 
-theorem irratErr_measurable : Measurable irratErr :=
+theorem measurable_irratErr : Measurable irratErr :=
   measurable_const.indicator measurableSet_not_irrational
 
 theorem irratErr_le_one (r : ℝ) : irratErr r ≤ 1 := by
   by_cases h : Irrational r <;> simp [h]
 
-theorem irratErr_lintegral_zero : ∫⁻ r, irratErr r ∂(ProbLangℝ.unifUnit (T := ℝ)) = 0 := by
+open MeasureTheory in
+theorem lintegral_irratErr_eq_zero : ∫⁻ r, irratErr r ∂(ProbLangℝ.unifUnit (T := ℝ)) = 0 := by
+  have hrange : {r : ℝ | ¬ Irrational r} = Set.range ((↑) : ℚ → ℝ) := by
+    ext r; simp [Irrational]
   rw [irratErr, lintegral_indicator_const measurableSet_not_irrational, one_mul]
   show volume.restrict (Set.Icc (0 : ℝ) 1) {r : ℝ | ¬ Irrational r} = 0
   rw [Measure.restrict_apply measurableSet_not_irrational]
-  refine measure_mono_null Set.inter_subset_left ?_
-  refine _root_.Set.Countable.measure_zero ?_ volume
-  have Hrw : {r : ℝ | ¬ Irrational r} = Set.range ((↑) : ℚ → ℝ) := by
-    ext r; simp [Irrational]
-  rw [Hrw]
+  refine measure_mono_null Set.inter_subset_left
+    (Set.Countable.measure_zero ?_ volume)
+  rw [hrange]
   exact Set.countable_range _
 
 section Wp
@@ -54,37 +51,35 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS ℝ hlc GF]
 /-- `urand` samples irrational values with probability 1 -/
 theorem twp_urand_irrational (E : CoPset) :
     ⊢@{IProp GF} tglWp E pl(urand)
-       (fun w => iprop% ⌜∃ r : ℝ, w = .real r ∧ Irrational r⌝) := by
-  iapply twp_err_pos solve_not_red
+      (fun w => iprop(⌜∃ r : ℝ, w = .real r ∧ Irrational r⌝)) := by
+  iapply twp_err_pos solve_not_value
   iintro %ε %Hε Herr
-  iapply (twp_urand_exp irratErr_measurable irratErr_le_one ?Gexp) $$ Herr
-  case Gexp => simp [irratErr_lintegral_zero]
-  iintro %r ⟨%_hr, Hcr⟩
+  iapply (twp_urand_exp measurable_irratErr irratErr_le_one ?Gexp) $$ Herr
+  case Gexp => simp [lintegral_irratErr_eq_zero]
+  iintro %r ⟨%-, Hcr⟩
   by_cases h : Irrational r
   · ipureintro; exact ⟨r, rfl, h⟩
   · iexfalso
     iapply ErrorCredit.contradict $$ Hcr
-    rw [irratErr_rat h]
+    rw [irratErr_of_not_irrational h]
 
 end Wp
 
-
-
-/-! Adequacy -/
+/-! ### Adequacy -/
 
 theorem measurableSet_irrational_val :
     MeasurableSet {v : Val ℝ | ∃ r : ℝ, v = .real r ∧ Irrational r} := by
-  rw [show {v : Val ℝ | ∃ r : ℝ, v = .real r ∧ Irrational r}
-        = Val.fst ⁻¹' {e : Exp ℝ | ∃ r : ℝ, e = .lit (.real r) ∧ Irrational r} by
-      ext v; simp only [Set.mem_setOf_eq, Set.mem_preimage]
-      constructor
-      · rintro ⟨r, rfl, hr⟩; exact ⟨r, rfl, hr⟩
-      · rintro ⟨r, hvr, hr⟩; exact ⟨r, Val.ext hvr, hr⟩]
+  have hval : {v : Val ℝ | ∃ r : ℝ, v = .real r ∧ Irrational r}
+      = Val.fst ⁻¹' {e : Exp ℝ | ∃ r : ℝ, e = .lit (.real r) ∧ Irrational r} := by
+    ext v; simp only [Set.mem_setOf_eq, Set.mem_preimage]
+    exact ⟨fun ⟨r, hvr, hr⟩ => ⟨r, hvr ▸ rfl, hr⟩, fun ⟨r, hvr, hr⟩ => ⟨r, Val.ext hvr, hr⟩⟩
+  have hexp : {e : Exp ℝ | ∃ r : ℝ, e = .lit (.real r) ∧ Irrational r}
+      = (fun r : ℝ => (Exp.lit (.real r) : Exp ℝ)) '' {r | Irrational r} := by
+    ext e; simp only [Set.mem_setOf_eq, Set.mem_image]
+    exact ⟨fun ⟨r, he, hr⟩ => ⟨r, hr, he.symm⟩, fun ⟨r, hr, he⟩ => ⟨r, he.symm, hr⟩⟩
+  rw [hval]
   refine Val.fst.measurable ?_
-  rw [show {e : Exp ℝ | ∃ r : ℝ, e = .lit (.real r) ∧ Irrational r}
-        = (fun r : ℝ => (Exp.lit (.real r) : Exp ℝ)) '' {r | Irrational r} by
-      ext e; simp only [Set.mem_setOf_eq, Set.mem_image]
-      exact ⟨fun ⟨r, he, hr⟩ => ⟨r, hr, he.symm⟩, fun ⟨r, hr, he⟩ => ⟨r, he.symm, hr⟩⟩]
+  rw [hexp]
   exact (Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding).measurableSet_image'
     IsGδ.setOf_irrational.measurableSet
 
