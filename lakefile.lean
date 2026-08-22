@@ -8,13 +8,13 @@ package metrology where
   testDriver := "ProbLangTest"
 
 require mathlib from git
-  "https://github.com/leanprover-community/mathlib4" @ "v4.30.0"
+  "https://github.com/leanprover-community/mathlib4" @ "v4.32.2"
 
 require cslib from git
-   "https://github.com/leanprover/cslib" @ "v4.30.0"
+   "https://github.com/leanprover/cslib" @ "v4.32.2"
 
 require iris from git
-  "https://github.com/leanprover-community/iris-lean.git" /  "Iris"
+  "https://github.com/leanprover-community/iris-lean.git" / "Iris"
 
 -- SampCert dropped in the iris-lean-bump branch: it has no v4.30.0 release.
 -- The two dependent files Metrology/SampCert/{SLang,Samplers}.lean are excluded
