@@ -233,7 +233,7 @@ macro "head_case" : tactic =>
   ))
 
 
-abbrev HeadReducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+abbrev HeadReducible (e : Exp rT) (σ : State rT) : Prop :=
   headStep ⟨e, σ⟩ ≠ 0
 
 /-! ### Measurability for arbitrary measurable `rT`.
@@ -492,8 +492,7 @@ keystone `Exp.measurable_rec_param` then assembles them. -/
 @[simp] def headStep.c_unop (p : State rT × UnOp × Exp rT) : Measure (Cfg rT) :=
   p.2.2.isValM ((p.2.1.eval p.2.2).unwrapM (fun e' => dirac ⟨e', p.1⟩))
 
-theorem headStep.c_unop.measurable [Inhabited rT] :
-    Measurable (headStep.c_unop (rT := rT)) := by
+theorem headStep.c_unop.measurable : Measurable (headStep.c_unop (rT := rT)) := by
   have hoe : Measurable (fun p : State rT × UnOp × Exp rT => p.2.1.eval p.2.2) :=
     Exp.UnOp_eval.measurable.comp measurable_snd
   have hdir : Measurable
@@ -630,12 +629,7 @@ theorem headStep.c_alloc.measurable :
   | .lit (.bool false) => dirac ⟨p.2.2.2, p.1⟩
   | _ => 0
 
-theorem headStep.c_cond.measurable [Inhabited rT] :
-    Measurable (headStep.c_cond (rT := rT)) := by
-  -- Nested rec on `ec` with `(σ, et, ef)` as param.
-  -- For each Exp ctor: only `.lit` non-zero, and within `.lit` only `.bool true/false`.
-  -- Cleanest: use Exp.measurable_rec_param on ec, with c_lit doing a nested
-  -- BaseLit.measurable_rec.
+theorem headStep.c_cond.measurable : Measurable (headStep.c_cond (rT := rT)) := by
   let c_lit_inner : (State rT × Exp rT × Exp rT) × BaseLit rT → Measure (Cfg rT) :=
     fun q => match q.2 with
       | .bool true => dirac ⟨q.1.2.1, q.1.1⟩
@@ -783,7 +777,7 @@ theorem headStep.c_case.measurable :
                       | some v => dirac ⟨Exp.ofVal v, p.1⟩
   | _ => 0
 
-theorem headStep.c_load.measurable [Inhabited rT] :
+theorem headStep.c_load.measurable :
     Measurable (headStep.c_load (rT := rT)) := by
   -- Three-level: outer Exp.lit live → inner BaseLit.loc live → option dispatch on
   -- heap[ℓ]?. The innermost some-branch is `dirac ⟨ofVal v, σ⟩`.
@@ -854,7 +848,7 @@ theorem headStep.c_load.measurable [Inhabited rT] :
       | some _ => dirac ⟨.lit .unit, p.1.update_heap (·.insert ℓ v)⟩)
   | _ => 0
 
-theorem headStep.c_store.measurable [Inhabited rT] :
+theorem headStep.c_store.measurable :
     Measurable (headStep.c_store (rT := rT)) := by
   -- Three-level: outer Exp.lit live → inner BaseLit.loc live → asValM on e2 with
   -- inner heap-lookup option dispatch.
@@ -967,7 +961,7 @@ theorem headStep.c_store.measurable [Inhabited rT] :
     dirac ⟨.lit (.lbl α), p.1.update_tapes (·.insert α (.empty z))⟩
   | _ => 0
 
-theorem headStep.c_tape.measurable [Inhabited rT] :
+theorem headStep.c_tape.measurable :
     Measurable (headStep.c_tape (rT := rT)) := by
   -- Two-level: outer `Exp.measurable_rec_param` only `.lit` live; inner
   -- `BaseLit.measurable_rec_param` only `.int` live. β := State rT throughout.
@@ -1043,7 +1037,7 @@ theorem headStep.c_tape.measurable [Inhabited rT] :
       else Cfg.uniform z p.1
   | _, _ => 0
 
-theorem headStep.c_rand.measurable [Inhabited rT] :
+theorem headStep.c_rand.measurable :
     Measurable (headStep.c_rand (rT := rT)) := by
   -- Structure: outer Exp dispatch (e1) → BaseLit dispatch (l1, only .int live) →
   -- inner Exp dispatch (e2) → BaseLit dispatch (l2, .unit AND .lbl live).

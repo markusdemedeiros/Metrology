@@ -174,7 +174,7 @@ theorem stepOrFinal_not_isValue {ρ : Cfg rT} (hv : ¬ ρ.expr.isValue) :
   simp [stepOrFinal, hv]
 
 @[fun_prop]
-theorem stepOrFinal.measurable [Inhabited rT] :
+theorem stepOrFinal.measurable :
     Measurable (stepOrFinal : Cfg rT → Measure (Cfg rT)) := by
   have hpred : MeasurableSet {ρ : Cfg rT | ρ.expr.isValue} := by
     -- `isValue` now also requires local closedness; `{isValue} = {isValueR} ∩ {lcb 0 = true}`.

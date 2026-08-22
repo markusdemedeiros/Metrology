@@ -234,8 +234,8 @@ theorem BiiCCredit_one (F : Bool → ℝ≥0∞) {x : ℝ} (hx0 : 0 ≤ x) (hx1 
       = (fun r => (Set.Ioi x).indicator (fun _ => F true) r
           + (Set.Iic x).indicator (fun _ => F false) r) := by
     funext r; by_cases h : x < r
-    · simp [Set.indicator_apply, h, _root_.not_le.mpr h, _root_.le_of_lt h]
-    · simp [Set.indicator_apply, h, _root_.not_lt.mp h]
+    · simp [h, _root_.not_le.mpr h]
+    · simp [h, _root_.not_lt.mp h]
   rw [hdecomp,
     lintegral_add_left ((measurable_const.indicator measurableSet_Ioi)),
     lintegral_indicator measurableSet_Ioi, lintegral_indicator measurableSet_Iic,
