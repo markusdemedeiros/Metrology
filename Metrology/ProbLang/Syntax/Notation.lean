@@ -112,6 +112,7 @@ syntax:58 pl_exp:58 " ^^ " pl_exp:59                            : pl_exp
 syntax:50 pl_exp:50 " = " pl_exp:50                             : pl_exp
 syntax:10 "if " pl_exp " then " pl_exp " else " pl_exp          : pl_exp
 syntax:75 "~" pl_exp:75                                         : pl_exp
+syntax:100 "toReal(" pl_exp ")"                                 : pl_exp
 syntax:75 "-" pl_exp:75                                         : pl_exp
 syntax:100 pl_exp:100 colGt ppSpace pl_exp:101                  : pl_exp
 syntax:10 "let " pl_arg " := " pl_exp:10 "; " pl_exp:1          : pl_exp
@@ -299,6 +300,7 @@ meta partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
   | `(pl_exp|$e1 = $e2)    => do `(Exp.binop .eq    $(← elabPL env st e1) $(← elabPL env st e2))
   | `(pl_exp|~$e)          => do `(Exp.unop  .neg   $(← elabPL env st e))
   | `(pl_exp|-$e)          => do `(Exp.unop  .minus $(← elabPL env st e))
+  | `(pl_exp|toReal($e))   => do `(Exp.unop  .toReal $(← elabPL env st e))
   | `(pl_exp|if $ec then $et else $ef) => do
       `(Exp.cond $(← elabPL env st ec) $(← elabPL env st et) $(← elabPL env st ef))
   | `(pl_exp|$e1 $e2)      => do `(Exp.app $(← elabPL env st e1) $(← elabPL env st e2))
@@ -593,8 +595,9 @@ meta def unexpBinop : Unexpander
 
 @[app_unexpander Exp.unop]
 meta def unexpUnop : Unexpander
-  | `($_ UnOp.neg   $e) => do `(pl(~$(← unpackPLExp e)))
-  | `($_ UnOp.minus $e) => do `(pl(- $(← unpackPLExp e)))
+  | `($_ UnOp.neg    $e) => do `(pl(~$(← unpackPLExp e)))
+  | `($_ UnOp.minus  $e) => do `(pl(- $(← unpackPLExp e)))
+  | `($_ UnOp.toReal $e) => do `(pl(toReal($(← unpackPLExp e))))
   | _ => throw ()
 
 @[app_unexpander Exp.cond]

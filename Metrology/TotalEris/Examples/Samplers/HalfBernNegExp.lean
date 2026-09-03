@@ -27,6 +27,13 @@ def LeHalfSpec (r : ℝ) : Bool := decide (r ≤ 1 / 2)
 @[pl_fold]
 def LeHalf : Exp ℝ := pl% fun x, x <= #(.real (1 / 2 : ℝ))
 
+/-- Unbiased coin: `urand ≤ ½`. -/
+@[pl_fold]
+def FairCoin : Exp ℝ := pl%
+  fun _u,
+    let u := urand;
+    &LeHalf u
+
 @[pl_fold]
 def BNEHalf : Exp ℝ := pl%
   fun _u,
@@ -219,6 +226,98 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
       isimp only [LiftParity_eq_ite, if_neg (show ¬ n % 2 = 0 by omega)] at Hcrn
       iframe Hcrn
       itrivial
+
+/-! ## Fair coin
+
+`LeHalf` applied to a `urand` sample is an unbiased coin: `urand ≤ ½` has
+probability exactly ½. `FairCoinCredit` is the pointwise credit fed to
+`twp_urand_exp'`, and `FairCoinCreditV` its expectation. -/
+
+section fairCoin
+
+def FairCoinCredit (F : Bool → ℝ≥0∞) : ℝ → ℝ≥0∞ :=
+  fun r => if r ≤ 1 / 2 then F true else F false
+
+def FairCoinCreditV (F : Bool → ℝ≥0∞) : ℝ≥0∞ :=
+  ENNReal.ofReal (1 / 2) * F true + ENNReal.ofReal (1 / 2) * F false
+
+theorem measurable_fairCoinCredit (F : Bool → ℝ≥0∞) : Measurable (FairCoinCredit F) :=
+  Measurable.ite measurableSet_Iic measurable_const measurable_const
+
+open MeasureTheory in
+theorem FairCoinCredit_lintegral (F : Bool → ℝ≥0∞) :
+    ∫⁻ r, FairCoinCredit F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = FairCoinCreditV F := by
+  have hsetA : Set.Iic (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Icc 0 (1 / 2) := by
+    ext r; simp only [Set.mem_inter_iff, Set.mem_Iic, Set.mem_Icc]
+    exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, by linarith⟩⟩
+  have hsetB : Set.Ioi (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Ioc (1 / 2) 1 := by
+    ext r; simp only [Set.mem_inter_iff, Set.mem_Ioi, Set.mem_Icc, Set.mem_Ioc]
+    exact ⟨fun ⟨h2, _, h1⟩ => ⟨h2, h1⟩, fun ⟨h2, h1⟩ => ⟨h2, by linarith, h1⟩⟩
+  have hsplit : FairCoinCredit F
+      = fun r => (Set.Iic (1 / 2 : ℝ)).indicator (fun _ => F true) r
+          + (Set.Ioi (1 / 2 : ℝ)).indicator (fun _ => F false) r := by
+    funext r
+    simp only [FairCoinCredit, Set.indicator_apply, Set.mem_Iic, Set.mem_Ioi]
+    by_cases hr : r ≤ 1 / 2
+    · rw [if_pos hr, if_pos hr, if_neg (not_lt.mpr hr), add_zero]
+    · rw [if_neg hr, if_neg hr, if_pos (not_le.mp hr), zero_add]
+  show ∫⁻ r, FairCoinCredit F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
+  rw [hsplit, lintegral_add_left (measurable_const.indicator measurableSet_Iic),
+    lintegral_indicator_restrict measurableSet_Iic (fun _ => F true),
+    lintegral_indicator_restrict measurableSet_Ioi (fun _ => F false),
+    hsetA, hsetB, setLIntegral_const, setLIntegral_const, Real.volume_Icc, Real.volume_Ioc]
+  norm_num [FairCoinCreditV, mul_comm]
+
+/-! `FairCoin` is a closed constant, so it survives being carried under the
+binders of an enclosing program: these two rewrites strip the `openRec`/`closeRec`
+wrapper that stepping leaves behind, letting `twp_bind` see the constant. -/
+
+theorem FairCoin_lc : (FairCoin : Exp ℝ).IsLocallyClosed := by is_lc
+
+theorem FairCoin_fv : (FairCoin : Exp ℝ).fv = ∅ := by
+  simp [FairCoin, LeHalf, Exp.fv]
+
+@[simp] theorem FairCoin_openRec (k : ℕ) (t : Exp ℝ) :
+    Exp.openRec k t FairCoin = FairCoin := (Exp.open_lc k t FairCoin FairCoin_lc).symm
+
+@[simp] theorem FairCoin_closeRec (k : ℕ) (x : Var) :
+    Exp.closeRec k x FairCoin = FairCoin :=
+  Exp.closeRec_fresh x FairCoin k (by simp [FairCoin_fv])
+
+theorem twp_FairCoin (E : CoPset) (F : Bool → ℝ≥0∞) :
+    ⊢@{IProp GF} ↯ (FairCoinCreditV F) -∗
+      tglWp E pl(&FairCoin #.unit)
+        (fun v : Val ℝ => iprop(∃ b : Bool, ⌜v.1 = .lit (.bool b)⌝ ∗ ↯ (F b))) := by
+  iintro Hε
+  twp_pure
+  twp_bind pl(urand)
+  iapply (twp_urand_exp' (ε₂ := FairCoinCredit F) (measurable_fairCoinCredit F) ?hint) $$ Hε
+  case hint => rw [FairCoinCredit_lintegral]
+  iintro %r ⟨%Hrm, Hcr⟩
+  twp_pure
+  twp_bind pl(&LeHalf #(.real r))
+  iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(⌜v.1 = .lit (.bool (LeHalfSpec r))⌝)))
+  isplitl []
+  · iapply twp_LeHalf
+  iintro %⟨w, _⟩ %hv
+  dsimp only at hv
+  generalize hbdef : LeHalfSpec r = b at hv
+  subst hv
+  twp_value
+  imodintro
+  obtain _ | _ := b
+  · iexists false
+    isimp only [FairCoinCredit, if_neg (of_decide_eq_false hbdef)] at Hcr
+    iframe Hcr
+    ipureintro
+    rfl
+  · iexists true
+    isimp only [FairCoinCredit, if_pos (of_decide_eq_true hbdef)] at Hcr
+    iframe Hcr
+    ipureintro
+    rfl
+
+end fairCoin
 
 end specification
 

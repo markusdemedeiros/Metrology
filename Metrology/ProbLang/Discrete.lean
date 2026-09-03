@@ -92,5 +92,11 @@ instance instProbLangℝInt : ProbLang.ProbLangℝ Int where
   realLe a b := decide (a ≤ b)
   measurable_realLt := .of_discrete
   measurable_realLe := .of_discrete
+  -- On the discrete `Int` instantiation the "reals" are the integers themselves.
+  realAdd a b := a + b
+  realNeg a := -a
+  realOfInt z := z
+  measurable_realAdd := .of_discrete
+  measurable_realNeg := .of_discrete
 
 end ProbLangDiscrete

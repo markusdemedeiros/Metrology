@@ -284,7 +284,7 @@ instance instMeasurableSingletonClassBinOp : MeasurableSingletonClass BinOp wher
 This is a nested two-level pattern match: outer on `v : Exp rT` via
 `Exp.measurable_rec`, inner on `BaseLit rT` (in the `.lit` branch) via
 `BaseLit.measurable_rec`. -/
-theorem UnOp.eval_op_measurable [MeasurableSpace rT] [Inhabited rT] (op : UnOp) :
+theorem UnOp.eval_op_measurable [ProbLangℝ rT] (op : UnOp) :
     Measurable (fun v : Exp rT => UnOp.eval op v) := by
   -- Unfold `UnOp.eval op` into `Exp.casesOn` form, then apply `measurable_rec`.
   -- The only non-constant branches are `.lit`, which inner-recurses on `BaseLit`.
@@ -341,7 +341,8 @@ theorem UnOp.eval_op_measurable [MeasurableSpace rT] [Inhabited rT] (op : UnOp) 
           (fun _ => none) (fun _ => none)
           (fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
             (fun z => some (.lit (.int z.neg))) (fun _ => none) none
-            (fun _ => none) (fun _ => none) (fun _ => none))
+            (fun _ => none) (fun _ => none)
+            (fun r => some (.lit (.real (ProbLangℝ.realNeg r)))))
           (fun _ => none) (fun _ => none)
           (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
           (fun u e => (fun _ : UnOp × Exp rT => none) (u, e))
@@ -365,7 +366,8 @@ theorem UnOp.eval_op_measurable [MeasurableSpace rT] [Inhabited rT] (op : UnOp) 
       (f_bvar := fun _ => none) (f_fvar := fun _ => none)
       (f_lit := fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
         (fun z => some (Exp.lit (.int z.neg))) (fun _ => none) none
-        (fun _ => none) (fun _ => none) (fun _ => none))
+        (fun _ => none) (fun _ => none)
+        (fun r => some (Exp.lit (.real (ProbLangℝ.realNeg r)))))
       (f_lam := fun _ => none) (f_fix := fun _ => none)
       (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
       (f_cond := fun _ => none) (f_pair := fun _ => none)
@@ -378,11 +380,63 @@ theorem UnOp.eval_op_measurable [MeasurableSpace rT] [Inhabited rT] (op : UnOp) 
     · apply BaseLit.measurable_rec
         (f_int := fun z => some (Exp.lit (.int z.neg))) (f_bool := fun _ => none)
         (f_unit := fun _ => none) (f_loc := fun _ => none) (f_lbl := fun _ => none)
-        (f_real := fun _ => none)
-      exact measurable_const
+        (f_real := fun r => some (Exp.lit (.real (ProbLangℝ.realNeg r))))
+      exact MeasurableEmbedding.some_mk.measurable.comp
+        (Exp.lit.measurable.comp (BaseLit.real.measurable.comp ProbLangℝ.measurable_realNeg))
     all_goals exact measurable_const
 
-theorem UnOp_eval.measurable [MeasurableSpace rT] [Inhabited rT] :
+  | toReal =>
+    have heq : (fun v : Exp rT => UnOp.eval .toReal v) = fun v : Exp rT =>
+        Exp.casesOn (motive := fun _ => Option (Exp rT)) v
+          (fun _ => none) (fun _ => none)
+          (fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+            (fun z => some (.lit (.real (ProbLangℝ.realOfInt z)))) (fun _ => none) none
+            (fun _ => none) (fun _ => none)
+            (fun r => some (.lit (.real r))))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun u e => (fun _ : UnOp × Exp rT => none) (u, e))
+          (fun b e1 e2 => (fun _ : BinOp × Exp rT × Exp rT => none) (b, e1, e2))
+          (fun ec et ef => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, et, ef))
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+          (fun ec el er => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, el, er))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          ((fun _ : Unit => none) ())
+          ((fun _ : Unit => none) ())
+          (fun e p => (fun _ : Exp rT × Pat rT => none) (e, p)) := by
+      funext v
+      cases v <;> simp [UnOp.eval]
+      rename_i l; cases l <;> simp
+    rw [heq]
+    apply Exp.measurable_rec (rT := rT)
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none)
+      (f_lit := fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+        (fun z => some (Exp.lit (.real (ProbLangℝ.realOfInt z)))) (fun _ => none) none
+        (fun _ => none) (fun _ => none)
+        (fun r => some (Exp.lit (.real r))))
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none) (f_pair := fun _ => none)
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun _ => none) (f_inr := fun _ => none)
+      (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none)
+      (f_fail := fun _ => none) (f_urand := fun _ => none) (f_scrut := fun _ => none)
+    · apply BaseLit.measurable_rec
+        (f_int := fun z => some (Exp.lit (.real (ProbLangℝ.realOfInt z))))
+        (f_bool := fun _ => none)
+        (f_unit := fun _ => none) (f_loc := fun _ => none) (f_lbl := fun _ => none)
+        (f_real := fun r => some (Exp.lit (.real r)))
+      exact MeasurableEmbedding.some_mk.measurable.comp
+        (Exp.lit.measurable.comp BaseLit.real.measurable)
+    all_goals exact measurable_const
+
+theorem UnOp_eval.measurable [ProbLangℝ rT] :
     Measurable (Function.uncurry (UnOp.eval (α := rT))) := by
   -- `UnOp × Exp rT → Option (Exp rT)`. `UnOp` is Countable + has `⊤` σ-alg
   -- (hence `MeasurableSingletonClass`). Split over it via `_right` form.
@@ -1768,6 +1822,38 @@ theorem liftRB.measurable [MeasurableSpace rT] [Inhabited rT] (f : rT → rT →
   show Measurable (Function.uncurry (fun r1 r2 : rT => BaseLit.bool (f r1 r2)))
   exact BaseLit.bool.measurable.comp hf
 
+/-- Lift a real binary operation `rT → rT → rT` (`.plus` on real literals):
+both inputs real literals, output real literal. -/
+@[reducible] def liftRR (f : rT → rT → rT) : Exp rT × Exp rT → Option (Exp rT) :=
+  liftBin BaseLit.realExtract (fun r1 r2 => .real (f r1 r2))
+
+theorem liftRR.measurable [MeasurableSpace rT] [Inhabited rT] (f : rT → rT → rT)
+    (hf : Measurable (Function.uncurry f)) :
+    Measurable (liftRR (rT := rT) f) := by
+  refine liftBin.measurable _ _ BaseLit.realExtract.measurable ?_
+  show Measurable (Function.uncurry (fun r1 r2 : rT => BaseLit.real (f r1 r2)))
+  exact BaseLit.real.measurable.comp hf
+
+/-- Arithmetic lifter for `.plus`: dispatches on integer *or* real literal
+operands — integers via `liftII`, reals via `liftRR`. Same `orElse` pattern as
+`liftLtLe`; the two literal shapes are disjoint. -/
+@[reducible] def liftIIorRR (fi : Int → Int → Int) (f : rT → rT → rT) :
+    Exp rT × Exp rT → Option (Exp rT) :=
+  fun p => (liftII fi p).orElse (fun _ => liftRR f p)
+
+theorem liftIIorRR.measurable [MeasurableSpace rT] [Inhabited rT]
+    (fi : Int → Int → Int) (f : rT → rT → rT) (hf : Measurable (Function.uncurry f)) :
+    Measurable (liftIIorRR (rT := rT) fi f) := by
+  have hrw : liftIIorRR (rT := rT) fi f
+      = fun p => Option.casesOn (motive := fun _ => Option (Exp rT)) (liftII fi p)
+          (liftRR f p) (fun x => some x) := by
+    funext p
+    show (liftII fi p).orElse (fun _ => liftRR f p) = _
+    cases liftII fi p <;> rfl
+  rw [hrw]
+  exact Option.measurable_elim_param (liftII.measurable fi) (liftRR.measurable f hf)
+    (MeasurableEmbedding.some_mk.measurable.comp measurable_snd)
+
 /-- Comparison lifter for `.lt`/`.le`: dispatches on integer *or* real literal
 operands — integers via `liftIB`, reals via `liftRB`. The two are disjoint
 (a literal is never both), so `orElse` picks whichever fires. -/
@@ -2258,6 +2344,36 @@ private theorem liftRB_def_eq [ProbLangℝ rT] (f : rT → rT → Bool) (v1 v2 :
   rename_i l2
   cases l2 <;> simp
 
+private theorem liftRR_def_eq [ProbLangℝ rT] (f : rT → rT → rT) (v1 v2 : Exp rT) :
+    liftRR f (v1, v2) =
+      (match v1, v2 with
+       | .lit (.real r1), .lit (.real r2) => some (Exp.lit (.real (f r1 r2)))
+       | _, _ => none) := by
+  unfold liftRR liftBin
+  cases v1 <;> simp [Exp.litExtract, BaseLit.realExtract, Option.bind]
+  rename_i l1
+  cases l1 <;> simp; cases v2 <;>
+    simp [BaseLit.realExtract]
+  rename_i l2
+  cases l2 <;> simp
+
+private theorem liftIIorRR_def_eq [ProbLangℝ rT] (fi : Int → Int → Int) (f : rT → rT → rT)
+    (v1 v2 : Exp rT) :
+    liftIIorRR fi f (v1, v2) =
+      (match v1, v2 with
+       | .lit (.int z1), .lit (.int z2) => some (Exp.lit (.int (fi z1 z2)))
+       | .lit (.real r1), .lit (.real r2) => some (Exp.lit (.real (f r1 r2)))
+       | _, _ => none) := by
+  show (liftII fi (v1, v2)).orElse (fun _ => liftRR f (v1, v2)) = _
+  rw [liftII_def_eq, liftRR_def_eq]
+  cases v1 <;> first
+    | rfl
+    | (rename_i l1; cases l1 <;> first
+        | rfl
+        | (cases v2 <;> first
+            | rfl
+            | (rename_i l2; cases l2 <;> rfl)))
+
 private theorem liftLtLe_def_eq [ProbLangℝ rT] (fi : Int → Int → Bool) (f : rT → rT → Bool)
     (v1 v2 : Exp rT) :
     liftLtLe fi f (v1, v2) =
@@ -2267,6 +2383,18 @@ private theorem liftLtLe_def_eq [ProbLangℝ rT] (fi : Int → Int → Bool) (f 
        | _, _ => none) := by
   show (liftIB fi (v1, v2)).orElse (fun _ => liftRB f (v1, v2)) = _
   rw [liftIB_def_eq, liftRB_def_eq]
+  cases v1 <;> first
+    | rfl
+    | (rename_i l1; cases l1 <;> first
+        | rfl
+        | (cases v2 <;> first
+            | rfl
+            | (rename_i l2; cases l2 <;> rfl)))
+
+/-- Helper for the `plus` arm of `BinOp.eval_eq_lift`: integer *or* real operands. -/
+private theorem BinOp.eval_plus_eq_liftIIorRR [ProbLangℝ rT] (v1 v2 : Exp rT) :
+    BinOp.eval .plus v1 v2 = liftIIorRR (· + ·) ProbLangℝ.realAdd (v1, v2) := by
+  rw [liftIIorRR_def_eq]
   cases v1 <;> first
     | rfl
     | (rename_i l1; cases l1 <;> first
@@ -2315,7 +2443,7 @@ nested-`match` form via the `liftXY_def_eq` helpers (`rfl` for `liftEq`). -/
 theorem BinOp.eval_eq_lift [ProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
     BinOp.eval op v1 v2 =
       (match op with
-       | .plus  => liftII (· + ·)
+       | .plus  => liftIIorRR (· + ·) ProbLangℝ.realAdd
        | .minus => liftII (· - ·)
        | .mult  => liftII (· * ·)
        | .div   => liftII (· / ·)
@@ -2346,6 +2474,7 @@ theorem BinOp.eval_eq_lift [ProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
               | (cases v2 <;> first
                   | rfl
                   | (rename_i l2; cases l2 <;> rfl))))
+      | exact BinOp.eval_plus_eq_liftIIorRR v1 v2
       | exact BinOp.eval_lt_eq_liftLtLe v1 v2
       | exact BinOp.eval_le_eq_liftLtLe v1 v2
       | exact BinOp.eval_eq_eq_liftEq v1 v2
@@ -2355,7 +2484,7 @@ theorem BinOp_eval.measurable [ProbLangℝ rT] :
   have hrw : (fun (q : BinOp × Exp rT × Exp rT) => BinOp.eval q.1 q.2.1 q.2.2)
       = fun q : BinOp × Exp rT × Exp rT =>
           (match q.1 with
-           | .plus  => liftII (· + ·)
+           | .plus  => liftIIorRR (· + ·) ProbLangℝ.realAdd
            | .minus => liftII (· - ·)
            | .mult  => liftII (· * ·)
            | .div   => liftII (· / ·)
@@ -2374,7 +2503,7 @@ theorem BinOp_eval.measurable [ProbLangℝ rT] :
   intro op
   cases op
   all_goals dsimp only
-  · exact liftII.measurable _
+  · exact liftIIorRR.measurable _ _ ProbLangℝ.measurable_realAdd
   · exact liftII.measurable _
   · exact liftII.measurable _
   · exact liftII.measurable _

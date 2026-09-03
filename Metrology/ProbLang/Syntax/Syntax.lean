@@ -128,6 +128,17 @@ class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, In
   realLe : T → T → Bool
   measurable_realLt : Measurable (Function.uncurry realLt)
   measurable_realLe : Measurable (Function.uncurry realLe)
+  /-- Addition of two reals. Powers the `.plus` case of `BinOp.eval` on real
+  literals. Like the comparisons above this is *data*, not an `Add` instance, so
+  that `ProbLangℝ` stays free of algebraic-structure diamonds. -/
+  realAdd : T → T → T
+  /-- Negation of a real. Powers `UnOp.eval .minus` on real literals. -/
+  realNeg : T → T
+  /-- Injection of integers into the reals. Powers `UnOp.eval .toReal`, the
+  coercion that lets a program combine an integer part with a real fraction. -/
+  realOfInt : Int → T
+  measurable_realAdd : Measurable (Function.uncurry realAdd)
+  measurable_realNeg : Measurable realNeg
 
 attribute [reducible, instance] ProbLangℝ.instDecidableEq
 attribute [instance] ProbLangℝ.unifUnit_isProbabilityMeasure
@@ -158,7 +169,7 @@ inductive BaseLit (rT : Type _)
   deriving Countable, BEq
 
 @[uncurriedProjections, curriedProjections, constructors]
-inductive UnOp | neg | minus
+inductive UnOp | neg | minus | toReal
   deriving Inhabited, Countable, Repr, BEq
 
 @[uncurriedProjections, curriedProjections, constructors]
@@ -1082,10 +1093,16 @@ def Exp.decompItem (e : Exp α) : Option (EctxItem α × Exp α) :=
 
 /- ## Deterministic evaluation helpers -/
 
-def UnOp.eval (op : UnOp) (v : Exp α) : Option (Exp α) :=
+def UnOp.eval [ProbLangℝ α] (op : UnOp) (v : Exp α) : Option (Exp α) :=
   match op, v with
   | neg, .lit (.bool b) => some <| .lit <| .bool <| ¬ b
   | minus, .lit (.int z) => some <| .lit <| .int <| z.neg
+  -- Real negation, via the `ProbLangℝ` `realNeg` data.
+  | minus, .lit (.real r) => some <| .lit <| .real <| ProbLangℝ.realNeg r
+  -- Integer-to-real coercion, via the `ProbLangℝ` `realOfInt` data. Real
+  -- literals are already reals, so the coercion is idempotent on them.
+  | toReal, .lit (.int z) => some <| .lit <| .real <| ProbLangℝ.realOfInt z
+  | toReal, .lit (.real r) => some <| .lit <| .real r
   | _, _ => none
 
 def BinOp.eval (op : BinOp) (v1 v2 : Exp rT) : Option (Exp rT) :=
@@ -1113,6 +1130,9 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp rT) : Option (Exp rT) :=
   -- Real comparison, via the `ProbLangℝ` `realLt`/`realLe` comparison data.
   | lt,    .lit (.real r1), .lit (.real r2) => some <| .lit <| .bool (ProbLangℝ.realLt r1 r2)
   | le,    .lit (.real r1), .lit (.real r2) => some <| .lit <| .bool (ProbLangℝ.realLe r1 r2)
+  -- Real addition, via the `ProbLangℝ` `realAdd` data. Mixed int/real operands
+  -- stay stuck: a program coerces explicitly with `UnOp.toReal`.
+  | plus,  .lit (.real r1), .lit (.real r2) => some <| .lit <| .real (ProbLangℝ.realAdd r1 r2)
   -- Bit shifts on integers. Shift amount is converted to Nat via `toNat`
   -- (negative shift amounts treat as 0 — caller's responsibility to ensure non-negative).
   | shl,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 * 2 ^ z2.toNat)

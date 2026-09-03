@@ -8,6 +8,8 @@ public import Metrology.TotalEris.Examples.Samplers.NegExp
 public import Metrology.TotalEris.Examples.Samplers.Selector
 public import Metrology.TotalEris.Examples.Samplers.Gauss
 public import Metrology.TotalEris.Examples.Samplers.GaussianAdequacy
+public import Metrology.TotalEris.Examples.Samplers.GaussianConcentration
+public import Metrology.TotalEris.Examples.Samplers.Gaussian
 
 @[expose] public section
 
@@ -26,11 +28,19 @@ RealDecrTrial ── decreasing trial (urand init, real `<` compare, twp_urand_e
 BernoulliGeometric (AbstractBernoulli, GeometricTrial)
   └── BernIter (AbstractBernoulliI, IterTrial, AbstractBernoulli.toAbstractBernoulliI)
 Gauss (G1, G2)  ← BNEHalf, GeometricTrial, IterTrial, B
-  └── GaussianAdequacy  ← DistributionAdequacy
+  └── Gaussian (Gauss)                       ── real assembly + sign flip ⇒ N(0,1)
+        └── GaussianAdequacy  ← DistributionAdequacy
+              └── GaussianConcentration          ── Chebyshev/Chernoff/Mills tails
 ```
 
 Every WP spec here is complete and `sorry`-free, and fixed at `rT = ℝ`.
 
-Laplace is not included: its value reconstruction and scaling need real-arithmetic
-and real-power-of-two `BinOp.eval` extensions the language does not yet have.
+`G2` samples the half-normal as a pair `(x, k)`; `Gauss` assembles the real
+`x + k` in the object language (via the `toReal` coercion and real addition),
+flips a fair coin, and negates on heads, giving a sampler whose limiting
+execution is distributed exactly as `gaussianReal 0 1`.
+
+Laplace is still not included: its value reconstruction needs real scaling by
+powers of two, which `BinOp.eval` does not yet have (real `+`, unary `-` and the
+`toReal` coercion do exist).
 -/

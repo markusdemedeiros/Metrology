@@ -370,7 +370,7 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
     | ~q(some $res)                 => return some (e, res, #[])
     | _                             => return none
   | ~q(.unop $op $e1)                     => do
-    let r : Q(Option (Exp $α)) ← whnf q(@UnOp.eval $α $op $e1)
+    let r : Q(Option (Exp $α)) ← whnf q(@UnOp.eval $α $instPL $op $e1)
     match r with
     | ~q(some (Exp.lit (.bool $b)))          => do
         let b' : Q(Bool) ← Lean.Meta.reduce b

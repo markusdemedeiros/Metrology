@@ -59,6 +59,24 @@ public noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
         = {p : ℝ × ℝ | p.1 ≤ p.2} := by
       ext p; simp [Function.uncurry, decide_eq_true_eq]
     rw [h]; exact measurableSet_le measurable_fst measurable_snd
+  -- Arithmetic is Lean's own on `ℝ`; both operations are Borel-measurable.
+  realAdd a b := a + b
+  realNeg a := -a
+  realOfInt z := (z : ℝ)
+  measurable_realAdd := measurable_add
+  measurable_realNeg := measurable_neg
+
+/-! ### Arithmetic reduction lemmas
+
+`BinOp.eval`/`UnOp.eval` produce `ProbLangℝ.realAdd`/`realNeg`/`realOfInt`
+applications. At `rT = ℝ` these are Lean's own operations; these `simp` lemmas
+let `twp_pures` and the stepping display normalise them away. -/
+
+@[simp] public theorem realAdd_real (a b : ℝ) : ProbLangℝ.realAdd a b = a + b := rfl
+
+@[simp] public theorem realNeg_real (a : ℝ) : ProbLangℝ.realNeg a = -a := rfl
+
+@[simp] public theorem realOfInt_real (z : ℤ) : ProbLangℝ.realOfInt z = (z : ℝ) := rfl
 
 /-- For the `ℝ` instance, `unifUnitSupport` is the open interval `(0,1)`, so membership
 unpacks to the strict range `0 < r < 1`. Used by `urand` samplers to read off sample
