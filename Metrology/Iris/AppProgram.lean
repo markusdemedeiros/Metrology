@@ -6,7 +6,7 @@ public import Iris.Algebra.HeapView
 public import Iris.Instances.IProp.Instance
 public import Iris.Std.HeapInstances
 public import Metrology.Iris.Algebra
-public import Metrology.Iris.SpecProgram
+public import Metrology.Iris.StateAlgebra
 public import Metrology.ProbLang.Syntax.Syntax
 public import Metrology.ProbLang.Syntax.Notation
 
@@ -15,23 +15,15 @@ public import Metrology.ProbLang.Syntax.Notation
 /-!
 # Program-side ghost state
 
-Concrete ghost-state for the **program** side of the Approxis WP. Mirrors
-`Metrology/Iris/SpecProgram.lean` but owns *program* heap and tapes rather
-than spec-side ones.
+Concrete ghost-state for the program heap and tapes.
 
 ## Rocq source
 
 `clutch/theories/approxis/primitive_laws.v` — the `approxisGS` class bundles
-program-side heap/tape ghost-maps with the spec resources.
-
-Here we separate concerns:
-- `AppPreGS` / `AppGS` own *program* heap and tape γ-names.
-- `SpecGS` owns spec-side γ-names (already in `SpecProgram.lean`).
-- The Approxis "combined" instance is the union `[AppGS rT GF] [SpecGS GF] [ecGS GF]`.
-
-The CMRAs (`SpecHeap = HeapView Loc (Agree (Val rT)) LocHeap`, etc.) are reused
-verbatim from `SpecProgram.lean` — nothing spec-specific about them, just
-"ghost-map over Loc".
+program-side heap/tape ghost-maps with the spec resources. Only the
+program-side half is kept here: `AppPreGS` / `AppGS` own the heap and tape
+γ-names, and the underlying CMRAs (`SpecHeap`, `SpecTapes`) come from
+`Metrology/Iris/StateAlgebra.lean`.
 -/
 
 section AppProgramRA
@@ -41,8 +33,8 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 /-! ## Ghost-state classes -/
 
-/-- The preGS bundle: which CMRAs live in `GF`. Reuses `SpecHeap`/`SpecTapes`
-from `SpecProgram.lean` — the algebra is identical for program and spec. -/
+/-- The preGS bundle: which CMRAs live in `GF`, taken from
+`StateAlgebra.lean`. -/
 class AppPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors) where
   heap : ElemG GF (constOF (SpecHeap rT))
   tapes : ElemG GF (constOF SpecTapes)
@@ -95,11 +87,7 @@ end AppGS
 -- (which binds `↪` globally). Heap points-to `↦` lives in scope `AppGS`.
 notation:51 l:51 " ↪ₐ " v:51 => appTapesFrag l v
 
-/-! ## Algebra: lookup, update, alloc
-
-These mirror `spec_auth_lookup_heap`, `spec_auth_update_heap`,
-`spec_auth_heap_alloc` (and tape analogues) from `SpecProgram.lean`, but
-act on the program-side γ names. -/
+/-! ## Algebra: lookup, update, alloc -/
 
 section Algebra
 open scoped AppGS
