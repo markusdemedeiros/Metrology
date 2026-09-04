@@ -50,15 +50,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS ℝ hlc GF]
 
 /-- `urand` samples irrational values with probability 1 -/
 theorem twp_urand_irrational (E : CoPset) :
-    ⊢@{IProp GF} tglWp E pl(urand)
-      (fun w => iprop(⌜∃ r : ℝ, w = .real r ∧ Irrational r⌝)) := by
+    [{ (True : IProp GF) }] pl(urand) @ E [{ r, RET .real r; ⌜Irrational r⌝ }] := by
+  iintro %Φ - HΦ
   iapply twp_err_pos solve_not_value
   iintro %ε %Hε Herr
   iapply (twp_urand_exp measurable_irratErr irratErr_le_one ?Gexp) $$ Herr
   case Gexp => simp [lintegral_irratErr_eq_zero]
   iintro %r ⟨%-, Hcr⟩
   by_cases h : Irrational r
-  · ipureintro; exact ⟨r, rfl, h⟩
+  · iapply HΦ; ipureintro; exact h
   · iexfalso
     iapply ErrorCredit.contradict $$ Hcr
     rw [irratErr_of_not_irrational h]
@@ -91,7 +91,12 @@ theorem urand_irrational_pgl (σ : State ℝ) :
   refine twp_pgl_lim (GF := erisGF) (e := pl(urand)) (σ := σ)
     (φ := fun v => ∃ r : ℝ, v = .real r ∧ Irrational r)
     measurableSet_irrational_val ?_
-  intro _; iintro _; iapply twp_urand_irrational
+  intro _; iintro _
+  iapply twp_urand_irrational
+  · itrivial
+  iintro %r %hr
+  ipureintro
+  exact ⟨r, rfl, hr⟩
 
 /-- info: 'ProbLang.TotalEris.urand_irrational_pgl' depends on axioms: [propext, Classical.choice, Quot.sound] -/
 #guard_msgs(info) in

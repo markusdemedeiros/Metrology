@@ -3,6 +3,7 @@ module
 public meta import Metrology.Meta.Discrete
 public import Metrology.TotalEris.Glm
 public import Metrology.TotalEris.TotalWeakestpre
+public import Metrology.TotalEris.Triple
 public import Metrology.TotalEris.TotalLifting
 public import Metrology.TotalEris.ErisGS
 public import Metrology.TotalEris.TotalPrimitiveLaws

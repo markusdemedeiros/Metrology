@@ -158,30 +158,42 @@ theorem hasSubgaussianMGF_id_gaussianReal : HasSubgaussianMGF id 1 (gaussianReal
   integrable_exp_mul t := integrable_exp_mul_gaussianReal t
   mgf_le t := by rw [mgf_id_gaussianReal]; simp
 
-theorem chernoff_half {X : ℝ → ℝ} (hX : HasSubgaussianMGF X 1 (gaussianReal 0 1)) {t : ℝ}
-    (ht : 0 ≤ t) :
-    (gaussianReal 0 1) {y : ℝ | t ≤ X y} ≤ ENNReal.ofReal (Real.exp (-t ^ 2 / 2)) := by
-  have h := hX.measure_ge_le ht
-  rw [Measure.real] at h
-  refine (ENNReal.le_ofReal_iff_toReal_le (measure_ne_top _ _) (Real.exp_pos _).le).mpr ?_
-  refine h.trans (le_of_eq ?_)
-  rw [NNReal.coe_one, mul_one]
+theorem integral_Ioi_exp_le_shift {t : ℝ} (ht : 0 ≤ t) :
+    (∫ y in Set.Ioi t, Real.exp (-y ^ 2 / 2))
+      ≤ Real.exp (-t ^ 2 / 2) * ∫ u in Set.Ioi (0 : ℝ), Real.exp (-u ^ 2 / 2) := by
+  have hmp : MeasurePreserving (fun u : ℝ => u + t) volume volume :=
+    measurePreserving_add_right volume t
+  have hemb : MeasurableEmbedding (fun u : ℝ => u + t) :=
+    (Homeomorph.addRight t).measurableEmbedding
+  have hpre : (fun u : ℝ => u + t) ⁻¹' Set.Ioi t = Set.Ioi 0 := by
+    ext u
+    simp only [Set.mem_preimage, Set.mem_Ioi]
+    constructor <;> intro h <;> linarith
+  have hint : IntegrableOn (fun u : ℝ => Real.exp (-(u + t) ^ 2 / 2)) (Set.Ioi 0) := by
+    have h := (hmp.integrableOn_comp_preimage (f := fun y : ℝ => Real.exp (-y ^ 2 / 2))
+      (s := Set.Ioi t) hemb).mpr integrable_exp_neg_sq_half.integrableOn
+    rwa [hpre] at h
+  have hshift := hmp.setIntegral_preimage_emb hemb (fun y : ℝ => Real.exp (-y ^ 2 / 2)) (Set.Ioi t)
+  rw [hpre] at hshift
+  rw [← hshift, ← integral_const_mul]
+  refine setIntegral_mono_on hint (integrable_exp_neg_sq_half.const_mul _).integrableOn
+    measurableSet_Ioi fun u (hu : 0 < u) => ?_
+  rw [← Real.exp_add]
+  exact Real.exp_le_exp.mpr (by nlinarith)
 
-theorem gaussianReal_abs_ge_le_chernoff {t : ℝ} (ht : 0 ≤ t) :
-    (gaussianReal 0 1) {y : ℝ | t ≤ |y|} ≤ ENNReal.ofReal (2 * Real.exp (-t ^ 2 / 2)) := by
-  have hsub : {y : ℝ | t ≤ |y|} ⊆ {y : ℝ | t ≤ id y} ∪ {y : ℝ | t ≤ (-id) y} := fun y hy => by
-    have hy' : t ≤ |y| := hy
-    rcases le_total 0 y with h | h
-    · exact Or.inl (show t ≤ y by rwa [abs_of_nonneg h] at hy')
-    · exact Or.inr (show t ≤ -y by rwa [abs_of_nonpos h] at hy')
-  calc (gaussianReal 0 1) {y : ℝ | t ≤ |y|}
-      ≤ _ := measure_mono hsub
-    _ ≤ _ := measure_union_le _ _
-    _ ≤ ENNReal.ofReal (Real.exp (-t ^ 2 / 2)) + ENNReal.ofReal (Real.exp (-t ^ 2 / 2)) :=
-        add_le_add (chernoff_half hasSubgaussianMGF_id_gaussianReal ht)
-          (chernoff_half hasSubgaussianMGF_id_gaussianReal.neg ht)
-    _ = ENNReal.ofReal (2 * Real.exp (-t ^ 2 / 2)) := by
-        rw [← ENNReal.ofReal_add (Real.exp_pos _).le (Real.exp_pos _).le]; ring_nf
+theorem halfNormal_Ici_le_chernoff {t : ℝ} (ht : 0 < t) :
+    halfNormal (Set.Ici t) ≤ ENNReal.ofReal (Real.exp (-t ^ 2 / 2)) := by
+  have hset : Set.Ici t ∩ Set.Ioi (0 : ℝ) = Set.Ici t :=
+    Set.inter_eq_self_of_subset_left fun y hy => lt_of_lt_of_le ht hy
+  rw [halfNormal_eq_withDensity, withDensity_apply _ measurableSet_Ici,
+    Measure.restrict_restrict measurableSet_Ici, hset, setLIntegral_congr Ioi_ae_eq_Ici.symm]
+  show ∫⁻ y in Set.Ioi t, ENNReal.ofReal (Real.exp (-y ^ 2 / 2) / Norm2) ∂volume ≤ _
+  rw [← ofReal_integral_eq_lintegral_ofReal (integrable_exp_neg_sq_half.div_const _).integrableOn
+      (ae_restrict_of_forall_mem measurableSet_Ioi
+        fun y _ => div_nonneg (Real.exp_pos _).le Norm2_pos.le), integral_div]
+  refine ENNReal.ofReal_le_ofReal ?_
+  rw [div_le_iff₀ Norm2_pos, ← integral_Ioi_exp_eq_Norm2]
+  exact integral_Ioi_exp_le_shift ht.le
 
 theorem halfNormal_Ici_le_mills {t : ℝ} (ht : 0 < t) :
     halfNormal (Set.Ici t)
@@ -213,6 +225,10 @@ theorem gaussianReal_abs_ge_eq_halfNormal_Ici {t : ℝ} :
     withDensity_apply _ measurableSet_Ici, Measure.restrict_restrict (measurableSet_abs_ge t),
     Measure.restrict_restrict measurableSet_Ici, hint]
 
+theorem gaussianReal_abs_ge_le_chernoff {t : ℝ} (ht : 0 < t) :
+    (gaussianReal 0 1) {y : ℝ | t ≤ |y|} ≤ ENNReal.ofReal (Real.exp (-t ^ 2 / 2)) :=
+  gaussianReal_abs_ge_eq_halfNormal_Ici ▸ halfNormal_Ici_le_chernoff ht
+
 theorem gaussianReal_abs_ge_le_mills {t : ℝ} (ht : 0 < t) :
     (gaussianReal 0 1) {y : ℝ | t ≤ |y|}
       ≤ ENNReal.ofReal (Real.sqrt (2 / Real.pi) * Real.exp (-t ^ 2 / 2) / t) :=
@@ -227,10 +243,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 /-- Any bound on the tail mass is a price for a `t`-bounded sample. -/
 theorem twp_Gauss_tail_of_le (E : CoPset) {t : ℝ} {ε : ℝ≥0∞}
     (hb : (ProbabilityTheory.gaussianReal 0 1) {y : ℝ | t ≤ |y|} ≤ ε) :
-    ⊢@{IProp GF} ↯ ε -∗
-      tglWp E pl(&Gauss #.unit)
-        (fun v : Val ℝ => iprop(⌜∃ y : ℝ, v.1 = .lit (.real y) ∧ |y| < t⌝)) := by
-  iintro Hε
+    [{ (↯ ε : IProp GF) }] pl(&Gauss #.unit) @ E [{ y, RET .real y; ⌜|y| < t⌝ }] := by
+  iintro %Φ Hε HΦ
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ y : ℝ,
     ⌜v.1 = .lit (.real y)⌝ ∗ ↯ (stdTailErr t y))))
   isplitl [Hε]
@@ -239,38 +253,36 @@ theorem twp_Gauss_tail_of_le (E : CoPset) {t : ℝ} {ε : ℝ≥0∞}
     iexact Hε
   iintro %v ⟨%y, %hy, Hcr⟩
   by_cases hlt : |y| < t
-  · ipureintro
-    exact ⟨y, hy, hlt⟩
+  · obtain rfl : v = Val.real y := Val.ext hy
+    iapply HΦ
+    ipureintro
+    exact hlt
   · iexfalso
     iapply ErrorCredit.contradict $$ Hcr
     rw [stdTailErr_of_le (not_lt.mp hlt)]
 
 /-- Markov: `↯(√(2/π)/t)` buys `|y| < t`. -/
 theorem twp_Gauss_tail_markov (E : CoPset) {t : ℝ} (ht : 0 < t) :
-    ⊢@{IProp GF} ↯ (ENNReal.ofReal (Real.sqrt (2 / Real.pi) / t)) -∗
-      tglWp E pl(&Gauss #.unit)
-        (fun v : Val ℝ => iprop(⌜∃ y : ℝ, v.1 = .lit (.real y) ∧ |y| < t⌝)) :=
+    [{ (↯ (ENNReal.ofReal (Real.sqrt (2 / Real.pi) / t)) : IProp GF) }]
+      pl(&Gauss #.unit) @ E [{ y, RET .real y; ⌜|y| < t⌝ }] :=
   twp_Gauss_tail_of_le E (gaussianReal_abs_ge_le_markov ht)
 
 /-- Chebyshev: `↯(1/t²)` buys `|y| < t`. -/
 theorem twp_Gauss_tail (E : CoPset) {t : ℝ} (ht : 0 < t) :
-    ⊢@{IProp GF} ↯ (ENNReal.ofReal (1 / t ^ 2)) -∗
-      tglWp E pl(&Gauss #.unit)
-        (fun v : Val ℝ => iprop(⌜∃ y : ℝ, v.1 = .lit (.real y) ∧ |y| < t⌝)) :=
+    [{ (↯ (ENNReal.ofReal (1 / t ^ 2)) : IProp GF) }]
+      pl(&Gauss #.unit) @ E [{ y, RET .real y; ⌜|y| < t⌝ }] :=
   twp_Gauss_tail_of_le E (gaussianReal_abs_ge_le ht)
 
-/-- Chernoff: `↯(2·exp(-t²/2))` buys `|y| < t`. -/
-theorem twp_Gauss_tail_chernoff (E : CoPset) {t : ℝ} (ht : 0 ≤ t) :
-    ⊢@{IProp GF} ↯ (ENNReal.ofReal (2 * Real.exp (-t ^ 2 / 2))) -∗
-      tglWp E pl(&Gauss #.unit)
-        (fun v : Val ℝ => iprop(⌜∃ y : ℝ, v.1 = .lit (.real y) ∧ |y| < t⌝)) :=
+/-- Chernoff: `↯(exp(-t²/2))` buys `|y| < t`; sharpest of the four for `t ≤ 0.79`. -/
+theorem twp_Gauss_tail_chernoff (E : CoPset) {t : ℝ} (ht : 0 < t) :
+    [{ (↯ (ENNReal.ofReal (Real.exp (-t ^ 2 / 2))) : IProp GF) }]
+      pl(&Gauss #.unit) @ E [{ y, RET .real y; ⌜|y| < t⌝ }] :=
   twp_Gauss_tail_of_le E (gaussianReal_abs_ge_le_chernoff ht)
 
-/-- Mills: `↯(√(2/π)·exp(-t²/2)/t)` buys `|y| < t`, the sharpest of the four. -/
+/-- Mills: `↯(√(2/π)·exp(-t²/2)/t)` buys `|y| < t`; sharpest of the four for `t ≥ 0.8`. -/
 theorem twp_Gauss_tail_mills (E : CoPset) {t : ℝ} (ht : 0 < t) :
-    ⊢@{IProp GF} ↯ (ENNReal.ofReal (Real.sqrt (2 / Real.pi) * Real.exp (-t ^ 2 / 2) / t)) -∗
-      tglWp E pl(&Gauss #.unit)
-        (fun v : Val ℝ => iprop(⌜∃ y : ℝ, v.1 = .lit (.real y) ∧ |y| < t⌝)) :=
+    [{ (↯ (ENNReal.ofReal (Real.sqrt (2 / Real.pi) * Real.exp (-t ^ 2 / 2) / t)) : IProp GF) }]
+      pl(&Gauss #.unit) @ E [{ y, RET .real y; ⌜|y| < t⌝ }] :=
   twp_Gauss_tail_of_le E (gaussianReal_abs_ge_le_mills ht)
 
 end Credit
@@ -301,10 +313,10 @@ theorem gauss_std_tail_prob [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : �
       ≤ ENNReal.ofReal (1 / t ^ 2) :=
   gauss_std_tail_prob_of_le (GF := GF) (gaussianReal_abs_ge_le ht) σ
 
-theorem gauss_std_tail_prob_chernoff [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 ≤ t) (σ : State ℝ) :
+theorem gauss_std_tail_prob_chernoff [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t) (σ : State ℝ) :
     (limExec ⟨pl(&Gauss #.unit), σ⟩)
         ((fun ρ : Cfg ℝ => realOfExp ρ.expr) ⁻¹' {y : ℝ | t ≤ |y|})
-      ≤ ENNReal.ofReal (2 * Real.exp (-t ^ 2 / 2)) :=
+      ≤ ENNReal.ofReal (Real.exp (-t ^ 2 / 2)) :=
   gauss_std_tail_prob_of_le (GF := GF) (gaussianReal_abs_ge_le_chernoff ht) σ
 
 theorem gauss_std_tail_prob_mills [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t) (σ : State ℝ) :
