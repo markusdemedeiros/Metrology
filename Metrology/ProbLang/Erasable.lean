@@ -219,6 +219,7 @@ theorem ofPexecN [Countable rT] [MeasurableSingletonClass rT]
 /-- Erasability on the state component lifts to rewritability on the
 configuration: if `μ` is erasable at `ρ.state`, then binding `ρ.expr`
 onto samples from `μ` gives a rewritable `Cfg`-distribution. -/
+@[discrete] -- of_erasable'
 theorem of_erasable [Countable rT] [MeasurableSingletonClass rT]
     {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.state) :
     Rewritable ρ (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))) := by
@@ -235,6 +236,7 @@ theorem of_erasable [Countable rT] [MeasurableSingletonClass rT]
 
 /-- Erasability combined with `pexecN`: push `μ` in on the state side,
 then unfold `pexecN m` inside. -/
+@[discrete] -- of_erasable_pexecN'
 theorem of_erasable_pexecN [Countable rT] [MeasurableSingletonClass rT]
     {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
     (h : Erasable μ ρ.state) :

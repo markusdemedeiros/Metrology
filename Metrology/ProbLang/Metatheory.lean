@@ -1364,6 +1364,7 @@ theorem Cfg.uniform_one_eq_dirac [Countable rT] [MeasurableSingletonClass rT]
       simp [Finset.filter_singleton, hmem]
     rw [hfilt]; simp
 
+@[discrete]
 theorem Cfg.uniform_singleton_ne_one [Countable rT] [MeasurableSingletonClass rT]
     {z : Int} {σ : State rT} {ρ : Cfg rT}
     (Hz : 1 < z) : Cfg.uniform z σ {ρ} ≠ 1 := by

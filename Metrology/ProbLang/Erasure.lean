@@ -1653,6 +1653,7 @@ noncomputable def tapePresampleIter (α : Loc) (σ : (State rT)) : Nat → Measu
 
 /-- Tape-bound persistence under `tapePresampleIter`: every state in the
 support retains tape `α` with the same bound as the initial `σ`. -/
+@[discrete]
 theorem tapePresampleIter_tape_bound_ae [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (n : Nat) :
@@ -1683,6 +1684,7 @@ theorem tapePresampleIter_tape_bound_ae [Countable rT] [MeasurableSingletonClass
 /-- Iterated-presample variant of `execN_tape_presample_expr_eq`:
 `n`-fold presampling onto tape `α` is invisible to `execN m ⟨e, ·⟩` at the
 expression level, provided the initial tape exists and has positive bound. -/
+@[discrete]
 theorem execN_tapePresampleIter_expr_eq [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {e : (Exp rT)} {m : Nat} {t : Tape} (n : Nat)
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
@@ -1725,6 +1727,7 @@ theorem execN_tapePresampleIter_expr_eq [Countable rT] [MeasurableSingletonClass
           have h_ih := ih h
           rw [h_ih, Measure.map_apply Measurable.of_discrete hS]
 
+@[discrete]
 theorem execN_iterM_tape_presample_expr_eq [Countable rT] [MeasurableSingletonClass rT]
     {σ : (State rT)} {α : Loc} {e : (Exp rT)} {m : Nat} {t : Tape} (n : Nat)
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
@@ -1848,10 +1851,10 @@ theorem mass {μ : Measure (State rT)} {σ : (State rT)} (h : ErasableExpr μ σ
   simp at hboth
   exact hboth
 
-/-- Dirac distributions are `ErasableExpr`. -/
-theorem dret [Countable rT] [MeasurableSingletonClass rT]
-    (σ : (State rT)) : ErasableExpr (Measure.dirac σ) σ :=
-  of_erasable (Erasable.dret σ)
+/-- Dirac distributions are `ErasableExpr`. Countability-free (routes through
+`Erasable.dret'`). -/
+theorem dret (σ : (State rT)) : ErasableExpr (Measure.dirac σ) σ :=
+  of_erasable (Erasable.dret' σ)
 
 /-- `tapePresample σ α` is `ErasableExpr`. This is the main theorem
 `execN_tape_presample_expr_eq`, repackaged as an `ErasableExpr` witness.
