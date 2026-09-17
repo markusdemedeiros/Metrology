@@ -69,7 +69,12 @@ namespace SubstMap
 
 def empty : SubstMap rT := []
 
-/-- Insert a (var, value) pair, shadowing any existing binding for the key. -/
+/-- Extend with a `(var, value)` pair.
+
+**This does *not* shadow.** The new pair is consed on the left, and both
+`lookup` and `Exp.substMap` give precedence to the *rightmost* binding, so
+inserting over a key `vs` already binds leaves its meaning unchanged
+(`lookup_insert_of_isSome`). Delete first if you want to override. -/
 def insert (vs : SubstMap rT) (x : Var) (v : Exp rT) : SubstMap rT := (x, v) :: vs
 
 /-- Remove all entries for `x`. -/
@@ -87,10 +92,36 @@ def lookup : SubstMap rT → Var → Option (Exp rT)
     | some w => some w
     | none => if x = y then some v else none
 
+/-- `lookup` on an `insert`, unfolded: the tail is consulted first. -/
+@[simp] theorem lookup_insert (vs : SubstMap rT) (x y : Var) (v : Exp rT) :
+    (vs.insert x v).lookup y
+      = match vs.lookup y with
+        | some w => some w
+        | none => if y = x then some v else none := rfl
+
+/-- **Existing bindings win over inserted ones.** If `vs` already binds `x`, then
+`vs.insert x v` still looks `x` up to the old value. This is the opposite of the
+`Insert`-typeclass convention, hence stated explicitly. -/
+theorem lookup_insert_of_isSome {vs : SubstMap rT} {x : Var} {w v : Exp rT}
+    (h : vs.lookup x = some w) : (vs.insert x v).lookup x = some w := by
+  simp [lookup_insert, h]
+
+/-- `insert` only takes effect on a key the map does not already bind. -/
+theorem lookup_insert_of_none {vs : SubstMap rT} {x : Var} {v : Exp rT}
+    (h : vs.lookup x = none) : (vs.insert x v).lookup x = some v := by
+  simp [lookup_insert, h]
+
 end SubstMap
 
-/-- Apply a substitution map: fold `subst` left-to-right.
-    Each pair `(x, v)` replaces free `fvar x` by `v` in the current accumulator. -/
+/-- Apply a substitution map by folding `subst` over the list with `foldr`, so the
+**rightmost pair is substituted first** and the leftmost last:
+`substMap [(x,u), (y,w)] e = subst (subst e y w) x u`.
+
+Two consequences, both relied on below. Substitution is sequential rather than
+simultaneous, so an outer pair can rewrite inside a value introduced by an inner
+one — which is why the closedness hypothesis `SubstMap.AllClosed` appears on the
+lemmas that need the two readings to agree. And the rightmost binding for a key
+is the one that takes effect, matching `SubstMap.lookup`. -/
 def Exp.substMap (vs : SubstMap rT) (e : Exp rT) : Exp rT :=
   vs.foldr (fun p acc => Exp.subst acc p.1 p.2) e
 
@@ -413,146 +444,148 @@ holds definitionally. -/
 /-! ### `substMap` distributivity over expression constructors
 
 These let `simp` push `Exp.substMap vs` through every constructor of `Exp rT`,
-mirroring the recursive structure of `Exp.subst`. Each lemma is one
-`induction vs` on the substitution list. They are critical for the
+mirroring the recursive structure of `Exp.subst`. They are critical for the
 `Fundamental.lean` lemmas, which need to commute `substMap vs` with the
 relational expression constructors before invoking the corresponding
-`refines_*` compatibility rule. -/
+`refines_*` compatibility rule.
+
+Every one of them is the same argument: `substMap` is a `foldr` of `subst`, and
+`subst` already commutes with the constructor, so the induction on `vs` only
+transports that fact. The four `substMap_hom*` lemmas run that induction once
+each, indexed by the constructor's arity; the per-constructor lemmas then supply
+nothing but the relevant `Exp.subst` defining equation.
+
+(Clutch defines `subst_map` by recursion on the *expression*, which makes these
+hold by `simpl`. That is not available here: HeapLang's `subst` stops at the
+`Val` constructor, so its `subst_map` is simultaneous, whereas `Exp` has no
+value constructor and this `substMap` is a sequential fold.) -/
+
+/-- A nullary former fixed by `subst` is fixed by `substMap`. -/
+theorem Exp.substMap_hom₀ (C : Exp rT) (hC : ∀ x v, Exp.subst C x v = C)
+    (vs : SubstMap rT) : C.substMap vs = C := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => simp only [Exp.substMap_cons, ih, hC]
+
+/-- A unary former that `subst` commutes with is commuted with by `substMap`. -/
+theorem Exp.substMap_hom₁ (C : Exp rT → Exp rT)
+    (hC : ∀ e x v, Exp.subst (C e) x v = C (Exp.subst e x v))
+    (vs : SubstMap rT) (e : Exp rT) :
+    (C e).substMap vs = C (e.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => simp only [Exp.substMap_cons, ih, hC]
+
+/-- A binary former that `subst` commutes with is commuted with by `substMap`. -/
+theorem Exp.substMap_hom₂ (C : Exp rT → Exp rT → Exp rT)
+    (hC : ∀ e1 e2 x v, Exp.subst (C e1 e2) x v = C (Exp.subst e1 x v) (Exp.subst e2 x v))
+    (vs : SubstMap rT) (e1 e2 : Exp rT) :
+    (C e1 e2).substMap vs = C (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => simp only [Exp.substMap_cons, ih, hC]
+
+/-- A ternary former that `subst` commutes with is commuted with by `substMap`. -/
+theorem Exp.substMap_hom₃ (C : Exp rT → Exp rT → Exp rT → Exp rT)
+    (hC : ∀ e0 e1 e2 x v, Exp.subst (C e0 e1 e2) x v
+      = C (Exp.subst e0 x v) (Exp.subst e1 x v) (Exp.subst e2 x v))
+    (vs : SubstMap rT) (e0 e1 e2 : Exp rT) :
+    (C e0 e1 e2).substMap vs
+      = C (e0.substMap vs) (e1.substMap vs) (e2.substMap vs) := by
+  induction vs with
+  | nil => rfl
+  | cons _ _ ih => simp only [Exp.substMap_cons, ih, hC]
 
 @[simp] theorem Exp.substMap_lit (vs : SubstMap rT) (b : BaseLit rT) :
-    (Exp.lit b).substMap vs = .lit b := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.lit b).substMap vs = .lit b :=
+  Exp.substMap_hom₀ _ (by intros; simp [Exp.subst]) vs
 
 @[simp] theorem Exp.substMap_bvar (vs : SubstMap rT) (j : Nat) :
-    (Exp.bvar j).substMap vs = .bvar j := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.bvar j).substMap vs = .bvar j :=
+  Exp.substMap_hom₀ _ (by intros; simp [Exp.subst]) vs
 
 @[simp] theorem Exp.substMap_fail (vs : SubstMap rT) :
-    Exp.fail.substMap vs = .fail := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    Exp.fail.substMap vs = .fail :=
+  Exp.substMap_hom₀ _ (by intros; simp [Exp.subst]) vs
 
 @[simp] theorem Exp.substMap_urand (vs : SubstMap rT) :
-    Exp.urand.substMap vs = .urand := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    Exp.urand.substMap vs = .urand :=
+  Exp.substMap_hom₀ _ (by intros; simp [Exp.subst]) vs
 
 @[simp] theorem Exp.substMap_pair (vs : SubstMap rT) (e1 e2 : Exp rT) :
-    (Exp.pair e1 e2).substMap vs = .pair (e1.substMap vs) (e2.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.pair e1 e2).substMap vs = .pair (e1.substMap vs) (e2.substMap vs) :=
+  Exp.substMap_hom₂ _ (by intros; simp [Exp.subst]) vs e1 e2
 
 @[simp] theorem Exp.substMap_fst (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.fst e).substMap vs = .fst (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.fst e).substMap vs = .fst (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_snd (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.snd e).substMap vs = .snd (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.snd e).substMap vs = .snd (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_inl (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.inl e).substMap vs = .inl (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.inl e).substMap vs = .inl (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_inr (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.inr e).substMap vs = .inr (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.inr e).substMap vs = .inr (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_case (vs : SubstMap rT) (e0 e1 e2 : Exp rT) :
     (Exp.case e0 e1 e2).substMap vs =
-      .case (e0.substMap vs) (e1.substMap vs) (e2.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+      .case (e0.substMap vs) (e1.substMap vs) (e2.substMap vs) :=
+  Exp.substMap_hom₃ _ (by intros; simp [Exp.subst]) vs e0 e1 e2
 
 @[simp] theorem Exp.substMap_cond (vs : SubstMap rT) (e0 e1 e2 : Exp rT) :
     (Exp.cond e0 e1 e2).substMap vs =
-      .cond (e0.substMap vs) (e1.substMap vs) (e2.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+      .cond (e0.substMap vs) (e1.substMap vs) (e2.substMap vs) :=
+  Exp.substMap_hom₃ _ (by intros; simp [Exp.subst]) vs e0 e1 e2
 
 @[simp] theorem Exp.substMap_app (vs : SubstMap rT) (e1 e2 : Exp rT) :
-    (Exp.app e1 e2).substMap vs = .app (e1.substMap vs) (e2.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.app e1 e2).substMap vs = .app (e1.substMap vs) (e2.substMap vs) :=
+  Exp.substMap_hom₂ _ (by intros; simp [Exp.subst]) vs e1 e2
 
 @[simp] theorem Exp.substMap_lam (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.lam e).substMap vs = .lam (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.lam e).substMap vs = .lam (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_fix (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.fix e).substMap vs = .fix (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.fix e).substMap vs = .fix (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_unop (vs : SubstMap rT) (op : UnOp) (e : Exp rT) :
-    (Exp.unop op e).substMap vs = .unop op (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.unop op e).substMap vs = .unop op (e.substMap vs) :=
+  Exp.substMap_hom₁ (Exp.unop op) (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_binop (vs : SubstMap rT) (op : BinOp) (e1 e2 : Exp rT) :
     (Exp.binop op e1 e2).substMap vs =
-      .binop op (e1.substMap vs) (e2.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+      .binop op (e1.substMap vs) (e2.substMap vs) :=
+  Exp.substMap_hom₂ (Exp.binop op) (by intros; simp [Exp.subst]) vs e1 e2
 
 @[simp] theorem Exp.substMap_alloc (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.alloc e).substMap vs = .alloc (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.alloc e).substMap vs = .alloc (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_load (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.load e).substMap vs = .load (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.load e).substMap vs = .load (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_store (vs : SubstMap rT) (e1 e2 : Exp rT) :
-    (Exp.store e1 e2).substMap vs = .store (e1.substMap vs) (e2.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.store e1 e2).substMap vs = .store (e1.substMap vs) (e2.substMap vs) :=
+  Exp.substMap_hom₂ _ (by intros; simp [Exp.subst]) vs e1 e2
 
 @[simp] theorem Exp.substMap_tape (vs : SubstMap rT) (e : Exp rT) :
-    (Exp.tape e).substMap vs = .tape (e.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.tape e).substMap vs = .tape (e.substMap vs) :=
+  Exp.substMap_hom₁ _ (by intros; simp [Exp.subst]) vs e
 
 @[simp] theorem Exp.substMap_rand (vs : SubstMap rT) (e1 e2 : Exp rT) :
-    (Exp.rand e1 e2).substMap vs = .rand (e1.substMap vs) (e2.substMap vs) := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.rand e1 e2).substMap vs = .rand (e1.substMap vs) (e2.substMap vs) :=
+  Exp.substMap_hom₂ _ (by intros; simp [Exp.subst]) vs e1 e2
 
 @[simp] theorem Exp.substMap_scrut (vs : SubstMap rT) (e : Exp rT) (p : Pat rT) :
-    (Exp.scrut e p).substMap vs = .scrut (e.substMap vs) p := by
-  induction vs with
-  | nil => rfl
-  | cons _ _ ih => rw [Exp.substMap_cons, ih]; simp [Exp.subst]
+    (Exp.scrut e p).substMap vs = .scrut (e.substMap vs) p :=
+  Exp.substMap_hom₁ (Exp.scrut · p) (by intros; simp [Exp.subst]) vs e
 
 /-- `substMap` distributes over `openRec` when all bindings are LC. The key
 binder-substitution lemma: `substMap vs (openRec k u e) = openRec k (substMap vs u) (substMap vs e)`. -/
