@@ -21,7 +21,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 section TyEnvSetup
 variable {GF : BundledGFunctors}
@@ -32,7 +32,7 @@ def TyEnv.cons (X : lrel rT GF) (Δ : TyEnv rT GF) : TyEnv rT GF
   | 0 => X
   | n + 1 => Δ n
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem TyEnv.cons_ne_head {n : Nat} {X Y : lrel rT GF} {Δ : TyEnv rT GF}
     (h : X ≡{n}≡ Y) : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons Y Δ) := by
   intro k
@@ -40,7 +40,7 @@ theorem TyEnv.cons_ne_head {n : Nat} {X Y : lrel rT GF} {Δ : TyEnv rT GF}
   | zero => exact h
   | succ m => exact Dist.rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem TyEnv.cons_ne_tail {n : Nat} {X : lrel rT GF} {Δ Δ' : TyEnv rT GF}
     (h : Δ ≡{n}≡ Δ') : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons X Δ') := by
   intro k
@@ -57,7 +57,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- A function `TyEnv rT GF → lrel rT GF` paired with its pointwise
 nonexpansiveness witness. -/
-structure NEFun (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+structure NEFun (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT]
     (GF : BundledGFunctors) where
   fn  : TyEnv rT GF → lrel rT GF
   ne  : ∀ {n : Nat} {Δ Δ' : TyEnv rT GF}, Δ ≡{n}≡ Δ' → fn Δ ≡{n}≡ fn Δ'
@@ -462,7 +462,7 @@ abbrev RelCtx (rT : Type _) (GF : BundledGFunctors) := List (Var × lrel rT GF)
 abbrev ValSubstMap (rT : Type _) := List (Var × (Val rT × Val rT))
 
 namespace RelCtx
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 variable {GF : BundledGFunctors}
 
 /-- Lookup in a relational context. **Rightmost** binding wins (matching
@@ -474,7 +474,7 @@ def lookup : RelCtx rT GF → Var → Option (lrel rT GF)
     | some B => some B
     | none => if x = y then some A else none
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- An entry's existence in `Γ` implies the lookup at its key is some. -/
 theorem lookup_isSome_of_mem {Γ : RelCtx rT GF} {p : Var × lrel rT GF}
     (h : p ∈ Γ) : (Γ.lookup p.1).isSome := by
@@ -496,7 +496,7 @@ theorem lookup_isSome_of_mem {Γ : RelCtx rT GF} {p : Var × lrel rT GF}
 end RelCtx
 
 namespace ValSubstMap
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-- Lookup in a value substitution. **Rightmost** binding wins. -/
 def lookup : ValSubstMap rT → Var → Option (Val rT × Val rT)
@@ -512,7 +512,7 @@ def fst (vs : ValSubstMap rT) : SubstMap rT := vs.map (fun p => (p.1, p.2.1.1))
 /-- Right projection as a `SubstMap`. -/
 def snd (vs : ValSubstMap rT) : SubstMap rT := vs.map (fun p => (p.1, p.2.2.1))
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- Lookup commutes with `.fst` projection. -/
 theorem fst_lookup (vs : ValSubstMap rT) (x : Var) :
     SubstMap.lookup vs.fst x = (vs.lookup x).map (fun p => p.1.1) := by
@@ -527,7 +527,7 @@ theorem fst_lookup (vs : ValSubstMap rT) (x : Var) :
     | some q => simp
     | none => simp
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- A variable outside the domain is unbound. Feeds the `hdom` premise of
 `Exp.lam_substMap_isLocallyClosed`. -/
 theorem lookup_eq_none_of_not_mem {y : Var} : ∀ (vs : ValSubstMap rT),
@@ -539,13 +539,13 @@ theorem lookup_eq_none_of_not_mem {y : Var} : ∀ (vs : ValSubstMap rT),
     simp only [ValSubstMap.lookup, lookup_eq_none_of_not_mem rest hyNot.2]
     simp [hyNot.1]
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- `.fst` specialisation of `lookup_eq_none_of_not_mem`. -/
 theorem fst_lookup_eq_none_of_not_mem {vs : ValSubstMap rT} {y : Var}
     (hy : y ∉ (vs.map (·.1)).toFinset) : SubstMap.lookup vs.fst y = none := by
   rw [fst_lookup, lookup_eq_none_of_not_mem vs hy]; rfl
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- Lookup commutes with `.snd` projection. -/
 theorem snd_lookup (vs : ValSubstMap rT) (x : Var) :
     SubstMap.lookup vs.snd x = (vs.lookup x).map (fun p => p.2.1) := by
@@ -560,13 +560,13 @@ theorem snd_lookup (vs : ValSubstMap rT) (x : Var) :
     | some q => simp
     | none => simp
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- `.snd` specialisation of `lookup_eq_none_of_not_mem`. -/
 theorem snd_lookup_eq_none_of_not_mem {vs : ValSubstMap rT} {y : Var}
     (hy : y ∉ (vs.map (·.1)).toFinset) : SubstMap.lookup vs.snd y = none := by
   rw [snd_lookup, lookup_eq_none_of_not_mem vs hy]; rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- A lookup that returns `some` implies the key appears in the list. -/
 theorem mem_of_lookup_isSome {vs : ValSubstMap rT} {x : Var}
     (h : (vs.lookup x).isSome) : ∃ p ∈ vs, p.1 = x := by
@@ -588,7 +588,7 @@ theorem mem_of_lookup_isSome {vs : ValSubstMap rT} {x : Var}
         exact ⟨(x, w), List.mem_cons.mpr (.inl rfl), rfl⟩
       · simp at h
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- If a key appears in vs, lookup is some. -/
 theorem lookup_isSome_of_mem {vs : ValSubstMap rT} {x : Var}
     (hmem : ∃ w, (x, w) ∈ vs) : (vs.lookup x).isSome := by
@@ -616,7 +616,7 @@ theorem lookup_isSome_of_mem {vs : ValSubstMap rT} {x : Var}
 def delete (vs : ValSubstMap rT) (x : Var) : ValSubstMap rT :=
   vs.filter (fun p => !decide (p.1 = x))
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- After deleting `x`, lookup at `x` returns `none`. -/
 theorem lookup_delete_self (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).lookup x = none := by
@@ -637,7 +637,7 @@ theorem lookup_delete_self (vs : ValSubstMap rT) (x : Var) :
       rw [ih]
       simp [Ne.symm hzx]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- After deleting `x`, lookup at any other key is unchanged. -/
 theorem lookup_delete_other (vs : ValSubstMap rT) (x z : Var) (hxz : z ≠ x) :
     (vs.delete x).lookup z = vs.lookup z := by
@@ -672,7 +672,7 @@ theorem lookup_delete_other (vs : ValSubstMap rT) (x z : Var) (hxz : z ≠ x) :
             | none => if z = w then some v else none)
       rw [ih]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Membership in `vs.delete x` excludes any pair with key `x`. -/
 theorem mem_delete (vs : ValSubstMap rT) (x : Var) (p : Var × (Val rT × Val rT)) :
     p ∈ vs.delete x ↔ p ∈ vs ∧ p.1 ≠ x := by
@@ -680,7 +680,7 @@ theorem mem_delete (vs : ValSubstMap rT) (x : Var) (p : Var × (Val rT × Val rT
   rw [List.mem_filter]
   simp
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- The fst-projection of `vs.delete x` filters x out of vs.fst. -/
 theorem fst_delete (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).fst = vs.fst.filter (fun p => !decide (p.1 = x)) := by
@@ -700,7 +700,7 @@ theorem fst_delete (vs : ValSubstMap rT) (x : Var) :
       simp only [List.cons.injEq, true_and]
       exact ih
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- Snd analog. -/
 theorem snd_delete (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).snd = vs.snd.filter (fun p => !decide (p.1 = x)) := by
@@ -720,7 +720,7 @@ theorem snd_delete (vs : ValSubstMap rT) (x : Var) :
       simp only [List.cons.injEq, true_and]
       exact ih
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Domain of `vs.delete x` excludes x. -/
 theorem map_fst_delete_notMem (vs : ValSubstMap rT) (x : Var) :
     x ∉ ((vs.delete x).map (·.1)).toFinset := by
@@ -730,7 +730,7 @@ theorem map_fst_delete_notMem (vs : ValSubstMap rT) (x : Var) :
   rw [mem_delete] at hpmem
   exact hpmem.2 hpeq
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Domain of `vs.delete x` is contained in domain of vs. -/
 theorem map_fst_delete_subset (vs : ValSubstMap rT) (x : Var) :
     ((vs.delete x).map (·.1)).toFinset ⊆ (vs.map (·.1)).toFinset := by
@@ -740,7 +740,7 @@ theorem map_fst_delete_subset (vs : ValSubstMap rT) (x : Var) :
   rw [mem_delete] at hpmem
   exact ⟨p, hpmem.1, hpeq⟩
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- The pair returned by `lookup` is the rightmost matching member. -/
 theorem mem_of_lookup_eq_some {vs : ValSubstMap rT} {y : Var} {w1 w2 : Val rT}
     (h : vs.lookup y = some (w1, w2)) : (y, (w1, w2)) ∈ vs := by
@@ -765,14 +765,14 @@ theorem mem_of_lookup_eq_some {vs : ValSubstMap rT} {y : Var} {w1 w2 : Val rT}
         subst h1; subst h2
         exact List.mem_cons.mpr (.inl rfl)
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- After delete + cons of new x-binding, fst-projection equals
 substituting via subst _ x w in front of the deleted vs.fst. Used in `bin_log_related_rename`. -/
 theorem fst_cons_delete (vs : ValSubstMap rT) (x : Var) (w1 w2 : Val rT) :
     ValSubstMap.fst ((x, (w1, w2)) :: vs.delete x)
       = (x, w1.1) :: (vs.delete x).fst := rfl
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 theorem snd_cons_delete (vs : ValSubstMap rT) (x : Var) (w1 w2 : Val rT) :
     ValSubstMap.snd ((x, (w1, w2)) :: vs.delete x)
       = (x, w2.1) :: (vs.delete x).snd := rfl
@@ -803,7 +803,7 @@ instance env_ltyped2_persistent (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   unfold env_ltyped2
   infer_instance
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Domain agreement: `Γ.lookup x = some _ ↔ vs.lookup x = some _`. -/
 theorem env_ltyped2_domEq (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
@@ -812,7 +812,7 @@ theorem env_ltyped2_domEq (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   iintro ⟨%H, _, _⟩
   ipureintro; exact H
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Closedness: every binding in `vs` is closed. -/
 theorem env_ltyped2_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
@@ -821,7 +821,7 @@ theorem env_ltyped2_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   iintro ⟨_, %Hc, _⟩
   ipureintro; exact Hc
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Lookup-by-Γ: if `Γ x = some A`, the substitution has a matching pair
 and the pair is in `A`. -/
 theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (A : lrel rT GF)
@@ -838,7 +838,7 @@ theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (
   · ipureintro; exact hΓ
   · ipureintro; exact hvs_eq
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Empty-Γ empty-vs. -/
 theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx rT GF) [] := by
   unfold env_ltyped2
@@ -849,7 +849,7 @@ theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx rT GF) [] :=
   iintro %x %A %v1 %v2 %hΓ %hvs
   simp [RelCtx.lookup] at hΓ
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Empty-Γ forces vs empty. -/
 theorem env_ltyped2_empty_inv (vs : ValSubstMap rT) :
     env_ltyped2 ([] : RelCtx rT GF) vs ⊢@{IProp GF} ⌜vs = []⌝ := by
@@ -868,7 +868,7 @@ theorem env_ltyped2_empty_inv (vs : ValSubstMap rT) :
     have := (Hdom p.1).mpr hsome
     simp [RelCtx.lookup] at this
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Extending both contexts preserves `env_ltyped2`. Requires the new values
 to be closed (since `env_ltyped2` records closedness of all bindings). -/
 theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
@@ -929,7 +929,7 @@ theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
       obtain ⟨rfl, rfl⟩ := heq
       iexact HA
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Helper: a `RelCtx.lookup` that returns `some` implies the key appears in the list. -/
 theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx rT GF} {y : Var}
     (h : (Γ.lookup y).isSome) : y ∈ (Γ.map (·.1)).toFinset := by
@@ -951,7 +951,7 @@ theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx rT GF} {y : Var}
       · simp [hyk]
       · simp at h
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- Drop a head binding for a fresh atom: if `y ∉ Γ.dom`, then
 `env_ltyped2 ((y, A) :: Γ) vs ⊢ env_ltyped2 Γ (vs.delete y)`. -/
 theorem env_ltyped2_drop_head (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
@@ -1209,7 +1209,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 @[reducible] def TyEnv.comp (Δ : TyEnv rT GF) (ξ : Nat → Nat) : TyEnv rT GF :=
   fun n => Δ (ξ n)
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 /-- `cons X (Δ ∘ ξ) = cons X Δ ∘ upren ξ`. -/
 theorem TyEnv.comp_upren (X : lrel rT GF) (Δ : TyEnv rT GF) (ξ : Nat → Nat) :
     TyEnv.cons X (TyEnv.comp Δ ξ) = TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ) := by

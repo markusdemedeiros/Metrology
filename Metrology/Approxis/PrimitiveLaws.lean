@@ -31,7 +31,7 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingl
 /-! ## Bundled ghost-state class -/
 /-- Embeds `SpecGS` as a non-extends field to avoid Lean's diamond-inheritance
 field collapse, which would force program and spec heaps to share γ-names. -/
-class ApproxisGS (rT : Type _) [ProbLang.ProbLangℝ rT] [Countable rT]
+class ApproxisGS (rT : Type _) [ProbLang.ProbLangℝ rT]
     [MeasurableSingletonClass rT]
     (hlc : outParam HasLC) (GF : BundledGFunctors) where
   appGS    : AppGS rT GF
@@ -821,6 +821,7 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : (Ectx rT)) {z M : Int} {l : Loc}
     · isplitl [HαNat'] <;> iassumption
     iapply Hwp $$ HwpArg
     ipureintro; exact ⟨Hv0, Hvz⟩
+
 
 end Lifting
 

@@ -19,7 +19,7 @@ namespace ProbLang.AdequacyHelpers
 
 section FupdPlainForall
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 variable {GF : BundledGFunctors} [InvGS_gen .hasNoLC GF]
 
 open Iris Iris.BI Iris.BI.BIBase Iris.ProofMode
@@ -179,7 +179,7 @@ theorem fupd_stepFupdN_plain_forall_1
       (iprop(◇ ∀ x, Φ x))).trans ?_
     exact step_fupdN_except_0 ∅ ∅ (iprop(∀ x, Φ x)) n
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem fupd_stepFupdN_plain_forall_3
     (Ψ : (State rT) → (Exp rT) → (State rT) → IProp GF)
     [instP : ∀ a b c, Plain (Ψ a b c)] (n : Nat) :
@@ -194,7 +194,7 @@ theorem fupd_stepFupdN_plain_forall_3
   exact fupd_stepFupdN_plain_forall_1 (GF := GF)
     (fun a => iprop(∀ b c, Ψ a b c)) n
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem fupd_stepFupdN_plain_forall_4
     (Ψ : (Exp rT) → (State rT) → (Exp rT) → (State rT) → IProp GF)
     [∀ a b c d, Plain (Ψ a b c d)] (n : Nat) :
@@ -235,7 +235,24 @@ namespace ProbLang
 
 open ProbLang.AdequacyHelpers
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+/-! ### Countability inventory
+
+`[Countable rT]` is **gone** from this file: Approxis adequacy holds for a diffuse
+`rT`. Getting here took three things:
+
+* rewiring `wp_adequacy` off `AddCoupl.map_inv`;
+* making `AddCoupl_erasure_erasable_exp_rhs` / `..._lhs_kanto`
+  (`ProbLang/Erasure.lean`) countability-free — they had been discharging kernel
+  measurability with `Measurable.of_discrete` where `execN_measurable` /
+  `pexecN_measurable` / `limExec.measurable` / `Cfg.measurable_expr` /
+  `Measure.bind_map_comm'` do the job honestly;
+* dropping the gratuitous `[Countable rT]` from the `ApproxisRGS` header
+  (`Approxis/Model.lean`), which none of its fields needed.
+
+No proof here uses `measure_ext_singletons`, `measurable_of_countable` or `tsum`, and
+every former `Measurable.of_discrete` in this file is now `Cfg.measurable_expr`. -/
+
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 def adequacyRel (φ : (Val rT) → (Val rT) → Prop) : Set ((Exp rT) × (Exp rT)) :=
   fun p => ∃ (v v' : (Val rT)), p.1.toVal? = some v ∧ p.2.toVal? = some v' ∧ φ v v'
@@ -282,7 +299,7 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : (Exp rT)) (σ₁ : (State rT)
     ipureintro
     exact AddCoupl.trivial_of_one_le HVac (by
       unfold asExpr
-      rw [MeasureTheory.Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+      rw [MeasureTheory.Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
       simpa using execN_univ_le_one m ⟨e₁, σ₀⟩)
   ·
     iapply HZ
@@ -453,7 +470,7 @@ theorem wpPre_value_Z_eq {v : (Val rT)} {Φ : (Val rT) → IProp GF} (E : CoPset
   funext σ₂ ρ' ε₂
   rw [Exp.toVal?_ofVal]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem wpPre_match_eq (motive : Option (Val rT) → Sort u)
     (x : Option (Val rT)) (some_f : (v : (Val rT)) → motive (some v))
     (none_f : Unit → motive none) :
@@ -519,9 +536,9 @@ theorem wp_adequacy_val_fupd (e e' : (Exp rT)) (σ σ' : (State rT)) (n : Nat)
     rw [execN_succ_isValue (ρ := ⟨Exp.ofVal v, σ₂⟩) hv_is_val n,
         limExec_of_isVal (e := Exp.ofVal v') (σ := σ₂') v'.2,
         MeasureTheory.Measure.map_dirac'
-          (Measurable.of_discrete (f := (·.expr : (Cfg rT) → (Exp rT)))),
+          (Cfg.measurable_expr (α := rT)),
         MeasureTheory.Measure.map_dirac'
-          (Measurable.of_discrete (f := (·.expr : (Cfg rT) → (Exp rT))))]
+          (Cfg.measurable_expr (α := rT))]
     exact AddCoupl.dirac (a := Exp.ofVal v) (b := Exp.ofVal v')
       (ε := ε') (adequacyRel φ)
       ⟨v, v', Exp.toVal?_ofVal v, Exp.toVal?_ofVal v', Hφrel⟩
@@ -608,7 +625,7 @@ theorem wp_adequacy_exec_n {GF : BundledGFunctors}
   ·
     refine AddCoupl.trivial_of_one_le hε1 ?_
     unfold asExpr
-    rw [MeasureTheory.Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+    rw [MeasureTheory.Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
     simpa using execN_univ_le_one n ⟨e, σ⟩
   have hε_lt : ε < 1 := lt_of_not_ge hε1
   refine pure_soundness (PROP := IProp GF) ?_
@@ -640,31 +657,12 @@ theorem wp_adequacy {GF : BundledGFunctors}
         wp ⊤ e (fun v => iprop(∃ v' : (Val rT), ⤇ Exp.ofVal v' ∗ ⌜φ v v'⌝)))) :
     AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩)
         (limExecV ⟨e', σ'⟩) := by
-  have Hlifted : AddCoupl ε (fun (p : (Cfg rT) × (Exp rT)) => adequacyRel φ (p.1.expr, p.2))
-      (limExec ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
-    apply limExec_AddCoupl
-    intro n
-    have H := wp_adequacy_exec_n (GF := GF) e e' σ σ' n φ ε Hwp
-    have Hmap_id :
-        (limExecV (⟨e', σ'⟩ : (Cfg rT))) =
-          (limExecV (⟨e', σ'⟩ : (Cfg rT))).map id := by
-      rw [MeasureTheory.Measure.map_id]
-    rw [Hmap_id] at H
-    have := AddCoupl.map_inv (α' := (Exp rT)) (β' := (Exp rT))
-      (f := fun (c : (Cfg rT)) => c.expr) (g := id) Measurable.of_discrete measurable_id H
-    exact this
-  have Hmap_id :
-      (limExecV (⟨e', σ'⟩ : (Cfg rT))) =
-        (limExecV (⟨e', σ'⟩ : (Cfg rT))).map id := by
-    rw [MeasureTheory.Measure.map_id]
-  rw [Hmap_id] at Hlifted
-  have H_pushed := AddCoupl.map (α' := (Exp rT)) (β' := (Exp rT))
-    (f := fun (c : (Cfg rT)) => c.expr) (g := id) Measurable.of_discrete measurable_id
-    (S := fun (p : (Cfg rT) × (Exp rT)) => adequacyRel φ (p.1.expr, p.2))
-    (R := adequacyRel φ)
-    (fun {a b} h => h) Hlifted
-  simp only [MeasureTheory.Measure.map_id] at H_pushed
-  exact H_pushed
+  -- `limExecV = asExpr ∘ limExec`, and `limExecV_AddCoupl` takes the limit *under*
+  -- the `asExpr` pushforward (via `AddCoupl.iSup_left`). The old route pulled the
+  -- coupling back along `Cfg.expr` with `AddCoupl.map_inv`, took the limit, then
+  -- pushed it forward again with `AddCoupl.map`; `map_inv` is the one genuinely
+  -- discrete step in the adequacy path, and this avoids it entirely.
+  exact limExecV_AddCoupl fun n => wp_adequacy_exec_n (GF := GF) e e' σ σ' n φ ε Hwp
 
 theorem wp_adequacy_error_lim {GF : BundledGFunctors}
     [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
@@ -679,7 +677,7 @@ theorem wp_adequacy_error_lim {GF : BundledGFunctors}
   · subst hε_top
     refine AddCoupl.trivial_of_one_le (by exact le_top (a := (1 : ENNReal))) ?_
     unfold limExecV asExpr
-    rw [MeasureTheory.Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+    rw [MeasureTheory.Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
     simpa using limExec_leq_mass (r := 1) (fun n => execN_univ_le_one n ⟨e, σ⟩)
   apply AddCoupl.limit
   intro δ Hδ

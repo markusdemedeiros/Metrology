@@ -341,13 +341,45 @@ theorem map {ε : ENNReal} {S : Set (α × β)} {R : Set (α' × β')}
   rw [MeasureTheory.lintegral_map Hf'm Hfm, MeasureTheory.lintegral_map Hg'm Hgm]
   exact H F G HFG
 
+/-- **Left limit principle.** An `AddCoupl` only inspects `μₗ` through the left
+lintegrals `∫⁻ f ∂μₗ` of measurable `f ≤ 1`. So if every such integral is dominated
+by the supremum of the corresponding integrals against a family `ν i`, each of which
+is `AddCoupl ε S`-related to `μᵣ`, then `μₗ` is too.
+
+This is the countability-free way to pass to a limit on the left, and unlike
+`AddCoupl.map_inv` it survives a pushforward: for `F` measurable,
+`∫⁻ f ∂((ν i).map F) = ∫⁻ (f ∘ F) ∂(ν i)`, so an increasing limit of measures can be
+mapped forward *before* the limit is taken and this lemma still applies. The naive
+route — pull the coupling back along `F` with `map_inv`, take the limit, push forward
+again with `map` — needs `F`'s codomain to carry a discrete σ-algebra. -/
+theorem iSup_left {ι : Sort _} {ε : ENNReal} {S : Set (α × β)}
+    {μₗ : Measure α} {ν : ι → Measure α} {μᵣ : Measure β}
+    (hle : ∀ f : α → ENNReal, Measurable f → ∫⁻ a, f a ∂μₗ ≤ ⨆ i, ∫⁻ a, f a ∂(ν i))
+    (H : ∀ i, AddCoupl ε S (ν i) μᵣ) :
+    AddCoupl ε S μₗ μᵣ := by
+  rintro ⟨f, hfm, hfb⟩ G hfg
+  exact (hle f hfm).trans (iSup_le fun i => H i ⟨f, hfm, hfb⟩ G hfg)
+
 /-- Inverse of `AddCoupl.map`: pulling back along measurable maps.
 
-Specialized to countable discrete spaces on the codomain side (so every function on
-`α'` / `β'` is measurable). The trick: lift `f'` to `fT(a') := ⨆_{a : f a = a'} f'(a)` and
-`g'` to `gT(b') := ⨅_{b : g b = b'} g'(b)` (capped at 1). -/
-theorem map_inv [Countable α'] [Countable β']
-    [MeasurableSingletonClass α'] [MeasurableSingletonClass β']
+**This needs a discrete σ-algebra on the codomains, and that is not an artefact of the
+proof.** The argument lifts the left test function fiberwise,
+`fT a' := ⨆_{a : f a = a'} f' a`, and the right one dually,
+`gT b' := (⨅_{b : g b = b'} g' b) ⊓ 1`. Those are the only choices that transport the
+relation `R`, and a fiberwise sup/inf over an arbitrary measurable fibre is not
+measurable in general. `DiscreteMeasurableSpace α'` — which
+`Countable α' + MeasurableSingletonClass α'` supplies, and which is the form this lemma
+is now stated in — makes *every* function out of `α'` measurable, which is exactly and
+only what the proof uses.
+
+No diffuse generalization is available: an `AddCoupl` sees `μₗ` only through
+`μₗ ∘ f⁻¹` on *measurable* sets of `α'`, and replacing `f '' A` by a measurable hull
+can strictly enlarge its `R`-image, so the transfer is lossy precisely when `f '' A`
+fails to be measurable. Repairing that needs descriptive-set-theoretic input
+(analytic sets are universally measurable), not a measurability side condition.
+Consumers that only need to take a limit under a pushforward should use
+`AddCoupl.iSup_left`, which has no such requirement. -/
+theorem map_inv [DiscreteMeasurableSpace α'] [DiscreteMeasurableSpace β']
     {ε : ENNReal} {R : Set (α' × β')}
     {μₗ : Measure α} {μᵣ : Measure β} (f : α → α') (g : β → β')
     (Hfm : Measurable f) (Hgm : Measurable g)
@@ -357,8 +389,8 @@ theorem map_inv [Countable α'] [Countable β']
   -- Lift f' to α' via supremum over the fiber; g' via infimum capped at 1.
   let fT : α' → ENNReal := fun a' => ⨆ (a : α) (_ : f a = a'), f' a
   let gT : β' → ENNReal := fun b' => (⨅ (b : β) (_ : g b = b'), g' b) ⊓ 1
-  have HfTm : Measurable fT := measurable_of_countable _
-  have HgTm : Measurable gT := measurable_of_countable _
+  have HfTm : Measurable fT := .of_discrete
+  have HgTm : Measurable gT := .of_discrete
   have HfTb : ∀ a', fT a' ≤ 1 := fun a' =>
     iSup_le fun a => iSup_le fun _ => Hf'b a
   have HgTb : ∀ b', gT b' ≤ 1 := fun b' => inf_le_right
@@ -394,57 +426,6 @@ theorem map_inv [Countable α'] [Countable β']
           gcongr
           · exact HgT_le _
 
-/-- Strengthen the relation to its intersection with the product of supports.
-
-Specialized to countable discrete measurable spaces, matching Rocq's setting. In general
-measure-theoretic land this statement is false for continuous measures (every singleton
-has measure zero). -/
-theorem pos_R [Countable α] [Countable β]
-    [MeasurableSingletonClass α] [MeasurableSingletonClass β]
-    {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
-    (H : AddCoupl ε S μₗ μᵣ) :
-    AddCoupl ε (fun v => S v ∧ μₗ {v.1} ≠ 0 ∧ μᵣ {v.2} ≠ 0) μₗ μᵣ := by
-  rintro ⟨f, Hfm, Hfb⟩ ⟨g, Hgm, Hgb⟩ Hle
-  -- Modified test functions: zero out `f` off μₗ-atoms; set `g` to 1 off μᵣ-atoms.
-  let f' : α → ENNReal := fun a => if μₗ {a} = 0 then 0 else f a
-  let g' : β → ENNReal := fun b => if μᵣ {b} = 0 then 1 else g b
-  -- Countable + MeasurableSingletonClass makes every function measurable.
-  have Hf'm : Measurable f' := measurable_of_countable _
-  have Hg'm : Measurable g' := measurable_of_countable _
-  have Hf'b : ∀ a, f' a ≤ 1 := fun a => by
-    simp only [f']; split_ifs
-    · exact zero_le_one
-    · exact Hfb a
-  have Hg'b : ∀ b, g' b ≤ 1 := fun b => by
-    simp only [g']; split_ifs
-    · exact le_refl _
-    · exact Hgb b
-  let F : CouplingFunction α := ⟨f', Hf'm, Hf'b⟩
-  let G : CouplingFunction β := ⟨g', Hg'm, Hg'b⟩
-  -- Key: F a ≤ G b on S. Three cases on the ifs.
-  have HFG : ∀ {a b}, S (a, b) → F.1 a ≤ G.1 b := by
-    intro a b HS
-    simp only [F, G, f', g']
-    split_ifs with Hμa Hμb Hμb
-    · exact zero_le
-    · exact zero_le
-    · exact (Hfb a).trans (le_refl _)
-    · exact Hle ⟨HS, Hμa, Hμb⟩
-  -- Now show ∫ f dμₗ = ∫ f' dμₗ via countable decomposition.
-  have Hfeq : ∫⁻ a, f a ∂μₗ = ∫⁻ a, f' a ∂μₗ := by
-    rw [MeasureTheory.lintegral_countable' f, MeasureTheory.lintegral_countable' f']
-    refine tsum_congr (fun a => ?_)
-    by_cases Hμa : μₗ {a} = 0
-    · simp [f', Hμa]
-    · simp [f', Hμa]
-  have Hgeq : ∫⁻ b, g b ∂μᵣ = ∫⁻ b, g' b ∂μᵣ := by
-    rw [MeasureTheory.lintegral_countable' g, MeasureTheory.lintegral_countable' g']
-    refine tsum_congr (fun b => ?_)
-    by_cases Hμb : μᵣ {b} = 0
-    · simp [g', Hμb]
-    · simp [g', Hμb]
-  rw [Hfeq, Hgeq]
-  exact H F G HFG
 
 /-- Refine the RHS relation of an additive coupling to a `μᵣ`-concentrated set.
 
@@ -486,6 +467,82 @@ theorem concentrated_R {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} 
   have Hgeq : ∫⁻ b, g b ∂μᵣ = ∫⁻ b, g' b ∂μᵣ := MeasureTheory.lintegral_congr_ae hae
   rw [Hgeq]
   exact H ⟨f, Hfm, Hfb⟩ G HFG
+
+/-- Refine the LHS relation of an additive coupling to a `μₗ`-concentrated set.
+
+Countability-free analogue of the LHS half of `pos_R`. Mirrors `concentrated_R`,
+modifying only `f` (to `0` off `T`, which is safe because `f` appears on the
+*small* side of the inequality) and using the a.e.-equality `f =ᵐ[μₗ] f'`. -/
+theorem concentrated_L {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
+    {T : Set α} (hT : MeasurableSet T) (hconc : μₗ Tᶜ = 0)
+    (H : AddCoupl ε S μₗ μᵣ) :
+    AddCoupl ε (fun v => S v ∧ v.1 ∈ T) μₗ μᵣ := by
+  classical
+  rintro ⟨f, Hfm, Hfb⟩ ⟨g, Hgm, Hgb⟩ Hle
+  -- Modify `f` to be `0` off `T`; it agrees with `f` `μₗ`-a.e. since `μₗ Tᶜ = 0`.
+  let f' : α → ENNReal := fun a => if a ∈ T then f a else 0
+  have Hf'm : Measurable f' := Measurable.ite hT Hfm measurable_const
+  have Hf'b : ∀ a, f' a ≤ 1 := fun a => by
+    simp only [f']; split_ifs
+    · exact Hfb a
+    · exact zero_le_one
+  let F : CouplingFunction α := ⟨f', Hf'm, Hf'b⟩
+  -- `f' ≤ g` on the *original* `S`: on `T` use the refined hypothesis, off `T`
+  -- use `f' = 0`.
+  have HFG : ∀ {a b}, S (a, b) → F.1 a ≤ g b := by
+    intro a b HS
+    simp only [F, f']
+    split_ifs with haT
+    · exact Hle ⟨HS, haT⟩
+    · exact zero_le
+  have hae : f =ᶠ[MeasureTheory.ae μₗ] f' := by
+    rw [Filter.EventuallyEq, MeasureTheory.ae_iff]
+    refine measure_mono_null ?_ hconc
+    intro a ha
+    simp only [Set.mem_compl_iff]
+    intro haT
+    exact ha (by simp only [f', if_pos haT])
+  have Hfeq : ∫⁻ a, f a ∂μₗ = ∫⁻ a, f' a ∂μₗ := MeasureTheory.lintegral_congr_ae hae
+  rw [Hfeq]
+  exact H F ⟨g, Hgm, Hgb⟩ HFG
+
+/-- Strengthen the relation to its intersection with the product of supports.
+
+Specialized to countable discrete measurable spaces, matching Rocq's setting. In general
+measure-theoretic land this statement is false for continuous measures (every singleton
+has measure zero) — which is the whole reason `concentrated_L` / `concentrated_R` exist.
+
+This is now a *corollary* of those two: a countable space's atom set is measurable, and
+its complement is a countable union of null singletons, hence null. So countability is
+confined to establishing that one concentration fact, rather than being baked into the
+coupling argument itself. -/
+theorem pos_R [Countable α] [Countable β]
+    [MeasurableSingletonClass α] [MeasurableSingletonClass β]
+    {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
+    (H : AddCoupl ε S μₗ μᵣ) :
+    AddCoupl ε (fun v => S v ∧ μₗ {v.1} ≠ 0 ∧ μᵣ {v.2} ≠ 0) μₗ μᵣ := by
+  classical
+  -- In a countable space every set is measurable, and the co-atom set is a
+  -- countable union of null singletons.
+  have hmL : MeasurableSet {a : α | μₗ {a} ≠ 0} := (Set.to_countable _).measurableSet
+  have hmR : MeasurableSet {b : β | μᵣ {b} ≠ 0} := (Set.to_countable _).measurableSet
+  have hnullL : μₗ ({a : α | μₗ {a} ≠ 0}ᶜ) = 0 := by
+    have hcompl : ({a : α | μₗ {a} ≠ 0}ᶜ) = {a : α | μₗ {a} = 0} := by
+      ext a; simp
+    rw [hcompl, show {a : α | μₗ {a} = 0} = ⋃ a ∈ {a : α | μₗ {a} = 0}, ({a} : Set α) by
+      ext a; simp]
+    rw [MeasureTheory.measure_biUnion_null_iff (Set.to_countable _)]
+    exact fun a ha => ha
+  have hnullR : μᵣ ({b : β | μᵣ {b} ≠ 0}ᶜ) = 0 := by
+    have hcompl : ({b : β | μᵣ {b} ≠ 0}ᶜ) = {b : β | μᵣ {b} = 0} := by
+      ext b; simp
+    rw [hcompl, show {b : β | μᵣ {b} = 0} = ⋃ b ∈ {b : β | μᵣ {b} = 0}, ({b} : Set β) by
+      ext b; simp]
+    rw [MeasureTheory.measure_biUnion_null_iff (Set.to_countable _)]
+    exact fun b hb => hb
+  refine AddCoupl.mono_rel ?_ (concentrated_R hmR hnullR (concentrated_L hmL hnullL H))
+  rintro ⟨a, b⟩ ⟨⟨hS, haL⟩, hbR⟩
+  exact ⟨hS, haL, hbR⟩
 
 /-- Exact couplings embed into approximate couplings at any `ε`. -/
 theorem of_RelCoupl {ε : ENNReal} {S : Set (α × β)}

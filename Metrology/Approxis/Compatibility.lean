@@ -850,11 +850,11 @@ theorem refines_load {e e' : Exp rT} {A : lrel rT GF} :
   iapply (ApproxisWpGS.wp_step_fupd (P := A.car w1 w2)
     (E1 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc))) (E2 := ∅) HE hv)
   isplitl [HwAL]
-  · ihave Hgoal := step_fupd_intro_later
+  · ihave Hgoal := step_fupd_intro_later (rT := rT)
       (E1 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc))) (E2 := ∅)
       (P := A.car w1 w2) HE $$ HwAL
     iexact Hgoal
-  iapply (wp_load (l := l) (v := w1))
+  iapply (wp_load (rT := rT) (l := l) (v := w1))
   isplitl [Hw1]; · iexact Hw1
   iintro Hw1'
   iintro #HwA

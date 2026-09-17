@@ -22,7 +22,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-! ## `Pos.Countable` instances for namespace indexing -/
 
@@ -105,7 +105,7 @@ def logN : Namespace := nroot.@ (1 : Pos)
 
 /-! ## `ApproxisRGS` ghost-state bundle -/
 
-class ApproxisRGS (rT : Type _) [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+class ApproxisRGS (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT]
     (hlc : outParam HasLC) (GF : BundledGFunctors) where
   approxisGS : ApproxisGS rT hlc GF
   naInvG     : NaInvG GF
@@ -259,7 +259,7 @@ scoped notation:100 "REL " e1 " << " e2 " : " A =>
 section SimpleLRels
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
     iprop(⌜v1.1 = .lit .unit ∧ v2.1 = .lit .unit⌝ : IProp GF)
       ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
@@ -415,12 +415,12 @@ noncomputable def lrelRec1Hom (C : lrel rT GF -n> lrel rT GF) : lrel rT GF -c> l
 noncomputable def lrel_rec (C : lrel rT GF -n> lrel rT GF) : lrel rT GF :=
   fixpoint (lrelRec1 C)
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem lrel_rec_unfold (C : lrel rT GF -n> lrel rT GF) :
     lrel_rec C = lrelRec1 C (lrel_rec C) :=
   fixpoint_unfold (lrelRec1Hom C)
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem lrel_rec_ne {n : Nat} {C1 C2 : lrel rT GF -n> lrel rT GF}
     (hC : ∀ A : lrel rT GF, C1 A ≡{n}≡ C2 A) :
     lrel_rec C1 ≡{n}≡ lrel_rec C2 := by
@@ -567,7 +567,7 @@ theorem lrel_forall_ne {n : Nat} {C1 C2 : lrel rT GF → lrel rT GF}
   refine forall_ne fun A => ?_
   exact lrel_arr_ne_2.ne .rfl (h A) v1 v2
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
 theorem lrel_exists_ne {n : Nat} {C1 C2 : lrel rT GF → lrel rT GF}
     (h : ∀ A, C1 A ≡{n}≡ C2 A) :
     (lrel_exists C1 : lrel rT GF) ≡{n}≡ lrel_exists C2 := by

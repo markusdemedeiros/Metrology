@@ -21,13 +21,13 @@ namespace ProbLang
 open Iris Iris.BI Iris.ProofMode OFE COFE Iris.Std DisjointLeibnizSet Auth HeapView
 open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-- Bundle of the "pre" ghost-state classes needed to instantiate the relational
 adequacy theorem. Spelled with instance-implicit fields rather than `class abbrev`:
 `class abbrev` flattens each parent's *fields* into value parameters, which since
 Lean 4.32 is rejected because e.g. `SpecPreGS.prog` is then an uninferable argument. -/
-class RefinesPreGS (rT : outParam (Type _)) [ProbLangℝ rT] [Countable rT]
+class RefinesPreGS (rT : outParam (Type _)) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] (GF : BundledGFunctors) where
   [app : AppPreGS rT GF]
   [spec : SpecPreGS rT GF]
@@ -38,7 +38,7 @@ class RefinesPreGS (rT : outParam (Type _)) [ProbLangℝ rT] [Countable rT]
 attribute [instance] RefinesPreGS.app RefinesPreGS.spec RefinesPreGS.ec
   RefinesPreGS.inv RefinesPreGS.nainv
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- `⤇ e` and `⤇ Ectx.fill [] e` are definitionally equal. Named for use in
 `rw` rewrites where Lean's defeq is not exposed (e.g. when adapting hypotheses
 to fit lemmas that universally quantify over an evaluation context). -/
@@ -46,7 +46,7 @@ theorem spec_eq_fill_nil {GF : BundledGFunctors} [SpecGS rT GF] (e : Exp rT) :
     (iprop(⤇ e) : IProp GF) = iprop(⤇ Ectx.fill ([] : Ectx rT) e) :=
   rfl
 
-omit [Countable rT] [MeasurableSingletonClass rT] in
+omit [MeasurableSingletonClass rT] in
 /-- `⤇ Ectx.fill [] v.1` and `⤇ Exp.ofVal v` are definitionally equal. -/
 theorem spec_fill_nil_eq_ofVal {GF : BundledGFunctors} [SpecGS rT GF] (v : Val rT) :
     (iprop(⤇ Ectx.fill ([] : Ectx rT) v.1) : IProp GF) = iprop(⤇ Exp.ofVal v) :=
@@ -60,7 +60,10 @@ by `φ` with zero error.
 This is the bridge from the Iris-internal `refines` judgement to the
 external probabilistic semantics, obtained by combining the WP-level
 adequacy theorem `wp_adequacy_error_lim` with the parametric assumption
-to allocate a fresh non-atomic invariant pool. -/
+to allocate a fresh non-atomic invariant pool.
+
+This theorem — Approxis's top-level relational adequacy statement — is now free of
+`[Countable rT]`: contextual refinement holds for a diffuse real type. -/
 theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     (A : ∀ (_ : ApproxisRGS rT .hasNoLC GF), lrel rT GF)
     (φ : (Val rT) → (Val rT) → Prop) (e e' : Exp rT) (σ σ' : State rT)
@@ -101,7 +104,7 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   iexact Hwp
 
 /-- Concrete model for Approxis -/
-noncomputable def ApproxisFunctor (rT : Type) [ProbLangℝ rT] [Countable rT]
+noncomputable def ApproxisFunctor (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : BundledGFunctors := fun n =>
   match n with
   | 0 => ⟨InvMapF, by infer_instance⟩
@@ -117,41 +120,41 @@ noncomputable def ApproxisFunctor (rT : Type) [ProbLangℝ rT] [Countable rT]
 
 /-! ### `RefinesPreGS` instances for `ApproxisFunctor` -/
 
-instance ApproxisFunctor_WsatGpreS (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_WsatGpreS (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : WsatGpreS (ApproxisFunctor rT) where
   inv := ⟨0, rfl⟩
   enabled := ⟨1, rfl⟩
   disabled := ⟨2, rfl⟩
 
-instance ApproxisFunctor_LcGpreS (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_LcGpreS (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : LcGpreS (ApproxisFunctor rT) where
   lc_elem := ⟨3, rfl⟩
 
-instance ApproxisFunctor_InvGpreS (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_InvGpreS (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : InvGpreS (ApproxisFunctor rT) where
   toWsatGpreS := ApproxisFunctor_WsatGpreS rT
   toLcGpreS := ApproxisFunctor_LcGpreS rT
 
-instance ApproxisFunctor_AppPreGS (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_AppPreGS (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : AppPreGS rT (ApproxisFunctor rT) where
   heap := ⟨4, rfl⟩
   tapes := ⟨5, rfl⟩
 
-instance ApproxisFunctor_SpecPreGS (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_SpecPreGS (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : SpecPreGS rT (ApproxisFunctor rT) where
   prog := ⟨6, rfl⟩
   heap := ⟨4, rfl⟩
   tapes := ⟨5, rfl⟩
 
-instance ApproxisFunctor_ECPreGS (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_ECPreGS (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : ECPreGS (ApproxisFunctor rT) where
   ec := ⟨7, rfl⟩
 
-instance ApproxisFunctor_NaInvG (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_NaInvG (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : NaInvG (ApproxisFunctor rT) where
   inv := ⟨8, rfl⟩
 
-instance ApproxisFunctor_RefinesPreGS (rT : Type) [ProbLangℝ rT] [Countable rT]
+instance ApproxisFunctor_RefinesPreGS (rT : Type) [ProbLangℝ rT]
     [MeasurableSingletonClass rT] : RefinesPreGS rT (ApproxisFunctor rT) where
 
 end ProbLang

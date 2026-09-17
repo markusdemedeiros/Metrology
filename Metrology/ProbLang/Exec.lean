@@ -426,7 +426,7 @@ theorem lintegral_limExec'
 
 -- Rocq: lim_exec_ARcoupl, specialized to additive form.
 -- If every finite unrolling is AddCoupl-related to μ₂ at slack ε, so is limExec.
-theorem limExec_AddCoupl [Countable rT] [MeasurableSingletonClass rT]
+theorem limExec_AddCoupl
     {β : Type*} [MeasurableSpace β] {ε : ENNReal}
     {Φ : Set (Cfg rT × β)} {ρ : Cfg rT} {μ₂ : Measure β}
     (H : ∀ n, AddCoupl ε Φ (execN n ρ) μ₂) :
@@ -435,6 +435,36 @@ theorem limExec_AddCoupl [Countable rT] [MeasurableSingletonClass rT]
   rw [lintegral_limExec' ρ f]
   refine iSup_le fun n => ?_
   exact H n ⟨f, hf, hfb⟩ ⟨g, hg, hgb⟩ hfg
+
+/-- Additive-coupling lift through a *pushforward* of `limExec`.
+
+`limExec` is the increasing supremum of the finite unrollings, and
+`lintegral_limExec'` turns the left lintegral against it into the supremum of the
+left lintegrals against the unrollings — no atoms and no countability. Pushing
+forward along a measurable `F` commutes with that step (`lintegral_map`), so an
+`AddCoupl` that holds for every `(execN n ρ).map F` holds for `(limExec ρ).map F`.
+
+This is the countability-free replacement for the
+`AddCoupl.map_inv` → `limExec_AddCoupl` → `AddCoupl.map` round trip: `map_inv`
+needs `F`'s codomain to carry a discrete σ-algebra, and here it is only used to
+undo a pushforward that `AddCoupl.iSup_left` can carry along directly. -/
+theorem limExec_map_AddCoupl
+    {γ β : Type*} [MeasurableSpace γ] [MeasurableSpace β] {ε : ENNReal}
+    {Φ : Set (γ × β)} {ρ : Cfg rT} {μ₂ : Measure β}
+    {F : Cfg rT → γ} (hF : Measurable F)
+    (H : ∀ n, AddCoupl ε Φ ((execN n ρ).map F) μ₂) :
+    AddCoupl ε Φ ((limExec ρ).map F) μ₂ := by
+  refine AddCoupl.iSup_left (ν := fun n => (execN n ρ).map F) (fun f hf => ?_) H
+  simp_rw [lintegral_map hf hF]
+  exact le_of_eq (lintegral_limExec' ρ (fun a => f (F a)))
+
+/-- `limExec_map_AddCoupl` at `F := Cfg.expr`: the form `adequacy` needs. -/
+theorem limExecV_AddCoupl
+    {β : Type*} [MeasurableSpace β] {ε : ENNReal}
+    {Φ : Set (Exp rT × β)} {ρ : Cfg rT} {μ₂ : Measure β}
+    (H : ∀ n, AddCoupl ε Φ (asExpr (execN n ρ)) μ₂) :
+    AddCoupl ε Φ (limExecV ρ) μ₂ :=
+  limExec_map_AddCoupl Cfg.measurable_expr H
 
 end ProbLang
 end

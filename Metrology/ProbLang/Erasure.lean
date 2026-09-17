@@ -2029,7 +2029,7 @@ theorem AddCoupl_erasure_erasable [Countable rT] [MeasurableSingletonClass rT]
 /-- **Clutch `ARcoupl_erasure_erasable_exp_rhs`, reformulated (projected form).**
 RHS expected-value variant (advanced composition). The continuation's
 slack `E₂` depends on the RHS sample, paid as additional slack on the LHS. -/
-theorem AddCoupl_erasure_erasable_exp_rhs [Countable rT] [MeasurableSingletonClass rT]
+theorem AddCoupl_erasure_erasable_exp_rhs [MeasurableSingletonClass rT]
     {e₁ e₁' : (Exp rT)} {σ₁ σ₁' : (State rT)}
     {μ₁ μ₁' : Measure (State rT)} {R : Set ((State rT) × (Cfg rT))}
     {Φexp : Set ((Exp rT) × (Exp rT))}
@@ -2050,6 +2050,14 @@ theorem AddCoupl_erasure_erasable_exp_rhs [Countable rT] [MeasurableSingletonCla
       (limExecV ⟨e₁', σ₁'⟩) := by
   -- Rewrite both projected targets via the erasability hypotheses.
   -- LHS: `(execN n ⟨e₁, σ₁⟩).map (·.expr)` ← `(μ₁.bind (execN n ⟨e₁, ·⟩)).map (·.expr)`
+  have hmkC : ∀ e : Exp rT, Measurable (fun σ : State rT => (⟨e, σ⟩ : Cfg rT)) := fun e =>
+    Cfg.measurable_iff.mpr ⟨measurable_const, measurable_id⟩
+  have hek : ∀ (e : Exp rT) (k : Nat),
+      Measurable (fun σ : State rT => execN k (⟨e, σ⟩ : Cfg rT)) :=
+    fun e k => (execN_measurable k).comp (hmkC e)
+  have hpk : ∀ (e : Exp rT) (k : Nat),
+      Measurable (fun σ : State rT => pexecN k (⟨e, σ⟩ : Cfg rT)) :=
+    fun e k => pexecN_measurable.comp (hmkC e)
   rw [← hErase₁ e₁ n]
   -- RHS: `(limExec ⟨e₁', σ₁'⟩).map (·.expr)` ← `(μ₁'.bind (limExec ⟨e₁', ·⟩)).map (·.expr)`
   rw [← hErase₁'.lim_exec e₁']
@@ -2064,23 +2072,25 @@ theorem AddCoupl_erasure_erasable_exp_rhs [Countable rT] [MeasurableSingletonCla
   have hrw : (μ₁'.bind (fun σ₂' => limExec ⟨e₁', σ₂'⟩))
            = (μ₁'.bind (fun σ₂' => pexecN m ⟨e₁', σ₂'⟩)).bind limExec := by
     rw [Measure.bind_bind
-          Measurable.of_discrete.aemeasurable
-          Measurable.of_discrete.aemeasurable]
+          (hpk e₁' m).aemeasurable
+          limExec.measurable.aemeasurable]
     congr 1
     funext σ₂'
     exact limExec_pexecN m ⟨e₁', σ₂'⟩
   rw [hrw]
   unfold asExpr
   -- Push `.map (·.expr)` through both outer binds.
-  rw [Measure.bind_map_comm, Measure.bind_map_comm]
+  rw [Measure.bind_map_comm' _ _ _ (hek e₁ n).aemeasurable Cfg.measurable_expr,
+      Measure.bind_map_comm' _ _ _ limExec.measurable.aemeasurable Cfg.measurable_expr]
   -- Sub-probability of the inner kernels (projected `execN n ⟨e₁, ·⟩`).
   have hmassk : ∀ σ : (State rT), (execN n ⟨e₁, σ⟩).map (·.expr) Set.univ ≤ 1 := by
     intro σ
-    rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+    rw [Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
     simpa using execN_univ_le_one n ⟨e₁, σ⟩
   -- Apply `bind_adv` with outer `hCoupl` and inner `hCont`.
   have hBind := AddCoupl.bind_adv
-    (Hfm := Measurable.of_discrete) (Hgm := Measurable.of_discrete)
+    (Hfm := (Measure.measurable_map _ Cfg.measurable_expr).comp (hek e₁ n))
+    (Hgm := (Measure.measurable_map _ Cfg.measurable_expr).comp limExec.measurable)
     (HE₂m := hE₂meas)
     (Hfsprob := hmassk)
     (HE₂sum := hBoundSum)
@@ -2145,7 +2155,7 @@ test-function expectation-bound hypothesis (`hExp`): for every pair of
 The conclusion operates on the LHS *after* one `primStep` bind — i.e. on
 `(primStep ⟨e₁,σ₁⟩ >>= execN n).map (·.expr)` — matching `execN (n+1)` for
 non-value `e₁` via `execN_succ_not_isValue`. -/
-theorem AddCoupl_erasure_erasable_exp_lhs_kanto [Countable rT] [MeasurableSingletonClass rT]
+theorem AddCoupl_erasure_erasable_exp_lhs_kanto [MeasurableSingletonClass rT]
     {e₁ e₁' : (Exp rT)} {σ₁ σ₁' : (State rT)}
     {μ₁' : Measure (State rT)} {Φexp : Set ((Exp rT) × (Exp rT))}
     {ε : ENNReal} {E₂ : (Cfg rT) → (Cfg rT) → ENNReal}
@@ -2169,32 +2179,38 @@ theorem AddCoupl_erasure_erasable_exp_lhs_kanto [Countable rT] [MeasurableSingle
   --   = (μ₁'.bind (limExec ⟨e₁', ·⟩)).map (·.expr)                (hErase)
   --   = (μ₁'.bind (fun σ => (pexecN m ⟨e₁',σ⟩).bind limExec)).map (·.expr)  (limExec_pexecN)
   --   = ((μ₁'.bind (pexecN m ⟨e₁', ·⟩)).bind limExec).map (·.expr)           (bind_bind)
+  have hmkC : ∀ e : Exp rT, Measurable (fun σ : State rT => (⟨e, σ⟩ : Cfg rT)) := fun e =>
+    Cfg.measurable_iff.mpr ⟨measurable_const, measurable_id⟩
+  have hpk : ∀ (e : Exp rT) (k : Nat),
+      Measurable (fun σ : State rT => pexecN k (⟨e, σ⟩ : Cfg rT)) :=
+    fun e k => pexecN_measurable.comp (hmkC e)
   rw [← hErase₁'.lim_exec e₁']
   have hrw : (μ₁'.bind (fun σ => limExec ⟨e₁', σ⟩))
            = (μ₁'.bind (fun σ => pexecN m ⟨e₁', σ⟩)).bind limExec := by
     rw [Measure.bind_bind
-          Measurable.of_discrete.aemeasurable
-          Measurable.of_discrete.aemeasurable]
+          (hpk e₁' m).aemeasurable
+          limExec.measurable.aemeasurable]
     congr 1
     funext σ
     exact limExec_pexecN m ⟨e₁', σ⟩
   rw [hrw]
   unfold asExpr
   -- Push `.map (·.expr)` through both outer binds.
-  rw [Measure.bind_map_comm, Measure.bind_map_comm]
+  rw [Measure.bind_map_comm' _ _ _ (execN_measurable n).aemeasurable Cfg.measurable_expr,
+      Measure.bind_map_comm' _ _ _ limExec.measurable.aemeasurable Cfg.measurable_expr]
   -- Subprobability of inner kernels.
   have hmassk_L : ∀ ρ : (Cfg rT), (execN n ρ).map (·.expr) Set.univ ≤ 1 := by
     intro ρ
-    rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+    rw [Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
     simpa using execN_univ_le_one n ρ
   have hmassk_R : ∀ ρ' : (Cfg rT), (limExec ρ').map (·.expr) Set.univ ≤ 1 := by
     intro ρ'
-    rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
+    rw [Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
     simpa using limExec_leq_mass (r := 1) (fun n => execN_univ_le_one n ρ')
-  -- Apply `bind_adv_kanto`. Test-function measurability is automatic on (Cfg rT)
-  -- (discrete space) via `Measurable.of_discrete`.
+  -- Apply `bind_adv_kanto` with explicit kernel measurability (no discreteness).
   exact AddCoupl.bind_adv_kanto
-    (Hfm := Measurable.of_discrete) (Hgm := Measurable.of_discrete)
+    (Hfm := (Measure.measurable_map _ Cfg.measurable_expr).comp (execN_measurable n))
+    (Hgm := (Measure.measurable_map _ Cfg.measurable_expr).comp limExec.measurable)
     (Hfsprob := hmassk_L) (Hgsprob := hmassk_R)
     (Hexp := fun h₁ h₂ Hm₁ Hm₂ => hExp h₁ h₂ Hm₁ Hm₂)
     (Hcont := fun ρ ρ' => by

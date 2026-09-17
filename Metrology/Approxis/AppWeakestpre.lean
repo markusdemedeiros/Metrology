@@ -882,9 +882,55 @@ theorem specCoupl_steps_det {E : CoPset} {σ : (State rT)} {e₁' : (Exp rT)} {�
   cases HS'
   iexact HS
 
+/-- `specCoupl_step_concentrated` — single spec-side step landing anywhere in a
+measurable set `S` carrying the spec step measure.
+
+Countability-free generalization of `specCoupl_step`. The trivial coupling
+`dirac σ₁` vs `primStep ⟨e₁', σ₁'⟩` is refined on the left by
+`AddCoupl.concentrated_L` at `{σ₁}` (pinning the LHS sample, which for a `dirac`
+needs only measurable singletons) and on the right by `AddCoupl.concentrated_R`
+at `S` — replacing `AddCoupl.pos_R`'s atom enumeration on both sides. -/
+theorem specCoupl_step_concentrated {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
+    {ε : ENNReal} {Z : (State rT) → (Cfg rT) → ENNReal → IProp GF}
+    {S : Set (Cfg rT)} (Hred : Reducible e₁' σ₁')
+    (hSmeas : MeasurableSet S) (hSconc : Concentrated (primStep ⟨e₁', σ₁'⟩) S) :
+    iprop(∀ (e₂' : (Exp rT)) (σ₂' : (State rT)),
+        (⌜(⟨e₂', σ₂'⟩ : Cfg rT) ∈ S⌝) -∗ |={E}=>
+          specCoupl E σ₁ e₂' σ₂' ε Z) ⊢@{IProp GF}
+      specCoupl E σ₁ e₁' σ₁' ε Z := by
+  iintro H
+  have Hε : (0 : ENNReal) + ε ≤ ε := by rw [zero_add]
+  have hprob_lhs : (MeasureTheory.Measure.dirac σ₁ : MeasureTheory.Measure (State rT)) .univ = 1 := by
+    simp
+  have hprob_rhs : (primStep ⟨e₁', σ₁'⟩) .univ = 1 := by
+    haveI := prim_step_mass Hred
+    exact MeasureTheory.IsProbabilityMeasure.measure_univ
+  have Htrivial : AddCoupl 0 Set.univ (MeasureTheory.Measure.dirac σ₁) (primStep ⟨e₁', σ₁'⟩) :=
+    RelCoupl.exact (RelCoupl.trivial hprob_lhs hprob_rhs)
+  have hdirac : (MeasureTheory.Measure.dirac σ₁ : MeasureTheory.Measure (State rT))
+      (({σ₁} : Set (State rT))ᶜ) = 0 := by
+    rw [MeasureTheory.Measure.dirac_apply' _ (by measurability)]; simp
+  have hpexec1 : pexecN 1 ⟨e₁', σ₁'⟩ = primStep ⟨e₁', σ₁'⟩ := by
+    rw [pexecN_one, stepOrFinal_not_isValue (val_stuck Hred)]
+  have HcplR : AddCoupl 0 {p : (State rT) × (Cfg rT) | (fun σ c => σ = σ₁ ∧ c ∈ S) p.1 p.2}
+        (MeasureTheory.Measure.dirac σ₁) (pexecN 1 ⟨e₁', σ₁'⟩) := by
+    rw [hpexec1]
+    refine AddCoupl.mono_rel ?_
+      (AddCoupl.concentrated_R hSmeas hSconc
+        (AddCoupl.concentrated_L (MeasurableSet.singleton σ₁) hdirac Htrivial))
+    rintro ⟨σ, c⟩ ⟨⟨_, hσ⟩, hc⟩
+    exact ⟨hσ, hc⟩
+  iapply (specCoupl_steps (n := 1) (R := fun σ c => σ = σ₁ ∧ c ∈ S)
+    (ε₁ := 0) (ε₂ := ε) (Hε := Hε) HcplR)
+  iintro %σ₂ %e₂' %σ₂' %HR
+  obtain ⟨rfl, Hmem⟩ := HR
+  iapply H $$ %e₂' %σ₂' %Hmem
+
 /-- Single-step specialization: when `(e₁', σ₁')` is reducible, every
 positive-measure spec successor lets us land on a `specCoupl` at the
-post-step config. Mirrors Rocq's `spec_coupl_step`. -/
+post-step config. Mirrors Rocq's `spec_coupl_step`.
+
+Discrete corollary of `specCoupl_step_concentrated` at the atom set. -/
 @[discrete]
 theorem specCoupl_step [Countable rT] {E : CoPset} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
     {ε : ENNReal} {Z : (State rT) → (Cfg rT) → ENNReal → IProp GF}
@@ -893,38 +939,14 @@ theorem specCoupl_step [Countable rT] {E : CoPset} {σ₁ : (State rT)} {e₁' :
         (⌜0 < primStep ⟨e₁', σ₁'⟩ {⟨e₂', σ₂'⟩}⌝) -∗ |={E}=>
           specCoupl E σ₁ e₂' σ₂' ε Z) ⊢@{IProp GF}
       specCoupl E σ₁ e₁' σ₁' ε Z := by
-  iintro H
-  have Hε : (0 : ENNReal) + ε ≤ ε := by rw [zero_add]
-  have hprob_lhs : (MeasureTheory.Measure.dirac σ₁ : MeasureTheory.Measure (State rT)) .univ = 1 := by
-    simp
-  have hprob_rhs : (primStep ⟨e₁', σ₁'⟩) .univ = 1 := by
-    haveI := prim_step_mass (Reducible_ReducibleM_iff.mp Hred)
-    exact MeasureTheory.IsProbabilityMeasure.measure_univ
-  have Htrivial : AddCoupl 0 Set.univ (MeasureTheory.Measure.dirac σ₁) (primStep ⟨e₁', σ₁'⟩) :=
-    RelCoupl.exact (RelCoupl.trivial hprob_lhs hprob_rhs)
-  have Hpos := AddCoupl.pos_R Htrivial
-  have hnotval : ¬ e₁'.isValue := fun hv => by
-    obtain ⟨ρ, hρ⟩ := Hred
-    exact val_stuck (fun hz => by rw [hz] at hρ; simp at hρ) hv
-  have hpexec1 : pexecN 1 ⟨e₁', σ₁'⟩ = primStep ⟨e₁', σ₁'⟩ := by
-    rw [pexecN_one, stepOrFinal_not_isValue hnotval]
-  have HcplR : AddCoupl 0 {p : (State rT) × (Cfg rT) | (fun σ c => σ = σ₁ ∧
-        0 < primStep ⟨e₁', σ₁'⟩ {c}) p.1 p.2}
-        (MeasureTheory.Measure.dirac σ₁) (pexecN 1 ⟨e₁', σ₁'⟩) := by
-    rw [hpexec1]
-    refine AddCoupl.mono_rel ?_ Hpos
-    rintro ⟨σ, c⟩ ⟨_, hσ, hc⟩
-    refine ⟨?_, ?_⟩
-    · by_contra hne
-      apply hσ
-      rw [MeasureTheory.Measure.dirac_apply' _ (by measurability)]
-      simp [Ne.symm hne]
-    · exact pos_iff_ne_zero.mpr hc
-  iapply (specCoupl_steps (n := 1) (R := fun σ c => σ = σ₁ ∧
-    0 < primStep ⟨e₁', σ₁'⟩ {c}) (ε₁ := 0) (ε₂ := ε) (Hε := Hε) HcplR)
-  iintro %σ₂ %e₂' %σ₂' %HR
-  obtain ⟨rfl, Hpos'⟩ := HR
-  iapply H $$ %e₂' %σ₂' %Hpos'
+  refine specCoupl_step_concentrated (S := {ρ : Cfg rT | 0 < primStep ⟨e₁', σ₁'⟩ {ρ}})
+    (Reducible_ReducibleM_iff.mp Hred) (measurableSet_primStep_support e₁' σ₁') ?_
+  have heq : ({ρ : Cfg rT | 0 < primStep ⟨e₁', σ₁'⟩ {ρ}}ᶜ)
+      = {ρ : Cfg rT | (primStep ⟨e₁', σ₁'⟩) {ρ} = 0} := by
+    ext ρ; simp [pos_iff_ne_zero]
+  show (primStep ⟨e₁', σ₁'⟩) _ = 0
+  rw [heq]
+  exact isAtomicSupport_of_countable _
 
 /-! ## `progCoupl` — derived lemmas -/
 
@@ -1549,8 +1571,51 @@ theorem progCoupl_step_l_dret {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (E
   obtain ⟨HR, rfl⟩ := HR'
   iapply H $$ %e₂ %σ₂ %HR
 
+/-- `progCoupl_step_l_concentrated` — pure LHS-step, landing anywhere in a
+measurable set `S` carrying the step measure.
+
+Countability-free generalization of `progCoupl_step_l`. The coupling against
+`dirac σ₁'` is the trivial one, refined on the left by `AddCoupl.concentrated_L`
+instead of by `AddCoupl.pos_R`'s atom enumeration. -/
+theorem progCoupl_step_l_concentrated {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
+    {ε : ENNReal} {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
+    {S : Set (Cfg rT)} (Hred : Reducible e₁ σ₁)
+    (hSmeas : MeasurableSet S) (hSconc : Concentrated (primStep ⟨e₁, σ₁⟩) S) :
+    iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
+          (∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+            (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S⌝) -∗ |={∅}=>
+              Z e₂ σ₂ e₁' σ₁' ε)) ⊢@{IProp GF}
+      progCoupl e₁ σ₁ e₁' σ₁' ε Z := by
+  iintro ⟨#H1F, H⟩
+  classical
+  have hprob_lhs : (primStep ⟨e₁, σ₁⟩) .univ = 1 := by
+    haveI := prim_step_mass Hred
+    exact MeasureTheory.IsProbabilityMeasure.measure_univ
+  have hprob_rhs : (MeasureTheory.Measure.dirac σ₁' : MeasureTheory.Measure (State rT)) .univ = 1 := by
+    simp
+  have Htrivial : AddCoupl 0 Set.univ (primStep ⟨e₁, σ₁⟩)
+      (MeasureTheory.Measure.dirac σ₁') :=
+    RelCoupl.exact (RelCoupl.trivial hprob_lhs hprob_rhs)
+  have Hε : (0 : ENNReal) + ε ≤ ε := by rw [zero_add]
+  -- Refine the (trivial) relation on the left by `S`, countability-free.
+  have HcplR : AddCoupl 0 {p : (Cfg rT) × (State rT) | (fun ρ _ => ρ ∈ S) p.1 p.2}
+      (primStep ⟨e₁, σ₁⟩) (MeasureTheory.Measure.dirac σ₁') := by
+    refine AddCoupl.mono_rel ?_ (AddCoupl.concentrated_L hSmeas hSconc Htrivial)
+    rintro ⟨ρ, σ⟩ ⟨_, hρ⟩
+    exact hρ
+  iapply (progCoupl_step_l_dret (ε₁ := 0) (ε₂ := ε)
+    (R := fun ρ _ => ρ ∈ S)
+    (Hε := Hε) (Hred := Hred) HcplR)
+  isplitr
+  · iintro !> %e₂ %σ₂ %e₂' %σ₂'; iexact H1F
+  iintro %e₂ %σ₂ %Hmem
+  iapply H $$ %e₂ %σ₂ %Hmem
+
 /-- `prog_coupl_step_l` — pure LHS-step, any positive-measure primStep
-successor lets us land. Mirrors Rocq's `prog_coupl_step_l`. -/
+successor lets us land. Mirrors Rocq's `prog_coupl_step_l`.
+
+Discrete corollary of `progCoupl_step_l_concentrated` at the atom set, whose
+conullity is exactly `primStep`-atomicity. -/
 @[discrete]
 theorem progCoupl_step_l [Countable rT] {e₁ : (Exp rT)} {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)}
     {ε : ENNReal} {Z : (Exp rT) → (State rT) → (Exp rT) → (State rT) → ENNReal → IProp GF}
@@ -1560,32 +1625,14 @@ theorem progCoupl_step_l [Countable rT] {e₁ : (Exp rT)} {σ₁ : (State rT)} {
             (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅}=>
               Z e₂ σ₂ e₁' σ₁' ε)) ⊢@{IProp GF}
       progCoupl e₁ σ₁ e₁' σ₁' ε Z := by
-  iintro ⟨#H1F, H⟩
-  classical
-  -- Build AddCoupl 0 R (primStep ⟨e₁,σ₁⟩) (dirac σ₁') via pos_R, where
-  -- R ρ₁ _ := 0 < primStep {ρ₁}.
-  have hprob_lhs : (primStep ⟨e₁, σ₁⟩) .univ = 1 := by
-    haveI := prim_step_mass (Reducible_ReducibleM_iff.mp Hred)
-    exact MeasureTheory.IsProbabilityMeasure.measure_univ
-  have hprob_rhs : (MeasureTheory.Measure.dirac σ₁' : MeasureTheory.Measure (State rT)) .univ = 1 := by
-    simp
-  have Htrivial : AddCoupl 0 Set.univ (primStep ⟨e₁, σ₁⟩)
-      (MeasureTheory.Measure.dirac σ₁') :=
-    RelCoupl.exact (RelCoupl.trivial hprob_lhs hprob_rhs)
-  have Hpos := AddCoupl.pos_R Htrivial
-  have Hε : (0 : ENNReal) + ε ≤ ε := by rw [zero_add]
-  have HcplR : AddCoupl 0 {p : (Cfg rT) × (State rT) | (fun ρ _ => 0 < primStep ⟨e₁, σ₁⟩ {ρ}) p.1 p.2}
-      (primStep ⟨e₁, σ₁⟩) (MeasureTheory.Measure.dirac σ₁') := by
-    refine AddCoupl.mono_rel ?_ Hpos
-    rintro ⟨ρ, σ⟩ ⟨_, hρ, _⟩
-    exact pos_iff_ne_zero.mpr hρ
-  iapply (progCoupl_step_l_dret (ε₁ := 0) (ε₂ := ε)
-    (R := fun ρ _ => 0 < primStep ⟨e₁, σ₁⟩ {ρ})
-    (Hε := Hε) (Hred := Reducible_ReducibleM_iff.mp Hred) HcplR)
-  isplitr
-  · iintro !> %e₂ %σ₂ %e₂' %σ₂'; iexact H1F
-  iintro %e₂ %σ₂ %Hpos'
-  iapply H $$ %e₂ %σ₂ %Hpos'
+  refine progCoupl_step_l_concentrated (S := {ρ : Cfg rT | 0 < primStep ⟨e₁, σ₁⟩ {ρ}})
+    (Reducible_ReducibleM_iff.mp Hred) (measurableSet_primStep_support e₁ σ₁) ?_
+  have heq : ({ρ : Cfg rT | 0 < primStep ⟨e₁, σ₁⟩ {ρ}}ᶜ)
+      = {ρ : Cfg rT | (primStep ⟨e₁, σ₁⟩) {ρ} = 0} := by
+    ext ρ; simp [pos_iff_ne_zero]
+  show (primStep ⟨e₁, σ₁⟩) _ = 0
+  rw [heq]
+  exact isAtomicSupport_of_countable _
 
 /-! ## WP — outer OFE instances and `IntoVal`-style value intros -/
 
@@ -2187,15 +2234,21 @@ theorem wp_lift_step_prog_couple {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) �
   iapply specCoupl_ret
   iexact HL
 
-/-- `wp_lift_step_later` — single LHS step, no spec-side coupling, results
-under a later. Uses `progCoupl_step_l` through `wp_lift_step_couple`. -/
-@[discrete]
-theorem wp_lift_step_later [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
-    (Hv : e₁.toVal? = none) :
+/-- `wp_lift_step_later_concentrated` — single LHS step, no spec-side coupling,
+results under a later, landing anywhere in a measurable set carrying the step
+measure.
+
+Countability-free generalization of `wp_lift_step_later`. The carrying set is a
+*family* `S : State rT → Set (Cfg rT)` because the start state `σ₁` is bound
+inside the assertion, so the set may depend on it. -/
+theorem wp_lift_step_later_concentrated {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
+    {S : (State rT) → Set (Cfg rT)} (Hv : e₁.toVal? = none)
+    (hSmeas : ∀ σ₁, MeasurableSet (S σ₁))
+    (hSconc : ∀ σ₁, Concentrated (primStep ⟨e₁, σ₁⟩) (S σ₁)) :
     iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E, ∅}=>
-      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
+      (⌜Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
-        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
+        (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S σ₁⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
           stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ)) ⊢@{IProp GF}
       wp E e₁ Φ := by
   iintro H
@@ -2207,17 +2260,17 @@ theorem wp_lift_step_later [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {Φ : (
   imodintro
   iapply specCoupl_ret
   simp only [Hv]
-  iapply (progCoupl_step_l (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
+  iapply (progCoupl_step_l_concentrated (Z := fun e₃ σ₃ e₃' σ₃' ε₃ =>
     iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
       iprop(|={∅, E}=>
         stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
-          wp E e₃ Φ)))) Hred)
+          wp E e₃ Φ)))) Hred (hSmeas σ₁) (hSconc σ₁))
   isplitr
   · iintro !> %e₃ %σ₃ %e₃' %σ₃'
     iintro !>
     iapply (specCoupl_err_ge_1 (_root_.le_refl _))
-  iintro %e₂ %σ₂ %Hstep
-  ispecialize H $$ %e₂ %σ₂ %Hstep
+  iintro %e₂ %σ₂ %Hmem
+  ispecialize H $$ %e₂ %σ₂ %Hmem
   imod H
   imodintro
   iintro !>
@@ -2228,6 +2281,64 @@ theorem wp_lift_step_later [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {Φ : (
   isplitl [Hs]; · iassumption
   isplitl [Hε]; · iassumption
   iassumption
+
+/-- `wp_lift_step_later` — single LHS step, no spec-side coupling, results
+under a later.
+
+Discrete corollary of `wp_lift_step_later_concentrated` at the atom set. -/
+@[discrete]
+theorem wp_lift_step_later [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
+    (Hv : e₁.toVal? = none) :
+    iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E, ∅}=>
+      (⌜Discrete.Reducible e₁ σ₁⌝) ∗
+      ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+        (⌜0 < primStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩}⌝) -∗ |={∅}=> iprop(▷ |={∅, E}=>
+          stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ)) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply (wp_lift_step_later_concentrated
+    (S := fun σ₁ => {ρ : Cfg rT | 0 < primStep ⟨e₁, σ₁⟩ {ρ}}) Hv
+    (fun σ₁ => measurableSet_primStep_support e₁ σ₁)
+    (fun σ₁ => by
+      have heq : ({ρ : Cfg rT | 0 < primStep ⟨e₁, σ₁⟩ {ρ}}ᶜ)
+          = {ρ : Cfg rT | (primStep ⟨e₁, σ₁⟩) {ρ} = 0} := by
+        ext ρ; simp [pos_iff_ne_zero]
+      show (primStep ⟨e₁, σ₁⟩) _ = 0
+      rw [heq]
+      exact isAtomicSupport_of_countable _))
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imodintro
+  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp Hred
+  iintro %e₂ %σ₂ %Hmem
+  iapply H $$ %e₂ %σ₂ %Hmem
+
+/-- `wp_lift_step_concentrated` — like `wp_lift_step_later_concentrated` but with
+the `▷` flipped inside. -/
+theorem wp_lift_step_concentrated {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
+    {S : (State rT) → Set (Cfg rT)} (Hv : e₁.toVal? = none)
+    (hSmeas : ∀ σ₁, MeasurableSet (S σ₁))
+    (hSconc : ∀ σ₁, Concentrated (primStep ⟨e₁, σ₁⟩) (S σ₁)) :
+    iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E, ∅}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ▷ ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+        (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S σ₁⌝) -∗ |={∅, E}=>
+          stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply (wp_lift_step_later_concentrated Hv hSmeas hSconc)
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imodintro
+  isplitr; · ipureintro; exact Hred
+  iintro %e₂ %σ₂ %Hmem
+  imodintro
+  iintro !>
+  iapply H $$ %e₂ %σ₂ %Hmem
 
 /-- `wp_lift_step` — like `wp_lift_step_later` but with the `▷` flipped inside. -/
 @[discrete]
@@ -2436,6 +2547,55 @@ theorem wp_lift_pure_step [Countable rT] {E E' : CoPset} {e₁ : (Exp rT)} {Φ :
   have Hpstep' : 0 < primStep ⟨e₁, σ₂⟩ {⟨e₂, σ₂⟩} := hσ ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %Hpstep'
 
+/-- `wp_lift_atomic_step_fupd_concentrated` — atomic step with mask-shifting
+fupd, landing anywhere in a measurable set carrying the step measure.
+
+Countability-free generalization of `wp_lift_atomic_step_fupd`. For a genuinely
+atomic redex the natural instantiation is `S σ₁ := {ρ | ρ.1.isValue}`, whose
+carrying hypothesis is exactly `Atomic'` — which holds for the continuous
+sampler (`ProbLang.Atomic.urand'`). -/
+theorem wp_lift_atomic_step_fupd_concentrated {E1 E2 : CoPset} {e₁ : (Exp rT)}
+    {Φ : (Val rT) → IProp GF} {S : (State rT) → Set (Cfg rT)} (Hv : e₁.toVal? = none)
+    (hSmeas : ∀ σ₁, MeasurableSet (S σ₁))
+    (hSconc : ∀ σ₁, Concentrated (primStep ⟨e₁, σ₁⟩) (S σ₁)) :
+    iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E1}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+        (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S σ₁⌝) -∗ |={E1}[E2]▷=>
+          stateInterp (rT := rT) σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E1 e₁ Φ := by
+  iintro H
+  iapply (wp_lift_step_later_concentrated Hv hSmeas hSconc)
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imod (BIFUpdate.subset (E1 := E1) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  isplitr; · ipureintro; exact Hred
+  iintro %e₂ %σ₂ %Hmem
+  imod Hclose
+  ispecialize H $$ %e₂ %σ₂ %Hmem
+  imod H
+  imod (BIFUpdate.subset (E1 := E2) (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  iintro !>
+  imod Hclose
+  cases htv : e₂.toVal? with
+  | some v =>
+    imod H with ⟨Hσ', HΦ⟩
+    imodintro
+    isplitl [Hσ']; · iassumption
+    iapply wp_value_of_toVal htv
+    iexact HΦ
+  | none =>
+    imod H with ⟨Hσ', HΦ⟩
+    iexfalso
+    iexact HΦ
+
 /-- `wp_lift_atomic_step_fupd` — atomic step with mask-shifting fupd. -/
 @[discrete]
 theorem wp_lift_atomic_step_fupd [Countable rT] {E1 E2 : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
@@ -2480,6 +2640,32 @@ theorem wp_lift_atomic_step_fupd [Countable rT] {E1 E2 : CoPset} {e₁ : (Exp rT
     iexfalso
     iexact HΦ
 
+/-- `wp_lift_atomic_step_concentrated` — atomic step without mask shift on the
+inner step, landing anywhere in a measurable set carrying the step measure. -/
+theorem wp_lift_atomic_step_concentrated {E : CoPset} {e₁ : (Exp rT)}
+    {Φ : (Val rT) → IProp GF} {S : (State rT) → Set (Cfg rT)} (Hv : e₁.toVal? = none)
+    (hSmeas : ∀ σ₁, MeasurableSet (S σ₁))
+    (hSconc : ∀ σ₁, Concentrated (primStep ⟨e₁, σ₁⟩) (S σ₁)) :
+    iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E}=>
+      (⌜Reducible e₁ σ₁⌝) ∗
+      ▷ ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+        (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S σ₁⌝) -∗ |={E}=>
+          stateInterp (rT := rT) σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply (wp_lift_atomic_step_fupd_concentrated (E2 := E) Hv hSmeas hSconc)
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hred, H⟩
+  imodintro
+  isplitr; · ipureintro; exact Hred
+  iintro %e₂ %σ₂ %Hmem
+  imodintro
+  iintro !>
+  iapply H $$ %e₂ %σ₂ %Hmem
+
 /-- `wp_lift_atomic_step` — atomic step without mask shift on the inner step. -/
 @[discrete]
 theorem wp_lift_atomic_step [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
@@ -2521,6 +2707,44 @@ theorem wp_lift_pure_det_step [Countable rT] {E E' : CoPset} {e₁ e₂ : (Exp r
   iintro %e₂' %σ %Hpstep
   obtain ⟨_, heq⟩ := Hdet σ e₂' σ Hpstep
   subst heq
+  iexact H
+
+/-- `wp_lift_pure_det_step_concentrated` — pure deterministic step,
+countability-free.
+
+The pure family is discrete for a different reason than the sampling rules: not
+atoms, but `PureStep_discrete`'s `primStep {⟨e₂,σ⟩} = 1` phrasing. The
+measure-theoretic `PureStep` instead gives `primStep ⟨e₁,σ⟩ = dirac ⟨e₂,σ⟩`, so
+the carrying set is simply the singleton `{⟨e₂, σ₁⟩}` — measurable, and conull
+under a `dirac` with no countability anywhere. -/
+theorem wp_lift_pure_det_step_concentrated {E E' : CoPset} {e₁ e₂ : (Exp rT)}
+    {Φ : (Val rT) → IProp GF} (Hpure : PureStep e₁ e₂) :
+    iprop(|={E}[E']▷=> wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  iintro H
+  have Hv : e₁.toVal? = none := by
+    rcases htv : e₁.toVal? with _ | v
+    · rfl
+    · exact absurd (Exp.toVal?_isValue htv) (val_stuck (Hpure.safe default))
+  iapply (wp_lift_step_concentrated (S := fun σ₁ => {(⟨e₂, σ₁⟩ : Cfg rT)}) Hv
+    (fun σ₁ => by measurability)
+    (fun σ₁ => by
+      show (primStep ⟨e₁, σ₁⟩) _ = 0
+      rw [Hpure.det σ₁, MeasureTheory.Measure.dirac_apply' _ (by measurability)]
+      simp))
+  iintro %σ₁ Hσ
+  imod H
+  imod (BIFUpdate.subset (E1 := E') (E2 := ∅) Std.LawfulSet.empty_subset)
+    with Hclose
+  imodintro
+  isplitr; · ipureintro; exact Hpure.safe σ₁
+  iintro !>
+  iintro %e₂' %σ₂ %Hmem
+  have heq : (⟨e₂', σ₂⟩ : Cfg rT) = ⟨e₂, σ₁⟩ := Hmem
+  cases heq
+  imod Hclose
+  imod H
+  imodintro
+  isplitl [Hσ]; · iassumption
   iexact H
 
 end ApproxisWpGS
@@ -2616,6 +2840,61 @@ theorem wp_pure_step_later [Countable rT] {E : CoPset} {e₁ e₂ : (Exp rT)} {�
     refine (BI.later_mono ih).trans ?_
     -- `▷ |={E}[E]▷=>^[n] wp ⊢ |={E}[E]▷=> |={E}[E]▷=>^[n] wp`
     -- using `fupd_intro_mask` on both outer masks (mask E = E, trivial).
+    iintro H
+    imodintro; iintro !>; imodintro; iexact H
+
+/-! ### Countability-free pure-step rules
+
+Same three rules on the measure-theoretic `PureStep` / `PureExec` rather than
+their `_discrete` counterparts, so they hold for a diffuse `rT`. -/
+
+/-- `wp_pure_step_one'` — single `PureStep`, countability-free. -/
+theorem wp_pure_step_one' {E : CoPset} {e₁ e₂ : (Exp rT)} {Φ : (Val rT) → IProp GF}
+    (Hstep : PureStep e₁ e₂) :
+    iprop(▷ wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  iintro H
+  iapply (ApproxisWpGS.wp_lift_pure_det_step_concentrated (E' := E) Hstep)
+  imodintro; iintro !>; imodintro; iexact H
+
+/-- `wp_pure_step_fupd'` — `PureExec` step lifting (n-step `step_fupd` form),
+countability-free. -/
+theorem wp_pure_step_fupd' {E E' : CoPset} {e₁ e₂ : (Exp rT)} {φ : Prop} {n : Nat}
+    {Φ : (Val rT) → IProp GF}
+    [Hex : PureExec φ n e₁ e₂] (Hφ : φ) :
+    iprop(|={E}[E']▷=>^[n] wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
+  have Hsteps := Hex.pure_exec Hφ
+  clear Hex
+  induction n generalizing e₁ with
+  | zero =>
+    simp only [nsteps] at Hsteps
+    subst Hsteps
+    simp only [Nat.repeat]
+    iintro H; iexact H
+  | succ n IH =>
+    obtain ⟨c, Hstep, Hrest⟩ := Hsteps
+    simp only [Nat.repeat]
+    iintro H
+    iapply (ApproxisWpGS.wp_lift_pure_det_step_concentrated Hstep)
+    imod H; imodintro; iintro !>; imod H; imodintro
+    iapply (IH Hrest)
+    iexact H
+
+/-- `wp_pure_step_later'` — `PureExec` step lifting (n-step `▷` form),
+countability-free. -/
+theorem wp_pure_step_later' {E : CoPset} {e₁ e₂ : (Exp rT)} {φ : Prop} {n : Nat}
+    {Φ : (Val rT) → IProp GF}
+    [Hex : PureExec φ n e₁ e₂] (Hφ : φ) :
+    Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (wp E e₂ Φ) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  refine BI.Entails.trans ?_ (wp_pure_step_fupd' (E := E) (E' := E)
+    (e₁ := e₁) (e₂ := e₂) (n := n) (Hex := Hex) Hφ)
+  induction n with
+  | zero =>
+    simp only [Nat.repeat]
+    exact BI.BIBase.Entails.rfl
+  | succ n ih =>
+    simp only [Nat.repeat]
+    refine (BI.later_mono ih).trans ?_
     iintro H
     imodintro; iintro !>; imodintro; iexact H
 
@@ -2769,6 +3048,110 @@ theorem wp_lift_atomic_head_step [Countable rT] {E : CoPset} {e₁ : (Exp rT)} {
         (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ))
     exact heq ▸ Hpstep
   iapply H $$ %e₂ %σ₂ %hpos
+
+/-! ### Countability-free head-step rules
+
+The head-step rules gate on `headStep` rather than `primStep`. Head-reducibility
+is established *inside* the assertion (from the state interpretation), so the
+carrying set cannot simply be required to carry `primStep` at every `σ₁` — at a
+state where `e₁` is not head-reducible the redex may sit under a context and
+`primStep` moves elsewhere. The trick is to pad the carrying set to `Set.univ`
+off the head-reducible states, where concentration is free. -/
+
+open scoped Classical in
+/-- `wp_lift_head_step_concentrated` — countability-free `wp_lift_head_step`. -/
+theorem wp_lift_head_step_concentrated {E : CoPset} {e₁ : (Exp rT)} {Φ : (Val rT) → IProp GF}
+    {S : (State rT) → Set (Cfg rT)} (Hv : e₁.toVal? = none)
+    (Hlc : e₁.IsLocallyClosed := by is_lc)
+    (hSmeas : ∀ σ₁, MeasurableSet (S σ₁))
+    (hSconc : ∀ σ₁, HeadReducible e₁ σ₁ → Concentrated (headStep ⟨e₁, σ₁⟩) (S σ₁)) :
+    iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E, ∅}=>
+      (⌜HeadReducible e₁ σ₁⌝) ∗
+      ▷ ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+        (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S σ₁⌝) -∗ |={∅, E}=>
+          stateInterp (rT := rT) σ₂ ∗ wp E e₂ Φ) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply (wp_lift_step_concentrated
+    (S := fun σ₁ => if HeadReducible e₁ σ₁ then S σ₁ else Set.univ) Hv
+    (fun σ₁ => by split_ifs; exacts [hSmeas σ₁, MeasurableSet.univ])
+    (fun σ₁ => by
+      split_ifs with hhr
+      · rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible Hlc hhr)]
+        exact hSconc σ₁ hhr
+      · exact Concentrated.univ))
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hhred, H⟩
+  imodintro
+  isplitr; · ipureintro; exact reducible_of_headReducible Hlc Hhred
+  iintro !>
+  iintro %e₂ %σ₂ %Hmem
+  rw [if_pos Hhred] at Hmem
+  iapply H $$ %e₂ %σ₂ %Hmem
+
+open scoped Classical in
+/-- `wp_lift_atomic_head_step_fupd_concentrated` — countability-free
+`wp_lift_atomic_head_step_fupd`. -/
+theorem wp_lift_atomic_head_step_fupd_concentrated {E1 E2 : CoPset} {e₁ : (Exp rT)}
+    {Φ : (Val rT) → IProp GF} {S : (State rT) → Set (Cfg rT)} (Hv : e₁.toVal? = none)
+    (Hlc : e₁.IsLocallyClosed := by is_lc)
+    (hSmeas : ∀ σ₁, MeasurableSet (S σ₁))
+    (hSconc : ∀ σ₁, HeadReducible e₁ σ₁ → Concentrated (headStep ⟨e₁, σ₁⟩) (S σ₁)) :
+    iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E1}=>
+      (⌜HeadReducible e₁ σ₁⌝) ∗
+      ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+        (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S σ₁⌝) -∗ |={E1}[E2]▷=>
+          stateInterp (rT := rT) σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E1 e₁ Φ := by
+  iintro H
+  iapply (wp_lift_atomic_step_fupd_concentrated
+    (S := fun σ₁ => if HeadReducible e₁ σ₁ then S σ₁ else Set.univ) Hv
+    (fun σ₁ => by split_ifs; exacts [hSmeas σ₁, MeasurableSet.univ])
+    (fun σ₁ => by
+      split_ifs with hhr
+      · rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible Hlc hhr)]
+        exact hSconc σ₁ hhr
+      · exact Concentrated.univ))
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hhred, H⟩
+  imodintro
+  isplitr; · ipureintro; exact reducible_of_headReducible Hlc Hhred
+  iintro %e₂ %σ₂ %Hmem
+  rw [if_pos Hhred] at Hmem
+  iapply H $$ %e₂ %σ₂ %Hmem
+
+open scoped Classical in
+/-- `wp_lift_atomic_head_step_concentrated` — countability-free
+`wp_lift_atomic_head_step`. -/
+theorem wp_lift_atomic_head_step_concentrated {E : CoPset} {e₁ : (Exp rT)}
+    {Φ : (Val rT) → IProp GF} {S : (State rT) → Set (Cfg rT)} (Hv : e₁.toVal? = none)
+    (Hlc : e₁.IsLocallyClosed := by is_lc)
+    (hSmeas : ∀ σ₁, MeasurableSet (S σ₁))
+    (hSconc : ∀ σ₁, HeadReducible e₁ σ₁ → Concentrated (headStep ⟨e₁, σ₁⟩) (S σ₁)) :
+    iprop(∀ (σ₁ : (State rT)), stateInterp (rT := rT) σ₁ -∗ |={E}=>
+      (⌜HeadReducible e₁ σ₁⌝) ∗
+      ▷ ∀ (e₂ : (Exp rT)) (σ₂ : (State rT)),
+        (⌜(⟨e₂, σ₂⟩ : Cfg rT) ∈ S σ₁⌝) -∗ |={E}=>
+          stateInterp (rT := rT) σ₂ ∗
+          (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
+      wp E e₁ Φ := by
+  iintro H
+  iapply (wp_lift_atomic_head_step_fupd_concentrated (E2 := E) Hv Hlc hSmeas hSconc)
+  iintro %σ₁ Hσ
+  ispecialize H $$ %σ₁ [Hσ]
+  · iassumption
+  imod H with ⟨%Hhred, H⟩
+  imodintro
+  isplitr; · ipureintro; exact Hhred
+  iintro %e₂ %σ₂ %Hmem
+  imodintro
+  iintro !>
+  iapply H $$ %e₂ %σ₂ %Hmem
 
 /-- `wp_lift_pure_det_head_step` — pure deterministic head step. -/
 @[discrete]
