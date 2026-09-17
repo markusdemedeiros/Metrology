@@ -306,6 +306,23 @@ noncomputable def lrel_int : lrel rT GF where
     ipureintro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
+/-- Relatedness at the real type: both sides are the *same* real literal.
+
+The continuous counterpart of `lrel_int`. -/
+noncomputable def lrel_real : lrel rT GF where
+  car v1 v2 := iprop(∃ r : rT, ⌜ v1.1 = .lit (.real r) ∧ v2.1 = .lit (.real r) ⌝)
+  persistent _ _ := inferInstance
+  closed v1 v2 := by
+    iintro ⟨%r, %h⟩
+    ipureintro
+    exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
+
+theorem lrel_real_unfold (v v' : Val rT) :
+    (lrel_real (GF := GF)).car v v'
+      ⊢@{IProp GF} iprop(∃ r : rT,
+        ⌜v.1 = .lit (.real r) ∧ v'.1 = .lit (.real r)⌝) :=
+  BIBase.Entails.rfl
+
 noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
     iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗

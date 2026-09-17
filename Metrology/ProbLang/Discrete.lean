@@ -96,7 +96,10 @@ instance instProbLangℝInt : ProbLang.ProbLangℝ Int where
   realAdd a b := a + b
   realNeg a := -a
   realOfInt z := z
+  -- On the discrete `Int` instantiation an "integer real" has no fractional part.
+  realFrac _ := 0
   measurable_realAdd := .of_discrete
   measurable_realNeg := .of_discrete
+  measurable_realFrac := .of_discrete
 
 end ProbLangDiscrete

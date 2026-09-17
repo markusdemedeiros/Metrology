@@ -1471,6 +1471,7 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   cases op with
   | neg => simp [UnOp.intResTy] at Hres
   | toReal => simp [UnOp.intResTy] at Hres
+  | frac => simp [UnOp.intResTy] at Hres
   | minus =>
     simp [UnOp.intResTy] at Hres; subst Hres
     iintro IH
@@ -1525,6 +1526,7 @@ theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   cases op with
   | minus => simp [UnOp.boolResTy] at Hres
   | toReal => simp [UnOp.boolResTy] at Hres
+  | frac => simp [UnOp.boolResTy] at Hres
   | neg =>
     simp [UnOp.boolResTy] at Hres; subst Hres
     iintro IH

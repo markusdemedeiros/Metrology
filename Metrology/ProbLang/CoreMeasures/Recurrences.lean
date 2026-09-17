@@ -436,6 +436,58 @@ theorem UnOp.eval_op_measurable [ProbLangℝ rT] (op : UnOp) :
         (Exp.lit.measurable.comp BaseLit.real.measurable)
     all_goals exact measurable_const
 
+  | frac =>
+    have heq : (fun v : Exp rT => UnOp.eval .frac v) = fun v : Exp rT =>
+        Exp.casesOn (motive := fun _ => Option (Exp rT)) v
+          (fun _ => none) (fun _ => none)
+          (fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+            (fun _ => none) (fun _ => none) none
+            (fun _ => none) (fun _ => none)
+            (fun r => some (.lit (.real (ProbLangℝ.realFrac r)))))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun u e => (fun _ : UnOp × Exp rT => none) (u, e))
+          (fun b e1 e2 => (fun _ : BinOp × Exp rT × Exp rT => none) (b, e1, e2))
+          (fun ec et ef => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, et, ef))
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none) (fun _ => none) (fun _ => none) (fun _ => none)
+          (fun ec el er => (fun _ : Exp rT × Exp rT × Exp rT => none) (ec, el, er))
+          (fun _ => none) (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          (fun _ => none)
+          (fun e1 e2 => (fun _ : Exp rT × Exp rT => none) (e1, e2))
+          ((fun _ : Unit => none) ())
+          ((fun _ : Unit => none) ())
+          (fun e p => (fun _ : Exp rT × Pat rT => none) (e, p)) := by
+      funext v
+      cases v <;> simp [UnOp.eval]
+      rename_i l; cases l <;> simp
+    rw [heq]
+    apply Exp.measurable_rec (rT := rT)
+      (f_bvar := fun _ => none) (f_fvar := fun _ => none)
+      (f_lit := fun l => BaseLit.casesOn (motive := fun _ => Option (Exp rT)) l
+        (fun _ => none) (fun _ => none) none
+        (fun _ => none) (fun _ => none)
+        (fun r => some (Exp.lit (.real (ProbLangℝ.realFrac r)))))
+      (f_lam := fun _ => none) (f_fix := fun _ => none)
+      (f_app := fun _ => none) (f_unop := fun _ => none) (f_binop := fun _ => none)
+      (f_cond := fun _ => none) (f_pair := fun _ => none)
+      (f_fst := fun _ => none) (f_snd := fun _ => none)
+      (f_inl := fun _ => none) (f_inr := fun _ => none)
+      (f_case := fun _ => none)
+      (f_alloc := fun _ => none) (f_load := fun _ => none) (f_store := fun _ => none)
+      (f_tape := fun _ => none) (f_rand := fun _ => none)
+      (f_fail := fun _ => none) (f_urand := fun _ => none) (f_scrut := fun _ => none)
+    · apply BaseLit.measurable_rec
+        (f_int := fun _ => none)
+        (f_bool := fun _ => none)
+        (f_unit := fun _ => none) (f_loc := fun _ => none) (f_lbl := fun _ => none)
+        (f_real := fun r => some (Exp.lit (.real (ProbLangℝ.realFrac r))))
+      exact MeasurableEmbedding.some_mk.measurable.comp
+        (Exp.lit.measurable.comp
+          (BaseLit.real.measurable.comp ProbLangℝ.measurable_realFrac))
+    all_goals exact measurable_const
+
 theorem UnOp_eval.measurable [ProbLangℝ rT] :
     Measurable (Function.uncurry (UnOp.eval (α := rT))) := by
   -- `UnOp × Exp rT → Option (Exp rT)`. `UnOp` is Countable + has `⊤` σ-alg

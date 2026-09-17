@@ -137,8 +137,15 @@ class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, In
   /-- Injection of integers into the reals. Powers `UnOp.eval .toReal`, the
   coercion that lets a program combine an integer part with a real fraction. -/
   realOfInt : Int → T
+  /-- Fractional part of a real. Powers `UnOp.eval .frac`, the operation that lets
+  a program compute *modulo 1* — which is what a combiner on the unit interval
+  needs. Intended to satisfy `realFrac r ∈ [0,1)` with `r - realFrac r` integral,
+  but the class demands only measurability; laws that depend on it (notably
+  rotation-invariance of `unifUnit`) are proved per instance. -/
+  realFrac : T → T
   measurable_realAdd : Measurable (Function.uncurry realAdd)
   measurable_realNeg : Measurable realNeg
+  measurable_realFrac : Measurable realFrac
 
 attribute [reducible, instance] ProbLangℝ.instDecidableEq
 attribute [instance] ProbLangℝ.unifUnit_isProbabilityMeasure
@@ -169,7 +176,7 @@ inductive BaseLit (rT : Type _)
   deriving Countable, BEq, Repr
 
 @[uncurriedProjections, curriedProjections, constructors]
-inductive UnOp | neg | minus | toReal
+inductive UnOp | neg | minus | toReal | frac
   deriving Inhabited, Countable, Repr, BEq
 
 @[uncurriedProjections, curriedProjections, constructors]
@@ -1103,6 +1110,9 @@ def UnOp.eval [ProbLangℝ α] (op : UnOp) (v : Exp α) : Option (Exp α) :=
   -- literals are already reals, so the coercion is idempotent on them.
   | toReal, .lit (.int z) => some <| .lit <| .real <| ProbLangℝ.realOfInt z
   | toReal, .lit (.real r) => some <| .lit <| .real r
+  -- Fractional part, via the `ProbLangℝ` `realFrac` data. Only defined on reals:
+  -- on an integer literal the program must coerce with `toReal` first.
+  | frac, .lit (.real r) => some <| .lit <| .real <| ProbLangℝ.realFrac r
   | _, _ => none
 
 def BinOp.eval (op : BinOp) (v1 v2 : Exp rT) : Option (Exp rT) :=

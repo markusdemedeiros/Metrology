@@ -241,11 +241,13 @@ def UnOp.intResTy : UnOp → Option Ty
   | .minus => some .int
   -- `Ty` has no real type, so the int→real coercion has no typed result.
   | .toReal => none
+  | .frac  => none
 
 def UnOp.boolResTy : UnOp → Option Ty
   | .neg   => some .bool
   | .minus => none
   | .toReal => none
+  | .frac  => none
 
 /-! ## Typing contexts
 

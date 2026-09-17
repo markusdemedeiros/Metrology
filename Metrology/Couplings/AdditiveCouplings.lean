@@ -544,6 +544,41 @@ theorem pos_R [Countable α] [Countable β]
   rintro ⟨a, b⟩ ⟨⟨hS, haL⟩, hbR⟩
   exact ⟨hS, haL, hbR⟩
 
+/-- **Eliminating a coupling at equality.** An `AddCoupl ε (=) μ ν` bounds `μ`
+by `ν` on every measurable set, up to `ε`.
+
+This is the Rocq `ARcoupl_eq_elim`, in measure-theoretic form: instantiate the
+Kantorovich-dual with `f = g = 1_S`, which satisfies the relational premise
+because the relation is equality. Applying it in both directions at `ε = 0`
+yields equality of the two measures (`AddCoupl.eq_of_eq_zero`). -/
+theorem eq_elim {ε : ENNReal} {μ ν : Measure α}
+    (h : AddCoupl ε {p : α × α | p.1 = p.2} μ ν) {S : Set α} (hS : MeasurableSet S) :
+    μ S ≤ ν S + ε := by
+  have hind : Measurable (S.indicator (1 : α → ENNReal)) :=
+    measurable_one.indicator hS
+  have hb : BoundedFunction (S.indicator (1 : α → ENNReal)) :=
+    fun a => Set.indicator_apply_le' (fun _ => le_rfl) (fun _ => zero_le)
+  have key := h ⟨_, hind, hb⟩ ⟨_, hind, hb⟩ (fun {a b} hab => by
+    have heq : a = b := hab
+    rw [heq])
+  have hμ : ∫⁻ a, S.indicator (1 : α → ENNReal) a ∂μ = μ S :=
+    MeasureTheory.lintegral_indicator_one hS
+  have hν : ∫⁻ a, S.indicator (1 : α → ENNReal) a ∂ν = ν S :=
+    MeasureTheory.lintegral_indicator_one hS
+  rw [hμ, hν] at key
+  exact key
+
+/-- Two measures coupled at equality with **zero** error in both directions are
+equal. This is the sense in which a pair of mutual refinements is an
+*equivalence*: the two programs induce literally the same distribution. -/
+theorem eq_of_eq_zero {μ ν : Measure α}
+    (h₁ : AddCoupl 0 {p : α × α | p.1 = p.2} μ ν)
+    (h₂ : AddCoupl 0 {p : α × α | p.1 = p.2} ν μ) :
+    μ = ν := by
+  refine Measure.ext fun S hS => le_antisymm ?_ ?_
+  · simpa using eq_elim h₁ hS
+  · simpa using eq_elim h₂ hS
+
 /-- Exact couplings embed into approximate couplings at any `ε`. -/
 theorem of_RelCoupl {ε : ENNReal} {S : Set (α × β)}
     {μₗ : Measure α} {μᵣ : Measure β}

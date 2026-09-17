@@ -3,6 +3,7 @@ module
 public import Metrology.ProbLang.Syntax.Syntax
 public import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 public import Mathlib.MeasureTheory.Measure.Restrict
+public import Mathlib.MeasureTheory.Function.Floor
 
 /-! # The continuous `ProbLangℝ ℝ` instance -/
 namespace ProbLang
@@ -63,8 +64,10 @@ public noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
   realAdd a b := a + b
   realNeg a := -a
   realOfInt z := (z : ℝ)
+  realFrac r := Int.fract r
   measurable_realAdd := measurable_add
   measurable_realNeg := measurable_neg
+  measurable_realFrac := measurable_fract
 
 /-! ### Arithmetic reduction lemmas
 
@@ -78,10 +81,132 @@ let `twp_pures` and the stepping display normalise them away. -/
 
 @[simp] public theorem realOfInt_real (z : ℤ) : ProbLangℝ.realOfInt z = (z : ℝ) := rfl
 
+@[simp] public theorem realFrac_real (r : ℝ) : ProbLangℝ.realFrac r = Int.fract r := rfl
+
 /-- For the `ℝ` instance, `unifUnitSupport` is the open interval `(0,1)`, so membership
 unpacks to the strict range `0 < r < 1`. Used by `urand` samplers to read off sample
 bounds from the strengthened `twp_urand_exp'` continuation. -/
 public theorem mem_unifUnitSupport_real {r : ℝ} :
     r ∈ ProbLangℝ.unifUnitSupport (T := ℝ) ↔ 0 < r ∧ r < 1 := Set.mem_Ioo
+
+/-! ### Rotation invariance of `Uniform[0,1]`
+
+The one-time-pad combiner. `x ↦ frac (m + x)` is the rotation of the unit
+interval by `m`; it is a piecewise translation swapping the blocks `[0, 1-m)`
+and `[1-m, 1)`, so it preserves `Uniform[0,1]`. This is exactly the hypothesis
+`wp_couple_urand_urand` / `refines_couple_urands_lr` ask for, and it is what
+makes a *continuous* one-time pad provable. -/
+
+open MeasureTheory Set in
+/-- Auxiliary: rotation invariance for a shift already normalised to `[0,1)`. -/
+theorem measurePreserving_fracAdd_aux {m : ℝ} (hm0 : 0 ≤ m) (hm1 : m < 1) :
+    MeasureTheory.MeasurePreserving
+      (fun r : ℝ => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
+      (ProbLangℝ.unifUnit (T := ℝ)) (ProbLangℝ.unifUnit (T := ℝ)) := by
+  show MeasurePreserving (fun r : ℝ => Int.fract (m + r))
+      (volume.restrict (Icc (0:ℝ) 1)) (volume.restrict (Icc (0:ℝ) 1))
+  have hmeas : Measurable (fun r : ℝ => Int.fract (m + r)) :=
+    measurable_fract.comp (measurable_const_add m)
+  refine ⟨hmeas, ?_⟩
+  refine Measure.ext fun S hS => ?_
+  rw [Measure.map_apply hmeas hS, Measure.restrict_apply (hmeas hS),
+      Measure.restrict_apply hS]
+  -- `Icc 0 1` and `Ico 0 1` differ by the null set `{1}`.
+  have hIcc : ∀ A : Set ℝ, volume (A ∩ Icc (0:ℝ) 1) = volume (A ∩ Ico (0:ℝ) 1) := by
+    intro A
+    have hsplit : A ∩ Icc (0:ℝ) 1 = (A ∩ Ico (0:ℝ) 1) ∪ (A ∩ {(1:ℝ)}) := by
+      rw [← Set.inter_union_distrib_left, Set.Ico_union_right (by norm_num : (0:ℝ) ≤ 1)]
+    have hnull : volume (A ∩ {(1:ℝ)}) = 0 :=
+      measure_mono_null Set.inter_subset_right
+        (measure_singleton (μ := (volume : Measure ℝ)) 1)
+    rw [hsplit]
+    refine le_antisymm ?_ (measure_mono Set.subset_union_left)
+    exact (measure_union_le _ _).trans (by rw [hnull, add_zero])
+  rw [hIcc, hIcc]
+  -- The two blocks of the domain, and the two blocks of the codomain.
+  have hlo : (0:ℝ) ≤ 1 - m := by linarith
+  have hhi : (1:ℝ) - m ≤ 1 := by linarith
+  -- (A) On `[0, 1-m)` the map is the translation `r ↦ m + r`, onto `[m, 1)`.
+  have hA : (fun r : ℝ => Int.fract (m + r)) ⁻¹' S ∩ Ico (0:ℝ) (1 - m)
+      = (fun r : ℝ => m + r) ⁻¹' (S ∩ Ico m 1) := by
+    ext r
+    simp only [Set.mem_inter_iff, Set.mem_preimage, Set.mem_Ico]
+    constructor
+    · rintro ⟨hSr, hr0, hr1⟩
+      have hfr : Int.fract (m + r) = m + r :=
+        Int.fract_eq_self.mpr ⟨by linarith, by linarith⟩
+      rw [hfr] at hSr
+      exact ⟨hSr, by linarith, by linarith⟩
+    · rintro ⟨hSr, hge, hlt⟩
+      have hfr : Int.fract (m + r) = m + r :=
+        Int.fract_eq_self.mpr ⟨by linarith, by linarith⟩
+      exact ⟨by rw [hfr]; exact hSr, by linarith, by linarith⟩
+  -- (B) On `[1-m, 1)` the map is `r ↦ (m-1) + r`, onto `[0, m)`.
+  have hB : (fun r : ℝ => Int.fract (m + r)) ⁻¹' S ∩ Ico (1 - m) (1:ℝ)
+      = (fun r : ℝ => (m - 1) + r) ⁻¹' (S ∩ Ico (0:ℝ) m) := by
+    ext r
+    simp only [Set.mem_inter_iff, Set.mem_preimage, Set.mem_Ico]
+    have hshift : Int.fract (m + r) = Int.fract (m + r - 1) := (Int.fract_sub_one (m + r)).symm
+    constructor
+    · rintro ⟨hSr, hr0, hr1⟩
+      have hfr : Int.fract (m + r - 1) = m + r - 1 :=
+        Int.fract_eq_self.mpr ⟨by linarith, by linarith⟩
+      rw [hshift, hfr] at hSr
+      refine ⟨by convert hSr using 1; ring, by linarith, by linarith⟩
+    · rintro ⟨hSr, hge, hlt⟩
+      have hfr : Int.fract (m + r - 1) = m + r - 1 :=
+        Int.fract_eq_self.mpr ⟨by linarith, by linarith⟩
+      refine ⟨?_, by linarith, by linarith⟩
+      rw [hshift, hfr]
+      convert hSr using 1; ring
+  -- Assemble: both sides split into the same two blocks, swapped.
+  have hunion1 : Ico (0:ℝ) (1 - m) ∪ Ico (1 - m) (1:ℝ) = Ico (0:ℝ) 1 :=
+    Set.Ico_union_Ico_eq_Ico hlo hhi
+  have hunion2 : Ico (0:ℝ) m ∪ Ico m (1:ℝ) = Ico (0:ℝ) 1 :=
+    Set.Ico_union_Ico_eq_Ico hm0 (le_of_lt hm1)
+  have hL : volume ((fun r : ℝ => Int.fract (m + r)) ⁻¹' S ∩ Ico (0:ℝ) 1)
+      = volume ((fun r : ℝ => Int.fract (m + r)) ⁻¹' S ∩ Ico (0:ℝ) (1 - m))
+        + volume ((fun r : ℝ => Int.fract (m + r)) ⁻¹' S ∩ Ico (1 - m) (1:ℝ)) := by
+    rw [← hunion1, Set.inter_union_distrib_left]
+    exact measure_union
+      ((Set.Ico_disjoint_Ico_same (a := (0:ℝ)) (b := 1 - m) (c := 1)).mono
+        Set.inter_subset_right Set.inter_subset_right)
+      ((hmeas hS).inter measurableSet_Ico)
+  have hR : volume (S ∩ Ico (0:ℝ) 1)
+      = volume (S ∩ Ico (0:ℝ) m) + volume (S ∩ Ico m (1:ℝ)) := by
+    rw [← hunion2, Set.inter_union_distrib_left]
+    exact measure_union
+      ((Set.Ico_disjoint_Ico_same (a := (0:ℝ)) (b := m) (c := 1)).mono
+        Set.inter_subset_right Set.inter_subset_right)
+      (hS.inter measurableSet_Ico)
+  rw [hL, hR, hA, hB, measure_preimage_add, measure_preimage_add]
+  exact add_comm _ _
+
+/-- **Rotation invariance of `Uniform[0,1]`**, for an arbitrary shift.
+
+`frac` is `1`-periodic in the shift, so the general case reduces to
+`measurePreserving_fracAdd_aux` at `Int.fract m ∈ [0,1)`. This is the hypothesis
+`refines_couple_urands_lr` wants, with no side condition on `m`. -/
+public theorem measurePreserving_fracAdd (m : ℝ) :
+    MeasureTheory.MeasurePreserving
+      (fun r : ℝ => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
+      (ProbLangℝ.unifUnit (T := ℝ)) (ProbLangℝ.unifUnit (T := ℝ)) := by
+  have hper : (fun r : ℝ => Int.fract (m + r))
+      = fun r : ℝ => Int.fract (Int.fract m + r) := by
+    funext r
+    have hshift : Int.fract m + r = (m + r) - (⌊m⌋ : ℝ) := by
+      have := Int.fract_add_floor m
+      linarith
+    rw [hshift, Int.fract_sub_intCast]
+  show MeasureTheory.MeasurePreserving (fun r : ℝ => Int.fract (m + r)) _ _
+  rw [hper]
+  exact measurePreserving_fracAdd_aux (Int.fract_nonneg m) (Int.fract_lt_one m)
+
+/-- `fract` absorbs a `fract` on the right of a sum. -/
+public theorem fract_add_fract_right (x y : ℝ) :
+    Int.fract (x + Int.fract y) = Int.fract (x + y) := by
+  have h : x + Int.fract y = (x + y) - (⌊y⌋ : ℝ) := by
+    have := Int.fract_add_floor y; linarith
+  rw [h, Int.fract_sub_intCast]
 
 end ProbLang

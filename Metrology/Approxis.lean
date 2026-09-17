@@ -16,6 +16,7 @@ public import Metrology.Approxis.Adequacy
 public import Metrology.Approxis.AdequacyRel
 public import Metrology.Approxis.Soundness
 public import Metrology.Approxis.Examples.OTP
+public import Metrology.Approxis.Examples.ContinuousOTP
 
 @[expose] public section
 
