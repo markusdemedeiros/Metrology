@@ -53,8 +53,10 @@ inductive MyTree where
 
 example : (3, 4, 5) = (3, (4, 5)) := rfl
 
-example : MyTree.nil.π .nil = some () := rfl
-example : MyTree.nil.π (.leaf 5) = none := rfl
+-- Nullary constructors get no `.π`: there is nothing to project, so `mkProjection`
+-- skips them (`Metrology/Meta/Projections.lean`). Unary/n-ary ones do:
+example : MyTree.leaf.π (.leaf 5) = some 5 := rfl
+example : MyTree.leaf.π .nil = none := rfl
 example : MyTree.branch.π (.leaf 5) = none := rfl
 example : MyTree.branch.π (.branch (.leaf 1) (.leaf 2) 5) = some (MyTree.leaf 1, MyTree.leaf 2, 5) := rfl
 

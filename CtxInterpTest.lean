@@ -1,7 +1,14 @@
 import Metrology.ProbLang.Syntax.Notation
 import Metrology.ProbLang.Interp.CtxInterp
+import Metrology.ProbLang.Discrete
 
 open ProbLang ProbLang.EvalPrim
+
+/-! **Not currently in the build** (see `lakefile.toml`). `ProbLangℝ` bundles the
+computable real operations with a noncomputable `MeasureTheory.Measure`, so
+`instProbLangℝInt` is noncomputable and `check`/`checkError` below cannot be compiled.
+Splitting a computable `ProbLangℝOps` parent out of `ProbLangℝ` would revive this file;
+everything else in it is up to date. -/
 
 /-! Tests for the context-decomposing ProbLang interpreter (`EvalPrim`).
 
@@ -66,12 +73,12 @@ A failing assertion throws an IO error naming the test.
 - [x] `rand` off-by-one: documented discrepancy between spec and implementation
 -/
 
-private def check (name : String) (prog : Exp) (expected : Exp) : IO Unit := do
+private def check (name : String) (prog : Exp Int) (expected : Exp Int) : IO Unit := do
   let v ← run prog
   if v.1 != expected then
     throw (IO.userError s!"FAIL [{name}]: got {repr v.1}, expected {repr expected}")
 
-private def checkError (name : String) (prog : Exp) : IO Unit := do
+private def checkError (name : String) (prog : Exp Int) : IO Unit := do
   try
     let v ← run prog
     throw (IO.userError s!"FAIL [{name}]: expected error, got {repr v.1}")
@@ -188,7 +195,7 @@ private def checkError (name : String) (prog : Exp) : IO Unit := do
 -- Recursion: factorial 5 = 120
 -- ---------------------------------------------------------------------------
 
-private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n - #1))
+private def factExp : Exp Int := pl(rec fact n := if n = #0 then #1 else n * fact (n - #1))
 
 #eval check "factorial 5"
   pl({factExp} #5)
@@ -448,13 +455,13 @@ private def factExp : Exp := pl(rec fact n := if n = #0 then #1 else n * fact (n
   pl(#2)
 
 -- Recursive: sum 1..10 = 55
-private def sumExp : Exp := pl(rec sum n := if n = #0 then #0 else n + sum (n - #1))
+private def sumExp : Exp Int := pl(rec sum n := if n = #0 then #0 else n + sum (n - #1))
 #eval check "sum 1..10"
   pl({sumExp} #10)
   pl(#55)
 
 -- Mutual recursion via pairs: is_even/is_odd
-private def isEvenOdd : Exp :=
+private def isEvenOdd : Exp Int :=
   pl(rec eo n := if n = #0 then (#true, #false) else (snd(eo (n - #1)), fst(eo (n - #1))))
 #eval check "is_even 4"
   pl(fst({isEvenOdd} #4))
@@ -909,7 +916,7 @@ private def String.hasSubstr (haystack needle : String) : Bool :=
   (haystack.splitOn needle).length > 1
 
 /-- Like `checkError` but also checks the error message contains `needle`. -/
-private def checkErrorMsg (name : String) (prog : Exp) (needle : String) : IO Unit := do
+private def checkErrorMsg (name : String) (prog : Exp Int) (needle : String) : IO Unit := do
   match ← (run prog |>.toBaseIO) with
   | .ok v =>
     throw (IO.userError s!"FAIL [{name}]: expected error, got {repr v.1}")

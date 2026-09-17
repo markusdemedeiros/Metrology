@@ -166,7 +166,7 @@ inductive BaseLit (rT : Type _)
   | loc (loc : Loc)
   | lbl (lbl : Lbl)
   | real (r : rT)
-  deriving Countable, BEq
+  deriving Countable, BEq, Repr
 
 @[uncurriedProjections, curriedProjections, constructors]
 inductive UnOp | neg | minus | toReal
@@ -197,7 +197,7 @@ inductive Pat (rT : Type _)
   | pair (p1 p2 : Pat rT)
   | inl (p : Pat rT)
   | inr (p : Pat rT)
-  deriving Inhabited, Countable, BEq
+  deriving Inhabited, Countable, BEq, Repr
 
 @[uncurriedProjections, curriedProjections, constructors]
 inductive Exp (rT : Type _)
@@ -239,7 +239,7 @@ inductive Exp (rT : Type _)
   | urand
   /-- Pattern matching primitive -/
   | scrut (e : Exp rT) (pat : Pat rT)
-  deriving Inhabited, Countable, BEq
+  deriving Inhabited, Countable, BEq, Repr
 
 section WithRealParam
 
