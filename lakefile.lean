@@ -1,5 +1,5 @@
 import Lake
-open Lake DSL System
+open Lake DSL
 
 package metrology where
   leanOptions := #[
@@ -35,40 +35,3 @@ lean_exe ProbLangTest where
 lean_exe CtxInterpTest where
   root := `CtxInterpTest
   supportInterpreter := true
-
-target LibCryptoFFI (pkg : NPackage __name__) : FilePath := do
-  let oFile := pkg.buildDir / "ffi" / "FFI.o"
-  let aFile := pkg.buildDir / "ffi" / "libCryptoFFI.a"
-  let srcFile ← inputFile (pkg.dir / "Metrology" / "LibCrypto" / "LibCryptoBindings.c") false
-  let lean ← getLeanInstall
-  let oJob ← buildO oFile srcFile
-    (weakArgs := #[s!"-I{lean.includeDir}", "-I/opt/local/include/openssl", "-I/opt/local/include"])
-    (compiler := "cc")
-  buildStaticLib aFile #[oJob]
-
-def linkObjs : TargetArray FilePath := #[LibCryptoFFI]
-def linkArgs : Array String := #["-L/opt/local/lib", "-lssl", "-lcrypto"]
-
-lean_lib LibCrypto where
-  srcDir := "Metrology"
-  moreLinkObjs := linkObjs
-  moreLinkArgs := linkArgs
-
-lean_exe LibCryptoTest where
-  root := `LibCryptoTest
-  moreLinkObjs := linkObjs
-  moreLinkArgs := linkArgs
-
-lean_lib MicroCircuit where
-  moreLinkObjs := linkObjs
-  moreLinkArgs := linkArgs
-
-lean_exe MicroCircuitTest where
-  root := `MicroCircuitTest
-  moreLinkObjs := linkObjs
-  moreLinkArgs := linkArgs
-
--- lake env lean --run MicroCircuitViz.lean sha256.dot
--- sfdp -Tpng sha256.dot -o sha256.png   
-lean_exe MicroCircuitViz where
-  root := `MicroCircuitViz
