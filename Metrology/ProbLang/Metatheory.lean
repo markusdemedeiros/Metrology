@@ -713,6 +713,25 @@ theorem Exp.substMap_lc {vs : SubstMap rT} {e : Exp rT}
     rw [Exp.substMap_cons]
     exact subst_lc (ih hRestClosed) hwClosed.1
 
+/-- A `lam` whose body is closed off by a substitution is locally closed: the body is
+locally closed once opened at any atom outside `L`, and `σ` neither captures nor
+introduces dangling indices (its values are closed, and its domain sits inside `D`).
+Extracted from `bin_log_related_lam`, which needs exactly this for `Val`'s new
+local-closedness field. -/
+theorem Exp.lam_substMap_isLocallyClosed {e : Exp rT} {σ : SubstMap rT} {L D : Finset Var}
+    (hσ : SubstMap.AllClosed σ) (hdom : ∀ y ∉ D, SubstMap.lookup σ y = none)
+    (he : ∀ x ∉ L, (Exp.open' e (.fvar x)).IsLocallyClosed) :
+    (Exp.lam (Exp.substMap σ e)).IsLocallyClosed := by
+  refine Exp.IsLocallyClosed.lam (L ∪ D) _ ?_
+  intro y hy
+  have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
+  have hyD : y ∉ D := fun h => hy (Finset.mem_union_right _ h)
+  have hbridge : Exp.substMap σ (Exp.open' e (.fvar y)) =
+      Exp.open' (Exp.substMap σ e) (.fvar y) := by
+    rw [Exp.substMap_open _ _ _ hσ, Exp.substMap_fvar_lookup_none (hdom y hyD)]
+  rw [← hbridge]
+  exact Exp.substMap_lc hσ (he y hyL)
+
 /-- A free variable of `(substMap vs e)` either was already free in `e` (and
 not substituted out), or comes from one of the substituted values. -/
 theorem Exp.fv_substMap_subset (vs : SubstMap rT) (e : Exp rT) :

@@ -310,6 +310,14 @@ theorem open_close_subst_lc (x y : Var) (e : Exp rT) (he : IsLocallyClosed e) :
     open' (close e x) (fvar y) = subst e x (fvar y) :=
   open_close_to_subst e x y 0 he
 
+/-- Opening a `close`d locally-closed term is locally closed: `open ∘ close` is a
+renaming substitution, which preserves local closedness. This is the shape the
+`unpack` contexts produce (`CtxItem.fill (.unpackR x e₁) e = app (lam (close e x)) e₁`). -/
+theorem open_close_isLocallyClosed {e : Exp rT} (x y : Var) (he : IsLocallyClosed e) :
+    (Exp.open' (Exp.close e x) (Exp.fvar y)).IsLocallyClosed := by
+  rw [open_close_subst_lc x y e he]
+  exact subst_lc he (IsLocallyClosed.fvar y)
+
 /-- Generalised: outermost open ∘ close equals substitution by an arbitrary
     LC value. Proved via `subst_intro` with a fresh atom and the `fvar`-only
     version `open_close_subst_lc`. -/
@@ -363,6 +371,12 @@ theorem isClosedEmpty.toFvSubsetEmpty {e : Exp rT} (h : e.isClosedEmpty) :
 theorem lit_isClosedEmpty (b : BaseLit rT) : (Exp.lit b).isClosedEmpty :=
   ⟨IsLocallyClosed.lit b, by simp [Exp.fv]⟩
 
+/-- Opening a locally-closed term leaves it locally closed (opening is a no-op). -/
+theorem open_isLocallyClosed {e : Exp rT} (t : Exp rT) (he : e.IsLocallyClosed) :
+    (Exp.open' e t).IsLocallyClosed := by
+  have h : Exp.open' e t = e := (open_lc 0 t e he).symm
+  rw [h]; exact he
+
 /-- Opening at a free variable preserves the original free variables. -/
 theorem fv_subset_openRec (k : Nat) (y : Var) (e : Exp rT) :
     e.fv ⊆ (openRec k (fvar y) e).fv := by
@@ -383,4 +397,106 @@ theorem fv_open_subset (e : Exp rT) (y : Var) :
   fv_openRec_subset 0 y e
 
 end Exp
+
+/-- `is_lc` discharges `Exp.IsLocallyClosed e` goals. Runtime values and program
+fragments are locally closed; the proof is either a kernel computation of the decidable
+checker (`Exp.lcb_imp_lc (by rfl)`, for fully concrete closed subterms such as source
+`lam`/`fix` bodies), or a structural decomposition bottoming out at an abstract value's
+`Val.lc` field (`exact Val.lc _`) or a closedness hypothesis already in context. -/
+syntax "is_lc" : tactic
+macro_rules
+  | `(tactic| is_lc) =>
+    `(tactic| first
+        | assumption
+        | exact Exp.lcb_imp_lc (by rfl)
+        | repeat' (first
+            | assumption
+            | exact Exp.lcb_imp_lc (by rfl)
+            | exact Val.lc _
+            | exact Exp.IsLocallyClosed.fvar _
+            | exact Exp.IsLocallyClosed.lit _
+            | exact Exp.IsLocallyClosed.fail
+            | exact Exp.IsLocallyClosed.urand
+            -- Binders: introduce a fresh opening variable (cofinite, `L := ∅`) and
+            -- reduce the `open'` so the body's constructors are exposed to the descent.
+            -- `openRec`/`open'` are `@[simp]`, so `simp only` distributes them and
+            -- decides the `bvar`→`fvar` substitution; it leaves an `openRec _ _ e₀`
+            -- stuck on each opaque leaf `e₀` (a `Val` projection or a closed constant),
+            -- cleared below by `← Exp.open_lc`.
+            | (refine Exp.IsLocallyClosed.lam ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            | (refine Exp.IsLocallyClosed.fix ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            -- Clear an `openRec k t e₀` stuck on a closed leaf `e₀`: rewrite it back to
+            -- `e₀` (the side goal `e₀.IsLocallyClosed` is then closed by the recursion —
+            -- `Val.lc` for a value, `lcb_imp_lc (by rfl)` for a closed constant).
+            | rw [← Exp.open_lc]
+            | apply Exp.IsLocallyClosed.app | apply Exp.IsLocallyClosed.unop
+            | apply Exp.IsLocallyClosed.binop | apply Exp.IsLocallyClosed.cond
+            | apply Exp.IsLocallyClosed.pair | apply Exp.IsLocallyClosed.fst
+            | apply Exp.IsLocallyClosed.snd | apply Exp.IsLocallyClosed.inl
+            | apply Exp.IsLocallyClosed.inr | apply Exp.IsLocallyClosed.case
+            | apply Exp.IsLocallyClosed.alloc | apply Exp.IsLocallyClosed.load
+            | apply Exp.IsLocallyClosed.store | apply Exp.IsLocallyClosed.tape
+            | apply Exp.IsLocallyClosed.rand | apply Exp.IsLocallyClosed.scrut))
+
+syntax "is_value" : tactic
+macro_rules
+  | `(tactic| is_value) =>
+    `(tactic| first
+        | trivial
+        | repeat' (first
+            | rfl
+            | assumption       -- a value-hood fact already in context (e.g. an abstract
+                               -- `Val`'s `v.isValue`), matched up to defeq
+            | exact Val.snd _                -- `IsVal v.fst` for an abstract `Val v`
+            | exact Val.isValue _            -- `v.fst.isValue` (`Nonempty (IsVal v.fst)`)
+            | exact Exp.lcb_imp_lc (by rfl)  -- a closed `(lam/fix …).IsLocallyClosed` subterm
+            | exact Val.lc _                 -- a value's closedness, from its `Val.lc` field
+            | exact ProbLang.IsVal.lit
+            | refine ProbLang.IsVal.lam ?_ | refine ProbLang.IsVal.fix ?_
+            | apply ProbLang.IsVal.inl | apply ProbLang.IsVal.inr | apply ProbLang.IsVal.pair
+            -- A `(lam/fix …).IsLocallyClosed` side condition whose body is *not* closed
+            -- (e.g. it mentions an abstract `Val` projection): introduce the cofinite
+            -- opening variable, reduce `open'`, and let the descent below finish — see
+            -- `is_lc` for the full rationale (`← Exp.open_lc` clears the `openRec`
+            -- stuck on each opaque leaf).
+            | (refine Exp.IsLocallyClosed.lam ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            | (refine Exp.IsLocallyClosed.fix ∅ _ ?_ <;> intro _ _ <;>
+                 simp only [Exp.open', Exp.openRec])
+            | rw [← Exp.open_lc]
+            | apply Exp.IsLocallyClosed.fvar
+            | apply Exp.IsLocallyClosed.lit | apply Exp.IsLocallyClosed.app
+            | apply Exp.IsLocallyClosed.unop | apply Exp.IsLocallyClosed.binop
+            | apply Exp.IsLocallyClosed.cond | apply Exp.IsLocallyClosed.pair
+            | apply Exp.IsLocallyClosed.fst | apply Exp.IsLocallyClosed.snd
+            | apply Exp.IsLocallyClosed.inl | apply Exp.IsLocallyClosed.inr
+            | apply Exp.IsLocallyClosed.case | apply Exp.IsLocallyClosed.alloc
+            | apply Exp.IsLocallyClosed.load | apply Exp.IsLocallyClosed.store
+            | apply Exp.IsLocallyClosed.tape | apply Exp.IsLocallyClosed.rand
+            | apply Exp.IsLocallyClosed.scrut
+            | refine ⟨?_, ?_⟩    -- split `∧` (binop/unop/scrut side condition)
+            | refine ⟨?_⟩))      -- enter `Nonempty (IsVal …)`
+
+/-! ## `toVal?` on value-shaped expressions -/
+
+-- `rfl` goes through despite the `Val.lc` field: `lc` is a `Prop`, so any two
+-- proofs are definitionally equal (kernel proof irrelevance), and the `lit` branch's
+-- closedness proof is the real `lcb_imp_lc rfl` (`lcb 0 (lit b)` reduces to `true`).
+@[simp] theorem Exp.toVal?_lit (b : BaseLit rT) :
+    (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit, Exp.lcb_imp_lc rfl⟩ := rfl
+
+-- `lam`/`fix` are values only when locally closed (`toVal?`/`check?` gate on `lcb`),
+-- so these carry the closedness hypothesis, which supplies both the `IsVal` witness and
+-- the `Val.lc` field. (`(IsVal.lam h).lc` is `h` definitionally, so this is `rfl` after
+-- reducing `check?`.)
+@[simp] theorem Exp.toVal?_lam (e : Exp rT) (h : (Exp.lam e).IsLocallyClosed) :
+    (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam h, h⟩ := by
+  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
+
+@[simp] theorem Exp.toVal?_fix (e : Exp rT) (h : (Exp.fix e).IsLocallyClosed) :
+    (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix h, h⟩ := by
+  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
+
 end ProbLang

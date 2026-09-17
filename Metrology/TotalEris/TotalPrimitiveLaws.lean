@@ -18,24 +18,6 @@ namespace ProbLang
 
 variable {rT : Type _}
 
--- `rfl` goes through despite the `Val.lc` field: `lc` is a `Prop`, so any two
--- proofs are definitionally equal (kernel proof irrelevance), and the `lit` branch's
--- closedness proof is the real `lcb_imp_lc rfl` (`lcb 0 (lit b)` reduces to `true`).
-@[simp] theorem Exp.toVal?_lit (b : BaseLit rT) :
-    (Exp.lit b).toVal? = some ⟨.lit b, IsVal.lit, Exp.lcb_imp_lc rfl⟩ := rfl
-
--- `lam`/`fix` are values only when locally closed (`toVal?`/`check?` gate on `lcb`),
--- so these carry the closedness hypothesis, which supplies both the `IsVal` witness and
--- the `Val.lc` field. (`(IsVal.lam h).lc` is `h` definitionally, so this is `rfl` after
--- reducing `check?`.)
-@[simp] theorem Exp.toVal?_lam (e : Exp rT) (h : (Exp.lam e).IsLocallyClosed) :
-    (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam h, h⟩ := by
-  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
-
-@[simp] theorem Exp.toVal?_fix (e : Exp rT) (h : (Exp.fix e).IsLocallyClosed) :
-    (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix h, h⟩ := by
-  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
-
 macro "solve_not_value" : term =>
   `(Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w)
 

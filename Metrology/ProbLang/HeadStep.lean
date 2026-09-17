@@ -1966,6 +1966,66 @@ theorem HeadStepSupport.ne_zero {e1 e2 : Exp rT} {σ1 σ2 : State rT}
   | RandTapeNonposOtherS Hz htape hzN =>
     simp [headStep, htape, if_neg (Ne.symm hzN), Cfg.uniform, Int.isPos, Hz]
 
+/-- A support point carries positive mass — the **atom-based** support fact, stated
+measurability-free as `Possible`. This is the discrete-fragment counterpart of the
+universally-true `HeadStepSupport.ne_zero`: it is **false** for the diffuse continuous
+sampler, so it is gated on `e1 ≠ .urand` and marked `@[discrete]`. The partial-WP
+layer (`Approxis`) reasons entirely within the discrete fragment and is its only
+consumer; `linter.discrete` enforces that boundary at every call site. -/
+@[discrete]
+theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+    (h : HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩) (hne : e1 ≠ .urand := by nofun) :
+    Possible (⟨e2, σ2⟩ : Cfg rT) (headStep ⟨e1, σ1⟩) := by
+  cases h with
+  | UrandS _ =>
+    -- Excluded by `hne`: the continuous sampler has no atoms.
+    exact absurd rfl hne
+  | BetaLamS hv he | BetaFixS hv he =>
+    subst he; exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv])
+  | IfTrueS | IfFalseS =>
+    exact Possible.of_dirac_eq (by simp [headStep])
+  | FstS hv1 hv2 | SndS hv1 hv2 =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv1, hv2])
+  | CaseLS hv | CaseRS hv =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv])
+  | UnOpS hv heval =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv, Option.unwrapM, ← heval])
+  | BinOpS hv1 hv2 heval =>
+    exact Possible.of_dirac_eq
+      (by simp [headStep, Exp.isValM, hv1, hv2, Option.unwrapM, ← heval])
+  | AllocS hvd hl hσ =>
+    subst hl; subst hσ; exact Possible.of_dirac_eq (by simp [headStep, Exp.asValM, hvd])
+  | LoadS hlook he =>
+    subst he; exact Possible.of_dirac_eq (by simp [headStep, hlook])
+  | StoreS hv hsome hσ =>
+    subst hσ
+    obtain ⟨vold, hvold⟩ := Option.isSome_iff_exists.mp hsome
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.asValM, hv, hvold])
+  | TapeS hl hσ =>
+    subst hl; subst hσ; exact Possible.of_dirac_eq (by simp [headStep])
+  | ScrutSuccessS hv hmatch =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv, hmatch])
+  | ScrutFailureS hv hmatch =>
+    exact Possible.of_dirac_eq (by simp [headStep, Exp.isValM, hv, hmatch])
+  | RandNoTapeS Hz Hv0 Hvz =>
+    simp only [headStep]; exact Cfg.uniform_possible Hz Hv0 Hvz
+  | RandNonposS Hz =>
+    exact Possible.of_dirac_eq (by simp [headStep, Cfg.uniform, Int.isPos, Hz])
+  | RandTapeS htape hz hv hσ =>
+    subst hz; subst hv; subst hσ; exact Possible.of_dirac_eq (by simp [headStep, htape])
+  | RandTapeEmptyS Hz htape hz Hv0 Hvz hσ =>
+    subst hσ; subst hz; simp only [headStep, htape, ↓reduceIte]
+    exact Cfg.uniform_possible Hz Hv0 Hvz
+  | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
+    subst hσ; simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    exact Cfg.uniform_possible Hz Hv0 Hvz
+  | RandTapeNonposEmptyS Hz htape hz =>
+    subst hz; exact Possible.of_dirac_eq (by simp [headStep, htape, Cfg.uniform, Int.isPos, Hz])
+  | RandTapeNonposOtherS Hz htape hzN =>
+    refine Possible.of_dirac_eq ?_
+    simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    simp [Cfg.uniform, Int.isPos, Hz]
+
 /-- `→` direction of the continuous support characterisation. Unlike
 `HeadStepSupport.possible`, this needs `[MeasurableSingletonClass rT]`: recovering
 *which* outcome occurred from a positive-mass fact requires separating configs by

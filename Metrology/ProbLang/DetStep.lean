@@ -111,6 +111,30 @@ theorem PureStep.fill_nsteps (K : Ectx rT) {n : ℕ} {e1 e2 : Exp rT}
     obtain ⟨c, hstep, hrest⟩ := h
     exact ⟨K.fill c, hstep.fill K, ih hrest⟩
 
+/-- Every `PureStep` restricts to the discrete fragment: `primStep = dirac` is strictly
+stronger than "the successor singleton carries mass 1". -/
+@[discrete]
+theorem PureStep.toDiscrete [Countable rT] [MeasurableSingletonClass rT]
+    {e1 e2 : Exp rT} (h : PureStep e1 e2) : PureStep_discrete e1 e2 where
+  safe σ := Reducible_ReducibleM_iff.mpr (h.safe σ)
+  det σ := by rw [h.det σ]; exact MeasureTheory.Measure.dirac_apply_of_mem rfl
+
+/-- `PureExec` ⇒ `PureExec_discrete`, lifting `PureStep.toDiscrete` over `nsteps`.
+This is what lets the discrete partial-WP layer (`Approxis`) consume the
+`pureExec_*` instances, which ProbLang now states in the general `PureStep` form. -/
+@[discrete]
+instance PureExec.toDiscrete [Countable rT] [MeasurableSingletonClass rT]
+    {φ : Prop} {n : ℕ} {e1 e2 : Exp rT} [h : PureExec φ n e1 e2] :
+    PureExec_discrete φ n e1 e2 where
+  pure_exec hφ := by
+    have hs := h.pure_exec hφ
+    clear h
+    induction n generalizing e1 with
+    | zero => exact hs
+    | succ m ih =>
+      obtain ⟨c, hc, hrest⟩ := hs
+      exact ⟨c, hc.toDiscrete, ih hrest⟩
+
 -- PureExec.fill
 @[discrete]
 theorem PureExec_discrete.fill [Countable rT] [MeasurableSingletonClass rT]
