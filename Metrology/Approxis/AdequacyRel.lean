@@ -49,28 +49,31 @@ theorem spec_fill_nil_eq_ofVal {GF : BundledGFunctors} [SpecGS rT GF] (v : Val r
     (iprop(⤇ Ectx.fill ([] : Ectx rT) v.1) : IProp GF) = iprop(⤇ Exp.ofVal v) :=
   rfl
 
-/-- **Relational adequacy.** If a parametric `refines` judgement holds for
-every `ApproxisRGS` instance, and its relation `A IR` implies a pure
-relation `φ`, then the limit-step distributions of `e` and `e'` are coupled
-by `φ` with zero error.
+/-- **Approximate relational adequacy.** If a parametric `refines` judgement
+holds for every `ApproxisRGS` instance *given* `↯ ε` to spend, and its relation
+`A IR` implies a pure relation `φ`, then the limit-step distributions of `e` and
+`e'` are coupled by `φ` **at error `ε`**.
 
-This is the bridge from the Iris-internal `refines` judgement to the
-external probabilistic semantics, obtained by combining the WP-level
-adequacy theorem `wp_adequacy_error_lim` with the parametric assumption
-to allocate a fresh non-atomic invariant pool.
+This is Approxis's reason to exist: it is the only way an ε > 0 result leaves the
+logic. Rocq's `approximates_coupling`.
 
-This theorem — Approxis's top-level relational adequacy statement — is now free of
-`[Countable rT]`: contextual refinement holds for a diffuse real type. -/
-theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
+The proof is `wp_adequacy_error_lim` at `ε`. That theorem hands the continuation
+a supply `↯ ε'` with `ε < ε'`; `ErrorCredit.difference` splits it into the `↯ ε`
+the refinement consumes and a strictly positive remainder `↯ (ε' - ε)`, which is
+what `refines` needs as its own slack.
+
+Free of `[Countable rT]`: approximate contextual refinement holds for a diffuse
+real type. -/
+theorem approximates_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     (A : ∀ (_ : ApproxisRGS rT .hasNoLC GF), lrel rT GF)
-    (φ : Val rT → Val rT → Prop) (e e' : Exp rT) (σ σ' : State rT)
+    (φ : Val rT → Val rT → Prop) (e e' : Exp rT) (σ σ' : State rT) (ε : ENNReal)
     (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
       ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
     (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),
-      ⊢@{IProp GF} refines (hlc := .hasNoLC) (GF := GF) ⊤ e e' (A IR)) :
-    AddCoupl 0 (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
+      ⊢@{IProp GF} iprop(↯ ε -∗ refines (hlc := .hasNoLC) (GF := GF) ⊤ e e' (A IR))) :
+    AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
   -- Reduce relational adequacy to the WP-level adequacy theorem.
-  apply wp_adequacy_error_lim (GF := GF) e e' σ σ' 0 φ
+  apply wp_adequacy_error_lim (GF := GF) e e' σ σ' ε φ
   intro IGS ε' Hε'pos
   iintro He' Herr
   -- Allocate the non-atomic invariant pool needed to build an `ApproxisRGS`.
@@ -78,13 +81,17 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   icases HnaEx with ⟨%γ, Htok⟩
   set IR : ApproxisRGS rT .hasNoLC GF :=
     { approxisGS := IGS, naInvG := _, nais := γ }
+  -- Split the supply: `ε` for the refinement, `ε' - ε > 0` as its own slack.
+  ihave Hsplit := ErrorCredit.difference (le_of_lt Hε'pos) $$ Herr
+  icases Hsplit with ⟨Hεc, Hrest⟩
+  have Hrestpos : (0 : ENNReal) < ε' - ε := tsub_pos_of_lt Hε'pos
   -- Specialize the parametric `refines` to this instance and unfold to a WP.
-  ihave HlogR := Hlog IR
+  ihave HlogR := Hlog IR $$ Hεc
   ihave Hwp := refines_unfold $$ HlogR
   -- Adapt `He'` to the empty-context form expected by `Hwp`.
   ihave He'' : iprop(⤇ Ectx.fill ([] : Ectx rT) e') $$ [He']
   · rw [← spec_eq_fill_nil e']; iexact He'
-  ispecialize Hwp $$ %([] : Ectx rT) %ε' He'' Htok Herr %Hε'pos
+  ispecialize Hwp $$ %([] : Ectx rT) %(ε' - ε) He'' Htok Hrest %Hrestpos
   -- Weaken the WP post-condition from `(A IR).car v v'` to `φ v v'`.
   iapply (ApproxisWpGS.wp_mono
     (Φ := fun v => iprop(∃ (v' : Val rT) (ε'' : ENNReal),
@@ -99,6 +106,21 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     · rw [← spec_fill_nil_eq_ofVal v']; iexact Hspec
     · iapply (HA IR v v') $$ HA_v
   iexact Hwp
+
+/-- **Exact relational adequacy**, the `ε = 0` case of `approximates_coupling`.
+Approxis's top-level statement for refinements that spend no error. -/
+theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
+    (A : ∀ (_ : ApproxisRGS rT .hasNoLC GF), lrel rT GF)
+    (φ : Val rT → Val rT → Prop) (e e' : Exp rT) (σ σ' : State rT)
+    (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
+      ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
+    (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),
+      ⊢@{IProp GF} refines (hlc := .hasNoLC) (GF := GF) ⊤ e e' (A IR)) :
+    AddCoupl 0 (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) :=
+  approximates_coupling A φ e e' σ σ' 0 HA (fun IR => by
+    iintro _
+    ihave H := Hlog IR
+    iexact H)
 
 /-- Concrete model for Approxis -/
 noncomputable def ApproxisFunctor (rT : Type) [ProbLangℝ rT]

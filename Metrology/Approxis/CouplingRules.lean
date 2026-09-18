@@ -105,26 +105,7 @@ theorem Cfg.uniform_addCoupl_bij [MeasurableSingletonClass rT] {z : Int} (Hz : 0
   show ∫⁻ c, φ c ∂(Cfg.uniform z σ) ≤ ∫⁻ c, ψ c ∂(Cfg.uniform z σ')
   rw [Cfg.lintegral_uniform' Hz σ Hφm, Cfg.lintegral_uniform' Hz σ' Hψm]
   refine mul_le_mul_right ?_ _
-  have hreindex : ∑ m ∈ Finset.Ico (0 : Int) z, ψ (⟨pl(#(.int m)), σ'⟩ : Cfg rT)
-      = ∑ n ∈ Finset.Ico (0 : Int) z, ψ (⟨pl(#(.int (f n))), σ'⟩ : Cfg rT) := by
-    symm
-    refine Finset.sum_bij (fun n _ => f n) ?_ ?_ ?_ ?_
-    · intro n hn
-      simp only [Finset.mem_Ico] at hn ⊢
-      exact hdom n hn.1 hn.2
-    · intro n₁ hn₁ n₂ hn₂ h
-      simp only [Finset.mem_Ico] at hn₁ hn₂
-      obtain ⟨n₀, ⟨⟨_, _⟩, _⟩, huniq⟩ := hbij (f n₁)
-        (hdom n₁ hn₁.1 hn₁.2).1 (hdom n₁ hn₁.1 hn₁.2).2
-      have h1 : n₁ = n₀ := huniq n₁ ⟨hn₁, rfl⟩
-      have h2 : n₂ = n₀ := huniq n₂ ⟨hn₂, h.symm⟩
-      exact h1.trans h2.symm
-    · intro m hm
-      simp only [Finset.mem_Ico] at hm
-      obtain ⟨n₀, ⟨hn₀, hfn₀⟩, _⟩ := hbij m hm.1 hm.2
-      exact ⟨n₀, by simp only [Finset.mem_Ico]; exact hn₀, hfn₀⟩
-    · intro n _; rfl
-  rw [hreindex]
+  rw [← Finset.sum_Ico_comp_of_bijOn hdom hbij (fun m => ψ (⟨pl(#(.int m)), σ'⟩ : Cfg rT))]
   refine Finset.sum_le_sum fun n hn => ?_
   simp only [Finset.mem_Ico] at hn
   exact Hle ⟨n, hn.1, hn.2, rfl, rfl⟩
@@ -311,6 +292,245 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
   iapply Hcnt
   · ipureintro; exact ⟨hn0, hnz⟩
   · iexact Hj'
+
+/-- **Adversarial same-bound coupling.** Both sides draw from `[0, z)` and `f`
+links the draws; the caller spends the amortized credit `ε₁` up front and the
+continuation is handed the per-draw credit `ε₂ n`. -/
+theorem wp_couple_rand_rand_adv (z : Int) (f : Int → Int) (ε₁ : ENNReal) (ε₂ : Int → ENNReal)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z)
+    (hamort : (∑ n ∈ Finset.Ico (0 : Int) z, ε₂ n) / (z.toNat : ENNReal) ≤ ε₁)
+    (K : Ectx rT) (E : CoPset) (Φ : Val rT → IProp GF) :
+    iprop((⤇ K.fill (pl(rand(#(.int z), #(.unit))))) ∗ ↯ ε₁ ∗
+        (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ ↯ (ε₂ n) -∗
+          (⤇ K.fill (pl(#(.int (f n))))) -∗ Φ (.int n : Val rT)))
+      ⊢@{IProp GF} wp E (pl(rand(#(.int z), #(.unit)))) Φ := by
+  classical
+  iintro ⟨Hj, Herr, Hcnt⟩
+  have Hv : (pl(rand(#(.int z), #(.unit))) : Exp rT).toVal? = none :=
+    Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
+  have Hv_rand : ¬ (pl(rand(#(.int z), #(.unit))) : Exp rT).isValue := fun ⟨w⟩ => nomatch w
+  iapply (wp_lift_prim_steps_coupl_adv_err_le_1 Hv)
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
+  subst Heq
+  have HheadL : 0 < headStep ⟨pl(rand(#(.int z), #(.unit))), σ₁⟩
+        {⟨pl(#(.int 0)), σ₁⟩} :=
+    HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+  have HredL : Discrete.Reducible (pl(rand(#(.int z), #(.unit)))) σ₁ :=
+    Reducible.toDiscrete (by no_urand)
+      (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadL; simp at HheadL))
+  have HheadR : 0 < headStep ⟨pl(rand(#(.int z), #(.unit))), σ₁'⟩
+        {⟨pl(#(.int 0)), σ₁'⟩} :=
+    HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+  have HredR : Discrete.Reducible (K.fill (pl(rand(#(.int z), #(.unit))))) σ₁' :=
+    Reducible.toDiscrete (by no_urand)
+      ((Reducible.toDiscrete (by no_urand)
+        (reducible_of_headReducible (by is_lc)
+          (fun hz => by rw [hz] at HheadR; simp at HheadR))).toReducible.fill K)
+  set P : Cfg rT → Cfg rT → Int → Prop := fun ρ₁ ρ₂ n =>
+    (0 ≤ n ∧ n < z) ∧ ρ₁ = (⟨pl(#(.int n)), σ₁⟩ : Cfg rT) ∧
+      ρ₂ = (⟨K.fill pl(#(.int (f n))), σ₁'⟩ : Cfg rT) with hP
+  set X : Cfg rT → Cfg rT → ENNReal :=
+    fun ρ₁ ρ₂ => 1 ⊓ ⨅ n, ⨅ (_ : P ρ₁ ρ₂ n), ε₂ n with hX
+  have hXle1 : ∀ ρ₁ ρ₂, X ρ₁ ρ₂ ≤ 1 := fun _ _ => inf_le_left
+  have hXgraph : ∀ n : Int, 0 ≤ n → n < z →
+      X ⟨pl(#(.int n)), σ₁⟩ ⟨K.fill pl(#(.int (f n))), σ₁'⟩ = 1 ⊓ ε₂ n := by
+    intro n h0 hn
+    refine _root_.le_antisymm (inf_le_inf_left _ (iInf₂_le n ⟨⟨h0, hn⟩, rfl, rfl⟩))
+      (le_inf inf_le_left (le_iInf₂ fun n' hn' => ?_))
+    obtain ⟨-, h1, -⟩ := hn'
+    obtain ⟨he, -⟩ := (Cfg.mk.injEq ..).mp h1
+    simp only [Exp.lit.injEq, BaseLit.int.injEq] at he
+    subst he
+    exact inf_le_right
+  have hXoff : ∀ ρ₁ ρ₂, (¬ ∃ n, P ρ₁ ρ₂ n) → X ρ₁ ρ₂ = 1 := fun ρ₁ ρ₂ h =>
+    _root_.le_antisymm inf_le_left (le_inf le_rfl (le_iInf₂ fun n hn => absurd ⟨n, hn⟩ h))
+  have Hkant : ∀ h₁ h₂ : Cfg rT → ENNReal, Measurable h₁ → Measurable h₂ →
+      (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) → (∀ a b, h₁ a ≤ h₂ b + X a b) →
+      (∫⁻ a, h₁ a ∂(primStep (⟨pl(rand(#(.int z), #(.unit))), σ₁⟩ : Cfg rT))) ≤
+        (∫⁻ b, h₂ b ∂(primStep (⟨K.fill pl(rand(#(.int z), #(.unit))), σ₁'⟩ : Cfg rT))) + ε₁ := by
+    intro h₁ h₂ hm₁ hm₂ _ _ hle
+    have hR : (∫⁻ b, h₂ b ∂(primStep (⟨K.fill pl(rand(#(.int z), #(.unit))), σ₁'⟩ : Cfg rT)))
+        = ((z.toNat : ENNReal))⁻¹ *
+            ∑ m ∈ Finset.Ico (0 : Int) z, h₂ (⟨K.fill pl(#(.int m)), σ₁'⟩ : Cfg rT) := by
+      rw [primStep_fill Hv_rand, primStep_rand_unit Hz,
+        MeasureTheory.lintegral_map hm₂
+          (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
+          (Ectx.fillCfg.measurable K),
+        Cfg.lintegral_uniform' Hz σ₁'
+          (φ := fun a : Cfg rT => h₂ ⟨K.fill a.expr, a.state⟩)
+          (hm₂.comp (Ectx.fillCfg.measurable K))]
+    rw [primStep_rand_unit Hz, Cfg.lintegral_uniform' Hz σ₁ hm₁, hR,
+      ← Finset.sum_Ico_comp_of_bijOn hdom hbij
+        (fun m => h₂ (⟨K.fill pl(#(.int m)), σ₁'⟩ : Cfg rT))]
+    have hstep : ∑ n ∈ Finset.Ico (0 : Int) z, h₁ (⟨pl(#(.int n)), σ₁⟩ : Cfg rT) ≤
+        (∑ n ∈ Finset.Ico (0 : Int) z, h₂ (⟨K.fill pl(#(.int (f n))), σ₁'⟩ : Cfg rT)) +
+          ∑ n ∈ Finset.Ico (0 : Int) z, ε₂ n := by
+      rw [← Finset.sum_add_distrib]
+      refine Finset.sum_le_sum fun n hn => ?_
+      simp only [Finset.mem_Ico] at hn
+      refine (hle _ (⟨K.fill pl(#(.int (f n))), σ₁'⟩ : Cfg rT)).trans ?_
+      gcongr
+      rw [hXgraph n hn.1 hn.2]
+      exact inf_le_right
+    calc ((z.toNat : ENNReal))⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) z, h₁ (⟨pl(#(.int n)), σ₁⟩ : Cfg rT)
+        ≤ ((z.toNat : ENNReal))⁻¹ *
+            ((∑ n ∈ Finset.Ico (0 : Int) z, h₂ (⟨K.fill pl(#(.int (f n))), σ₁'⟩ : Cfg rT)) +
+              ∑ n ∈ Finset.Ico (0 : Int) z, ε₂ n) := by gcongr
+      _ = ((z.toNat : ENNReal))⁻¹ *
+            (∑ n ∈ Finset.Ico (0 : Int) z, h₂ (⟨K.fill pl(#(.int (f n))), σ₁'⟩ : Cfg rT)) +
+          ((z.toNat : ENNReal))⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) z, ε₂ n := mul_add ..
+      _ ≤ _ := by
+          gcongr
+          rwa [← ENNReal.div_eq_inv_mul]
+  ihave %Hεle := ErrorCredit.supply_bound (GF := GF) $$ Hε Herr
+  ihave Hdec := ErrorCredit.supply_decrease (GF := GF) $$ Hε Herr
+  imod Hdec
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
+  imodintro
+  iexists X, ε₁, (ε - ε₁)
+  isplitr; · ipureintro; exact _root_.le_of_eq (add_tsub_cancel_of_le Hεle)
+  isplitr; · ipureintro; exact HredL.toReducible
+  isplitr; · ipureintro; exact HredR.toReducible
+  isplitr; · ipureintro; exact hXle1
+  isplitr; · ipureintro; exact Hkant
+  iintro %e₂ %σ₂ %e₂' %σ₂'
+  iintro !>
+  by_cases hg : ∃ n : Int, P ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ n
+  · obtain ⟨n, ⟨hn0, hnz⟩, h1, h2⟩ := hg
+    obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h1
+    obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp h2
+    rw [hXgraph n hn0 hnz]
+    by_cases hbig : (1 : ENNReal) ≤ (1 ⊓ ε₂ n) + (ε - ε₁)
+    · imod Hclose
+      imodintro
+      ileft
+      ipureintro
+      exact hbig
+    · rw [_root_.not_le] at hbig
+      have hinf : (1 : ENNReal) ⊓ ε₂ n < 1 := _root_.lt_of_le_of_lt le_self_add hbig
+      have hlt : ε₂ n < 1 := by
+        by_contra hge
+        exact absurd (inf_eq_left.mpr (_root_.not_lt.mp hge)) hinf.ne
+      rw [inf_eq_right.mpr hlt.le]
+      have hsum : (ε - ε₁) + ε₂ n < 1 := by
+        rw [inf_eq_right.mpr hlt.le] at hbig
+        rwa [add_comm]
+      ihave HUpd := specProg_update (GF := GF)
+        (e3 := K.fill (pl(#(.int (f n))))) $$ Hs Hj
+      imod HUpd with ⟨Hs', Hj'⟩
+      ihave Hinc := ErrorCredit.supply_increase (GF := GF) (ε₂ := ε₂ n) hsum $$ Hdec
+      imod Hinc with ⟨HdecA, Hfrag⟩
+      imod Hclose
+      imodintro
+      iright
+      isplitl [Hσ]; · iexact Hσ
+      isplitl [Hs']; · iexact Hs'
+      isplitl [HdecA]
+      · iapply ErrorCredit.extAuth (add_comm _ _)
+        iexact HdecA
+      iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
+      ispecialize Hcnt $$ %n %⟨hn0, hnz⟩ Hfrag Hj'
+      iexact Hcnt
+  · imod Hclose
+    imodintro
+    ileft
+    ipureintro
+    rw [hXoff _ _ hg]
+    exact le_self_add
+
+/-- Avoidance: both sides draw the same value from `[0, z)`, and the caller pays
+`1/z` to learn that the value is not `bad`. -/
+theorem wp_couple_rand_rand_avoid (z bad : Int) (Hz : 0 < z) (K : Ectx rT) (E : CoPset)
+    (Φ : Val rT → IProp GF) :
+    iprop((⤇ K.fill (pl(rand(#(.int z), #(.unit))))) ∗ ↯ ((z.toNat : ENNReal))⁻¹ ∗
+        (∀ (n : Int), (⌜(0 ≤ n ∧ n < z) ∧ n ≠ bad⌝) -∗
+          (⤇ K.fill (pl(#(.int n)))) -∗ Φ (.int n : Val rT)))
+      ⊢@{IProp GF} wp E (pl(rand(#(.int z), #(.unit)))) Φ := by
+  classical
+  iintro ⟨Hj, Herr, Hcnt⟩
+  have hamort : (∑ n ∈ Finset.Ico (0 : Int) z, if n = bad then (1 : ENNReal) else 0)
+      / (z.toNat : ENNReal) ≤ ((z.toNat : ENNReal))⁻¹ := by
+    rw [← one_div]
+    gcongr
+    rw [Finset.sum_ite_eq' (Finset.Ico (0 : Int) z) bad (fun _ => (1 : ENNReal))]
+    split <;> simp
+  iapply (wp_couple_rand_rand_adv z id ((z.toNat : ENNReal))⁻¹
+    (fun n => if n = bad then 1 else 0) (fun _ h1 h2 => ⟨h1, h2⟩)
+    (fun m h1 h2 => ⟨m, ⟨⟨h1, h2⟩, rfl⟩, fun _ hn' => hn'.2⟩) Hz hamort K E Φ)
+  isplitl [Hj]; · iexact Hj
+  isplitl [Herr]; · iexact Herr
+  iintro %n %hn Hec Hj'
+  by_cases hb : n = bad
+  · rw [if_pos hb]
+    iexfalso
+    iapply ErrorCredit.contradict (_root_.le_refl 1) $$ Hec
+  · simp only [id_eq]
+    iapply Hcnt
+    · ipureintro; exact ⟨hn, hb⟩
+    · iexact Hj'
+
+/-- `wp_couple_tapes_bij`: presample both tapes in lockstep along a bijection
+`f` on `[0, z)`. No program step and no error. -/
+theorem wp_couple_tapes_bij {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
+    {z : Int} {α αₛ : Loc} {ns nsₛ : List Int} (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z) :
+    iprop(appNatTape α z ns ∗ specNatTape αₛ z nsₛ ∗
+        (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ appNatTape α z (ns ++ [n]) -∗
+          specNatTape αₛ z (nsₛ ++ [f n]) -∗ wp E e Φ))
+      ⊢@{IProp GF} wp E e Φ := by
+  iintro ⟨Hα, Hαₛ, Hcnt⟩
+  unfold appNatTape specNatTape
+  icases Hα with ⟨%fs, %Hfs, Hα⟩
+  icases Hαₛ with ⟨%fsₛ, %Hfsₛ, Hαₛ⟩
+  iapply wp_couple_erasables
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  ihave %hlk := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hα
+  ihave %hlk' := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hαₛ
+  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
+  imodintro
+  iexists (fun σ₂ σ₂' => ∃ n : Int, 0 ≤ n ∧ n < z ∧
+      σ₂ = σ₁.update_tapes (·.insert α ⟨z, fs ++ [tapeIdxOf Hz n]⟩) ∧
+      σ₂' = σ₁'.update_tapes (·.insert αₛ ⟨z, fsₛ ++ [tapeIdxOf Hz (f n)]⟩)),
+    tapePresample σ₁ α, tapePresample σ₁' αₛ
+  isplitr; · ipureintro; exact ErasableExpr.tapePresample hlk Hz
+  isplitr; · ipureintro; exact ErasableExpr.tapePresample hlk' Hz
+  isplitr; · ipureintro; exact tapePresample_addCoupl_bij hlk hlk' Hz f hdom hbij
+  iintro %σ₂ %σ₂' %HR
+  obtain ⟨n, hn0, hnz, rfl, rfl⟩ := HR
+  ihave HU := app_state_update_tape (GF := GF) (σ := σ₁)
+    (s := ⟨z, fs ++ [tapeIdxOf Hz n]⟩) $$ Hσ Hα
+  imod HU with ⟨Hσ', Hα'⟩
+  ihave HU' := spec_auth_update_tape (GF := GF) (σ := σ₁')
+    (s := ⟨z, fsₛ ++ [tapeIdxOf Hz (f n)]⟩) $$ Hs Hαₛ
+  imod HU' with ⟨Hs', Hαₛ'⟩
+  imod Hclose
+  imodintro
+  simp only [approxisWpGS_stateInterp_eq, approxisWpGS_specInterp_eq,
+    ExtTreeMap.insert_eq_PartialMap_insert]
+  isplitl [Hσ']; · iexact Hσ'
+  isplitl [Hs']; · iexact Hs'
+  isplitl [Hε]; · iexact Hε
+  ihave HnatA : iprop(∃ gs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+      (⌜gs.map (fun x => x.val) = ns ++ [n]⌝) ∗ α ↪ₐ ⟨z, gs⟩) $$ [Hα']
+  · iexists (fs ++ [tapeIdxOf Hz n])
+    isplitr
+    · ipureintro; simp [← Hfs, tapeIdxOf_val Hz hn0 hnz]
+    · iexact Hα'
+  ihave HnatS : iprop(∃ gs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+      (⌜gs.map (fun x => x.val) = nsₛ ++ [f n]⌝) ∗ αₛ ↪ₛ ⟨z, gs⟩) $$ [Hαₛ']
+  · iexists (fsₛ ++ [tapeIdxOf Hz (f n)])
+    isplitr
+    · ipureintro
+      have hd := hdom n hn0 hnz
+      simp [← Hfsₛ, tapeIdxOf_val Hz hd.1 hd.2]
+    · iexact Hαₛ'
+  ispecialize Hcnt $$ %n %⟨hn0, hnz⟩ HnatA HnatS
+  iexact Hcnt
 
 /-- Labeled-rand coupling where both tapes have the wrong bound `M ≠ z`.
 Both tapes are unchanged; the draw is uniform and `f` links the values. -/

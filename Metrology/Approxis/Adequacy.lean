@@ -320,8 +320,8 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp rT) (σ₁ : State rT)
         (hCoupl := HAC)
         (hBoundSum := _root_.le_refl _)
         (hEpsSum := HεBnd)
-        (hErase₁ := ErasableExpr.of_erasable Herase1)
-        (hErase₁' := ErasableExpr.of_erasable Herase1')
+        (hErase₁ := Herase1)
+        (hErase₁' := Herase1')
         (hCont := fun σ₂ ρ' hR => by
           obtain ⟨e₂', σ₂'⟩ := ρ'
           exact Hpure σ₂ e₂' σ₂' hR)
@@ -411,7 +411,7 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp rT) (σ₁ : State rT)
     exact AddCoupl_erasure_erasable_exp_lhs_kanto
       (e₁ := e₁) (e₁' := e₁') (σ₁ := σ₁) (σ₁' := σ₁') (n := m) (m := k)
       (μ₁' := μ₁') (E₂ := X₂) (ε := ε)
-      (hErase₁' := ErasableExpr.of_erasable Herase')
+      (hErase₁' := Herase')
       (hExp := Hexp)
       (hCont := fun ρ ρ' => by
         obtain ⟨e₂, σ₂⟩ := ρ

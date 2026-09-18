@@ -8,6 +8,7 @@ public import Metrology.Couplings.Couplings
 public import Metrology.ProbLang.Syntax.LocallyClosed
 public import Metrology.ProbLang.Exec
 public import Metrology.ProbLang.Erasable
+public import Metrology.ProbLang.Erasure
 public import Iris.BI.Lib.Fixpoint
 public import Iris.ProofMode.Classes
 public import Iris.ProofMode.InstancesUpdates
@@ -79,8 +80,8 @@ abbrev specCouplCouple (E : CoPset)
     (⌜Measurable X₂⌝) ∗
     (⌜∀ ρ, X₂ ρ ≤ r⌝) ∗
     (⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))) ≤ ε⌝) ∗
-    (⌜Erasable μ₁ σ₁⌝) ∗
-    (⌜Erasable μ₁' σ₁'⌝) ∗
+    (⌜ErasableExpr μ₁ σ₁⌝) ∗
+    (⌜ErasableExpr μ₁' σ₁'⌝) ∗
     (∀ (σ₂ : State rT) (e₂' : Exp rT) (σ₂' : State rT),
       (⌜S σ₂ ⟨e₂', σ₂'⟩⌝) -∗ |={E}=> Φ
       ((σ₂, (⟨e₂', σ₂'⟩ : Cfg rT), X₂ ⟨e₂', σ₂'⟩) : SpecCouplState rT)))
@@ -302,7 +303,7 @@ abbrev progCoupl (e₁ : Exp rT) (σ₁ : State rT) (e₁' : Exp rT) (σ₁' : S
         (∀ a b, h₁ a ≤ h₂ b + X₂ a b) →
         (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
           (∫⁻ b, h₂ b ∂(μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))) + ε⌝) ∗
-    (⌜Erasable μ₁' σ₁'⌝) ∗
+    (⌜ErasableExpr μ₁' σ₁'⌝) ∗
     (∀ (e₂ : Exp rT) (σ₂ : State rT) (e₂' : Exp rT) (σ₂' : State rT),
       |={∅}=> Z e₂ σ₂ e₂' σ₂' (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩)))
 
@@ -330,7 +331,7 @@ theorem progCoupl_ne {n : Nat} {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp r
   refine sep_ne.ne (.of_eq rfl) ?_  -- Discrete.Reducible : Prop
   refine sep_ne.ne (.of_eq rfl) ?_  -- ∃ r, bound : Prop
   refine sep_ne.ne (.of_eq rfl) ?_  -- expectation bound : Prop
-  refine sep_ne.ne (.of_eq rfl) ?_  -- Erasable : Prop
+  refine sep_ne.ne (.of_eq rfl) ?_  -- ErasableExpr : Prop
   refine forall_ne fun e₂ => ?_
   refine forall_ne fun σ₂ => ?_
   refine forall_ne fun e₂' => ?_
@@ -647,8 +648,8 @@ theorem fupd_specCoupl_of_le {E : CoPset} {σ : State rT} {e' : Exp rT} {σ' : S
       _ ≤ (ε₂ - ε₁) + ε₁ * 1 := by gcongr
       _ = (ε₂ - ε₁) + ε₁ := by rw [mul_one]
       _ = ε₂ := tsub_add_cancel_of_le Hε
-  isplitr; · ipureintro; exact Erasable.dret σ
-  isplitr; · ipureintro; exact Erasable.dret σ'
+  isplitr; · ipureintro; exact ErasableExpr.dret σ
+  isplitr; · ipureintro; exact ErasableExpr.dret σ'
   iintro %σ₂ %e₂' %σ₂' %HS'
   obtain ⟨rfl, HS'⟩ := HS'
   cases HS'
@@ -709,7 +710,7 @@ theorem specCoupl_erasables_exp {E : CoPset} {σ₁ : State rT} {e₁' : Exp rT}
     {X₂ : State rT → ENNReal} {r : ENNReal}
     (Hcpl : AddCoupl ε₁ {p : State rT × (State rT) | R p.1 p.2} μ₁ μ₁')
     (HX₂meas : Measurable X₂)
-    (Heras₁ : Erasable μ₁ σ₁) (Heras₁' : Erasable μ₁' σ₁')
+    (Heras₁ : ErasableExpr μ₁ σ₁) (Heras₁' : ErasableExpr μ₁' σ₁')
     (Hbnd : ∀ σ', X₂ σ' ≤ r)
     (Hexp : ε₁ + ∫⁻ σ', X₂ σ' ∂μ₁' ≤ ε) :
     iprop(∀ (σ₂ σ₂' : State rT), (⌜R σ₂ σ₂'⌝) -∗ |={E}=>
@@ -755,14 +756,14 @@ theorem specCoupl_erasables {E : CoPset} {σ₁ : State rT} {e₁' : Exp rT} {σ
     {μ₁ : MeasureTheory.Measure (State rT)} {μ₁' : MeasureTheory.Measure (State rT)}
     (Hε : ε₁ + ε₂ ≤ ε)
     (Hcpl : AddCoupl ε₁ {p : State rT × (State rT) | R p.1 p.2} μ₁ μ₁')
-    (Heras₁ : Erasable μ₁ σ₁) (Heras₁' : Erasable μ₁' σ₁') :
+    (Heras₁ : ErasableExpr μ₁ σ₁) (Heras₁' : ErasableExpr μ₁' σ₁') :
     iprop(∀ (σ₂ σ₂' : State rT), (⌜R σ₂ σ₂'⌝) -∗ |={E}=>
         specCoupl E σ₂ e₁' σ₂' ε₂ Z) ⊢@{IProp GF}
       specCoupl E σ₁ e₁' σ₁' ε Z := by
   iintro H
   have Hexp_bnd : ε₁ + ∫⁻ _, ε₂ ∂μ₁' ≤ ε := by
     refine _root_.le_trans ?_ Hε
-    rw [MeasureTheory.lintegral_const, Erasable.mass Heras₁', mul_one]
+    rw [MeasureTheory.lintegral_const, ErasableExpr.mass Heras₁', mul_one]
   iapply (specCoupl_erasables_exp (X₂ := fun _ => ε₂) (r := ε₂) Hcpl measurable_const Heras₁ Heras₁'
     (fun _ => _root_.le_refl _) Hexp_bnd)
   iintro %σ₂ %σ₂' %HR
@@ -777,7 +778,7 @@ theorem specCoupl_erasable_steps {E : CoPset} {σ₁ : State rT} {e₁' : Exp rT
     {R : State rT → Cfg rT → Prop} {μ₁ : MeasureTheory.Measure (State rT)}
     (Hε : ε₁ + ε₂ ≤ ε)
     (Hcpl : AddCoupl ε₁ {p : State rT × (Cfg rT) | R p.1 p.2} μ₁ (pexecN n ⟨e₁', σ₁'⟩))
-    (Heras₁ : Erasable μ₁ σ₁) :
+    (Heras₁ : ErasableExpr μ₁ σ₁) :
     iprop(∀ (σ₂ : State rT) (e₂' : Exp rT) (σ₂' : State rT),
         (⌜R σ₂ ⟨e₂', σ₂'⟩⌝) -∗ |={E}=>
           specCoupl E σ₂ e₂' σ₂' ε₂ Z) ⊢@{IProp GF}
@@ -818,7 +819,7 @@ theorem specCoupl_erasable_steps {E : CoPset} {σ₁ : State rT} {e₁' : Exp rT
         ≤ ε₂ * 1 := by gcongr; exact hmass n _
       _ = ε₂ := mul_one _
   isplitr; · ipureintro; exact Heras₁
-  isplitr; · ipureintro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact ErasableExpr.dret σ₁'
   iintro %σ₂ %e₂' %σ₂' %HR
   iapply H $$ %σ₂ %e₂' %σ₂' %HR
 
@@ -835,7 +836,7 @@ theorem specCoupl_steps {E : CoPset} {σ₁ : State rT} {e₁' : Exp rT} {σ₁'
           specCoupl E σ₂ e₂' σ₂' ε₂ Z) ⊢@{IProp GF}
       specCoupl E σ₁ e₁' σ₁' ε Z := by
   iintro H
-  iapply (specCoupl_erasable_steps Hε Hcpl (Erasable.dret σ₁))
+  iapply (specCoupl_erasable_steps Hε Hcpl (ErasableExpr.dret σ₁))
   iexact H
 
 /-- Deterministic-step specialization: if `pexecN n ⟨e₁', σ₁'⟩ = dirac ⟨e₂', σ₂'⟩`
@@ -873,8 +874,8 @@ theorem specCoupl_steps_det {E : CoPset} {σ : State rT} {e₁' : Exp rT} {σ₁
             rw [zero_add, MeasureTheory.lintegral_const, mul_comm]
       _ ≤ ε * 1 := by gcongr
       _ = ε := mul_one _
-  isplitr; · ipureintro; exact Erasable.dret σ
-  isplitr; · ipureintro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact ErasableExpr.dret σ
+  isplitr; · ipureintro; exact ErasableExpr.dret σ₁'
   iintro %σ₂ %e₂'' %σ₂'' %HS'
   imodintro
   obtain ⟨rfl, HS'⟩ := HS'
@@ -1195,7 +1196,7 @@ theorem progCoupl_steps_adv' {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT}
       rw [pexecN_one, stepOrFinal_not_isValue hnotval']
     rw [heq]
     exact Hcpl h₁ h₂ Hh₁meas Hh₂meas Hh₁ Hh₂ Hh₁h₂
-  isplitr; · ipureintro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact ErasableExpr.dret σ₁'
   iintro %e₂ %σ₂ %e₂' %σ₂'
   iapply Hcnt $$ %e₂ %σ₂ %e₂' %σ₂'
 
@@ -1276,7 +1277,7 @@ theorem progCoupl_steps_adv {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT} 
       _ ≤ (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε := by
             rw [mul_one, add_assoc, add_comm ε₂ ε₁]
             gcongr
-  isplitr; · ipureintro; exact Erasable.dret σ₁'
+  isplitr; · ipureintro; exact ErasableExpr.dret σ₁'
   iintro %e₂ %σ₂ %e₂' %σ₂'
   iapply Hcnt $$ %e₂ %σ₂ %e₂' %σ₂'
 
@@ -1384,7 +1385,7 @@ theorem progCoupl_step_l_erasable_adv {e₁ : Exp rT} {σ₁ : State rT} {e₁' 
     {Z : Exp rT → State rT → Exp rT → State rT → ENNReal → IProp GF}
     {X₂ : Cfg rT → State rT → ENNReal}
     (Hred : Reducible e₁ σ₁)
-    (Heras : Erasable μ₁' σ₁')
+    (Heras : ErasableExpr μ₁' σ₁')
     (Hbnd : ∀ ρ₁ σ₂', X₂ ρ₁ σ₂' ≤ 1)
     (Hcpl : ∀ (h₁ h₂ : Cfg rT → ENNReal),
         Measurable h₁ → Measurable h₂ →
@@ -1459,7 +1460,7 @@ theorem progCoupl_step_l_erasable {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Ex
     (Hε : ε₁ + ε₂ ≤ ε)
     (Hred : Reducible e₁ σ₁)
     (Hcpl : AddCoupl ε₁ {p : Cfg rT × (State rT) | R p.1 p.2} (primStep ⟨e₁, σ₁⟩) μ₁')
-    (Heras : Erasable μ₁' σ₁') :
+    (Heras : ErasableExpr μ₁' σ₁') :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
           (∀ (e₂ : Exp rT) (σ₂ : State rT) (σ₂' : State rT),
             (⌜R ⟨e₂, σ₂⟩ σ₂'⌝) -∗ |={∅}=>
@@ -1500,7 +1501,7 @@ theorem progCoupl_step_l_erasable {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Ex
             rw [add_zero] at this
             exact this)
         simpa using this
-      have hμ₁_mass : μ₁' .univ = 1 := Erasable.mass Heras
+      have hμ₁_mass : μ₁' .univ = 1 := ErasableExpr.mass Heras
       calc (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩))
           ≤ (∫⁻ b, h₃ b ∂μ₁') + ε₁ := HAdd
         _ ≤ (∫⁻ σ, (h₂ ⟨e₁', σ⟩ + ε₂) ∂μ₁') + ε₁ := by
@@ -1565,7 +1566,7 @@ theorem progCoupl_step_l_dret {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT
     exact ⟨HR, hmem⟩
   iapply (progCoupl_step_l_erasable (μ₁' := MeasureTheory.Measure.dirac σ₁')
     (Hε := Hε) (Hred := Hred)
-    (R := fun ρ σ => R ρ σ ∧ σ = σ₁') HcplR (Erasable.dret σ₁'))
+    (R := fun ρ σ => R ρ σ ∧ σ = σ₁') HcplR (ErasableExpr.dret σ₁'))
   isplitr
   · iintro !> %e₂ %σ₂ %e₂' %σ₂'; iexact H1F
   iintro %e₂ %σ₂ %σ₂' %HR'
@@ -2057,6 +2058,19 @@ instance isExcept0_wp {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
     IsExcept0 (wp (GF := GF) E e Φ) where
   is_except0 := (except0_mono fupd_intro).trans (BIFUpdate.except0.trans fupd_wp)
 
+/-- `iframe` across a weakest precondition: framing `R` out of every
+post-condition frames it out of the `wp`. -/
+instance frame_wp {p : Bool} {E : CoPset} {e : Exp rT} {R : IProp GF}
+    {Φ Ψ : Val rT → IProp GF} [inst : ∀ v, Frame p R (Φ v) (Ψ v)] :
+    Frame p R (wp E e Φ) (wp E e Ψ) where
+  frame := wp_frame_l.trans (wp_mono fun v => (inst v).frame)
+
+/-- `ihave`/`ispecialize` may add a same-mask fancy update in front of a `wp`
+goal. -/
+instance addModal_fupd_wp {E : CoPset} {e : Exp rT} {P : IProp GF}
+    {Φ : Val rT → IProp GF} : AddModal iprop(|={E}=> P) P (wp E e Φ) where
+  add_modal := fupd_frame_right.trans <| (BIFUpdate.mono wand_elim_right).trans fupd_wp
+
 /-- `iMod` on basic-update: given `|==> P`, absorb via `bupd ⊆ fupd`. -/
 instance elimModal_bupd_wp {p : Bool} {io : InOut} {E : CoPset} {e : Exp rT} {P : IProp GF}
     {Φ : Val rT → IProp GF} :
@@ -2360,7 +2374,7 @@ theorem wp_lift_prim_step_l_erasable {E : CoPset} {e₁ : Exp rT} {Φ : Val rT �
           (ε₁ ε₂ : ENNReal),
           (⌜ε₁ + ε₂ ≤ ε⌝) ∗
           (⌜Reducible e₁ σ₁⌝) ∗
-          (⌜Erasable μ₁' σ₁'⌝) ∗
+          (⌜ErasableExpr μ₁' σ₁'⌝) ∗
           (⌜AddCoupl ε₁ {p : Cfg rT × (State rT) | R p.1 p.2}
               (primStep ⟨e₁, σ₁⟩) μ₁'⌝) ∗
           (∀ (e₂ : Exp rT) (σ₂ : State rT) (σ₂' : State rT),

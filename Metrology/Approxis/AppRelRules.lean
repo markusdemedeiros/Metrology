@@ -680,6 +680,52 @@ theorem refines_get_ec {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} :
   iapply HrefFolded $$ %K %(ε / 2) Hj Hna Herr2 Hpos2I'
 
 
+/-- `refines_ind_amp` (app_rel_rules.v): **error amplification**. To prove a
+refinement outright it suffices to prove it from an arbitrary positive budget
+`↯ ε`, given the same refinement at the amplified budget `↯ (k * ε)` for some
+fixed `k > 1`. The initial budget comes from `refines_get_ec`; the induction is
+`ErrorCredit.Induction.amplifying`, which terminates because `err_amp_power`
+makes `ε * kⁿ ≥ 1` for some `n` and `↯ 1` is absurd. This is the mechanism for
+unbounded rejection-sampling loops. -/
+theorem refines_ind_amp {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} {k : NNReal}
+    (hk : 1 < k) :
+    iprop(□ (∀ (ε : ENNReal), (⌜0 < ε⌝) -∗
+            □ ((↯ ((k : ENNReal) * ε)) -∗ refines E e e' A) -∗
+            (↯ ε) -∗ refines E e e' A))
+      ⊢@{IProp GF} refines E e e' A := by
+  iintro #Hamp
+  iapply refines_get_ec
+  iintro %ε Herr %hpos
+  iapply (ErrorCredit.Induction.amplifying (P := refines E e e' A) hpos hk) $$ [] Herr
+  imodintro
+  iintro %ε' %hε' #Hstep Hε'
+  iapply Hamp $$ %ε' %hε' Hstep Hε'
+
+/-- `refines_arrow_val_err` (app_rel_rules.v): `refines_ind_amp` at arrow type.
+The amplification runs on the *quantified* body `∀ v1 v2, A v1 v2 -∗ REL …`, so
+the budget is established once for the closure rather than per call. Requires
+the closedness witness that `lrel_arr` carries. -/
+theorem refines_arrow_val_err {v v' : Val rT} {A A' : lrel rT GF} {k : NNReal}
+    (hk : 1 < k) (hv : v.1.isClosedEmpty ∧ v'.1.isClosedEmpty) :
+    iprop(□ (∀ (ε : ENNReal), (⌜0 < ε⌝) -∗
+            □ ((↯ ((k : ENNReal) * ε)) -∗ ∀ (v1 v2 : Val rT), A v1 v2 -∗
+                refines (⊤ : CoPset) (.app v.1 v1.1) (.app v'.1 v2.1) A') -∗
+            (↯ ε) -∗ ∀ (v1 v2 : Val rT), A v1 v2 -∗
+              refines (⊤ : CoPset) (.app v.1 v1.1) (.app v'.1 v2.1) A'))
+      ⊢@{IProp GF} refines (⊤ : CoPset) v.1 v'.1 (lrel_arr A A') := by
+  iintro #Hamp
+  iapply (refines_arrow_val (hv := hv))
+  iintro !> %v1 %v2 HA
+  iapply refines_get_ec
+  iintro %ε Herr %hpos
+  ihave Hall := (ErrorCredit.Induction.amplifying
+      (P := iprop(∀ (w1 w2 : Val rT), A w1 w2 -∗
+        refines (⊤ : CoPset) (.app v.1 w1.1) (.app v'.1 w2.1) A')) hpos hk) $$ [] Herr
+  · imodintro
+    iintro %ε' %hε' #Hstep Hε'
+    iapply Hamp $$ %ε' %hε' Hstep Hε'
+  iapply Hall $$ %v1 %v2 HA
+
 /-! ## Coupling-driven rule -/
 
 /-- `refines_couple_rands_lr` (= `refines_couple_UU`, app_rel_rules.v:463):
@@ -721,6 +767,100 @@ theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {
       pl(#(.int n)) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
+
+/-- Adversarial counterpart of `refines_couple_rands_lr`: the caller pays the
+amortized credit `ε₁` and each branch is handed `↯ (ε₂ n)`. Lifts
+`wp_couple_rand_rand_adv` through `refines`; the caller's `↯ ε₁` is independent
+of the `↯ ε` slack that `refines` threads through its own definition. -/
+theorem refines_couple_rands_lr_adv
+    {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : Int}
+    (f : Int → Int) (ε₁ : ENNReal) (ε₂ : Int → ENNReal)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z)
+    (hamort : (∑ n ∈ Finset.Ico (0 : Int) z, ε₂ n) / (z.toNat : ENNReal) ≤ ε₁) :
+    iprop((↯ ε₁) ∗ ∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ (↯ (ε₂ n)) -∗
+            refines E (K.fill pl(#(.int n))) (K'.fill (pl(#(.int (f n))))) A)
+      ⊢@{IProp GF}
+        refines E (K.fill (pl(rand(#(.int z), #(.unit)))))
+          (K'.fill (pl(rand(#(.int z), #(.unit))))) A := by
+  iintro ⟨Hε, Hcnt⟩
+  unfold refines
+  iintro %K2 %ε Hj Hna Herr Hpos
+  have hfc : K2.fill (K'.fill (pl(rand(#(.int z), #(.unit))))) =
+      (K2.comp K').fill (pl(rand(#(.int z), #(.unit)))) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (pl(rand(#(.int z), #(.unit))))) $$ [Hj]
+  · rw [← hfc]; iexact Hj
+  iapply ApproxisWpGS.wp_bind (K := K)
+  iapply (wp_couple_rand_rand_adv z f ε₁ ε₂ hdom hbij Hz hamort (K2.comp K') ⊤
+    (fun n => wp ⊤ (K.fill (Exp.ofVal n))
+      (fun v => iprop(∃ v' ε',
+        (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
+  isplitl [Hj']; · iexact Hj'
+  isplitl [Hε]; · iexact Hε
+  iintro %n %Hn Hec HKres
+  have hfcN : K2.fill (K'.fill (pl(#(.int (f n))))) =
+      (K2.comp K').fill (pl(#(.int (f n)))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (pl(#(.int (f n)))))) $$ [HKres]
+  · rw [hfcN]; iexact HKres
+  ispecialize Hcnt $$ %n %Hn Hec
+  have hfillN : Exp.ofVal (.int n : Val rT) = pl(#(.int n)) := rfl
+  rw [hfillN]
+  iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
+
+/-- Avoidance at the relational level: paying `↯ (1/z)` buys `n ≠ bad` on both
+sides of the coupling. -/
+theorem refines_couple_rands_lr_avoid
+    {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : Int} (bad : Int) (Hz : 0 < z) :
+    iprop((↯ ((z.toNat : ENNReal))⁻¹) ∗ ∀ (n : Int), (⌜(0 ≤ n ∧ n < z) ∧ n ≠ bad⌝) -∗
+            refines E (K.fill pl(#(.int n))) (K'.fill (pl(#(.int n)))) A)
+      ⊢@{IProp GF}
+        refines E (K.fill (pl(rand(#(.int z), #(.unit)))))
+          (K'.fill (pl(rand(#(.int z), #(.unit))))) A := by
+  classical
+  iintro ⟨Hε, Hcnt⟩
+  have hamort : (∑ n ∈ Finset.Ico (0 : Int) z, if n = bad then (1 : ENNReal) else 0)
+      / (z.toNat : ENNReal) ≤ ((z.toNat : ENNReal))⁻¹ := by
+    rw [← one_div]
+    gcongr
+    rw [Finset.sum_ite_eq' (Finset.Ico (0 : Int) z) bad (fun _ => (1 : ENNReal))]
+    split <;> simp
+  iapply (refines_couple_rands_lr_adv (K := K) (K' := K') (A := A) id
+    ((z.toNat : ENNReal))⁻¹ (fun n => if n = bad then 1 else 0)
+    (fun _ h1 h2 => ⟨h1, h2⟩) (fun m h1 h2 => ⟨m, ⟨⟨h1, h2⟩, rfl⟩, fun _ hn' => hn'.2⟩)
+    Hz hamort)
+  isplitl [Hε]; · iexact Hε
+  iintro %n %hn Hec
+  by_cases hb : n = bad
+  · rw [if_pos hb]
+    iexfalso
+    iapply ErrorCredit.contradict (_root_.le_refl 1) $$ Hec
+  · simp only [id_eq]
+    iapply Hcnt
+    ipureintro
+    exact ⟨hn, hb⟩
+
+/-- `refines_couple_tapes` (app_rel_rules.v): presample both tapes in lockstep
+along a bijection `f` on `[0, z)`, without stepping either program. -/
+theorem refines_couple_tapes_bij {E : CoPset} {e e' : Exp rT} {A : lrel rT GF}
+    {z : Int} {α αₛ : Loc} {ns nsₛ : List Int} (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (Hz : 0 < z) :
+    iprop(appNatTape α z ns ∗ specNatTape αₛ z nsₛ ∗
+        (∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗ appNatTape α z (ns ++ [n]) -∗
+          specNatTape αₛ z (nsₛ ++ [f n]) -∗ refines E e e' A))
+      ⊢@{IProp GF} refines E e e' A := by
+  iintro ⟨Hα, Hαₛ, Hcnt⟩
+  unfold refines
+  iintro %K %ε Hj Hna Herr Hpos
+  iapply (wp_couple_tapes_bij (E := ⊤) (α := α) (αₛ := αₛ) (ns := ns) (nsₛ := nsₛ)
+    f hdom hbij Hz)
+  isplitl [Hα]; · iexact Hα
+  isplitl [Hαₛ]; · iexact Hαₛ
+  iintro %n %hn HA HS
+  ispecialize Hcnt $$ %n %hn HA HS
+  iapply Hcnt $$ %K %ε Hj Hna Herr Hpos
 
 /-- `refines_couple_TU`: couple a LHS tape-rand (on empty tape α) with a RHS
 unit-rand via bijection `f`. -/

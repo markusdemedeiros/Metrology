@@ -152,4 +152,30 @@ theorem wp_lift_prim_steps_coupl_adv_err_le_1 {E : CoPset} {e₁ : Exp rT}
       iassumption
   · iapply specCoupl_err_ge_1 (_root_.not_lt.mp hle)
 
+/-- Couple two *erasable* state distributions without taking a program step. -/
+theorem wp_couple_erasables {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} :
+    iprop(∀ (σ₁ : State rT) (e₁' : Exp rT) (σ₁' : State rT) (ε : ENNReal),
+      (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗
+          errInterp (rT := rT) ε) -∗
+        |={E, ∅}=>
+        ∃ (R : State rT → State rT → Prop)
+          (μ₁ μ₁' : MeasureTheory.Measure (State rT)),
+          (⌜ErasableExpr μ₁ σ₁⌝) ∗ (⌜ErasableExpr μ₁' σ₁'⌝) ∗
+          (⌜AddCoupl 0 {p : State rT × State rT | R p.1 p.2} μ₁ μ₁'⌝) ∗
+          (∀ (σ₂ σ₂' : State rT), (⌜R σ₂ σ₂'⌝) -∗ |={∅, E}=>
+            stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₂'⟩ ∗
+              errInterp (rT := rT) ε ∗ wp E e Φ)) ⊢@{IProp GF} wp E e Φ := by
+  iintro H
+  iapply wp_lift_step_spec_couple
+  iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
+  ispecialize H $$ %σ₁ %e₁' %σ₁' %ε [Hσ Hs Hε]
+  · iframe
+  imod H with ⟨%R, %μ₁, %μ₁', %Her, %Her', %Hcpl, H⟩
+  imodintro
+  iapply (specCoupl_erasables (ε₁ := 0) (ε₂ := ε) (by rw [zero_add]) Hcpl Her Her')
+  iintro %σ₂ %σ₂' %HR
+  imodintro
+  iapply specCoupl_ret
+  iapply H $$ %σ₂ %σ₂' %HR
+
 end ProbLang.ApproxisWpGS

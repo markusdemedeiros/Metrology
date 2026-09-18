@@ -1342,6 +1342,27 @@ theorem Cfg.uniform_ne_zero
     Cfg.uniform_isProbabilityMeasure
   have := hp.measure_univ; rw [heq] at this; simp at this
 
+/-- Reindex a sum over `Ico 0 z` along a map that restricts to a bijection on it. -/
+theorem _root_.Finset.sum_Ico_comp_of_bijOn {M : Type _} [AddCommMonoid M]
+    {z : Int} {f : Int → Int}
+    (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
+    (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
+    (g : Int → M) :
+    ∑ n ∈ Finset.Ico (0 : Int) z, g (f n) = ∑ m ∈ Finset.Ico (0 : Int) z, g m := by
+  refine Finset.sum_bij (fun n _ => f n) ?_ ?_ ?_ ?_
+  · intro n hn
+    simp only [Finset.mem_Ico] at hn ⊢
+    exact hdom n hn.1 hn.2
+  · intro n₁ hn₁ n₂ hn₂ h
+    simp only [Finset.mem_Ico] at hn₁ hn₂
+    obtain ⟨n₀, -, huniq⟩ := hbij (f n₁) (hdom n₁ hn₁.1 hn₁.2).1 (hdom n₁ hn₁.1 hn₁.2).2
+    exact (huniq n₁ ⟨hn₁, rfl⟩).trans (huniq n₂ ⟨hn₂, h.symm⟩).symm
+  · intro m hm
+    simp only [Finset.mem_Ico] at hm
+    obtain ⟨n₀, ⟨hn₀, hfn₀⟩, -⟩ := hbij m hm.1 hm.2
+    exact ⟨n₀, by simp only [Finset.mem_Ico]; exact hn₀, hfn₀⟩
+  · intro n _; rfl
+
 /-- Integrate a function over `Cfg.uniform z σ`: the result is the uniform
 average over `n ∈ Ico 0 z` of `φ ⟨#n, σ⟩`. -/
 theorem Cfg.uniform_eq_map_uniformOfFinset {z : Int} (hz : 0 < z) (σ : State rT) :

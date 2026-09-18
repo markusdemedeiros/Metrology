@@ -2,6 +2,7 @@ module
 
 public import Metrology.Approxis.AppWeakestpre
 public import Metrology.ProbLang.Atomic
+import Metrology.ProbLang.Syntax.Notation
 
 @[expose] public section
 
@@ -186,5 +187,116 @@ theorem wp_atomic {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
     iprop((|={E1, E2}=> wp E2 e (fun v => iprop(|={E2, E1}=> Φ v)))) ⊢@{IProp GF}
       wp E1 e Φ :=
   h
+
+/-! ## Proof-mode support
+
+`wp_atomic` is the theorem; these make the proof mode *find* it. Without the
+`ElimModal` instance below, `imod`/`iinv` will not fire on an atomic `wp` and the
+lemma has to be applied by hand. `OpenInv` is a plain `Prop`, so it is wrapped in
+a class that the concrete redexes register into. -/
+
+/-- Typeclass form of `OpenInv`, so proof-mode instances can discover logical
+atomicity by synthesis. -/
+class IsOpenInv (e : Exp rT) : Prop where
+  out : OpenInv e
+
+section Instances
+variable [MeasurableSingletonClass rT]
+
+instance : IsOpenInv (rT := rT) .urand := ⟨OpenInv.of_atomic Atomic.urand'⟩
+
+instance (l : Loc) : IsOpenInv (rT := rT) pl(!#(.loc l)) :=
+  ⟨OpenInv.of_atomic (Atomic.load' l)⟩
+
+instance (l : Loc) (v : Val rT) : IsOpenInv (Exp.store pl(#(.loc l)) v.1) :=
+  ⟨OpenInv.of_atomic (Atomic.store' l v)⟩
+
+instance (v : Val rT) : IsOpenInv (Exp.alloc v.1) :=
+  ⟨OpenInv.of_atomic (Atomic.alloc' v)⟩
+
+instance (z : Int) : IsOpenInv (rT := rT) pl(rand(#(.int z), #(.unit))) :=
+  ⟨OpenInv.of_atomic (Atomic.rand_unit' z)⟩
+
+instance (z : Int) (l : Loc) : IsOpenInv (rT := rT) pl(rand(#(.int z), #(.lbl l))) :=
+  ⟨OpenInv.of_atomic (Atomic.rand_lbl' z l)⟩
+
+end Instances
+
+/-- `imod`/`iinv` on a mask-shifting update in front of an *atomic* `wp`: the
+mask reopens in the post-condition. Rocq's `elim_modal_fupd_wp_atomic`. -/
+instance (priority := low) elimModal_fupd_wp_atomic {p : Bool} {io : InOut} {E1 E2 : CoPset} {e : Exp rT}
+    [h : IsOpenInv e] {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
+    {P : IProp GF} {Φ : Val rT → IProp GF} :
+    ElimModal True p io false iprop(|={E1, E2}=> P) P
+      (wp E1 e Φ) (wp E2 e (fun v => iprop(|={E2, E1}=> Φ v))) where
+  elim_modal _ := (sep_mono_left intuitionisticallyIf_elim).trans <|
+    fupd_frame_right.trans <| (BIFUpdate.mono wand_elim_right).trans (wp_atomic h.out)
+
+/-- `iinv` on an *atomic* `wp`: open the invariant, take the step, close it in
+the post-condition. iris-lean's `elimAcc_wp_atomic` with `IsOpenInv` in place of
+`Language.Atomic`. The closing wand is spatial, so it is carried through the
+`wp` by `wp_frame_wand` rather than `wp_wand` (whose continuation here is
+persistent). -/
+instance (priority := low) elimAcc_wp_atomic {X : Type} {e : Exp rT} [h : IsOpenInv e]
+    {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {Φ : Val rT → IProp GF}
+    (E₁ E₂ : CoPset) (α β : X → IProp GF) (γ : X → Option (IProp GF)) :
+    ElimAcc True (fupd E₁ E₂) (fupd E₂ E₁) α β γ (wp E₁ e Φ)
+      (fun x => wp E₂ e (fun v => iprop(|={E₂}=> β x ∗ (γ x -∗? Φ v)))) where
+  elim_acc := by
+    dsimp only [accessor]
+    iintro %_ Hinner Hacc
+    iapply (wp_atomic h.out)
+    imod Hacc with ⟨%x, Hα, Hclose⟩
+    imodintro
+    ispecialize Hinner $$ %x Hα
+    iapply (ApproxisWpGS.wp_frame_wand (R := iprop(β x -∗ |={E₂, E₁}=> ((γ x).getD BIBase.emp))))
+    isplitl [Hclose]
+    · iexact Hclose
+    iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E₂}=> β x ∗ (γ x -∗? Φ v))))
+    case HΦ =>
+      intro v
+      iintro Hpost Hcl
+      imod Hpost with ⟨Hβ, HΦ⟩
+      ispecialize Hcl $$ Hβ
+      imod Hcl
+      imodintro
+      cases γ x with
+      | none =>
+        dsimp only [BIBase.wandM]
+        iexact HΦ
+      | some P => iapply HΦ $$ Hcl
+    iexact Hinner
+
+/-- `iinv` on a non-atomic `wp` at a fixed mask. -/
+instance elimAcc_wp_nonatomic {X : Type} {e : Exp rT}
+    {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {Φ : Val rT → IProp GF}
+    (E : CoPset) (α β : X → IProp GF) (γ : X → Option (IProp GF)) :
+    ElimAcc True (fupd E E) (fupd E E) α β γ (wp E e Φ)
+      (fun x => wp E e (fun v => iprop(|={E}=> β x ∗ (γ x -∗? Φ v)))) where
+  elim_acc := by
+    dsimp only [accessor]
+    iintro %_ Hinner Hacc
+    iapply ApproxisWpGS.fupd_wp
+    imod Hacc with ⟨%x, Hα, Hclose⟩
+    imodintro
+    ispecialize Hinner $$ %x Hα
+    iapply ApproxisWpGS.wp_fupd
+    iapply (ApproxisWpGS.wp_frame_wand (R := iprop(β x -∗ |={E, E}=> ((γ x).getD BIBase.emp))))
+    isplitl [Hclose]
+    · iexact Hclose
+    iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E}=> β x ∗ (γ x -∗? Φ v))))
+    case HΦ =>
+      intro v
+      iintro Hpost Hcl
+      imod Hpost with ⟨Hβ, HΦ⟩
+      ispecialize Hcl $$ Hβ
+      imod Hcl
+      imodintro
+      cases γ x with
+      | none =>
+        dsimp only [BIBase.wandM]
+        iexact HΦ
+      | some P => iapply HΦ $$ Hcl
+    iexact Hinner
 
 end ProbLang

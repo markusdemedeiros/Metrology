@@ -61,6 +61,37 @@ theorem tapeIndexUniform_univ_eq_one {N : Int} (hN : 0 < N) :
   rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
   simp only [Set.preimage_univ, measure_univ]
 
+/-- The clamping injection `Int → [0, N)` used by `tapeIndexUniform`. -/
+noncomputable def tapeIdxOf {N : Int} (hN : 0 < N) (n : Int) : { z : Int // 0 ≤ z ∧ z < N } :=
+  if hz : 0 ≤ n ∧ n < N then ⟨n, hz⟩ else ⟨0, ⟨_root_.le_refl _, hN⟩⟩
+
+@[simp] theorem tapeIdxOf_val {N : Int} (hN : 0 < N) {n : Int} (h0 : 0 ≤ n) (hn : n < N) :
+    (tapeIdxOf hN n).val = n := by
+  simp [tapeIdxOf, h0, hn]
+
+theorem tapeIndexUniform_eq_map {N : Int} (hN : 0 < N) :
+    tapeIndexUniform N =
+      (PMF.uniformOfFinset (Finset.Ico (0 : Int) N)
+        ⟨0, Finset.mem_Ico.mpr ⟨_root_.le_refl _, hN⟩⟩).toMeasure.map (tapeIdxOf hN) := by
+  unfold tapeIndexUniform tapeIdxOf
+  rw [dif_pos ⟨0, Finset.mem_Ico.mpr ⟨_root_.le_refl _, hN⟩⟩]
+
+/-- Countability-free `lintegral` against `tapeIndexUniform`. -/
+theorem lintegral_tapeIndexUniform {N : Int} (hN : 0 < N)
+    (ψ : { z : Int // 0 ≤ z ∧ z < N } → ENNReal) :
+    ∫⁻ x, ψ x ∂(tapeIndexUniform N)
+      = ((N.toNat : ENNReal))⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) N, ψ (tapeIdxOf hN n) := by
+  have hcard : (Finset.Ico (0 : Int) N).card = N.toNat := by rw [Int.card_Ico]; omega
+  rw [tapeIndexUniform_eq_map hN, lintegral_map Measurable.of_discrete Measurable.of_discrete,
+      lintegral_countable',
+      tsum_eq_sum (s := Finset.Ico (0 : Int) N) fun n hn => by
+        rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
+            PMF.uniformOfFinset_apply_of_notMem _ hn, mul_zero],
+      Finset.mul_sum]
+  refine Finset.sum_congr rfl fun n hn => ?_
+  rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
+      PMF.uniformOfFinset_apply_of_mem _ hn, hcard, mul_comm]
+
 /-- `tapePresample σ α` is a probability measure when `α` is an existing
 omit [ProbLangℝ rT] in
 tape with positive bound. -/
@@ -1968,6 +1999,48 @@ rather than the unprojected `AddCoupl ε (ExprRel Φexp) μ ν`. The projected
 form is semantically what the adequacy layer consumes (Clutch's `ARcoupl`
 is already at the val-projected level), and it's the level at which our
 `ErasableExpr` hypothesis naturally interacts with `AddCoupl.bind`. -/
+
+/-- Uniform presample coupling on the index type, along a bijection of `[0, N)`. -/
+theorem tapeIndexUniform_addCoupl_bij {N : Int} (hN : 0 < N) (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < N → 0 ≤ f n ∧ f n < N)
+    (hbij : ∀ m : Int, 0 ≤ m → m < N → ∃! n : Int, (0 ≤ n ∧ n < N) ∧ f n = m) :
+    AddCoupl 0
+      {p : { z : Int // 0 ≤ z ∧ z < N } × { z : Int // 0 ≤ z ∧ z < N } |
+        ∃ n : Int, 0 ≤ n ∧ n < N ∧ p.1 = tapeIdxOf hN n ∧ p.2 = tapeIdxOf hN (f n)}
+      (tapeIndexUniform N) (tapeIndexUniform N) := by
+  rintro ⟨φ, Hφm, Hφb⟩ ⟨ψ, Hψm, Hψb⟩ Hle
+  simp only [add_zero]
+  show ∫⁻ x, φ x ∂(tapeIndexUniform N) ≤ ∫⁻ x, ψ x ∂(tapeIndexUniform N)
+  rw [lintegral_tapeIndexUniform hN, lintegral_tapeIndexUniform hN,
+    ← Finset.sum_Ico_comp_of_bijOn hdom hbij (fun m => ψ (tapeIdxOf hN m))]
+  gcongr with n hn
+  simp only [Finset.mem_Ico] at hn
+  exact Hle ⟨n, hn.1, hn.2, rfl, rfl⟩
+
+theorem tapePresample_eq_map {σ : State rT} {α : Loc} {N : Int}
+    {bs : List { z : Int // 0 ≤ z ∧ z < N }} (hσ : σ.tapes[α]? = some ⟨N, bs⟩) :
+    tapePresample σ α =
+      (tapeIndexUniform N).map (fun n => σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)) := by
+  simp only [tapePresample, hσ]
+  rw [Measure.bind_dirac_eq_map _ Measurable.of_discrete]
+
+/-- Two same-bound tapes presample in lockstep along a bijection `f` on `[0, N)`. -/
+theorem tapePresample_addCoupl_bij {σ σ' : State rT} {α α' : Loc} {N : Int}
+    {bs bs' : List { z : Int // 0 ≤ z ∧ z < N }}
+    (hσ : σ.tapes[α]? = some ⟨N, bs⟩) (hσ' : σ'.tapes[α']? = some ⟨N, bs'⟩)
+    (hN : 0 < N) (f : Int → Int)
+    (hdom : ∀ n : Int, 0 ≤ n → n < N → 0 ≤ f n ∧ f n < N)
+    (hbij : ∀ m : Int, 0 ≤ m → m < N → ∃! n : Int, (0 ≤ n ∧ n < N) ∧ f n = m) :
+    AddCoupl 0
+      {p : State rT × State rT | ∃ n : Int, 0 ≤ n ∧ n < N ∧
+        p.1 = σ.update_tapes (·.insert α ⟨N, bs ++ [tapeIdxOf hN n]⟩) ∧
+        p.2 = σ'.update_tapes (·.insert α' ⟨N, bs' ++ [tapeIdxOf hN (f n)]⟩)}
+      (tapePresample σ α) (tapePresample σ' α') := by
+  rw [tapePresample_eq_map hσ, tapePresample_eq_map hσ']
+  refine AddCoupl.map _ _ Measurable.of_discrete Measurable.of_discrete ?_
+    (tapeIndexUniform_addCoupl_bij hN f hdom hbij)
+  rintro a b ⟨n, h0, hn, rfl, rfl⟩
+  exact ⟨n, h0, hn, rfl, rfl⟩
 
 /-- **Clutch `ARcoupl_erasure_erasable`, core version (projected form).**
 Given an additive coupling between `ErasableExpr` distributions `μ₁` and
