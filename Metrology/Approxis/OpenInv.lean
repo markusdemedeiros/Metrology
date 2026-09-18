@@ -15,7 +15,7 @@ namespace ProbLang
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 /-- `OpenInv e`: `e` can be evaluated inside a `|={E1, E2}=>` mask-shift, with
 the mask closed back in the post. -/
@@ -25,10 +25,12 @@ def OpenInv (e : Exp rT) : Prop :=
 
 namespace OpenInv
 
-theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 E3 : CoPset} {P Q : IProp GF}
+theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 E3 : CoPset}
+    {P Q : IProp GF}
     (h : P ⊢ |={E2, E3}=> Q) : iprop(|={E1, E2}=> P) ⊢ |={E1, E3}=> Q := fupd_elim h
 
-theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 E3 : CoPset}
+theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
+    {E1 E2 E3 : CoPset}
     {P R Q : IProp GF} (h : P ∗ R ⊢ |={E2, E3}=> Q) : (|={E1, E2}=> P) ∗ R ⊢ |={E1, E3}=> Q :=
   fupd_frame_right.trans (fupd_elim h)
 

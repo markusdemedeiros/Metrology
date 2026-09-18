@@ -314,7 +314,8 @@ theorem Exp.isValM.measurable {T : Type _} [MeasurableSpace T] :
   -- (since `isValue ↔ isValueR` and `isValueR.measurable` is proved).
   have hpred : MeasurableSet {p : Exp rT × Measure T | p.1.isValue} := by
     have : {p : Exp rT × Measure T | p.1.isValue} =
-           ({e : Exp rT | e.isValueR} ∩ {e | Exp.lcb 0 e = true}) ×ˢ (Set.univ : Set (Measure T)) := by
+           ({e : Exp rT | e.isValueR} ∩ {e | Exp.lcb 0 e = true}) ×ˢ (Set.univ : Set (Measure T)) :=
+           by
       ext ⟨e, m⟩; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff]
     rw [this]
     exact ((Exp.isValueR.measurable.setOf).inter Exp.lcb_zero.measurableSet).prod MeasurableSet.univ
@@ -1016,7 +1017,8 @@ theorem headStep.c_tape.measurable :
     have hbase : Measurable
         (fun p : BaseLit rT × State rT =>
           BaseLit.casesOn (motive := fun _ => Measure (Cfg rT)) p.1
-            (fun z => c_int_inner (p.2, z)) (fun _ => 0) 0 (fun _ => 0) (fun _ => 0) (fun _ => 0)) := by
+            (fun z => c_int_inner (p.2, z)) (fun _ => 0) 0 (fun _ => 0) (fun _ => 0)
+            (fun _ => 0)) := by
       baseLit_zero_int_apply c_int_inner, hc_int
     exact BaseLit.measurable_param_swap hbase
   -- Outer: Exp.measurable_rec_param with only c_lit live; stamp it.

@@ -58,7 +58,8 @@ class MeasurableSyntax (Syntax : Type _) (Gen : outParam (Type _)) where
 def MeasurableSyntax.cylinder [I : MeasurableSyntax Syntax Gen] : Set (Set Syntax) :=
   I.flatten '' I.base
 
-instance MeasurableSyntax.instMeasurableSpace [MeasurableSyntax Syntax Gen] : MeasurableSpace Syntax :=
+instance MeasurableSyntax.instMeasurableSpace [MeasurableSyntax Syntax Gen]
+    : MeasurableSpace Syntax :=
   .generateFrom cylinder
 
 @[uncurriedProjections, constructors]

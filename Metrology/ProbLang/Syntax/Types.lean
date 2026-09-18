@@ -77,7 +77,8 @@ theorem under_id : ∀ n, Renaming.under id n = n
   | 0     => rfl
   | _ + 1 => rfl
 
-theorem under_comp (ξ₁ ξ₂ : Renaming) : ∀ n, Renaming.under ξ₁ (Renaming.under ξ₂ n) = Renaming.under (ξ₁ ∘ ξ₂) n
+theorem under_comp (ξ₁ ξ₂ : Renaming)
+    : ∀ n, Renaming.under ξ₁ (Renaming.under ξ₂ n) = Renaming.under (ξ₁ ∘ ξ₂) n
   | 0     => rfl
   | _ + 1 => rfl
 

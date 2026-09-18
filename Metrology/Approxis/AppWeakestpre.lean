@@ -22,7 +22,7 @@ namespace ProbLang
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 
 /-! ## Approxis ghost state class -/
@@ -74,14 +74,16 @@ abbrev specCouplCouple (E : CoPset)
   iprop(∃ (S : State rT → Cfg rT → Prop) (n : Nat)
           (μ₁ : MeasureTheory.Measure (State rT)) (μ₁' : MeasureTheory.Measure (State rT))
           (ε₁ : ENNReal) (X₂ : Cfg rT → ENNReal) (r : ENNReal),
-    (⌜AddCoupl ε₁ {p : State rT × (Cfg rT) | S p.1 p.2} μ₁ (μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))⌝) ∗
+    (⌜AddCoupl ε₁ {p : State rT × (Cfg rT) | S p.1 p.2} μ₁ (μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))⌝)
+    ∗
     (⌜Measurable X₂⌝) ∗
     (⌜∀ ρ, X₂ ρ ≤ r⌝) ∗
     (⌜ε₁ + (∫⁻ ρ, X₂ ρ ∂(μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))) ≤ ε⌝) ∗
     (⌜Erasable μ₁ σ₁⌝) ∗
     (⌜Erasable μ₁' σ₁'⌝) ∗
     (∀ (σ₂ : State rT) (e₂' : Exp rT) (σ₂' : State rT),
-      (⌜S σ₂ ⟨e₂', σ₂'⟩⌝) -∗ |={E}=> Φ ((σ₂, (⟨e₂', σ₂'⟩ : Cfg rT), X₂ ⟨e₂', σ₂'⟩) : SpecCouplState rT)))
+      (⌜S σ₂ ⟨e₂', σ₂'⟩⌝) -∗ |={E}=> Φ
+      ((σ₂, (⟨e₂', σ₂'⟩ : Cfg rT), X₂ ⟨e₂', σ₂'⟩) : SpecCouplState rT)))
 
 /-- The pre-functor whose least fixpoint is `specCoupl`.
 
@@ -465,7 +467,8 @@ theorem wp_value_of_toVal {E : CoPset} {e : Exp rT} {v : Val rT} {Φ : Val rT �
 /-- The post-condition transformer `HΦ` packaged for `wp_strong_mono'`. -/
 abbrev wpStrongMonoCont (E2 : CoPset) (Φ Ψ : Val rT → IProp GF) : IProp GF :=
   iprop(□ ∀ σ ρ v ε,
-    (stateInterp (rT := rT) σ ∗ SpecUpdateGS.specInterp (rT := rT) ρ ∗ errInterp (rT := rT) ε ∗ Φ v) ={E2}=∗
+    (stateInterp (rT := rT) σ ∗ SpecUpdateGS.specInterp (rT := rT) ρ ∗ errInterp (rT := rT) ε ∗ Φ v)
+    ={E2}=∗
       stateInterp (rT := rT) σ ∗ SpecUpdateGS.specInterp (rT := rT) ρ ∗ errInterp (rT := rT) ε ∗ Ψ v)
 
 /-- The Löb invariant for `wp_strong_mono'`: a single iprop universally
@@ -1074,7 +1077,8 @@ at `e₁` with continuation receiving the filled-in expression lifts to one at
 Concrete-(Ectx rT) port: instead of Rocq's classical `Kinv` constructed inside the
 proof, we use `Function.partialInv K.fill`. The expectation bound argument
 goes through `lintegral_map` + `primStep_fill hv` (the pushforward formula). -/
-theorem progCoupl_ctx_bind {K : Ectx rT} {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT}
+theorem progCoupl_ctx_bind {K : Ectx rT} {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT}
+    {σ₁' : State rT}
     {ε : ENNReal} {Z : Exp rT → State rT → Exp rT → State rT → ENNReal → IProp GF}
     (hv : ¬ e₁.isValue) :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
@@ -2443,7 +2447,8 @@ theorem wp_lift_atomic_step_fupd_concentrated {E1 E2 : CoPset} {e₁ : Exp rT}
 
 /-- Atomic step with mask-shifting fupd. -/
 @[discrete]
-theorem wp_lift_atomic_step_fupd [Countable rT] {E1 E2 : CoPset} {e₁ : Exp rT} {Φ : Val rT → IProp GF}
+theorem wp_lift_atomic_step_fupd [Countable rT] {E1 E2 : CoPset} {e₁ : Exp rT}
+    {Φ : Val rT → IProp GF}
     (Hv : e₁.toVal? = none) :
     iprop(∀ (σ₁ : State rT), stateInterp (rT := rT) σ₁ -∗ |={E1}=>
       (⌜Discrete.Reducible e₁ σ₁⌝) ∗

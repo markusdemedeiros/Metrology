@@ -185,7 +185,8 @@ abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
 @[discrete]
 theorem Discrete.primStep_discrete_iff {e : Exp rT} {σ : State rT}
     [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
-    (∃ ρ, 0 < (primStep { expr := e, state := σ }) {ρ}) ↔ primStep { expr := e, state := σ } ≠ 0 := by
+    (∃ ρ, 0 < (primStep { expr := e, state := σ }) {ρ}) ↔ primStep { expr := e, state := σ } ≠ 0 :=
+    by
   refine ⟨fun ⟨ρ, Hρ⟩ Hz => by simp [Hz] at Hρ, ?_⟩
   by_contra!
   rcases this with ⟨Hnz, H⟩
@@ -296,7 +297,8 @@ theorem primStep_fillItem [ProbLangℝ rT]
 -- TODO: This generalized to continuous, though really I imagine it can't be used in any continuous way.
 -- I won't mark it as discrete, but I'd guess this should really be changed to be primStep_fill
 theorem primStep_fill_singleton [ProbLangℝ rT] {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
-    (hv : ¬e1.isValue) : primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩} := by
+    (hv : ¬e1.isValue) : primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩}
+    := by
   rw [primStep_fill hv, Measure.map_apply ?G1 ?G2]
   case G1 => measurability
   case G2 => measurability
@@ -323,9 +325,8 @@ theorem primStep_fill_inv [ProbLangℝ rT]  {K : Ectx rT} {e1 e2 : Exp rT} {σ1 
   simp [Cfg.mk.injEq] at heq
   exact ⟨e2', heq.1.symm, heq.2 ▸ hpos⟩
 
-/-! ## Discrete.Reducible: fill interaction -/
+/-! ## Reducible: fill interaction -/
 
--- Reducible.fill
 @[discrete]
 theorem Discrete.Reducible.fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}

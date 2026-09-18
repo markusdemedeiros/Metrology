@@ -21,7 +21,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 /-! ## `Pos.Countable` instances for namespace indexing -/
 
@@ -191,6 +191,7 @@ instance lrel.car_ne {GF : BundledGFunctors} (v1 v2 : Val rT) :
     OFE.NonExpansive (fun A : lrel rT GF => A.car v1 v2) where
   ne {_ _ _} hAB := hAB v1 v2
 
+omit [ProbLangℝ rT] in
 /-- Extensionality for `lrel`: two logical relations agreeing pointwise are equal.
 With the Leibniz OFE this replaces the old `Equiv`-unfolding, which used to let
 callers `intro v1 v2` on an `lrel` equivalence goal. -/
@@ -229,7 +230,8 @@ noncomputable def refines (E : CoPset) (e e' : Exp rT) (A : lrel rT GF) : IProp 
     (↯ ε) -∗
     (⌜ (0 : ENNReal) < ε ⌝) -∗
     wp ⊤ e (fun v => iprop(∃ (v' : Val rT) (ε' : ENNReal),
-      (⤇ (K.fill v'.1)) ∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A v v')))
+      (⤇ (K.fill v'.1)) ∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A
+      v v')))
 
 /-- Bridge between the folded and unfolded form of `refines` for `iapply`/`iexact`. -/
 theorem refines_unfold {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} :
@@ -240,7 +242,8 @@ theorem refines_unfold {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} :
         (↯ ε) -∗
         (⌜ (0 : ENNReal) < ε ⌝) -∗
         wp ⊤ e (fun v => iprop(∃ (v' : Val rT) (ε' : ENNReal),
-          (⤇ (K.fill v'.1)) ∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A v v'))) :=
+          (⤇ (K.fill v'.1)) ∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝)
+          ∗ A v v'))) :=
   BIBase.Entails.rfl
 
 end Refines
@@ -258,7 +261,7 @@ scoped notation:100 "REL " e1 " << " e2 " : " A =>
 section SimpleLRels
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
     iprop(⌜v1.1 = .lit .unit ∧ v2.1 = .lit .unit⌝ : IProp GF)
       ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
@@ -316,6 +319,7 @@ noncomputable def lrel_real : lrel rT GF where
     ipureintro
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
+omit [ProbLangℝ rT] in
 theorem lrel_real_unfold (v v' : Val rT) :
     (lrel_real (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ r : rT,
@@ -431,12 +435,12 @@ noncomputable def lrelRec1Hom (C : lrel rT GF -n> lrel rT GF) : lrel rT GF -c> l
 noncomputable def lrel_rec (C : lrel rT GF -n> lrel rT GF) : lrel rT GF :=
   fixpoint (lrelRec1 C)
 
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem lrel_rec_unfold (C : lrel rT GF -n> lrel rT GF) :
     lrel_rec C = lrelRec1 C (lrel_rec C) :=
   fixpoint_unfold (lrelRec1Hom C)
 
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem lrel_rec_ne {n : Nat} {C1 C2 : lrel rT GF -n> lrel rT GF}
     (hC : ∀ A : lrel rT GF, C1 A ≡{n}≡ C2 A) :
     lrel_rec C1 ≡{n}≡ lrel_rec C2 := by
@@ -583,7 +587,7 @@ theorem lrel_forall_ne {n : Nat} {C1 C2 : lrel rT GF → lrel rT GF}
   refine forall_ne fun A => ?_
   exact lrel_arr_ne_2.ne .rfl (h A) v1 v2
 
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem lrel_exists_ne {n : Nat} {C1 C2 : lrel rT GF → lrel rT GF}
     (h : ∀ A, C1 A ≡{n}≡ C2 A) :
     (lrel_exists C1 : lrel rT GF) ≡{n}≡ lrel_exists C2 := by
@@ -835,7 +839,8 @@ theorem refines_bind (K K' : Ectx rT) {E : CoPset} {A A' : lrel rT GF} {e e' : E
       ⌜(0 : ENNReal) < ε'⌝ ∗ A'.car v v')
   let HfTy : IProp GF := iprop(
     ∀ (v v' : Val rT), A v v' -∗ ∀ (K_1 : Ectx rT) (ε : ENNReal),
-      (⤇ K_1.fill (K'.fill v'.1)) -∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) -∗ (↯ ε) -∗ (⌜(0 : ENNReal) < ε⌝) -∗
+      (⤇ K_1.fill (K'.fill v'.1)) -∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) -∗ (↯ ε) -∗
+      (⌜(0 : ENNReal) < ε⌝) -∗
       wp ⊤ (K.fill v.1) (fun v₂ => iprop(
         ∃ (v'' : Val rT) (ε'' : ENNReal),
           (⤇ K_1.fill v''.1) ∗ naOwnP (rT := rT) (hlc := hlc) ⊤ ∗ ↯ ε'' ∗
@@ -929,7 +934,8 @@ theorem refines_ret {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
   iframe Hj Hna Herr Hpos
   iassumption
 
-instance elim_fupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp GF) (A : lrel rT GF) :
+instance elim_fupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp GF) (A : lrel rT GF)
+    :
     ElimModal True false io false (iprop(|={⊤}=> P)) P
       (refines E e t A) (refines E e t A) where
   elim_modal _ := by
@@ -939,7 +945,8 @@ instance elim_fupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp G
     imod HP
     iapply HI $$ HP
 
-instance elim_bupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp GF) (A : lrel rT GF) :
+instance elim_bupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp GF) (A : lrel rT GF)
+    :
     ElimModal True false io false (iprop(|==> P)) P
       (refines E e t A) (refines E e t A) where
   elim_modal _ := by
@@ -958,7 +965,8 @@ instance is_except_0_refines (E : CoPset) (e t : Exp rT) (A : lrel rT GF) :
     imodintro
     iexact HL
 
-theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Exp rT} {A : lrel rT GF} :
+theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Exp rT}
+    {A : lrel rT GF} :
     iprop((▷ P) ∗ ((naInvP (rT := rT) (hlc := hlc) N P) -∗ refines E e1 e2 A)) ⊢@{IProp GF}
     refines E e1 e2 A := by
   iintro ⟨HP, Hcont⟩
@@ -987,7 +995,8 @@ theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp 
   imodintro
   iapply IH' $$ %K %ε Hj Hnais' Herr Hpos
 
-theorem refines_na_close {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp rT} {A : lrel rT GF} :
+theorem refines_na_close {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp rT}
+    {A : lrel rT GF} :
     iprop((▷ P) ∗ (naCloseP (rT := rT) (hlc := hlc) P N E) ∗ refines E e1 e2 A) ⊢@{IProp GF}
     refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A := by
   unfold refines

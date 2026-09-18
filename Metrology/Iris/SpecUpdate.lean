@@ -22,7 +22,7 @@ open SpecUpdateGS
 
 section SpecUpdate
 
-variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 variable {GF : BundledGFunctors} {hlc : HasLC} [InvGS_gen hlc GF] [iSpec : SpecUpdateGS rT GF]
 
 /-- Spec update for `n` deterministic steps. -/

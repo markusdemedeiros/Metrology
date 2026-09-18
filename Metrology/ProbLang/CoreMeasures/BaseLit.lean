@@ -249,14 +249,16 @@ attribute [aesop safe apply (rule_sets := [Measurable])]
 /-- The cylinder flatten family is closed under nonempty intersection. -/
 theorem Cylinder.flatten_isPiSystem [MeasurableSpace rT] :
     IsPiSystem
-      ({S : Set (BaseLit rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+      ({S : Set (BaseLit rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S})
+      :=
   Stamp.flatten_isPiSystem Cylinder.flatten_inter
     (fun {_ _ _} => Cylinder.hasMeasurableLeaves_inter)
 
 /-- The cylinder flatten family is countably spanning. -/
 theorem Cylinder.flatten_isCountablySpanning [MeasurableSpace rT] :
     IsCountablySpanning
-      ({S : Set (BaseLit rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S}) :=
+      ({S : Set (BaseLit rT) | ∃ c : Cylinder rT, c.HasMeasurableLeaves ∧ Cylinder.flatten c = S})
+      :=
   Stamp.flatten_isCountablySpanning Shape.cylinder_hasMeasurableLeaves
     Shape.cylinder_preimage_shape .unit .unit
 

@@ -50,7 +50,8 @@ class AppPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledG
 attribute [reducible, instance] AppPreGS.heap AppPreGS.tapes
 
 /-- The full GS: picks concrete γ names for the program-side heap and tapes. -/
-class AppGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors) extends AppPreGS rT GF where
+class AppGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors) extends
+    AppPreGS rT GF where
   γheap : GName
   γtapes : GName
 

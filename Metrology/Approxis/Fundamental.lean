@@ -21,7 +21,7 @@ namespace ProbLang
 open Cslib Exp
 
 section Fundamental
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ## Tctx → RelCtx lifting -/
@@ -535,7 +535,8 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
     fun h => hf (Finset.mem_union_right _ h)
   iapply refines_ret
     (e1 := Exp.fix (Exp.substMap vs.fst e)) (e2 := Exp.fix (Exp.substMap vs.snd e'))
-    (v1 := ⟨_, IsVal.fix (by is_lc), by is_lc⟩) (v2 := ⟨_, IsVal.fix (by is_lc), by is_lc⟩) (hv1 := rfl) (hv2 := rfl)
+    (v1 := ⟨_, IsVal.fix (by is_lc), by is_lc⟩) (v2 := ⟨_, IsVal.fix (by is_lc), by is_lc⟩)
+    (hv1 := rfl) (hv2 := rfl)
   imodintro
   iapply (loeb_wand (P := (lrel_arr (interp τ1 Δ) (interp τ2 Δ)).car
     ⟨Exp.fix (Exp.substMap vs.fst e), IsVal.fix (by is_lc), by is_lc⟩
@@ -632,6 +633,14 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
       Exp.app (Exp.open' (Exp.substMap vs.snd e') fixv'.1) v2.1 := rfl
   rw [hWrap_L, hWrap_R]
   iexact Hgoal
+
+/-! ### Heap and tape cases
+
+These are the discrete fragment: `alloc`/`load`/`store` and the bounded
+integer sampler `rand`, whose step rules are stated with atoms. -/
+
+section Discrete
+variable [Countable rT]
 
 theorem bin_log_related_alloc (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ : Ty} :
@@ -755,6 +764,8 @@ theorem bin_log_related_rand_unit (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
 
 /-! ### Polymorphic / recursive type compatibility -/
 
+end Discrete
+
 /-! #### OFE-rewrite helper for `bin_log_related`
 
 Several polymorphic cases (`tapp`, `fold`, `unfold`, `pack`) need to
@@ -802,7 +813,7 @@ theorem refines_proper_wand (E : CoPset) (e e' : Exp rT) {A B : lrel rT GF}
     refines E e e' A ⊢@{IProp GF} refines E e e' B :=
   refines_proper_entails E e e' h
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- lrel-level OFE-rewrite at a value pair: bridge `A v v'` and `B v v'`
 when `A = B`. Used for value-relation level rewrites under e.g.
 `lrel_exists` instantiation. -/
@@ -1269,7 +1280,8 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       show Exp.binop op (Exp.substMap vs.snd e1') (Exp.lit (.int n2)) =
         Ectx.fill [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
   iapply (refines_bind [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (A := lrel_int)) $$ [IH1'']
+    [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    (A := lrel_int)) $$ [IH1'']
   · iexact IH1''
   iintro %v1 %v1' Hint1
   ihave Hv1Ex := lrel_int_unfold v1 v1' $$ Hint1
@@ -1407,7 +1419,8 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       show Exp.binop op (Exp.substMap vs.snd e1') (Exp.lit (.bool b2)) =
         Ectx.fill [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
   iapply (refines_bind [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (A := lrel_bool)) $$ [IH1'']
+    [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    (A := lrel_bool)) $$ [IH1'']
   · iexact IH1''
   iintro %v1 %v1' Hbool1
   ihave Hv1Ex := lrel_bool_unfold v1 v1' $$ Hbool1
@@ -1763,7 +1776,8 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     -- def-eq to iprop(⌜...⌝).
     have hrfl : (lrel_unit (GF := GF)).car ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩
         = iprop(⌜(⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit .unit ∧
-                 (⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit .unit⌝) := rfl
+                 (⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit
+                 .unit⌝) := rfl
     rw [hrfl]
     iintro
     ipureintro
@@ -1998,7 +2012,7 @@ theorem TctxRelated.insert {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT GF
         show some (interp τ' Δ) = some A
         rw [heq]
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: an `isSome` lookup in a `RelCtx` gives a list-membership witness. -/
 theorem RelCtx.exists_mem_of_lookup_isSome {Γ : RelCtx rT GF} {x : Var}
     (h : (Γ.lookup x).isSome) : ∃ p ∈ Γ, p.1 = x := by
@@ -2034,7 +2048,7 @@ binder cases (`lam`, `fix`) recurse on the body's typing under an extended
 context. The polymorphic binder cases (`tlam`, `tunpack`) require relating
 the shifted typing context to a re-interpreted relational context — sorried
 pending an additional `TctxRelated.shift` lemma threading through `interp_ren`. -/
-theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
+theorem fundamental [Countable rT] {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     (Δ : TyEnv rT GF)
     (Γrc : RelCtx rT GF)
     (HCtx : TctxRelated Δ Γtc Γrc) :
@@ -2444,7 +2458,7 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     exact bin_log_related_unpack Δ Γrc L' HIH1 he2_lc he2_lc HIH2
 
 /-- Closed specialization: `∅ ⊢ₜ e : τ → ⊢ REL e << e : interp τ Δ`. -/
-theorem refines_typed (Δ : TyEnv rT GF) {e : Exp rT} {τ : Ty}
+theorem refines_typed [Countable rT] (Δ : TyEnv rT GF) {e : Exp rT} {τ : Ty}
     (Hty : Typed Tctx.empty e τ) :
     ⊢@{IProp GF} refines (⊤ : CoPset) e e (interp τ Δ) := by
   have HRel : TctxRelated Δ Tctx.empty ([] : RelCtx rT GF) := by

@@ -26,7 +26,7 @@ namespace ProbLang
 
 
 section Compatibility
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-- Helper: unfold `lrel_arr` application. Proves that `(lrel_arr A B).car v v'`
@@ -110,7 +110,8 @@ theorem refines_injl {e e' : Exp rT} {A B : lrel rT GF} :
   iapply refines_ret
     (e1 := Ectx.fill [EctxItem.inl] v.1)
     (e2 := Ectx.fill [EctxItem.inl] v'.1)
-    (v1 := ⟨.inl v.1, IsVal.inl v.2, (IsVal.inl v.2).lc⟩) (v2 := ⟨.inl v'.1, IsVal.inl v'.2, (IsVal.inl v'.2).lc⟩)
+    (v1 := ⟨.inl v.1, IsVal.inl v.2, (IsVal.inl v.2).lc⟩)
+    (v2 := ⟨.inl v'.1, IsVal.inl v'.2, (IsVal.inl v'.2).lc⟩)
     (hv1 := rfl) (hv2 := rfl)
   imodintro
   unfold lrel_sum
@@ -133,7 +134,8 @@ theorem refines_injr {e e' : Exp rT} {A B : lrel rT GF} :
   iapply refines_ret
     (e1 := Ectx.fill [EctxItem.inr] v.1)
     (e2 := Ectx.fill [EctxItem.inr] v'.1)
-    (v1 := ⟨.inr v.1, IsVal.inr v.2, (IsVal.inr v.2).lc⟩) (v2 := ⟨.inr v'.1, IsVal.inr v'.2, (IsVal.inr v'.2).lc⟩)
+    (v1 := ⟨.inr v.1, IsVal.inr v.2, (IsVal.inr v.2).lc⟩)
+    (v2 := ⟨.inr v'.1, IsVal.inr v'.2, (IsVal.inr v'.2).lc⟩)
     (hv1 := rfl) (hv2 := rfl)
   imodintro
   unfold lrel_sum
@@ -217,7 +219,7 @@ theorem refines_seq (A : lrel rT GF) {e1 e2 e1' e2' : Exp rT} {B : lrel rT GF}
   rw [hfillRHS]
   iexact IH2
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: build `(lrel_exists C).car v v'` from a closedness witness and the
 existential body. Defeq via `lrel.mk` projection. -/
 theorem lrel_exists_unfold (C : lrel rT GF → lrel rT GF) (v v' : Val rT) :
@@ -226,7 +228,7 @@ theorem lrel_exists_unfold (C : lrel rT GF → lrel rT GF) (v v' : Val rT) :
       ⊢@{IProp GF} (lrel_exists C).car v v' :=
   BIBase.Entails.rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_nat).car v v' ⊢ ∃ n : Nat, v = #n ∧ v' = #n`. -/
 theorem lrel_nat_unfold (v v' : Val rT) :
     (lrel_nat (GF := GF)).car v v'
@@ -234,7 +236,7 @@ theorem lrel_nat_unfold (v v' : Val rT) :
         ⌜v.1 = .lit (.int (n : Int)) ∧ v'.1 = .lit (.int (n : Int))⌝) :=
   BIBase.Entails.rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_pos_nat).car v v' ⊢ ∃ n : Nat, 0 < n ∧ v = #n ∧ v' = #n`. -/
 theorem lrel_pos_nat_unfold (v v' : Val rT) :
     (lrel_pos_nat (GF := GF)).car v v'
@@ -242,7 +244,7 @@ theorem lrel_pos_nat_unfold (v v' : Val rT) :
         v.1 = .lit (.int (n : Int)) ∧ v'.1 = .lit (.int (n : Int))⌝) :=
   BIBase.Entails.rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_int).car v v' ⊢ ∃ n : Int, v = #n ∧ v' = #n`. -/
 theorem lrel_int_unfold (v v' : Val rT) :
     (lrel_int (GF := GF)).car v v'
@@ -250,7 +252,7 @@ theorem lrel_int_unfold (v v' : Val rT) :
         ⌜v.1 = .lit (.int n) ∧ v'.1 = .lit (.int n)⌝) :=
   BIBase.Entails.rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_prod A B).car v v' ⊢ ∃ a1 a2 b1 b2, v=(a1,b1) ∧ v'=(a2,b2) ∧ A a1 a2 ∧ B b1 b2`. -/
 theorem lrel_prod_unfold (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_prod A B).car v v' ⊢@{IProp GF}
@@ -259,7 +261,7 @@ theorem lrel_prod_unfold (A B : lrel rT GF) (v v' : Val rT) :
         A a1 a2 ∗ B b1 b2) :=
   BIBase.Entails.rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_sum A B).car v v' ⊢ ∃ w1 w2, ((inl form) ∨ (inr form))`. -/
 theorem lrel_sum_unfold (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_sum A B).car v v' ⊢@{IProp GF}
@@ -269,7 +271,7 @@ theorem lrel_sum_unfold (A B : lrel rT GF) (v v' : Val rT) :
         ((⌜v.1 = .inr w1.1⌝) ∗ (⌜v'.1 = .inr w2.1⌝) ∗ B w1 w2)) :=
   BIBase.Entails.rfl
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_bool).car v v' ⊢ ∃ b : Bool, v=#b ∧ v'=#b`. -/
 theorem lrel_bool_unfold (v v' : Val rT) :
     (lrel_bool (GF := GF)).car v v' ⊢@{IProp GF}
@@ -392,6 +394,10 @@ theorem refines_binop_pure (op : BinOp) (v1 v2 r : Exp rT)
   imodintro
   iapply HA
 
+/-! ### Discrete fragment: tape allocation and bounded sampling -/
+
+variable [Countable rT]
+
 /-- `refines_alloctape`: tape-allocation compatibility. After binding the
 bound argument to value `n : Int`, allocate fresh tapes on both sides and
 establish the `lrel_tape` invariant. -/
@@ -504,6 +510,7 @@ theorem refines_alloc {e e' : Exp rT} {A : lrel rT GF} :
   isplitr; · ipureintro; rfl
   iexact HInv
 
+omit [Countable rT] in
 /-- `refines_if`: if-then-else compatibility. -/
 theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     iprop(refines ⊤ e0 e0' lrel_bool) ⊢@{IProp GF}
@@ -548,6 +555,7 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     rw [show Ectx.fill [] e2 = e2 from rfl, show Ectx.fill [] e2' = e2' from rfl]
     iexact IH2
 
+omit [Countable rT] in
 /-- `refines_snd`: if `e ≤ e' : A × B`, then `snd e ≤ snd e' : B`. -/
 theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e e' (lrel_prod A B))
@@ -579,6 +587,7 @@ theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
   imodintro
   iexact HB
 
+omit [Countable rT] in
 /-- Helper: `(lrel_tape).car v v'` exposes the tape locations and bound. -/
 theorem lrel_tape_unfold (v v' : Val rT) :
     (lrel_tape (GF := GF)).car v v' ⊢@{IProp GF}
@@ -588,6 +597,7 @@ theorem lrel_tape_unfold (v v' : Val rT) :
           (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩)))) :=
   BIBase.Entails.rfl
 
+omit [Countable rT] in
 /-- `refines_pack` (compatibility.v:73): existential-packing compatibility.
 Given `REL e << e' : C A` for a specific `A`, conclude `REL e << e' : ∃ A, C A`.
 Requires a proof that `C A` only relates closed values (port-specific). -/
@@ -615,6 +625,7 @@ theorem refines_pack (A : lrel rT GF) {e e' : Exp rT} {C : lrel rT GF → lrel r
   iexists A
   iexact HCA
 
+omit [Countable rT] in
 /-- `refines_forall` (compatibility.v:83): universal-typing compatibility.
 If for all semantic types `A`, `REL e << e' : C A`, then `(λ_. e) << (λ_. e') : ∀A, C A`.
 
@@ -674,6 +685,7 @@ theorem refines_forall {e e' : Exp rT} {C : lrel rT GF → lrel rT GF}
   rw [hfillR]
   iapply H
 
+omit [Countable rT] in
 /-- Helper: introduce a step-fupd from a `▷ P` with mask shift (E2 ⊆ E1).
 
 Standard Iris `step_fupd_intro`. Construction:
@@ -691,6 +703,7 @@ theorem step_fupd_intro_later {E1 E2 : CoPset} {P : IProp GF} (HE : E2 ⊆ E1) :
   imodintro
   iexact HP
 
+omit [Countable rT] in
 /-- Helper: `(lrel_ref A).car v v'` exposes the existence of related locations
 plus the heap invariant. -/
 theorem lrel_ref_unfold (A : lrel rT GF) (v v' : Val rT) :
@@ -817,7 +830,8 @@ theorem refines_load {e e' : Exp rT} {A : lrel rT GF} :
   have hfill_empty : (Exp.load (.lit (.loc l)) : Exp rT) = Ectx.fill [] (Exp.load (.lit (.loc l))) := rfl
   rw [hfill_empty]
   iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)))
-    (K := []) (e1 := (Exp.load (.lit (.loc l)) : Exp rT)) (t := (Exp.load (.lit (.loc l')) : Exp rT))
+    (K := []) (e1 := (Exp.load (.lit (.loc l)) : Exp rT))
+    (t := (Exp.load (.lit (.loc l')) : Exp rT))
     (A := A) (OpenInv.of_atomic (Atomic.load' (rT := rT) l)))
   iintro %K' Hr
   have hsub : (↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=

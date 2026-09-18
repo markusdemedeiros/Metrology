@@ -58,12 +58,15 @@ noncomputable instance approxisWpGS_of_components : ApproxisWpGS (rT := rT) GF w
 
 /-! ### `stateInterp` / `errInterp` unfolding lemmas -/
 
+omit [Countable rT] in
 @[simp] theorem approxisWpGS_stateInterp_eq :
     (ApproxisWpGS.stateInterp (rT := rT) : State rT → IProp GF) = appStateAuth := rfl
 
+omit [Countable rT] in
 @[simp] theorem approxisWpGS_errInterp_eq :
     (ApproxisWpGS.errInterp (rT := rT) (GF := GF) : ENNReal → IProp GF) = ecAuth := rfl
 
+omit [Countable rT] in
 @[simp] theorem approxisWpGS_specInterp_eq :
     (SpecUpdateGS.specInterp (rT := rT) : Cfg rT → IProp GF) = Cfg.specAuth := rfl
 
@@ -646,6 +649,7 @@ theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : Ectx rT) {l : Loc} {z N : Int} {e
     isplitl [Hε]; · iexact Hε
     iapply Hwp $$ Hl Hj'
 
+omit [Countable rT] in
 theorem wp_alloc_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {e : Exp rT}
     {Φ : Val rT → IProp GF} :
     iprop((⤇ K.fill (.tape (.lit (.int z)))) ∗
@@ -661,6 +665,7 @@ theorem wp_alloc_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {e : Exp rT}
   ihave HlNat := spec_empty_to_natTape (GF := GF) (l := l) (z := z) $$ Hl'
   iapply Hwp $$ %l Hj' HlNat
 
+omit [Countable rT] in
 theorem wp_rand_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {l : Loc}
     {n : Int} {ns : List Int} {e : Exp rT} {Φ : Val rT → IProp GF} :
     iprop((⤇ K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) ∗

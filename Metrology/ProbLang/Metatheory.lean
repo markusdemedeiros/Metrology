@@ -1392,6 +1392,12 @@ theorem Cfg.lintegral_uniform [Countable rT] [MeasurableSingletonClass rT]
 -- DISCRETE: `Cfg.uniform_one_eq_dirac [Countable rT] [MeasurableSingletonClass rT]`
 --   `(σ : State rT) : Cfg.uniform 1 σ = Measure.dirac ⟨.lit (.int 0), σ⟩`
 
+-- DISCRETE: `Cfg.uniform_singleton_ne_one [Countable rT] [MeasurableSingletonClass rT]`
+--   `{z : Int} {σ : State rT} {ρ : Cfg rT} (Hz : 1 < z) : Cfg.uniform z σ {ρ} ≠ 1`
+
+-- The `simpa` below runs under `all_goals try`: the linter sees one branch where the
+-- goal-side `simp` is idle, but other branches need it.
+set_option linter.unnecessarySimpa false in
 theorem State.head_step_dzero_upd_tapes [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {α : Loc} {bs bs' : Tape}
     (hmem : σ.tapes[α]? = some bs)

@@ -27,7 +27,7 @@ open scoped AppGS
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 section Unary
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
@@ -99,7 +99,7 @@ theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
   obtain ⟨r, heq, hr⟩ := Hmem
   cases heq
   imodintro
-  simp only [approxisWpGS_stateInterp_eq, Exp.toVal?_lit]
+  simp only [Exp.toVal?_lit]
   isplitl [Hσ]; · iexact Hσ
   iapply HΦ $$ %r
   ipureintro

@@ -990,7 +990,8 @@ theorem Exp.toVal?_ofVal (v : Val α) : (Exp.ofVal v).toVal? = some v := by
 /-- `v.fst`-shaped form of `toVal?_ofVal` (matches goals after `Exp.ofVal` is unfolded). -/
 @[simp] theorem Val.toVal?_fst (v : Val α) : v.fst.toVal? = some v := Exp.toVal?_ofVal v
 
-theorem Exp.ofVal_of_toVal_some {e : Exp α} {v : Val α} (h : e.toVal? = some v) : Exp.ofVal v = e := by
+theorem Exp.ofVal_of_toVal_some {e : Exp α} {v : Val α} (h : e.toVal? = some v)
+    : Exp.ofVal v = e := by
   simp only [toVal?] at h
   split at h
   · simp at h; exact congrArg Val.fst h.symm
@@ -1149,7 +1150,8 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp rT) : Option (Exp rT) :=
   | shr,   .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .int (z1 / 2 ^ z2.toNat)
   |_,      _,        _        => none
 
-def State.update_heap (σ : State α) (f : ExtTreeMap Loc (Val α) → ExtTreeMap Loc (Val α)) : State α :=
+def State.update_heap (σ : State α) (f : ExtTreeMap Loc (Val α) → ExtTreeMap Loc (Val α))
+    : State α :=
   ⟨f σ.heap, σ.tapes⟩
 
 def State.update_tapes (σ : State α) (f : ExtTreeMap Loc Tape → ExtTreeMap Loc Tape) : State α :=

@@ -20,7 +20,7 @@ namespace ProbLang
 open Iris Iris.BI Iris.ProofMode OFE COFE Iris.Std DisjointLeibnizSet Auth HeapView
 open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS
 
-variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 /-- Bundle of the "pre" ghost-state classes needed to instantiate the relational
 adequacy theorem. Spelled with instance-implicit fields rather than `class abbrev`:
@@ -34,10 +34,9 @@ class RefinesPreGS (rT : outParam (Type _)) [ProbLangℝ rT]
   [inv : InvGpreS GF]
   [nainv : NaInvG GF]
 
-attribute [instance] RefinesPreGS.app RefinesPreGS.spec RefinesPreGS.ec
+attribute [reducible, instance] RefinesPreGS.app RefinesPreGS.spec RefinesPreGS.ec
   RefinesPreGS.inv RefinesPreGS.nainv
 
-omit [MeasurableSingletonClass rT] in
 /-- `⤇ e` and `⤇ Ectx.fill [] e` are definitionally equal. Named for use in
 `rw` rewrites where Lean's defeq is not exposed (e.g. when adapting hypotheses
 to fit lemmas that universally quantify over an evaluation context). -/
@@ -45,7 +44,6 @@ theorem spec_eq_fill_nil {GF : BundledGFunctors} [SpecGS rT GF] (e : Exp rT) :
     (iprop(⤇ e) : IProp GF) = iprop(⤇ Ectx.fill ([] : Ectx rT) e) :=
   rfl
 
-omit [MeasurableSingletonClass rT] in
 /-- `⤇ Ectx.fill [] v.1` and `⤇ Exp.ofVal v` are definitionally equal. -/
 theorem spec_fill_nil_eq_ofVal {GF : BundledGFunctors} [SpecGS rT GF] (v : Val rT) :
     (iprop(⤇ Ectx.fill ([] : Ectx rT) v.1) : IProp GF) = iprop(⤇ Exp.ofVal v) :=

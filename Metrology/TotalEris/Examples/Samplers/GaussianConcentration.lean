@@ -301,25 +301,29 @@ theorem gauss_std_tail_prob_of_le [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {
   rw [← Measure.map_apply hmg (measurableSet_abs_ge t), gauss_std_distributed (GF := GF) σ]
   exact hb
 
-theorem gauss_std_tail_prob_markov [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t) (σ : State ℝ) :
+theorem gauss_std_tail_prob_markov [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t)
+    (σ : State ℝ) :
     (limExec ⟨pl(&Gauss #.unit), σ⟩)
         ((fun ρ : Cfg ℝ => realOfExp ρ.expr) ⁻¹' {y : ℝ | t ≤ |y|})
       ≤ ENNReal.ofReal (Real.sqrt (2 / Real.pi) / t) :=
   gauss_std_tail_prob_of_le (GF := GF) (gaussianReal_abs_ge_le_markov ht) σ
 
-theorem gauss_std_tail_prob [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t) (σ : State ℝ) :
+theorem gauss_std_tail_prob [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t)
+    (σ : State ℝ) :
     (limExec ⟨pl(&Gauss #.unit), σ⟩)
         ((fun ρ : Cfg ℝ => realOfExp ρ.expr) ⁻¹' {y : ℝ | t ≤ |y|})
       ≤ ENNReal.ofReal (1 / t ^ 2) :=
   gauss_std_tail_prob_of_le (GF := GF) (gaussianReal_abs_ge_le ht) σ
 
-theorem gauss_std_tail_prob_chernoff [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t) (σ : State ℝ) :
+theorem gauss_std_tail_prob_chernoff [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t)
+    (σ : State ℝ) :
     (limExec ⟨pl(&Gauss #.unit), σ⟩)
         ((fun ρ : Cfg ℝ => realOfExp ρ.expr) ⁻¹' {y : ℝ | t ≤ |y|})
       ≤ ENNReal.ofReal (Real.exp (-t ^ 2 / 2)) :=
   gauss_std_tail_prob_of_le (GF := GF) (gaussianReal_abs_ge_le_chernoff ht) σ
 
-theorem gauss_std_tail_prob_mills [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t) (σ : State ℝ) :
+theorem gauss_std_tail_prob_mills [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] {t : ℝ} (ht : 0 < t)
+    (σ : State ℝ) :
     (limExec ⟨pl(&Gauss #.unit), σ⟩)
         ((fun ρ : Cfg ℝ => realOfExp ρ.expr) ⁻¹' {y : ℝ | t ≤ |y|})
       ≤ ENNReal.ofReal (Real.sqrt (2 / Real.pi) * Real.exp (-t ^ 2 / 2) / t) :=

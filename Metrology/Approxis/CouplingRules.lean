@@ -34,10 +34,12 @@ instance heapView_tape_frag_discreteE (l : Loc) (t : Tape) :
     OFE.DiscreteE (HeapView.Frag (H := LocHeap) l (.own 1) (toAgree t)) :=
   View.frag_discrete
 
-instance appTapesFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [AppGS rT GF] (l : Loc) (t : Tape) :
+instance appTapesFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [AppGS rT GF] (l : Loc)
+    (t : Tape) :
     BI.Timeless (iprop(l ↪ₐ t) : IProp GF) := iOwn_timeless
 
-instance specTapesFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [ISpec : SpecGS rT GF] (l : Loc) (t : Tape) :
+instance specTapesFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [ISpec : SpecGS rT GF]
+    (l : Loc) (t : Tape) :
     BI.Timeless (l ↪ₛ t : IProp GF) := iOwn_timeless
 
 instance heapView_heap_frag_discreteE (l : Loc) (v : Val rT) :
@@ -45,22 +47,26 @@ instance heapView_heap_frag_discreteE (l : Loc) (v : Val rT) :
   unfold HeapView.Frag
   exact View.frag_discrete
 
-instance appHeapFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [IApp : AppGS rT GF] (l : Loc) (v : Val rT) :
+instance appHeapFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [IApp : AppGS rT GF]
+    (l : Loc) (v : Val rT) :
     BI.Timeless (iprop(l ↦ v) : IProp GF) := by
   unfold appHeapFrag
   exact iOwn_timeless
 
-instance specHeapFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [ISpec : SpecGS rT GF] (l : Loc) (v : Val rT) :
+instance specHeapFrag_timeless [Countable rT] [MeasurableSingletonClass rT] [ISpec : SpecGS rT GF]
+    (l : Loc) (v : Val rT) :
     BI.Timeless (iprop(l ↦ₛ v) : IProp GF) := by
   unfold specHeapFrag
   exact iOwn_timeless
 
-instance appNatTape_timeless [Countable rT] [MeasurableSingletonClass rT] [IApp : AppGS rT GF] (l : Loc) (z : Int) (ns : List Int) :
+instance appNatTape_timeless [Countable rT] [MeasurableSingletonClass rT] [IApp : AppGS rT GF]
+    (l : Loc) (z : Int) (ns : List Int) :
     BI.Timeless (appNatTape l z ns : IProp GF) := by
   unfold appNatTape
   infer_instance
 
-instance specNatTape_timeless [Countable rT] [MeasurableSingletonClass rT] [ISpec : SpecGS rT GF] (l : Loc) (z : Int) (ns : List Int) :
+instance specNatTape_timeless [Countable rT] [MeasurableSingletonClass rT] [ISpec : SpecGS rT GF]
+    (l : Loc) (z : Int) (ns : List Int) :
     BI.Timeless (specNatTape l z ns : IProp GF) := by
   unfold specNatTape
   infer_instance
@@ -83,7 +89,8 @@ end TimelessTapes
 /-- Uniform-measure coupling under a bijection on the support: for `f` that
 restricts to a bijection on `Ico 0 z`, `Cfg.uniform z σ` and `Cfg.uniform z σ'`
 are exactly coupled along `{(⟨#n, σ⟩, ⟨#(f n), σ'⟩) | n ∈ Ico 0 z}`. -/
-theorem Cfg.uniform_addCoupl_bij [Countable rT] [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z) (σ σ' : State rT)
+theorem Cfg.uniform_addCoupl_bij [Countable rT] [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z)
+    (σ σ' : State rT)
     (f : Int → Int)
     (hdom : ∀ n : Int, 0 ≤ n → n < z → 0 ≤ f n ∧ f n < z)
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m) :
@@ -122,7 +129,8 @@ theorem Cfg.uniform_addCoupl_bij [Countable rT] [MeasurableSingletonClass rT] {z
   exact Hle ⟨n, hn.1, hn.2, rfl, rfl⟩
 
 /-- `primStep` of `rand #z ()` (unlabeled) equals `Cfg.uniform z σ`. -/
-theorem primStep_rand_unit [Countable rT] [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z) (σ : State rT) :
+theorem primStep_rand_unit [Countable rT] [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z)
+    (σ : State rT) :
     primStep (⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩
         ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
@@ -131,7 +139,8 @@ theorem primStep_rand_unit [Countable rT] [MeasurableSingletonClass rT] {z : Int
   rfl
 
 /-- `primStep` of `rand #z (lbl α)` when the tape has the wrong bound. -/
-theorem primStep_rand_lbl_wrong [Countable rT] [MeasurableSingletonClass rT] {z M : Int} (Hz : 0 < z) (HneM : z ≠ M)
+theorem primStep_rand_lbl_wrong [Countable rT] [MeasurableSingletonClass rT] {z M : Int}
+    (Hz : 0 < z) (HneM : z ≠ M)
     (σ : State rT) (l : Loc) (fs : List { z' : Int // 0 ≤ z' ∧ z' < M })
     (Hlk : σ.tapes[l]? = some ⟨M, fs⟩) :
     primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
@@ -153,7 +162,8 @@ theorem primStep_rand_lbl_wrong [Countable rT] [MeasurableSingletonClass rT] {z 
   simp only [if_neg (Ne.symm HneM)]
 
 /-- `primStep` of `rand #z (lbl α)` when the tape has the correct bound and is empty. -/
-theorem primStep_rand_lbl_empty [Countable rT] [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z) (σ : State rT) (l : Loc)
+theorem primStep_rand_lbl_empty [Countable rT] [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z)
+    (σ : State rT) (l : Loc)
     (Hlk : σ.tapes[l]? = some ⟨z, []⟩) :
     primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
@@ -178,7 +188,8 @@ theorem primStep_rand_lbl_empty [Countable rT] [MeasurableSingletonClass rT] {z 
 open MeasureTheory in
 /-- Lift a coupling between `μ` and `primStep ⟨e, σ⟩` to one between `μ` and
 `primStep ⟨K.fill e, σ⟩` via `λ a (e', σ'). ∃ e'', e' = K.fill e'' ∧ R a (e'', σ')`. -/
-theorem AddCoupl_steps_ctx_bind_r [Countable rT] [MeasurableSingletonClass rT] {α} [MeasurableSpace α] [DiscreteMeasurableSpace α]
+theorem AddCoupl_steps_ctx_bind_r [Countable rT] [MeasurableSingletonClass rT] {α}
+    [MeasurableSpace α] [DiscreteMeasurableSpace α]
     {μ : Measure α} {e : Exp rT} {σ : State rT} {R : Set (α × Cfg rT)} {ε : ENNReal}
     {K : Ectx rT} (hv : ¬ e.isValue)
     (Hcpl : AddCoupl ε R μ (primStep ⟨e, σ⟩)) :
@@ -217,7 +228,6 @@ section CouplingRules
 
 variable {hlc : HasLC} {GF : BundledGFunctors}
     [Countable rT] [MeasurableSingletonClass rT] [ApproxisGS rT hlc GF]
-    [Countable rT] [MeasurableSingletonClass rT]
 
 /-- Same-bound bijective coupling: `f : Int → Int` restricts to a bijection on
 `[0, z)`. -/

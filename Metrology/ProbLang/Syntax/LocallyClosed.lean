@@ -189,7 +189,8 @@ theorem subst_open_var (x y : Var) (u e : Exp rT) (hne : y ≠ x) (hu : IsLocall
 
 /-- Substitution of LC terms into LC terms is LC. -/
 @[scoped grind ←]
-theorem subst_lc {x : Var} {e u : Exp rT} (he : IsLocallyClosed e) (hu : IsLocallyClosed u) : IsLocallyClosed (subst e x u) := by
+theorem subst_lc {x : Var} {e u : Exp rT} (he : IsLocallyClosed e) (hu : IsLocallyClosed u)
+    : IsLocallyClosed (subst e x u) := by
   induction he with
   | lam L e _ ih =>
       apply IsLocallyClosed.lam (free_union Var)
@@ -222,7 +223,8 @@ theorem subst_intro (x : Var) (t e : Exp rT) (mem : x ∉ e.fv) (t_lc : IsLocall
 
 /-- β-style: opening an LC `lam` body with an LC argument is LC. -/
 theorem beta_lc (L : Finset Var) (e u : Exp rT)
-    (he : ∀ x ∉ L, IsLocallyClosed (open' e (fvar x))) (hu : IsLocallyClosed u) : IsLocallyClosed (open' e u) := by
+    (he : ∀ x ∉ L, IsLocallyClosed (open' e (fvar x))) (hu : IsLocallyClosed u) : IsLocallyClosed
+    (open' e u) := by
   obtain ⟨x, hx⟩ := HasFresh.fresh_exists (L ∪ e.fv)
   have hxL : x ∉ L := fun h => hx (Finset.mem_union_left _ h)
   have hxfv : x ∉ e.fv := fun h => hx (Finset.mem_union_right _ h)

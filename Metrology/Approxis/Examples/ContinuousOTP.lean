@@ -21,7 +21,7 @@ open Iris Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 namespace ContinuousOTP
 
-variable {rT : Type} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type} [ProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-- The LHS program: sample a uniform key `k`, output `frac (m + k)`. -/
@@ -202,7 +202,7 @@ theorem otp_adequate_real [RefinesPreGS ℝ GF] (m : ℝ) (σ σ' : State ℝ) :
   ProbLang.refines_coupling (A := fun _ => lrel_real) (φ := otpφ)
     (otp_enc (rT := ℝ) m) (otp_ideal (rT := ℝ)) σ σ'
     (fun _ v v' => lrel_real_to_otpφ v v')
-    (fun IR => otp_refines_real (hlc := .hasNoLC) (GF := GF) m)
+    (fun _ => otp_refines_real (hlc := .hasNoLC) (GF := GF) m)
 
 /-- **Semantic guarantee (reverse)**. -/
 theorem otp_adequate_rev_real [RefinesPreGS ℝ GF] (m : ℝ) (σ σ' : State ℝ) :
@@ -211,7 +211,7 @@ theorem otp_adequate_rev_real [RefinesPreGS ℝ GF] (m : ℝ) (σ σ' : State �
   ProbLang.refines_coupling (A := fun _ => lrel_real) (φ := otpφ)
     (otp_ideal (rT := ℝ)) (otp_enc (rT := ℝ) m) σ σ'
     (fun _ v v' => lrel_real_to_otpφ v v')
-    (fun IR => otp_refines_rev_real (hlc := .hasNoLC) (GF := GF) m)
+    (fun _ => otp_refines_rev_real (hlc := .hasNoLC) (GF := GF) m)
 
 end Adequacy
 
@@ -220,6 +220,7 @@ end Adequacy
 At the concrete model `ApproxisFunctor ℝ` every ghost-state hypothesis is
 discharged, leaving a self-contained theorem about `ℝ`-valued programs. -/
 
+omit [ProbLangℝ rT] in
 /-- On value configurations, `adequacyRel otpφ` *is* equality: both sides are the
 same real literal. This is what lets the two couplings be eliminated. -/
 theorem adequacyRel_otpφ_subset_eq :

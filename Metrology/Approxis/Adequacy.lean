@@ -18,7 +18,7 @@ namespace ProbLang.AdequacyHelpers
 
 section FupdPlainForall
 
-variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 variable {GF : BundledGFunctors} [InvGS_gen .hasNoLC GF]
 
 open Iris Iris.BI Iris.BI.BIBase Iris.ProofMode
@@ -178,7 +178,7 @@ theorem fupd_stepFupdN_plain_forall_1
       (iprop(◇ ∀ x, Φ x))).trans ?_
     exact step_fupdN_except_0 ∅ ∅ (iprop(∀ x, Φ x)) n
 
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem fupd_stepFupdN_plain_forall_3
     (Ψ : State rT → Exp rT → State rT → IProp GF)
     [instP : ∀ a b c, Plain (Ψ a b c)] (n : Nat) :
@@ -193,7 +193,7 @@ theorem fupd_stepFupdN_plain_forall_3
   exact fupd_stepFupdN_plain_forall_1 (GF := GF)
     (fun a => iprop(∀ b c, Ψ a b c)) n
 
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
+omit [ProbLangℝ rT] in
 theorem fupd_stepFupdN_plain_forall_4
     (Ψ : Exp rT → State rT → Exp rT → State rT → IProp GF)
     [∀ a b c d, Plain (Ψ a b c d)] (n : Nat) :
@@ -251,7 +251,7 @@ open ProbLang.AdequacyHelpers
 No proof here uses `measure_ext_singletons`, `measurable_of_countable` or `tsum`, and
 every former `Measurable.of_discrete` in this file is now `Cfg.measurable_expr`. -/
 
-variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT]
 
 def adequacyRel (φ : Val rT → Val rT → Prop) : Set ((Exp rT) × (Exp rT)) :=
   fun p => ∃ (v v' : Val rT), p.1.toVal? = some v ∧ p.2.toVal? = some v' ∧ φ v v'
@@ -469,7 +469,10 @@ theorem wpPre_value_Z_eq {v : Val rT} {Φ : Val rT → IProp GF} (E : CoPset) :
   funext σ₂ ρ' ε₂
   rw [Exp.toVal?_ofVal]
 
-omit [ProbLangℝ rT] [MeasurableSingletonClass rT] in
+-- Bridging two match-compiler artifacts is the whole point of this lemma, so the
+-- reference to `.match_1` is deliberate rather than an accident to be refactored away.
+set_option linter.auxLemma false in
+omit [ProbLangℝ rT] in
 theorem wpPre_match_eq (motive : Option (Val rT) → Sort u)
     (x : Option (Val rT)) (some_f : (v : Val rT) → motive (some v))
     (none_f : Unit → motive none) :

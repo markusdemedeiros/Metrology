@@ -395,17 +395,6 @@ theorem tapePresample_ae
   simp only [Set.mem_setOf_eq, not_not]
   exact hP n
 
-/-- Discrete wrapper around `tapePresample_ae` (supplies the predicate
-measurability via `MeasurableSet.of_discrete`). -/
-@[discrete]
-theorem Discrete.tapePresample_ae [Countable rT] [MeasurableSingletonClass rT]
-    {σ : State rT} {α : Loc} {N : Int}
-    {bs : List { z : Int // 0 ≤ z ∧ z < N }} (h : σ.tapes[α]? = some ⟨N, bs⟩)
-    {P : State rT → Prop}
-    (hP : ∀ n, P (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩))) :
-    ∀ᵐ σ' ∂(tapePresample σ α), P σ' :=
-  ProbLang.tapePresample_ae h MeasurableSet.of_discrete hP
-
 /-- `tapePresample σ α` is heap-preserving: every state in its support has
 the same heap as `σ`. -/
 theorem tapePresample_heap_eq
@@ -478,7 +467,8 @@ Countability-free: the bind is over the discrete sample type (an `Int`
 subtype), so the kernel is measurable via `.of_discrete`; only the
 `update_heap f` map requires the explicit measurability hypothesis `hf`. -/
 theorem tapePresample_update_heap_comm
-    {σ : State rT} {α : Loc} (f : Std.ExtTreeMap Loc (Val rT) compare → Std.ExtTreeMap Loc (Val rT) compare)
+    {σ : State rT} {α : Loc}
+    (f : Std.ExtTreeMap Loc (Val rT) compare → Std.ExtTreeMap Loc (Val rT) compare)
     (hf : Measurable f) :
     tapePresample (σ.update_heap f) α =
       (tapePresample σ α).map (·.update_heap f) := by
@@ -862,7 +852,6 @@ theorem erasure_det_close_ae
 /-- Helper for `Cfg.uniform` head-step cases. Given that
 `headStep ⟨e_h, σ'⟩ = Cfg.uniform z_r σ'` a.e. on `tapePresample σ α` and at
 `σ` itself, the goal collapses via Fubini + `ih_fill` at each sampled
-omit [MeasurableSingletonClass rT] in
 index. -/
 theorem erasure_uniform_close
     {m : Nat} {K : Ectx rT} {S : Set (Exp rT)} {σ : State rT} {α : Loc} {t : Tape}
@@ -1677,7 +1666,7 @@ theorem tapePresampleIter_tape_bound_ae [Countable rT] [MeasurableSingletonClass
     -- same bound as `t''` (just one extra presample appended).
     show tapePresample σ'' α _ = 0
     obtain ⟨Nb, bs⟩ := t''
-    refine MeasureTheory.ae_iff.mp (Discrete.tapePresample_ae ht'' fun n' => ?_)
+    refine MeasureTheory.ae_iff.mp (tapePresample_ae ht'' MeasurableSet.of_discrete fun n' => ?_)
     exact ⟨⟨Nb, bs ++ [n']⟩, by simp [State.update_tapes], hbound⟩
 
 /-- Iterated-presample variant of `execN_tape_presample_expr_eq`:

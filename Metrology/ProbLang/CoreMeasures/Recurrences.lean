@@ -856,7 +856,8 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
         simp [Equiv.optionEquivSumPUnit]
       rw [heqv]
       have hmem_iff : (Sum.inl (Val.mk e (Classical.choice hv) (Classical.choice hv).lc) : Val rT ⊕ PUnit) ∈ Ssum ↔
-          (Val.mk e (Classical.choice hv) (Classical.choice hv).lc : Val rT) ∈ (Sum.inl ⁻¹' Ssum : Set (Val rT)) := Iff.rfl
+          (Val.mk e (Classical.choice hv) (Classical.choice hv).lc : Val rT) ∈
+          (Sum.inl ⁻¹' Ssum : Set (Val rT)) := Iff.rfl
       rw [hmem_iff, ← hUval_eq]
       have hfeq : (Val.mk e (Classical.choice hv) (Classical.choice hv).lc : Val rT).fst = e := rfl
       simp only [Set.mem_preimage]

@@ -304,7 +304,8 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
     case binopL op' S' =>
       simp only [Cylinder.flatten]
       refine Stamp.flatten_inter_mixed_data (flatten := Cylinder.flatten) (ctor := EctxItem.binopL)
-        (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopL (fun _ _ => rfl) ?_
+        (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopL (fun _ _ => rfl)
+        ?_
       simp only [Cylinder.inter?]
     cyl_mismatch
   | binopR op S =>
@@ -312,7 +313,8 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
     case binopR op' S' =>
       simp only [Cylinder.flatten]
       refine Stamp.flatten_inter_mixed_data (flatten := Cylinder.flatten) (ctor := EctxItem.binopR)
-        (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopR (fun _ _ => rfl) ?_
+        (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopR (fun _ _ => rfl)
+        ?_
       simp only [Cylinder.inter?]
     cyl_mismatch
   | condC S1 S2 =>
