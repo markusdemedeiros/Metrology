@@ -372,67 +372,6 @@ theorem spec_ra_init {GF : BundledGFunctors} [ISPre : SpecPreGS rT GF]
     isplitl [HH] <;> iassumption
   · iexact Hpf
 
-/-
-Lemma spec_ra_init e σ `{specGpreS Σ} :
-  ⊢ |==> ∃ _ : specG_prob_lang Σ,
-      spec_auth (e, σ) ∗ ⤇ e ∗ ([∗ map] l ↦ v ∈ σ.(heap), l ↦ₛ v) ∗ ([∗ map] α ↦ t ∈ σ.(tapes), α ↪ₛ t) ∗ ([∗ map] α ↦ t ∈ σ.(tapes_laplace), α ↪Lₛ t).
-Proof.
-  iMod (own_alloc ((● (Excl' e)) ⋅ (◯ (Excl' e)))) as "(%γp & Hprog_auth & Hprog_frag)".
-  { by apply auth_both_valid_discrete. }
-  iMod (ghost_map_alloc σ.(heap)) as "[%γH [Hh Hls]]".
-  iMod (ghost_map_alloc σ.(tapes)) as "[%γT [Ht Hαs]]".
-  iMod (ghost_map_alloc σ.(tapes_laplace)) as "[%γTL [Htl Hαs']]".
-  iExists (SpecGS _ _ γp _ _ _ γH γT γTL).
-  by iFrame.
-Qed.
-
-(** Tapes containing natural numbers defined as a wrapper over backend tapes *)
-Definition nat_spec_tape `{specG_prob_lang Σ} l (N : nat) (ns : list nat) : iProp Σ :=
-  ∃ (fs : list (fin (S N))), ⌜fin_to_nat <$> fs = ns⌝ ∗ l ↪ₛ (N; fs).
-
-Notation "l ↪ₛN ( M ; ns )" := (nat_spec_tape l M ns)%I
-       (at level 20, format "l ↪ₛN ( M ; ns )") : bi_scope.
-
-Section spec_tape_interface.
-  Context `{!specG_prob_lang Σ}.
-
-  (** Helper lemmas to go back and forth between the user-level representation
-      of tapes (using nat) and the backend (using fin) *)
-
-  Lemma spec_tapeN_to_empty l M :
-    (l ↪ₛN ( M ; [] ) -∗ l ↪ₛ ( M ; [] )).
-  Proof.
-    iIntros "Hl".
-    iDestruct "Hl" as (?) "(%Hmap & Hl')".
-    by destruct (fmap_nil_inv _ _ Hmap).
-  Qed.
-
-
-  Lemma empty_to_spec_tapeN l M :
-    (l ↪ₛ ( M ; [] ) -∗ l ↪ₛN ( M ; [] )).
-  Proof.
-    iIntros "Hl".
-    iExists []. auto.
-  Qed.
-
-  Lemma read_spec_tape_head l M n ns :
-    (l ↪ₛN ( M ; n :: ns ) -∗
-      ∃ x xs, l ↪ₛ ( M ; x :: xs ) ∗ ⌜ fin_to_nat x = n ⌝ ∗
-              ( l ↪ₛ ( M ; xs ) -∗l ↪ₛN ( M ; ns ) )).
-  Proof.
-    iIntros "Hl".
-    iDestruct "Hl" as (xss) "(%Hmap & Hl')".
-    destruct (fmap_cons_inv _ _ _ _ Hmap) as (x&xs&->&Hxs&->).
-    iExists x, xs.
-    iFrame.
-    iSplit; auto.
-    iIntros.
-    iExists xs; auto.
-  Qed.
-
-End spec_tape_interface.
-
--/
 
 end Algebra
 

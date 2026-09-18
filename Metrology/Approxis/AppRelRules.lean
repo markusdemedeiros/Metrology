@@ -8,7 +8,6 @@ public import Metrology.Approxis.OpenInv
 
 @[expose] public section
 
-set_option linter.discrete false
 
 /-! # Relational Rules -/
 
@@ -18,7 +17,7 @@ open scoped AppGS
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 section AppRelRules
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
@@ -34,14 +33,14 @@ theorem nat_repeat_later_eq_laterN (n : Nat) (P : IProp GF) :
 /-- `refines_pure_l` (app_rel_rules.v:27): if `e` pure-steps to `e'` in `n` steps,
 `▷^n (REL K[e'] << t : A) ⊢ REL K[e] << t : A`. -/
 theorem refines_pure_l {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
-    {φ : Prop} {n : ℕ} [Hex : PureExec_discrete φ n e e'] (Hφ : φ) :
+    {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
     Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (refines E (K.fill e') t A)
       ⊢@{IProp GF} refines E (K.fill e) t A := by
-  have HexK : PureExec_discrete φ n (K.fill e) (K.fill e') := PureExec_discrete.fill K
+  have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
   unfold refines
   iintro H
   iintro %K' %ε HK Hna Herr Hpos
-  iapply (ApproxisWpGS.wp_pure_step_later (Hex := HexK) Hφ)
+  iapply (ApproxisWpGS.wp_pure_step_later' (Hex := HexK) Hφ)
   ihave H0 : iprop(▷^[n] (∀ (K₂ : Ectx rT) (ε₂ : ENNReal),
       (⤇ K₂.fill t) -∗ (naOwnP E) -∗ (↯ ε₂) -∗ (⌜(0 : ENNReal) < ε₂⌝) -∗
       wp ⊤ (K.fill e') (fun v => iprop(∃ v' ε',
@@ -72,7 +71,7 @@ theorem refines_pure_l {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT
 
 /-- `refines_pure_r` (app_rel_rules.v:73): RHS pure step. -/
 theorem refines_pure_r {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
-    {φ : Prop} {n : ℕ} [Hex : PureExec_discrete φ n e e'] (Hφ : φ) :
+    {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
     refines E t (K.fill e') A ⊢@{IProp GF} refines E t (K.fill e) A := by
   unfold refines
   iintro H
@@ -89,6 +88,8 @@ theorem refines_pure_r {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT
   · rw [hfc']; iexact HK'
   iapply specUpdate_ret
   iapply H $$ %K' %ε HK'' Hna Herr Hpos
+
+variable [Countable rT]
 
 /-- `refines_step_r` (app_rel_rules.v): single-step RHS spec helper. The user
 provides, for any outer context `K''`, a `specUpdate` from `⤇ K''.fill e₂` to
@@ -167,8 +168,7 @@ theorem refines_wp_l {E : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel rT GF}
   let R : IProp GF := iprop((⤇ K'.fill t) ∗ (naOwnP (rT := rT) (hlc := hlc) E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
   ihave HR : R $$ [HK Hna Herr Hpos]
   · isplitl [HK]; · iassumption
-    isplitl [Hna]; · iassumption
-    isplitl [Herr]; · iassumption
+    iframe Hna Herr
     iassumption
   ihave HFrame : iprop(wp ⊤ e1 (fun v => iprop(R ∗ refines E (K.fill v.1) t A)))
       $$ [HR He]

@@ -9,7 +9,6 @@ public import Metrology.ProbLang.ContextualRefinement
 
 @[expose] public section
 
-set_option linter.discrete false
 
 /-! # Soundness
 

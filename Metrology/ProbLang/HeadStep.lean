@@ -1782,20 +1782,8 @@ inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
   ProbLangℝ.unifUnitSupport r →
   HeadStepSupport ⟨.urand, σ⟩ ⟨.lit (.real r), σ⟩
 
--- TODO: Not sure how to generalize you yet, let's see what the call sites look like
-@[simp, discrete]
-theorem Discrete.dirac_singleton_pos [Countable rT] [MeasurableSingletonClass rT]
-    {a b : Cfg rT} :
-    0 < (dirac a) {b} ↔ a = b := by
-  constructor
-  · rw [dirac_apply' a .of_discrete, Set.indicator_singleton, Pi.single, Function.update]
-    split <;> simp; trivial
-  · simp_all [dirac_apply_of_mem (Set.mem_singleton _)]
-
-/-- Countable-free version of `Discrete.dirac_singleton_pos`: needs only
-`[MeasurableSingletonClass rT]` (so the singleton `{b}` is measurable), not the
-full discrete structure. -/
-theorem dirac_singleton_pos' [MeasurableSingletonClass rT]
+@[simp]
+theorem dirac_singleton_pos [MeasurableSingletonClass rT]
     {a b : Cfg rT} :
     0 < (dirac a) {b} ↔ a = b := by
   constructor
@@ -1812,14 +1800,7 @@ theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp α} {m : Measure T} {s
   · rw [if_pos He]; exact ⟨fun h => ⟨He, h⟩, And.right⟩
   · rw [if_neg He]; exact ⟨fun h => absurd h (by simp), fun ⟨hv, _⟩ => absurd hv He⟩
 
-@[simp, discrete]
-theorem Discrete.unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
-    {f : α → Measure β} {opt : Option α} {s : Set β} :
-    0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
-  cases opt <;> simp [Option.unwrapM]
-
-/-- Non-`@[discrete]` copy of `Discrete.unwrapM_singleton_pos` — it needs no
-discreteness — for use in Countable-free proofs. -/
+@[simp]
 theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
     {f : α → Measure β} {opt : Option α} {s : Set β} :
     0 < (opt.unwrapM f) s ↔ ∃ a, opt = some a ∧ 0 < (f a) s := by
@@ -1830,11 +1811,11 @@ theorem asValM_singleton_pos [MeasurableSpace T] {e : Exp α} {f : Val α → Me
     0 < (e.asValM f) s ↔ ∃ v, e.toVal? = some v ∧ 0 < (f v) s := by
   unfold Exp.asValM; cases e.toVal? <;> simp
 
-/-- Countable-free version of `Discrete.Cfg.uniform_singleton_pos_inv`: needs only
+/-- Inversion for a positive `Cfg.uniform` singleton: needs only
 `[MeasurableSingletonClass rT]`. The `Int → Cfg rT` embedding is measurable for
 any `rT`, and the only singleton-measurability used is on `Cfg rT` (from
 `MeasurableSingletonClass rT`). -/
-theorem Cfg.uniform_singleton_pos_inv' [MeasurableSingletonClass rT]
+theorem Cfg.uniform_singleton_pos_inv [MeasurableSingletonClass rT]
     {z : Int} {σ : State rT} {ρ : Cfg rT}
     (h : 0 < Cfg.uniform z σ {ρ}) :
     ρ.state = σ ∧
@@ -1854,33 +1835,17 @@ theorem Cfg.uniform_singleton_pos_inv' [MeasurableSingletonClass rT]
     subst hfa
     exact ⟨rfl, .inl ⟨Hz, a, rfl, ha.1, ha.2⟩⟩
   · simp only [Hz, dite_false] at h
-    rw [dirac_singleton_pos'] at h
+    rw [dirac_singleton_pos] at h
     have ⟨h1, h2⟩ := (Cfg.mk.injEq ..).mp h
     exact ⟨h2.symm, .inr ⟨Hz, h1.symm⟩⟩
 
-@[discrete]
-theorem Discrete.Cfg.uniform_singleton_pos_of_mem [Countable rT] [MeasurableSingletonClass rT]
-    {z v : Int} {σ : State rT}
-    (Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) :
-    0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩} := by
-  unfold Cfg.uniform Int.isPos
-  simp only [Hz, dite_true]
-  rw [Measure.map_apply (f := fun x => (⟨.lit (.int x), σ⟩ : Cfg rT)) Measurable.of_discrete MeasurableSet.of_discrete]
-  rw [PMF.toMeasure_uniformOfFinset_apply _ _ MeasurableSet.of_discrete]
-  rw [ENNReal.div_pos_iff]
-  refine ⟨?_, ?_⟩
-  · rw [ne_eq, Nat.cast_eq_zero]
-    exact Finset.card_ne_zero.mpr ⟨v, by simp [Finset.mem_filter, Finset.mem_Ico, Hv0, Hvz, Set.mem_preimage]⟩
-  · exact ENNReal.natCast_ne_top _
+-- DISCRETE: `Discrete.Cfg.uniform_singleton_pos_of_mem [Countable rT]`
+--   `[MeasurableSingletonClass rT] {z v : Int} {σ : State rT}`
+--   `(Hz : 0 < z) (Hv0 : 0 ≤ v) (Hvz : v < z) : 0 < Cfg.uniform z σ {⟨.lit (.int v), σ⟩}`
 
 /-- Decompose `0 < (dirac a) {b}` into Cfg component equalities, then substitute. -/
 macro "cfg_dirac" h:ident : tactic =>
-  `(tactic| (rw [Discrete.dirac_singleton_pos] at $h:ident
-             have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
-
-/-- Countable-free `cfg_dirac`, using `dirac_singleton_pos'`. -/
-macro "cfg_dirac'" h:ident : tactic =>
-  `(tactic| (rw [dirac_singleton_pos'] at $h:ident
+  `(tactic| (rw [dirac_singleton_pos] at $h:ident
              have ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp $h:ident))
 
 /-- Measurability-free `←` core for the `rand` constructors: every value in
@@ -2026,62 +1991,71 @@ theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     simp only [headStep, htape, if_neg (Ne.symm hzN)]
     simp [Cfg.uniform, Int.isPos, Hz]
 
+/-- `HeadStepSupport` as positive singleton mass — the form every discrete
+`Approxis` call site actually wants. -/
+@[discrete]
+theorem HeadStepSupport.pos [Countable rT] [MeasurableSingletonClass rT]
+    {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+    (h : HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩) (hne : e1 ≠ .urand := by nofun) :
+    0 < headStep (⟨e1, σ1⟩ : Cfg rT) {(⟨e2, σ2⟩ : Cfg rT)} :=
+  possible_iff_pos.mp (h.possible hne)
+
 /-- `→` direction of the continuous support characterisation. Unlike
 `HeadStepSupport.possible`, this needs `[MeasurableSingletonClass rT]`: recovering
 *which* outcome occurred from a positive-mass fact requires separating configs by
 measurable sets, which on the `rT`-payload needs measurable singletons. **No
 `[Countable rT]`**: the proof mirrors the `→` direction of
 `Discrete.headStep_support_iff` but uses the Countable-free inversions
-(`dirac_singleton_pos'`, `Cfg.uniform_singleton_pos_inv'`). -/
+(`dirac_singleton_pos`, `Cfg.uniform_singleton_pos_inv`). -/
 theorem headStep_support_of_pos [MeasurableSingletonClass rT]
     (e1 e2 : Exp rT) (σ1 σ2 : State rT) :
     0 < headStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} → HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩ := by
   head_case
   all_goals try (· simp)
-  case cond.true | cond.false => intro h; cfg_dirac' h; constructor
-  case beta.lam.redex => intro h; cfg_dirac' h; exact .BetaLamS ‹_› rfl
-  case beta.fix.redex => intro h; cfg_dirac' h; exact .BetaFixS ‹_› rfl
-  case fst.redex => intro h; cfg_dirac' h; exact .FstS ‹_› ‹_›
-  case snd.redex => intro h; cfg_dirac' h; exact .SndS ‹_› ‹_›
-  case case.left.redex => intro h; cfg_dirac' h; exact .CaseLS ‹_›
-  case case.right.redex => intro h; cfg_dirac' h; exact .CaseRS ‹_›
-  case tape => intro h; cfg_dirac' h; exact .TapeS rfl rfl
-  case load.redex => intro h; cfg_dirac' h; exact .LoadS ‹_› rfl
-  case alloc.redex => intro h; cfg_dirac' h; exact .AllocS ‹_› rfl rfl
+  case cond.true | cond.false => intro h; cfg_dirac h; constructor
+  case beta.lam.redex => intro h; cfg_dirac h; exact .BetaLamS ‹_› rfl
+  case beta.fix.redex => intro h; cfg_dirac h; exact .BetaFixS ‹_› rfl
+  case fst.redex => intro h; cfg_dirac h; exact .FstS ‹_› ‹_›
+  case snd.redex => intro h; cfg_dirac h; exact .SndS ‹_› ‹_›
+  case case.left.redex => intro h; cfg_dirac h; exact .CaseLS ‹_›
+  case case.right.redex => intro h; cfg_dirac h; exact .CaseRS ‹_›
+  case tape => intro h; cfg_dirac h; exact .TapeS rfl rfl
+  case load.redex => intro h; cfg_dirac h; exact .LoadS ‹_› rfl
+  case alloc.redex => intro h; cfg_dirac h; exact .AllocS ‹_› rfl rfl
   case store.redex =>
-    intro h; cfg_dirac' h
+    intro h; cfg_dirac h
     exact .StoreS ‹_› (by rw [Option.isSome_iff_exists]; exact ⟨_, ‹_›⟩) rfl
   case rand.tape.deterministic =>
-    intro h; cfg_dirac' h; exact .RandTapeS ‹_› rfl rfl rfl
+    intro h; cfg_dirac h; exact .RandTapeS ‹_› rfl rfl rfl
   case unop.redex =>
     intro h; rw [unwrapM_singleton_pos] at h
-    obtain ⟨r, hr, h⟩ := h; cfg_dirac' h; exact .UnOpS ‹_› hr.symm
+    obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .UnOpS ‹_› hr.symm
   case binop.redex =>
     intro h; rw [unwrapM_singleton_pos] at h
-    obtain ⟨r, hr, h⟩ := h; cfg_dirac' h; exact .BinOpS ‹_› ‹_› hr.symm
+    obtain ⟨r, hr, h⟩ := h; cfg_dirac h; exact .BinOpS ‹_› ‹_› hr.symm
   case rand.plain =>
     intro h
-    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv' h
+    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
     simp at hσ; subst hσ
     rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
     · simp at hv; subst hv; exact .RandNoTapeS Hz Hv0 Hvz
     · simp at hv; subst hv; exact .RandNonposS Hz
   case rand.tape =>
     intro h
-    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv' h
+    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
     simp at hσ; subst hσ
     rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
     · simp at hv; subst hv; exact .RandTapeEmptyS Hz ‹_› rfl Hv0 Hvz rfl
     · simp at hv; subst hv; exact .RandTapeNonposEmptyS Hz ‹_› rfl
   case rand.tape.mismatch =>
     intro h
-    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv' h
+    obtain ⟨hσ, hbr⟩ := Cfg.uniform_singleton_pos_inv h
     simp at hσ; subst hσ
     rcases hbr with ⟨Hz, v, hv, Hv0, Hvz⟩ | ⟨Hz, hv⟩
     · simp at hv; subst hv; exact .RandTapeOtherS Hz ‹_› (Ne.symm ‹_›) Hv0 Hvz rfl
     · simp at hv; subst hv; exact .RandTapeNonposOtherS Hz ‹_› (Ne.symm ‹_›)
-  case scrut_success => intro h; cfg_dirac' h; exact .ScrutSuccessS ‹_› ‹_›
-  case scrut_failure => intro h; cfg_dirac' h; exact .ScrutFailureS ‹_› ‹_›
+  case scrut_success => intro h; cfg_dirac h; exact .ScrutSuccessS ‹_› ‹_›
+  case scrut_failure => intro h; cfg_dirac h; exact .ScrutFailureS ‹_› ‹_›
   case urand =>
     -- Continuous sampler: positive mass forces a real-literal outcome at the
     -- unchanged state. Inverts the pushforward `unifUnit.map (⟨.lit (.real ·), σ⟩)`
@@ -2417,7 +2391,7 @@ theorem IsAtomicSupport.concentrated_atoms {α : Type _} [MeasurableSpace α]
 /-- `headStep` is a sub-probability measure for arbitrary `rT`: by case analysis,
 each branch returns either `0`, a `dirac`, or a probability measure (gated by
 `isValM`/`asValM`/`unwrapM` which only ever shrink mass). -/
-theorem headStep_univ_le_one' (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
+theorem headStep_univ_le_one (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
   -- Helper: isValM-univ shrinks mass.
   have hisValM_le : ∀ {T : Type _} [MeasurableSpace T] (e : Exp rT) (m : Measure T),
       m Set.univ ≤ 1 → (e.isValM m) Set.univ ≤ 1 := by
@@ -2489,16 +2463,5 @@ theorem headStep_univ_le_one' (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
     split <;> apply hdirac
   case _ => exact Cfg.uniformReal_isProbabilityMeasure.measure_univ.le -- urand
   case _ => simp -- default
-
-set_option maxHeartbeats 400000
--- TODO: This other theorem is proved, but I do think that the below commented out proof
--- might let us delete it (the primed version is horrible)
-theorem headStep_univ_le_one (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 :=
-  headStep_univ_le_one' ρ
-
-  -- by_cases hred : (headStep ρ) = 0
-  -- · simp [hred]
-  -- · have X := head_step_mass hred
-  --   sorry
 
 end ProbLang

@@ -269,6 +269,10 @@ theorem Cylinder.flatten_disjoint_of_shape_ne {α : Type _} {c₁ c₂ : Cylinde
   Stamp.flatten_disjoint_of_shape_ne (cShape := Cylinder.shape)
     (fun {_ _} h => Cylinder.shape_of_mem_flatten h) h
 
+/-- Off-diagonal cylinder pairs: their shapes differ, so the flattens are disjoint. -/
+local macro "cyl_mismatch" : tactic =>
+  `(tactic| all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl))
+
 /-- The cylinder flatten of the intersection equals the intersection of the
 flattens. Mirrors `BaseLit.Cylinder.flatten_inter`. -/
 theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
@@ -280,13 +284,13 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
     case appL S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.appL.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | appR S =>
     cases c₂
     case appR S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.appR.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | unop u =>
     cases c₂
     case unop u' =>
@@ -294,7 +298,7 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
       refine Stamp.flatten_inter_leaf (flatten := Cylinder.flatten) (ctor := EctxItem.unop)
         (fun _ _ h => by injection h) Cylinder.unop (fun _ => rfl) ?_
       simp only [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | binopL op S =>
     cases c₂
     case binopL op' S' =>
@@ -302,7 +306,7 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
       refine Stamp.flatten_inter_mixed_data (flatten := Cylinder.flatten) (ctor := EctxItem.binopL)
         (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopL (fun _ _ => rfl) ?_
       simp only [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | binopR op S =>
     cases c₂
     case binopR op' S' =>
@@ -310,90 +314,89 @@ theorem Cylinder.flatten_inter {α : Type _} (c₁ c₂ : Cylinder α) :
       refine Stamp.flatten_inter_mixed_data (flatten := Cylinder.flatten) (ctor := EctxItem.binopR)
         (fun _ _ _ h => by injection h) (fun h => by injection h) Cylinder.binopR (fun _ _ => rfl) ?_
       simp only [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | condC S1 S2 =>
     cases c₂
     case condC S1' S2' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_prod EctxItem.condC.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | pairL S =>
     cases c₂
     case pairL S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.pairL.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | pairR S =>
     cases c₂
     case pairR S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.pairR.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | fst =>
     cases c₂
     case fst => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | snd =>
     cases c₂
     case snd => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | inl =>
     cases c₂
     case inl => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | inr =>
     cases c₂
     case inr => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | case S1 S2 =>
     cases c₂
     case case S1' S2' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_prod EctxItem.case.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | alloc =>
     cases c₂
     case alloc => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | load =>
     cases c₂
     case load => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | storeL S =>
     cases c₂
     case storeL S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.storeL.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | storeR S =>
     cases c₂
     case storeR S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.storeR.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | tape =>
     cases c₂
     case tape => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | randL S =>
     cases c₂
     case randL S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.randL.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | randR S =>
     cases c₂
     case randR S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.randR.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | scrut S =>
     cases c₂
     case scrut S' =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data EctxItem.scrut.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
-
+    cyl_mismatch
 theorem Cylinder.flatten_inter_some {α : Type _} {c₁ c₂ c : Cylinder α}
     (h : Cylinder.inter? c₁ c₂ = some c) :
     Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ :=

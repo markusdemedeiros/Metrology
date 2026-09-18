@@ -10,6 +10,7 @@ public import Metrology.ProbLang.Syntax.LocallyClosed
 
 set_option linter.discrete false
 
+
 /-! # Compatibility Lemmas: structural compatibility of the logical relation, one rule per language construct. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
@@ -303,11 +304,11 @@ theorem refines_fst {e e' : Exp rT} {A B : lrel rT GF} :
   have hφ1 : a1.1.isValue ∧ b1.1.isValue := ⟨a1.2.toIsValue, b1.2.toIsValue⟩
   have hφ2 : a2.1.isValue ∧ b2.1.isValue := ⟨a2.2.toIsValue, b2.2.toIsValue⟩
   iapply (refines_pure_l (K := []) (e := Exp.fst (.pair a1.1 b1.1)) (e' := a1.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_fst_pair)) hφ1)
+    (Hex := pureExec_fst_pair) hφ1)
   simp only [Nat.repeat]
   iintro !>
   iapply (refines_pure_r (K := []) (e := Exp.fst (.pair a2.1 b2.1)) (e' := a2.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_fst_pair)) hφ2)
+    (Hex := pureExec_fst_pair) hφ2)
   iapply refines_ret (e1 := Ectx.fill [] a1.1) (e2 := Ectx.fill [] a2.1)
     (v1 := a1) (v2 := a2) (hv1 := rfl) (hv2 := rfl)
   imodintro
@@ -339,10 +340,10 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp rT} {A B C : lrel rT GF} :
     have hf1 : (Exp.case (.inl w1.1) e1 e2) = Ectx.fill [] (Exp.case (.inl w1.1) e1 e2) := rfl
     have hf2 : (Exp.case (.inl w2.1) e1' e2') = Ectx.fill [] (Exp.case (.inl w2.1) e1' e2') := rfl
     rw [hf1, hf2]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_case_inl)) w1.2.toIsValue)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_case_inl) w1.2.toIsValue)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_case_inl)) w2.2.toIsValue)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_case_inl) w2.2.toIsValue)
     rw [show Ectx.fill [] (Exp.app e1 w1.1) = Exp.app e1 w1.1 from rfl,
         show Ectx.fill [] (Exp.app e1' w2.1) = Exp.app e1' w2.1 from rfl]
     iapply (refines_app (A := A) (B := C)) $$ [IH1]
@@ -355,10 +356,10 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp rT} {A B C : lrel rT GF} :
     have hf1 : (Exp.case (.inr w1.1) e1 e2) = Ectx.fill [] (Exp.case (.inr w1.1) e1 e2) := rfl
     have hf2 : (Exp.case (.inr w2.1) e1' e2') = Ectx.fill [] (Exp.case (.inr w2.1) e1' e2') := rfl
     rw [hf1, hf2]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_case_inr)) w1.2.toIsValue)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_case_inr) w1.2.toIsValue)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_case_inr)) w2.2.toIsValue)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_case_inr) w2.2.toIsValue)
     rw [show Ectx.fill [] (Exp.app e2 w1.1) = Exp.app e2 w1.1 from rfl,
         show Ectx.fill [] (Exp.app e2' w2.1) = Exp.app e2' w2.1 from rfl]
     iapply (refines_app (A := B) (B := C)) $$ [IH2]
@@ -382,10 +383,10 @@ theorem refines_binop_pure (op : BinOp) (v1 v2 r : Exp rT)
   rw [hf]
   have hφ : v1.isValue ∧ v2.isValue ∧ op.eval v1 v2 = some r :=
     ⟨hv1.toIsValue, hv2.toIsValue, heval⟩
-  iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_binop)) hφ)
+  iapply (refines_pure_l (K := []) (Hex := pureExec_binop) hφ)
   simp only [Nat.repeat]
   iintro !>
-  iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_binop)) hφ)
+  iapply (refines_pure_r (K := []) (Hex := pureExec_binop) hφ)
   iapply refines_ret (e1 := Ectx.fill [] r) (e2 := Ectx.fill [] r)
     (v1 := ⟨r, hrv, hrv.lc⟩) (v2 := ⟨r, hrv, hrv.lc⟩) (hv1 := rfl) (hv2 := rfl)
   imodintro
@@ -423,7 +424,7 @@ theorem refines_alloctape {e e' : Exp rT} :
   isplitr
   · ipureintro
     exact ⟨_, HeadStepSupport.TapeS (ℓ := σ₁.tapes.fresh) rfl rfl
-      |> (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))⟩
+      |> (fun hs => hs.pos)⟩
   iintro !> %e₂ %σ₂ %Hstep
   replace Hstep := Possible.headStepSupport (possible_iff_pos.mpr Hstep)
   cases Hstep with
@@ -528,10 +529,10 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     have hf2 : (Exp.cond (.lit (.bool true)) e1' e2') =
         Ectx.fill [] (Exp.cond (.lit (.bool true)) e1' e2') := rfl
     rw [hf1, hf2]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_cond_true)) trivial)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_cond_true) trivial)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_cond_true)) trivial)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_cond_true) trivial)
     rw [show Ectx.fill [] e1 = e1 from rfl, show Ectx.fill [] e1' = e1' from rfl]
     iexact IH1
   | false =>
@@ -540,10 +541,10 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     have hf2 : (Exp.cond (.lit (.bool false)) e1' e2') =
         Ectx.fill [] (Exp.cond (.lit (.bool false)) e1' e2') := rfl
     rw [hf1, hf2]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_cond_false)) trivial)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_cond_false) trivial)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_cond_false)) trivial)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_cond_false) trivial)
     rw [show Ectx.fill [] e2 = e2 from rfl, show Ectx.fill [] e2' = e2' from rfl]
     iexact IH2
 
@@ -568,11 +569,11 @@ theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
   have hφ1 : a1.1.isValue ∧ b1.1.isValue := ⟨a1.2.toIsValue, b1.2.toIsValue⟩
   have hφ2 : a2.1.isValue ∧ b2.1.isValue := ⟨a2.2.toIsValue, b2.2.toIsValue⟩
   iapply (refines_pure_l (K := []) (e := Exp.snd (.pair a1.1 b1.1)) (e' := b1.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_snd_pair)) hφ1)
+    (Hex := pureExec_snd_pair) hφ1)
   simp only [Nat.repeat]
   iintro !>
   iapply (refines_pure_r (K := []) (e := Exp.snd (.pair a2.1 b2.1)) (e' := b2.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_snd_pair)) hφ2)
+    (Hex := pureExec_snd_pair) hφ2)
   iapply refines_ret (e1 := Ectx.fill [] b1.1) (e2 := Ectx.fill [] b2.1)
     (v1 := b1) (v2 := b2) (hv1 := rfl) (hv2 := rfl)
   imodintro

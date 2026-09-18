@@ -2081,7 +2081,7 @@ private theorem decide_eq_BaseLit_measurable
   rw [hpre]
   exact MeasurableEq.measurableSet_diagonal
 
-/-- `liftEq_litK.measurable` — outer split on `p.1` (the `v2`); only `.lit` live.
+/-- Outer split on `p.1` (the `v2`); only `.lit` live.
 Requires `[MeasurableEq rT]` because the innermost
 `decide (l1 = l2)` over `BaseLit rT` factors through the diagonal of `rT × rT`. -/
 theorem liftEq_litK.measurable [MeasurableSpace rT] [Inhabited rT]
@@ -2113,7 +2113,7 @@ theorem liftEq_litK.measurable [MeasurableSpace rT] [Inhabited rT]
     exact (decide_eq_BaseLit_measurable (rT := rT)).comp
       ((measurable_snd.comp measurable_fst).prodMk measurable_snd)
 
-/-- `liftEq_inlK.measurable` — joint over `(e1', v2)`; live shapes: `(lit l1, inl (lit l2))`
+/-- Joint over `(e1', v2)`; live shapes: `(lit l1, inl (lit l2))`
 and `(lit _, inr (lit _))`. Reshape via `Exp.litExtract` on `e1'` first, then a
 2-arm decision on `v2`. -/
 theorem liftEq_inlK.measurable [MeasurableSpace rT] [Inhabited rT]
@@ -2188,7 +2188,7 @@ theorem liftEq_inlK.measurable [MeasurableSpace rT] [Inhabited rT]
         exact decide_eq_BaseLit_measurable.comp
           ((measurable_snd.comp (measurable_fst.comp measurable_fst)).prodMk measurable_snd)
 
-/-- `liftEq_inrK.measurable` — symmetric to `inlK`. -/
+/-- Symmetric to `inlK`. -/
 theorem liftEq_inrK.measurable [MeasurableSpace rT] [Inhabited rT]
     [DecidableEq (BaseLit rT)] [MeasurableEq rT] :
     Measurable (liftEq_inrK (rT := rT)) := by
@@ -2279,7 +2279,7 @@ private theorem liftEq_dispatch [MeasurableSpace rT] [Inhabited rT]
       (rename_i e2'; cases e2' <;> simp)
   | _ => rfl
 
-/-- `liftEq.measurable` — bespoke 5-pattern lifter for `BinOp.eval .eq`. Decomposed via
+/-- Bespoke 5-pattern lifter for `BinOp.eval .eq`. Decomposed via
 three per-shape helpers: `litK` (when `v1 = .lit _`), `inlK` (when `v1 = .inl _`),
 `inrK` (when `v1 = .inr _`). The outer split on `v1` uses `Exp.measurable_rec`. -/
 theorem liftEq.measurable [MeasurableSpace rT] [Inhabited rT]

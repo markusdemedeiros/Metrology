@@ -8,7 +8,6 @@ public import Iris.Instances.Lib.Invariants
 
 @[expose] public section
 
-set_option linter.discrete false
 
 /-!
 # Semantic Model
@@ -877,10 +876,7 @@ theorem refines_ret_na {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel 
   imod HFA with ⟨HF, HA⟩
   imodintro
   iexists v2, ε
-  isplitl [HK]; · iassumption
-  isplitl [HF]; · iassumption
-  isplitl [Herr]; · iassumption
-  isplitl [Hpos]; · iassumption
+  iframe HK HF Herr Hpos
   iassumption
 
 /-- Dual of `refines_ret_na` splitting `⊤ = E ∪ (⊤ \ E)`. -/
@@ -912,8 +908,7 @@ theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel
     · iexact Hnais
     · iexact HF
   isplitl [Hfull]; · iexact Hfull
-  isplitl [Herr]; · iassumption
-  isplitl [Hpos]; · iassumption
+  iframe Herr Hpos
   iassumption
 
 /-- From `|={⊤}=> A v1 v2`, conclude `REL v1 << v2 : A`. -/
@@ -931,10 +926,7 @@ theorem refines_ret {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
   imod HA
   imodintro
   iexists v2, ε
-  isplitl [Hj]; · iassumption
-  isplitl [Hna]; · iassumption
-  isplitl [Herr]; · iassumption
-  isplitl [Hpos]; · iassumption
+  iframe Hj Hna Herr Hpos
   iassumption
 
 instance elim_fupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp GF) (A : lrel rT GF) :

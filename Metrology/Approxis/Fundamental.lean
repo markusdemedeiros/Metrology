@@ -9,7 +9,6 @@ public import Metrology.Approxis.Interp
 
 @[expose] public section
 
-set_option linter.discrete false
 
 /-! # Fundamental Theorem
 
@@ -398,13 +397,13 @@ theorem bin_log_related_lam (Δ : TyEnv rT GF)
   rw [hL1, hR1]
   iapply (refines_pure_l (K := []) (e := Exp.app (Exp.lam (Exp.substMap vs.fst e)) v1.1)
     (e' := Exp.open' (Exp.substMap vs.fst e) v1.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_lam))
+    (Hex := pureExec_app_lam)
     ⟨v1.2.toIsValue, by is_lc⟩)
   simp only [Nat.repeat]
   iintro !>
   iapply (refines_pure_r (K := []) (e := Exp.app (Exp.lam (Exp.substMap vs.snd e')) v2.1)
     (e' := Exp.open' (Exp.substMap vs.snd e') v2.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_lam))
+    (Hex := pureExec_app_lam)
     ⟨v2.2.toIsValue, by is_lc⟩)
   have hf1 : (Ectx.fill ([] : Ectx rT) (Exp.open' (Exp.substMap vs.fst e) v1.1)) =
       Exp.open' (Exp.substMap vs.fst e) v1.1 := rfl
@@ -554,13 +553,13 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
   rw [hL1, hR1]
   iapply (refines_pure_l (K := []) (e := Exp.app (Exp.fix (Exp.substMap vs.fst e)) v1.1)
     (e' := Exp.app (Exp.open' (Exp.substMap vs.fst e) (Exp.fix (Exp.substMap vs.fst e))) v1.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_fix))
+    (Hex := pureExec_app_fix)
     ⟨v1.2.toIsValue, by is_lc⟩)
   simp only [Nat.repeat]
   iintro !>
   iapply (refines_pure_r (K := []) (e := Exp.app (Exp.fix (Exp.substMap vs.snd e')) v2.1)
     (e' := Exp.app (Exp.open' (Exp.substMap vs.snd e') (Exp.fix (Exp.substMap vs.snd e'))) v2.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_fix))
+    (Hex := pureExec_app_fix)
     ⟨v2.2.toIsValue, by is_lc⟩)
   let fixv : Val rT := ⟨Exp.fix (Exp.substMap vs.fst e), IsVal.fix (by is_lc), by is_lc⟩
   let fixv' : Val rT := ⟨Exp.fix (Exp.substMap vs.snd e'), IsVal.fix (by is_lc), by is_lc⟩
@@ -1014,7 +1013,7 @@ theorem bin_log_related_unfold (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Ex
   have hopenR : Exp.open' (.bvar 0) v'.1 = v'.1 := by simp [Exp.open', Exp.openRec]
   iapply (refines_pure_l (K := []) (e := Exp.app (.lam (.bvar 0)) v.1)
     (e' := Exp.open' (.bvar 0) v.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_lam))
+    (Hex := pureExec_app_lam)
     ⟨v.2.toIsValue, by is_lc⟩)
   simp only [Nat.repeat]
   iintro !>
@@ -1022,7 +1021,7 @@ theorem bin_log_related_unfold (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Ex
   rw [hopenL]
   iapply (refines_pure_r (K := []) (e := Exp.app (.lam (.bvar 0)) v'.1)
     (e' := Exp.open' (.bvar 0) v'.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_lam)) ⟨v'.2.toIsValue, by is_lc⟩)
+    (Hex := pureExec_app_lam) ⟨v'.2.toIsValue, by is_lc⟩)
   rw [hopenR]
   iapply refines_ret (e1 := Ectx.fill [] v.1) (e2 := Ectx.fill [] v'.1)
     (v1 := v) (v2 := v') (hv1 := rfl) (hv2 := rfl)
@@ -1156,13 +1155,13 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
   rw [hL2, hR2]
   iapply (refines_pure_l (K := []) (e := Exp.app (Exp.lam (Exp.substMap vs.fst e2)) v.1)
     (e' := Exp.open' (Exp.substMap vs.fst e2) v.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_lam))
+    (Hex := pureExec_app_lam)
     ⟨v.2.toIsValue, by is_lc⟩)
   simp only [Nat.repeat]
   iintro !>
   iapply (refines_pure_r (K := []) (e := Exp.app (Exp.lam (Exp.substMap vs.snd e2')) v'.1)
     (e' := Exp.open' (Exp.substMap vs.snd e2') v'.1)
-    (Hex := PureExec.toDiscrete (h := pureExec_app_lam)) ⟨v'.2.toIsValue, by is_lc⟩)
+    (Hex := pureExec_app_lam) ⟨v'.2.toIsValue, by is_lc⟩)
   -- Goal: refines ⊤ ([].fill (open' (substMap vs.fst e2) v.1)) ([].fill (open' (substMap vs.snd e2') v'.1)) (interp τ2 Δ).
   -- Use HIH2 at A and x. vs' := (x, (v, v')) :: vs.
   let vs' : ValSubstMap rT := (x, (v, v')) :: vs
@@ -1503,10 +1502,10 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     have hf1 : (Exp.unop .minus (.lit (.int n)) : Exp rT) =
         Ectx.fill [] (Exp.unop .minus (.lit (.int n))) := rfl
     rw [hf1]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_unop)) hφ)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_unop) hφ)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_unop)) hφ)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_unop) hφ)
     iapply refines_ret (e1 := Ectx.fill [] (Exp.lit (.int n.neg)))
       (e2 := Ectx.fill [] (Exp.lit (.int n.neg)))
       (v1 := .int n.neg) (v2 := .int n.neg)
@@ -1556,10 +1555,10 @@ theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     have hf1 : (Exp.unop .neg (.lit (.bool b)) : Exp rT) =
         Ectx.fill [] (Exp.unop .neg (.lit (.bool b))) := rfl
     rw [hf1]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_unop)) hφ)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_unop) hφ)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_unop)) hφ)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_unop) hφ)
     iapply refines_ret (e1 := Ectx.fill [] (Exp.lit (.bool (¬b))))
       (e2 := Ectx.fill [] (Exp.lit (.bool (¬b))))
       (v1 := .bool (¬b)) (v2 := .bool (¬b))
@@ -1654,10 +1653,10 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   have hfR : Exp.binop .eq (.lit l1') (.lit l2') =
       Ectx.fill ([] : Ectx rT) (Exp.binop .eq (.lit l1') (.lit l2')) := rfl
   rw [hfL, hfR]
-  iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_binop)) hφ_l)
+  iapply (refines_pure_l (K := []) (Hex := pureExec_binop) hφ_l)
   simp only [Nat.repeat]
   iintro !>
-  iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_binop)) hφ_r)
+  iapply (refines_pure_r (K := []) (Hex := pureExec_binop) hφ_r)
   iapply refines_ret
     (e1 := Ectx.fill [] (Exp.lit (.bool (decide (l1 = l2)))))
     (e2 := Ectx.fill [] (Exp.lit (.bool (decide (l1' = l2')))))
@@ -1881,10 +1880,10 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     have hf1 : Exp.scrut v.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v.1 p) := rfl
     have hf2 : Exp.scrut v'.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v'.1 p) := rfl
     rw [hf1, hf2]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_scrut_some)) ⟨v.2.toIsValue, hr.1⟩)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_scrut_some) ⟨v.2.toIsValue, hr.1⟩)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_scrut_some)) ⟨v'.2.toIsValue, hr.2⟩)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_scrut_some) ⟨v'.2.toIsValue, hr.2⟩)
     iapply refines_ret
       (e1 := Ectx.fill [] (Exp.inl bb.1))
       (e2 := Ectx.fill [] (Exp.inl bb'.1))
@@ -1905,10 +1904,10 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     have hf1 : Exp.scrut v.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v.1 p) := rfl
     have hf2 : Exp.scrut v'.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v'.1 p) := rfl
     rw [hf1, hf2]
-    iapply (refines_pure_l (K := []) (Hex := PureExec.toDiscrete (h := pureExec_scrut_none)) ⟨v.2.toIsValue, hn.1⟩)
+    iapply (refines_pure_l (K := []) (Hex := pureExec_scrut_none) ⟨v.2.toIsValue, hn.1⟩)
     simp only [Nat.repeat]
     iintro !>
-    iapply (refines_pure_r (K := []) (Hex := PureExec.toDiscrete (h := pureExec_scrut_none)) ⟨v'.2.toIsValue, hn.2⟩)
+    iapply (refines_pure_r (K := []) (Hex := pureExec_scrut_none) ⟨v'.2.toIsValue, hn.2⟩)
     iapply refines_ret
       (e1 := Ectx.fill [] (Exp.inr (.lit .unit)))
       (e2 := Ectx.fill [] (Exp.inr (.lit .unit)))

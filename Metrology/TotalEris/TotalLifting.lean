@@ -191,7 +191,7 @@ theorem twp_lift_pure_det_step_of_pureStep {E : CoPset} {Φ : Val rT → IProp G
     (hatom := fun σ => by rw [h.det σ]; exact isAtomicSupport_dirac _) (hsafe := h.safe)
   intros σ e₂' σ₂ hp
   by_contra hne
-  rw [h.det σ, possible_iff_pos, dirac_singleton_pos'] at hp
+  rw [h.det σ, possible_iff_pos, dirac_singleton_pos] at hp
   have hother : (⟨e₂', σ₂⟩ : Cfg rT) ≠ ⟨e₂, σ⟩ := by
     rintro ⟨⟩; exact hne ⟨rfl, rfl⟩
   exact hother hp.symm

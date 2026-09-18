@@ -8,6 +8,7 @@ public import Metrology.ProbLang.Metatheory
 
 set_option linter.discrete false
 
+
 /-!
 # Coupling Rules
 
@@ -125,7 +126,7 @@ theorem primStep_rand_unit [Countable rT] [MeasurableSingletonClass rT] {z : Int
     primStep (⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ⟩
         ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs)) (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+    HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
   rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (fun hz => by rw [hz] at Hhead; simp at Hhead))]
   rfl
 
@@ -136,7 +137,7 @@ theorem primStep_rand_lbl_wrong [Countable rT] [MeasurableSingletonClass rT] {z 
     primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
         ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeOtherS Hz Hlk HneM (_root_.le_refl _) Hz rfl)
   rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (fun hz => by rw [hz] at Hhead; simp at Hhead))]
   show (match σ.tapes[l]? with
@@ -157,7 +158,7 @@ theorem primStep_rand_lbl_empty [Countable rT] [MeasurableSingletonClass rT] {z 
     primStep (⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   have Hhead : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
         ({⟨.lit (.int 0), σ⟩} : Set (Cfg rT)) :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeEmptyS Hz Hlk rfl (_root_.le_refl _) Hz rfl)
   rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (fun hz => by rw [hz] at Hhead; simp at Hhead))]
   show (match σ.tapes[l]? with
@@ -238,12 +239,12 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
   subst Heq
   have HheadL : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩
         {⟨.lit (.int 0), σ₁⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs)) (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+    HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
   have HredL : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadL; simp at HheadL))
   have HheadR : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs)) (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+    HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
   have HredR_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁' :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadR; simp at HheadR))
   have HredR : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit .unit))) σ₁' :=
@@ -341,13 +342,13 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
   ihave %Hlk_α' := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hα'_b
   have HheadL : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α)), σ₁⟩
         {⟨.lit (.int 0), σ₁⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeOtherS Hz Hlk_α HneM (_root_.le_refl _) Hz rfl)
   have HredL : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α))) σ₁ :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadL; simp at HheadL))
   have HheadR : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α')), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeOtherS Hz Hlk_α' HneM (_root_.le_refl _) Hz rfl)
   have HredR_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) σ₁' :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadR; simp at HheadR))
@@ -463,13 +464,13 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   ihave %Hlk_α' := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hα'_b
   have HheadL : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α)), σ₁⟩
         {⟨.lit (.int 0), σ₁⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeEmptyS Hz Hlk_α rfl (_root_.le_refl _) Hz rfl)
   have HredL : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α))) σ₁ :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadL; simp at HheadL))
   have HheadR : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α')), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeEmptyS Hz Hlk_α' rfl (_root_.le_refl _) Hz rfl)
   have HredR_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) σ₁' :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadR; simp at HheadR))
@@ -576,13 +577,13 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
   ihave %Hlk_α := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hα_b
   have HheadL : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α)), σ₁⟩
         {⟨.lit (.int 0), σ₁⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeEmptyS Hz Hlk_α rfl (_root_.le_refl _) Hz rfl)
   have HredL : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α))) σ₁ :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadL; simp at HheadL))
   have HheadR : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs)) (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+    HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
   have HredR_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁' :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadR; simp at HheadR))
   have HredR : Discrete.Reducible (K.fill (.rand (.lit (.int z)) (.lit .unit))) σ₁' :=
@@ -679,12 +680,12 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
   ihave %Hlk_α' := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hα'_b
   have HheadL : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩
         {⟨.lit (.int 0), σ₁⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs)) (.RandNoTapeS Hz (_root_.le_refl _) Hz)
+    HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
   have HredL : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadL; simp at HheadL))
   have HheadR : 0 < headStep ⟨Exp.rand (.lit (.int z)) (.lit (.lbl α')), σ₁'⟩
         {⟨.lit (.int 0), σ₁'⟩} :=
-    (fun hs => possible_iff_pos.mp (HeadStepSupport.possible hs))
+    HeadStepSupport.pos
       (.RandTapeEmptyS Hz Hlk_α' rfl (_root_.le_refl _) Hz rfl)
   have HredR_rand : Discrete.Reducible (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) σ₁' :=
     Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) (fun hz => by rw [hz] at HheadR; simp at HheadR))

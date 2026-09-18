@@ -1389,81 +1389,9 @@ theorem Cfg.lintegral_uniform [Countable rT] [MeasurableSingletonClass rT]
   refine Finset.sum_congr rfl fun n _ => ?_
   ring
 
-theorem Cfg.uniform_one_eq_dirac [Countable rT] [MeasurableSingletonClass rT]
-    (σ : State rT) :
-    Cfg.uniform 1 σ = MeasureTheory.Measure.dirac (⟨.lit (.int 0), σ⟩ : Cfg rT) := by
-  classical
-  unfold Cfg.uniform Int.isPos
-  simp only [show (0 : Int) < 1 from Int.one_pos, dite_true]
-  have hico : Finset.Ico (0 : Int) 1 = {0} := by
-    ext x; simp [Finset.mem_Ico]; omega
-  refine MeasureTheory.Measure.ext fun S hS => ?_
-  rw [MeasureTheory.Measure.map_apply Measurable.of_discrete hS]
-  rw [PMF.toMeasure_uniformOfFinset_apply _ _ (MeasurableSet.of_discrete)]
-  rw [hico]
-  simp only [Finset.card_singleton, Nat.cast_one]
-  by_cases hmem : (⟨.lit (.int 0), σ⟩ : Cfg rT) ∈ S
-  · rw [MeasureTheory.Measure.dirac_apply_of_mem hmem]
-    have hfilt : ({x ∈ ({0} : Finset Int) |
-        x ∈ (fun x : Int => (⟨.lit (.int x), σ⟩ : Cfg rT)) ⁻¹' S}).card = 1 := by
-      simp [Finset.filter_singleton, hmem]
-    rw [hfilt]; simp
-  · rw [show (MeasureTheory.Measure.dirac (⟨.lit (.int 0), σ⟩ : Cfg rT)) S = 0 from by
-          rw [MeasureTheory.Measure.dirac_apply' _ hS]
-          simp [hmem]]
-    have hfilt : ({x ∈ ({0} : Finset Int) |
-        x ∈ (fun x : Int => (⟨.lit (.int x), σ⟩ : Cfg rT)) ⁻¹' S}).card = 0 := by
-      simp [Finset.filter_singleton, hmem]
-    rw [hfilt]; simp
+-- DISCRETE: `Cfg.uniform_one_eq_dirac [Countable rT] [MeasurableSingletonClass rT]`
+--   `(σ : State rT) : Cfg.uniform 1 σ = Measure.dirac ⟨.lit (.int 0), σ⟩`
 
-theorem Cfg.uniform_singleton_ne_one [Countable rT] [MeasurableSingletonClass rT]
-    {z : Int} {σ : State rT} {ρ : Cfg rT}
-    (Hz : 1 < z) : Cfg.uniform z σ {ρ} ≠ 1 := by
-  intro h1
-  have Hz0 : 0 < z := by omega
-  have hprob : MeasureTheory.IsProbabilityMeasure (Cfg.uniform z σ) :=
-    Cfg.uniform_isProbabilityMeasure
-  have hpos0 : 0 < Cfg.uniform z σ {⟨.lit (.int 0), σ⟩} :=
-    Discrete.Cfg.uniform_singleton_pos_of_mem Hz0 (le_refl 0) Hz0
-  have hpos1 : 0 < Cfg.uniform z σ {⟨.lit (.int 1), σ⟩} :=
-    Discrete.Cfg.uniform_singleton_pos_of_mem Hz0 (by norm_num) Hz
-  have hne : (⟨.lit (.int 0), σ⟩ : Cfg rT) ≠ ⟨.lit (.int 1), σ⟩ := by
-    intro heq
-    have := (Cfg.mk.injEq ..).mp heq |>.1
-    simp at this
-  have hcompl : Cfg.uniform z σ ({ρ}ᶜ) = 0 := by
-    have htot : Cfg.uniform z σ Set.univ = 1 := hprob.measure_univ
-    have hsplit : Cfg.uniform z σ Set.univ =
-        Cfg.uniform z σ {ρ} + Cfg.uniform z σ ({ρ}ᶜ) := by
-      rw [← MeasureTheory.measure_add_measure_compl (s := {ρ}) MeasurableSet.of_discrete]
-    rw [htot, h1] at hsplit
-    have hone_ne_top : (1 : ENNReal) ≠ ⊤ := ENNReal.one_ne_top
-    have heq : (1 : ENNReal) + 0 = 1 + Cfg.uniform z σ ({ρ}ᶜ) := by
-      rw [add_zero]; exact hsplit
-    exact ((ENNReal.add_right_inj hone_ne_top).mp heq).symm
-  by_cases h0 : (⟨.lit (.int 0), σ⟩ : Cfg rT) = ρ
-  · have hnρ : (⟨.lit (.int 1), σ⟩ : Cfg rT) ≠ ρ := by
-      intro heq; apply hne; rw [h0, ← heq]
-    have hin : (⟨.lit (.int 1), σ⟩ : Cfg rT) ∈ ({ρ} : Set (Cfg rT))ᶜ := by
-      simp [Set.mem_compl_iff, Set.mem_singleton_iff, hnρ]
-    have : Cfg.uniform z σ {⟨.lit (.int 1), σ⟩} ≤ Cfg.uniform z σ ({ρ}ᶜ) :=
-      MeasureTheory.measure_mono (by
-        intro x hx
-        rw [Set.mem_singleton_iff] at hx
-        subst hx; exact hin)
-    rw [hcompl] at this
-    exact absurd (lt_of_lt_of_le hpos1 this) (lt_irrefl _)
-  · have hin : (⟨.lit (.int 0), σ⟩ : Cfg rT) ∈ ({ρ} : Set (Cfg rT))ᶜ := by
-      simp [Set.mem_compl_iff, Set.mem_singleton_iff, h0]
-    have : Cfg.uniform z σ {⟨.lit (.int 0), σ⟩} ≤ Cfg.uniform z σ ({ρ}ᶜ) :=
-      MeasureTheory.measure_mono (by
-        intro x hx
-        rw [Set.mem_singleton_iff] at hx
-        subst hx; exact hin)
-    rw [hcompl] at this
-    exact absurd (lt_of_lt_of_le hpos0 this) (lt_irrefl _)
-
-set_option linter.unnecessarySimpa false in
 theorem State.head_step_dzero_upd_tapes [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} {α : Loc} {bs bs' : Tape}
     (hmem : σ.tapes[α]? = some bs)

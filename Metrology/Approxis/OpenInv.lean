@@ -5,7 +5,6 @@ public import Metrology.ProbLang.Atomic
 
 @[expose] public section
 
-set_option linter.discrete false
 
 /-! # `OpenInv e`: the logical-atomicity predicate enabling mask-shift around evaluating `e`. -/
 
@@ -20,8 +19,8 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-- `OpenInv e`: `e` can be evaluated inside a `|={E1, E2}=>` mask-shift, with
 the mask closed back in the post. -/
-def OpenInv (e : (Exp rT)) : Prop :=
-  ∀ {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 : CoPset} {Φ : (Val rT) → IProp GF}, iprop%
+def OpenInv (e : Exp rT) : Prop :=
+  ∀ {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 : CoPset} {Φ : Val rT → IProp GF}, iprop%
     (|={E1, E2}=> wp E2 e (fun v => iprop% |={E2, E1}=> Φ v)) ⊢ wp E1 e Φ
 
 namespace OpenInv
@@ -36,8 +35,8 @@ theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF
 theorem specCoupl_atomic_bridge_some {hlc : HasLC} {GF : BundledGFunctors}
     [ApproxisWpGS (rT := rT) GF] [InvGS_gen hlc GF]
     {E1 E2 : CoPset}
-    {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)} {ε₁ : ENNReal}
-    {Φ : (Val rT) → IProp GF} {v : (Val rT)} :
+    {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT} {ε₁ : ENNReal}
+    {Φ : Val rT → IProp GF} {v : Val rT} :
     iprop% specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
         |={∅, E2}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ (|={E2, E1}=> Φ v))
       ⊢ specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
@@ -51,9 +50,9 @@ theorem specCoupl_atomic_bridge_some {hlc : HasLC} {GF : BundledGFunctors}
   iframe
 
 theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
-    {e : (Exp rT)} (h : Atomic' e) {E1 E2 : CoPset}
-    {σ₁ : (State rT)} {e₁' : (Exp rT)} {σ₁' : (State rT)} {ε₁ : ENNReal}
-    {Φ : (Val rT) → IProp GF} :
+    {e : Exp rT} (h : Atomic' e) {E1 E2 : CoPset}
+    {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT} {ε₁ : ENNReal}
+    {Φ : Val rT → IProp GF} :
     specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
         progCoupl e σ₂ ρ'.expr ρ'.state ε₂
           (fun e₃ σ₃ e₃' σ₃' ε₃ => iprop%
@@ -131,7 +130,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
     exact Hε1
 
 /-- Every syntactically atomic expression satisfies `OpenInv`. -/
-theorem of_atomic {e : (Exp rT)} (h : Atomic' e) : OpenInv e := by
+theorem of_atomic {e : Exp rT} (h : Atomic' e) : OpenInv e := by
   intro GF _ E1 E2 Φ
   iintro HF
   iapply ApproxisWpGS.wp_unfold
@@ -181,7 +180,7 @@ end OpenInv
 /-- User-facing WP rule for atomic (or logically-atomic) expressions:
 mask-shift around a single step. -/
 theorem wp_atomic {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
-    {e : (Exp rT)} (h : OpenInv e) {E1 E2 : CoPset} {Φ : (Val rT) → IProp GF} :
+    {e : Exp rT} (h : OpenInv e) {E1 E2 : CoPset} {Φ : Val rT → IProp GF} :
     iprop((|={E1, E2}=> wp E2 e (fun v => iprop(|={E2, E1}=> Φ v)))) ⊢@{IProp GF}
       wp E1 e Φ :=
   h

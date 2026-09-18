@@ -142,6 +142,10 @@ theorem Cylinder.flatten_disjoint_of_shape_ne {rT : Type _} {c₁ c₂ : Cylinde
   Stamp.flatten_disjoint_of_shape_ne (cShape := Cylinder.shape)
     (fun {_ _} h => Cylinder.shape_of_mem_flatten h) h
 
+/-- Off-diagonal cylinder pairs: their shapes differ, so the flattens are disjoint. -/
+local macro "cyl_mismatch" : tactic =>
+  `(tactic| all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl))
+
 /-- The cylinder flatten of the intersection equals the intersection of the flattens. -/
 theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
     Cylinder.flatten c₁ ∩ Cylinder.flatten c₂
@@ -150,13 +154,13 @@ theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
   | wildcard =>
     cases c₂
     case wildcard => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | lit S₁ =>
     cases c₂
     case lit S₂ =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data Pat.lit.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | pair a b ih₁ ih₂ =>
     cases c₂
     case pair a' b' =>
@@ -164,22 +168,21 @@ theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
       exact Stamp.flatten_inter_image₂ Pat.pair.ι.inj Cylinder.pair (fun _ _ => rfl)
         (ih₁ a') (ih₂ b') (by rw [Cylinder.inter?]; cases Cylinder.inter? a a' <;>
           cases Cylinder.inter? b b' <;> rfl)
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | inl c ih =>
     cases c₂
     case inl c' =>
       simp only [Cylinder.flatten]
       exact Stamp.flatten_inter_image₁ Pat.inl.ι.inj Cylinder.inl (fun _ => rfl) (ih c')
         (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | inr c ih =>
     cases c₂
     case inr c' =>
       simp only [Cylinder.flatten]
       exact Stamp.flatten_inter_image₁ Pat.inr.ι.inj Cylinder.inr (fun _ => rfl) (ih c')
         (by rw [Cylinder.inter?]; cases Cylinder.inter? c c' <;> rfl)
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
-
+    cyl_mismatch
 theorem Cylinder.flatten_inter_some {rT : Type _} {c₁ c₂ c : Cylinder rT}
     (h : Cylinder.inter? c₁ c₂ = some c) :
     Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ :=

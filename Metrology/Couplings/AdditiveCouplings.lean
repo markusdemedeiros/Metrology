@@ -338,7 +338,7 @@ theorem map {ε : ENNReal} {S : Set (α × β)} {R : Set (α' × β')}
   let F : CouplingFunction α := .mk (f' ∘ f) ⟨Hf'm.comp Hfm, fun _ => Hf'b _⟩
   let G : CouplingFunction β := .mk (g' ∘ g) ⟨Hg'm.comp Hgm, fun _ => Hg'b _⟩
   have HFG {a b} (HS : S (a, b)) : F.1 a ≤ G.1 b := Hle (HR HS)
-  rw [MeasureTheory.lintegral_map Hf'm Hfm, MeasureTheory.lintegral_map Hg'm Hgm]
+  rw [lintegral_map Hf'm Hfm, lintegral_map Hg'm Hgm]
   exact H F G HFG
 
 /-- **Left limit principle.** An `AddCoupl` only inspects `μₗ` through the left
@@ -418,10 +418,10 @@ theorem map_inv [DiscreteMeasurableSpace α'] [DiscreteMeasurableSpace β']
   --                                  = ∫ gT∘g dμᵣ + ε ≤ ∫ g' dμᵣ + ε.
   calc ∫⁻ a, f' a ∂μₗ
       ≤ ∫⁻ a, fT (f a) ∂μₗ := lintegral_mono Hf'_le
-    _ = ∫⁻ a', fT a' ∂(μₗ.map f) := (MeasureTheory.lintegral_map HfTm Hfm).symm
+    _ = ∫⁻ a', fT a' ∂(μₗ.map f) := (lintegral_map HfTm Hfm).symm
     _ ≤ ∫⁻ b', gT b' ∂(μᵣ.map g) + ε := H FT GT HFG
     _ = ∫⁻ b, gT (g b) ∂μᵣ + ε := by
-          rw [MeasureTheory.lintegral_map HgTm Hgm]
+          rw [lintegral_map HgTm Hgm]
     _ ≤ ∫⁻ b, g' b ∂μᵣ + ε := by
           gcongr
           · exact HgT_le _
@@ -457,14 +457,14 @@ theorem concentrated_R {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} 
     split_ifs with hbT
     · exact Hle ⟨HS, hbT⟩
     · exact Hfb a
-  have hae : g =ᶠ[MeasureTheory.ae μᵣ] g' := by
-    rw [Filter.EventuallyEq, MeasureTheory.ae_iff]
+  have hae : g =ᶠ[ae μᵣ] g' := by
+    rw [Filter.EventuallyEq, ae_iff]
     refine measure_mono_null ?_ hconc
     intro b hb
     simp only [Set.mem_compl_iff]
     intro hbT
     exact hb (by simp only [g', if_pos hbT])
-  have Hgeq : ∫⁻ b, g b ∂μᵣ = ∫⁻ b, g' b ∂μᵣ := MeasureTheory.lintegral_congr_ae hae
+  have Hgeq : ∫⁻ b, g b ∂μᵣ = ∫⁻ b, g' b ∂μᵣ := lintegral_congr_ae hae
   rw [Hgeq]
   exact H ⟨f, Hfm, Hfb⟩ G HFG
 
@@ -495,14 +495,14 @@ theorem concentrated_L {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} 
     split_ifs with haT
     · exact Hle ⟨HS, haT⟩
     · exact zero_le
-  have hae : f =ᶠ[MeasureTheory.ae μₗ] f' := by
-    rw [Filter.EventuallyEq, MeasureTheory.ae_iff]
+  have hae : f =ᶠ[ae μₗ] f' := by
+    rw [Filter.EventuallyEq, ae_iff]
     refine measure_mono_null ?_ hconc
     intro a ha
     simp only [Set.mem_compl_iff]
     intro haT
     exact ha (by simp only [f', if_pos haT])
-  have Hfeq : ∫⁻ a, f a ∂μₗ = ∫⁻ a, f' a ∂μₗ := MeasureTheory.lintegral_congr_ae hae
+  have Hfeq : ∫⁻ a, f a ∂μₗ = ∫⁻ a, f' a ∂μₗ := lintegral_congr_ae hae
   rw [Hfeq]
   exact H F ⟨g, Hgm, Hgb⟩ HFG
 
@@ -531,14 +531,14 @@ theorem pos_R [Countable α] [Countable β]
       ext a; simp
     rw [hcompl, show {a : α | μₗ {a} = 0} = ⋃ a ∈ {a : α | μₗ {a} = 0}, ({a} : Set α) by
       ext a; simp]
-    rw [MeasureTheory.measure_biUnion_null_iff (Set.to_countable _)]
+    rw [measure_biUnion_null_iff (Set.to_countable _)]
     exact fun a ha => ha
   have hnullR : μᵣ ({b : β | μᵣ {b} ≠ 0}ᶜ) = 0 := by
     have hcompl : ({b : β | μᵣ {b} ≠ 0}ᶜ) = {b : β | μᵣ {b} = 0} := by
       ext b; simp
     rw [hcompl, show {b : β | μᵣ {b} = 0} = ⋃ b ∈ {b : β | μᵣ {b} = 0}, ({b} : Set β) by
       ext b; simp]
-    rw [MeasureTheory.measure_biUnion_null_iff (Set.to_countable _)]
+    rw [measure_biUnion_null_iff (Set.to_countable _)]
     exact fun b hb => hb
   refine AddCoupl.mono_rel ?_ (concentrated_R hmR hnullR (concentrated_L hmL hnullL H))
   rintro ⟨a, b⟩ ⟨⟨hS, haL⟩, hbR⟩
@@ -562,9 +562,9 @@ theorem eq_elim {ε : ENNReal} {μ ν : Measure α}
     have heq : a = b := hab
     rw [heq])
   have hμ : ∫⁻ a, S.indicator (1 : α → ENNReal) a ∂μ = μ S :=
-    MeasureTheory.lintegral_indicator_one hS
+    lintegral_indicator_one hS
   have hν : ∫⁻ a, S.indicator (1 : α → ENNReal) a ∂ν = ν S :=
-    MeasureTheory.lintegral_indicator_one hS
+    lintegral_indicator_one hS
   rw [hμ, hν] at key
   exact key
 
@@ -620,7 +620,7 @@ theorem dzero_r_inv {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α}
 theorem antisym {μ₁ μ₂ : Measure α}
     (H₁ : AddCoupl 0 (fun v => v.1 = v.2) μ₁ μ₂)
     (H₂ : AddCoupl 0 (fun v => v.1 = v.2) μ₂ μ₁) : μ₁ = μ₂ := by
-  refine MeasureTheory.Measure.ext fun A HA => ?_
+  refine Measure.ext fun A HA => ?_
   -- Test with the indicator of A. Indicator values are in {0,1} ⊆ [0,1].
   let χ : CouplingFunction α :=
     ⟨A.indicator (fun _ => 1), Measurable.indicator measurable_const HA, fun a => by
@@ -632,8 +632,8 @@ theorem antisym {μ₁ μ₂ : Measure α}
   have H21 := H₂ χ χ Hle
   simp only [add_zero] at H12 H21
   have Hχint : ∀ μ : Measure α, ∫⁻ x, χ.1 x ∂μ = μ A := fun μ => by
-    simp only [χ, MeasureTheory.lintegral_indicator HA, MeasureTheory.lintegral_const,
-      MeasureTheory.Measure.restrict_apply, MeasurableSet.univ, Set.univ_inter, one_mul]
+    simp only [χ, lintegral_indicator HA, lintegral_const,
+      Measure.restrict_apply, MeasurableSet.univ, Set.univ_inter, one_mul]
   rw [Hχint μ₁, Hχint μ₂] at H12
   rw [Hχint μ₂, Hχint μ₁] at H21
   exact le_antisymm H12 H21
@@ -660,11 +660,11 @@ theorem swap {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ : M
   have HμL_ne : μₗ .univ ≠ ⊤ := ne_top_of_le_ne_top (by simp) HμₗP
   have HμR_ne : μᵣ .univ ≠ ⊤ := ne_top_of_le_ne_top (by simp) HμᵣP
   have HFint : ∫⁻ a, (1 - g a) ∂μₗ = μₗ .univ - ∫⁻ a, g a ∂μₗ := by
-    rw [MeasureTheory.lintegral_sub Hgm (ne_of_lt (lt_of_le_of_lt Hgint_le HμL_ne.lt_top))
+    rw [lintegral_sub Hgm (ne_of_lt (lt_of_le_of_lt Hgint_le HμL_ne.lt_top))
       (ae_of_all _ Hgb)]
     simp
   have HGint : ∫⁻ b, (1 - f b) ∂μᵣ = μᵣ .univ - ∫⁻ b, f b ∂μᵣ := by
-    rw [MeasureTheory.lintegral_sub Hfm (ne_of_lt (lt_of_le_of_lt Hfint_le HμR_ne.lt_top))
+    rw [lintegral_sub Hfm (ne_of_lt (lt_of_le_of_lt Hfint_le HμR_ne.lt_top))
       (ae_of_all _ Hfb)]
     simp
   rw [HFint, HGint] at Hcpl

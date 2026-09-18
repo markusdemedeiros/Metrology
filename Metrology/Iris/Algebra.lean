@@ -16,17 +16,12 @@ open Std Iris COFE ProbabilityTheory MeasureTheory
 
 noncomputable section
 
--- The generic `UFraction ℕ+` instance was removed: iris-lean dropped the
--- `UFraction` interface in favour of a concrete `Qp`-based `DFrac`, so the
--- fraction algebra is no longer parameterised by `ℕ+`.
-
 instance authMeasureOFE [MeasurableSpace α] : OFE (Measure α) where
   Dist _ x y := x = y
   dist_eqv := ⟨fun _ => rfl, (Eq.symm ·), (Eq.trans · ·)⟩
   eq_dist' := .symm <| forall_const _
   dist_lt H _ := H
 
--- CMRA of subprobability distributions with addition
 instance [MeasurableSpace α] : CMRA (Measure α) where
   pcore _ := .some 0
   op μ₁ μ₂ := μ₁ + μ₂
@@ -56,30 +51,4 @@ instance [MeasurableSpace α] : UCMRA (Measure α) where
   pcore_unit := by simp [CMRA.pcore]
 
 
--- class WpMarkov (GF : BundledGFunctors) (T : Type _) [MeasurableSpace T] where
---   state : ElemG GF (constOF (Measure T))
---   state_γ : GName
---
--- export WpMarkov (state_γ)
--- attribute [reducible, instance] WpMarkov.state
---
--- section logic
---
--- variable {GF : BundledGFunctors} {T : Type _} [MeasurableSpace T] [WpMarkov GF T]
---
--- def bound (μ : Measure T) := @iOwn GF _ _ WpMarkov.state (WpMarkov.state_γ GF T) μ
---
---
--- variable (κ : Kernel T T)
---
--- def step (μ : Measure T) : Measure T := μ.bind κ
---
--- def is_value (μ : Measure T) : Prop := step κ μ = μ
---
--- def twp_F (μΦ : Measure T × (Measure T → IProp GF))
---     (twp : (Measure T × (Measure T → IProp GF)) → IProp GF) : IProp GF := iprop(
---   (⌜is_value κ μΦ.1⌝ ∗ |==> μΦ.2 μΦ.1) ∨
---   (|==> (twp (step κ μΦ.1, μΦ.2))))
---
--- end logic
 end

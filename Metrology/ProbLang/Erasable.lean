@@ -48,44 +48,17 @@ def Erasable (μ : Measure (State rT)) (σ : State rT) : Prop :=
   ∀ (e : Exp rT) (m : Nat),
     μ.bind (fun σ' => execN m ⟨e, σ'⟩) = execN m ⟨e, σ⟩
 
-/-- Two measures on `Cfg` are equal iff they agree on every singleton.
-Uses `⊤`-measurable space + countability of `Cfg` via `tsum` over
-singletons. -/
-theorem Cfg.measure_ext_singletons [Countable rT] [MeasurableSingletonClass rT]
-    {μ ν : Measure (Cfg rT)}
-    (h : ∀ c : Cfg rT, μ {c} = ν {c}) : μ = ν := by
-  refine Measure.ext fun S _ => ?_
-  -- Decompose `S` as a countable disjoint union of singletons indexed
-  -- by the subtype `↑S`, then evaluate the union via `measure_iUnion`.
-  have hSeq : (⋃ c : S, ({(c : Cfg rT)} : Set (Cfg rT))) = S := by
-    ext c; simp
-  have hdecomp : ∀ μ' : Measure (Cfg rT),
-      μ' S = ∑' c : S, μ' ({(c : Cfg rT)} : Set (Cfg rT)) := by
-    intro μ'
-    conv_lhs => rw [← hSeq]
-    exact measure_iUnion
-      (f := fun c : S => ({c.val} : Set (Cfg rT)))
-      (fun i j hij => Set.disjoint_singleton.mpr fun heq => hij (Subtype.ext heq))
-      (fun _ => .of_discrete)
-  rw [hdecomp μ, hdecomp ν]
-  exact tsum_congr (fun c => h c)
+-- DISCRETE: `Cfg.measure_ext_singletons {μ ν : Measure (Cfg rT)}`
+--   `(h : ∀ c : Cfg rT, μ {c} = ν {c}) : μ = ν`
 
 namespace Erasable
 
-/-- The dirac distribution at `σ` is erasable at `σ`. The bind collapses
-to a single evaluation at `σ`, after which the projection is trivially
-equal. -/
-@[discrete] -- dret'
-theorem dret [Countable rT] [MeasurableSingletonClass rT]
-    (σ : State rT) : Erasable (Measure.dirac σ) σ := by
-  intro e m
-  rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) Measurable.of_discrete]
-
-theorem dret' (σ : State rT) : Erasable (Measure.dirac σ) σ := by
+/-- The dirac distribution at `σ` is erasable at `σ`. -/
+theorem dret (σ : State rT) : Erasable (Measure.dirac σ) σ := by
   intro e m
   rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) (by measurability)]
 
-theorem dbind'
+theorem dbind
     {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
     (h₁ : Erasable μ₁ σ) (h₂ : ∀ σ', Erasable (μ₂ σ') σ') (hm₂ : AEMeasurable μ₂ μ₁) :
     Erasable (μ₁.bind μ₂) σ := by
@@ -97,7 +70,7 @@ theorem dbind'
           funext σ'; exact h₂ σ' e m]
   exact h₁ e m
 
-theorem lim_exec'
+theorem lim_exec
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
     μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ := by
   ext S HS
@@ -113,12 +86,6 @@ theorem lim_exec'
   intro n
   have hμ : (μ.bind fun σ' ↦ execN n ⟨e, σ'⟩) S = (execN n ⟨e, σ⟩) S := congrArg (· S) (h e n)
   rw [← hμ, bind_apply HS (by measurability)]
-
-@[discrete] -- lim_exec'
-theorem lim_exec [Countable rT] [MeasurableSingletonClass rT]
-    {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) (e : Exp rT) :
-    μ.bind (fun σ' => limExec ⟨e, σ'⟩) = limExec ⟨e, σ⟩ :=
-  lim_exec' h e
 
 theorem dret_final {μ : Measure (State rT)} {σ : State rT} {e : Exp rT} (hv : IsVal e)
     (h : Erasable μ σ) :
@@ -146,7 +113,7 @@ theorem pexecN_lim_exec
     rw [show (fun σ' => (pexecN n ⟨e, σ'⟩).bind limExec)
            = (fun σ' => limExec ⟨e, σ'⟩) from by
          funext σ'; exact (limExec_pexecN n ⟨e, σ'⟩).symm]
-  exact h.lim_exec' e
+  exact h.lim_exec e
 
 theorem mass
     {μ : Measure (State rT)} {σ : State rT} (h : Erasable μ σ) :
@@ -169,15 +136,14 @@ theorem mass
 
 /-- A two-branch erasable combinator: dispatching on a measurable Boolean
 function through a total distribution yields an erasable combination. -/
-theorem dbind_predicate [Countable rT] [MeasurableSingletonClass rT]
-    {A : Type*} [MeasurableSpace A] [DiscreteMeasurableSpace A]
+theorem dbind_predicate {A : Type*} [MeasurableSpace A] [DiscreteMeasurableSpace A]
     {μ : Measure A} {μ₁ μ₂ : Measure (State rT)} {σ : State rT} {f : A → Bool}
     (hμ : μ Set.univ = 1) (h₁ : Erasable μ₁ σ) (h₂ : Erasable μ₂ σ) :
     Erasable (μ.bind (fun a => if f a then μ₁ else μ₂)) σ := by
   intro e m
   rw [Measure.bind_bind
         (Measurable.aemeasurable .of_discrete)
-        (Measurable.aemeasurable .of_discrete)]
+        (Measurable.aemeasurable (by measurability))]
   have hker : ∀ a : A,
       (if f a then μ₁ else μ₂).bind (fun σ' => execN m ⟨e, σ'⟩) = execN m ⟨e, σ⟩ := by
     intro a
@@ -187,11 +153,8 @@ theorem dbind_predicate [Countable rT] [MeasurableSingletonClass rT]
   conv_lhs => rw [show (fun a => (if f a then μ₁ else μ₂).bind
                     (fun σ' => execN m ⟨e, σ'⟩))
                 = (fun _ => execN m ⟨e, σ⟩) from by funext a; exact hker a]
-  -- Now we have `μ.bind (fun _ => execN m ⟨e, σ⟩) = execN m ⟨e, σ⟩`.
-  -- Evaluate both sides on every set: LHS reduces to `μ Set.univ * (RHS S) = 1 * (RHS S)`.
-  refine Measure.ext fun S _ => ?_
-  rw [bind_apply MeasurableSet.of_discrete Measurable.of_discrete.aemeasurable,
-      lintegral_const, hμ, mul_one]
+  refine Measure.ext fun S hS => ?_
+  rw [bind_apply hS measurable_const.aemeasurable, lintegral_const, hμ, mul_one]
 
 end Erasable
 
@@ -206,65 +169,17 @@ def Rewritable (ρ : Cfg rT) (μ : Measure (Cfg rT)) : Prop :=
 namespace Rewritable
 
 /-- Dirac rewritability: `limExec ρ = dirac ρ >>= limExec`. -/
-theorem dret [Countable rT] [MeasurableSingletonClass rT]
-    (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
-  show limExec ρ = (Measure.dirac ρ).bind limExec
-  rw [Measure.dirac_bind Measurable.of_discrete]
-
-/-- Every finite unfolding `pexecN m ρ` is rewritable at `ρ`. -/
-theorem ofPexecN [Countable rT] [MeasurableSingletonClass rT]
-    (ρ : Cfg rT) (m : Nat) : Rewritable ρ (ProbLang.pexecN m ρ) :=
-  limExec_pexecN m ρ
-
-/-- Erasability on the state component lifts to rewritability on the
-configuration: if `μ` is erasable at `ρ.state`, then binding `ρ.expr`
-onto samples from `μ` gives a rewritable `Cfg`-distribution. -/
-theorem of_erasable [Countable rT] [MeasurableSingletonClass rT]
-    {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.state) :
-    Rewritable ρ (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))) := by
-  show limExec ρ
-      = (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))).bind limExec
-  rw [Measure.bind_bind
-        (Measurable.aemeasurable .of_discrete)
-        (Measurable.aemeasurable .of_discrete)]
-  have hker : (fun σ : State rT => (Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT)).bind limExec)
-       = (fun σ : State rT => limExec ⟨ρ.expr, σ⟩) := by
-    funext σ
-    rw [Measure.dirac_bind (f := limExec) Measurable.of_discrete]
-  rw [hker, h.lim_exec ρ.expr]
-
-/-- Erasability combined with `pexecN`: push `μ` in on the state side,
-then unfold `pexecN m` inside. -/
-theorem of_erasable_pexecN [Countable rT] [MeasurableSingletonClass rT]
-    {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
-    (h : Erasable μ ρ.state) :
-    Rewritable ρ (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)) := by
-  show limExec ρ = (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)).bind limExec
-  rw [Measure.bind_bind
-        (Measurable.aemeasurable .of_discrete)
-        (Measurable.aemeasurable .of_discrete)]
-  have : (fun σ => (pexecN m ⟨ρ.expr, σ⟩).bind limExec)
-       = (fun σ => limExec ⟨ρ.expr, σ⟩) := by
-    funext σ; exact (limExec_pexecN m ⟨ρ.expr, σ⟩).symm
-  rw [this, h.lim_exec ρ.expr]
-
-/-! ### Countability-free variants
-
-These mirror the `@[discrete]` lemmas above but route through the
-countability-free `limExec.measurable` and `Erasable.lim_exec'` instead of
-`Measurable.of_discrete` / `Erasable.lim_exec`, so they hold for a diffuse `rT`. -/
-
-/-- Dirac rewritability, countability-free: `limExec ρ = dirac ρ >>= limExec`. -/
-theorem dret' (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
+theorem dret (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
   show limExec ρ = (Measure.dirac ρ).bind limExec
   rw [Measure.dirac_bind (f := limExec) limExec.measurable]
 
-/-- Every finite unfolding `pexecN m ρ` is rewritable at `ρ`, countability-free. -/
-theorem ofPexecN' (ρ : Cfg rT) (m : Nat) : Rewritable ρ (ProbLang.pexecN m ρ) :=
+/-- Every finite unfolding `pexecN m ρ` is rewritable at `ρ`. -/
+theorem ofPexecN (ρ : Cfg rT) (m : Nat) : Rewritable ρ (ProbLang.pexecN m ρ) :=
   limExec_pexecN m ρ
 
-/-- Erasability on the state component lifts to rewritability, countability-free. -/
-theorem of_erasable' {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.state) :
+/-- Erasability on the state component lifts to rewritability on the
+configuration. -/
+theorem of_erasable {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.state) :
     Rewritable ρ (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))) := by
   show limExec ρ
       = (μ.bind (fun σ => Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT))).bind limExec
@@ -275,10 +190,11 @@ theorem of_erasable' {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ
        = (fun σ : State rT => limExec ⟨ρ.expr, σ⟩) := by
     funext σ
     rw [Measure.dirac_bind (f := limExec) limExec.measurable]
-  rw [hker, h.lim_exec' ρ.expr]
+  rw [hker, h.lim_exec ρ.expr]
 
-/-- Erasability combined with `pexecN`, countability-free. -/
-theorem of_erasable_pexecN' {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
+/-- Erasability combined with `pexecN`: push `μ` in on the state side,
+then unfold `pexecN m` inside. -/
+theorem of_erasable_pexecN {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
     (h : Erasable μ ρ.state) :
     Rewritable ρ (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)) := by
   show limExec ρ = (μ.bind (fun σ => pexecN m ⟨ρ.expr, σ⟩)).bind limExec
@@ -288,7 +204,7 @@ theorem of_erasable_pexecN' {ρ : Cfg rT} {μ : Measure (State rT)} (m : Nat)
   have : (fun σ => (pexecN m ⟨ρ.expr, σ⟩).bind limExec)
        = (fun σ => limExec ⟨ρ.expr, σ⟩) := by
     funext σ; exact (limExec_pexecN m ⟨ρ.expr, σ⟩).symm
-  rw [this, h.lim_exec' ρ.expr]
+  rw [this, h.lim_exec ρ.expr]
 
 end Rewritable
 

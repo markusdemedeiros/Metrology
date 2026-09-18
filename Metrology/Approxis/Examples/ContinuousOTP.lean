@@ -61,7 +61,7 @@ theorem otp_refines (m : rT)
     (Ectx.fill ([] : Ectx rT) pl({Exp.lam (otpBody (rT := rT) m)} #(.real r)))
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
   -- β-reduce the `let`.
-  iapply (refines_pure_l' (K := ([] : Ectx rT))
+  iapply (refines_pure_l (K := ([] : Ectx rT))
     (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
   simp only [Nat.repeat]
   iintro !>
@@ -69,7 +69,7 @@ theorem otp_refines (m : rT)
     (Kfrac.fill pl(#(.real m) + #(.real r)))
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
   -- Evaluate the addition.
-  iapply (refines_pure_l' (K := Kfrac) (Hex := pureExec_binop)
+  iapply (refines_pure_l (K := Kfrac) (Hex := pureExec_binop)
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
   simp only [Nat.repeat]
   iintro !>
@@ -77,7 +77,7 @@ theorem otp_refines (m : rT)
     (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m r)))))
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
   -- Evaluate `frac`.
-  iapply (refines_pure_l' (K := ([] : Ectx rT)) (Hex := pureExec_unop)
+  iapply (refines_pure_l (K := ([] : Ectx rT)) (Hex := pureExec_unop)
     ⟨IsVal.lit.toIsValue, rfl⟩)
   simp only [Nat.repeat]
   iintro !>
@@ -121,20 +121,20 @@ theorem otp_refines_rev (m : rT) (g : rT → rT)
     (Ectx.fill ([] : Ectx rT) pl({Exp.lam (otpBody (rT := rT) m)} #(.real (g r))))
     lrel_real)
   -- β-reduce the RHS `let`.
-  iapply (refines_pure_r' (K := ([] : Ectx rT))
+  iapply (refines_pure_r (K := ([] : Ectx rT))
     (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
   show ⊢@{IProp GF} iprop(refines ⊤
     pl(#(.real r))
     (Kfrac.fill pl(#(.real m) + #(.real (g r)))) lrel_real)
   -- Evaluate the addition.
-  iapply (refines_pure_r' (K := Kfrac) (Hex := pureExec_binop)
+  iapply (refines_pure_r (K := Kfrac) (Hex := pureExec_binop)
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
   show ⊢@{IProp GF} iprop(refines ⊤
     pl(#(.real r))
     (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m (g r))))))
     lrel_real)
   -- Evaluate `frac`; the inverse law collapses the result to `r`.
-  iapply (refines_pure_r' (K := ([] : Ectx rT)) (Hex := pureExec_unop)
+  iapply (refines_pure_r (K := ([] : Ectx rT)) (Hex := pureExec_unop)
     ⟨IsVal.lit.toIsValue, rfl⟩)
   rw [hinv r hr]
   show ⊢@{IProp GF} iprop(refines ⊤ pl(#(.real r)) pl(#(.real r)) lrel_real)

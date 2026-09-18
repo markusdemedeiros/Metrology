@@ -169,26 +169,11 @@ theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
     simp only [CMRA.Valid, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
     exact fun _ => ⟨h, add_comm _ _⟩
   iintro Hε
-  -- FIXME: Is this fixed by the last update to master?
-  -- imod (iOwn_update Hupd) with H'
-  -- Application type mismatch: The argument
-  --   Hupd
-  -- has type
-  --   (● ε₁) ~~> (● ε₁ + ε₂) • ◯ ε₂
-  -- but is expected to have type
-  --   ?m.102 ~~> ?m.103
-  -- in the application
-  --   iOwn_update Hupd
-  suffices Hup :
-      iOwn (E := IEC.ec) (ECGS.γec GF) (● ε₁)
-      ⊢ |==> iOwn (E := IEC.ec) (ECGS.γec GF) ((● ε₁ + ε₂) • (◯ ε₂)) by
-    refine .trans Hup ?_
-    iintro H
-    imod H
-    imodintro
-    iapply iOwn_op
-    iexact H
-  refine iOwn_update Hupd
+  ihave H := iOwn_update (E := IEC.ec) (γ := ECGS.γec GF) Hupd $$ Hε
+  imod H
+  imodintro
+  iapply iOwn_op
+  iexact H
 
 theorem weaken {ε₁ ε₂ : ℝ≥0∞} (h : ε₂ ≤ ε₁) : ↯ε₁ ⊢@{IProp GF} ↯ε₂ := by
   iintro Hε

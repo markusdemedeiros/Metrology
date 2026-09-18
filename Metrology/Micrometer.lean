@@ -125,21 +125,3 @@ instance [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B] :
 open ExprSyntax
 example (ident_body : Ident × ExprSyntax R Z B) : lam.π (lam.ι ident_body) = some ident_body := rfl
 example (ident_body : Ident × ExprSyntax R Z B) : app.π (lam.ι ident_body) = none := rfl
-
--- variable {R Z B : Type _} [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B]
--- #synth MeasurableSpace (ExprSyntax R Z B)
-
-section MeasurableProjections
-
-variable {R Z B : Type _} [MeasurableSpace R] [MeasurableSpace Z] [MeasurableSpace B]
-
--- theorem LitSyntax.real.π.measurable : Measurable (@LitSyntax.real.π R Z B) := by
---   intros S HS
---   have X := measurableSet_iff_int_some_measurableSet.mp HS
---   refine MeasurableSpace.measurableSet_generateFrom ?_
---   simp only [MeasurableSyntax.cylinder, MeasurableSyntax.base, MeasurableSyntax.flatten, mem_image]
---   -- This is something that should be metaprogrammed
---   sorry
-
-
-end MeasurableProjections

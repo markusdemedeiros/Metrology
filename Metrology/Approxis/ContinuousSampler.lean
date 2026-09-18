@@ -11,7 +11,7 @@ public import Metrology.Approxis.AppRelRules
 
 WP rules for ProbLang's *diffuse* sampler `urand`, which lies outside the
 discrete fragment: `unifUnit` may have no atoms, so every atom-based step rule
-(`wp_lift_atomic_step`, `progCoupl_step_l`, …) is vacuous for it.
+(`wp_lift_atomic_step`, `wp_lift_atomic_head_step`, …) is vacuous for it.
 
 This file deliberately carries **no `[Countable rT]`** in its variable block, so
 everything here is machine-checked to hold for a diffuse real type. It is the
@@ -44,7 +44,7 @@ lives on by `concentratedOn_map`, and which is measurable because the injection
 Note the absence of `[Countable rT]`: the whole point is that this rule holds for
 a diffuse `rT`. Follows the same shape as `TotalEris.twp_urand_exp`, minus the
 error credits (a plain atomic lift spends none). -/
-theorem wp_urand {E : CoPset} {Φ : (Val rT) → IProp GF} :
+theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
     iprop(▷ ∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗ Φ (.real r : Val rT))
       ⊢@{IProp GF} wp E (Exp.urand) Φ := by
   iintro HΦ
@@ -270,106 +270,6 @@ theorem refines_couple_urands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF}
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
-/-! ### Countability-free RHS stepping
-
-The spec side steps through `step_pure`, which bottoms out in
-`pexecN_of_PureExec` — gated on `Countable rT` only because it routes through
-`DetExec_discrete`. On the measure-theoretic `PureStep` the same induction goes
-through directly, via the already-continuous `pexecN_1_of_DetStep_cts`. -/
-
-/-- `pexecN n ⟨e1,σ⟩ = dirac ⟨e2,σ⟩` for a `PureExec`, countability-free. -/
-theorem pexecN_of_PureExec_cts {φ : Prop} {n : ℕ} {e1 e2 : Exp rT}
-    [h : PureExec φ n e1 e2] (σ : State rT) (hφ : φ) :
-    pexecN n (⟨e1, σ⟩ : Cfg rT) = MeasureTheory.Measure.dirac ⟨e2, σ⟩ := by
-  have hs := h.pure_exec hφ
-  clear h
-  induction n generalizing e1 with
-  | zero => simp only [nsteps] at hs; subst hs; rfl
-  | succ k ih =>
-    obtain ⟨c, hstep, hrest⟩ := hs
-    rw [show k + 1 = 1 + k from Nat.add_comm _ _, pexecN_plus,
-        pexecN_1_of_DetStep_cts (ρ' := (⟨c, σ⟩ : Cfg rT)) ⟨hstep.safe σ, hstep.det σ⟩,
-        MeasureTheory.Measure.dirac_bind pexecN_measurable, ih hrest]
-
-/-- `step_pure` on `PureExec`, countability-free. -/
-theorem step_pure' {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : ℕ}
-    (Hφ : φ) [Hex : PureExec φ n e e'] :
-    iprop(⤇ (K.fill e)) ⊢@{IProp GF} specUpdate rT E iprop(⤇ (K.fill e')) := by
-  have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
-  iintro HK
-  unfold specUpdate
-  iintro %ρ Hρ
-  obtain ⟨_, σ⟩ := ρ
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
-  subst Heq
-  imod specProg_update $$ Hρ HK with ⟨HρNew, HKNew⟩
-  imodintro
-  iexists (⟨K.fill e', σ⟩ : Cfg rT), n
-  isplitr
-  · ipureintro; exact pexecN_of_PureExec_cts (h := HexK) σ Hφ
-  isplitl [HρNew] <;> iassumption
-
-/-- `refines_pure_l'` — LHS pure step, countability-free.
-
-Copy of `refines_pure_l` on the measure-theoretic `PureExec` rather than
-`PureExec_discrete`, so it applies at a diffuse `rT` (where `PureExec.toDiscrete`
-is unavailable because `ℝ` is not countable). -/
-theorem refines_pure_l' {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
-    {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
-    Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (refines E (K.fill e') t A)
-      ⊢@{IProp GF} refines E (K.fill e) t A := by
-  have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
-  unfold refines
-  iintro H
-  iintro %K' %ε HK Hna Herr Hpos
-  iapply (wp_pure_step_later' (Hex := HexK) Hφ)
-  ihave H0 : iprop(▷^[n] (∀ (K₂ : Ectx rT) (ε₂ : ENNReal),
-      (⤇ K₂.fill t) -∗ (naOwnP E) -∗ (↯ ε₂) -∗ (⌜(0 : ENNReal) < ε₂⌝) -∗
-      wp ⊤ (K.fill e') (fun v => iprop(∃ v' ε',
-        (⤇ K₂.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v')))) $$ [H]
-  · rw [← nat_repeat_later_eq_laterN]; iexact H
-  rw [nat_repeat_later_eq_laterN]
-  ihave H1 := (BI.laterN_forall n).mp $$ H0
-  ispecialize H1 $$ %K'
-  ihave H2 := (BI.laterN_forall n).mp $$ H1
-  ispecialize H2 $$ %ε
-  ihave H3 := BI.laterN_wand n $$ H2
-  ihave HKLater : iprop(▷^[n] (⤇ K'.fill t)) $$ [HK]
-  · iapply BI.laterN_intro n; iexact HK
-  ispecialize H3 $$ HKLater
-  ihave H4 := BI.laterN_wand n $$ H3
-  ihave HnaLater : iprop(▷^[n] naOwnP E) $$ [Hna]
-  · iapply BI.laterN_intro n; iexact Hna
-  ispecialize H4 $$ HnaLater
-  ihave H5 := BI.laterN_wand n $$ H4
-  ihave HerrLater : iprop(▷^[n] (↯ ε)) $$ [Herr]
-  · iapply BI.laterN_intro n; iexact Herr
-  ispecialize H5 $$ HerrLater
-  ihave H6 := BI.laterN_wand n $$ H5
-  ihave HposLater : iprop(▷^[n] ⌜(0 : ENNReal) < ε⌝) $$ [Hpos]
-  · iapply BI.laterN_intro n; iexact Hpos
-  ispecialize H6 $$ HposLater
-  iexact H6
-
-/-- `refines_pure_r'` — RHS pure step, countability-free. -/
-theorem refines_pure_r' {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
-    {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
-    refines E t (K.fill e') A ⊢@{IProp GF} refines E t (K.fill e) A := by
-  unfold refines
-  iintro H
-  iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill e) = (K'.comp K).fill e := Ectx.fill_comp K' K e
-  have hfc' : K'.fill (K.fill e') = (K'.comp K).fill e' := Ectx.fill_comp K' K e'
-  rw [hfc]
-  ihave HStep := step_pure' (E := ⊤) (K'.comp K) (Hex := Hex) Hφ $$ Hj
-  iapply specUpdate_wp
-  iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
-  isplitl [HStep]; · iexact HStep
-  iintro HK'
-  ihave HK'' : iprop(⤇ K'.fill (K.fill e')) $$ [HK']
-  · rw [hfc']; iexact HK'
-  iapply specUpdate_ret
-  iapply H $$ %K' %ε HK'' Hna Herr Hpos
 
 end Relational
 

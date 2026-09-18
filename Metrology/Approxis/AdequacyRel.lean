@@ -11,7 +11,6 @@ public import Iris.Instances.Lib.FUpd
 
 @[expose] public section
 
-set_option linter.discrete false
 
 /-! # Relational adequacy: bridging parametric `refines` to an `AddCoupl` on `limExec`. -/
 
@@ -66,7 +65,7 @@ This theorem — Approxis's top-level relational adequacy statement — is now f
 `[Countable rT]`: contextual refinement holds for a diffuse real type. -/
 theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     (A : ∀ (_ : ApproxisRGS rT .hasNoLC GF), lrel rT GF)
-    (φ : (Val rT) → (Val rT) → Prop) (e e' : Exp rT) (σ σ' : State rT)
+    (φ : Val rT → Val rT → Prop) (e e' : Exp rT) (σ σ' : State rT)
     (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
       ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
     (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),

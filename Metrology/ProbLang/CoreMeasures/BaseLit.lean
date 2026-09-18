@@ -125,6 +125,10 @@ theorem Cylinder.flatten_disjoint_of_shape_ne {rT : Type _} {c₁ c₂ : Cylinde
   Stamp.flatten_disjoint_of_shape_ne (cShape := Cylinder.shape)
     (fun {_ _} h => Cylinder.shape_of_mem_flatten h) h
 
+/-- Off-diagonal cylinder pairs: their shapes differ, so the flattens are disjoint. -/
+local macro "cyl_mismatch" : tactic =>
+  `(tactic| all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl))
+
 /-- The cylinder flatten of the intersection equals the intersection of the flattens.
 For mismatched cylinders (where `inter?` returns `none`) the intersection is empty. -/
 theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
@@ -134,30 +138,29 @@ theorem Cylinder.flatten_inter {rT : Type _} (c₁ c₂ : Cylinder rT) :
   | int z₁ =>
     cases c₂
     case int z₂ => simp [Cylinder.inter?]; split_ifs <;> simp_all
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | bool b₁ =>
     cases c₂
     case bool b₂ => simp [Cylinder.inter?]; split_ifs <;> simp_all
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | unit =>
     cases c₂
     case unit => simp [Cylinder.inter?]
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | loc l₁ =>
     cases c₂
     case loc l₂ => simp [Cylinder.inter?]; split_ifs <;> simp_all
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | lbl l₁ =>
     cases c₂
     case lbl l₂ => simp [Cylinder.inter?]; split_ifs <;> simp_all
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
+    cyl_mismatch
   | real S₁ =>
     cases c₂
     case real S₂ =>
       simp only [Cylinder.flatten, Cylinder.inter?, Option.elim]
       exact Stamp.flatten_inter_data BaseLit.real.ι.inj
-    all_goals (rw [Cylinder.flatten_disjoint_of_shape_ne (by simp [Cylinder.shape])]; rfl)
-
+    cyl_mismatch
 theorem Cylinder.flatten_inter_some {rT : Type _} {c₁ c₂ c : Cylinder rT}
     (h : Cylinder.inter? c₁ c₂ = some c) :
     Cylinder.flatten c = Cylinder.flatten c₁ ∩ Cylinder.flatten c₂ :=
