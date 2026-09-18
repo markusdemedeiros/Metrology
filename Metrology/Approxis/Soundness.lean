@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.PrimitiveLaws
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.Model
 public import Metrology.Approxis.AdequacyRel
 public import Metrology.Approxis.Interp
@@ -575,7 +576,7 @@ variable {GF : BundledGFunctors} [RefinesPreGS rT GF]
 
 /-- The bool-equality value relation extracted from `lrel_bool`. -/
 def boolEqVal (v v' : Val rT) : Prop :=
-  ∃ b : Bool, v.1 = .lit (.bool b) ∧ v'.1 = .lit (.bool b)
+  ∃ b : Bool, v.1 = pl(#(.bool b)) ∧ v'.1 = pl(#(.bool b))
 
 omit [RefinesPreGS rT GF] in
 /-- `lrel_bool` extracts purely to `boolEqVal`. -/
@@ -649,7 +650,7 @@ theorem refines_sound_open_fresh [Countable rT]
   intro K σ₀ b Htyped HfreshK Hbinders
   have hRewriteFb : ∀ (e0 : Exp rT),
       limExec ⟨e0, σ₀⟩ (finalBool b) =
-      (limExecV ⟨e0, σ₀⟩) {.lit (.bool b)} := by
+      (limExecV ⟨e0, σ₀⟩) {pl(#(.bool b))} := by
     intro e0
     unfold limExecV asExpr
     rw [Measure.map_apply (by fun_prop) (MeasurableSet.singleton _)]
@@ -683,12 +684,12 @@ theorem refines_sound_open_fresh [Countable rT]
     split at he
     · rw [← Option.some.inj he]
     · cases he
-  have hvbeq : v.1 = .lit (.bool b) := (toVal?_to_eq hv) ▸ ha
+  have hvbeq : v.1 = pl(#(.bool b)) := (toVal?_to_eq hv) ▸ ha
   rw [hvbeq] at hvb1
   injection hvb1 with hbool
   injection hbool with hbb
   subst hbb
-  show b' ∈ ({.lit (.bool b)} : Set (Exp rT))
+  show b' ∈ ({pl(#(.bool b))} : Set (Exp rT))
   exact (toVal?_to_eq hv').trans hvb2
 
 /-- **Soundness of the logical relation (closed case), restricted to fresh contexts.** -/

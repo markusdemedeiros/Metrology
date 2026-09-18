@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.PrimitiveLaws
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.Model
 public import Metrology.Approxis.RelTactics
 public import Metrology.Approxis.AppRelRules
@@ -233,7 +234,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_nat_unfold (v v' : Val rT) :
     (lrel_nat (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ n : Nat,
-        ⌜v.1 = .lit (.int (n : Int)) ∧ v'.1 = .lit (.int (n : Int))⌝) :=
+        ⌜v.1 = pl(#(.int (n : Int))) ∧ v'.1 = pl(#(.int (n : Int)))⌝) :=
   BIBase.Entails.rfl
 
 omit [ProbLangℝ rT] in
@@ -241,7 +242,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_pos_nat_unfold (v v' : Val rT) :
     (lrel_pos_nat (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ n : Nat, ⌜0 < n ∧
-        v.1 = .lit (.int (n : Int)) ∧ v'.1 = .lit (.int (n : Int))⌝) :=
+        v.1 = pl(#(.int (n : Int))) ∧ v'.1 = pl(#(.int (n : Int)))⌝) :=
   BIBase.Entails.rfl
 
 omit [ProbLangℝ rT] in
@@ -249,7 +250,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_int_unfold (v v' : Val rT) :
     (lrel_int (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ n : Int,
-        ⌜v.1 = .lit (.int n) ∧ v'.1 = .lit (.int n)⌝) :=
+        ⌜v.1 = pl(#(.int n)) ∧ v'.1 = pl(#(.int n))⌝) :=
   BIBase.Entails.rfl
 
 omit [ProbLangℝ rT] in
@@ -275,7 +276,7 @@ omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_bool).car v v' ⊢ ∃ b : Bool, v=#b ∧ v'=#b`. -/
 theorem lrel_bool_unfold (v v' : Val rT) :
     (lrel_bool (GF := GF)).car v v' ⊢@{IProp GF}
-      iprop(∃ b : Bool, ⌜v.1 = .lit (.bool b) ∧ v'.1 = .lit (.bool b)⌝) :=
+      iprop(∃ b : Bool, ⌜v.1 = pl(#(.bool b)) ∧ v'.1 = pl(#(.bool b))⌝) :=
   BIBase.Entails.rfl
 
 /-! ### Symmetric refines lemmas for pure-step constructors
@@ -423,7 +424,7 @@ theorem refines_alloctape {e e' : Exp rT} :
   isplitl [HStep]; · iexact HStep
   iintro ⟨%l', HKRes, Hl'frag⟩
   iapply specUpdate_ret
-  iapply (wp_lift_atomic_head_step (e₁ := .tape (.lit (.int n)))
+  iapply (wp_lift_atomic_head_step (e₁ := pl(tape(#(.int n))))
     (Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w))
   iintro %σ₁ Hσ
   imodintro
@@ -499,8 +500,8 @@ theorem refines_alloc {e e' : Exp rT} {A : lrel rT GF} :
     (P := iprop(∃ (w1 w2 : Val rT),
       (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2))) $$ [HInvBody] with #HInv
   · iexact HInvBody
-  iapply refines_ret (e1 := Ectx.fill [] (.lit (.loc l)))
-    (e2 := Ectx.fill [] (.lit (.loc l')))
+  iapply refines_ret (e1 := Ectx.fill [] pl(#(.loc l)))
+    (e2 := Ectx.fill [] pl(#(.loc l')))
     (v1 := .loc l) (v2 := .loc l')
     (hv1 := rfl) (hv2 := rfl)
   imodintro
@@ -531,10 +532,10 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
       hv, hv']
   cases b with
   | true =>
-    have hf1 : (Exp.cond (.lit (.bool true)) e1 e2) =
-        Ectx.fill [] (Exp.cond (.lit (.bool true)) e1 e2) := rfl
-    have hf2 : (Exp.cond (.lit (.bool true)) e1' e2') =
-        Ectx.fill [] (Exp.cond (.lit (.bool true)) e1' e2') := rfl
+    have hf1 : (Exp.cond pl(#(.bool true)) e1 e2) =
+        Ectx.fill [] (Exp.cond pl(#(.bool true)) e1 e2) := rfl
+    have hf2 : (Exp.cond pl(#(.bool true)) e1' e2') =
+        Ectx.fill [] (Exp.cond pl(#(.bool true)) e1' e2') := rfl
     rw [hf1, hf2]
     iapply (refines_pure_l (K := []) (Hex := pureExec_cond_true) trivial)
     simp only [Nat.repeat]
@@ -543,10 +544,10 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     rw [show Ectx.fill [] e1 = e1 from rfl, show Ectx.fill [] e1' = e1' from rfl]
     iexact IH1
   | false =>
-    have hf1 : (Exp.cond (.lit (.bool false)) e1 e2) =
-        Ectx.fill [] (Exp.cond (.lit (.bool false)) e1 e2) := rfl
-    have hf2 : (Exp.cond (.lit (.bool false)) e1' e2') =
-        Ectx.fill [] (Exp.cond (.lit (.bool false)) e1' e2') := rfl
+    have hf1 : (Exp.cond pl(#(.bool false)) e1 e2) =
+        Ectx.fill [] (Exp.cond pl(#(.bool false)) e1 e2) := rfl
+    have hf2 : (Exp.cond pl(#(.bool false)) e1' e2') =
+        Ectx.fill [] (Exp.cond pl(#(.bool false)) e1' e2') := rfl
     rw [hf1, hf2]
     iapply (refines_pure_l (K := []) (Hex := pureExec_cond_false) trivial)
     simp only [Nat.repeat]
@@ -592,7 +593,7 @@ omit [Countable rT] in
 theorem lrel_tape_unfold (v v' : Val rT) :
     (lrel_tape (GF := GF)).car v v' ⊢@{IProp GF}
       iprop(∃ (α1 α2 : Loc) (z : Int),
-        (⌜ v.1 = .lit (.lbl α1) ⌝) ∗ (⌜ v'.1 = .lit (.lbl α2) ⌝) ∗
+        (⌜ v.1 = pl(#(.lbl α1)) ⌝) ∗ (⌜ v'.1 = pl(#(.lbl α2)) ⌝) ∗
         Iris.inv (logN.@ ((α1, α2) : Loc × Loc))
           (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩)))) :=
   BIBase.Entails.rfl
@@ -709,7 +710,7 @@ plus the heap invariant. -/
 theorem lrel_ref_unfold (A : lrel rT GF) (v v' : Val rT) :
     (lrel_ref A).car v v' ⊢@{IProp GF}
       iprop(∃ (l l' : Loc),
-        (⌜ v.1 = .lit (.loc l) ⌝) ∗ (⌜ v'.1 = .lit (.loc l') ⌝) ∗
+        (⌜ v.1 = pl(#(.loc l)) ⌝) ∗ (⌜ v'.1 = pl(#(.loc l')) ⌝) ∗
         Iris.inv (logN.@ ((l, l') : Loc × Loc))
           (iprop(∃ (w1 w2 : Val rT),
             (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2))) :=
@@ -744,12 +745,12 @@ theorem refines_store {e1 e2 e1' e2' : Exp rT} {A : lrel rT GF} :
   have hfillv : Ectx.fill [EctxItem.storeL w] v.1 = Exp.store v.1 w.1 := rfl
   have hfillv' : Ectx.fill [EctxItem.storeL w'] v'.1 = Exp.store v'.1 w'.1 := rfl
   rw [hfillv, hfillv', heq, heq']
-  have hfill_empty : Exp.store (.lit (.loc l)) w.1 =
-    Ectx.fill [] (Exp.store (.lit (.loc l)) w.1) := rfl
+  have hfill_empty : Exp.store pl(#(.loc l)) w.1 =
+    Ectx.fill [] (Exp.store pl(#(.loc l)) w.1) := rfl
   rw [hfill_empty]
   iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)))
-    (K := []) (e1 := Exp.store (.lit (.loc l)) w.1)
-    (t := Exp.store (.lit (.loc l')) w'.1)
+    (K := []) (e1 := Exp.store pl(#(.loc l)) w.1)
+    (t := Exp.store pl(#(.loc l')) w'.1)
     (A := lrel_unit) (OpenInv.of_atomic (Atomic.store' l w)))
   iintro %K' Hr
   have hsub : (↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
@@ -777,8 +778,8 @@ theorem refines_store {e1 e2 e1' e2' : Exp rT} {A : lrel rT GF} :
   isplitl [HStep]; · iexact HStep
   iintro ⟨HKRes, Hv2'⟩
   iapply specUpdate_ret
-  have hstoreL : Exp.store (.lit (.loc l)) w.1 =
-    Exp.store (.lit (.loc l)) (Exp.ofVal w) := rfl
+  have hstoreL : Exp.store pl(#(.loc l)) w.1 =
+    Exp.store pl(#(.loc l)) (Exp.ofVal w) := rfl
   rw [hstoreL]
   iapply (wp_store (l := l) (v := w) (v' := v1))
   isplitl [Hv1]; · iexact Hv1
@@ -793,9 +794,9 @@ theorem refines_store {e1 e2 e1' e2' : Exp rT} {A : lrel rT GF} :
   ispecialize Hclose $$ HCloseArg
   imod Hclose with _
   imodintro
-  iexists (Exp.lit .unit)
+  iexists pl(#(.unit))
   isplitl [HKRes]; · iexact HKRes
-  iapply (refines_ret (e1 := Ectx.fill [] (Exp.lit .unit)) (e2 := Exp.lit .unit)
+  iapply (refines_ret (e1 := Ectx.fill [] pl(#(.unit))) (e2 := pl(#(.unit)))
     (v1 := .unit) (v2 := .unit)
     (hv1 := rfl) (hv2 := rfl))
   imodintro
@@ -827,11 +828,11 @@ theorem refines_load {e e' : Exp rT} {A : lrel rT GF} :
   have hfillv : Ectx.fill [EctxItem.load] v.1 = Exp.load v.1 := rfl
   have hfillv' : Ectx.fill [EctxItem.load] v'.1 = Exp.load v'.1 := rfl
   rw [hfillv, hfillv', heq, heq']
-  have hfill_empty : (Exp.load (.lit (.loc l)) : Exp rT) = Ectx.fill [] (Exp.load (.lit (.loc l))) := rfl
+  have hfill_empty : (pl(!#(.loc l)) : Exp rT) = Ectx.fill [] pl(!#(.loc l)) := rfl
   rw [hfill_empty]
   iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)))
-    (K := []) (e1 := (Exp.load (.lit (.loc l)) : Exp rT))
-    (t := (Exp.load (.lit (.loc l')) : Exp rT))
+    (K := []) (e1 := (pl(!#(.loc l)) : Exp rT))
+    (t := (pl(!#(.loc l')) : Exp rT))
     (A := A) (OpenInv.of_atomic (Atomic.load' (rT := rT) l)))
   iintro %K' Hr
   have hsub : (↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
@@ -860,7 +861,7 @@ theorem refines_load {e e' : Exp rT} {A : lrel rT GF} :
   iapply specUpdate_ret
   have HE : (∅ : CoPset) ⊆ (⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) :=
     Std.LawfulSet.empty_subset
-  have hv : ((Exp.load (.lit (.loc l)) : Exp rT)).toVal? = none :=
+  have hv : ((pl(!#(.loc l)) : Exp rT)).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (ApproxisWpGS.wp_step_fupd (P := A.car w1 w2)
     (E1 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc))) (E2 := ∅) HE hv)
@@ -934,12 +935,12 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
   have hfillv : Ectx.fill [EctxItem.randL w] v.1 = Exp.rand v.1 w.1 := rfl
   have hfillv' : Ectx.fill [EctxItem.randL w'] v'.1 = Exp.rand v'.1 w'.1 := rfl
   rw [hfillv, hfillv', HvM, Hv'M, Hw, Hw']
-  have hfill_empty : (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α)) : Exp rT) =
-    Ectx.fill [] (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α))) := rfl
+  have hfill_empty : (Exp.rand (pl(#(.int (M : Int)))) pl(#(.lbl α)) : Exp rT) =
+    Ectx.fill [] (Exp.rand (pl(#(.int (M : Int)))) pl(#(.lbl α))) := rfl
   rw [hfill_empty]
   iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((α, α') : Loc × Loc)))
-    (K := []) (e1 := (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α)) : Exp rT))
-    (t := (Exp.rand (.lit (.int (M : Int))) (.lit (.lbl α')) : Exp rT))
+    (K := []) (e1 := (Exp.rand (pl(#(.int (M : Int)))) pl(#(.lbl α)) : Exp rT))
+    (t := (Exp.rand (pl(#(.int (M : Int)))) pl(#(.lbl α')) : Exp rT))
     (A := lrel_nat) (OpenInv.of_atomic (Atomic.rand_lbl' (rT := rT) (M : Int) α)))
   iintro %K' Hr
   have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
@@ -976,10 +977,10 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     ispecialize Hclose $$ HCloseArg
     imod Hclose with _
     imodintro
-    iexists (.lit (.int (id n)))
+    iexists (pl(#(.int (id n))))
     isplitl [HKRes]; · iexact HKRes
-    iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int n)))
-      (e2 := Exp.lit (.int (id n)))
+    iapply (refines_ret (e1 := Ectx.fill [] pl(#(.int n)))
+      (e2 := pl(#(.int (id n))))
       (v1 := .int n) (v2 := .int (id n))
       (hv1 := rfl) (hv2 := rfl))
     imodintro
@@ -1013,10 +1014,10 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     ispecialize Hclose $$ HCloseArg
     imod Hclose with _
     imodintro
-    iexists (.lit (.int (id n)))
+    iexists (pl(#(.int (id n))))
     isplitl [HKRes]; · iexact HKRes
-    iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int n)))
-      (e2 := Exp.lit (.int (id n)))
+    iapply (refines_ret (e1 := Ectx.fill [] pl(#(.int n)))
+      (e2 := pl(#(.int (id n))))
       (v1 := .int n) (v2 := .int (id n))
       (hv1 := rfl) (hv2 := rfl))
     imodintro
@@ -1055,13 +1056,13 @@ theorem refines_rand_unit {e e' : Exp rT} :
   ihave HPosNatEx := lrel_pos_nat_unfold v v' $$ HPosNat
   icases HPosNatEx with ⟨%n, %hn_pos, %Hv, %Hv'⟩
   have hfillv : Ectx.fill [EctxItem.randL (.unit : Val _)] v.1 =
-      Exp.rand v.1 (.lit .unit) := rfl
+      Exp.rand v.1 pl(#(.unit)) := rfl
   have hfillv' : Ectx.fill [EctxItem.randL (.unit : Val _)] v'.1 =
-      Exp.rand v'.1 (.lit .unit) := rfl
+      Exp.rand v'.1 pl(#(.unit)) := rfl
   rw [hfillv, hfillv', Hv, Hv']
   · have hnpos : (0 : Int) < (n : Int) := by exact_mod_cast hn_pos
-    have hfill_emp : (Exp.rand (.lit (.int (n : Int))) (.lit .unit) : Exp rT) =
-      Ectx.fill [] (Exp.rand (.lit (.int (n : Int))) (.lit .unit)) := rfl
+    have hfill_emp : (Exp.rand (pl(#(.int (n : Int)))) pl(#(.unit)) : Exp rT) =
+      Ectx.fill [] (Exp.rand (pl(#(.int (n : Int)))) pl(#(.unit))) := rfl
     rw [hfill_emp]
     iapply (refines_couple_rands_lr (rT := rT) (E := ⊤) (K := []) (K' := []) (A := lrel_nat)
       (z := (n : Int)) (f := id)
@@ -1069,10 +1070,10 @@ theorem refines_rand_unit {e e' : Exp rT} :
       (hbij := fun m h0 hlt => ⟨m, ⟨⟨h0, hlt⟩, rfl⟩, fun n' ⟨_, heq⟩ => heq⟩)
       (Hz := hnpos))
     iintro %m ⟨%Hm0, %Hmn⟩
-    have hfill1 : (Ectx.fill [] (Exp.lit (.int m)) : Exp rT) = Exp.lit (.int m) := rfl
-    have hfill2 : (Ectx.fill [] (Exp.lit (.int (id m))) : Exp rT) = Exp.lit (.int m) := rfl
+    have hfill1 : (Ectx.fill [] pl(#(.int m)) : Exp rT) = pl(#(.int m)) := rfl
+    have hfill2 : (Ectx.fill [] (pl(#(.int (id m)))) : Exp rT) = pl(#(.int m)) := rfl
     rw [hfill1, hfill2]
-    iapply (refines_ret (e1 := Exp.lit (.int m)) (e2 := Exp.lit (.int m))
+    iapply (refines_ret (e1 := pl(#(.int m))) (e2 := pl(#(.int m)))
       (v1 := .int m) (v2 := .int m)
       (hv1 := rfl) (hv2 := rfl))
     imodintro
@@ -1117,12 +1118,12 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
   rw [hfillv, hfillv', Hv, Hv', Hw, Hw']
   by_cases hnpos : 0 < n
   · -- Positive bound: same proof as refines_rand_tape, parameterized over lrel_int.
-    have hfill_empty : (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT) =
-      Ectx.fill [] (Exp.rand (.lit (.int n)) (.lit (.lbl α))) := rfl
+    have hfill_empty : (pl(rand(#(.int n), #(.lbl α))) : Exp rT) =
+      Ectx.fill [] (pl(rand(#(.int n), #(.lbl α)))) := rfl
     rw [hfill_empty]
     iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((α, α') : Loc × Loc)))
-      (K := []) (e1 := (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT))
-      (t := (Exp.rand (.lit (.int n)) (.lit (.lbl α')) : Exp rT))
+      (K := []) (e1 := (pl(rand(#(.int n), #(.lbl α))) : Exp rT))
+      (t := (pl(rand(#(.int n), #(.lbl α'))) : Exp rT))
       (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl' (rT := rT) n α)))
     iintro %K' Hr
     have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
@@ -1158,10 +1159,10 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       ispecialize Hclose $$ HCloseArg
       imod Hclose with _
       imodintro
-      iexists (.lit (.int (id m)))
+      iexists (pl(#(.int (id m))))
       isplitl [HKRes]; · iexact HKRes
-      iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int m)))
-        (e2 := Exp.lit (.int (id m)))
+      iapply (refines_ret (e1 := Ectx.fill [] pl(#(.int m)))
+        (e2 := pl(#(.int (id m))))
         (v1 := .int m) (v2 := .int (id m))
         (hv1 := rfl) (hv2 := rfl))
       imodintro
@@ -1191,10 +1192,10 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       ispecialize Hclose $$ HCloseArg
       imod Hclose with _
       imodintro
-      iexists (.lit (.int (id m)))
+      iexists (pl(#(.int (id m))))
       isplitl [HKRes]; · iexact HKRes
-      iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int m)))
-        (e2 := Exp.lit (.int (id m)))
+      iapply (refines_ret (e1 := Ectx.fill [] pl(#(.int m)))
+        (e2 := pl(#(.int (id m))))
         (v1 := .int m) (v2 := .int (id m))
         (hv1 := rfl) (hv2 := rfl))
       imodintro
@@ -1203,12 +1204,12 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       ipureintro
       exact ⟨rfl, rfl⟩
   · -- Nonpositive bound: open invariant, both sides step deterministically to -1.
-    have hfill_empty : (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT) =
-      Ectx.fill [] (Exp.rand (.lit (.int n)) (.lit (.lbl α))) := rfl
+    have hfill_empty : (pl(rand(#(.int n), #(.lbl α))) : Exp rT) =
+      Ectx.fill [] (pl(rand(#(.int n), #(.lbl α)))) := rfl
     rw [hfill_empty]
     iapply (refines_atomic_l (E := ⊤) (E' := ⊤ \ ↑(logN.@ ((α, α') : Loc × Loc)))
-      (K := []) (e1 := (Exp.rand (.lit (.int n)) (.lit (.lbl α)) : Exp rT))
-      (t := (Exp.rand (.lit (.int n)) (.lit (.lbl α')) : Exp rT))
+      (K := []) (e1 := (pl(rand(#(.int n), #(.lbl α))) : Exp rT))
+      (t := (pl(rand(#(.int n), #(.lbl α'))) : Exp rT))
       (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl' (rT := rT) n α)))
     iintro %K' Hr
     have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
@@ -1234,10 +1235,10 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
     ispecialize Hclose $$ HCloseArg
     imod Hclose with _
     imodintro
-    iexists (.lit (.int (-1)))
+    iexists (pl(#(.int (-1))))
     isplitl [HKRes]; · iexact HKRes
-    iapply (refines_ret (e1 := Ectx.fill [] (.lit (.int (-1))))
-      (e2 := Exp.lit (.int (-1)))
+    iapply (refines_ret (e1 := Ectx.fill [] (pl(#(.int (-1)))))
+      (e2 := pl(#(.int (-1))))
       (v1 := .int (-1)) (v2 := .int (-1))
       (hv1 := rfl) (hv2 := rfl))
     imodintro
@@ -1266,13 +1267,13 @@ theorem refines_rand_unit_int {e e' : Exp rT} :
   ihave HIntEx := lrel_int_unfold v v' $$ HInt
   icases HIntEx with ⟨%n, %Hv, %Hv'⟩
   have hfillv : Ectx.fill [EctxItem.randL (.unit : Val _)] v.1 =
-      Exp.rand v.1 (.lit .unit) := rfl
+      Exp.rand v.1 pl(#(.unit)) := rfl
   have hfillv' : Ectx.fill [EctxItem.randL (.unit : Val _)] v'.1 =
-      Exp.rand v'.1 (.lit .unit) := rfl
+      Exp.rand v'.1 pl(#(.unit)) := rfl
   rw [hfillv, hfillv', Hv, Hv']
   by_cases hnpos : 0 < n
-  · have hfill_emp : (Exp.rand (.lit (.int n)) (.lit .unit) : Exp rT) =
-      Ectx.fill [] (Exp.rand (.lit (.int n)) (.lit .unit)) := rfl
+  · have hfill_emp : (pl(rand(#(.int n), #(.unit))) : Exp rT) =
+      Ectx.fill [] (pl(rand(#(.int n), #(.unit)))) := rfl
     rw [hfill_emp]
     iapply (refines_couple_rands_lr (rT := rT) (E := ⊤) (K := []) (K' := []) (A := lrel_int)
       (z := n) (f := id)
@@ -1280,10 +1281,10 @@ theorem refines_rand_unit_int {e e' : Exp rT} :
       (hbij := fun m h0 hlt => ⟨m, ⟨⟨h0, hlt⟩, rfl⟩, fun n' ⟨_, heq⟩ => heq⟩)
       (Hz := hnpos))
     iintro %m _
-    have hfill1 : (Ectx.fill [] (Exp.lit (.int m)) : Exp rT) = Exp.lit (.int m) := rfl
-    have hfill2 : (Ectx.fill [] (Exp.lit (.int (id m))) : Exp rT) = Exp.lit (.int m) := rfl
+    have hfill1 : (Ectx.fill [] pl(#(.int m)) : Exp rT) = pl(#(.int m)) := rfl
+    have hfill2 : (Ectx.fill [] (pl(#(.int (id m)))) : Exp rT) = pl(#(.int m)) := rfl
     rw [hfill1, hfill2]
-    iapply (refines_ret (e1 := Exp.lit (.int m)) (e2 := Exp.lit (.int m))
+    iapply (refines_ret (e1 := pl(#(.int m))) (e2 := pl(#(.int m)))
       (v1 := .int m) (v2 := .int m)
       (hv1 := rfl) (hv2 := rfl))
     imodintro

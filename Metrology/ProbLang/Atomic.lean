@@ -1,6 +1,7 @@
 module
 
 public import Metrology.ProbLang.HeadStep
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.CtxStep
 
 @[expose] public section
@@ -62,9 +63,9 @@ theorem toAtomic' {e : Exp rT} (h : Atomic e) (hne : e.decomp.2 ≠ .urand) :
 
 /-! ## Instances for the ops used by Compatibility -/
 
-theorem load (l : Loc) : Atomic (rT := rT) (.load (.lit (.loc l))) := by
+theorem load (l : Loc) : Atomic (rT := rT) pl(!#(.loc l)) := by
   intro σ e' σ' hpos
-  have hd : (Exp.load (.lit (.loc l)) : Exp rT).decompItem = none := rfl
+  have hd : (pl(!#(.loc l)) : Exp rT).decompItem = none := rfl
   rw [primStep_eq_headStep_of_decomp_nil hd] at hpos
   replace hpos := Possible.headStepSupport (possible_iff_pos.mpr hpos)
   cases hpos with
@@ -76,10 +77,10 @@ theorem load (l : Loc) : Atomic (rT := rT) (.load (.lit (.loc l))) := by
 
 
 theorem store (l : Loc) (v : Val rT) :
-    Atomic (.store (.lit (.loc l)) v.1) := by
+    Atomic (.store pl(#(.loc l)) v.1) := by
   intro σ e' σ' hpos
   have hv : v.1.toVal? = some v := Exp.toVal?_ofVal v
-  have hd : (Exp.store (.lit (.loc l)) v.1).decompItem = none := by
+  have hd : (Exp.store pl(#(.loc l)) v.1).decompItem = none := by
     show (v.1.toVal?.casesOn _ _ : Option _) = none
     rw [hv]
     rfl
@@ -99,9 +100,9 @@ theorem alloc (v : Val rT) : Atomic (.alloc v.1) := by
   cases hpos with
   | AllocS _ _ _ => exact IsVal.lit.toIsValue
 
-theorem rand_unit (z : Int) : Atomic (rT := rT) (.rand (.lit (.int z)) (.lit .unit)) := by
+theorem rand_unit (z : Int) : Atomic (rT := rT) (pl(rand(#(.int z), #(.unit)))) := by
   intro σ e' σ' hpos
-  have hd : (Exp.rand (.lit (.int z)) (.lit .unit) : Exp rT).decompItem = none := rfl
+  have hd : (pl(rand(#(.int z), #(.unit))) : Exp rT).decompItem = none := rfl
   rw [primStep_eq_headStep_of_decomp_nil hd] at hpos
   replace hpos := Possible.headStepSupport (possible_iff_pos.mpr hpos)
   cases hpos with
@@ -109,9 +110,9 @@ theorem rand_unit (z : Int) : Atomic (rT := rT) (.rand (.lit (.int z)) (.lit .un
   | RandNonposS _ => exact IsVal.lit.toIsValue
 
 theorem rand_lbl (z : Int) (l : Loc) :
-    Atomic (rT := rT) (.rand (.lit (.int z)) (.lit (.lbl l))) := by
+    Atomic (rT := rT) (pl(rand(#(.int z), #(.lbl l)))) := by
   intro σ e' σ' hpos
-  have hd : (Exp.rand (.lit (.int z)) (.lit (.lbl l)) : Exp rT).decompItem = none := rfl
+  have hd : (pl(rand(#(.int z), #(.lbl l))) : Exp rT).decompItem = none := rfl
   rw [primStep_eq_headStep_of_decomp_nil hd] at hpos
   replace hpos := Possible.headStepSupport (possible_iff_pos.mpr hpos)
   cases hpos with
@@ -127,12 +128,12 @@ Each is the corresponding `Atomic` fact pushed through `Atomic.toAtomic'`. The
 `decomp.2 ≠ .urand` obligation reduces by `rfl` here because the redex is a
 concrete constructor. -/
 
-theorem load' (l : Loc) : Atomic' (rT := rT) (.load (.lit (.loc l))) :=
+theorem load' (l : Loc) : Atomic' (rT := rT) pl(!#(.loc l)) :=
   toAtomic' (load l) (by rw [decomp_snd_of_decompItem_none rfl]; nofun)
 
-theorem store' (l : Loc) (v : Val rT) : Atomic' (.store (.lit (.loc l)) v.1) := by
+theorem store' (l : Loc) (v : Val rT) : Atomic' (.store pl(#(.loc l)) v.1) := by
   have hv : v.1.toVal? = some v := Exp.toVal?_ofVal v
-  have hd : (Exp.store (.lit (.loc l)) v.1).decompItem = none := by
+  have hd : (Exp.store pl(#(.loc l)) v.1).decompItem = none := by
     show (v.1.toVal?.casesOn _ _ : Option _) = none
     rw [hv]
     rfl
@@ -145,21 +146,21 @@ theorem alloc' (v : Val rT) : Atomic' (.alloc v.1) := by
     rw [hv]
   exact toAtomic' (alloc v) (by rw [decomp_snd_of_decompItem_none hd]; nofun)
 
-theorem rand_unit' (z : Int) : Atomic' (rT := rT) (.rand (.lit (.int z)) (.lit .unit)) :=
+theorem rand_unit' (z : Int) : Atomic' (rT := rT) (pl(rand(#(.int z), #(.unit)))) :=
   toAtomic' (rand_unit z) (by rw [decomp_snd_of_decompItem_none rfl]; nofun)
 
 theorem rand_lbl' (z : Int) (l : Loc) :
-    Atomic' (rT := rT) (.rand (.lit (.int z)) (.lit (.lbl l))) :=
+    Atomic' (rT := rT) (pl(rand(#(.int z), #(.lbl l)))) :=
   toAtomic' (rand_lbl z l) (by rw [decomp_snd_of_decompItem_none rfl]; nofun)
 
 /-- **The continuous sampler is `Atomic'`.** `urand` has no atoms at all, so
 `Atomic` says nothing about it; but its step measure is a pushforward of `unifUnit`
-along `r ↦ ⟨.lit (.real r), σ⟩`, whose entire image consists of value
+along `r ↦ ⟨pl(#(.real r)), σ⟩`, whose entire image consists of value
 configurations. Concentration holds because the bad set pulls back to `∅` — no
 atomicity, no countability, no discreteness. -/
 theorem urand' : Atomic' (rT := rT) .urand := by
   intro σ
-  have hd : (Exp.urand : Exp rT).decompItem = none := rfl
+  have hd : (pl(urand) : Exp rT).decompItem = none := rfl
   rw [primStep_eq_headStep_of_decomp_nil hd]
   show (Cfg.uniformReal σ) {ρ : Cfg rT | ρ.1.isValue}ᶜ = 0
   rw [Cfg.uniformReal, MeasureTheory.Measure.map_apply (by fun_prop) Cfg.isValue_measurableSet.compl]

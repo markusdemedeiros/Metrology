@@ -1,6 +1,7 @@
 module
 
 public import Metrology.TotalEris
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.Reals
 public import Metrology.TotalEris.Examples.Samplers.RealDecrTrial
 
@@ -430,12 +431,12 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
     ⊢@{IProp GF} ↯ (CCreditV F m) -∗
       tglWp E pl(&C #(.int (m : ℤ)))
         (fun v : Val ℝ => iprop(∃ n : ℕ,
-          ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ⌜n = 0 ∨ n = 1 ∨ n = 2⌝ ∗ ↯ (F n))) := by
+          ⌜v.1 = pl(#(.int (Int.ofNat n)))⌝ ∗ ⌜n = 0 ∨ n = 1 ∨ n = 2⌝ ∗ ↯ (F n))) := by
   iintro Hε
   twp_pure
   twp_bind pl(rand(#(.int (m : ℤ)) + #2, #.unit))
   twp_pures
-  twp_bind (Exp.rand (Exp.lit (.int ((m : ℤ) + 2))) (Exp.lit .unit))
+  twp_bind (Exp.rand (pl(#(.int ((m : ℤ) + 2)))) pl(#(.unit)))
   iapply (twp_rand_exp' (ε₂ := CCredit F) (Hz := by omega) (HSum := cCredit_sum_div_le F m)) $$ Hε
   iintro %n ⟨%Hn, Hcr⟩
   iapply (ErisWpGS.tglWp_value_of_toVal (v := (.int n : Val ℝ)) rfl)
@@ -486,7 +487,7 @@ theorem twp_Bii (E : CoPset) (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx0 
   have h2k : (2 * (k : ℤ)) = ((2 * k : ℕ) : ℤ) := by push_cast; ring
   rw [h2k]
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-    ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ⌜n = 0 ∨ n = 1 ∨ n = 2⌝ ∗ ↯ (BiiCCredit F x n))))
+    ⌜v.1 = pl(#(.int (Int.ofNat n)))⌝ ∗ ⌜n = 0 ∨ n = 1 ∨ n = 2⌝ ∗ ↯ (BiiCCredit F x n))))
   isplitl [Hε]
   · iapply (twp_C E (BiiCCredit F x) (2 * k))
     iapply (ErrorCredit.ext (BiiCreditV_C_eq F k x hx0 hx1)) $$ Hε
@@ -576,7 +577,7 @@ theorem twp_S_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx
     twp_pure
     twp_bind pl(&Bii #(.int (k : ℤ)) #(.real x))
     iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ bii : Bool,
-      ⌜v.1 = .lit (.bool bii)⌝ ∗ ↯ (SbiiCredit F k x N z ((kf : ℝ≥0∞) * ε_term) bii))))
+      ⌜v.1 = pl(#(.bool bii))⌝ ∗ ↯ (SbiiCredit F k x N z ((kf : ℝ≥0∞) * ε_term) bii))))
     isplitl [Hcz]
     · iapply (twp_Bii E (SbiiCredit F k x N z ((kf : ℝ≥0∞) * ε_term)) k x hx0 hx1) $$ Hcz
     iintro %⟨w, _⟩ ⟨%bii, %rfl, Hcbii⟩
@@ -631,7 +632,7 @@ theorem twp_S (E : CoPset) (F : ℕ → ℝ≥0∞) (k : ℕ) (x y : ℝ) (N : �
     twp_pure
     twp_bind pl(&Bii #(.int (k : ℤ)) #(.real x))
     iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ bii : Bool,
-      ⌜v.1 = .lit (.bool bii)⌝ ∗ ↯ (SbiiCredit F k x N z 0 bii))))
+      ⌜v.1 = pl(#(.bool bii))⌝ ∗ ↯ (SbiiCredit F k x N z 0 bii))))
     isplitl [Hcz]
     · iapply (twp_Bii E (SbiiCredit F k x N z 0) k x hx0 hx1) $$ Hcz
     iintro %⟨w, _⟩ ⟨%bii, %rfl, Hcbii⟩
@@ -683,7 +684,7 @@ theorem twp_S0 (E : CoPset) (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx0 : 
     twp_pure
     twp_bind pl(&Bii #(.int (k : ℤ)) #(.real x))
     iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ bii : Bool,
-      ⌜v.1 = .lit (.bool bii)⌝ ∗ ↯ (SbiiCredit F k x 0 z 0 bii))))
+      ⌜v.1 = pl(#(.bool bii))⌝ ∗ ↯ (SbiiCredit F k x 0 z 0 bii))))
     isplitl [Hcz]
     · iapply (twp_Bii E (SbiiCredit F k x 0 z 0) k x hx0 hx1) $$ Hcz
     iintro %⟨w, _⟩ ⟨%bii, %rfl, Hcbii⟩
@@ -717,7 +718,7 @@ theorem twp_B (E : CoPset) (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (Hx : 0
   twp_pure
   twp_bind pl(&S0 #(.int (k : ℤ)) #(.real x))
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-    ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (BS0Credit F n))))
+    ⌜v.1 = pl(#(.int (Int.ofNat n)))⌝ ∗ ↯ (BS0Credit F n))))
   isplitl [Hε]
   · iapply (twp_S0 E (BS0Credit F) k x Hx.1 Hx.2)
     iapply (ErrorCredit.ext (BCreditV_S0_eq F k x Hx.1 Hx.2)) $$ Hε

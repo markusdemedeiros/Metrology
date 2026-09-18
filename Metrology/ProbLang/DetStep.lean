@@ -1,6 +1,7 @@
 module
 
 public import Metrology.ProbLang.CtxStep
+import Metrology.ProbLang.Syntax.Notation
 public import Mathlib.Order.Defs.PartialOrder
 
 @[expose] public section
@@ -144,11 +145,11 @@ theorem DetHeadStep.snd_pair {e1 e2 : Exp rT} (h1 : IsVal e1) (h2 : IsVal e2) (�
   .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (⟨.pair h1 h2⟩ : (Exp.pair e1 e2).isValue); simp [Exp.decompItem, hd]) (by simp [headStep, Exp.isValM_some' h1, Exp.isValM_some' h2])
 
 theorem DetHeadStep.cond_true (et ef : Exp rT) (σ : State rT) :
-    DetHeadStep ⟨.cond (.lit (.bool true)) et ef, σ⟩ ⟨et, σ⟩ :=
+    DetHeadStep ⟨.cond pl(#(.bool true)) et ef, σ⟩ ⟨et, σ⟩ :=
   .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool true) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, hd]) (by simp [headStep])
 
 theorem DetHeadStep.cond_false (et ef : Exp rT) (σ : State rT) :
-    DetHeadStep ⟨.cond (.lit (.bool false)) et ef, σ⟩ ⟨ef, σ⟩ :=
+    DetHeadStep ⟨.cond pl(#(.bool false)) et ef, σ⟩ ⟨ef, σ⟩ :=
   .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool false) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, hd]) (by simp [headStep])
 
 theorem DetHeadStep.app_lam {body v : Exp rT}
@@ -177,20 +178,20 @@ instance pureExec_app_lam {body v : Exp rT} :
 
 /-- `PureHeadStep` for `if true then et else ef → et`. -/
 theorem PureHeadStep.cond_true (et ef : Exp rT) :
-    PureHeadStep (.cond (.lit (.bool true)) et ef) et :=
+    PureHeadStep (.cond pl(#(.bool true)) et ef) et :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool true) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, h]) fun σ => by simp [headStep]
 
 /-- `PureHeadStep` for `if false then et else ef → ef`. -/
 theorem PureHeadStep.cond_false (et ef : Exp rT) :
-    PureHeadStep (.cond (.lit (.bool false)) et ef) ef :=
+    PureHeadStep (.cond pl(#(.bool false)) et ef) ef :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.bool false) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, h]) fun σ => by simp [headStep]
 
 instance pureExec_cond_true {et ef : Exp rT} :
-    PureExec True 1 (.cond (.lit (.bool true)) et ef) et where
+    PureExec True 1 (.cond pl(#(.bool true)) et ef) et where
   pure_exec _ := ⟨_, (PureHeadStep.cond_true et ef).toPureStep, rfl⟩
 
 instance pureExec_cond_false {et ef : Exp rT} :
-    PureExec True 1 (.cond (.lit (.bool false)) et ef) ef where
+    PureExec True 1 (.cond pl(#(.bool false)) et ef) ef where
   pure_exec _ := ⟨_, (PureHeadStep.cond_false et ef).toPureStep, rfl⟩
 
 /-- `PureHeadStep` for `fst (v1, v2) → v1` when both are values. -/
@@ -277,7 +278,7 @@ theorem PureHeadStep.scrut_some {v : Exp rT} {p : Pat rT} {b : Exp rT}
 /-- `PureHeadStep` for `scrut v p` when match fails. -/
 theorem PureHeadStep.scrut_none {v : Exp rT} {p : Pat rT}
     (hv : IsVal v) (hmatch : Pat.tryMatch p v = none) :
-    PureHeadStep (.scrut v p) (.inr (.lit .unit)) :=
+    PureHeadStep (.scrut v p) (.inr pl(#(.unit))) :=
   .of_det _ _ (by obtain ⟨_, h⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue); simp [Exp.decompItem, h]) fun σ => by simp [headStep, Exp.isValM_some' hv, hmatch]
 
 instance pureExec_scrut_some {v : Exp rT} {p : Pat rT} {b : Exp rT} :
@@ -285,7 +286,7 @@ instance pureExec_scrut_some {v : Exp rT} {p : Pat rT} {b : Exp rT} :
   pure_exec h := ⟨_, (PureHeadStep.scrut_some h.1.some h.2).toPureStep, rfl⟩
 
 instance pureExec_scrut_none {v : Exp rT} {p : Pat rT} :
-    PureExec (v.isValue ∧ Pat.tryMatch p v = none) 1 (.scrut v p) (.inr (.lit .unit)) where
+    PureExec (v.isValue ∧ Pat.tryMatch p v = none) 1 (.scrut v p) (.inr pl(#(.unit))) where
   pure_exec h := ⟨_, (PureHeadStep.scrut_none h.1.some h.2).toPureStep, rfl⟩
 
 theorem DetHeadStep.app_fix {body v : Exp rT}
@@ -318,19 +319,19 @@ theorem DetHeadStep.case_inr {v el er : Exp rT} (hv : IsVal v) (σ : State rT) :
   .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (⟨.inr hv⟩ : (Exp.inr v).isValue); simp [Exp.decompItem, hd]) (by simp [headStep, Exp.isValM_some' hv])
 
 theorem DetHeadStep.alloc {v : Exp rT} (hv : IsVal v) (σ : State rT) :
-    DetHeadStep ⟨.alloc v, σ⟩ ⟨.lit (.loc σ.heap.fresh), σ.update_heap (·.insert σ.heap.fresh ⟨v, hv, hv.lc⟩)⟩ := by
+    DetHeadStep ⟨.alloc v, σ⟩ ⟨pl(#(.loc σ.heap.fresh)), σ.update_heap (·.insert σ.heap.fresh ⟨v, hv, hv.lc⟩)⟩ := by
   obtain ⟨w, hw⟩ := hv.check?_some
   exact .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (⟨hv⟩ : v.isValue); simp [Exp.decompItem, hd]) (by simp [headStep, Exp.asValM, Exp.toVal?, hw, IsVal.subsingleton hv w])
 
 theorem DetHeadStep.load {ℓ : Loc} {v : Val rT} (σ : State rT) (hlookup : σ.heap[ℓ]? = some v) :
-    DetHeadStep ⟨.load (.lit (.loc ℓ)), σ⟩ ⟨.ofVal v, σ⟩ :=
+    DetHeadStep ⟨pl(!#(.loc ℓ)), σ⟩ ⟨.ofVal v, σ⟩ :=
   .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.loc ℓ) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, hd]) (by simp [headStep, hlookup])
 
 theorem DetHeadStep.store {ℓ : Loc} {e : Exp rT} {v_old v_new : Val rT}
     (_hv : IsVal e) (σ : State rT)
     (hlookup : σ.heap[ℓ]? = some v_old)
     (hnew : e.toVal? = some v_new) :
-    DetHeadStep ⟨.store (.lit (.loc ℓ)) e, σ⟩ ⟨.lit .unit, σ.update_heap (·.insert ℓ v_new)⟩ :=
+    DetHeadStep ⟨.store pl(#(.loc ℓ)) e, σ⟩ ⟨pl(#(.unit)), σ.update_heap (·.insert ℓ v_new)⟩ :=
   .of_det _ _ (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.loc ℓ) : Exp rT)) ⟨.lit⟩; simp [Exp.decompItem, hnew, hd]) (by simp [headStep, Exp.asValM, hnew, hlookup])
 
 theorem DetStep.fill (K : Ectx rT) {cfg1 cfg2 : Cfg rT} (h : DetStep cfg1 cfg2) :

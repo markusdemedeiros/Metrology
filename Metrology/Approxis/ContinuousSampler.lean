@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.PrimitiveLaws
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.CouplingRules
 public import Metrology.Approxis.AppRelRules
 
@@ -37,31 +38,31 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
 This is the payoff of the `_concentrated` generalization: `urand` samples from a
 *diffuse* measure, so it has no atoms and every atom-based step rule is vacuous
 for it. Here the carrying set is the real-literal image
-`{⟨.lit (.real r), σ₁⟩ | r ∈ unifUnitSupport}`, which `primStep ⟨urand, σ₁⟩`
+`{⟨pl(#(.real r)), σ₁⟩ | r ∈ unifUnitSupport}`, which `primStep ⟨urand, σ₁⟩`
 lives on by `concentratedOn_map`, and which is measurable because the injection
-`r ↦ ⟨.lit (.real r), σ₁⟩` is a `MeasurableEmbedding`.
+`r ↦ ⟨pl(#(.real r)), σ₁⟩` is a `MeasurableEmbedding`.
 
 Note the absence of `[Countable rT]`: the whole point is that this rule holds for
 a diffuse `rT`. Follows the same shape as `TotalEris.twp_urand_exp`, minus the
 error credits (a plain atomic lift spends none). -/
 theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
     iprop(▷ ∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗ Φ (.real r : Val rT))
-      ⊢@{IProp GF} wp E (Exp.urand) Φ := by
+      ⊢@{IProp GF} wp E pl(urand) Φ := by
   iintro HΦ
-  have Hnv : (Exp.urand : Exp rT).toVal? = none :=
+  have Hnv : (pl(urand) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  have hhead : ∀ σ₁ : State rT, HeadReducible (Exp.urand : Exp rT) σ₁ :=
+  have hhead : ∀ σ₁ : State rT, HeadReducible (pl(urand) : Exp rT) σ₁ :=
     fun σ₁ => show Cfg.uniformReal σ₁ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
-  have hps : ∀ σ₁ : State rT, primStep (⟨Exp.urand, σ₁⟩ : Cfg rT)
-      = (ProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
+  have hps : ∀ σ₁ : State rT, primStep (⟨pl(urand), σ₁⟩ : Cfg rT)
+      = (ProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => primStep_eq_headStep
       (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))
-  have hg : ∀ σ₁ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
+  have hg : ∀ σ₁ : State rT, Measurable (fun r : rT => (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => Cfg.measurable_iff.mpr
       ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
   have hgemb : ∀ σ₁ : State rT,
-      MeasurableEmbedding (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) := fun σ₁ => by
-    have hcomp : (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT))
+      MeasurableEmbedding (fun r : rT => (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)) := fun σ₁ => by
+    have hcomp : (fun r : rT => (⟨pl(#(.real r)), σ₁⟩ : Cfg rT))
         = Cfg.measurableEquivProd.symm ∘ (fun e : Exp rT => (e, σ₁))
             ∘ Exp.lit ∘ BaseLit.real := rfl
     rw [hcomp]
@@ -69,26 +70,26 @@ theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
       ((measurableEmbedding_prod_mk_right σ₁).comp
         (Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding))
   have hrange : ∀ σ₁ : State rT,
-      {ρ : Cfg rT | ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT)
+      {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)
           ∧ r ∈ ProbLangℝ.unifUnitSupport}
-      = (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) '' ProbLangℝ.unifUnitSupport :=
+      = (fun r : rT => (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)) '' ProbLangℝ.unifUnitSupport :=
     fun σ₁ => by
       ext ρ; simp only [Set.mem_image, Set.mem_setOf_eq]
       exact ⟨fun ⟨r, h, hr⟩ => ⟨r, hr, h.symm⟩, fun ⟨r, hr, h⟩ => ⟨r, h.symm, hr⟩⟩
   have hSmeas : ∀ σ₁ : State rT, MeasurableSet
-      {ρ : Cfg rT | ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT)
+      {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)
           ∧ r ∈ ProbLangℝ.unifUnitSupport} := fun σ₁ => by
     rw [hrange σ₁]
     exact (hgemb σ₁).measurableSet_image.mpr ProbLangℝ.unifUnitSupportMeasurable
-  have hSconc : ∀ σ₁ : State rT, Concentrated (primStep ⟨Exp.urand, σ₁⟩)
-      {ρ : Cfg rT | ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT)
+  have hSconc : ∀ σ₁ : State rT, Concentrated (primStep ⟨pl(urand), σ₁⟩)
+      {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)
           ∧ r ∈ ProbLangℝ.unifUnitSupport} := fun σ₁ => by
     rw [hps σ₁, hrange σ₁]
     exact concentratedOn_map (hg σ₁)
       ((hgemb σ₁).measurableSet_image.mpr ProbLangℝ.unifUnitSupportMeasurable)
       ProbLangℝ.unifUnitIsConcentrated
   iapply (wp_lift_atomic_step_concentrated (S := fun σ₁ =>
-    {ρ : Cfg rT | ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT)
+    {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)
       ∧ r ∈ ProbLangℝ.unifUnitSupport}) Hnv hSmeas hSconc)
   iintro %σ₁ Hσ
   imodintro
@@ -127,10 +128,10 @@ theorem Cfg.uniformReal_addCoupl_bij (σ σ' : State rT) (f : rT → rT)
       (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT))) :
     AddCoupl 0
       {p : Cfg rT × Cfg rT | ∃ r : rT, r ∈ ProbLangℝ.unifUnitSupport ∧
-        p.1 = (⟨.lit (.real r), σ⟩ : Cfg rT) ∧ p.2 = (⟨.lit (.real (f r)), σ'⟩ : Cfg rT)}
+        p.1 = (⟨pl(#(.real r)), σ⟩ : Cfg rT) ∧ p.2 = (⟨pl(#(.real (f r))), σ'⟩ : Cfg rT)}
       (Cfg.uniformReal σ) (Cfg.uniformReal σ') := by
   classical
-  have hg : ∀ τ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), τ⟩ : Cfg rT)) :=
+  have hg : ∀ τ : State rT, Measurable (fun r : rT => (⟨pl(#(.real r)), τ⟩ : Cfg rT)) :=
     fun τ => Cfg.measurable_iff.mpr
       ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
   rintro ⟨φ, Hφm, Hφb⟩ ⟨ψ, Hψm, Hψb⟩ Hle
@@ -140,7 +141,7 @@ theorem Cfg.uniformReal_addCoupl_bij (σ σ' : State rT) (f : rT → rT)
       MeasureTheory.lintegral_map Hφm (hg σ),
       MeasureTheory.lintegral_map Hψm (hg σ')]
   -- Reindex the RHS along `f`; this is where measure preservation is spent.
-  have hψ' : Measurable (fun r : rT => ψ (⟨.lit (.real r), σ'⟩ : Cfg rT)) :=
+  have hψ' : Measurable (fun r : rT => ψ (⟨pl(#(.real r)), σ'⟩ : Cfg rT)) :=
     Hψm.comp (hg σ')
   rw [← hmp.lintegral_comp hψ']
   -- `unifUnit` lives on its support, so the pointwise bound is only needed there.
@@ -158,20 +159,20 @@ theorem wp_couple_urand_urand (f : rT → rT)
     (hmp : MeasureTheory.MeasurePreserving f
       (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT)))
     (K : Ectx rT) (E : CoPset) (Φ : Val rT → IProp GF) :
-    iprop((⤇ K.fill Exp.urand) ∗
+    iprop((⤇ K.fill pl(urand)) ∗
         (∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗
-          (⤇ K.fill (.lit (.real (f r)))) -∗ Φ (.real r : Val rT)))
-      ⊢@{IProp GF} wp E Exp.urand Φ := by
+          (⤇ K.fill (pl(#(.real (f r))))) -∗ Φ (.real r : Val rT)))
+      ⊢@{IProp GF} wp E pl(urand) Φ := by
   iintro ⟨Hj, Hcnt⟩
-  have Hv : (Exp.urand : Exp rT).toVal? = none :=
+  have Hv : (pl(urand) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
-  have Hnval : ¬ (Exp.urand : Exp rT).isValue := fun ⟨w⟩ => nomatch w
-  have hhead : ∀ τ : State rT, HeadReducible (Exp.urand : Exp rT) τ :=
+  have Hnval : ¬ (pl(urand) : Exp rT).isValue := fun ⟨w⟩ => nomatch w
+  have hhead : ∀ τ : State rT, HeadReducible (pl(urand) : Exp rT) τ :=
     fun τ => show Cfg.uniformReal τ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
-  have hps : ∀ τ : State rT, primStep (⟨Exp.urand, τ⟩ : Cfg rT) = Cfg.uniformReal τ :=
+  have hps : ∀ τ : State rT, primStep (⟨pl(urand), τ⟩ : Cfg rT) = Cfg.uniformReal τ :=
     fun τ => primStep_eq_headStep
       (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead τ))
-  have hred : ∀ τ : State rT, Reducible (Exp.urand : Exp rT) τ :=
+  have hred : ∀ τ : State rT, Reducible (pl(urand) : Exp rT) τ :=
     fun τ => reducible_of_headReducible (by is_lc) (hhead τ)
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
@@ -182,8 +183,8 @@ theorem wp_couple_urand_urand (f : rT → rT)
   imodintro
   let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
     ∃ r : rT, r ∈ ProbLangℝ.unifUnitSupport
-      ∧ c₁ = (⟨.lit (.real r), σ₁⟩ : Cfg rT)
-      ∧ c₂ = (⟨K.fill (.lit (.real (f r))), σ₁'⟩ : Cfg rT)
+      ∧ c₁ = (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)
+      ∧ c₂ = (⟨K.fill (pl(#(.real (f r)))), σ₁'⟩ : Cfg rT)
   iexists R, 0, ε
   isplitr; · ipureintro; rw [zero_add]
   isplitr; · ipureintro; exact hred σ₁
@@ -212,7 +213,7 @@ theorem wp_couple_urand_urand (f : rT → rT)
   imodintro
   iintro !>
   ihave HUpd := specProg_update (GF := GF)
-    (e3 := K.fill (.lit (.real (f r)))) $$ Hs Hj
+    (e3 := K.fill (pl(#(.real (f r))))) $$ Hs Hj
   imod HUpd with ⟨Hs', Hj'⟩
   imod Hclose
   imodintro
@@ -244,15 +245,15 @@ theorem refines_couple_urands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF}
     (hmp : MeasureTheory.MeasurePreserving f
       (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT))) :
     iprop(∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗
-            refines E (K.fill (.lit (.real r))) (K'.fill (.lit (.real (f r)))) A)
+            refines E (K.fill pl(#(.real r))) (K'.fill (pl(#(.real (f r))))) A)
       ⊢@{IProp GF}
-        refines E (K.fill Exp.urand) (K'.fill Exp.urand) A := by
+        refines E (K.fill pl(urand)) (K'.fill pl(urand)) A := by
   iintro Hcnt
   unfold refines
   iintro %K2 %ε Hj Hna Herr Hpos
-  have hfc : K2.fill (K'.fill (Exp.urand : Exp rT)) =
-      (K2.comp K').fill (Exp.urand : Exp rT) := Ectx.fill_comp K2 K' _
-  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.urand : Exp rT)) $$ [Hj]
+  have hfc : K2.fill (K'.fill (pl(urand) : Exp rT)) =
+      (K2.comp K').fill (pl(urand) : Exp rT) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (pl(urand) : Exp rT)) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply ApproxisWpGS.wp_bind (K := K)
   iapply (wp_couple_urand_urand f hmp (K2.comp K') ⊤
@@ -261,12 +262,12 @@ theorem refines_couple_urands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF}
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
   isplitl [Hj']; · iexact Hj'
   iintro %r %hrsupp HKres
-  have hfcN : K2.fill (K'.fill (Exp.lit (.real (f r)) : Exp rT)) =
-      (K2.comp K').fill (Exp.lit (.real (f r)) : Exp rT) := Ectx.fill_comp K2 K' _
-  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.real (f r)) : Exp rT))) $$ [HKres]
+  have hfcN : K2.fill (K'.fill (pl(#(.real (f r))) : Exp rT)) =
+      (K2.comp K').fill (pl(#(.real (f r))) : Exp rT) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (pl(#(.real (f r))) : Exp rT))) $$ [HKres]
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %r %hrsupp
-  have hfillN : Exp.ofVal (.real r : Val rT) = Exp.lit (.real r) := rfl
+  have hfillN : Exp.ofVal (.real r : Val rT) = pl(#(.real r)) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 

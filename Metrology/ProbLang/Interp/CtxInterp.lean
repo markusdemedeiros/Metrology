@@ -1,6 +1,7 @@
 module
 
 public import Metrology.ProbLang.Syntax.Syntax
+import Metrology.ProbLang.Syntax.Notation
 public import Std.Data.ExtTreeMap.Lemmas
 
 @[expose] public section
@@ -50,7 +51,7 @@ def sampleUniform (rT : Type _) [ProbLangℝ rT] (z : Int) : IO Int := do
   if 0 < z then
     return ← IO.rand 0 z.toNat
   else
-    throw' (Error.stuck (rT := rT) "rand: bound must be positive" (.lit (.int z)))
+    throw' (Error.stuck (rT := rT) "rand: bound must be positive" pl(#(.int z)))
 
 /-!
 ### Head step
@@ -110,7 +111,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : IO (
     | none    => throw' (.stuck "alloc: argument is not a value" vd)
     | some vd' =>
       σ.modify (·.insert ℓ vd')
-      return .lit (.loc ℓ)
+      return pl(#(.loc ℓ))
 
   | .load (.lit (.loc ℓ)) =>
     let heap ← σ.get
@@ -127,7 +128,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : IO (
       | none   => throw' (Error.segfault (rT := rT) ℓ)
       | some _ =>
         σ.modify (·.insert ℓ v')
-        return .lit .unit
+        return pl(#(.unit))
 
   -- Tape operations: unsupported
   | .tape _   => throw' (Error.unsupported (rT := rT) "tape allocation")
@@ -136,7 +137,7 @@ def headStep (σ : IO.Ref (ExtTreeMap Loc (Val rT) compare)) (e : Exp rT) : IO (
   -- Probabilistic sampling (no tape): headStep (rand z unit) = Uniform [0,z)
   | .rand (.lit (.int z)) (.lit .unit) =>
     let n ← sampleUniform rT z
-    return .lit (.int n)
+    return pl(#(.int n))
 
   -- Scrutinize: headStep (scrut v pat) = inl(bindings) | inr(unit)
   | .scrut v p =>

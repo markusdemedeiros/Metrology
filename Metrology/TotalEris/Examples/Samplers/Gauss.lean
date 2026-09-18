@@ -1,6 +1,7 @@
 module
 
 public import Metrology.TotalEris
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.Reals
 public import Metrology.TotalEris.Examples.Samplers.HalfBernNegExp
 public import Metrology.TotalEris.Examples.Samplers.BernoulliGeometric
@@ -135,7 +136,7 @@ theorem abstractBernoulli_Bkx (k : ℕ) (x : ℝ) (hx : 0 ≤ x ∧ x ≤ 1) :
     iintro %F Hε
     twp_pure
     have hβ :
-        (Exp.openRec 0 (Exp.lit .unit) (Exp.closeRec 0 (Var.internal 0) B) : Exp ℝ) = B := rfl
+        (Exp.openRec 0 pl(#(.unit)) (Exp.closeRec 0 (Var.internal 0) B) : Exp ℝ) = B := rfl
     rw [hβ]
     iapply (twp_B E F k x hx)
     iapply (ErrorCredit.ext (γBkx_credit_eq F k x hx.1))
@@ -621,7 +622,7 @@ theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) :
   twp_bind pl(&GeometricTrial &BNEHalfVal.1 #(.int (0 : ℤ)))
   icombine Hε_spec Hε_term as Hε
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ z : ℤ,
-    ⌜v.1 = .lit (.int z)⌝ ∗ ⌜(0 : ℤ) ≤ z⌝ ∗ ↯ (G1GeometricCredit F c z))))
+    ⌜v.1 = pl(#(.int z))⌝ ∗ ⌜(0 : ℤ) ≤ z⌝ ∗ ↯ (G1GeometricCredit F c z))))
   isplitl [Hε]
   · iapply (twp_GeometricTrial E (γ := γBNE) 0 BNEHalfVal γBNE_pos γBNE_lt_one
       abstractBernoulli_BNEHalf) $$ %(G1GeometricCredit F c)
@@ -638,7 +639,7 @@ theorem twp_G1 (E : CoPset) (F : ℕ → ℝ≥0∞) :
   twp_pure
   rw [IterN_toNat_cast hz0]
   iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-    ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (G1IterContAmp F c z.toNat b) ∗ ⌜True⌝)))
+    ⌜w.1 = pl(#(.bool b))⌝ ∗ ↯ (G1IterContAmp F c z.toNat b) ∗ ⌜True⌝)))
   isplitl [Hck]
   · iapply (twp_IterTrial E BNEHalfVal γBNE (iprop(⌜True⌝))
       (abstractBernoulliI_BNEHalf (iprop(⌜True⌝)))
@@ -672,7 +673,7 @@ theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measu
       tglWp E pl(&G2 #.unit)
         (fun p : Val ℝ => iprop(∃ (k : ℕ) (r : ℝ),
           ⌜0 ≤ r ∧ r < 1⌝ ∗
-          ⌜p.1 = .pair (.lit (.real r)) (.lit (.int (Int.ofNat k)))⌝ ∗ ↯ (F k r))) := by
+          ⌜p.1 = .pair pl(#(.real r)) (pl(#(.int (Int.ofNat k))))⌝ ∗ ↯ (F k r))) := by
   iintro Hε_spec
   iapply twp_err_pos solve_not_value
   iintro %ε_term %Hε_pos Hε_term
@@ -685,7 +686,7 @@ theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measu
   twp_bind pl(&G1 #.unit)
   icombine Hε_spec Hε_term as Hε
   iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-    ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (G2G1Credit F c n))))
+    ⌜v.1 = pl(#(.int (Int.ofNat n)))⌝ ∗ ↯ (G2G1Credit F c n))))
   isplitl [Hε]
   · iapply (twp_G1 E (G2G1Credit F c))
     iapply (ErrorCredit.ext (G2G1_collapse F hFm ε_term).symm)
@@ -708,7 +709,7 @@ theorem twp_G2 (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measu
   have hck : G2CreditAmp F c k x
       = IterCreditV (G2IterContAmp F c k x) (γBkx k x) (k + 1) := rfl
   iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-    ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (G2IterContAmp F c k x b) ∗ ⌜True⌝)))
+    ⌜w.1 = pl(#(.bool b))⌝ ∗ ↯ (G2IterContAmp F c k x b) ∗ ⌜True⌝)))
   isplitl [Hcx]
   · iapply (twp_IterTrial E (BkxVal k x) (γBkx k x) (iprop(⌜True⌝))
       (abstractBernoulliI_Bkx k x Hxr (iprop(⌜True⌝)))

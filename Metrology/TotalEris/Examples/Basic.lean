@@ -1,6 +1,7 @@
 module
 
 public import Metrology.TotalEris
+import Metrology.ProbLang.Syntax.Notation
 
 @[expose] public section
 
@@ -44,7 +45,7 @@ example (E : CoPset) (l : Loc) (z : Int)
     (n : { z' : Int // 0 ≤ z' ∧ z' < z })
     (ns : List { z' : Int // 0 ≤ z' ∧ z' < z }) :
     ⊢@{IProp GF} l ↪ₐ ⟨z, n :: ns⟩ -∗
-      tglWp E (.rand (.lit (.int z)) (.lit (.lbl l)))
+      tglWp E (pl(rand(#(.int z), #(.lbl l))))
         (fun w : Val rT => iprop(⌜w = .int n.val⌝ ∗ l ↪ₐ ⟨z, ns⟩)) := by
   iintro Hl
   iapply twp_rand_tape
@@ -56,7 +57,7 @@ example (E : CoPset) (l : Loc) (z : Int)
 sampling and the empty tape is preserved. -/
 example (E : CoPset) (l : Loc) (z : Int) (Hz : 0 < z) :
     ⊢@{IProp GF} l ↪ₐ ⟨z, []⟩ -∗
-      tglWp E (.rand (.lit (.int z)) (.lit (.lbl l)))
+      tglWp E (pl(rand(#(.int z), #(.lbl l))))
         (fun w : Val rT => iprop(∃ n : Int,
           ⌜0 ≤ n ∧ n < z⌝ ∗ ⌜w = .int n⌝ ∗ l ↪ₐ ⟨z, []⟩)) := by
   iintro Hl
@@ -165,7 +166,7 @@ example (E : CoPset) (v : Val rT) (R : Prop) (HR : R) :
 fn `F 0 = 0`, `F 1 = ε`. Continuation receives the per-outcome credit. -/
 example (E : CoPset) (ε : ENNReal) :
     ⊢@{IProp GF} ↯ε -∗
-      tglWp E (.rand (.lit (.int 2)) (.lit .unit))
+      tglWp E (pl(rand(#(.int 2), #(.unit))))
         (fun w : Val rT => iprop(∃ n : Int, ⌜0 ≤ n ∧ n < 2 ∧
           w = .int n⌝)) := by
   iintro Hcr
@@ -186,7 +187,7 @@ example (E : CoPset) (ε : ENNReal) :
 The single outcome `n = 0` returns `↯0` to the continuation. -/
 example (E : CoPset) (ε : ENNReal) :
     ⊢@{IProp GF} ↯ε -∗
-      tglWp E (.rand (.lit (.int 1)) (.lit .unit))
+      tglWp E (pl(rand(#(.int 1), #(.unit))))
         (fun w : Val rT => iprop(⌜w = .int 0⌝)) := by
   iintro Hε
   iapply (twp_rand_exp (z := 1) (ε₁ := ε) (ε₂ := fun _ => 0)

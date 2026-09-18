@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.AppWeakestpre
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.Model
 public import Metrology.Approxis.PrimitiveLaws
 public import Metrology.Approxis.CouplingRules
@@ -260,7 +261,7 @@ ownership under later). The Lean `wp_alloc` returns the fragment directly withou
 so we drop the `▷` in the port. Callers who have `▷` in their context can use
 `iNext`-style stripping earlier. -/
 theorem refines_alloc_l {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A : lrel rT GF} :
-    iprop(∀ (l : Loc), (l ↦ v) -∗ refines E (K.fill (.lit (.loc l))) t A)
+    iprop(∀ (l : Loc), (l ↦ v) -∗ refines E (K.fill pl(#(.loc l))) t A)
       ⊢@{IProp GF} refines E (K.fill (.alloc v.1)) t A := by
   iintro Hlog
   iapply (refines_wp_l (K := K) (e1 := .alloc v.1))
@@ -275,9 +276,9 @@ theorem refines_alloc_l {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A 
 **Port note**: `▷`s dropped (Lean convention, same rationale as `refines_alloc_l`). -/
 theorem refines_load_l {E : CoPset} {K : Ectx rT} {l : Loc} {t : Exp rT} {A : lrel rT GF} :
     iprop(∃ v : Val rT, (l ↦ v) ∗ ((l ↦ v) -∗ refines E (K.fill v.1) t A))
-      ⊢@{IProp GF} refines E (K.fill (.load (.lit (.loc l)))) t A := by
+      ⊢@{IProp GF} refines E (K.fill pl(!#(.loc l))) t A := by
   iintro ⟨%v, Hl, Hlog⟩
-  iapply (refines_wp_l (K := K) (e1 := .load (.lit (.loc l))))
+  iapply (refines_wp_l (K := K) (e1 := pl(!#(.loc l))))
   iapply (wp_load (v := v))
   isplitl [Hl]; · iexact Hl
   iintro Hl
@@ -288,12 +289,12 @@ theorem refines_load_l {E : CoPset} {K : Ectx rT} {l : Loc} {t : Exp rT} {A : lr
 **Port note**: `▷`s dropped (Lean convention, same rationale as `refines_alloc_l`). -/
 theorem refines_store_l {E : CoPset} {K : Ectx rT} {l : Loc} {v' : Val rT} {t : Exp rT}
     {A : lrel rT GF} :
-    iprop(∃ v : Val rT, (l ↦ v) ∗ ((l ↦ v') -∗ refines E (K.fill (.lit .unit)) t A))
-      ⊢@{IProp GF} refines E (K.fill (.store (.lit (.loc l)) v'.1)) t A := by
+    iprop(∃ v : Val rT, (l ↦ v) ∗ ((l ↦ v') -∗ refines E (K.fill pl(#(.unit))) t A))
+      ⊢@{IProp GF} refines E (K.fill (.store pl(#(.loc l)) v'.1)) t A := by
   iintro ⟨%v, Hl, Hlog⟩
-  iapply (refines_wp_l (K := K) (e1 := .store (.lit (.loc l)) v'.1))
-  have hstore : Exp.store (.lit (.loc l)) v'.1 =
-      Exp.store (.lit (.loc l)) (Exp.ofVal v') := rfl
+  iapply (refines_wp_l (K := K) (e1 := .store pl(#(.loc l)) v'.1))
+  have hstore : Exp.store pl(#(.loc l)) v'.1 =
+      Exp.store pl(#(.loc l)) (Exp.ofVal v') := rfl
   rw [hstore]
   -- `wp_store`'s `v` is the NEW value, `v'` is the OLD; swapped here.
   iapply (wp_store (v := v') (v' := v))
@@ -307,7 +308,7 @@ omit [Countable rT] in
 /-- `refines_alloc_r` (app_rel_rules.v:119). -/
 theorem refines_alloc_r {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), (l ↦ₛ v) -∗
-            refines E t (K.fill (.lit (.loc l))) A)
+            refines E t (K.fill pl(#(.loc l))) A)
       ⊢@{IProp GF} refines E t (K.fill (.alloc v.1)) A := by
   iintro Hlog
   unfold refines
@@ -321,9 +322,9 @@ theorem refines_alloc_r {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A 
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro ⟨%l, HKRes, Hl⟩
-  have hfcL : K'.fill (K.fill (Exp.lit (.loc l))) =
-      (K'.comp K).fill (Exp.lit (.loc l)) := Ectx.fill_comp K' K _
-  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.loc l)))) $$ [HKRes]
+  have hfcL : K'.fill (K.fill pl(#(.loc l))) =
+      (K'.comp K).fill pl(#(.loc l)) := Ectx.fill_comp K' K _
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill pl(#(.loc l)))) $$ [HKRes]
   · rw [hfcL]; iexact HKRes
   iapply specUpdate_ret
   have hv_eq : (⟨v.1, v.2, v.lc⟩ : Val rT) = v := rfl
@@ -340,14 +341,14 @@ full ownership for simplicity (most callers have full permission). -/
 theorem refines_load_r {E : CoPset} {K : Ectx rT} {l : Loc} {v : Val rT} {t : Exp rT}
     {A : lrel rT GF} :
     iprop((l ↦ₛ v) ∗ ((l ↦ₛ v) -∗ refines E t (K.fill v.1) A))
-      ⊢@{IProp GF} refines E t (K.fill (.load (.lit (.loc l)))) A := by
+      ⊢@{IProp GF} refines E t (K.fill pl(!#(.loc l))) A := by
   iintro ⟨Hl, Hlog⟩
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill (Exp.load (.lit (.loc l)))) =
-      (K'.comp K).fill (Exp.load (.lit (.loc l))) := Ectx.fill_comp K' K _
+  have hfc : K'.fill (K.fill pl(!#(.loc l))) =
+      (K'.comp K).fill pl(!#(.loc l)) := Ectx.fill_comp K' K _
   have hfcv : (K'.comp K).fill (Exp.ofVal v) = K'.fill (K.fill v.1) := (Ectx.fill_comp K' K _).symm
-  ihave Hj' : iprop(⤇ (K'.comp K).fill (Exp.load (.lit (.loc l)))) $$ [Hj]
+  ihave Hj' : iprop(⤇ (K'.comp K).fill pl(!#(.loc l))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   ihave HStep := step_load (E := ⊤) (K'.comp K) (l := l) (v := v) $$ [Hj' Hl]
   · isplitl [Hj']; · iexact Hj'
@@ -366,14 +367,14 @@ omit [Countable rT] in
 /-- `refines_store_r` (app_rel_rules.v:144). -/
 theorem refines_store_r {E : CoPset} {K : Ectx rT} {l : Loc} {v v' : Val rT} {e : Exp rT}
     {A : lrel rT GF} :
-    iprop((l ↦ₛ v) ∗ ((l ↦ₛ v') -∗ refines E e (K.fill (.lit .unit)) A))
-      ⊢@{IProp GF} refines E e (K.fill (.store (.lit (.loc l)) v'.1)) A := by
+    iprop((l ↦ₛ v) ∗ ((l ↦ₛ v') -∗ refines E e (K.fill pl(#(.unit))) A))
+      ⊢@{IProp GF} refines E e (K.fill (.store pl(#(.loc l)) v'.1)) A := by
   iintro ⟨Hl, Hlog⟩
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill (Exp.store (.lit (.loc l)) v'.1)) =
-      (K'.comp K).fill (Exp.store (.lit (.loc l)) v'.1) := Ectx.fill_comp K' K _
-  ihave Hj' : iprop(⤇ (K'.comp K).fill (Exp.store (.lit (.loc l)) v'.1)) $$ [Hj]
+  have hfc : K'.fill (K.fill (Exp.store pl(#(.loc l)) v'.1)) =
+      (K'.comp K).fill (Exp.store pl(#(.loc l)) v'.1) := Ectx.fill_comp K' K _
+  ihave Hj' : iprop(⤇ (K'.comp K).fill (Exp.store pl(#(.loc l)) v'.1)) $$ [Hj]
   · rw [← hfc]; iexact Hj
   ihave HStep := step_store (E := ⊤) (K'.comp K) (l := l) (v_old := v) (v_new := v')
     (e := v'.1) v'.2 (Exp.toVal?_ofVal v') $$ [Hj' Hl]
@@ -383,9 +384,9 @@ theorem refines_store_r {E : CoPset} {K : Ectx rT} {l : Loc} {v v' : Val rT} {e 
   iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
   isplitl [HStep]; · iexact HStep
   iintro ⟨HKRes, Hl'⟩
-  have hfcU : K'.fill (K.fill (Exp.lit .unit)) =
-      (K'.comp K).fill (Exp.lit .unit) := Ectx.fill_comp K' K _
-  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit .unit))) $$ [HKRes]
+  have hfcU : K'.fill (K.fill pl(#(.unit))) =
+      (K'.comp K).fill pl(#(.unit)) := Ectx.fill_comp K' K _
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill pl(#(.unit)))) $$ [HKRes]
   · rw [hfcU]; iexact HKRes
   iapply specUpdate_ret
   ispecialize Hlog $$ Hl'
@@ -403,10 +404,10 @@ the `wp_rand{,_lbl}*` lemmas from `PrimitiveLaws.lean`. -/
 theorem refines_randU_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A : lrel rT GF}
     (Hz : 0 < z) :
     iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
-            refines E (K.fill (.lit (.int n))) t A)
-      ⊢@{IProp GF} refines E (K.fill (.rand (.lit (.int z)) (.lit .unit))) t A := by
+            refines E (K.fill pl(#(.int n))) t A)
+      ⊢@{IProp GF} refines E (K.fill (pl(rand(#(.int z), #(.unit))))) t A := by
   iintro Hlog
-  iapply (refines_wp_l (K := K) (e1 := .rand (.lit (.int z)) (.lit .unit)))
+  iapply (refines_wp_l (K := K) (e1 := pl(rand(#(.int z), #(.unit)))))
   iapply (wp_rand Hz)
   iintro %n %Hbnds
   iapply Hlog $$ %n
@@ -417,10 +418,10 @@ theorem refines_randT_l {E : CoPset} {K : Ectx rT} {l : Loc} {z n : Int}
     {ns : List Int} {t : Exp rT} {A : lrel rT GF} :
     iprop(appNatTape l z (n :: ns) ∗
             (appNatTape l z ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-              refines E (K.fill (.lit (.int n))) t A))
-      ⊢@{IProp GF} refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) t A := by
+              refines E (K.fill pl(#(.int n))) t A))
+      ⊢@{IProp GF} refines E (K.fill (pl(rand(#(.int z), #(.lbl l))))) t A := by
   iintro ⟨Hl, Hlog⟩
-  iapply (refines_wp_l (K := K) (e1 := .rand (.lit (.int z)) (.lit (.lbl l))))
+  iapply (refines_wp_l (K := K) (e1 := pl(rand(#(.int z), #(.lbl l)))))
   iapply wp_rand_tape
   isplitl [Hl]; · iexact Hl
   iintro Hl' %Hbnds
@@ -432,10 +433,10 @@ theorem refines_randT_empty_l {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
     {t : Exp rT} {A : lrel rT GF} (Hz : 0 < z) :
     iprop(appNatTape l z [] ∗
             (∀ (n : Int), appNatTape l z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-              refines E (K.fill (.lit (.int n))) t A))
-      ⊢@{IProp GF} refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) t A := by
+              refines E (K.fill pl(#(.int n))) t A))
+      ⊢@{IProp GF} refines E (K.fill (pl(rand(#(.int z), #(.lbl l))))) t A := by
   iintro ⟨Hl, Hlog⟩
-  iapply (refines_wp_l (K := K) (e1 := .rand (.lit (.int z)) (.lit (.lbl l))))
+  iapply (refines_wp_l (K := K) (e1 := pl(rand(#(.int z), #(.lbl l)))))
   iapply (wp_rand_tape_empty Hz)
   isplitl [Hl]; · iexact Hl
   iintro %n Hl' %Hbnds
@@ -446,21 +447,21 @@ theorem refines_randT_empty_l {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
 theorem refines_randU_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : lrel rT GF}
     (Hz : 0 < z) :
     iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
-            refines E e (K.fill (.lit (.int n))) A)
-      ⊢@{IProp GF} refines E e (K.fill (.rand (.lit (.int z)) (.lit .unit))) A := by
+            refines E e (K.fill pl(#(.int n))) A)
+      ⊢@{IProp GF} refines E e (K.fill (pl(rand(#(.int z), #(.unit))))) A := by
   iintro Hlog
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill (Exp.rand (.lit (.int z)) (.lit .unit))) =
-      (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit .unit)) := Ectx.fill_comp K' K _
-  ihave Hj' : iprop(⤇ (K'.comp K).fill (.rand (.lit (.int z)) (.lit .unit))) $$ [Hj]
+  have hfc : K'.fill (K.fill (pl(rand(#(.int z), #(.unit))))) =
+      (K'.comp K).fill (pl(rand(#(.int z), #(.unit)))) := Ectx.fill_comp K' K _
+  ihave Hj' : iprop(⤇ (K'.comp K).fill (pl(rand(#(.int z), #(.unit))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply (wp_rand_r (K'.comp K) Hz)
   isplitl [Hj']; · iexact Hj'
   iintro %n %Hbnds HKRes
-  have hfcN : (K'.comp K).fill (Exp.lit (.int n)) = K'.fill (K.fill (.lit (.int n))) :=
+  have hfcN : (K'.comp K).fill pl(#(.int n)) = K'.fill (K.fill pl(#(.int n))) :=
     (Ectx.fill_comp K' K _).symm
-  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill pl(#(.int n)))) $$ [HKRes]
   · rw [← hfcN]; iexact HKRes
   ispecialize Hlog $$ %n
   ihave Hpure : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
@@ -480,14 +481,14 @@ theorem refines_randT_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
     {n : Int} {ns : List Int} {e : Exp rT} {A : lrel rT GF} :
     iprop(specNatTape l z (n :: ns) ∗
             (specNatTape l z ns -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-              refines E e (K.fill (.lit (.int n))) A))
-      ⊢@{IProp GF} refines E e (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) A := by
+              refines E e (K.fill pl(#(.int n))) A))
+      ⊢@{IProp GF} refines E e (K.fill (pl(rand(#(.int z), #(.lbl l))))) A := by
   iintro ⟨Hα, Hlog⟩
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) =
-      (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l))) := Ectx.fill_comp K' K _
-  ihave Hjc : iprop(⤇ (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) $$ [Hj]
+  have hfc : K'.fill (K.fill (pl(rand(#(.int z), #(.lbl l))))) =
+      (K'.comp K).fill (pl(rand(#(.int z), #(.lbl l)))) := Ectx.fill_comp K' K _
+  ihave Hjc : iprop(⤇ (K'.comp K).fill (pl(rand(#(.int z), #(.lbl l))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   ihave HαEx := show specNatTape l z (n :: ns) ⊢@{IProp GF}
       iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
@@ -507,9 +508,9 @@ theorem refines_randT_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
     isplitl [HStep]; · iexact HStep
     iintro ⟨HKRes, HαResNew⟩
     have hw_eq : w.val = n := hwn
-    have hfcN : (K'.comp K).fill (Exp.lit (.int w.val)) =
-        K'.fill (K.fill (.lit (.int w.val))) := (Ectx.fill_comp K' K _).symm
-    ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
+    have hfcN : (K'.comp K).fill pl(#(.int w.val)) =
+        K'.fill (K.fill pl(#(.int w.val))) := (Ectx.fill_comp K' K _).symm
+    ihave HKRes' : iprop(⤇ K'.fill (K.fill pl(#(.int n)))) $$ [HKRes]
     · rw [← hw_eq, ← hfcN]; iexact HKRes
     iapply specUpdate_ret
     ihave HαResNat : iprop(specNatTape l z ns) $$ [HαResNew]
@@ -533,22 +534,22 @@ theorem refines_randT_empty_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
     {e : Exp rT} {A : lrel rT GF} (Hz : 0 < z) :
     iprop(specNatTape l z [] ∗
             (∀ (n : Int), specNatTape l z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-              refines E e (K.fill (.lit (.int n))) A))
-      ⊢@{IProp GF} refines E e (K.fill (.rand (.lit (.int z)) (.lit (.lbl l)))) A := by
+              refines E e (K.fill pl(#(.int n))) A))
+      ⊢@{IProp GF} refines E e (K.fill (pl(rand(#(.int z), #(.lbl l))))) A := by
   iintro ⟨Hα, Hlog⟩
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill (Exp.rand (.lit (.int z)) (.lit (.lbl l)))) =
-      (K'.comp K).fill (Exp.rand (.lit (.int z)) (.lit (.lbl l))) := Ectx.fill_comp K' K _
-  ihave Hjc : iprop(⤇ (K'.comp K).fill (.rand (.lit (.int z)) (.lit (.lbl l)))) $$ [Hj]
+  have hfc : K'.fill (K.fill (pl(rand(#(.int z), #(.lbl l))))) =
+      (K'.comp K).fill (pl(rand(#(.int z), #(.lbl l)))) := Ectx.fill_comp K' K _
+  ihave Hjc : iprop(⤇ (K'.comp K).fill (pl(rand(#(.int z), #(.lbl l))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply (wp_rand_tape_empty_r (K'.comp K) Hz)
   isplitl [Hjc]; · iexact Hjc
   isplitl [Hα]; · iexact Hα
   iintro %n HαNew HKRes %Hbnds
-  have hfcN : (K'.comp K).fill (Exp.lit (.int n)) = K'.fill (K.fill (.lit (.int n))) :=
+  have hfcN : (K'.comp K).fill pl(#(.int n)) = K'.fill (K.fill pl(#(.int n))) :=
     (Ectx.fill_comp K' K _).symm
-  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.int n)))) $$ [HKRes]
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill pl(#(.int n)))) $$ [HKRes]
   · rw [← hfcN]; iexact HKRes
   ispecialize Hlog $$ %n HαNew
   ihave Hbpure : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
@@ -564,10 +565,10 @@ theorem refines_randT_empty_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
 /-- `refines_alloctape_l`: LHS tape allocation. -/
 theorem refines_alloctape_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), appTapesFrag l (Tape.empty z) -∗
-            refines E (K.fill (.lit (.lbl l))) t A)
-      ⊢@{IProp GF} refines E (K.fill (.tape (.lit (.int z)))) t A := by
+            refines E (K.fill pl(#(.lbl l))) t A)
+      ⊢@{IProp GF} refines E (K.fill (pl(tape(#(.int z))))) t A := by
   iintro Hlog
-  iapply (refines_wp_l (K := K) (e1 := .tape (.lit (.int z))))
+  iapply (refines_wp_l (K := K) (e1 := pl(tape(#(.int z)))))
   iapply wp_alloctape
   iintro %l Hl
   iapply Hlog $$ %l Hl
@@ -577,21 +578,21 @@ omit [Countable rT] in
 fragment is delivered via the continuation. -/
 theorem refines_alloctape_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), specNatTape l z [] -∗
-            refines E e (K.fill (.lit (.lbl l))) A)
-      ⊢@{IProp GF} refines E e (K.fill (.tape (.lit (.int z)))) A := by
+            refines E e (K.fill pl(#(.lbl l))) A)
+      ⊢@{IProp GF} refines E e (K.fill (pl(tape(#(.int z))))) A := by
   iintro Hlog
   unfold refines
   iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill (Exp.tape (.lit (.int z)))) =
-      (K'.comp K).fill (Exp.tape (.lit (.int z))) := Ectx.fill_comp K' K _
-  ihave Hjc : iprop(⤇ (K'.comp K).fill (Exp.tape (.lit (.int z)))) $$ [Hj]
+  have hfc : K'.fill (K.fill (pl(tape(#(.int z))))) =
+      (K'.comp K).fill (pl(tape(#(.int z)))) := Ectx.fill_comp K' K _
+  ihave Hjc : iprop(⤇ (K'.comp K).fill (pl(tape(#(.int z))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply (wp_alloc_tape_r (K'.comp K))
   isplitl [Hjc]; · iexact Hjc
   iintro %l HKRes Hl
-  have hfcL : (K'.comp K).fill (Exp.lit (.lbl l)) = K'.fill (K.fill (.lit (.lbl l))) :=
+  have hfcL : (K'.comp K).fill pl(#(.lbl l)) = K'.fill (K.fill pl(#(.lbl l))) :=
     (Ectx.fill_comp K' K _).symm
-  ihave HKRes' : iprop(⤇ K'.fill (K.fill (.lit (.lbl l)))) $$ [HKRes]
+  ihave HKRes' : iprop(⤇ K'.fill (K.fill pl(#(.lbl l)))) $$ [HKRes]
   · rw [← hfcL]; iexact HKRes
   ispecialize Hlog $$ %l Hl
   ispecialize Hlog $$ %K' %ε
@@ -702,16 +703,16 @@ theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {
     (hbij : ∀ m : Int, 0 ≤ m → m < z → ∃! n : Int, (0 ≤ n ∧ n < z) ∧ f n = m)
     (Hz : 0 < z) :
     iprop(∀ (n : Int), (⌜0 ≤ n ∧ n < z⌝) -∗
-            refines E (K.fill (.lit (.int n))) (K'.fill (.lit (.int (f n)))) A)
+            refines E (K.fill pl(#(.int n))) (K'.fill (pl(#(.int (f n))))) A)
       ⊢@{IProp GF}
-        refines E (K.fill (.rand (.lit (.int z)) (.lit .unit)))
-          (K'.fill (.rand (.lit (.int z)) (.lit .unit))) A := by
+        refines E (K.fill (pl(rand(#(.int z), #(.unit)))))
+          (K'.fill (pl(rand(#(.int z), #(.unit))))) A := by
   iintro Hcnt
   unfold refines
   iintro %K2 %ε Hj Hna Herr Hpos
-  have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit .unit))) =
-      (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit)) := Ectx.fill_comp K2 K' _
-  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit))) $$ [Hj]
+  have hfc : K2.fill (K'.fill (pl(rand(#(.int z), #(.unit))))) =
+      (K2.comp K').fill (pl(rand(#(.int z), #(.unit)))) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (pl(rand(#(.int z), #(.unit))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply ApproxisWpGS.wp_bind (K := K)
   iapply (wp_couple_rand_rand z f hdom hbij Hz (K2.comp K') ⊤
@@ -720,14 +721,14 @@ theorem refines_couple_rands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
   isplitl [Hj']; · iexact Hj'
   iintro %n %Hn HKres
-  have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
-      (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
-  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
+  have hfcN : K2.fill (K'.fill (pl(#(.int (f n))))) =
+      (K2.comp K').fill (pl(#(.int (f n)))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (pl(#(.int (f n)))))) $$ [HKres]
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n
   ispecialize Hcnt $$ %Hn
   have hfillN : Exp.ofVal (.int n : Val rT) =
-      Exp.lit (.int n) := rfl
+      pl(#(.int n)) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
@@ -740,16 +741,16 @@ theorem refines_couple_TU {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
     (Hz : 0 < z) :
     iprop(▷ appNatTape α z [] ∗
         (∀ (n : Int), appNatTape α z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-            refines E (K.fill (.lit (.int n))) (K'.fill (.lit (.int (f n)))) A))
+            refines E (K.fill pl(#(.int n))) (K'.fill (pl(#(.int (f n))))) A))
       ⊢@{IProp GF}
-        refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl α))))
-          (K'.fill (.rand (.lit (.int z)) (.lit .unit))) A := by
+        refines E (K.fill (pl(rand(#(.int z), #(.lbl α)))))
+          (K'.fill (pl(rand(#(.int z), #(.unit))))) A := by
   iintro ⟨Hα, Hcnt⟩
   unfold refines
   iintro %K2 %ε Hj Hna Herr Hpos
-  have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit .unit))) =
-      (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit)) := Ectx.fill_comp K2 K' _
-  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit .unit))) $$ [Hj]
+  have hfc : K2.fill (K'.fill (pl(rand(#(.int z), #(.unit))))) =
+      (K2.comp K').fill (pl(rand(#(.int z), #(.unit)))) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (pl(rand(#(.int z), #(.unit))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply ApproxisWpGS.wp_bind (K := K)
   iapply (wp_couple_tape_rand z f hdom hbij Hz (K2.comp K') ⊤ α
@@ -759,16 +760,16 @@ theorem refines_couple_TU {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   isplitl [Hα]; · iexact Hα
   isplitl [Hj']; · iexact Hj'
   iintro %n ⟨HαNew, HKres, %Hn⟩
-  have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
-      (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
-  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
+  have hfcN : K2.fill (K'.fill (pl(#(.int (f n))))) =
+      (K2.comp K').fill (pl(#(.int (f n)))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (pl(#(.int (f n)))))) $$ [HKres]
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n HαNew
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
   have hfillN : Exp.ofVal (.int n : Val rT) =
-      Exp.lit (.int n) := rfl
+      pl(#(.int n)) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
@@ -781,16 +782,16 @@ theorem refines_couple_UT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
     (Hz : 0 < z) :
     iprop(▷ specNatTape α' z [] ∗
         (∀ (n : Int), specNatTape α' z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-            refines E (K.fill (.lit (.int n))) (K'.fill (.lit (.int (f n)))) A))
+            refines E (K.fill pl(#(.int n))) (K'.fill (pl(#(.int (f n))))) A))
       ⊢@{IProp GF}
-        refines E (K.fill (.rand (.lit (.int z)) (.lit .unit)))
-          (K'.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) A := by
+        refines E (K.fill (pl(rand(#(.int z), #(.unit)))))
+          (K'.fill (pl(rand(#(.int z), #(.lbl α'))))) A := by
   iintro ⟨Hα', Hcnt⟩
   unfold refines
   iintro %K2 %ε Hj Hna Herr Hpos
-  have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) =
-      (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) := Ectx.fill_comp K2 K' _
-  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) $$ [Hj]
+  have hfc : K2.fill (K'.fill (pl(rand(#(.int z), #(.lbl α'))))) =
+      (K2.comp K').fill (pl(rand(#(.int z), #(.lbl α')))) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (pl(rand(#(.int z), #(.lbl α'))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply ApproxisWpGS.wp_bind (K := K)
   iapply (wp_couple_rand_tape z f hdom hbij Hz (K2.comp K') ⊤ α'
@@ -800,16 +801,16 @@ theorem refines_couple_UT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   isplitl [Hα']; · iexact Hα'
   isplitl [Hj']; · iexact Hj'
   iintro %n ⟨Hα'New, HKres, %Hn⟩
-  have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
-      (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
-  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
+  have hfcN : K2.fill (K'.fill (pl(#(.int (f n))))) =
+      (K2.comp K').fill (pl(#(.int (f n)))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (pl(#(.int (f n)))))) $$ [HKres]
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n Hα'New
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
   have hfillN : Exp.ofVal (.int n : Val rT) =
-      Exp.lit (.int n) := rfl
+      pl(#(.int n)) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
@@ -822,16 +823,16 @@ theorem refines_couple_TT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
     (Hz : 0 < z) :
     iprop(▷ appNatTape α z [] ∗ ▷ specNatTape α' z [] ∗
         (∀ (n : Int), appNatTape α z [] -∗ specNatTape α' z [] -∗ (⌜0 ≤ n ∧ n < z⌝) -∗
-            refines E (K.fill (.lit (.int n))) (K'.fill (.lit (.int (f n)))) A))
+            refines E (K.fill pl(#(.int n))) (K'.fill (pl(#(.int (f n))))) A))
       ⊢@{IProp GF}
-        refines E (K.fill (.rand (.lit (.int z)) (.lit (.lbl α))))
-          (K'.fill (.rand (.lit (.int z)) (.lit (.lbl α')))) A := by
+        refines E (K.fill (pl(rand(#(.int z), #(.lbl α)))))
+          (K'.fill (pl(rand(#(.int z), #(.lbl α'))))) A := by
   iintro ⟨Hα, Hα', Hcnt⟩
   unfold refines
   iintro %K2 %ε Hj Hna Herr Hpos
-  have hfc : K2.fill (K'.fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) =
-      (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α'))) := Ectx.fill_comp K2 K' _
-  ihave Hj' : iprop(⤇ (K2.comp K').fill (Exp.rand (.lit (.int z)) (.lit (.lbl α')))) $$ [Hj]
+  have hfc : K2.fill (K'.fill (pl(rand(#(.int z), #(.lbl α'))))) =
+      (K2.comp K').fill (pl(rand(#(.int z), #(.lbl α')))) := Ectx.fill_comp K2 K' _
+  ihave Hj' : iprop(⤇ (K2.comp K').fill (pl(rand(#(.int z), #(.lbl α'))))) $$ [Hj]
   · rw [← hfc]; iexact Hj
   iapply ApproxisWpGS.wp_bind (K := K)
   iapply (wp_couple_rand_lbl_rand_lbl z f hdom hbij Hz (K2.comp K') ⊤ α α'
@@ -842,16 +843,16 @@ theorem refines_couple_TT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
   isplitl [Hα']; · iexact Hα'
   isplitl [Hj']; · iexact Hj'
   iintro %n ⟨HαNew, Hα'New, HKres, %Hn⟩
-  have hfcN : K2.fill (K'.fill (Exp.lit (.int (f n)))) =
-      (K2.comp K').fill (Exp.lit (.int (f n))) := Ectx.fill_comp K2 K' _
-  ihave HKres' : iprop(⤇ K2.fill (K'.fill (.lit (.int (f n))))) $$ [HKres]
+  have hfcN : K2.fill (K'.fill (pl(#(.int (f n))))) =
+      (K2.comp K').fill (pl(#(.int (f n)))) := Ectx.fill_comp K2 K' _
+  ihave HKres' : iprop(⤇ K2.fill (K'.fill (pl(#(.int (f n)))))) $$ [HKres]
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %n HαNew Hα'New
   ihave Hbnds : iprop((⌜0 ≤ n ∧ n < z⌝ : IProp GF)) $$ []
   · ipureintro; exact Hn
   ispecialize Hcnt $$ Hbnds
   have hfillN : Exp.ofVal (.int n : Val rT) =
-      Exp.lit (.int n) := rfl
+      pl(#(.int n)) := rfl
   rw [hfillN]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 

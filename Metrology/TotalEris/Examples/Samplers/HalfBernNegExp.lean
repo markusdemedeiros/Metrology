@@ -1,6 +1,7 @@
 module
 
 public import Metrology.TotalEris
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.Reals
 public import Metrology.TotalEris.Examples.Samplers.RealDecrTrial
 public import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
@@ -204,7 +205,7 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
     twp_pure
     twp_bind pl(&DecrTrial #(.int (0 : ℤ)) #(.real r))
     iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-      ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (LiftParity F n))))
+      ⌜v.1 = pl(#(.int (Int.ofNat n)))⌝ ∗ ↯ (LiftParity F n))))
     isplitl [Hcr]
     · iapply (twp_DecrTrial E (LiftParity F) 0 r Hr) $$ Hcr
     iintro %⟨w', _⟩ ⟨%n, %hn, Hcrn⟩

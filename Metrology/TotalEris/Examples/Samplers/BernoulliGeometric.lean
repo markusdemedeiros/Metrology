@@ -1,6 +1,7 @@
 module
 
 public import Metrology.TotalEris
+import Metrology.ProbLang.Syntax.Notation
 public import Mathlib.Probability.Distributions.Geometric
 
 @[expose] public section
@@ -37,7 +38,7 @@ structure AbstractBernoulli (v : Val rT) (γ : ↑unitInterval) : Prop where
     ∀ (F : Bool → ℝ≥0∞),
       ↯ (.ofReal γ * F true + (1 - .ofReal γ) * F false) -∗
       tglWp E pl(&v.1 #.unit) (fun w : Val rT => iprop(
-        ∃ b : Bool, ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b))))
+        ∃ b : Bool, ⌜w.1 = pl(#(.bool b))⌝ ∗ ↯ (F b))))
 
 end abstractBernoulli
 
@@ -138,7 +139,7 @@ theorem twp_GeometricTrial (E : CoPset) {γ : ↑unitInterval} (shift : Int) (v 
       ∀ (F : Int → ℝ≥0∞),
       ↯ (shiftGeometricPMFCreditV γ shift F) -∗
       tglWp E pl(&GeometricTrial &v.1 #(.int shift)) (fun w : Val rT => iprop(
-        ∃ z : ℤ, ⌜w.1 = .lit (.int z)⌝ ∗ ⌜shift ≤ z⌝ ∗ ↯ (F z))) := by
+        ∃ z : ℤ, ⌜w.1 = pl(#(.int z))⌝ ∗ ⌜shift ≤ z⌝ ∗ ↯ (F z))) := by
   iintro %F Hε_spec
   iapply twp_err_pos solve_not_value
   iintro %ε_term %Hε_term_pos Hε_term
@@ -171,7 +172,7 @@ theorem twp_GeometricTrial (E : CoPset) {γ : ↑unitInterval} (shift : Int) (v 
     twp_pure
     twp_bind pl(&GeometricTrial &v.1 #(.int (shift + 1)))
     iapply (tglWp_wand (Φ := fun w : Val rT => iprop(
-      ∃ z : ℤ, ⌜w.1 = .lit (.int z)⌝ ∗ ⌜shift + 1 ≤ z⌝ ∗ ↯ (F z))))
+      ∃ z : ℤ, ⌜w.1 = pl(#(.int z))⌝ ∗ ⌜shift + 1 ≤ z⌝ ∗ ↯ (F z))))
     isplitl [Hε IH]
     · rw [geometricContAmp]
       ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hε

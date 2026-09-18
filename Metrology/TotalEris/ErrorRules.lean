@@ -1,6 +1,7 @@
 module
 
 public import Metrology.TotalEris.ErisGS
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.TotalEris.TotalPrimitiveLaws
 
 @[expose] public section
@@ -124,7 +125,7 @@ is supplied rather than derived from discreteness, so no `[Countable rT]` is nee
 theorem Cfg.lintegral_uniform' {z : Int} (Hz : 0 < z) (σ : State rT)
     {φ : Cfg rT → ENNReal} (hφ : Measurable φ) :
     ∫⁻ c, φ c ∂(Cfg.uniform z σ)
-      = (z.toNat : ENNReal)⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) z, φ ⟨.lit (.int n), σ⟩ := by
+      = (z.toNat : ENNReal)⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) z, φ ⟨pl(#(.int n)), σ⟩ := by
   have hcard : (Finset.Ico (0 : Int) z).card = z.toNat := by rw [Int.card_Ico]; omega
   rw [Cfg.uniform_eq_map_uniformOfFinset Hz σ,
       MeasureTheory.lintegral_map hφ Measurable.of_discrete,
@@ -210,10 +211,10 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
     iprop(↯ε₁) ⊢
       iprop((∀ n, ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
         Φ (.int n : Val rT)) -∗
-      tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
+      tglWp E (pl(rand(#(.int z), #(.unit)))) Φ) := by
   -- `rand z ()` is a non-value, head-reducible at every state (`primStep = Cfg.uniform z`).
-  have Hnv : (Exp.rand (Exp.lit (.int z)) (Exp.lit .unit) : Exp rT).toVal? = none := solve_not_value
-  have hhead : ∀ σ₁ : State rT, HeadReducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
+  have Hnv : (pl(rand(#(.int z), #(.unit))) : Exp rT).toVal? = none := solve_not_value
+  have hhead : ∀ σ₁ : State rT, HeadReducible (pl(rand(#(.int z), #(.unit)))) σ₁ :=
     fun σ₁ => (HeadStepSupport.RandNoTapeS Hz (le_refl _) Hz).ne_zero
   -- Reach predicate `R` (the integers `0 ≤ n < z`) and per-outcome credit `f`.
   set R : State rT → Cfg rT → Prop :=
@@ -228,7 +229,7 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
     · exact zero_le
   have hstate : ∀ {σ₁ : State rT} {ρ : Cfg rT}, R σ₁ ρ → ρ.state = σ₁ := by
     rintro σ₁ ρ ⟨n, _, _, rfl⟩; rfl
-  have hred : ∀ σ₁, Reducible (Exp.rand (.lit (.int z)) (.lit .unit)) σ₁ :=
+  have hred : ∀ σ₁, Reducible (pl(rand(#(.int z), #(.unit)))) σ₁ :=
     fun σ₁ => Reducible.of_head (by is_lc) (hhead σ₁)
   have hrmeas : ∀ σ₁ : State rT, MeasurableSet {ρ : Cfg rT | R σ₁ ρ} := fun σ₁ => by
     apply Set.Countable.measurableSet
@@ -238,7 +239,7 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
   -- `Pgl 0`: the complement of the reach set is null under the uniform step.
   have hpgl : ∀ σ₁ : State rT,
       Pgl 0 (R σ₁) (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) := fun σ₁ => by
-    show (primStep ⟨Exp.rand (.lit (.int z)) (.lit .unit), σ₁⟩) {ρ : Cfg rT | ¬ R σ₁ ρ} ≤ 0
+    show (primStep ⟨pl(rand(#(.int z), #(.unit))), σ₁⟩) {ρ : Cfg rT | ¬ R σ₁ ρ} ≤ 0
     refine le_of_eq ?_
     rw [primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))]
     show (Cfg.uniform z σ₁) {ρ : Cfg rT | ¬ R σ₁ ρ} = 0
@@ -278,7 +279,7 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
   -- The reached value is `.int n`, carrying `↯(ε₂ n.toNat)`; hand it to `Hcont`.
   iintro %σ₁ %ρ %HRρ Hcr
   obtain ⟨n, Hn₁, Hn₂, rfl⟩ := HRρ
-  have hfe : f (⟨.lit (.int n), σ₁⟩ : Cfg rT) = ε₂ n.toNat := by
+  have hfe : f (⟨pl(#(.int n)), σ₁⟩ : Cfg rT) = ε₂ n.toNat := by
     simp only [hf]; exact dif_pos ⟨Hn₁, Hn₂⟩
   iapply (ErisWpGS.tglWp_value_of_toVal (v := (.int n : Val rT)) rfl)
   iapply Hcont $$ %n
@@ -292,13 +293,13 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
     iprop(↯ε₁) ⊢
       iprop((∀ r, (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
-      tglWp E Exp.urand Φ) := by
+      tglWp E pl(urand) Φ) := by
   -- `urand` is a non-value, head-reducible at every state (`primStep = uniformReal`).
-  have Hnv : (Exp.urand : Exp rT).toVal? = none := solve_not_value
-  have hhead : ∀ σ₁ : State rT, HeadReducible (Exp.urand : Exp rT) σ₁ :=
+  have Hnv : (pl(urand) : Exp rT).toVal? = none := solve_not_value
+  have hhead : ∀ σ₁ : State rT, HeadReducible (pl(urand) : Exp rT) σ₁ :=
     fun σ₁ => show Cfg.uniformReal σ₁ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
   -- The real-literal injection: `primStep = uniformReal = unifUnit.map inj`, and `inj` embeds.
-  have hps : ∀ σ₁ : State rT, primStep (⟨Exp.urand, σ₁⟩ : Cfg rT)
+  have hps : ∀ σ₁ : State rT, primStep (⟨pl(urand), σ₁⟩ : Cfg rT)
       = (ProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))
   have hg : ∀ σ₁ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
@@ -332,7 +333,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     · exact zero_le
   have hstate : ∀ {σ₁ : State rT} {ρ : Cfg rT}, R σ₁ ρ → ρ.state = σ₁ := by
     rintro σ₁ ρ ⟨r, rfl, _⟩; rfl
-  have hred : ∀ σ₁, Reducible (Exp.urand : Exp rT) σ₁ :=
+  have hred : ∀ σ₁, Reducible (pl(urand) : Exp rT) σ₁ :=
     fun σ₁ => reducible_of_headReducible (by is_lc) (hhead σ₁)
   have hrmeas : ∀ σ₁ : State rT, MeasurableSet {ρ : Cfg rT | R σ₁ ρ} := fun σ₁ => by
     rw [hrange σ₁]
@@ -355,7 +356,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
   -- The reached value is `.real r`, carrying `↯(ε₂ r)`; hand it to `Hcont`.
   iintro %σ₁ %ρ %HRρ Hcr
   obtain ⟨r, rfl, hrsupp⟩ := HRρ
-  have hfe : f (⟨.lit (.real r), σ₁⟩ : Cfg rT) = ε₂ r := by simp only [hf]
+  have hfe : f (⟨pl(#(.real r)), σ₁⟩ : Cfg rT) = ε₂ r := by simp only [hf]
   iapply (ErisWpGS.tglWp_value_of_toVal (v := (.real r : Val rT)) rfl)
   iapply Hcont $$ %r
   iframe %hrsupp
@@ -371,7 +372,7 @@ theorem twp_urand_exp' {E : CoPset} {ε₁ : ENNReal}
     (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
     iprop(↯ε₁) ⊢
       iprop((∀ r, (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
-      tglWp E Exp.urand Φ) := by
+      tglWp E pl(urand) Φ) := by
   iintro Herr Hcont
   -- Clamping shrinks the integrand pointwise, so the budget `HInt` survives.
   have hint : (∫⁻ r, min (ε₂ r) 1 ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁ :=
@@ -401,7 +402,7 @@ theorem twp_rand_exp' {E : CoPset} {z : Int} {ε₁ : ENNReal}
     iprop(↯ε₁) ⊢
       iprop((∀ n, ⌜0 ≤ n ∧ n < z⌝ ∗ ↯(ε₂ n.toNat) -∗
         Φ (.int n : Val rT)) -∗
-      tglWp E (.rand (.lit (.int z)) (.lit .unit)) Φ) := by
+      tglWp E (pl(rand(#(.int z), #(.unit)))) Φ) := by
   iintro Herr Hcont
   -- Clamping shrinks each summand, so the averaged bound `HSum` survives.
   have hsum : (∑ n ∈ Finset.range z.toNat, min (ε₂ n) 1) / (z.toNat : ENNReal) ≤ ε₁ :=

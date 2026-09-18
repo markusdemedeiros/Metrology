@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.AppWeakestpre
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.PrimitiveLaws
 public import Metrology.ProbLang.Syntax.LocallyClosed
 public import Iris.Instances.Lib.NaInvariants
@@ -263,19 +264,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 omit [ProbLangℝ rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
-    iprop(⌜v1.1 = .lit .unit ∧ v2.1 = .lit .unit⌝ : IProp GF)
+    iprop(⌜v1.1 = pl(#(.unit)) ∧ v2.1 = pl(#(.unit))⌝ : IProp GF)
       ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
   iintro %h
   ipureintro
   exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_unit : lrel rT GF where
-  car v1 v2 := iprop(⌜ v1.1 = .lit .unit ∧ v2.1 = .lit .unit ⌝)
+  car v1 v2 := iprop(⌜ v1.1 = pl(#(.unit)) ∧ v2.1 = pl(#(.unit)) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := lrel_closed_lit_pair v1 v2
 
 noncomputable def lrel_bool : lrel rT GF where
-  car v1 v2 := iprop(∃ b : Bool, ⌜ v1.1 = .lit (.bool b) ∧ v2.1 = .lit (.bool b) ⌝)
+  car v1 v2 := iprop(∃ b : Bool, ⌜ v1.1 = pl(#(.bool b)) ∧ v2.1 = pl(#(.bool b)) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%b, %h⟩
@@ -283,7 +284,7 @@ noncomputable def lrel_bool : lrel rT GF where
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_nat : lrel rT GF where
-  car v1 v2 := iprop(∃ n : Nat, ⌜ v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
+  car v1 v2 := iprop(∃ n : Nat, ⌜ v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%n, %h⟩
@@ -293,7 +294,7 @@ noncomputable def lrel_nat : lrel rT GF where
 /-- Both values are the same positive integer literal (`0 < n`). -/
 noncomputable def lrel_pos_nat : lrel rT GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ 0 < n ∧
-    v1.1 = .lit (.int (n : Int)) ∧ v2.1 = .lit (.int (n : Int)) ⌝)
+    v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%n, %h⟩
@@ -301,7 +302,7 @@ noncomputable def lrel_pos_nat : lrel rT GF where
     exact ⟨h.2.1 ▸ Exp.lit_isClosedEmpty _, h.2.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_int : lrel rT GF where
-  car v1 v2 := iprop(∃ n : Int, ⌜ v1.1 = .lit (.int n) ∧ v2.1 = .lit (.int n) ⌝)
+  car v1 v2 := iprop(∃ n : Int, ⌜ v1.1 = pl(#(.int n)) ∧ v2.1 = pl(#(.int n)) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%n, %h⟩
@@ -312,7 +313,7 @@ noncomputable def lrel_int : lrel rT GF where
 
 The continuous counterpart of `lrel_int`. -/
 noncomputable def lrel_real : lrel rT GF where
-  car v1 v2 := iprop(∃ r : rT, ⌜ v1.1 = .lit (.real r) ∧ v2.1 = .lit (.real r) ⌝)
+  car v1 v2 := iprop(∃ r : rT, ⌜ v1.1 = pl(#(.real r)) ∧ v2.1 = pl(#(.real r)) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%r, %h⟩
@@ -323,7 +324,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_real_unfold (v v' : Val rT) :
     (lrel_real (GF := GF)).car v v'
       ⊢@{IProp GF} iprop(∃ r : rT,
-        ⌜v.1 = .lit (.real r) ∧ v'.1 = .lit (.real r)⌝) :=
+        ⌜v.1 = pl(#(.real r)) ∧ v'.1 = pl(#(.real r))⌝) :=
   BIBase.Entails.rfl
 
 noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
@@ -539,7 +540,7 @@ guarded by an invariant at the log-namespace. Mirrors `lrel_ref` (model.v:108–
 noncomputable def lrel_ref (A : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
     iprop(∃ (l1 l2 : Loc),
-      (⌜ v1.1 = .lit (.loc l1) ⌝) ∗ (⌜ v2.1 = .lit (.loc l2) ⌝) ∗
+      (⌜ v1.1 = pl(#(.loc l1)) ⌝) ∗ (⌜ v2.1 = pl(#(.loc l2)) ⌝) ∗
       Iris.inv (logN.@ ((l1, l2) : Loc × Loc))
         (iprop(∃ (w1 w2 : Val rT), (appHeapFrag l1 w1) ∗ (specHeapFrag l2 w2) ∗ A w1 w2)))
   persistent _ _ := inferInstance
@@ -553,7 +554,7 @@ same finite range. Mirrors `lrel_tape` (model.v:113–115). -/
 noncomputable def lrel_tape : lrel rT GF where
   car v1 v2 :=
     iprop(∃ (α1 α2 : Loc) (z : Int),
-      (⌜ v1.1 = .lit (.lbl α1) ⌝) ∗ (⌜ v2.1 = .lit (.lbl α2) ⌝) ∗
+      (⌜ v1.1 = pl(#(.lbl α1)) ⌝) ∗ (⌜ v2.1 = pl(#(.lbl α2)) ⌝) ∗
       Iris.inv (logN.@ ((α1, α2) : Loc × Loc))
         (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩))))
   persistent _ _ := inferInstance

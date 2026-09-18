@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Iris.SpecUpdate
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.DetStep
 
 @[expose] public section
@@ -76,11 +77,11 @@ The two below are tape-specific and used by `step_alloctape` / `step_rand`. -/
 /-- Tape allocation: `tape #z` deterministically allocates a fresh empty tape of
 bound `z`. -/
 theorem DetHeadStep.tape {z : Int} (σ : State rT) :
-    DetHeadStep ⟨.tape (.lit (.int z)), σ⟩
-      ⟨.lit (.lbl σ.tapes.fresh),
+    DetHeadStep ⟨pl(tape(#(.int z))), σ⟩
+      ⟨pl(#(.lbl σ.tapes.fresh)),
        σ.update_tapes (·.insert σ.tapes.fresh (Tape.empty z))⟩ :=
   .of_det _ _
-    (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.int z) : Exp rT)) ⟨.lit⟩;
+    (by obtain ⟨_, hd⟩ := Exp.toVal?_eq_some_of_isValue (e := (pl(#(.int z)) : Exp rT)) ⟨.lit⟩;
         simp [Exp.decompItem, hd])
     (by simp [headStep])
 
@@ -89,11 +90,11 @@ theorem DetHeadStep.tape {z : Int} (σ : State rT) :
 theorem DetHeadStep.rand_tape {z : Int} (l : Loc)
     (n : { k : Int // 0 ≤ k ∧ k < z }) (ns : List { k : Int // 0 ≤ k ∧ k < z })
     {σ : State rT} (htape : σ.tapes[l]? = some ⟨z, n :: ns⟩) :
-    DetHeadStep ⟨.rand (.lit (.int z)) (.lit (.lbl l)), σ⟩
-      ⟨.lit (.int n), σ.update_tapes (·.insert l ⟨z, ns⟩)⟩ :=
+    DetHeadStep ⟨pl(rand(#(.int z), #(.lbl l))), σ⟩
+      ⟨pl(#(.int n)), σ.update_tapes (·.insert l ⟨z, ns⟩)⟩ :=
   .of_det _ _
-    (by obtain ⟨_, hd1⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.lbl l) : Exp rT)) ⟨.lit⟩
-        obtain ⟨_, hd2⟩ := Exp.toVal?_eq_some_of_isValue (e := (Exp.lit (.int z) : Exp rT)) ⟨.lit⟩
+    (by obtain ⟨_, hd1⟩ := Exp.toVal?_eq_some_of_isValue (e := (pl(#(.lbl l)) : Exp rT)) ⟨.lit⟩
+        obtain ⟨_, hd2⟩ := Exp.toVal?_eq_some_of_isValue (e := (pl(#(.int z)) : Exp rT)) ⟨.lit⟩
         simp [Exp.decompItem, hd1, hd2])
     (by simp [headStep, htape])
 
@@ -124,7 +125,7 @@ theorem step_pure {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : �
 /-- Allocation under an evaluation context. -/
 theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
     ⤇ (K.fill (.alloc v)) ⊢@{IProp GF}
-      specUpdate rT E iprop(∃ (l : Loc), (⤇ (K.fill (.lit (.loc l)))) ∗ (l ↦ₛ ⟨v, hv, hv.lc⟩)) := by
+      specUpdate rT E iprop(∃ (l : Loc), (⤇ (K.fill pl(#(.loc l)))) ∗ (l ↦ₛ ⟨v, hv, hv.lc⟩)) := by
   iintro HK
   unfold specUpdate
   iintro %ρ Hρ
@@ -134,12 +135,12 @@ theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
   set l := σ.heap.fresh with hl
   set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l ⟨v, hv, hv.lc⟩)
     with hσ'
-  imod specProg_update (e3 := K.fill (.lit (.loc l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
+  imod specProg_update (e3 := K.fill pl(#(.loc l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
   ihave HAlloc := spec_auth_heap_alloc (v := ⟨v, hv, hv.lc⟩) (GF := GF)
-    (e := K.fill (.lit (.loc l))) $$ HρNew
+    (e := K.fill pl(#(.loc l))) $$ HρNew
   imod HAlloc with ⟨HρFinal, Hl⟩
   imodintro
-  iexists ⟨K.fill (.lit (.loc l)), σ'⟩, 1
+  iexists ⟨K.fill pl(#(.loc l)), σ'⟩, 1
   isplitr
   · ipureintro
     refine pexecN_1_of_DetStep ?_
@@ -155,7 +156,7 @@ theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
 
 /-- Heap load under an evaluation context. -/
 theorem step_load {E : CoPset} (K : Ectx rT) {l : Loc} {v : Val rT} :
-    iprop((⤇ (K.fill (.load (.lit (.loc l))))) ∗ (l ↦ₛ v)) ⊢@{IProp GF}
+    iprop((⤇ (K.fill pl(!#(.loc l)))) ∗ (l ↦ₛ v)) ⊢@{IProp GF}
       specUpdate rT E iprop((⤇ (K.fill (Exp.ofVal v))) ∗ (l ↦ₛ v)) := by
   iintro ⟨HK, Hl⟩
   unfold specUpdate
@@ -175,8 +176,8 @@ theorem step_load {E : CoPset} (K : Ectx rT) {l : Loc} {v : Val rT} :
 /-- Heap store under an evaluation context. -/
 theorem step_store {E : CoPset} (K : Ectx rT) {l : Loc} {e : Exp rT} {v_old v_new : Val rT}
     (hv : IsVal e) (hnew : e.toVal? = some v_new) :
-    iprop((⤇ (K.fill (.store (.lit (.loc l)) e))) ∗ (l ↦ₛ v_old)) ⊢@{IProp GF}
-      specUpdate rT E iprop((⤇ (K.fill (.lit .unit))) ∗ (l ↦ₛ v_new)) := by
+    iprop((⤇ (K.fill (.store pl(#(.loc l)) e))) ∗ (l ↦ₛ v_old)) ⊢@{IProp GF}
+      specUpdate rT E iprop((⤇ (K.fill pl(#(.unit)))) ∗ (l ↦ₛ v_new)) := by
   iintro ⟨HK, Hl⟩
   unfold specUpdate
   iintro %ρ Hρ
@@ -186,12 +187,12 @@ theorem step_store {E : CoPset} (K : Ectx rT) {l : Loc} {e : Exp rT} {v_old v_ne
   ihave %Hlk := spec_auth_lookup_heap (GF := GF) $$ Hρ Hl
   set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l v_new)
     with hσ'
-  imod specProg_update (e3 := K.fill (.lit .unit)) $$ Hρ HK with ⟨HρNew, HKNew⟩
-  ihave HUpd := spec_auth_update_heap (GF := GF) (e := K.fill (.lit .unit))
+  imod specProg_update (e3 := K.fill pl(#(.unit))) $$ Hρ HK with ⟨HρNew, HKNew⟩
+  ihave HUpd := spec_auth_update_heap (GF := GF) (e := K.fill pl(#(.unit)))
     (l := l) (v := v_old) (w := v_new) $$ HρNew Hl
   imod HUpd with ⟨HρFinal, _Hl⟩
   imodintro
-  iexists ⟨K.fill (.lit .unit), σ'⟩, 1
+  iexists ⟨K.fill pl(#(.unit)), σ'⟩, 1
   isplitr
   · ipureintro
     refine pexecN_1_of_DetStep ?_
@@ -203,9 +204,9 @@ theorem step_store {E : CoPset} (K : Ectx rT) {l : Loc} {e : Exp rT} {v_old v_ne
 
 /-- Allocate a tape under an evaluation context. -/
 theorem step_alloctape {E : CoPset} (K : Ectx rT) (z : Int) :
-    ⤇ (K.fill (.tape (.lit (.int z)))) ⊢@{IProp GF}
+    ⤇ (K.fill (pl(tape(#(.int z))))) ⊢@{IProp GF}
       specUpdate rT E iprop(∃ (l : Loc),
-        (⤇ (K.fill (.lit (.lbl l)))) ∗ (l ↪ₛ Tape.empty z)) := by
+        (⤇ (K.fill pl(#(.lbl l)))) ∗ (l ↪ₛ Tape.empty z)) := by
   iintro HK
   unfold specUpdate
   iintro %ρ Hρ
@@ -215,12 +216,12 @@ theorem step_alloctape {E : CoPset} (K : Ectx rT) (z : Int) :
   set l := σ.tapes.fresh with hl
   set σ' := σ.update_tapes (fun h : LocHeap Tape => PartialMap.insert h l (Tape.empty z))
     with hσ'
-  imod specProg_update (e3 := K.fill (.lit (.lbl l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
+  imod specProg_update (e3 := K.fill pl(#(.lbl l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
   ihave HAlloc := spec_auth_tape_alloc (t := Tape.empty z) (GF := GF)
-    (e := K.fill (.lit (.lbl l))) $$ HρNew
+    (e := K.fill pl(#(.lbl l))) $$ HρNew
   imod HAlloc with ⟨HρFinal, Hl⟩
   imodintro
-  iexists ⟨K.fill (.lit (.lbl l)), σ'⟩, 1
+  iexists ⟨K.fill pl(#(.lbl l)), σ'⟩, 1
   isplitr
   · ipureintro
     refine pexecN_1_of_DetStep ?_
@@ -237,9 +238,9 @@ theorem step_alloctape {E : CoPset} (K : Ectx rT) (z : Int) :
 /-- Read from a non-empty tape under an evaluation context. -/
 theorem step_rand {E : CoPset} (K : Ectx rT) {z : Int} (l : Loc)
     (n : { k : Int // 0 ≤ k ∧ k < z }) (ns : List { k : Int // 0 ≤ k ∧ k < z }) :
-    iprop((⤇ (K.fill (.rand (.lit (.int z)) (.lit (.lbl l))))) ∗ (l ↪ₛ ⟨z, n :: ns⟩))
+    iprop((⤇ (K.fill (pl(rand(#(.int z), #(.lbl l)))))) ∗ (l ↪ₛ ⟨z, n :: ns⟩))
         ⊢@{IProp GF}
-      specUpdate rT E iprop((⤇ (K.fill (.lit (.int n)))) ∗ (l ↪ₛ ⟨z, ns⟩)) := by
+      specUpdate rT E iprop((⤇ (K.fill pl(#(.int n)))) ∗ (l ↪ₛ ⟨z, ns⟩)) := by
   iintro ⟨HK, Hl⟩
   unfold specUpdate
   iintro %ρ Hρ
@@ -249,12 +250,12 @@ theorem step_rand {E : CoPset} (K : Ectx rT) {z : Int} (l : Loc)
   ihave %Hlk := spec_auth_lookup_tape (GF := GF) $$ Hρ Hl
   set σ' := σ.update_tapes (fun h : LocHeap Tape => PartialMap.insert h l ⟨z, ns⟩)
     with hσ'
-  imod specProg_update (e3 := K.fill (.lit (.int n))) $$ Hρ HK with ⟨HρNew, HKNew⟩
-  ihave HUpd := spec_auth_update_tape (GF := GF) (e := K.fill (.lit (.int n)))
+  imod specProg_update (e3 := K.fill pl(#(.int n))) $$ Hρ HK with ⟨HρNew, HKNew⟩
+  ihave HUpd := spec_auth_update_tape (GF := GF) (e := K.fill pl(#(.int n)))
     (l := l) (t := ⟨z, n :: ns⟩) (s := ⟨z, ns⟩) $$ HρNew Hl
   imod HUpd with ⟨HρFinal, _Hl⟩
   imodintro
-  iexists ⟨K.fill (.lit (.int n)), σ'⟩, 1
+  iexists ⟨K.fill pl(#(.int n)), σ'⟩, 1
   isplitr
   · ipureintro
     refine pexecN_1_of_DetStep ?_

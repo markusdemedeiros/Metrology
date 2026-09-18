@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.ContinuousSampler
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.Reals
 public import Metrology.Approxis.AdequacyRel
 
@@ -26,18 +27,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-- The LHS program: sample a uniform key `k`, output `frac (m + k)`. -/
 def otp_enc (m : rT) : Exp rT :=
-  pl(let k := urand; frac(#(.real m) + k))
+  pl% let k := urand; frac(#(.real m) + k)
 
 /-- The RHS program: just sample uniformly. -/
-def otp_ideal : Exp rT := pl(urand)
+def otp_ideal : Exp rT := pl% urand
 
-/-- The `let`-body of `otp_enc m`, open at `bvar 0`. -/
-def otpBody (m : rT) : Exp rT :=
-  Exp.unop .frac (Exp.binop .plus (Exp.lit (.real m)) (Exp.bvar 0))
+/-- The `lam` that `otp_enc m` exposes once its `let` is read as an application. -/
+abbrev otpLam (m : rT) : Exp rT := pl% fun k, frac(#(.real m) + k)
 
 /-- The evaluation context `otp_enc m` exposes once its `let` is read as a
 `lam`-application. -/
-def otpKLam (m : rT) : Ectx rT := [EctxItem.appR (Exp.lam (otpBody (rT := rT) m))]
+def otpKLam (m : rT) : Ectx rT := [EctxItem.appR (otpLam m)]
 
 /-- **Continuous OTP refinement**: encrypting `m` with a fresh uniform key on the
 unit interval is observationally equivalent to a fresh uniform sample, provided
@@ -58,7 +58,7 @@ theorem otp_refines (m : rT)
   iintro %r %_hr
   let Kfrac : Ectx rT := [EctxItem.unop .frac]
   show ⊢@{IProp GF} iprop(refines ⊤
-    (Ectx.fill ([] : Ectx rT) pl({Exp.lam (otpBody (rT := rT) m)} #(.real r)))
+    (Ectx.fill ([] : Ectx rT) pl({otpLam (rT := rT) m} #(.real r)))
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
   -- β-reduce the `let`.
   iapply (refines_pure_l (K := ([] : Ectx rT))
@@ -118,7 +118,7 @@ theorem otp_refines_rev (m : rT) (g : rT → rT)
   let Kfrac : Ectx rT := [EctxItem.unop .frac]
   show ⊢@{IProp GF} iprop(refines ⊤
     pl(#(.real r))
-    (Ectx.fill ([] : Ectx rT) pl({Exp.lam (otpBody (rT := rT) m)} #(.real (g r))))
+    (Ectx.fill ([] : Ectx rT) pl({otpLam (rT := rT) m} #(.real (g r))))
     lrel_real)
   -- β-reduce the RHS `let`.
   iapply (refines_pure_r (K := ([] : Ectx rT))
@@ -181,7 +181,7 @@ execution distributions, with no Iris in sight. -/
 
 /-- The relation extracted from `lrel_real`: both sides are the same real. -/
 def otpφ (v v' : Val rT) : Prop :=
-  ∃ r : rT, v.1 = .lit (.real r) ∧ v'.1 = .lit (.real r)
+  ∃ r : rT, v.1 = pl(#(.real r)) ∧ v'.1 = pl(#(.real r))
 
 theorem lrel_real_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :
     ⊢@{IProp GF} iprop((lrel_real (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝) := by
@@ -256,13 +256,13 @@ carries the whole mass; the a.e. step "every successor is a value" is exactly
 /-- The ideal sampler's output distribution is a probability measure. -/
 theorem otp_ideal_mass (σ : State ℝ) :
     (limExecV (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ)) Set.univ = 1 := by
-  have hnv : ¬ (Exp.urand : Exp ℝ).isValue := fun ⟨w⟩ => nomatch w
+  have hnv : ¬ (pl(urand) : Exp ℝ).isValue := fun ⟨w⟩ => nomatch w
   -- One step of `urand` lands on a value, so `execN 2` already has full mass.
   have hstep : execN 2 (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ) Set.univ = 1 := by
-    show execN 2 (⟨Exp.urand, σ⟩ : Cfg ℝ) Set.univ = 1
+    show execN 2 (⟨pl(urand), σ⟩ : Cfg ℝ) Set.univ = 1
     rw [execN_succ_not_isValue hnv,
         MeasureTheory.Measure.bind_apply MeasurableSet.univ (execN_measurable 1).aemeasurable]
-    have hae : ∀ᵐ ρ' ∂(primStep (⟨Exp.urand, σ⟩ : Cfg ℝ)),
+    have hae : ∀ᵐ ρ' ∂(primStep (⟨pl(urand), σ⟩ : Cfg ℝ)),
         execN 1 ρ' Set.univ = 1 := by
       rw [MeasureTheory.ae_iff]
       refine MeasureTheory.measure_mono_null ?_ (Atomic.urand' (rT := ℝ) σ)
@@ -272,7 +272,7 @@ theorem otp_ideal_mass (σ : State ℝ) :
       exact hρ' (by rw [execN_succ_isValue hv]; simp)
     rw [MeasureTheory.lintegral_congr_ae hae]
     simp only [MeasureTheory.lintegral_const, one_mul]
-    have : primStep (⟨Exp.urand, σ⟩ : Cfg ℝ) = Cfg.uniformReal σ :=
+    have : primStep (⟨pl(urand), σ⟩ : Cfg ℝ) = Cfg.uniformReal σ :=
       primStep_eq_headStep
         (Exp.decompItem_none_of_lc_headReducible (by is_lc)
           (show Cfg.uniformReal σ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _))

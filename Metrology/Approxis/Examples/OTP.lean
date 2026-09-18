@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.Compatibility
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.AppRelRules
 public import Metrology.Approxis.AdequacyRel
 
@@ -49,20 +50,19 @@ theorem addMod_bij (m N : Int) (HN : 0 < N) :
 
 /-- The LHS program: sample a key, then output `(m + k) mod N`. -/
 def otp_enc (m N : Int) : Exp rT :=
-  pl(let k := rand(#(.int N), #(.unit)); (#(.int m) + k) % #(.int N))
+  pl% let k := rand(#(.int N), #(.unit)); (#(.int m) + k) % #(.int N)
 
 /-- The RHS program: just sample uniformly. -/
 def otp_ideal (N : Int) : Exp rT :=
-  pl(rand(#(.int N), #(.unit)))
+  pl% rand(#(.int N), #(.unit))
 
 /-- The β-redex body of `otp_enc (rT := rT) m N`: `(m + bvar 0) % N`. Open at `bvar 0`,
 which gets bound by `otp_enc`'s outer `let k := …; …` (a `lam`-encoded let). -/
-def otpBody (m N : Int) : Exp rT :=
-  Exp.binop .mod (Exp.binop .plus (Exp.lit (.int m)) (Exp.bvar 0)) (Exp.lit (.int N))
+abbrev otpLam (m N : Int) : Exp rT := pl% fun k, (#(.int m) + k) % #(.int N)
 
 /-- The evaluation context that `otp_enc (rT := rT) m N` reduces to after the `let` is
 β-encoded as `(λ k. body) (rand …)`: applying `(λ. otpBody)` to its argument. -/
-def otpKLam (m N : Int) : Ectx rT := [EctxItem.appR (Exp.lam (otpBody (rT := rT) m N))]
+def otpKLam (m N : Int) : Ectx rT := [EctxItem.appR (otpLam m N)]
 
 /-- **OTP refinement**: for any fixed `m ∈ [0, N)`, encrypting `m` with a fresh
 random key is observationally equivalent to a fresh random sample. -/
@@ -80,7 +80,7 @@ theorem otp_refines (m N : Int) (HN : 0 < N) :
     (Hz := HN))
   iintro %n ⟨%_, %_⟩
   show ⊢@{IProp GF} iprop(refines ⊤
-    (Ectx.fill ([] : Ectx rT) pl({Exp.lam (otpBody (rT := rT) m N)} #(.int n)))
+    (Ectx.fill ([] : Ectx rT) pl({otpLam (rT := rT) m N} #(.int n)))
     pl(#(.int (addMod m N n))) lrel_int)
   iapply (refines_pure_l (K := []) (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
   simp only [Nat.repeat]
@@ -139,7 +139,7 @@ theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
   -- β-reduce LHS literal-fill, then expose β-redex on RHS.
   show ⊢@{IProp GF} iprop(refines ⊤
     pl(#(.int n))
-    (Ectx.fill ([] : Ectx rT) pl({Exp.lam (otpBody (rT := rT) m N)} #(.int (addMod (-m) N n))))
+    (Ectx.fill ([] : Ectx rT) pl({otpLam (rT := rT) m N} #(.int (addMod (-m) N n))))
     lrel_int)
   iapply (refines_pure_r (K := ([] : Ectx rT)) (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
   -- Step 2 (inner plus).
@@ -178,7 +178,7 @@ are coupled by integer equality, with zero error. -/
 /-- The φ-relation we extract from `lrel_int`: the two values are the same
 integer literal. -/
 def otpφ (v v' : Val rT) : Prop :=
-  ∃ n : Int, v.1 = .lit (.int n) ∧ v'.1 = .lit (.int n)
+  ∃ n : Int, v.1 = pl(#(.int n)) ∧ v'.1 = pl(#(.int n))
 
 omit [Countable rT] in
 theorem lrel_int_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :

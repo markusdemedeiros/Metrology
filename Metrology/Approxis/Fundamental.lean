@@ -1,6 +1,7 @@
 module
 
 public import Metrology.Approxis.PrimitiveLaws
+import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.Model
 public import Metrology.Approxis.Compatibility
 public import Metrology.Approxis.AppRelRules
@@ -749,15 +750,15 @@ theorem bin_log_related_rand_unit (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   · iexact IH2''
   iintro %v2 %v2' Hu
   have hunit_unfold : (lrel_unit (GF := GF)).car v2 v2' =
-      iprop(⌜v2.1 = .lit .unit ∧ v2'.1 = .lit .unit⌝) := rfl
-  ihave %Hu' : (⌜v2.1 = .lit .unit ∧ v2'.1 = .lit .unit⌝ : IProp GF) $$ [Hu]
+      iprop(⌜v2.1 = pl(#(.unit)) ∧ v2'.1 = pl(#(.unit))⌝) := rfl
+  ihave %Hu' : (⌜v2.1 = pl(#(.unit)) ∧ v2'.1 = pl(#(.unit))⌝ : IProp GF) $$ [Hu]
   · rw [← hunit_unfold]; iexact Hu
   obtain ⟨hv2, hv2'⟩ := Hu'
   rw [hv2, hv2', interp_int]
-  have hbk1 : Ectx.fill [EctxItem.randR (Exp.substMap vs.fst e1)] (Exp.lit .unit) =
-      Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) := rfl
-  have hbk2 : Ectx.fill [EctxItem.randR (Exp.substMap vs.snd e1')] (Exp.lit .unit) =
-      Ectx.fill [EctxItem.randL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') := rfl
+  have hbk1 : Ectx.fill [EctxItem.randR (Exp.substMap vs.fst e1)] pl(#(.unit)) =
+      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) := rfl
+  have hbk2 : Ectx.fill [EctxItem.randR (Exp.substMap vs.snd e1')] pl(#(.unit)) =
+      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') := rfl
   rw [hbk1, hbk2]
   iapply refines_rand_unit_int
   iexact IH1'
@@ -894,19 +895,19 @@ theorem bin_log_related_tlam (Δ : TyEnv rT GF)
 theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp rT} {τ τ' : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' (.forall' τ)) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ
-        (.app e (.lit .unit)) (.app e' (.lit .unit)) (τ.single τ') := by
+        (.app e pl(#(.unit))) (.app e' pl(#(.unit))) (τ.single τ') := by
   iintro IH
   unfold bin_log_related_ty bin_log_related
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_app, Exp.substMap_app, Exp.substMap_lit, Exp.substMap_lit]
-  have hb1 : Exp.app (Exp.substMap vs.fst e) (.lit .unit) =
-      Ectx.fill [EctxItem.appL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e) := rfl
-  have hb2 : Exp.app (Exp.substMap vs.snd e') (.lit .unit) =
-      Ectx.fill [EctxItem.appL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e') := rfl
+  have hb1 : Exp.app (Exp.substMap vs.fst e) pl(#(.unit)) =
+      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e) := rfl
+  have hb2 : Exp.app (Exp.substMap vs.snd e') pl(#(.unit)) =
+      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e') := rfl
   rw [hb1, hb2]
-  iapply (refines_bind [EctxItem.appL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.appL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+  iapply (refines_bind [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
     (A := interp (Ty.forall' τ) Δ)
     (A' := interp (Ty.single τ τ') Δ)) $$ [IH']
   · iexact IH'
@@ -919,24 +920,24 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   ihave HvSpec := HvF $$ %(interp τ' Δ)
   ihave HvArr := lrel_arr_unfold_wand lrel_unit
     (interp τ (TyEnv.cons (interp τ' Δ) Δ)) v v' $$ HvSpec
-  ihave HvArr2 := HvArr $$ %⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ %⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩
+  ihave HvArr2 := HvArr $$ %⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ %⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩
   have hUnit : ⊢@{IProp GF} (lrel_unit (rT := rT) (GF := GF)).car
-      ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ := by
-    show ⊢@{IProp GF} iprop(⌜(.lit .unit : Exp rT) = .lit .unit ∧ (.lit .unit : Exp rT) = .lit .unit⌝)
+      ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ := by
+    show ⊢@{IProp GF} iprop(⌜(pl(#(.unit)) : Exp rT) = pl(#(.unit)) ∧ (pl(#(.unit)) : Exp rT) = pl(#(.unit))⌝)
     ipureintro; exact ⟨rfl, rfl⟩
-  ihave HvApp : iprop(refines ⊤ (Exp.app v.1 (.lit .unit)) (Exp.app v'.1 (.lit .unit))
+  ihave HvApp : iprop(refines ⊤ (Exp.app v.1 pl(#(.unit))) (Exp.app v'.1 pl(#(.unit)))
       (interp τ (TyEnv.cons (interp τ' Δ) Δ))) $$ [HvArr2]
   · ihave HUnit := hUnit
     iapply HvArr2
     iexact HUnit
   have hsub : interp τ (TyEnv.cons (interp τ' Δ) Δ) = interp (Ty.single τ τ') Δ :=
     (interp_subst τ' τ Δ).symm
-  ihave HvAppFinal := refines_proper_entails ⊤ (Exp.app v.1 (.lit .unit))
-    (Exp.app v'.1 (.lit .unit)) hsub $$ HvApp
-  have hbridge1 : Ectx.fill [EctxItem.appL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v.1 =
-      Exp.app v.1 (.lit .unit) := rfl
-  have hbridge2 : Ectx.fill [EctxItem.appL ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v'.1 =
-      Exp.app v'.1 (.lit .unit) := rfl
+  ihave HvAppFinal := refines_proper_entails ⊤ (Exp.app v.1 pl(#(.unit)))
+    (Exp.app v'.1 pl(#(.unit))) hsub $$ HvApp
+  have hbridge1 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v.1 =
+      Exp.app v.1 pl(#(.unit)) := rfl
+  have hbridge2 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v'.1 =
+      Exp.app v'.1 pl(#(.unit)) := rfl
   rw [hbridge1, hbridge2]
   iexact HvAppFinal
 
@@ -1275,21 +1276,21 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] v2'.1 =
         Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
       hv2, hv2']
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.lit (.int n2)) =
-        Ectx.fill [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') (Exp.lit (.int n2)) =
-        Ectx.fill [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+  rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.int n2)) =
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) from rfl,
+      show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.int n2)) =
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
+  iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
     (A := lrel_int)) $$ [IH1'']
   · iexact IH1''
   iintro %v1 %v1' Hint1
   ihave Hv1Ex := lrel_int_unfold v1 v1' $$ Hint1
   icases Hv1Ex with ⟨%n1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
-        Exp.binop op v1.1 (Exp.lit (.int n2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨.lit (.int n2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
-        Exp.binop op v1'.1 (Exp.lit (.int n2)) from rfl,
+  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
+        Exp.binop op v1.1 pl(#(.int n2)) from rfl,
+      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
+        Exp.binop op v1'.1 pl(#(.int n2)) from rfl,
       hv1, hv1']
   -- Goal: refines ⊤ (.binop op #n1 #n2) (.binop op #n1 #n2) (interp τ Δ).
   -- Per-op bridge: int-result ops (plus, minus, mult, div, mod) → lrel_int;
@@ -1414,21 +1415,21 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
       show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] v2'.1 =
         Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
       hv2, hv2']
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.lit (.bool b2)) =
-        Ectx.fill [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') (Exp.lit (.bool b2)) =
-        Ectx.fill [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+  rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.bool b2)) =
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) from rfl,
+      show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.bool b2)) =
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
+  iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
     (A := lrel_bool)) $$ [IH1'']
   · iexact IH1''
   iintro %v1 %v1' Hbool1
   ihave Hv1Ex := lrel_bool_unfold v1 v1' $$ Hbool1
   icases Hv1Ex with ⟨%b1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
-        Exp.binop op v1.1 (Exp.lit (.bool b2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨.lit (.bool b2), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
-        Exp.binop op v1'.1 (Exp.lit (.bool b2)) from rfl,
+  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
+        Exp.binop op v1.1 pl(#(.bool b2)) from rfl,
+      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
+        Exp.binop op v1'.1 pl(#(.bool b2)) from rfl,
       hv1, hv1']
   -- Bool-binops: and, or, xor, eq → all return bool. plus/minus/etc → none.
   cases op
@@ -1509,18 +1510,18 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         show Ectx.fill [EctxItem.unop UnOp.minus] v'.1 = Exp.unop UnOp.minus v'.1 from rfl,
         hv, hv']
     -- Goal: refines ⊤ (.unop minus #n) (.unop minus #n) lrel_int.
-    have heval : UnOp.eval .minus (Exp.lit (.int n) : Exp rT) = some (Exp.lit (.int n.neg)) := rfl
-    have hφ : (Exp.lit (.int n) : Exp rT).isValue ∧ UnOp.eval .minus (Exp.lit (.int n) : Exp rT) = some _ :=
+    have heval : UnOp.eval .minus (pl(#(.int n)) : Exp rT) = some pl(#(.int n.neg)) := rfl
+    have hφ : (pl(#(.int n)) : Exp rT).isValue ∧ UnOp.eval .minus (pl(#(.int n)) : Exp rT) = some _ :=
       ⟨IsVal.lit.toIsValue, heval⟩
-    have hf1 : (Exp.unop .minus (.lit (.int n)) : Exp rT) =
-        Ectx.fill [] (Exp.unop .minus (.lit (.int n))) := rfl
+    have hf1 : (Exp.unop .minus pl(#(.int n)) : Exp rT) =
+        Ectx.fill [] (Exp.unop .minus pl(#(.int n))) := rfl
     rw [hf1]
     iapply (refines_pure_l (K := []) (Hex := pureExec_unop) hφ)
     simp only [Nat.repeat]
     iintro !>
     iapply (refines_pure_r (K := []) (Hex := pureExec_unop) hφ)
-    iapply refines_ret (e1 := Ectx.fill [] (Exp.lit (.int n.neg)))
-      (e2 := Ectx.fill [] (Exp.lit (.int n.neg)))
+    iapply refines_ret (e1 := Ectx.fill [] pl(#(.int n.neg)))
+      (e2 := Ectx.fill [] pl(#(.int n.neg)))
       (v1 := .int n.neg) (v2 := .int n.neg)
       (hv1 := rfl) (hv2 := rfl)
     imodintro
@@ -1562,18 +1563,18 @@ theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     rw [show Ectx.fill [EctxItem.unop UnOp.neg] v.1 = Exp.unop UnOp.neg v.1 from rfl,
         show Ectx.fill [EctxItem.unop UnOp.neg] v'.1 = Exp.unop UnOp.neg v'.1 from rfl,
         hv, hv']
-    have heval : UnOp.eval .neg (Exp.lit (.bool b) : Exp rT) = some (Exp.lit (.bool (¬b))) := rfl
-    have hφ : (Exp.lit (.bool b) : Exp rT).isValue ∧ UnOp.eval .neg (Exp.lit (.bool b) : Exp rT) = some _ :=
+    have heval : UnOp.eval .neg (pl(#(.bool b)) : Exp rT) = some (pl(#(.bool (¬b)))) := rfl
+    have hφ : (pl(#(.bool b)) : Exp rT).isValue ∧ UnOp.eval .neg (pl(#(.bool b)) : Exp rT) = some _ :=
       ⟨IsVal.lit.toIsValue, heval⟩
-    have hf1 : (Exp.unop .neg (.lit (.bool b)) : Exp rT) =
-        Ectx.fill [] (Exp.unop .neg (.lit (.bool b))) := rfl
+    have hf1 : (Exp.unop .neg pl(#(.bool b)) : Exp rT) =
+        Ectx.fill [] (Exp.unop .neg pl(#(.bool b))) := rfl
     rw [hf1]
     iapply (refines_pure_l (K := []) (Hex := pureExec_unop) hφ)
     simp only [Nat.repeat]
     iintro !>
     iapply (refines_pure_r (K := []) (Hex := pureExec_unop) hφ)
-    iapply refines_ret (e1 := Ectx.fill [] (Exp.lit (.bool (¬b))))
-      (e2 := Ectx.fill [] (Exp.lit (.bool (¬b))))
+    iapply refines_ret (e1 := Ectx.fill [] (pl(#(.bool (¬b)))))
+      (e2 := Ectx.fill [] (pl(#(.bool (¬b)))))
       (v1 := .bool (¬b)) (v2 := .bool (¬b))
       (hv1 := rfl) (hv2 := rfl)
     imodintro
@@ -1652,9 +1653,9 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   -- Goal: refines ⊤ (.binop .eq #l1 #l2) (.binop .eq #l1' #l2') lrel_bool.
   -- β-step both sides via pureExec_binop_discrete with heval = .lit (.bool (decide (l1 = l2))) etc.
   have heval_l : BinOp.eval .eq (.lit l1) (.lit l2) =
-      some (.lit (.bool (decide (l1 = l2)))) := rfl
+      some (pl(#(.bool (decide (l1 = l2))))) := rfl
   have heval_r : BinOp.eval .eq (.lit l1') (.lit l2') =
-      some (.lit (.bool (decide (l1' = l2')))) := rfl
+      some (pl(#(.bool (decide (l1' = l2'))))) := rfl
   have hφ_l : (Exp.lit l1).isValue ∧ (Exp.lit l2).isValue ∧
       BinOp.eval .eq (.lit l1) (.lit l2) = some _ :=
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, heval_l⟩
@@ -1671,8 +1672,8 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro !>
   iapply (refines_pure_r (K := []) (Hex := pureExec_binop) hφ_r)
   iapply refines_ret
-    (e1 := Ectx.fill [] (Exp.lit (.bool (decide (l1 = l2)))))
-    (e2 := Ectx.fill [] (Exp.lit (.bool (decide (l1' = l2')))))
+    (e1 := Ectx.fill [] (pl(#(.bool (decide (l1 = l2))))))
+    (e2 := Ectx.fill [] (pl(#(.bool (decide (l1' = l2'))))))
     (v1 := .bool (decide (l1 = l2)))
     (v2 := .bool (decide (l1' = l2')))
     (hv1 := rfl) (hv2 := rfl)
@@ -1707,12 +1708,12 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       simp [Pat.tryMatch]
     iexact Hvv
   | @lit_int z =>
-    -- v ~ v' at lrel_int means v.1 = v'.1 = .lit (.int n) for same n.
+    -- v ~ v' at lrel_int means v.1 = v'.1 = pl(#(.int n)) for same n.
     rw [interp_int]
     iintro Hv
     ihave ⟨%n, %h⟩ := lrel_int_unfold v v' $$ Hv
     by_cases hzn : z = n
-    · -- Match succeeds: tryMatch (.lit (.int z)) (.lit (.int n)) = some (.lit .unit) when z = n.
+    · -- Match succeeds: tryMatch pl(#(.int z)) pl(#(.int n)) = some pl(#(.unit)) when z = n.
       iapply BI.or_intro_l
       iexists (.unit : Val _), (.unit : Val _)
       isplitr
@@ -1721,7 +1722,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
         refine ⟨?_, ?_⟩
         · rw [h.1]; exact Pat.tryMatch_lit_eq (.int z)
         · rw [h.2]; exact Pat.tryMatch_lit_eq (.int z)
-      -- (interp .unit Δ).car ⟨.lit .unit, _⟩ ⟨.lit .unit, _⟩ via lrel_unit.
+      -- (interp .unit Δ).car ⟨pl(#(.unit)), _⟩ ⟨pl(#(.unit)), _⟩ via lrel_unit.
       rw [interp_unit]
       unfold lrel_unit
       ipureintro
@@ -1763,7 +1764,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       · rw [h.2]; exact Pat.tryMatch_lit_ne hbeq
   | lit_unit =>
     rw [interp_unit]
-    show iprop(⌜v.1 = .lit .unit ∧ v'.1 = .lit .unit⌝) ⊢ _
+    show iprop(⌜v.1 = pl(#(.unit)) ∧ v'.1 = pl(#(.unit))⌝) ⊢ _
     iintro %h
     iapply BI.or_intro_l
     iexists (.unit : Val _), (.unit : Val _)
@@ -1774,9 +1775,9 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       · rw [h.2]; exact Pat.tryMatch_lit_eq .unit
     -- Goal: _ ⊢ lrel_unit.car ⟨lit unit, _⟩ ⟨lit unit, _⟩.
     -- def-eq to iprop(⌜...⌝).
-    have hrfl : (lrel_unit (GF := GF)).car ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩
-        = iprop(⌜(⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit .unit ∧
-                 (⟨.lit .unit, IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit
+    have hrfl : (lrel_unit (GF := GF)).car ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩
+        = iprop(⌜(⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = pl(#(.unit)) ∧
+                 (⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit
                  .unit⌝) := rfl
     rw [hrfl]
     iintro
@@ -1923,10 +1924,10 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     iintro !>
     iapply (refines_pure_r (K := []) (Hex := pureExec_scrut_none) ⟨v'.2.toIsValue, hn.2⟩)
     iapply refines_ret
-      (e1 := Ectx.fill [] (Exp.inr (.lit .unit)))
-      (e2 := Ectx.fill [] (Exp.inr (.lit .unit)))
-      (v1 := ⟨.inr (.lit .unit), IsVal.inr IsVal.lit, (IsVal.inr IsVal.lit).lc⟩)
-      (v2 := ⟨.inr (.lit .unit), IsVal.inr IsVal.lit, (IsVal.inr IsVal.lit).lc⟩)
+      (e1 := Ectx.fill [] (Exp.inr pl(#(.unit))))
+      (e2 := Ectx.fill [] (Exp.inr pl(#(.unit))))
+      (v1 := ⟨.inr pl(#(.unit)), IsVal.inr IsVal.lit, (IsVal.inr IsVal.lit).lc⟩)
+      (v2 := ⟨.inr pl(#(.unit)), IsVal.inr IsVal.lit, (IsVal.inr IsVal.lit).lc⟩)
       (hv1 := rfl) (hv2 := rfl)
     imodintro
     have hsum : (interp (Ty.sum τb .unit) Δ : lrel rT GF) =
@@ -2061,7 +2062,7 @@ theorem fundamental [Countable rT] {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : T
     iintro %vs _
     rw [Exp.substMap_lit, Exp.substMap_lit]
     set v : Val rT := .int n
-    have hv : (Exp.lit (.int n) : Exp rT) = v.1 := rfl
+    have hv : (pl(#(.int n)) : Exp rT) = v.1 := rfl
     rw [hv]
     iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
     imodintro
@@ -2075,7 +2076,7 @@ theorem fundamental [Countable rT] {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : T
     iintro %vs _
     rw [Exp.substMap_lit, Exp.substMap_lit]
     set v : Val rT := .bool b
-    have hv : (Exp.lit (.bool b) : Exp rT) = v.1 := rfl
+    have hv : (pl(#(.bool b)) : Exp rT) = v.1 := rfl
     rw [hv]
     iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
     imodintro
@@ -2089,7 +2090,7 @@ theorem fundamental [Countable rT] {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : T
     iintro %vs _
     rw [Exp.substMap_lit, Exp.substMap_lit]
     set v : Val rT := .unit
-    have hv : (Exp.lit .unit : Exp rT) = v.1 := rfl
+    have hv : (pl(#(.unit)) : Exp rT) = v.1 := rfl
     rw [hv]
     iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
     imodintro
