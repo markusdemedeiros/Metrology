@@ -28,7 +28,7 @@ namespace ProbLang
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-! ## Bundled ghost-state class -/
 /-- Embeds `SpecGS` as a non-extends field to avoid Lean's diamond-inheritance
@@ -59,15 +59,12 @@ noncomputable instance approxisWpGS_of_components : ApproxisWpGS (rT := rT) GF w
 
 /-! ### `stateInterp` / `errInterp` unfolding lemmas -/
 
-omit [Countable rT] in
 @[simp] theorem approxisWpGS_stateInterp_eq :
     (ApproxisWpGS.stateInterp (rT := rT) : State rT → IProp GF) = appStateAuth := rfl
 
-omit [Countable rT] in
 @[simp] theorem approxisWpGS_errInterp_eq :
     (ApproxisWpGS.errInterp (rT := rT) (GF := GF) : ENNReal → IProp GF) = ecAuth := rfl
 
-omit [Countable rT] in
 @[simp] theorem approxisWpGS_specInterp_eq :
     (SpecUpdateGS.specInterp (rT := rT) : Cfg rT → IProp GF) = Cfg.specAuth := rfl
 
@@ -395,10 +392,9 @@ theorem wp_rand_r {E : CoPset} (K : Ectx rT) {z : Int} {e : Exp rT}
     HeadStepSupport.pos (.RandNoTapeS Hz (_root_.le_refl _) Hz)
   have Hhr_rand : HeadReducible (pl(rand(#(.int z), #(.unit)))) σ₁' :=
     fun hz => by rw [hz] at Hhead_rand; simp at Hhead_rand
-  have Hred_rand : Discrete.Reducible (pl(rand(#(.int z), #(.unit)))) σ₁' :=
-    Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) Hhr_rand)
   have Hred : Discrete.Reducible (K.fill (pl(rand(#(.int z), #(.unit))))) σ₁' :=
-    Hred_rand.fill K
+    Reducible.toDiscrete (by no_urand)
+      ((reducible_of_headReducible (by is_lc) Hhr_rand).fill K)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
@@ -487,10 +483,9 @@ theorem wp_rand_nonpos_r {E : CoPset} (K : Ectx rT) {z : Int} {e : Exp rT}
     HeadStepSupport.pos (.RandNonposS Hz)
   have Hhr_rand : HeadReducible (pl(rand(#(.int z), #(.unit)))) σ₁' :=
     fun hz => by rw [hz] at Hhead_rand; simp at Hhead_rand
-  have Hred_rand : Discrete.Reducible (pl(rand(#(.int z), #(.unit)))) σ₁' :=
-    Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) Hhr_rand)
   have Hred : Discrete.Reducible (K.fill (pl(rand(#(.int z), #(.unit))))) σ₁' :=
-    Hred_rand.fill K
+    Reducible.toDiscrete (by no_urand)
+      ((reducible_of_headReducible (by is_lc) Hhr_rand).fill K)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
@@ -539,10 +534,9 @@ theorem wp_rand_tape_empty_r {E : CoPset} (K : Ectx rT) {l : Loc} {z : Int} {e :
       (.RandTapeEmptyS Hz hlook rfl (_root_.le_refl _) Hz rfl)
   have Hhr : HeadReducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
     fun hz => by rw [hz] at Hhead; simp at Hhead
-  have Hred_rand : Discrete.Reducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
-    Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) Hhr)
   have Hred : Discrete.Reducible (K.fill (pl(rand(#(.int z), #(.lbl l))))) σ₁' :=
-    Hred_rand.fill K
+    Reducible.toDiscrete (by no_urand)
+      ((reducible_of_headReducible (by is_lc) Hhr).fill K)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
@@ -601,10 +595,9 @@ theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : Ectx rT) {l : Loc} {z N : Int} {e
     · exact .RandTapeNonposOtherS Hz hlook (Ne.symm hN)
   have Hhr : HeadReducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
     fun hz => by rw [hz] at Hhead; simp at Hhead
-  have Hred_rand : Discrete.Reducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
-    Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) Hhr)
   have Hred : Discrete.Reducible (K.fill (pl(rand(#(.int z), #(.lbl l))))) σ₁' :=
-    Hred_rand.fill K
+    Reducible.toDiscrete (by no_urand)
+      ((reducible_of_headReducible (by is_lc) Hhr).fill K)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
@@ -650,7 +643,6 @@ theorem wp_rand_lbl_nonpos_r {E : CoPset} (K : Ectx rT) {l : Loc} {z N : Int} {e
     isplitl [Hε]; · iexact Hε
     iapply Hwp $$ Hl Hj'
 
-omit [Countable rT] in
 theorem wp_alloc_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {e : Exp rT}
     {Φ : Val rT → IProp GF} :
     iprop((⤇ K.fill (pl(tape(#(.int z))))) ∗
@@ -666,7 +658,6 @@ theorem wp_alloc_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {e : Exp rT}
   ihave HlNat := spec_empty_to_natTape (GF := GF) (l := l) (z := z) $$ Hl'
   iapply Hwp $$ %l Hj' HlNat
 
-omit [Countable rT] in
 theorem wp_rand_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {l : Loc}
     {n : Int} {ns : List Int} {e : Exp rT} {Φ : Val rT → IProp GF} :
     iprop((⤇ K.fill (pl(rand(#(.int z), #(.lbl l))))) ∗
@@ -706,10 +697,9 @@ theorem wp_rand_empty_r {E : CoPset} (K : Ectx rT) {z : Int} {l : Loc}
       (.RandTapeEmptyS Hz Hlk rfl (_root_.le_refl _) Hz rfl)
   have Hhr : HeadReducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
     fun hz => by rw [hz] at Hhead; simp at Hhead
-  have Hred_rand : Discrete.Reducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
-    Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) Hhr)
   have Hred : Discrete.Reducible (K.fill (pl(rand(#(.int z), #(.lbl l))))) σ₁' :=
-    Hred_rand.fill K
+    Reducible.toDiscrete (by no_urand)
+      ((reducible_of_headReducible (by is_lc) Hhr).fill K)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
@@ -777,10 +767,9 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : Ectx rT) {z M : Int} {l : Loc}
       (.RandTapeOtherS Hz Hlk HneM (_root_.le_refl _) Hz rfl)
   have Hhr : HeadReducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
     fun hz => by rw [hz] at Hhead; simp at Hhead
-  have Hred_rand : Discrete.Reducible (pl(rand(#(.int z), #(.lbl l)))) σ₁' :=
-    Reducible_ReducibleM_iff.mpr (reducible_of_headReducible (by is_lc) Hhr)
   have Hred : Discrete.Reducible (K.fill (pl(rand(#(.int z), #(.lbl l))))) σ₁' :=
-    Hred_rand.fill K
+    Reducible.toDiscrete (by no_urand)
+      ((reducible_of_headReducible (by is_lc) Hhr).fill K)
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
     with Hclose
   imodintro

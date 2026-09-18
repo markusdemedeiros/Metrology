@@ -119,25 +119,6 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} (Hnv : 
   iapply twp_err_incr (ε := 0) Hnv
   iframe
 
-/-- Countability-free `lintegral` against `Cfg.uniform`: for a **measurable** `φ`,
-the integral is the `Ico`-average. Unlike `Cfg.lintegral_uniform`, measurability of `φ`
-is supplied rather than derived from discreteness, so no `[Countable rT]` is needed. -/
-theorem Cfg.lintegral_uniform' {z : Int} (Hz : 0 < z) (σ : State rT)
-    {φ : Cfg rT → ENNReal} (hφ : Measurable φ) :
-    ∫⁻ c, φ c ∂(Cfg.uniform z σ)
-      = (z.toNat : ENNReal)⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) z, φ ⟨pl(#(.int n)), σ⟩ := by
-  have hcard : (Finset.Ico (0 : Int) z).card = z.toNat := by rw [Int.card_Ico]; omega
-  rw [Cfg.uniform_eq_map_uniformOfFinset Hz σ,
-      MeasureTheory.lintegral_map hφ Measurable.of_discrete,
-      MeasureTheory.lintegral_countable',
-      tsum_eq_sum (s := Finset.Ico (0 : Int) z) fun n hn => by
-        rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
-            PMF.uniformOfFinset_apply_of_notMem _ hn, mul_zero],
-      Finset.mul_sum]
-  refine Finset.sum_congr rfl fun n hn => ?_
-  rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
-      PMF.uniformOfFinset_apply_of_mem _ hn, hcard, mul_comm]
-
 /-- Generic error-spending presample rule, factoring out the `glm'` plumbing shared by
 `twp_rand_exp` and `twp_urand_exp`.
 

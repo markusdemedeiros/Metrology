@@ -207,6 +207,15 @@ inductive TypedCtxItem : CtxItem rT → Tctx → Ty → Tctx → Ty → Prop
   | binopR_bool {Γ op e1 τ} :
       Typed Γ e1 .bool → op.boolResTy = some τ →
       TypedCtxItem (.binopR op e1) Γ .bool Γ τ
+  | unop_real {Γ op τ} :
+      op.realResTy = some τ →
+      TypedCtxItem (.unop op) Γ .real Γ τ
+  | binopL_real {Γ op e2 τ} :
+      Typed Γ e2 .real → op.realResTy = some τ →
+      TypedCtxItem (.binopL op e2) Γ .real Γ τ
+  | binopR_real {Γ op e1 τ} :
+      Typed Γ e1 .real → op.realResTy = some τ →
+      TypedCtxItem (.binopR op e1) Γ .real Γ τ
   | binopL_unboxedEq {Γ e2 τ} :
       UnboxedType τ → Typed Γ e2 τ →
       TypedCtxItem (.binopL .eq e2) Γ τ Γ .bool
@@ -412,6 +421,9 @@ theorem TypedCtxItem.fill_typed {k : CtxItem rT} {Γ τ Γ' τ'} {e : Exp rT}
   | binopR_int h1 hop  => exact .binop_int h1 he hop
   | binopL_bool h2 hop => exact .binop_bool he h2 hop
   | binopR_bool h1 hop => exact .binop_bool h1 he hop
+  | unop_real hop       => exact .unop_real he hop
+  | binopL_real h2 hop  => exact .binop_real he h2 hop
+  | binopR_real h1 hop  => exact .binop_real h1 he hop
   | binopL_unboxedEq hu h2 => exact .unboxed_eq hu he h2
   | binopR_unboxedEq hu h1 => exact .unboxed_eq hu h1 he
   | ifL h1 h2   => exact .cond he h1 h2

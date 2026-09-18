@@ -252,7 +252,6 @@ theorem refines_atomic_l {E E' : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel
 
 /-! ## Stateful reductions on the LHS -/
 
-variable [Countable rT]
 
 /-- `refines_alloc_l` (app_rel_rules.v:244).
 
@@ -304,7 +303,6 @@ theorem refines_store_l {E : CoPset} {K : Ectx rT} {l : Loc} {v' : Val rT} {t : 
 
 /-! ## Stateful reductions on the RHS -/
 
-omit [Countable rT] in
 /-- `refines_alloc_r` (app_rel_rules.v:119). -/
 theorem refines_alloc_r {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A : lrel rT GF} :
     iprop(∀ (l : Loc), (l ↦ₛ v) -∗
@@ -333,7 +331,6 @@ theorem refines_alloc_r {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A 
   ispecialize Hlog $$ %l Hl'
   iapply Hlog $$ %K' %ε HKRes' Hna Herr Hpos
 
-omit [Countable rT] in
 /-- `refines_load_r` (app_rel_rules.v:132): RHS heap load.
 
 Note Rocq's `refines_load_r` takes `l ↦ₛ{q} v` with fractional permission; we port with
@@ -363,7 +360,6 @@ theorem refines_load_r {E : CoPset} {K : Ectx rT} {l : Loc} {v : Val rT} {t : Ex
   ispecialize Hlog $$ HlRes
   iapply Hlog $$ %K' %ε HKRes' Hna Herr Hpos
 
-omit [Countable rT] in
 /-- `refines_store_r` (app_rel_rules.v:144). -/
 theorem refines_store_r {E : CoPset} {K : Ectx rT} {l : Loc} {v v' : Val rT} {e : Exp rT}
     {A : lrel rT GF} :
@@ -474,7 +470,6 @@ theorem refines_randU_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : l
   iapply Hlog
   iexact Hpos
 
-omit [Countable rT] in
 /-- `refines_randT_r`: RHS tape-rand pop. The continuation receives the popped
 value and the tail tape. -/
 theorem refines_randT_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
@@ -573,7 +568,6 @@ theorem refines_alloctape_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A
   iintro %l Hl
   iapply Hlog $$ %l Hl
 
-omit [Countable rT] in
 /-- `refines_alloctape_r`: RHS tape allocation. The fresh location's spec tape
 fragment is delivered via the continuation. -/
 theorem refines_alloctape_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A : lrel rT GF} :
@@ -604,7 +598,6 @@ theorem refines_alloctape_r {E : CoPset} {K : Ectx rT} {z : Int} {e : Exp rT} {A
 
 /-! ## Structural rules -/
 
-omit [Countable rT] in
 /-- `refines_wand` (app_rel_rules.v:330): weakening the result relation. -/
 theorem refines_wand {E : CoPset} {e1 e2 : Exp rT} {A A' : lrel rT GF} :
     iprop(refines E e1 e2 A) ⊢@{IProp GF}
@@ -624,7 +617,6 @@ theorem refines_wand {E : CoPset} {e1 e2 : Exp rT} {A A' : lrel rT GF} :
   iapply refines_ret (v1 := v) (v2 := v') (hv1 := rfl) (hv2 := rfl)
   iapply HAA' $$ HA
 
-omit [Countable rT] in
 /-- `refines_arrow_val` (app_rel_rules.v:228). Requires the closedness
 witness for `v, v'` (port-specific: `lrel_arr` carries closedness as a
 conjunct because Lean's `Val` isn't intrinsically closed). -/
@@ -642,7 +634,6 @@ theorem refines_arrow_val {v v' : Val rT} {A A' : lrel rT GF}
   iintro !> %w1 %w2 HA
   iapply H $$ %w1 %w2 HA
 
-omit [Countable rT] in
 /-- `refines_arrow` (app_rel_rules.v:341): function refinement built from value
 refinement of argument. Reduces to `refines_arrow_val` via `refines_ret`
 injection of `A v1 v2` into `□ REL v1 << v2 : A`. Requires closedness of
@@ -664,7 +655,6 @@ theorem refines_arrow {v v' : Val rT} {A A' : lrel rT GF}
 
 /-! ## Error-credit rules -/
 
-omit [Countable rT] in
 /-- `refines_get_ec` (app_rel_rules.v): introduces an error-credit `↯ε` into
 the precondition. The user provides a refinement parametric in any positive ε,
 having access to `↯ε`. -/

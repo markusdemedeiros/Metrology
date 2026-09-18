@@ -39,13 +39,6 @@ theorem primStep_eq_headStep_of_decomp_nil
     rw [Exp.decomp_unfold, hd]
   simp only [primStep, hde, Ectx.fillCfg_empty, MeasureTheory.Measure.map_id]
 
-omit [ProbLangℝ rT] in
-/-- When there is no evaluation context to peel, the focused redex is the whole
-expression. -/
-theorem decomp_snd_of_decompItem_none {e : Exp rT} (hd : e.decompItem = none) :
-    e.decomp.2 = e := by
-  rw [Exp.decomp_unfold, hd]
-
 /-- **The discrete-to-support bridge.** For a redex that is not the continuous
 sampler, atomicity of the step measure (`primStep_atomic`) says it lives on its
 atom set, and `Atomic` says every atom is a value configuration. Composing the two
@@ -129,7 +122,7 @@ Each is the corresponding `Atomic` fact pushed through `Atomic.toAtomic'`. The
 concrete constructor. -/
 
 theorem load' (l : Loc) : Atomic' (rT := rT) pl(!#(.loc l)) :=
-  toAtomic' (load l) (by rw [decomp_snd_of_decompItem_none rfl]; nofun)
+  toAtomic' (load l) (by rw [Exp.decomp_snd_of_decompItem_none rfl]; nofun)
 
 theorem store' (l : Loc) (v : Val rT) : Atomic' (.store pl(#(.loc l)) v.1) := by
   have hv : v.1.toVal? = some v := Exp.toVal?_ofVal v
@@ -137,21 +130,21 @@ theorem store' (l : Loc) (v : Val rT) : Atomic' (.store pl(#(.loc l)) v.1) := by
     show (v.1.toVal?.casesOn _ _ : Option _) = none
     rw [hv]
     rfl
-  exact toAtomic' (store l v) (by rw [decomp_snd_of_decompItem_none hd]; nofun)
+  exact toAtomic' (store l v) (by rw [Exp.decomp_snd_of_decompItem_none hd]; nofun)
 
 theorem alloc' (v : Val rT) : Atomic' (.alloc v.1) := by
   have hv : v.1.toVal? = some v := Exp.toVal?_ofVal v
   have hd : (Exp.alloc v.1).decompItem = none := by
     show (v.1.toVal?.casesOn _ _ : Option _) = none
     rw [hv]
-  exact toAtomic' (alloc v) (by rw [decomp_snd_of_decompItem_none hd]; nofun)
+  exact toAtomic' (alloc v) (by rw [Exp.decomp_snd_of_decompItem_none hd]; nofun)
 
 theorem rand_unit' (z : Int) : Atomic' (rT := rT) (pl(rand(#(.int z), #(.unit)))) :=
-  toAtomic' (rand_unit z) (by rw [decomp_snd_of_decompItem_none rfl]; nofun)
+  toAtomic' (rand_unit z) (by rw [Exp.decomp_snd_of_decompItem_none rfl]; nofun)
 
 theorem rand_lbl' (z : Int) (l : Loc) :
     Atomic' (rT := rT) (pl(rand(#(.int z), #(.lbl l)))) :=
-  toAtomic' (rand_lbl z l) (by rw [decomp_snd_of_decompItem_none rfl]; nofun)
+  toAtomic' (rand_lbl z l) (by rw [Exp.decomp_snd_of_decompItem_none rfl]; nofun)
 
 /-- **The continuous sampler is `Atomic'`.** `urand` has no atoms at all, so
 `Atomic` says nothing about it; but its step measure is a pushforward of `unifUnit`

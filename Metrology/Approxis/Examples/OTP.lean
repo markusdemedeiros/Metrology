@@ -15,7 +15,7 @@ open Iris Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 namespace OTP
 
-variable {rT : Type} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type} [ProbLangℝ rT] [MeasurableSingletonClass rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ### The bijection -/
@@ -180,7 +180,6 @@ integer literal. -/
 def otpφ (v v' : Val rT) : Prop :=
   ∃ n : Int, v.1 = pl(#(.int n)) ∧ v'.1 = pl(#(.int n))
 
-omit [Countable rT] in
 theorem lrel_int_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :
     ⊢@{IProp GF} iprop((lrel_int (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝) := by
   iintro Hint

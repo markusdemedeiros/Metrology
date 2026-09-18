@@ -1344,50 +1344,40 @@ theorem Cfg.uniform_ne_zero
 
 /-- Integrate a function over `Cfg.uniform z σ`: the result is the uniform
 average over `n ∈ Ico 0 z` of `φ ⟨#n, σ⟩`. -/
+theorem Cfg.uniform_eq_map_uniformOfFinset {z : Int} (hz : 0 < z) (σ : State rT) :
+    Cfg.uniform z σ = (PMF.uniformOfFinset (Finset.Ico (0 : Int) z)
+        (Finset.nonempty_Ico.mpr hz)).toMeasure.map
+      (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg rT)) := by
+  unfold Cfg.uniform Int.isPos; simp only [dif_pos hz]
+
+/-- **Countability-free `lintegral` against `Cfg.uniform`.** For a *measurable* `φ`
+the integral is the `Ico`-average. `rand` branches over a finite set of integers,
+so nothing here depends on `rT` being countable — measurability of `φ` is supplied
+rather than derived from discreteness. -/
+theorem Cfg.lintegral_uniform' [MeasurableSingletonClass rT]
+    {z : Int} (Hz : 0 < z) (σ : State rT)
+    {φ : Cfg rT → ENNReal} (hφ : Measurable φ) :
+    ∫⁻ c, φ c ∂(Cfg.uniform z σ)
+      = ((z.toNat : ENNReal)⁻¹) * ∑ n ∈ Finset.Ico (0 : Int) z,
+          φ (⟨.lit (.int n), σ⟩ : Cfg rT) := by
+  have hcard : (Finset.Ico (0 : Int) z).card = z.toNat := by rw [Int.card_Ico]; omega
+  rw [Cfg.uniform_eq_map_uniformOfFinset Hz σ,
+      MeasureTheory.lintegral_map hφ Measurable.of_discrete,
+      MeasureTheory.lintegral_countable',
+      tsum_eq_sum (s := Finset.Ico (0 : Int) z) fun n hn => by
+        rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
+            PMF.uniformOfFinset_apply_of_notMem _ hn, mul_zero],
+      Finset.mul_sum]
+  refine Finset.sum_congr rfl fun n hn => ?_
+  rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
+      PMF.uniformOfFinset_apply_of_mem _ hn, hcard, mul_comm]
+
 theorem Cfg.lintegral_uniform [Countable rT] [MeasurableSingletonClass rT]
     {z : Int} (Hz : 0 < z) (σ : State rT) (φ : Cfg rT → ENNReal) :
     ∫⁻ c, φ c ∂(Cfg.uniform z σ) =
       ((z.toNat : ENNReal)⁻¹) * ∑ n ∈ Finset.Ico (0 : Int) z,
-        φ (⟨.lit (.int n), σ⟩ : Cfg rT) := by
-  classical
-  have Huniform : Cfg.uniform z σ =
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z)
-          (Finset.nonempty_Ico.mpr Hz)).toMeasure).map
-        (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg rT)) := by
-    unfold Cfg.uniform Int.isPos
-    simp only [Hz, dite_true]
-  rw [Huniform,
-      MeasureTheory.lintegral_map (Measurable.of_discrete) Measurable.of_discrete]
-  rw [MeasureTheory.lintegral_countable']
-  have hcard : (Finset.Ico (0 : Int) z).card = z.toNat := by
-    rw [Int.card_Ico]
-    omega
-  have hpmf_mem : ∀ n ∈ Finset.Ico (0 : Int) z,
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z) (Finset.nonempty_Ico.mpr Hz)).toMeasure)
-        {n} = ((z.toNat : ENNReal)⁻¹) := by
-    intro n hn
-    rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
-        PMF.uniformOfFinset_apply_of_mem _ hn, hcard]
-  have hpmf_notmem : ∀ n ∉ Finset.Ico (0 : Int) z,
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z) (Finset.nonempty_Ico.mpr Hz)).toMeasure)
-        {n} = 0 := by
-    intro n hn
-    rw [PMF.toMeasure_apply_singleton _ _ MeasurableSet.of_discrete,
-        PMF.uniformOfFinset_apply_of_notMem _ hn]
-  have htsum : ∑' n : Int, φ (⟨.lit (.int n), σ⟩ : Cfg rT) *
-      ((PMF.uniformOfFinset (Finset.Ico (0 : Int) z) (Finset.nonempty_Ico.mpr Hz)).toMeasure)
-        {n}
-      = ∑ n ∈ Finset.Ico (0 : Int) z,
-          φ (⟨.lit (.int n), σ⟩ : Cfg rT) * ((z.toNat : ENNReal)⁻¹) := by
-    rw [tsum_eq_sum (s := Finset.Ico (0 : Int) z) ?_]
-    · refine Finset.sum_congr rfl fun n hn => ?_
-      rw [hpmf_mem n hn]
-    · intro n hn
-      rw [hpmf_notmem n hn, mul_zero]
-  rw [htsum]
-  rw [Finset.mul_sum]
-  refine Finset.sum_congr rfl fun n _ => ?_
-  ring
+        φ (⟨.lit (.int n), σ⟩ : Cfg rT) :=
+  Cfg.lintegral_uniform' Hz σ Measurable.of_discrete
 
 -- DISCRETE: `Cfg.uniform_one_eq_dirac [Countable rT] [MeasurableSingletonClass rT]`
 --   `(σ : State rT) : Cfg.uniform 1 σ = Measure.dirac ⟨.lit (.int 0), σ⟩`

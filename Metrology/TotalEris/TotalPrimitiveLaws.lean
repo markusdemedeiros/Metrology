@@ -22,12 +22,6 @@ variable {rT : Type _}
 macro "solve_not_value" : term =>
   `(Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w)
 
-theorem Cfg.uniform_eq_map_uniformOfFinset [ProbLangℝ rT] {z : Int} (hz : 0 < z) (σ : State rT) :
-    Cfg.uniform z σ = (PMF.uniformOfFinset (Finset.Ico (0 : Int) z)
-        (Finset.nonempty_Ico.mpr hz)).toMeasure.map
-      (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg rT)) := by
-  unfold Cfg.uniform; simp only [Int.isPos, dif_pos hz]
-
 namespace TotalEris
 
 section Lifting

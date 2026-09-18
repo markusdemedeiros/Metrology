@@ -5,6 +5,7 @@ import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.Model
 public import Metrology.Approxis.Compatibility
 public import Metrology.Approxis.AppRelRules
+public import Metrology.Approxis.ContinuousSampler
 public import Metrology.Approxis.RelTactics
 public import Metrology.Approxis.Interp
 
@@ -641,7 +642,6 @@ These are the discrete fragment: `alloc`/`load`/`store` and the bounded
 integer sampler `rand`, whose step rules are stated with atoms. -/
 
 section Discrete
-variable [Countable rT]
 
 theorem bin_log_related_alloc (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ : Ty} :
@@ -924,7 +924,8 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   have hUnit : ⊢@{IProp GF} (lrel_unit (rT := rT) (GF := GF)).car
       ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ := by
     show ⊢@{IProp GF} iprop(⌜(pl(#(.unit)) : Exp rT) = pl(#(.unit)) ∧ (pl(#(.unit)) : Exp rT) = pl(#(.unit))⌝)
-    ipureintro; exact ⟨rfl, rfl⟩
+    ipureintro
+    exact ⟨rfl, rfl⟩
   ihave HvApp : iprop(refines ⊤ (Exp.app v.1 pl(#(.unit))) (Exp.app v'.1 pl(#(.unit)))
       (interp τ (TyEnv.cons (interp τ' Δ) Δ))) $$ [HvArr2]
   · ihave HUnit := hUnit
@@ -1483,8 +1484,35 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   -- Only `op = .minus` is consistent with `op.intResTy = some τ`, with τ = .int.
   cases op with
   | neg => simp [UnOp.intResTy] at Hres
-  | toReal => simp [UnOp.intResTy] at Hres
   | frac => simp [UnOp.intResTy] at Hres
+  | toReal =>
+    simp [UnOp.intResTy] at Hres; subst Hres
+    iintro IH
+    unfold bin_log_related_ty bin_log_related
+    iintro %vs #Hvs
+    ihave IH' := IH $$ %vs Hvs
+    rw [Exp.substMap_unop, Exp.substMap_unop, interp_real]
+    ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
+        lrel_int) $$ [IH']
+    · rw [← interp_int (GF := GF) Δ]; iexact IH'
+    rw [show Exp.unop UnOp.toReal (Exp.substMap vs.fst e) =
+          Ectx.fill [EctxItem.unop UnOp.toReal] (Exp.substMap vs.fst e) from rfl,
+        show Exp.unop UnOp.toReal (Exp.substMap vs.snd e') =
+          Ectx.fill [EctxItem.unop UnOp.toReal] (Exp.substMap vs.snd e') from rfl]
+    iapply (refines_bind [EctxItem.unop UnOp.toReal] [EctxItem.unop UnOp.toReal]
+      (A := lrel_int)) $$ [IH'']
+    · iexact IH''
+    iintro %v %v' Hint
+    ihave HvEx := lrel_int_unfold v v' $$ Hint
+    icases HvEx with ⟨%n, %hv, %hv'⟩
+    rw [show Ectx.fill [EctxItem.unop UnOp.toReal] v.1 = Exp.unop UnOp.toReal v.1 from rfl,
+        show Ectx.fill [EctxItem.unop UnOp.toReal] v'.1 = Exp.unop UnOp.toReal v'.1 from rfl,
+        hv, hv']
+    iapply (refines_unop_pure .toReal _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
+    unfold lrel_real
+    iexists (ProbLangℝ.realOfInt n)
+    ipureintro
+    exact ⟨rfl, rfl⟩
   | minus =>
     simp [UnOp.intResTy] at Hres; subst Hres
     iintro IH
@@ -1529,6 +1557,168 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     iexists n.neg
     ipureintro
     exact ⟨rfl, rfl⟩
+
+/-! ### The real fragment
+
+`lrel_real` relates two values exactly when both are the *same* real literal, so
+the two sides of a real operation always step to a common result and
+`refines_{unop,binop}_pure` applies directly. -/
+
+theorem bin_log_related_real_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
+    (op : UnOp) {e e' : Exp rT} {τ : Ty}
+    (Hres : op.realResTy = some τ) :
+    iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' .real) ⊢@{IProp GF}
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.unop op e) (.unop op e') τ := by
+  iintro IH
+  unfold bin_log_related_ty bin_log_related
+  iintro %vs #Hvs
+  ihave IH' := IH $$ %vs Hvs
+  rw [Exp.substMap_unop, Exp.substMap_unop]
+  ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
+      lrel_real) $$ [IH']
+  · rw [← interp_real (GF := GF) Δ]; iexact IH'
+  rw [show Exp.unop op (Exp.substMap vs.fst e) =
+        Ectx.fill [EctxItem.unop op] (Exp.substMap vs.fst e) from rfl,
+      show Exp.unop op (Exp.substMap vs.snd e') =
+        Ectx.fill [EctxItem.unop op] (Exp.substMap vs.snd e') from rfl]
+  iapply (refines_bind [EctxItem.unop op] [EctxItem.unop op] (A := lrel_real)) $$ [IH'']
+  · iexact IH''
+  iintro %v %v' Hreal
+  ihave HvEx := lrel_real_unfold v v' $$ Hreal
+  icases HvEx with ⟨%r, %hv, %hv'⟩
+  rw [show Ectx.fill [EctxItem.unop op] v.1 = Exp.unop op v.1 from rfl,
+      show Ectx.fill [EctxItem.unop op] v'.1 = Exp.unop op v'.1 from rfl,
+      hv, hv']
+  cases op with
+  | neg => simp [UnOp.realResTy] at Hres
+  | minus =>
+    simp [UnOp.realResTy] at Hres; subst Hres; rw [interp_real]
+    iapply (refines_unop_pure .minus _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
+    unfold lrel_real
+    iexists (ProbLangℝ.realNeg r)
+    ipureintro
+    exact ⟨rfl, rfl⟩
+  | toReal =>
+    simp [UnOp.realResTy] at Hres; subst Hres; rw [interp_real]
+    iapply (refines_unop_pure .toReal _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
+    unfold lrel_real
+    iexists r
+    ipureintro
+    exact ⟨rfl, rfl⟩
+  | frac =>
+    simp [UnOp.realResTy] at Hres; subst Hres; rw [interp_real]
+    iapply (refines_unop_pure .frac _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
+    unfold lrel_real
+    iexists (ProbLangℝ.realFrac r)
+    ipureintro
+    exact ⟨rfl, rfl⟩
+
+theorem bin_log_related_real_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
+    (op : BinOp) {e1 e2 e1' e2' : Exp rT} {τ : Ty}
+    (Hres : op.realResTy = some τ) :
+    iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' .real) ⊢@{IProp GF}
+      iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' .real -∗
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.binop op e1 e2) (.binop op e1' e2') τ) := by
+  iintro IH1 IH2
+  unfold bin_log_related_ty bin_log_related
+  iintro %vs #Hvs
+  ihave IH1' := IH1 $$ %vs Hvs
+  ihave IH2' := IH2 $$ %vs Hvs
+  rw [Exp.substMap_binop, Exp.substMap_binop]
+  ihave IH1'' : iprop(refines ⊤ (Exp.substMap vs.fst e1) (Exp.substMap vs.snd e1')
+      lrel_real) $$ [IH1']
+  · rw [← interp_real]; iexact IH1'
+  ihave IH2'' : iprop(refines ⊤ (Exp.substMap vs.fst e2) (Exp.substMap vs.snd e2')
+      lrel_real) $$ [IH2']
+  · rw [← interp_real]; iexact IH2'
+  rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
+        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) from rfl,
+      show Exp.binop op (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
+        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') from rfl]
+  iapply (refines_bind [EctxItem.binopR op (Exp.substMap vs.fst e1)]
+    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_real)) $$ [IH2'']
+  · iexact IH2''
+  iintro %v2 %v2' Hreal2
+  ihave Hv2Ex := lrel_real_unfold v2 v2' $$ Hreal2
+  icases Hv2Ex with ⟨%r2, %hv2, %hv2'⟩
+  rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
+        Exp.binop op (Exp.substMap vs.fst e1) v2.1 from rfl,
+      show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] v2'.1 =
+        Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
+      hv2, hv2']
+  rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.real r2)) =
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+          (Exp.substMap vs.fst e1) from rfl,
+      show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.real r2)) =
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+          (Exp.substMap vs.snd e1') from rfl]
+  iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    (A := lrel_real)) $$ [IH1'']
+  · iexact IH1''
+  iintro %v1 %v1' Hreal1
+  ihave Hv1Ex := lrel_real_unfold v1 v1' $$ Hreal1
+  icases Hv1Ex with ⟨%r1, %hv1, %hv1'⟩
+  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
+        Exp.binop op v1.1 pl(#(.real r2)) from rfl,
+      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
+        Exp.binop op v1'.1 pl(#(.real r2)) from rfl,
+      hv1, hv1']
+  cases op
+  case plus =>
+    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_real]
+    iapply (refines_binop_pure .plus _ _ _ IsVal.lit IsVal.lit IsVal.lit
+      (heval := rfl) (A := lrel_real))
+    unfold lrel_real
+    iexists (ProbLangℝ.realAdd r1 r2)
+    ipureintro
+    exact ⟨rfl, rfl⟩
+  case eq =>
+    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_bool]
+    iapply (refines_binop_pure .eq _ _ _ IsVal.lit IsVal.lit IsVal.lit
+      (heval := rfl) (A := lrel_bool))
+    unfold lrel_bool
+    iexists (decide ((BaseLit.real r1 : BaseLit rT) = .real r2))
+    ipureintro
+    exact ⟨rfl, rfl⟩
+  case lt =>
+    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_bool]
+    iapply (refines_binop_pure .lt _ _ _ IsVal.lit IsVal.lit IsVal.lit
+      (heval := rfl) (A := lrel_bool))
+    unfold lrel_bool
+    iexists (ProbLangℝ.realLt r1 r2)
+    ipureintro
+    exact ⟨rfl, rfl⟩
+  case le =>
+    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_bool]
+    iapply (refines_binop_pure .le _ _ _ IsVal.lit IsVal.lit IsVal.lit
+      (heval := rfl) (A := lrel_bool))
+    unfold lrel_bool
+    iexists (ProbLangℝ.realLe r1 r2)
+    ipureintro
+    exact ⟨rfl, rfl⟩
+  all_goals simp [BinOp.realResTy] at Hres
+
+/-- **The continuous sampler is self-related at `real`.** Couple the two `urand`
+draws along the identity — which is trivially measure-preserving — and return the
+common sample. -/
+theorem bin_log_related_urand (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) :
+    ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ Γ .urand .urand .real := by
+  unfold bin_log_related_ty bin_log_related
+  iintro %vs _
+  rw [Exp.substMap_urand, Exp.substMap_urand, interp_real,
+      show (Exp.urand : Exp rT) = Ectx.fill [] Exp.urand from rfl]
+  iapply (refines_couple_urands_lr (K := []) (K' := []) (A := lrel_real) id
+    (MeasureTheory.MeasurePreserving.id _))
+  iintro %r _
+  simp only [id_eq]
+  iapply (refines_ret (e1 := Ectx.fill [] pl(#(.real r))) (e2 := Ectx.fill [] pl(#(.real r)))
+    (v1 := Val.real r) (v2 := Val.real r) (hv1 := rfl) (hv2 := rfl))
+  imodintro
+  unfold lrel_real
+  iexists r
+  ipureintro
+  exact ⟨rfl, rfl⟩
 
 theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (op : UnOp) {e e' : Exp rT} {τ : Ty}
@@ -2043,13 +2233,13 @@ theorem fv_subset_relCtxDom {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT G
   simp only [List.mem_toFinset, List.mem_map]
   exact ⟨p, hpmem, hpeq⟩
 
-/-- **Fundamental theorem of the logical relation.** Induction on `Typed`
-dispatching each case to its `bin_log_related_*` lemma. The recursive
-binder cases (`lam`, `fix`) recurse on the body's typing under an extended
-context. The polymorphic binder cases (`tlam`, `tunpack`) require relating
-the shifted typing context to a re-interpreted relational context — sorried
-pending an additional `TctxRelated.shift` lemma threading through `interp_ren`. -/
-theorem fundamental [Countable rT] {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
+/-- **Fundamental theorem of the logical relation.** Induction on `Typed`,
+dispatching each case to its `bin_log_related_*` lemma. The binder cases
+(`lam`, `fix`, `tunpack`) recurse on the body's typing under an extended
+context; the polymorphic cases (`tlam`, `tapp`) relate the shifted typing
+context to a re-interpreted relational one via `TctxRelated.shift` and
+`interp_ren`. -/
+theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     (Δ : TyEnv rT GF)
     (Γrc : RelCtx rT GF)
     (HCtx : TctxRelated Δ Γtc Γrc) :
@@ -2071,6 +2261,37 @@ theorem fundamental [Countable rT] {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : T
     iexists n
     ipureintro
     exact ⟨rfl, rfl⟩
+  | @lit_real _ r =>
+    unfold bin_log_related_ty bin_log_related
+    iintro %vs _
+    rw [Exp.substMap_lit, Exp.substMap_lit,
+        show (pl(#(.real r)) : Exp rT) = (Val.real r).1 from rfl]
+    iapply (refines_ret (v1 := Val.real r) (v2 := Val.real r) (hv1 := rfl) (hv2 := rfl))
+    imodintro
+    rw [interp_real]
+    unfold lrel_real
+    iexists r
+    ipureintro
+    exact ⟨rfl, rfl⟩
+  | «urand» =>
+    exact bin_log_related_urand Δ Γrc
+  | unop_real Hty Hres ih =>
+    rename_i op _ τ
+    have IH := ih Δ Γrc HCtx
+    iintro
+    ihave IH' := IH
+    iapply (bin_log_related_real_unop Δ Γrc op Hres) $$ [IH']
+    iexact IH'
+  | binop_real Hty1 Hty2 Hres ih1 ih2 =>
+    rename_i op _ _ τ
+    have IH1 := ih1 Δ Γrc HCtx
+    have IH2 := ih2 Δ Γrc HCtx
+    iintro
+    ihave IH1' := IH1
+    ihave IH2' := IH2
+    iapply (bin_log_related_real_binop Δ Γrc op Hres) $$ [IH1' IH2']
+    · iexact IH1'
+    iexact IH2'
   | @lit_bool _ b =>
     unfold bin_log_related_ty bin_log_related
     iintro %vs _
@@ -2459,7 +2680,7 @@ theorem fundamental [Countable rT] {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : T
     exact bin_log_related_unpack Δ Γrc L' HIH1 he2_lc he2_lc HIH2
 
 /-- Closed specialization: `∅ ⊢ₜ e : τ → ⊢ REL e << e : interp τ Δ`. -/
-theorem refines_typed [Countable rT] (Δ : TyEnv rT GF) {e : Exp rT} {τ : Ty}
+theorem refines_typed (Δ : TyEnv rT GF) {e : Exp rT} {τ : Ty}
     (Hty : Typed Tctx.empty e τ) :
     ⊢@{IProp GF} refines (⊤ : CoPset) e e (interp τ Δ) := by
   have HRel : TctxRelated Δ Tctx.empty ([] : RelCtx rT GF) := by

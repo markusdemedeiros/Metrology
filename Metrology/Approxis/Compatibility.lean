@@ -395,9 +395,28 @@ theorem refines_binop_pure (op : BinOp) (v1 v2 r : Exp rT)
   imodintro
   iapply HA
 
+/-- Unary counterpart of `refines_binop_pure`: both sides hold the same value
+`v`, the operation evaluates to the same `r`, so one pure step on each side
+lands in `A r r`. -/
+theorem refines_unop_pure (op : UnOp) (v r : Exp rT)
+    (hv : IsVal v) (hrv : IsVal r)
+    (heval : op.eval v = some r) {A : lrel rT GF}
+    (HA : ⊢@{IProp GF} A ⟨r, hrv, hrv.lc⟩ ⟨r, hrv, hrv.lc⟩) :
+    ⊢@{IProp GF} refines ⊤ (.unop op v) (.unop op v) A := by
+  have hf : Exp.unop op v = Ectx.fill [] (Exp.unop op v) := rfl
+  rw [hf]
+  have hφ : v.isValue ∧ op.eval v = some r := ⟨hv.toIsValue, heval⟩
+  iapply (refines_pure_l (K := []) (Hex := pureExec_unop) hφ)
+  simp only [Nat.repeat]
+  iintro !>
+  iapply (refines_pure_r (K := []) (Hex := pureExec_unop) hφ)
+  iapply refines_ret (e1 := Ectx.fill [] r) (e2 := Ectx.fill [] r)
+    (v1 := ⟨r, hrv, hrv.lc⟩) (v2 := ⟨r, hrv, hrv.lc⟩) (hv1 := rfl) (hv2 := rfl)
+  imodintro
+  iapply HA
+
 /-! ### Discrete fragment: tape allocation and bounded sampling -/
 
-variable [Countable rT]
 
 /-- `refines_alloctape`: tape-allocation compatibility. After binding the
 bound argument to value `n : Int`, allocate fresh tapes on both sides and
@@ -511,7 +530,6 @@ theorem refines_alloc {e e' : Exp rT} {A : lrel rT GF} :
   isplitr; · ipureintro; rfl
   iexact HInv
 
-omit [Countable rT] in
 /-- `refines_if`: if-then-else compatibility. -/
 theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     iprop(refines ⊤ e0 e0' lrel_bool) ⊢@{IProp GF}
@@ -556,7 +574,6 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
     rw [show Ectx.fill [] e2 = e2 from rfl, show Ectx.fill [] e2' = e2' from rfl]
     iexact IH2
 
-omit [Countable rT] in
 /-- `refines_snd`: if `e ≤ e' : A × B`, then `snd e ≤ snd e' : B`. -/
 theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
     iprop(refines ⊤ e e' (lrel_prod A B))
@@ -588,7 +605,6 @@ theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
   imodintro
   iexact HB
 
-omit [Countable rT] in
 /-- Helper: `(lrel_tape).car v v'` exposes the tape locations and bound. -/
 theorem lrel_tape_unfold (v v' : Val rT) :
     (lrel_tape (GF := GF)).car v v' ⊢@{IProp GF}
@@ -598,7 +614,6 @@ theorem lrel_tape_unfold (v v' : Val rT) :
           (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩)))) :=
   BIBase.Entails.rfl
 
-omit [Countable rT] in
 /-- `refines_pack` (compatibility.v:73): existential-packing compatibility.
 Given `REL e << e' : C A` for a specific `A`, conclude `REL e << e' : ∃ A, C A`.
 Requires a proof that `C A` only relates closed values (port-specific). -/
@@ -626,7 +641,6 @@ theorem refines_pack (A : lrel rT GF) {e e' : Exp rT} {C : lrel rT GF → lrel r
   iexists A
   iexact HCA
 
-omit [Countable rT] in
 /-- `refines_forall` (compatibility.v:83): universal-typing compatibility.
 If for all semantic types `A`, `REL e << e' : C A`, then `(λ_. e) << (λ_. e') : ∀A, C A`.
 
@@ -686,7 +700,6 @@ theorem refines_forall {e e' : Exp rT} {C : lrel rT GF → lrel rT GF}
   rw [hfillR]
   iapply H
 
-omit [Countable rT] in
 /-- Helper: introduce a step-fupd from a `▷ P` with mask shift (E2 ⊆ E1).
 
 Standard Iris `step_fupd_intro`. Construction:
@@ -704,7 +717,6 @@ theorem step_fupd_intro_later {E1 E2 : CoPset} {P : IProp GF} (HE : E2 ⊆ E1) :
   imodintro
   iexact HP
 
-omit [Countable rT] in
 /-- Helper: `(lrel_ref A).car v v'` exposes the existence of related locations
 plus the heap invariant. -/
 theorem lrel_ref_unfold (A : lrel rT GF) (v v' : Val rT) :

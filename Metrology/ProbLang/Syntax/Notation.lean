@@ -72,6 +72,7 @@ syntax "(" ident " : " pl_ty ")" : pl_arg
 syntax:max "int"                                                : pl_ty
 syntax:max "bool"                                               : pl_ty
 syntax:max "unit"                                               : pl_ty
+syntax:max "real"                                               : pl_ty
 syntax:max "(" pl_ty ")"                                        : pl_ty
 syntax:35 pl_ty:36 " × " pl_ty:35                               : pl_ty
 syntax:30 pl_ty:31 " + " pl_ty:30                               : pl_ty
@@ -179,6 +180,7 @@ macro_rules
   | `(pl_ty(int))          => `(Ty.int)
   | `(pl_ty(bool))         => `(Ty.bool)
   | `(pl_ty(unit))         => `(Ty.unit)
+  | `(pl_ty(real))         => `(Ty.real)
   | `(pl_ty(($τ)))         => `(pl_ty($τ))
   | `(pl_ty($τ1 × $τ2))    => `(Ty.prod pl_ty($τ1) pl_ty($τ2))
   | `(pl_ty($τ1 + $τ2))    => `(Ty.sum pl_ty($τ1) pl_ty($τ2))
@@ -522,6 +524,9 @@ meta def unexpTyRef : Unexpander
 @[app_unexpander Ty.tape]
 meta def unexpTyTape : Unexpander
   | `($_) => do `(pl_ty(tape))
+@[app_unexpander Ty.real]
+meta def unexpTyReal : Unexpander
+  | `($_) => do `(pl_ty(real))
 
 /-! ### Patterns -/
 

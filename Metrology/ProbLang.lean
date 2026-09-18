@@ -1,6 +1,7 @@
 module
 
 public meta import Metrology.Meta.Discrete
+public import Metrology.ProbLang.Advantage
 public import Metrology.ProbLang.ContextualRefinement
 public import Metrology.ProbLang.CtxStep
 public import Metrology.ProbLang.DetStep

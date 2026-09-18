@@ -1994,9 +1994,12 @@ theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     simp [Cfg.uniform, Int.isPos, Hz]
 
 /-- `HeadStepSupport` as positive singleton mass — the form every discrete
-`Approxis` call site actually wants. -/
+`Approxis` call site actually wants.
+
+Needs no `[Countable rT]`: `MeasurableSingletonClass (Cfg rT)` follows from
+`MeasurableSingletonClass rT` alone, and that is all `possible_iff_pos` asks for. -/
 @[discrete]
-theorem HeadStepSupport.pos [Countable rT] [MeasurableSingletonClass rT]
+theorem HeadStepSupport.pos [MeasurableSingletonClass rT]
     {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (h : HeadStepSupport ⟨e1, σ1⟩ ⟨e2, σ2⟩) (hne : e1 ≠ .urand := by nofun) :
     0 < headStep (⟨e1, σ1⟩ : Cfg rT) {(⟨e2, σ2⟩ : Cfg rT)} :=
@@ -2214,16 +2217,8 @@ because its zero-set is exactly `(support)ᶜ`, disjoint from the support. -/
 def IsAtomicSupport {α : Type _} [MeasurableSpace α] (μ : Measure α) : Prop :=
   μ {x | μ {x} = 0} = 0
 
-/-- **Every measure on a countable space is purely atomic.** The co-atom set is a
-countable union of null singletons. This is the unconditional discrete-fragment
-form: it needs no `≠ urand` side condition, because on a countable `rT` even the
-"continuous" sampler is atomic. -/
-theorem isAtomicSupport_of_countable {α : Type _} [MeasurableSpace α] [Countable α]
-    [MeasurableSingletonClass α] (μ : Measure α) : IsAtomicSupport μ := by
-  unfold IsAtomicSupport
-  rw [show {x : α | μ {x} = 0} = ⋃ x ∈ {x : α | μ {x} = 0}, ({x} : Set α) by ext x; simp]
-  rw [MeasureTheory.measure_biUnion_null_iff (Set.to_countable _)]
-  exact fun x hx => hx
+-- DISCRETE: `isAtomicSupport_of_countable {α} [MeasurableSpace α] [Countable α]`
+--   `[MeasurableSingletonClass α] (μ : Measure α) : IsAtomicSupport μ`
 
 theorem isAtomicSupport_zero {α : Type _} [MeasurableSpace α] :
     IsAtomicSupport (0 : Measure α) := by simp [IsAtomicSupport]

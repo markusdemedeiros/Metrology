@@ -101,6 +101,7 @@ noncomputable def interpNE : Ty → NEFun rT GF
   | .unit         => NEFun.const lrel_unit
   | .int          => NEFun.const lrel_int
   | .bool         => NEFun.const lrel_bool
+  | .real         => NEFun.const lrel_real
   | .tape         => NEFun.const lrel_tape
   | .var x        => NEFun.ofCtx x
   | .prod τ1 τ2   => NEFun.map2 lrel_prod (interpNE τ1) (interpNE τ2)
@@ -129,6 +130,7 @@ updating. -/
 @[simp] theorem interp_unit (Δ : TyEnv rT GF) : interp Ty.unit Δ = lrel_unit := rfl
 @[simp] theorem interp_int  (Δ : TyEnv rT GF) : interp Ty.int  Δ = lrel_int  := rfl
 @[simp] theorem interp_bool (Δ : TyEnv rT GF) : interp Ty.bool Δ = lrel_bool := rfl
+@[simp] theorem interp_real (Δ : TyEnv rT GF) : interp Ty.real Δ = lrel_real := rfl
 @[simp] theorem interp_tape (Δ : TyEnv rT GF) : interp Ty.tape Δ = lrel_tape := rfl
 
 theorem interp_prod (Δ : TyEnv rT GF) (τ1 τ2 : Ty) :
@@ -1213,7 +1215,8 @@ equivalent to composing the environment with `ξ` semantically. -/
 theorem interp_rename (τ : Ty) (ξ : Nat → Nat) (Δ : TyEnv rT GF) :
     interp (τ.rename ξ) Δ = interp τ (TyEnv.comp Δ ξ) := by
   induction τ generalizing ξ Δ
-  -- int, bool, unit, tape: all rfl
+  -- int, bool, unit, real, tape: all rfl
+  · rfl
   · rfl
   · rfl
   · rfl
@@ -1302,6 +1305,7 @@ interpreting each substitution image. -/
 theorem interp_substG (τ : Ty) (σ : Nat → Ty) (Δ : TyEnv rT GF) :
     interp (τ.subst σ) Δ = interp τ (semSubst σ Δ) := by
   induction τ generalizing σ Δ
+  · rfl
   · rfl
   · rfl
   · rfl

@@ -186,6 +186,9 @@ inductive BinOp | plus | minus | mult | div | mod | and | or | xor | eq | lt | l
 @[uncurriedProjections, curriedProjections, constructors]
 inductive Ty
   | int | bool | unit
+  /-- The real-valued base type, inhabited by `.lit (.real r)` and produced by
+  the continuous sampler `urand`. -/
+  | real
   | prod (τ1 τ2 : Ty)
   | sum (τ1 τ2 : Ty)
   | arrow (τ1 τ2 : Ty)
@@ -1303,6 +1306,11 @@ theorem Exp.decomp_unfold (e : Exp α) :
       | none => ([], e) :=
   Exp.decomp.eq_1 e
 
+/-- When there is no evaluation context to peel, the focused redex is the whole
+expression. -/
+theorem Exp.decomp_snd_of_decompItem_none {e : Exp α} (hd : e.decompItem = none) :
+    e.decomp.2 = e := by rw [Exp.decomp_unfold, hd]
+
 theorem Exp.decomp_inv_nil {e e' : Exp α} (h : e.decomp = ([], e')) :
     e.decompItem = none ∧ e = e' := by
   rw [Exp.decomp] at h
@@ -1385,6 +1393,13 @@ theorem Exp.decomp_fill_comp {e e' : Exp α} {K K' : Ectx α}
     simp only [Ectx.fill_snoc]
     rw [decomp_unfold, EctxItem.decompItem_fillItem Ki (Ectx.fill_noVal hv)]
     simp only [ih K'' (by simp at hlen; omega), List.append_assoc]
+
+/-- Filling a head redex into an evaluation context leaves the redex as the
+decomposition's focus. -/
+theorem Exp.decomp_snd_fill {K : Ectx α} {e : Exp α} (hv : ¬e.isValue)
+    (hd : e.decompItem = none) : (K.fill e).decomp.2 = e := by
+  have he : e.decomp = ([], e) := by rw [Exp.decomp_unfold, hd]
+  rw [Exp.decomp_fill_comp hv he]
 
 /-- `x ∉ fv e` — LN replacement for the old string-based Fresh predicate. -/
 def Exp.Fresh (x : Var) (e : Exp α) : Prop := x ∉ e.fv

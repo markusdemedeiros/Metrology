@@ -181,25 +181,16 @@ abbrev Discrete.Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :
 abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   primStep ⟨e, σ⟩ ≠ 0
 
--- This one needs no continuous anlogue, it's purely discrete reasoning
+/-- One atom is already enough to make the step measure nonzero. The converse is
+`Reducible.toDiscrete`, which needs the fragment condition rather than
+countability. -/
 @[discrete]
-theorem Discrete.primStep_discrete_iff {e : Exp rT} {σ : State rT}
-    [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
-    (∃ ρ, 0 < (primStep { expr := e, state := σ }) {ρ}) ↔ primStep { expr := e, state := σ } ≠ 0 :=
-    by
-  refine ⟨fun ⟨ρ, Hρ⟩ Hz => by simp [Hz] at Hρ, ?_⟩
-  by_contra!
-  rcases this with ⟨Hnz, H⟩
-  refine Hnz <| ext_of_singleton fun ρ => ?_
-  simp [nonpos_iff_eq_zero.mp (H ρ)]
-
--- Bridge
-@[discrete]
-theorem Reducible_ReducibleM_iff {e : Exp rT} {σ : State rT}
-    [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
-    Discrete.Reducible e σ ↔ Reducible e σ := by
-  unfold Discrete.Reducible Reducible
-  exact Discrete.primStep_discrete_iff
+theorem Discrete.Reducible.toReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+    (h : Discrete.Reducible e σ) : _root_.ProbLang.Reducible e σ := by
+  obtain ⟨ρ, hρ⟩ := h
+  intro hz
+  rw [hz] at hρ
+  simp at hρ
 
 /-! ## Values can't step -/
 
@@ -326,12 +317,6 @@ theorem primStep_fill_inv [ProbLangℝ rT]  {K : Ectx rT} {e1 e2 : Exp rT} {σ1 
   exact ⟨e2', heq.1.symm, heq.2 ▸ hpos⟩
 
 /-! ## Reducible: fill interaction -/
-
-@[discrete]
-theorem Discrete.Reducible.fill [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
-    (K : Ectx rT) {e : Exp rT} {σ : State rT}
-    (hred : Discrete.Reducible e σ) : Discrete.Reducible (K.fill e) σ :=
-  Reducible_ReducibleM_iff.mpr (primStep_fill_pos (Reducible_ReducibleM_iff.mp hred))
 
 theorem Reducible.fill [ProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hred : Reducible e σ) : Reducible (K.fill e) σ :=
@@ -554,6 +539,41 @@ theorem primStep_atomic [ProbLangℝ rT] (e : Exp rT) (σ : State rT)
     ext ρ'; simp only [Set.mem_preimage, Set.mem_setOf_eq, hsingle ρ']
   rw [hpre]
   exact headStep_atomic e.decomp.2 σ hne
+
+/-- Discharge the `e.decomp.2 ≠ .urand` fragment condition at a concrete redex.
+The redex is usually its own decomposition, so it is enough to compute
+`decompItem` and then rule out the `urand` constructor. -/
+macro "no_urand" : tactic =>
+  `(tactic| first
+    | (rw [Exp.decomp_snd_fill (by first | (intro ⟨w⟩; nomatch w) | nofun)
+          (by first | rfl | (simp [Exp.decompItem, Exp.toVal?_ofVal]; done))]
+       intro h; cases h)
+    | (rw [Exp.decomp_snd_of_decompItem_none
+          (by first | rfl | (simp [Exp.decompItem, Exp.toVal?_ofVal]; done))]
+       intro h; cases h)
+    | (intro h; cases h))
+
+/-- **Converse of `Discrete.Reducible.toReducible`, without countability.** A
+nonzero measure that is purely atomic must have an atom: if every singleton were
+null the whole space would be the co-support, which `IsAtomicSupport` says is
+null. Away from `urand` that atomicity is exactly `primStep_atomic`, so the
+fragment condition does all the work countability used to. -/
+@[discrete]
+theorem Reducible.toDiscrete [ProbLangℝ rT] [MeasurableSingletonClass rT]
+    {e : Exp rT} {σ : State rT} (hne : e.decomp.2 ≠ .urand)
+    (h : _root_.ProbLang.Reducible e σ) : Discrete.Reducible e σ := by
+  by_contra hcon
+  refine h ?_
+  have hall : ∀ ρ : Cfg rT, (primStep ⟨e, σ⟩) {ρ} = 0 := by
+    intro ρ
+    by_contra hρ
+    exact hcon ⟨ρ, pos_iff_ne_zero.mpr hρ⟩
+  have huniv : {ρ : Cfg rT | (primStep ⟨e, σ⟩) {ρ} = 0} = Set.univ := by
+    ext ρ; simpa using hall ρ
+  have := primStep_atomic e σ hne
+  unfold IsAtomicSupport at this
+  rw [huniv] at this
+  exact MeasureTheory.Measure.measure_univ_eq_zero.mp this
 
 end ProbLang
 end

@@ -248,7 +248,7 @@ typing of the holes (used in binder cases to derive LC + fv-bounds on
 `K'.fill e`/`K'.fill e'` via `TypedCtx.fill_typed`); `Hbinders` ensures the
 context's binder atoms don't clash with `e.fv ∪ e'.fv ∪ payloadFv K`, also
 needed for `TypedCtx.fill_typed`. -/
-theorem bin_log_related_under_typed_ctx [Countable rT]
+theorem bin_log_related_under_typed_ctx
     {Γtc : Tctx} {e e' : Exp rT} {τ : Ty} {Γtc' : Tctx} {τ' : Ty} {K : Ctx rT}
     (HK : TypedCtx K Γtc τ Γtc' τ')
     (Hty_e : Typed Γtc e τ) (Hty_e' : Typed Γtc e' τ)
@@ -419,6 +419,22 @@ theorem bin_log_related_under_typed_ctx [Countable rT]
     | @unop_int _ op _ Hres =>
       ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
       iapply (bin_log_related_int_unop Δ Γrc' op Hres) $$ [IHk']
+      iexact IHk'
+    | @unop_real _ op _ Hres =>
+      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
+      iapply (bin_log_related_real_unop Δ Γrc' op Hres) $$ [IHk']
+      iexact IHk'
+    | @binopL_real _ op _ _ Hty2 Hres =>
+      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
+      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
+      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$ [IHk' IH2']
+      · iexact IHk'
+      iexact IH2'
+    | @binopR_real _ op _ _ Hty1 Hres =>
+      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
+      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
+      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$ [IH1' IHk']
+      · iexact IH1'
       iexact IHk'
     | @unop_bool _ op _ Hres =>
       ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
@@ -633,7 +649,7 @@ unrestricted version follows by alpha-renaming, which is not yet ported.
 
 Also requires typing of `e`, `e'`, and that `K`'s binder atoms are fresh
 in `e.fv ∪ e'.fv ∪ payloadFv K`. -/
-theorem refines_sound_open_fresh [Countable rT]
+theorem refines_sound_open_fresh
     (Γtc : Tctx) (e e' : Exp rT) (τ : Ty)
     (Hty_e : Typed Γtc e τ) (Hty_e' : Typed Γtc e' τ)
     (Hlog : ∀ (_IR : ApproxisRGS rT .hasNoLC GF) (Δ : TyEnv rT GF) (Γrc : RelCtx rT GF),
@@ -693,7 +709,7 @@ theorem refines_sound_open_fresh [Countable rT]
   exact (toVal?_to_eq hv').trans hvb2
 
 /-- **Soundness of the logical relation (closed case), restricted to fresh contexts.** -/
-theorem refines_sound_fresh [Countable rT] (e e' : Exp rT) (τ : Ty)
+theorem refines_sound_fresh (e e' : Exp rT) (τ : Ty)
     (Hty_e : Typed Tctx.empty e τ) (Hty_e' : Typed Tctx.empty e' τ)
     (Hlog : ∀ (_IR : ApproxisRGS rT .hasNoLC GF) (Δ : TyEnv rT GF),
       ⊢@{IProp GF} refines (hlc := .hasNoLC) (GF := GF)

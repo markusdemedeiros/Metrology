@@ -33,6 +33,7 @@ def Ty.rename (ξ : Renaming) : Ty → Ty
   | .int          => .int
   | .bool         => .bool
   | .unit         => .unit
+  | .real         => .real
   | .tape         => .tape
   | .prod τ1 τ2   => .prod (τ1.rename ξ) (τ2.rename ξ)
   | .sum  τ1 τ2   => .sum  (τ1.rename ξ) (τ2.rename ξ)
@@ -50,6 +51,7 @@ def Ty.subst (σ : Substitution) : Ty → Ty
   | .int          => .int
   | .bool         => .bool
   | .unit         => .unit
+  | .real         => .real
   | .tape         => .tape
   | .prod τ1 τ2   => .prod (τ1.subst σ) (τ2.subst σ)
   | .sum  τ1 τ2   => .sum  (τ1.subst σ) (τ2.subst σ)
@@ -240,8 +242,7 @@ def BinOp.boolResTy : BinOp → Option Ty
 def UnOp.intResTy : UnOp → Option Ty
   | .neg   => none
   | .minus => some .int
-  -- `Ty` has no real type, so the int→real coercion has no typed result.
-  | .toReal => none
+  | .toReal => some .real
   | .frac  => none
 
 def UnOp.boolResTy : UnOp → Option Ty
@@ -249,6 +250,27 @@ def UnOp.boolResTy : UnOp → Option Ty
   | .minus => none
   | .toReal => none
   | .frac  => none
+
+/-- Result types of the unary operations defined on real operands: negation,
+the idempotent `toReal`, and the fractional part. `UnOp.eval` implements exactly
+these three at `.lit (.real _)`. -/
+def UnOp.realResTy : UnOp → Option Ty
+  | .neg    => none
+  | .minus  => some .real
+  | .toReal => some .real
+  | .frac   => some .real
+
+/-- Result types of the binary operations defined on real operands. `BinOp.eval`
+implements addition (`realAdd`), the two comparisons (`realLt`/`realLe`), and
+literal equality. Mixed int/real operands stay stuck — a program coerces
+explicitly with `UnOp.toReal` — so this table is only consulted when *both*
+operands are reals. -/
+def BinOp.realResTy : BinOp → Option Ty
+  | .plus                                => some .real
+  | .minus | .mult | .div | .mod         => none
+  | .shl   | .shr                        => none
+  | .and   | .or   | .xor                => none
+  | .eq    | .lt   | .le                 => some .bool
 
 /-! ## Typing contexts
 
@@ -311,6 +333,16 @@ inductive Typed : Tctx → Exp rT → Ty → Prop
   | lit_int  {Γ z} : Typed Γ (.lit (.int z)) .int
   | lit_bool {Γ b} : Typed Γ (.lit (.bool b)) .bool
   | lit_unit {Γ}   : Typed Γ (.lit .unit)     .unit
+  | lit_real {Γ r} : Typed Γ (.lit (.real r)) .real
+  /-- The continuous sampler draws a real from `Uniform[0,1]`. -/
+  | urand {Γ}      : Typed Γ .urand           .real
+  | unop_real {Γ op e τ} :
+      Typed Γ e .real → op.realResTy = some τ →
+      Typed Γ (.unop op e) τ
+  | binop_real {Γ op e1 e2 τ} :
+      Typed Γ e1 .real → Typed Γ e2 .real →
+      op.realResTy = some τ →
+      Typed Γ (.binop op e1 e2) τ
   | binop_int {Γ op e1 e2 τ} :
       Typed Γ e1 .int → Typed Γ e2 .int →
       op.intResTy = some τ →
@@ -412,7 +444,10 @@ theorem Typed.isLocallyClosed {Γ : Tctx} {e : Exp rT} {τ : Ty}
     (h : Typed Γ e τ) : Exp.IsLocallyClosed e := by
   induction h with
   | fvar _ => exact .fvar _
-  | lit_int | lit_bool | lit_unit => exact .lit _
+  | lit_int | lit_bool | lit_unit | lit_real => exact .lit _
+  | urand => exact .urand
+  | unop_real _ _ ih => exact .unop _ ih
+  | binop_real _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
   | binop_int _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
   | binop_bool _ _ _ ih1 ih2 => exact .binop _ ih1 ih2
   | unop_int _ _ ih => exact .unop _ ih
@@ -464,13 +499,15 @@ theorem Typed.fvSubset {Γ : Tctx} {e : Exp rT} {τ : Ty}
     intro x hx'
     simp [Exp.fv, Finset.mem_singleton] at hx'
     subst hx'; rw [hx]; rfl
-  | lit_int | lit_bool | lit_unit => intro x hx; simp [Exp.fv] at hx
-  | binop_int _ _ _ ih1 ih2 | binop_bool _ _ _ ih1 ih2 | unboxed_eq _ _ _ ih1 ih2 =>
+  | lit_int | lit_bool | lit_unit | lit_real | urand => intro x hx; simp [Exp.fv] at hx
+  | binop_real _ _ _ ih1 ih2 | binop_int _ _ _ ih1 ih2 | binop_bool _ _ _ ih1 ih2
+  | unboxed_eq _ _ _ ih1 ih2 =>
     intro x hx; simp only [Exp.fv] at hx
     rcases Finset.mem_union.mp hx with hx | hx
     · exact ih1 x hx
     · exact ih2 x hx
-  | unop_int _ _ ih | unop_bool _ _ ih => intro x hx; simp [Exp.fv] at hx; exact ih x hx
+  | unop_int _ _ ih | unop_bool _ _ ih | unop_real _ _ ih =>
+    intro x hx; simp [Exp.fv] at hx; exact ih x hx
   | pair _ _ ih1 ih2 =>
     intro x hx; simp only [Exp.fv] at hx
     rcases Finset.mem_union.mp hx with hx | hx
@@ -639,6 +676,23 @@ theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
       intros; subst_vars; simp only [Exp.subst]; exact .lit_bool
   | lit_unit =>
       intros; subst_vars; simp only [Exp.subst]; exact .lit_unit
+  | lit_real =>
+      intros; subst_vars; simp only [Exp.subst]; exact .lit_real
+  | urand =>
+      intros; subst_vars; simp only [Exp.subst]; exact .urand
+  | binop_real _ _ hop ih1 ih2 =>
+      intro x y τ_x Γ heq hy
+      subst heq
+      simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
+      obtain ⟨⟨h1, h2⟩, hx⟩ := hy
+      simp only [Exp.subst]
+      refine .binop_real (ih1 x y τ_x Γ rfl ?_) (ih2 x y τ_x Γ rfl ?_) hop
+      · simp [h1, hx]
+      · simp [h2, hx]
+  | unop_real _ hop ih =>
+      intro x y τ_x Γ heq hy
+      subst heq; simp only [Exp.subst]
+      exact .unop_real (ih x y τ_x Γ rfl hy) hop
   | binop_int _ _ hop ih1 ih2 =>
       intro x y τ_x Γ heq hy
       subst heq

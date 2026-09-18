@@ -931,21 +931,22 @@ post-step config. Mirrors Rocq's `spec_coupl_step`.
 
 Discrete corollary of `specCoupl_step_concentrated` at the atom set. -/
 @[discrete]
-theorem specCoupl_step [Countable rT] {E : CoPset} {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT}
+theorem specCoupl_step {E : CoPset} {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT}
     {ε : ENNReal} {Z : State rT → Cfg rT → ENNReal → IProp GF}
-    (Hred : Discrete.Reducible e₁' σ₁') :
+    (Hred : Discrete.Reducible e₁' σ₁')
+    (hne : e₁'.decomp.2 ≠ .urand := by no_urand) :
     iprop(∀ (e₂' : Exp rT) (σ₂' : State rT),
         (⌜0 < primStep ⟨e₁', σ₁'⟩ {⟨e₂', σ₂'⟩}⌝) -∗ |={E}=>
           specCoupl E σ₁ e₂' σ₂' ε Z) ⊢@{IProp GF}
       specCoupl E σ₁ e₁' σ₁' ε Z := by
   refine specCoupl_step_concentrated (S := {ρ : Cfg rT | 0 < primStep ⟨e₁', σ₁'⟩ {ρ}})
-    (Reducible_ReducibleM_iff.mp Hred) (measurableSet_primStep_support e₁' σ₁') ?_
+    Hred.toReducible (measurableSet_primStep_support e₁' σ₁') ?_
   have heq : ({ρ : Cfg rT | 0 < primStep ⟨e₁', σ₁'⟩ {ρ}}ᶜ)
       = {ρ : Cfg rT | (primStep ⟨e₁', σ₁'⟩) {ρ} = 0} := by
     ext ρ; simp [pos_iff_ne_zero]
   show (primStep ⟨e₁', σ₁'⟩) _ = 0
   rw [heq]
-  exact isAtomicSupport_of_countable _
+  exact primStep_atomic e₁' σ₁' hne
 
 /-! ## `progCoupl` — derived lemmas -/
 
@@ -2245,8 +2246,8 @@ under a later.
 
 Discrete corollary of `wp_lift_step_later_concentrated` at the atom set. -/
 @[discrete]
-theorem wp_lift_step_later [Countable rT] {E : CoPset} {e₁ : Exp rT} {Φ : Val rT → IProp GF}
-    (Hv : e₁.toVal? = none) :
+theorem wp_lift_step_later {E : CoPset} {e₁ : Exp rT} {Φ : Val rT → IProp GF}
+    (Hv : e₁.toVal? = none) (hne : e₁.decomp.2 ≠ .urand := by no_urand) :
     iprop(∀ (σ₁ : State rT), stateInterp (rT := rT) σ₁ -∗ |={E, ∅}=>
       (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
@@ -2263,13 +2264,13 @@ theorem wp_lift_step_later [Countable rT] {E : CoPset} {e₁ : Exp rT} {Φ : Val
         ext ρ; simp [pos_iff_ne_zero]
       show (primStep ⟨e₁, σ₁⟩) _ = 0
       rw [heq]
-      exact isAtomicSupport_of_countable _))
+      exact primStep_atomic e₁ σ₁ hne))
   iintro %σ₁ Hσ
   ispecialize H $$ %σ₁ [Hσ]
   · iassumption
   imod H with ⟨%Hred, H⟩
   imodintro
-  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mp Hred
+  isplitr; · ipureintro; exact Hred.toReducible
   iintro %e₂ %σ₂ %Hmem
   iapply H $$ %e₂ %σ₂ %Hmem
 
@@ -2447,9 +2448,9 @@ theorem wp_lift_atomic_step_fupd_concentrated {E1 E2 : CoPset} {e₁ : Exp rT}
 
 /-- Atomic step with mask-shifting fupd. -/
 @[discrete]
-theorem wp_lift_atomic_step_fupd [Countable rT] {E1 E2 : CoPset} {e₁ : Exp rT}
+theorem wp_lift_atomic_step_fupd {E1 E2 : CoPset} {e₁ : Exp rT}
     {Φ : Val rT → IProp GF}
-    (Hv : e₁.toVal? = none) :
+    (Hv : e₁.toVal? = none) (hne : e₁.decomp.2 ≠ .urand := by no_urand) :
     iprop(∀ (σ₁ : State rT), stateInterp (rT := rT) σ₁ -∗ |={E1}=>
       (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ∀ (e₂ : Exp rT) (σ₂ : State rT),
@@ -2458,7 +2459,7 @@ theorem wp_lift_atomic_step_fupd [Countable rT] {E1 E2 : CoPset} {e₁ : Exp rT}
           (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
       wp E1 e₁ Φ := by
   iintro H
-  iapply wp_lift_step_later Hv
+  iapply wp_lift_step_later Hv hne
   iintro %σ₁ Hσ
   ispecialize H $$ %σ₁ [Hσ]
   · iassumption
@@ -2518,8 +2519,8 @@ theorem wp_lift_atomic_step_concentrated {E : CoPset} {e₁ : Exp rT}
 
 /-- Atomic step without mask shift on the inner step. -/
 @[discrete]
-theorem wp_lift_atomic_step [Countable rT] {E : CoPset} {e₁ : Exp rT} {Φ : Val rT → IProp GF}
-    (Hv : e₁.toVal? = none) :
+theorem wp_lift_atomic_step {E : CoPset} {e₁ : Exp rT} {Φ : Val rT → IProp GF}
+    (Hv : e₁.toVal? = none) (hne : e₁.decomp.2 ≠ .urand := by no_urand) :
     iprop(∀ (σ₁ : State rT), stateInterp (rT := rT) σ₁ -∗ |={E}=>
       (⌜Discrete.Reducible e₁ σ₁⌝) ∗
       ▷ ∀ (e₂ : Exp rT) (σ₂ : State rT),
@@ -2528,7 +2529,7 @@ theorem wp_lift_atomic_step [Countable rT] {E : CoPset} {e₁ : Exp rT} {Φ : Va
           (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
       wp E e₁ Φ := by
   iintro H
-  iapply wp_lift_atomic_step_fupd (E2 := E) Hv
+  iapply wp_lift_atomic_step_fupd (E2 := E) Hv hne
   iintro %σ₁ Hσ
   ispecialize H $$ %σ₁ [Hσ]
   · iassumption
@@ -2701,9 +2702,10 @@ theorem wp_lift_head_step_prog_couple {E : CoPset} {e₁ : Exp rT} {Φ : Val rT 
 
 /-- Atomic head-step without mask shift. -/
 @[discrete]
-theorem wp_lift_atomic_head_step [Countable rT] {E : CoPset} {e₁ : Exp rT} {Φ : Val rT → IProp GF}
+theorem wp_lift_atomic_head_step {E : CoPset} {e₁ : Exp rT} {Φ : Val rT → IProp GF}
     (Hv : e₁.toVal? = none)
-    (Hlc : e₁.IsLocallyClosed := by is_lc) :
+    (Hlc : e₁.IsLocallyClosed := by is_lc)
+    (hne : e₁.decomp.2 ≠ .urand := by no_urand) :
     iprop(∀ (σ₁ : State rT), stateInterp (rT := rT) σ₁ -∗ |={E}=>
       (⌜∃ ρ : Cfg rT, 0 < headStep ⟨e₁, σ₁⟩ {ρ}⌝) ∗
       ▷ ∀ (e₂ : Exp rT) (σ₂ : State rT),
@@ -2712,13 +2714,16 @@ theorem wp_lift_atomic_head_step [Countable rT] {E : CoPset} {e₁ : Exp rT} {Φ
           (match e₂.toVal? with | some v => Φ v | none => iprop(False))) ⊢@{IProp GF}
       wp E e₁ Φ := by
   iintro H
-  iapply wp_lift_atomic_step Hv
+  iapply wp_lift_atomic_step Hv hne
   iintro %σ₁ Hσ
   ispecialize H $$ %σ₁ [Hσ]
   · iassumption
   imod H with ⟨%Hhred, H⟩
   imodintro
-  isplitr; · ipureintro; exact Reducible_ReducibleM_iff.mpr (reducible_of_headReducible Hlc (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ))
+  isplitr
+  · ipureintro
+    exact Reducible.toDiscrete hne (reducible_of_headReducible Hlc
+      (let ⟨ρ, hρ⟩ := Hhred; fun hz => by rw [hz] at hρ; simp at hρ))
   iintro !>
   iintro %e₂ %σ₂ %Hpstep
   have hpos : 0 < headStep ⟨e₁, σ₁⟩ {⟨e₂, σ₂⟩} := by
