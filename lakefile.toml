@@ -1,0 +1,50 @@
+name = "metrology"
+testDriver = "ProbLangTest"
+defaultTargets = ["Metrology"]
+
+[leanOptions]
+pp.unicode.fun = true
+
+[[require]]
+name = "mathlib"
+git = "https://github.com/leanprover-community/mathlib4"
+rev = "v4.32.2"
+
+[[require]]
+name = "cslib"
+git = "https://github.com/leanprover/cslib"
+rev = "v4.32.2"
+
+[[require]]
+name = "iris"
+git = "https://github.com/leanprover-community/iris-lean.git"
+subDir = "Iris"
+
+# SampCert dropped in the iris-lean-bump branch: it has no v4.30.0 release.
+# The two dependent files Metrology/SampCert/{SLang,Samplers}.lean are excluded
+# from the build (orphan modules, not imported by the default target).
+# [[require]]
+# name = "sampcert"
+# git = "https://github.com/leanprover/SampCert.git"
+# rev = "v4.29.0"
+
+[[lean_lib]]
+name = "Metrology"
+
+[[lean_exe]]
+name = "metrology"
+root = "Main"
+
+[[lean_exe]]
+name = "ProbLangTest"
+root = "ProbLangTest"
+
+# CtxInterpTest is parked, not deleted. `ProbLangℝ` bundles the computable real
+# operations (realAdd/realLt/…) together with a noncomputable
+# `MeasureTheory.Measure`, so every instance of it is noncomputable and the
+# interpreter's test harness cannot be compiled. Splitting a `ProbLangℝOps`
+# parent class out would make it buildable again.
+# [[lean_exe]]
+# name = "CtxInterpTest"
+# root = "CtxInterpTest"
+# supportInterpreter = true
