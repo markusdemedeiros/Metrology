@@ -6,43 +6,21 @@ public import Metrology.ProbLang.Erasure
 
 @[expose] public section
 
-
-/-! # Adequacy: WP entailments imply `AddCoupl` between execution distributions. -/
-
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
-  ProbLang.ApproxisWpGS ProbLang.Cfg
+open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS ProbLang.Cfg
 open scoped AppGS
 
 namespace ProbLang.AdequacyHelpers
-
 
 section FupdPlainForall
 
 variable {rT : Type _} [ProbLangℝ rT]
 variable {GF : BundledGFunctors} [InvGS_gen .hasNoLC GF]
 
+variable {E E' : CoPset}
+
 open Iris Iris.BI Iris.BI.BIBase Iris.ProofMode
 
-theorem stepFupdN_mono' {E E' : CoPset} {n : Nat} {P Q : IProp GF}
-    (HPQ : P ⊢@{IProp GF} Q) :
-    iprop(|={E}[E']▷=>^[n] P) ⊢@{IProp GF} iprop(|={E}[E']▷=>^[n] Q) := by
-  induction n with
-  | zero => simp only [Nat.repeat]; exact HPQ
-  | succ n ih =>
-    simp only [Nat.repeat]
-    exact BIFUpdate.mono (later_mono (BIFUpdate.mono ih))
-
-theorem stepFupdN_intro' (E : CoPset) (n : Nat) {P : IProp GF} :
-    P ⊢@{IProp GF} iprop(|={E}[E]▷=>^[n] P) := by
-  induction n with
-  | zero => simp only [Nat.repeat]; exact Entails.rfl
-  | succ n ih =>
-    simp only [Nat.repeat]
-    refine Entails.trans ih ?_
-    refine Entails.trans (fupd_intro (E := E)) ?_
-    refine BIFUpdate.mono ?_
-    refine Entails.trans later_intro ?_
-    exact later_mono (fupd_intro (E := E))
+-- #check step_fupdN_intro
 
 theorem fupd_laterN_to_stepFupdN (E : CoPset) (n : Nat) (Q : IProp GF) :
     iprop(|={E}=> ▷^[n+1] Q) ⊢@{IProp GF} iprop(|={E}[E]▷=>^[n+1] Q) := by
@@ -60,44 +38,19 @@ theorem fupd_laterN_to_stepFupdN (E : CoPset) (n : Nat) (Q : IProp GF) :
     refine Entails.trans ih ?_
     exact fupd_intro (E := E)
 
-theorem fupd_plainly_forall_2 (E : CoPset) {A : Type _} (Φ : A → IProp GF) :
-    iprop((∀ x, |={E}=> ■ Φ x) ⊢ |={E}=> ∀ x, Φ x) := by
-  have step1 : iprop((∀ x, |={E}=> ■ Φ x) ⊢ |={E}=> (∀ x, ■ Φ x)) := by
-    -- iris-bump: the `IProp` fupd now unfolds to `le_upd` (`|==£>`); in the no-LC case
-    -- `le_upd_unfold_no_le` (`⊣⊢`, via the `LcGS .hasNoLC` instance from `InvGS_gen`)
-    -- recovers the old `|==> ◇` shape so the original `imod`-based proof goes through.
-    simp only [fupd, uPred_fupd, le_upd_unfold_no_le.to_eq]
-    iintro H ⟨Hwsat, HE⟩
-    ihave #HP : ◇ (∀ x, ■ Φ x) $$ [H Hwsat HE]
-    · iintro %x
-      ihave H' := H $$ %x
-      imod H' $$ [Hwsat HE] with ⟨_, _, H'⟩
-      · isplitl [Hwsat] <;> iassumption
-      iexact H'
-    imodintro; imod HP; imodintro
-    isplitl [Hwsat]; iassumption
-    isplitl [HE]; iassumption
-    iclear H
-    iexact HP
-  refine step1.trans (BIFUpdate.mono ?_)
-  exact forall_mono (fun _ => plainly_elim)
-
 theorem fupd_plain_forall_2 (E : CoPset) {A : Type _} (Φ : A → IProp GF)
     [∀ x, Plain (Φ x)] :
     iprop((∀ x, |={E}=> Φ x) ⊢ |={E}=> ∀ x, Φ x) := by
-  refine Entails.trans ?_ (fupd_plainly_forall_2 E Φ)
+  refine .trans ?_ Iris.fupd_plainly_forall_2
   refine forall_mono (fun x => ?_)
   exact BIFUpdate.mono Plain.plain
 
-theorem fupd_plain_forall' (E : CoPset) {A : Type _} (Φ : A → IProp GF)
-    [∀ x, Plain (Φ x)] :
-    iprop(|={E}=> ∀ x, Φ x) ⊣⊢@{IProp GF} iprop(∀ x, |={E}=> Φ x) :=
-  ⟨fupd_forall, fupd_plain_forall_2 E Φ⟩
+theorem fupd_plain_forall' (E : CoPset) {A : Type _} (Φ : A → IProp GF) [∀ x, Plain (Φ x)] : iprop%
+    (|={E}=> ∀ x, Φ x) ⊣⊢@{IProp GF} ∀ x, |={E}=> Φ x := ⟨fupd_forall, fupd_plain_forall_2 E Φ⟩
 
 theorem fupd_except_0 (E1 E2 : CoPset) (P : IProp GF) :
     iprop(|={E1,E2}=> ◇ P) ⊢@{IProp GF} iprop(|={E1,E2}=> P) := by
-  refine Entails.trans
-    (BIFUpdate.mono (except0_mono (fupd_intro (E := E2) (P := P)))) ?_
+  refine .trans (BIFUpdate.mono (except0_mono (fupd_intro (E := E2)))) ?_
   exact (BIFUpdate.mono BIFUpdate.except0).trans BIFUpdate.trans
 
 theorem step_fupd_except_0 (E1 E2 : CoPset) (P : IProp GF) :
@@ -119,7 +72,7 @@ theorem step_fupdN_plain_forall (E : CoPset) {A : Type _} (Φ : A → IProp GF)
     iprop(|={E}▷=>^[n] ∀ x, Φ x) ⊣⊢@{IProp GF} iprop(∀ x, |={E}▷=>^[n] Φ x) := by
   refine ⟨?_, ?_⟩
   · refine forall_intro (fun x => ?_)
-    exact stepFupdN_mono' (forall_elim x)
+    exact step_fupdN_mono (forall_elim x)
   cases n with
   | zero => simp only [Nat.repeat]; exact forall_intro (forall_elim ·)
   | succ n =>
@@ -215,15 +168,13 @@ theorem stepFupdN_pure_wand_intro (E : CoPset) (n : Nat) (p q : Prop) :
     iprop(⌜p⌝ -∗ |={E}[E]▷=>^[n] ⌜q⌝) ⊢@{IProp GF}
       iprop(|={E}[E]▷=>^[n] (⌜p⌝ -∗ ⌜q⌝)) := by
   by_cases hp : p
-  · refine Entails.trans ?step (stepFupdN_mono' (GF := GF) (E := E) (E' := E) (n := n)
-      (P := iprop(⌜q⌝ : IProp GF))
-      (Q := iprop(⌜p⌝ -∗ ⌜q⌝ : IProp GF))
-      (wand_intro sep_elim_left))
+  · refine Entails.trans ?step (step_fupdN_mono (wand_intro sep_elim_left))
     refine (sep_emp (P := iprop(⌜p⌝ -∗ |={E}[E]▷=>^[n] ⌜q⌝))).mpr.trans ?_
     refine (sep_mono_right (pure_intro (P := emp) hp)).trans ?_
     exact wand_elim_left
-  · refine Entails.trans ?_ (stepFupdN_intro' (GF := GF) E n)
-    exact wand_intro (sep_elim_right.trans (pure_elim' (fun h => absurd h hp)))
+  · refine Entails.trans ?_ ( step_fupdN_intro Std.LawfulSet.subset_refl)
+    iintro H !> %H
+    grind
 
 end FupdPlainForall
 
@@ -233,23 +184,6 @@ namespace ProbLang
 
 
 open ProbLang.AdequacyHelpers
-
-/-! ### Countability inventory
-
-`[Countable rT]` is **gone** from this file: Approxis adequacy holds for a diffuse
-`rT`. Getting here took three things:
-
-* rewiring `wp_adequacy` off `AddCoupl.map_inv`;
-* making `AddCoupl_erasure_erasable_exp_rhs` / `..._lhs_kanto`
-  (`ProbLang/Erasure.lean`) countability-free — they had been discharging kernel
-  measurability with `Measurable.of_discrete` where `execN_measurable` /
-  `pexecN_measurable` / `limExec.measurable` / `Cfg.measurable_expr` /
-  `Measure.bind_map_comm'` do the job honestly;
-* dropping the gratuitous `[Countable rT]` from the `ApproxisRGS` header
-  (`Approxis/Model.lean`), which none of its fields needed.
-
-No proof here uses `measure_ext_singletons`, `measurable_of_countable` or `tsum`, and
-every former `Measurable.of_discrete` in this file is now `Cfg.measurable_expr`. -/
 
 variable {rT : Type _} [ProbLangℝ rT]
 
@@ -513,13 +447,9 @@ theorem wp_adequacy_val_fupd (e e' : Exp rT) (σ σ' : State rT) (n : Nat)
   subst he_eq
   iintro ⟨Hσ, Hs, Hε, Hwp⟩
   ihave HspecPre := wp_value_specCoupl_unfold (GF := GF) (Φ := _) ⊤ He $$ Hwp
-  ispecialize HspecPre $$ %σ %e' %σ' %ε [Hσ Hs Hε]
-  · isplitl [Hσ]; iassumption
-    isplitl [Hs]; iassumption
-    iassumption
+  ispecialize HspecPre $$ %σ %e' %σ' %ε [$]
   imod HspecPre with HspecC
-  iapply (wp_adequacy_spec_coupl_zero (m := n) (e₁ := Exp.ofVal v) (σ₁ := σ)
-    (e₁' := e') (σ₁' := σ') (φ := φ) (ε := ε)) $$ HspecC
+  iapply wp_adequacy_spec_coupl_zero $$ HspecC
   iintro %σ₂ %e₂' %σ₂' %ε' HZ
   imod HZ with ⟨_, Hs', _, Hφ⟩
   icases Hφ with ⟨%v', Hv', %Hφrel⟩
@@ -569,53 +499,37 @@ theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp rT) (σ σ' : State rT
     intro ε e e' σ σ'
     iintro ⟨Hσ, Hs, Hε, Hwp⟩
     by_cases He : e.isValue
-    ·
-      -- `Val` now carries a local-closedness field; build it via the packaged lemma.
-      obtain ⟨v, Hv⟩ := Exp.toVal?_eq_some_of_isValue He
-      ihave HvF := wp_adequacy_val_fupd (GF := GF) e e' σ σ' (n+1) φ v ε Hv $$
-        [Hσ Hs Hε Hwp]
-      · isplitl [Hσ] <;> try iassumption
-        isplitl [Hs] <;> try iassumption
-        isplitl [Hε] <;> iassumption
+    · obtain ⟨v, Hv⟩ := Exp.toVal?_eq_some_of_isValue He
+      ihave HvF := wp_adequacy_val_fupd (GF := GF) e e' σ σ' (n+1) φ v ε Hv $$ [$]
       imod HvF with %Hpure
       imodintro
-      iapply ProbLang.ApproxisWpGS.stepFupdN_intro
-        (E := ∅) (E' := ∅) Std.LawfulSet.subset_refl (n+1)
+      iapply ProbLang.ApproxisWpGS.stepFupdN_intro Std.LawfulSet.subset_refl (n+1)
       ipureintro
       exact Hpure
-    ·
-      have Hnone : e.toVal? = none := Exp.toVal?_eq_none.mpr He
+    · have Hnone : e.toVal? = none := Exp.toVal?_eq_none.mpr He
       ihave Hwp' := (BI.equiv_iff.mp ApproxisWpGS.wp_unfold).1 $$ Hwp
-      ispecialize Hwp' $$ %σ %e' %σ' %ε [Hσ Hs Hε]
-      · isplitl [Hσ] <;> try iassumption
-        isplitl [Hs] <;> iassumption
+      ispecialize Hwp' $$ %σ %e' %σ' %ε [$]
       imod Hwp' with Hwp''
-      iapply (wp_adequacy_spec_coupl (GF := GF) (n := n+1) (m := n+1)
-        (e₁ := e) (σ₁ := σ) (e₁' := e') (σ₁' := σ') (φ := φ) (ε := ε)) $$ Hwp''
+      iapply wp_adequacy_spec_coupl $$ Hwp''
       rw [show e.toVal? = none from Hnone]
       iintro %σ₂ %e₂' %σ₂' %ε' Hprog
-      iapply (wp_adequacy_prog_coupl (GF := GF) (n := n+1) (m := n)
-        (e₁ := e) (σ₁ := σ₂) (e₁' := e₂') (σ₁' := σ₂') (φ := φ) (ε := ε')
-        (Hnone := Hnone)) $$ Hprog
+      iapply wp_adequacy_prog_coupl (Hnone := Hnone) $$ Hprog
       iintro %e₃ %σ₃ %e₃' %σ₃' %ε₃ Hspec
       simp only [Nat.repeat]
-      imodintro
-      iintro !>
-      imodintro
-      iapply (wp_adequacy_spec_coupl (GF := GF) (n := n) (m := n)
-        (e₁ := e₃) (σ₁ := σ₃) (e₁' := e₃') (σ₁' := σ₃') (φ := φ) (ε := ε₃)) $$ Hspec
+      iintro !> !> !>
+      iapply wp_adequacy_spec_coupl $$ Hspec
       iintro %σ₄ %e₄' %σ₄' %ε₄ HZ
       imod HZ with ⟨Hσ', Hs', Hε', Hcnt⟩
       iapply ih ε₄ e₃ e₄' σ₄ σ₄'
-      isplitl [Hσ'] <;> try iassumption
-      isplitl [Hs'] <;> try iassumption
-      isplitl [Hε'] <;> iassumption
+      iframe
 
 end Adequacy
 
-theorem wp_adequacy_exec_n {GF : BundledGFunctors}
-    [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
-    [IInvPre : InvGpreS GF]
+variable {GF : BundledGFunctors}
+variable [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
+variable [IInvPre : InvGpreS GF]
+
+theorem wp_adequacy_exec_n
     (e e' : Exp rT) (σ σ' : State rT) (n : Nat) (φ : Val rT → Val rT → Prop)
     (ε : ENNReal)
     (Hwp : ∀ (_ : ApproxisGS rT .hasNoLC GF),
@@ -624,8 +538,7 @@ theorem wp_adequacy_exec_n {GF : BundledGFunctors}
     AddCoupl ε (adequacyRel φ) (asExpr (execN n ⟨e, σ⟩))
         (limExecV ⟨e', σ'⟩) := by
   by_cases hε1 : (1 : ENNReal) ≤ ε
-  ·
-    refine AddCoupl.trivial_of_one_le hε1 ?_
+  · refine AddCoupl.trivial_of_one_le hε1 ?_
     unfold asExpr
     rw [MeasureTheory.Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
     simpa using execN_univ_le_one n ⟨e, σ⟩
@@ -633,9 +546,9 @@ theorem wp_adequacy_exec_n {GF : BundledGFunctors}
   refine pure_soundness (PROP := IProp GF) ?_
   refine step_fupdN_soundness (hlc := .hasNoLC) (GF := GF) n 0 (fun Hinv => ?_)
   iintro _Hcreds
-  imod (app_ra_init (GF := GF) σ) with ⟨%IA, HappAuth⟩
-  imod (spec_ra_init (GF := GF) e' σ') with ⟨%ISpec, HspecAuth, HspecFrag⟩
-  imod (ec_alloc (GF := GF) ε hε_lt) with ⟨%γec, HecAuth, HecFrag⟩
+  imod (app_ra_init σ) with ⟨%IA, HappAuth⟩
+  imod (spec_ra_init e' σ') with ⟨%ISpec, HspecAuth, HspecFrag⟩
+  imod (ec_alloc ε hε_lt) with ⟨%γec, HecAuth, HecFrag⟩
   let IAS : ApproxisGS rT .hasNoLC GF := {
     appGS  := IA
     specGS := ISpec
@@ -643,12 +556,7 @@ theorem wp_adequacy_exec_n {GF : BundledGFunctors}
     invGS  := Hinv }
   ihave Hwp' := Hwp IAS
   ispecialize Hwp' $$ HspecFrag HecFrag
-  ihave Hstep := wp_adequacy_step_fupdN (GF := GF) (IA := IAS) ε e e' σ σ' n φ
-  ispecialize Hstep $$ [HappAuth HspecAuth HecAuth Hwp']
-  · isplitl [HappAuth] <;> try iassumption
-    isplitl [HspecAuth] <;> try iassumption
-    isplitl [HecAuth] <;> try iassumption
-  iexact Hstep
+  iapply wp_adequacy_step_fupdN $$ [$]
 
 theorem wp_adequacy {GF : BundledGFunctors}
     [IPre : AppPreGS rT GF] [ISPre : SpecPreGS rT GF] [IECPre : ECPreGS GF]
