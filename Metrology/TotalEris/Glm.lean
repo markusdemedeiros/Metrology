@@ -83,21 +83,21 @@ theorem execStutter_free {P : ENNReal → IProp GF} {ε : ENNReal} :
   iintro HP; iright; iexact HP
 
 theorem execStutter_spend {P : ENNReal → IProp GF} {ε : ENNReal} (hε : 1 ≤ ε) :
-    ⊢ execStutter (GF := GF) P ε := by
+    ⊢ execStutter P ε := by
   iintro
   ileft
   ipureintro
   exact hε
 
 theorem execStutter_mono {P Q : ENNReal → IProp GF} {ε ε' : ENNReal} (hε : ε ≤ ε') :
-    ((P ε -∗ Q ε') ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε' := by
+    ((P ε -∗ Q ε') ∗ execStutter P ε) ⊢ execStutter Q ε' := by
   iintro ⟨HM, HS⟩
   icases HS with ⟨%HVac | HP⟩
   · ileft; ipureintro; exact HVac.trans hε
   · iright; iapply HM; iexact HP
 
 theorem execStutter_mono_pred {P Q : ENNReal → IProp GF} {ε : ENNReal} :
-    ((P ε -∗ Q ε) ∗ execStutter P ε) ⊢ execStutter (GF := GF) Q ε :=
+    ((P ε -∗ Q ε) ∗ execStutter P ε) ⊢ execStutter Q ε :=
   execStutter_mono le_rfl
 
 variable [ErisWpGS (rT := rT) GF]
@@ -193,10 +193,10 @@ abbrev glmPre' (Z : Cfg rT → ENNReal → IProp GF)
 
 abbrev glm' (e : Exp rT) (σ : State rT) (ε : ENNReal)
     (Z : Cfg rT → ENNReal → IProp GF) : IProp GF :=
-  bi_least_fixpoint (glmPre' (GF := GF) Z) ((⟨e, σ⟩, ε) : GlmState rT)
+  bi_least_fixpoint (glmPre' Z) ((⟨e, σ⟩, ε) : GlmState rT)
 
 instance glmPre'_mono {Z : Cfg rT → ENNReal → IProp GF} :
-    BIMonoPred (glmPre' (GF := GF) (rT := rT) Z) where
+    BIMonoPred (glmPre' Z) where
   mono_pred {Φ Ψ _ _} := by
     iintro #Hwand %s Hs
     obtain ⟨ρ, ε⟩ := s
@@ -217,8 +217,8 @@ instance glmPre'_mono {Z : Cfg rT → ENNReal → IProp GF} :
 
 theorem glm'_unfold {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
-    glm' (GF := GF) e σ ε Z =
-      glmPre' (GF := GF) Z
+    glm' e σ ε Z =
+      glmPre' Z
         (fun s => glm' s.1.expr s.1.state s.2 Z)
         ((⟨e, σ⟩, ε) : GlmState rT) :=
   least_fixpoint_unfold _
@@ -230,7 +230,7 @@ theorem glm'_strong_ind {Z : Cfg rT → ENNReal → IProp GF} {Ψ : GlmState rT 
               -∗ Ψ s)) ⊢
       (∀ s, bi_least_fixpoint (glmPre' Z) s -∗ Ψ s) := by
   iintro #HM
-  iapply least_fixpoint_ind (F := glmPre' Z) (Φ := Ψ)
+  iapply least_fixpoint_ind
   iexact HM
 
 theorem glm'_strong_mono
@@ -242,7 +242,7 @@ theorem glm'_strong_mono
     (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') -∗ bi_least_fixpoint (glmPre' Z₂) s)
   letI : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
   ihave HΨ : iprop(Ψ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
-  · iapply (least_fixpoint_iter (F := glmPre' Z₁) (Φ := Ψ))
+  · iapply (least_fixpoint_iter (F := glmPre' Z₁))
     · iintro !> %s HF Hwand
       iapply least_fixpoint_unfold_mpr (glmPre' Z₂)
       obtain ⟨ρ, ε⟩ := s
@@ -337,7 +337,7 @@ theorem glm'_bind
     fun s => bi_least_fixpoint (glmPre' Z) ((⟨K.fill s.1.expr, s.1.state⟩, s.2) : GlmState rT)
   letI : NonExpansive Φ := nonExpansive_of_discrete_leibniz Φ
   ihave HΦ : iprop(Φ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
-  · iapply (least_fixpoint_iter (F := glmPre' Z') (Φ := Φ))
+  · iapply (least_fixpoint_iter (F := glmPre' Z'))
     · iintro !> %s HF
       obtain ⟨ρ, ε'⟩ := s
       iapply least_fixpoint_unfold_mpr (glmPre' Z)

@@ -23,7 +23,7 @@ theorem LocHeap.measurable_iff {X V : Type _} [MeasurableSpace X] [MeasurableSpa
     {f : X → LocHeap V} :
     Measurable f ↔ ∀ ℓ : Loc, Measurable (fun x => (f x)[ℓ]?) :=
   ⟨fun hf ℓ => (LocHeap.measurable_getElem? ℓ).comp hf,
-   fun h => (measurable_comap_iff (g := fun (m : LocHeap V) ℓ => m[ℓ]?)).mpr
+   fun h => (measurable_comap_iff).mpr
               (measurable_pi_iff.mpr h)⟩
 
 theorem LocHeap.measurableSet_mem {V : Type _} [MeasurableSpace V] (ℓ : Loc) :

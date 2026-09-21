@@ -74,7 +74,7 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
   iintro ⟨Hl, HΦ⟩
   iapply twp_lift_atomic_head_step solve_not_value (by is_lc)
   iintro %σ₁ Hσ
-  ihave %hlook := app_state_lookup_heap (GF := GF) (σ := σ₁) $$ Hσ Hl
+  ihave %hlook := app_state_lookup_heap $$ Hσ Hl
   have hred : HeadReducible (.store pl(#(.loc l)) (.ofVal v)) σ₁ :=
     (HeadStepSupport.StoreS (Exp.toVal?_ofVal v)
       (by rw [hlook]; exact Option.isSome_some) rfl).ne_zero
@@ -84,7 +84,7 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
   cases Possible.headStepSupport Hstep with
   | StoreS hvd _ hσ =>
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hσ
-    imod app_state_update_heap (GF := GF) (σ := σ₁) (w := v) $$ Hσ Hl with ⟨Hσ', Hl'⟩
+    imod app_state_update_heap $$ Hσ Hl with ⟨Hσ', Hl'⟩
     imodintro
     simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
     iframe Hσ'
@@ -152,7 +152,7 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : { z' : Int // 0 ≤ 
     rw [hlook] at hlook'
     cases hlook'
     subst hσ hv
-    imod app_state_update_tape (s := ⟨z, ns⟩) $$ Hσ Hl with ⟨Hσ', Hl'⟩
+    imod app_state_update_tape $$ Hσ Hl with ⟨Hσ', Hl'⟩
     imodintro
     simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
     iframe Hσ'
@@ -170,7 +170,7 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   iintro ⟨Hl, HΦ⟩
   iapply twp_lift_atomic_head_step solve_not_value (by is_lc)
   iintro %σ₁ Hσ
-  ihave %hlook := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hl
+  ihave %hlook := app_state_lookup_tape $$ Hσ Hl
   have hred : HeadReducible (pl(rand(#(.int z), #(.lbl l)))) σ₁ :=
     (HeadStepSupport.RandTapeEmptyS Hz hlook rfl (le_refl _) Hz rfl).ne_zero
   imodintro

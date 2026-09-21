@@ -33,7 +33,7 @@ theorem irratErr_le_one (r : ℝ) : irratErr r ≤ 1 := by
   by_cases h : Irrational r <;> simp [h]
 
 open MeasureTheory in
-theorem lintegral_irratErr_eq_zero : ∫⁻ r, irratErr r ∂(ProbLangℝ.unifUnit (T := ℝ)) = 0 := by
+theorem lintegral_irratErr_eq_zero : ∫⁻ r, irratErr r ∂(ProbLangℝ.unifUnit) = 0 := by
   have hrange : {r : ℝ | ¬ Irrational r} = Set.range ((↑) : ℚ → ℝ) := by
     ext r; simp [Irrational]
   rw [irratErr, lintegral_indicator_const measurableSet_not_irrational, one_mul]
@@ -88,7 +88,7 @@ theorem urand_irrational_pgl (σ : State ℝ) :
             ρ.expr = Exp.ofVal v ∧
             ∃ r : ℝ, v = .real r ∧ Irrational r)
       (limExec ⟨pl(urand), σ⟩) := by
-  refine twp_pgl_lim (GF := erisGF) (e := pl(urand)) (σ := σ)
+  refine twp_pgl_lim (GF := erisGF)
     (φ := fun v => ∃ r : ℝ, v = .real r ∧ Irrational r)
     measurableSet_irrational_val ?_
   intro _; iintro _

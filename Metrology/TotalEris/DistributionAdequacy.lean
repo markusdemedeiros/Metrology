@@ -137,7 +137,7 @@ theorem twp_dist_adequacy' [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF]
   have hlower : ∀ (S : Set ℝ), MeasurableSet S → μ S ≤ (limExec ⟨e, σ⟩) (RSet' gExp S) := by
     intro S hS
     have htgl : Tgl (limExec ⟨e, σ⟩) (fun v => gExp v.fst ∈ S) (μ Sᶜ) :=
-      twp_tgl (σ := σ) (measurableSet_gExp_mem hgExp hS) (ray_pure_wp' e μ hspec hS)
+      twp_tgl (measurableSet_gExp_mem hgExp hS) (ray_pure_wp' e μ hspec hS)
     have hsum : μ S + μ Sᶜ = 1 := prob_add_prob_compl hS
     have hcompl : (1 : ℝ≥0∞) - μ Sᶜ = μ S := by
       rw [← hsum, ENNReal.add_sub_cancel_right (measure_ne_top _ _)]

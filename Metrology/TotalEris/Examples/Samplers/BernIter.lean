@@ -31,12 +31,11 @@ structure AbstractBernoulliI (v : Val ℝ) (γ : ↑unitInterval) (I : IProp GF)
 
 theorem AbstractBernoulli.toAbstractBernoulliI {v : Val ℝ} {γ : ↑unitInterval}
     (H : AbstractBernoulli (GF := GF) v γ) (I : IProp GF) :
-    AbstractBernoulliI (hlc := hlc) (GF := GF) v γ I where
+    AbstractBernoulliI v γ I where
   spec := by
     intro E
     iintro %F ⟨Hε, HI⟩
-    iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-      ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (F b))))
+    iapply (tglWp_wand)
     isplitl [Hε]
     · iapply H.spec $$ %F Hε
     iintro %w ⟨%b, %hb, Hfb⟩
@@ -102,9 +101,9 @@ theorem IterCreditV_succ (F : Bool → ℝ≥0∞) (γ : ↑unitInterval) (N : �
       ← ENNReal.ofReal_add (mul_nonneg hγ0 (by linarith)) (by linarith [γ.2.2])]
     congr 1; ring
   simp only [IterCreditV, IterCont]
-  rw [ENNReal.one_sub_ofReal (x := (γ : ℝ) ^ (N + 1)) (by positivity),
-    ENNReal.one_sub_ofReal (x := (γ : ℝ) ^ N) (by positivity),
-    ENNReal.one_sub_ofReal (x := (γ : ℝ)) hγ0, hT, ← hF]
+  rw [ENNReal.one_sub_ofReal (by positivity),
+    ENNReal.one_sub_ofReal (by positivity),
+    ENNReal.one_sub_ofReal hγ0, hT, ← hF]
   ring
 
 end conservation
@@ -112,7 +111,7 @@ end conservation
 section specification
 
 theorem twp_IterTrial (E : CoPset) (v : Val ℝ) (γ : ↑unitInterval) (I : IProp GF)
-    (Hspec : AbstractBernoulliI (hlc := hlc) (GF := GF) v γ I)
+    (Hspec : AbstractBernoulliI v γ I)
     (F : Bool → ℝ≥0∞) (N : ℕ) :
     ⊢ ↯ (IterCreditV F γ N) ∗ I -∗
       tglWp E pl(&IterTrial &v.1 #(.int (N : ℤ)))
@@ -131,10 +130,9 @@ theorem twp_IterTrial (E : CoPset) (v : Val ℝ) (γ : ↑unitInterval) (I : IPr
     iintro ⟨Hcr, HI⟩
     twp_pures
     twp_bind pl({v.fst} #.unit)
-    iapply (tglWp_wand (Φ := fun w : Val ℝ => iprop(∃ b : Bool,
-      ⌜w.1 = .lit (.bool b)⌝ ∗ ↯ (IterCont F γ N b) ∗ I)))
+    iapply (tglWp_wand)
     isplitl [Hcr HI]
-    · iapply (Hspec.spec (E := E)) $$ %(IterCont F γ N)
+    · iapply (Hspec.spec) $$ %(IterCont F γ N)
       rw [← IterCreditV_succ]
       iframe
     iintro %⟨w', _⟩ ⟨%b, %hret, Hcrb, HIb⟩

@@ -143,18 +143,18 @@ theorem zero : ⊢@{IProp GF} |==> ↯0 := iOwn_unit
 theorem supply_bound {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ ⌜ε ≤ εₛ⌝ := by
   unfold ec ecAuth
   iintro Hs Hε
-  ihave Hv := iOwn_cmraValid_op (E := IEC.ec) $$ [Hs Hε]
+  ihave Hv := iOwn_cmraValid_op $$ [Hs Hε]
   · isplitl [Hs] <;> first | iexact Hs | iexact Hε
-  ihave %hv := internalCmraValid_discrete (A := Auth ErrorCredit) (PROP := IProp GF) $$ Hv
+  ihave %hv := internalCmraValid_discrete $$ Hv
   ipureintro
   obtain ⟨hinc, _⟩ := Auth.auth_both_valid.mp hv
   exact ErrorCredit.includedN_iff.mp (hinc 0)
 
 theorem supply_decrease {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ |==> ●↯ (εₛ - ε) := by
   iintro Hs Hε
-  ihave %Hle := supply_bound (GF := GF) $$ Hs Hε
+  ihave %Hle := supply_bound $$ Hs Hε
   unfold ec ecAuth
-  ihave Hc := iOwn_op (E := IEC.ec) |>.mpr $$ [Hs Hε]
+  ihave Hc := iOwn_op |>.mpr $$ [Hs Hε]
   · isplitl [Hs] <;> first | iexact Hs | iexact Hε
   refine iOwn_update <| Auth.auth_update_dealloc ?_
   simp only [UCMRA.unit]
@@ -169,7 +169,7 @@ theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
     simp only [CMRA.Valid, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
     exact fun _ => ⟨h, add_comm _ _⟩
   iintro Hε
-  ihave H := iOwn_update (E := IEC.ec) (γ := ECGS.γec GF) Hupd $$ Hε
+  ihave H := iOwn_update Hupd $$ Hε
   imod H
   imodintro
   iapply iOwn_op
@@ -179,20 +179,20 @@ theorem weaken {ε₁ ε₂ : ℝ≥0∞} (h : ε₂ ≤ ε₁) : ↯ε₁ ⊢@{
   iintro Hε
   have hsplit : ε₁ = (ε₁ - ε₂) + ε₂ := (tsub_add_cancel_of_le h).symm
   rw [hsplit]
-  ihave ⟨_, H⟩ := split (GF := GF) $$ Hε
+  ihave ⟨_, H⟩ := split $$ Hε
   iexact H
 
 theorem valid {ε : ℝ≥0∞} : ↯ε ⊢@{IProp GF} ⌜ε < 1⌝ := by
   unfold ec
   iintro Hε
-  ihave Hv := iOwn_cmraValid (E := IEC.ec) $$ Hε
-  ihave %hv := internalCmraValid_discrete (A := Auth ErrorCredit) (PROP := IProp GF) $$ Hv
+  ihave Hv := iOwn_cmraValid $$ Hε
+  ihave %hv := internalCmraValid_discrete $$ Hv
   ipureintro
   exact Auth.frag_valid.mp hv
 
 theorem contradict {ε : ℝ≥0∞} (h : 1 ≤ ε) : ↯ε ⊢@{IProp GF} False := by
   iintro Hε
-  ihave %hle := valid (GF := GF) $$ Hε
+  ihave %hle := valid $$ Hε
   exact absurd h (Std.not_le.mpr hle)
 
 namespace Induction
@@ -249,14 +249,14 @@ theorem simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk
       rw [Nat.cast_add, Nat.cast_one, add_mul, one_mul, add_mul,
           add_assoc, add_comm (_ * ε) ε', ← add_assoc]
     rw [Hεeq]
-    ihave ⟨Hε₁, Hε₂⟩ := split (GF := GF) $$ Hε
+    ihave ⟨Hε₁, Hε₂⟩ := split $$ Hε
     iapply Hamp
     isplitr [Hε₂] <;> try · iexact Hε₂
     iintro Hε
-    ihave Hε₃ := combine (GF := GF) $$ [Hε₁ Hε]
+    ihave Hε₃ := combine $$ [Hε₁ Hε]
     · isplitl [Hε₁] <;> iassumption
     iapply IH $$ %ε'' %(Hhle.trans le_self_add) %Hn'
-    iapply ext (GF := GF) Hε''eq $$ Hε₃
+    iapply ext Hε''eq $$ Hε₃
 
 theorem external_simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk : 1 < k)
     (hamp : (↯(k * ε) -∗ P) ∗ ↯ε ⊢ P) : ↯ε ⊢ P := by
@@ -267,7 +267,7 @@ theorem external_simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 
 theorem increasing {ε : ℝ≥0∞} {ε' : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hε' : ε < ε') :
     □ ((↯ε' -∗ P) ∗ ↯ε -∗ P) ⊢@{IProp GF} ↯ε -∗ P := by
   iintro #Hamp Hε
-  ihave %hε'' := valid (GF := GF) $$ Hε
+  ihave %hε'' := valid $$ Hε
   let k' : ℝ≥0∞ := ε' / ε
   have hk1 : 1 < k' := ENNReal.lt_div_iff_mul_lt (by simp) (by simp) |>.mpr (by simp [hε'])
   have Hk' : k' ≠ ∞ := ENNReal.div_ne_top ENNReal.coe_ne_top (Std.ne_of_lt hε).symm
@@ -277,7 +277,7 @@ theorem increasing {ε : ℝ≥0∞} {ε' : ℝ≥0} {P : IProp GF} (hε : 0 < �
     simp [ENNReal.mul_comm_div, Hε]
   lift k' to ℝ≥0 using Hk' with k
   have Hk : 1 < k := ENNReal.one_lt_coe_iff.mp hk1
-  iapply simple (ε := ε) (k := k) hε Hk $$ [] Hε
+  iapply simple hε Hk $$ [] Hε
   imodintro
   iintro ⟨Hc, Hε⟩
   iapply Hamp

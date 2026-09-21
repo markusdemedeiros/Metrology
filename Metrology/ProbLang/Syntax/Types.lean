@@ -784,7 +784,7 @@ theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
       refine ih z hzL x y τ_x (Γ.insert z τ1) (Tctx.insert_swap Γ (Ne.symm hzx) τ_x τ1) ?_
       simp only [Finset.mem_union, Finset.mem_singleton, not_or]
       refine ⟨?_, hyx⟩
-      exact Exp.open_fresh_preserve_not_fvar (k := 0) e hyfv (Ne.symm hzy)
+      exact Exp.open_fresh_preserve_not_fvar e hyfv (Ne.symm hzy)
   | @fix L Γ' e τ1 τ2 _ ih =>
       intro x y τ_x Γ heq hy; subst heq
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
@@ -807,7 +807,7 @@ theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
         (Tctx.insert_swap Γ (Ne.symm hzx) τ_x (.arrow τ1 τ2)) ?_
       simp only [Finset.mem_union, Finset.mem_singleton, not_or]
       refine ⟨?_, hyx⟩
-      exact Exp.open_fresh_preserve_not_fvar (k := 0) e hyfv (Ne.symm hzy)
+      exact Exp.open_fresh_preserve_not_fvar e hyfv (Ne.symm hzy)
   | app _ _ ih1 ih2 =>
       intro x y τ_x Γ heq hy; subst heq
       simp only [Exp.fv, Finset.mem_union, Finset.mem_singleton, not_or] at hy
@@ -872,7 +872,7 @@ theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
       · rw [Tctx.shift_insert, Tctx.insert_swap Γ.shift (Ne.symm hzx) τ_x.shift τ]
       simp only [Finset.mem_union, Finset.mem_singleton, not_or]
       refine ⟨?_, hyx⟩
-      exact Exp.open_fresh_preserve_not_fvar (k := 0) e2 hye2 (Ne.symm hzy)
+      exact Exp.open_fresh_preserve_not_fvar e2 hye2 (Ne.symm hzy)
   | alloc _ ih =>
       intro x y τ_x Γ heq hy; subst heq; simp only [Exp.subst]
       exact .alloc (ih x y τ_x Γ rfl hy)

@@ -256,7 +256,6 @@ theorem primStep_eq_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
   suffices hd : e.decomp = ([], e) by simp [primStep, hd]
   unfold Exp.decomp; rw [hdec]
 
--- Use primStep_eq_headStep
 theorem reducible_of_headReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (he : e.IsLocallyClosed)
     (h : HeadReducible e σ) : Reducible e σ := by
@@ -305,7 +304,7 @@ theorem primStep_fill_pos [ProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : Stat
     have hm : Measurable (fun ρ : Cfg rT ↦ (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT)) := by measurability
     refine fun H => h ?_
     refine Measure.measure_univ_eq_zero.mp ?_
-    have := H ▸ Measure.map_apply hm .univ (μ := primStep ⟨e, σ⟩)
+    have := H ▸ Measure.map_apply hm .univ
     simpa using this.symm
 
 theorem primStep_fill_inv [ProbLangℝ rT]  {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
@@ -493,7 +492,7 @@ theorem measurableSet_primStep_support [ProbLangℝ rT] (e : Exp rT) (σ : State
     ⟨lt_of_le_of_lt (primStep_univ_le_one _) ENNReal.one_lt_top⟩
   have hc : {ρ : Cfg rT | 0 < primStep ⟨e, σ⟩ {ρ}}.Countable := by
     have h := MeasureTheory.Measure.countable_meas_level_set_pos
-      (μ := primStep ⟨e, σ⟩) (g := (id : Cfg rT → Cfg rT)) measurable_id
+      (μ := primStep ⟨e, σ⟩) measurable_id
     simpa only [id_eq, Set.setOf_eq_eq_singleton] using h
   exact hc.measurableSet
 

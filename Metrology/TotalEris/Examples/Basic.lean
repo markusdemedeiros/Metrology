@@ -159,7 +159,7 @@ example (E : CoPset) (v : Val rT) (R : Prop) (HR : R) :
     ⊢@{IProp GF} tglWp E (.ofVal v) (fun w => iprop(⌜w = v⌝)) -∗
       tglWp E (.ofVal v) (fun w => iprop(⌜R⌝ ∗ ⌜w = v⌝)) := by
   iintro HW
-  iapply tglWp_frame_left (R := iprop(⌜R⌝))
+  iapply tglWp_frame_left
   iframe HW %HR
 
 /-- `twp_rand_exp'` smoke test on `rand 2 ()` with the geometric-style error
@@ -177,7 +177,7 @@ example (E : CoPset) (ε : ENNReal) :
   have HSum : (∑ n ∈ Finset.range (2 : Int).toNat, F n) / ((2 : Int).toNat : ENNReal) ≤ ε := by
     rw [ENNReal.div_le_iff' (by simp) (by simp), htoNat, hF, hsplit, add_mul, one_mul]
     exact le_self_add
-  iapply (twp_rand_exp' (z := 2) (ε₁ := ε) (ε₂ := F) (Hz := by decide) (HSum := HSum)) $$ Hcr
+  iapply (twp_rand_exp' (Hz := by decide) (HSum := HSum)) $$ Hcr
   iintro %n ⟨%Hn, -⟩
   iexists n
   ipureintro
@@ -190,7 +190,7 @@ example (E : CoPset) (ε : ENNReal) :
       tglWp E (pl(rand(#(.int 1), #(.unit))))
         (fun w : Val rT => iprop(⌜w = .int 0⌝)) := by
   iintro Hε
-  iapply (twp_rand_exp (z := 1) (ε₁ := ε) (ε₂ := fun _ => 0)
+  iapply (twp_rand_exp
     (Hz := by decide) (Hbd := fun _ => zero_le)
     (HSum := by simp)) $$ Hε
   iintro %n ⟨%⟨Hn₁, Hn₂⟩, -⟩
@@ -211,7 +211,7 @@ variable {GF : BundledGFunctors.{0,0,0}}
 example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v)
     (hφm : MeasurableSet {v : Val rT | φ v}) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
-  refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) hφm ?_
+  refine twp_tgl (GF := GF) hφm ?_
   intro _
   iintro -
   iapply tglWp_value
@@ -222,7 +222,7 @@ example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v)
 example (v : Val rT) (σ : State rT) :
     1 ≤ (limExec ⟨Exp.ofVal v, σ⟩) Set.univ := by
   have h : Tgl (limExec ⟨Exp.ofVal v, σ⟩) (fun _ => True) 0 := by
-    refine twp_tgl (GF := GF) (e := Exp.ofVal v) (σ := σ)
+    refine twp_tgl (GF := GF)
       (φ := fun _ => True) (MeasurableSet.const True) ?_
     intro _
     iintro -
@@ -235,7 +235,7 @@ example (v : Val rT) (σ : State rT) :
 example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v)
     (hφm : MeasurableSet {v : Val rT | φ v}) :
     Tgl (limExec ⟨Exp.ofVal v, σ⟩) φ 0 := by
-  refine twp_tgl_limit (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) hφm ?_
+  refine twp_tgl_limit (GF := GF) hφm ?_
   intro _ _ _
   iintro -
   iapply tglWp_value
@@ -248,7 +248,7 @@ example (v : Val rT) (σ : State rT) (φ : Val rT → Prop) (hφ : φ v)
     (hφm : MeasurableSet {v : Val rT | φ v}) :
     Pgl 0 (fun ρ => ∃ w, ρ.expr = Exp.ofVal w ∧ φ w)
       (limExec ⟨Exp.ofVal v, σ⟩) := by
-  refine twp_pgl_lim (GF := GF) (e := Exp.ofVal v) (σ := σ) (φ := φ) hφm ?_
+  refine twp_pgl_lim (GF := GF) hφm ?_
   intro _
   iintro -
   iapply tglWp_value

@@ -172,12 +172,12 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
   iintro ⟨Herr, Htape, Hcont⟩
   iapply (twp_lift_step_fupd_glm hv)
   iintro %σ₁ %ε_now ⟨Hσ, Hε_now⟩
-  ihave %hlookup := app_state_lookup_tape (GF := GF) $$ Hσ Htape
+  ihave %hlookup := app_state_lookup_tape $$ Hσ Htape
   obtain ⟨N, bs⟩ := t
   ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp (rT := rT) ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
       $$ [Hε_now Herr]
   · iapply errInterp_supply_bound; iframe Hε_now Herr
-  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
+  imod (BIFUpdate.subset Std.LawfulSet.empty_subset) with Hclose
   imodintro
   have hErase := ErasableExpr.tapePresample hlookup hN
   have hMeas : MeasurableSet
@@ -209,7 +209,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
   iintro %σ' %⟨n, rfl⟩
   simp only [presampleAdvCompX₂_update]
   imod Hclose with -
-  imod (app_state_update_tape (GF := GF) (l := α) (t := ⟨N, bs⟩)
+  imod (app_state_update_tape
         (s := ⟨N, bs ++ [n]⟩)) $$ Hσ Htape with ⟨Hσ', Htape'⟩
   ihave >Hε_rem : iprop(|==> ErisWpGS.errInterp (rT := rT) (ε_now - ε₁)) $$ [Hε_now Herr]
   · iapply errInterp_supply_decrease; iframe Hε_now Herr
@@ -223,7 +223,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
     simp only [presampleUpdate, ExtTreeMap.insert_eq_PartialMap_insert]
     iexact HGlm
   · push Not at hlt
-    imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with -
+    imod (BIFUpdate.subset Std.LawfulSet.empty_subset) with -
     imodintro
     iapply execStutter_spend hlt
 
@@ -239,7 +239,7 @@ theorem twp_presample {E : CoPset} {e : Exp rT} {α : Loc} {Φ : Val rT → IPro
   iapply fupd_tglWp
   imod ErrorCredit.zero with Herr
   imodintro
-  iapply (twp_presample_adv_comp hN (ε₁ := 0) (ε₂ := fun _ => 0) (fun _ => zero_le) (by simp) hv)
+  iapply (twp_presample_adv_comp hN (fun _ => zero_le) (by simp) hv)
   iframe Herr Htape
   iintro %n ⟨-, Htape'⟩
   iapply Hcont $$ %n Htape'

@@ -26,7 +26,7 @@ theorem intOfNat_emod_two_eq_zero {n : ℕ} (hn : n % 2 = 0) : Int.ofNat n % 2 =
 theorem intOfNat_emod_two_eq_one {n : ℕ} (hn : n % 2 = 1) : Int.ofNat n % 2 = 1 := by
   simp only [Int.ofNat_eq_natCast]; omega
 
-theorem mem_unifUnitSupport_real_le {r : ℝ} (hr : r ∈ ProbLangℝ.unifUnitSupport (T := ℝ)) :
+theorem mem_unifUnitSupport_real_le {r : ℝ} (hr : r ∈ ProbLangℝ.unifUnitSupport) :
     0 ≤ r ∧ r ≤ 1 :=
   ⟨(mem_unifUnitSupport_real.mp hr).1.le, (mem_unifUnitSupport_real.mp hr).2.le⟩
 
@@ -134,7 +134,7 @@ def RealDecrTrialCreditV (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) : ℝ≥0�
 theorem RealDecrTrialCreditV_reindex (F : ℕ → ℝ≥0∞) (i : ℕ) (x : ℝ) :
     RealDecrTrialCreditV F i x = ∑' m : ℕ, RealDecrTrialPMF₀ x m * F (i + m) := by
   unfold RealDecrTrialCreditV
-  rw [← (add_right_injective i).tsum_eq (f := fun n => RealDecrTrialPMF x i n * F n) ?supp]
+  rw [← (add_right_injective i).tsum_eq ?supp]
   · exact tsum_congr fun m => by
       rw [RealDecrTrialPMF_supp (Nat.le_add_right i m), Nat.add_sub_cancel_left]
   · intro n hn
@@ -160,7 +160,7 @@ theorem RealDecrTrialCreditV_parity (A B : ℝ≥0∞) {x : ℝ} (hx0 : 0 ≤ x)
     rfl
   unfold RealDecrTrialCreditV
   simp only [RealDecrTrialPMF_base]
-  rw [← tsum_even_add_odd (f := fun n => RealDecrTrialPMF₀ x n * if n % 2 = 0 then A else B)
+  rw [← tsum_even_add_odd
       ENNReal.summable ENNReal.summable]
   congr 1
   · have heq : ∀ k, RealDecrTrialPMF₀ x (2 * k) * (if (2 * k) % 2 = 0 then A else B)
@@ -249,7 +249,7 @@ section conservation
 
 open MeasureTheory in
 theorem RealDecrTrialCredit_lintegral {F : ℕ → ℝ≥0∞} {N : ℕ} {x : ℝ} (hx : 0 ≤ x ∧ x ≤ 1) :
-    ∫⁻ y, RealDecrTrialCredit F N x y ∂(ProbLangℝ.unifUnit (T := ℝ)) =
+    ∫⁻ y, RealDecrTrialCredit F N x y ∂(ProbLangℝ.unifUnit) =
       RealDecrTrialCreditV F N x := by
   obtain ⟨hx0, hx1⟩ := hx
   have hset2 : Set.Ici x ∩ Set.Icc (0 : ℝ) 1 = Set.Icc x 1 := by
@@ -292,7 +292,7 @@ theorem RealDecrTrialCredit_lintegral {F : ℕ → ℝ≥0∞} {N : ℕ} {x : �
 open MeasureTheory in
 theorem RealDecrTrialCreditAmp_lintegral {F : ℕ → ℝ≥0∞} {N : ℕ} {x : ℝ} {c : ℝ≥0∞}
     (hx : 0 ≤ x ∧ x ≤ 1) :
-    ∫⁻ y, RealDecrTrialCreditAmp F N x c y ∂(ProbLangℝ.unifUnit (T := ℝ)) =
+    ∫⁻ y, RealDecrTrialCreditAmp F N x c y ∂(ProbLangℝ.unifUnit) =
       RealDecrTrialCreditV F N x + c * ENNReal.ofReal x := by
   obtain ⟨hx0, hx1⟩ := hx
   have hset : Set.Iio x ∩ Set.Icc (0 : ℝ) 1 = Set.Ico 0 x := by
@@ -328,7 +328,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (B : ℝ) (hB0 
   irevert %Hx0
   irevert %x
   irevert %N
-  iapply ErrorCredit.Induction.simple (k := k) Hε_pos Hk1 $$ [] Hε_term
+  iapply ErrorCredit.Induction.simple Hε_pos Hk1 $$ [] Hε_term
   imodintro
   iintro ⟨IH, Hε_term⟩ %N %x %Hx0 %HxB Hε_spec
   iterate 3 twp_pure
@@ -373,7 +373,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (B : ℝ) (hB0 
         unfold RealDecrTrialCreditAmp RealDecrTrialCredit
         rw [if_pos hlt'.le, if_neg (not_le.mpr hlt'), if_pos hlt', add_zero]
       rw [heq]; iexact Hcy
-    ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcy'
+    ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split $$ Hcy'
     twp_pure
     rw [← Nat.cast_add_one]
     twp_bind pl(&DecrTrial #(.int ((N + 1 : ℕ) : ℤ)) #(.real y))
@@ -390,7 +390,7 @@ theorem twp_DecrTrial (E : CoPset) (F : ℕ → ℝ≥0∞) (N : ℕ) (x : ℝ) 
   iintro Hε_spec
   iterate 3 twp_pure
   twp_bind pl(urand)
-  iapply (twp_urand_exp' (ε₂ := RealDecrTrialCredit F N x) ?hmeas ?hint) $$ Hε_spec
+  iapply (twp_urand_exp' ?hmeas ?hint) $$ Hε_spec
   case hmeas => exact measurable_realDecrTrialCredit F N x
   case hint => exact le_of_eq (RealDecrTrialCredit_lintegral Hx)
   iintro %y ⟨%Hym, Hcy⟩

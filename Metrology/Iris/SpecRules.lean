@@ -113,13 +113,13 @@ theorem step_pure {E : CoPset} (K : Ectx rT) {e e' : Exp rT} {φ : Prop} {n : �
   unfold specUpdate
   iintro %ρ Hρ
   obtain ⟨_, σ⟩ := ρ
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
+  ihave %Heq := specAuth_specFrag_agree $$ Hρ HK
   subst Heq
   imod specProg_update $$ Hρ HK with ⟨HρNew, HKNew⟩
   imodintro
   iexists ⟨K.fill e', σ⟩, n
   isplitr
-  · ipureintro; exact pexecN_of_PureExec (h := HexK) σ Hφ
+  · ipureintro; exact pexecN_of_PureExec σ Hφ
   isplitl [HρNew] <;> iassumption
 
 /-- Allocation under an evaluation context. -/
@@ -130,13 +130,13 @@ theorem step_alloc {E : CoPset} (K : Ectx rT) {v : Exp rT} (hv : IsVal v) :
   unfold specUpdate
   iintro %ρ Hρ
   obtain ⟨_, σ⟩ := ρ
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
+  ihave %Heq := specAuth_specFrag_agree $$ Hρ HK
   subst Heq
   set l := σ.heap.fresh with hl
   set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l ⟨v, hv, hv.lc⟩)
     with hσ'
-  imod specProg_update (e3 := K.fill pl(#(.loc l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
-  ihave HAlloc := spec_auth_heap_alloc (v := ⟨v, hv, hv.lc⟩) (GF := GF)
+  imod specProg_update $$ Hρ HK with ⟨HρNew, HKNew⟩
+  ihave HAlloc := spec_auth_heap_alloc
     (e := K.fill pl(#(.loc l))) $$ HρNew
   imod HAlloc with ⟨HρFinal, Hl⟩
   imodintro
@@ -162,10 +162,10 @@ theorem step_load {E : CoPset} (K : Ectx rT) {l : Loc} {v : Val rT} :
   unfold specUpdate
   iintro %ρ Hρ
   obtain ⟨_, σ⟩ := ρ
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
+  ihave %Heq := specAuth_specFrag_agree $$ Hρ HK
   subst Heq
-  ihave %Hlk := spec_auth_lookup_heap (GF := GF) $$ Hρ Hl
-  imod specProg_update (e3 := K.fill (Exp.ofVal v)) $$ Hρ HK with ⟨HρNew, HKNew⟩
+  ihave %Hlk := spec_auth_lookup_heap $$ Hρ Hl
+  imod specProg_update $$ Hρ HK with ⟨HρNew, HKNew⟩
   imodintro
   iexists ⟨K.fill (Exp.ofVal v), σ⟩, 1
   isplitr
@@ -182,14 +182,14 @@ theorem step_store {E : CoPset} (K : Ectx rT) {l : Loc} {e : Exp rT} {v_old v_ne
   unfold specUpdate
   iintro %ρ Hρ
   obtain ⟨_, σ⟩ := ρ
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
+  ihave %Heq := specAuth_specFrag_agree $$ Hρ HK
   subst Heq
-  ihave %Hlk := spec_auth_lookup_heap (GF := GF) $$ Hρ Hl
+  ihave %Hlk := spec_auth_lookup_heap $$ Hρ Hl
   set σ' := σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l v_new)
     with hσ'
-  imod specProg_update (e3 := K.fill pl(#(.unit))) $$ Hρ HK with ⟨HρNew, HKNew⟩
-  ihave HUpd := spec_auth_update_heap (GF := GF) (e := K.fill pl(#(.unit)))
-    (l := l) (v := v_old) (w := v_new) $$ HρNew Hl
+  imod specProg_update $$ Hρ HK with ⟨HρNew, HKNew⟩
+  ihave HUpd := spec_auth_update_heap
+    (l := l) $$ HρNew Hl
   imod HUpd with ⟨HρFinal, _Hl⟩
   imodintro
   iexists ⟨K.fill pl(#(.unit)), σ'⟩, 1
@@ -211,13 +211,13 @@ theorem step_alloctape {E : CoPset} (K : Ectx rT) (z : Int) :
   unfold specUpdate
   iintro %ρ Hρ
   obtain ⟨_, σ⟩ := ρ
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
+  ihave %Heq := specAuth_specFrag_agree $$ Hρ HK
   subst Heq
   set l := σ.tapes.fresh with hl
   set σ' := σ.update_tapes (fun h : LocHeap Tape => PartialMap.insert h l (Tape.empty z))
     with hσ'
-  imod specProg_update (e3 := K.fill pl(#(.lbl l))) $$ Hρ HK with ⟨HρNew, HKNew⟩
-  ihave HAlloc := spec_auth_tape_alloc (t := Tape.empty z) (GF := GF)
+  imod specProg_update $$ Hρ HK with ⟨HρNew, HKNew⟩
+  ihave HAlloc := spec_auth_tape_alloc
     (e := K.fill pl(#(.lbl l))) $$ HρNew
   imod HAlloc with ⟨HρFinal, Hl⟩
   imodintro
@@ -245,14 +245,14 @@ theorem step_rand {E : CoPset} (K : Ectx rT) {z : Int} (l : Loc)
   unfold specUpdate
   iintro %ρ Hρ
   obtain ⟨_, σ⟩ := ρ
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) $$ Hρ HK
+  ihave %Heq := specAuth_specFrag_agree $$ Hρ HK
   subst Heq
-  ihave %Hlk := spec_auth_lookup_tape (GF := GF) $$ Hρ Hl
+  ihave %Hlk := spec_auth_lookup_tape $$ Hρ Hl
   set σ' := σ.update_tapes (fun h : LocHeap Tape => PartialMap.insert h l ⟨z, ns⟩)
     with hσ'
-  imod specProg_update (e3 := K.fill pl(#(.int n))) $$ Hρ HK with ⟨HρNew, HKNew⟩
-  ihave HUpd := spec_auth_update_tape (GF := GF) (e := K.fill pl(#(.int n)))
-    (l := l) (t := ⟨z, n :: ns⟩) (s := ⟨z, ns⟩) $$ HρNew Hl
+  imod specProg_update $$ Hρ HK with ⟨HρNew, HKNew⟩
+  ihave HUpd := spec_auth_update_tape
+    (l := l) $$ HρNew Hl
   imod HUpd with ⟨HρFinal, _Hl⟩
   imodintro
   iexists ⟨K.fill pl(#(.int n)), σ'⟩, 1

@@ -35,7 +35,7 @@ abbrev ARCoupling.DP (S : Set (α × β)) := ARCoupling (DPF ε δ) S
 theorem ARCoupling.DP.trivial_δ {μₗ : Measure α} {μᵣ : Measure β} {S} (Hδ : μₗ .univ ≤ δ) :
     ARCoupling.DP ε δ S μₗ μᵣ := by
   refine fun ⟨f, _, Hf⟩ _ _ => ?_
-  refine lintegral_le_meas (s := .univ) Hf (fun _ => (·.elim trivial)) |>.trans ?_
+  refine lintegral_le_meas Hf (fun _ => (·.elim trivial)) |>.trans ?_
   refine Hδ.trans ?_
   exact le_add_self
 
@@ -94,7 +94,7 @@ theorem ARCoupling.DP.bind {ε'} {δ' : NNReal} {f : α → Measure α'} {g : β
   · rw [add_assoc]; refine add_le_add (le_refl _) ?_
     rw [add_comm]
     refine Hcpl F G (fun {a b} HS => ?_)
-    simp only [F, G]
+    simp only [ G]
     refine max_le (zero_le) (le_min ?_ ?_)
     · exact Hf'le _
     · refine tsub_le_iff_left.mpr ?_
@@ -103,7 +103,7 @@ theorem ARCoupling.DP.bind {ε'} {δ' : NNReal} {f : α → Measure α'} {g : β
     refine (ENNReal.mul_le_mul_iff_right (by simp) (by simp [Hε])).mpr ?_
     refine lintegral_mono (fun b => ?_)
     exact min_le_right _ _
-  · simp [DPF, exp_add, add_comm, mul_assoc]
+  · simp [ exp_add, add_comm, mul_assoc]
     refine le_of_eq ?_
     congr
     exact lintegral_const_mul (exp ε') (measurable_lintegral Hg'm |>.comp Hgm)

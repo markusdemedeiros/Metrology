@@ -70,14 +70,14 @@ theorem approximates_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
       ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
     (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),
-      ⊢@{IProp GF} iprop(↯ ε -∗ refines (hlc := .hasNoLC) (GF := GF) ⊤ e e' (A IR))) :
+      ⊢@{IProp GF} iprop(↯ ε -∗ refines ⊤ e e' (A IR))) :
     AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
   -- Reduce relational adequacy to the WP-level adequacy theorem.
   apply wp_adequacy_error_lim (GF := GF) e e' σ σ' ε φ
   intro IGS ε' Hε'pos
   iintro He' Herr
   -- Allocate the non-atomic invariant pool needed to build an `ApproxisRGS`.
-  imod (Iris.NonAtomicInvariant.alloc (GF := GF)) with HnaEx
+  imod (Iris.NonAtomicInvariant.alloc) with HnaEx
   icases HnaEx with ⟨%γ, Htok⟩
   set IR : ApproxisRGS rT .hasNoLC GF :=
     { approxisGS := IGS, naInvG := _, nais := γ }
@@ -95,7 +95,7 @@ theorem approximates_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   -- Weaken the WP post-condition from `(A IR).car v v'` to `φ v v'`.
   iapply (ApproxisWpGS.wp_mono
     (Φ := fun v => iprop(∃ (v' : Val rT) (ε'' : ENNReal),
-      (⤇ Ectx.fill ([] : Ectx rT) v'.1) ∗ (naOwnP (rT := rT) (hlc := .hasNoLC) ⊤) ∗ (↯ ε'') ∗
+      (⤇ Ectx.fill ([] : Ectx rT) v'.1) ∗ (naOwnP (rT := rT) ⊤) ∗ (↯ ε'') ∗
       (⌜(0 : ENNReal) < ε''⌝) ∗ (A IR).car v v')))
   case HΦ =>
     intro v
@@ -115,7 +115,7 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
       ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
     (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),
-      ⊢@{IProp GF} refines (hlc := .hasNoLC) (GF := GF) ⊤ e e' (A IR)) :
+      ⊢@{IProp GF} refines ⊤ e e' (A IR)) :
     AddCoupl 0 (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) :=
   approximates_coupling A φ e e' σ σ' 0 HA (fun IR => by
     iintro _

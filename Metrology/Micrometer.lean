@@ -30,7 +30,7 @@ theorem measurableSet_some {S : Set α} (HS : MeasurableSet S) : MeasurableSet (
   measurableSet_generateFrom <| mem_union_right _ (mem_image_of_mem _ HS)
 
 theorem measurableSet_range_some : MeasurableSet (range (some (α := α))) :=
-  image_univ ▸ measurableSet_some (α := α) .univ
+  image_univ ▸ measurableSet_some .univ
 
 /-- When proving the measurability of a set in Option, it suffices to only prove the
     measurability of the terms which are `some`. -/

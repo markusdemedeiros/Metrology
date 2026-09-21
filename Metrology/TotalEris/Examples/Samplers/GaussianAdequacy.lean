@@ -38,7 +38,7 @@ theorem gauss_std_distSpec :
   iintro Hε
   iapply ErisWpGS.tglWp_wand
   isplitl [Hε]
-  · iapply (twp_Gauss (GF := GF) ⊤ F hFm)
+  · iapply (twp_Gauss ⊤ F hFm)
     iapply (ErrorCredit.ext (gauss_credit_eq_gaussianReal F hFm))
     iexact Hε
   · iintro %v ⟨%y, %hy, Hcy⟩
@@ -50,7 +50,7 @@ open MeasureTheory ProbabilityTheory in
 `Gauss`, read as a real, is distributed exactly as `N(0,1)`. -/
 theorem gauss_std_distributed [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF] (σ : State ℝ) :
     (limExec ⟨pl(&Gauss #.unit), σ⟩).map (fun ρ => realOfExp ρ.expr) = gaussianReal 0 1 :=
-  twp_dist_adequacy (GF := GF) (pl(&Gauss #.unit)) σ (gaussianReal 0 1)
+  twp_dist_adequacy (pl(&Gauss #.unit)) σ (gaussianReal 0 1)
     (gauss_std_distSpec (GF := GF))
 
 end

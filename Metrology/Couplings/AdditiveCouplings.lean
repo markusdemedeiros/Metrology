@@ -89,7 +89,7 @@ theorem bind {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β')}{μ�
   have HFhGh {a b} (HS : S (a, b)) : Fh.1 a ≤ Gh.1 b := by
     have Hinner : ∫⁻ y, f' y ∂(f a) ≤ ∫⁻ y, g' y ∂(g b) + ε' :=
       Hbind HS ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
-    simp only [Fh, Gh, le_inf_iff]
+    simp only [ Gh, le_inf_iff]
     refine ⟨tsub_le_iff_right.mpr Hinner, ?_⟩
     exact tsub_le_iff_right.mpr ((HFle a).trans le_self_add)
   /- Main inequality. -/
@@ -150,7 +150,7 @@ theorem bind_adv {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β')}
   have HFhGh {a b} (HS : S (a, b)) : Fh.1 a ≤ Gh.1 b := by
     have Hinner : ∫⁻ y, f' y ∂(f a) ≤ ∫⁻ y, g' y ∂(g b) + E₂ b :=
       Hbind HS ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
-    simp only [Fh, Gh, le_inf_iff]
+    simp only [ Gh, le_inf_iff]
     exact ⟨Hinner, (HFle a).trans (by simp)⟩
   -- Apply the outer coupling to Fh, Gh.
   rw [lintegral_bind Hfm.aemeasurable Hf'm.aemeasurable,
@@ -200,7 +200,7 @@ theorem bind_adv_lhs {ε ε' : ENNReal} {S : Set (α × β)} {T : Set (α' × β
   have HFhGh {a b} (HS : S (a, b)) : Fh.1 a ≤ Gh.1 b := by
     have Hinner : ∫⁻ y, f' y ∂(f a) ≤ ∫⁻ y, g' y ∂(g b) + E₂ a :=
       Hbind HS ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'
-    simp only [Fh, Gh, le_inf_iff]
+    simp only [ Gh, le_inf_iff]
     refine ⟨?_, ?_⟩
     · exact tsub_le_iff_right.mpr Hinner
     · exact (tsub_le_self).trans (HFle a)
@@ -273,9 +273,9 @@ theorem mass_leq {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ
   let oneB : CouplingFunction β := .mk (fun _ => 1) ⟨measurable_const, fun _ => le_refl _⟩
   have h := H oneA oneB (fun _ => le_refl _)
   rwa [show (∫⁻ _, oneA.1 _ ∂μₗ) = μₗ .univ from by
-        simp [oneA, lintegral_const],
+        simp [oneA],
       show (∫⁻ _, oneB.1 _ ∂μᵣ) = μᵣ .univ from by
-        simp [oneB, lintegral_const]] at h
+        simp [oneB]] at h
 
 /-- Left transitivity with an equality-coupling: chain an exact-equality coupling into an
 arbitrary coupling, adding the error slacks. -/
@@ -324,7 +324,7 @@ coupled. Specialization of `AddCoupl.dirac`. -/
 theorem dret {ε : ENNReal} {R : α' → β' → Prop} {a : α} {b : β}
     (f : α → α') (g : β → β') (H : R (f a) (g b)) :
     AddCoupl ε (fun v => R v.1 v.2) (Measure.dirac (f a)) (Measure.dirac (g b)) :=
-  AddCoupl.dirac (ε := ε) _ H
+  AddCoupl.dirac _ H
 
 /-- Push an `AddCoupl` through measurable maps. The Rocq form is
 `ARcoupl_map : ARcoupl μ₁ μ₂ R ε → ARcoupl (dmap f μ₁) (dmap g μ₂) (λ a' b', ∃ a b, ...) ε`. -/
@@ -399,7 +399,7 @@ theorem map_inv [DiscreteMeasurableSpace α'] [DiscreteMeasurableSpace β']
   -- Relation: R(a',b') → fT(a') ≤ gT(b').
   have HFG : ∀ {a' b'}, R (a', b') → FT.1 a' ≤ GT.1 b' := by
     intro a' b' HR
-    simp only [FT, GT, fT, gT, le_inf_iff]
+    simp only [FT, GT, gT, le_inf_iff]
     refine ⟨?_, HfTb a'⟩
     refine iSup_le fun a => iSup_le fun Ha => ?_
     refine le_iInf fun b => le_iInf fun Hb => ?_

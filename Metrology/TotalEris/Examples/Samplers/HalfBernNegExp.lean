@@ -97,7 +97,7 @@ section conservation
 
 open MeasureTheory in
 theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} :
-    ∫⁻ r, BNEHalfCredit F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = BNEHalfCreditV F := by
+    ∫⁻ r, BNEHalfCredit F r ∂(ProbLangℝ.unifUnit) = BNEHalfCreditV F := by
   have hlift : LiftParity F = fun n => if n % 2 = 0 then F false else F true :=
     funext (LiftParity_eq_ite F)
   have hexphalf : ∫ r in (0 : ℝ)..(1 / 2), Real.exp (-r) = 1 - Real.exp (-1 / 2) := by
@@ -178,13 +178,13 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
   iintro Hε
   twp_pure
   twp_bind pl(urand)
-  iapply (twp_urand_exp' (ε₂ := BNEHalfCredit F) (measurable_bneHalfCredit F) ?hint) $$ Hε
+  iapply (twp_urand_exp' (measurable_bneHalfCredit F) ?hint) $$ Hε
   case hint => rw [BNEHalfCredit_lintegral]
   iintro %r ⟨%Hrm, Hcr⟩
   have Hr := mem_unifUnitSupport_real_le Hrm
   twp_pure
   twp_bind pl(&LeHalf #(.real r))
-  iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(⌜v.1 = .lit (.bool (LeHalfSpec r))⌝)))
+  iapply (tglWp_wand)
   isplitl []
   · iapply twp_LeHalf
   iintro %⟨w, _⟩ %hv
@@ -204,8 +204,7 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
     isimp only [BNEHalfCredit, if_pos hle, if_neg (not_not_intro hle), add_zero] at Hcr
     twp_pure
     twp_bind pl(&DecrTrial #(.int (0 : ℤ)) #(.real r))
-    iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ n : ℕ,
-      ⌜v.1 = pl(#(.int (Int.ofNat n)))⌝ ∗ ↯ (LiftParity F n))))
+    iapply (tglWp_wand)
     isplitl [Hcr]
     · iapply (twp_DecrTrial E (LiftParity F) 0 r Hr) $$ Hcr
     iintro %⟨w', _⟩ ⟨%n, %hn, Hcrn⟩
@@ -247,7 +246,7 @@ theorem measurable_fairCoinCredit (F : Bool → ℝ≥0∞) : Measurable (FairCo
 
 open MeasureTheory in
 theorem FairCoinCredit_lintegral (F : Bool → ℝ≥0∞) :
-    ∫⁻ r, FairCoinCredit F r ∂(ProbLangℝ.unifUnit (T := ℝ)) = FairCoinCreditV F := by
+    ∫⁻ r, FairCoinCredit F r ∂(ProbLangℝ.unifUnit) = FairCoinCreditV F := by
   have hsetA : Set.Iic (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Icc 0 (1 / 2) := by
     ext r; simp only [Set.mem_inter_iff, Set.mem_Iic, Set.mem_Icc]
     exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, by linarith⟩⟩
@@ -292,12 +291,12 @@ theorem twp_FairCoin (E : CoPset) (F : Bool → ℝ≥0∞) :
   iintro Hε
   twp_pure
   twp_bind pl(urand)
-  iapply (twp_urand_exp' (ε₂ := FairCoinCredit F) (measurable_fairCoinCredit F) ?hint) $$ Hε
+  iapply (twp_urand_exp' (measurable_fairCoinCredit F) ?hint) $$ Hε
   case hint => rw [FairCoinCredit_lintegral]
   iintro %r ⟨%Hrm, Hcr⟩
   twp_pure
   twp_bind pl(&LeHalf #(.real r))
-  iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(⌜v.1 = .lit (.bool (LeHalfSpec r))⌝)))
+  iapply (tglWp_wand)
   isplitl []
   · iapply twp_LeHalf
   iintro %⟨w, _⟩ %hv

@@ -82,7 +82,7 @@ theorem twp_err_incr {E : CoPset} {e : Exp rT} {ε : ENNReal} {Φ : Val rT → I
   iintro ⟨Herr, Hwp⟩
   iapply twp_lift_step_fupd_glm Hnv
   iintro %σ₁ %ε₂ ⟨Hσ₁, Hε₂⟩
-  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
+  imod (BIFUpdate.subset Std.LawfulSet.empty_subset) with Hclose
   imodintro
   iapply glm'_credit_bump
   iintro %ε' %Hε'
@@ -116,7 +116,7 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} (Hnv : 
   iapply fupd_tglWp
   imod zero with Herr
   imodintro
-  iapply twp_err_incr (ε := 0) Hnv
+  iapply twp_err_incr Hnv
   iframe
 
 /-- Generic error-spending presample rule, factoring out the `glm'` plumbing shared by
@@ -145,7 +145,7 @@ theorem twp_glm_spend {E : CoPset} {e₁ : Exp rT} {ε₁ : ENNReal}
   iintro Herr Hcont
   iapply twp_lift_step_fupd_glm hv
   iintro %σ₁ %ε_now ⟨Hσ, Hε_now⟩
-  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
+  imod (BIFUpdate.subset Std.LawfulSet.empty_subset) with Hclose
   imodintro
   ihave ⟨Hε_now, Herr, %hLe⟩ : iprop(ErisWpGS.errInterp (rT := rT) ε_now ∗ ↯ε₁ ∗ ⌜ε₁ ≤ ε_now⌝)
       $$ [Hε_now Herr]
@@ -256,13 +256,13 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
       show (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0) = ε₂ n.toNat
       exact dif_pos ⟨hn.1, hn.2⟩
   iintro Herr Hcont
-  iapply (twp_glm_spend (R := R) (f := f) Hnv hbd hstate hred hrmeas hpgl hint) $$ Herr
+  iapply (twp_glm_spend Hnv hbd hstate hred hrmeas hpgl hint) $$ Herr
   -- The reached value is `.int n`, carrying `↯(ε₂ n.toNat)`; hand it to `Hcont`.
   iintro %σ₁ %ρ %HRρ Hcr
   obtain ⟨n, Hn₁, Hn₂, rfl⟩ := HRρ
   have hfe : f (⟨pl(#(.int n)), σ₁⟩ : Cfg rT) = ε₂ n.toNat := by
     simp only [hf]; exact dif_pos ⟨Hn₁, Hn₂⟩
-  iapply (ErisWpGS.tglWp_value_of_toVal (v := (.int n : Val rT)) rfl)
+  iapply (ErisWpGS.tglWp_value_of_toVal rfl)
   iapply Hcont $$ %n
   isplitr
   · ipureintro; exact ⟨Hn₁, Hn₂⟩
@@ -271,7 +271,7 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
 theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     {ε₂ : rT → ENNReal} {Φ : Val rT → IProp GF}
     (hε₂ : Measurable ε₂) (Hbd : ∀ r, ε₂ r ≤ 1)
-    (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
+    (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit)) ≤ ε₁) :
     iprop(↯ε₁) ⊢
       iprop((∀ r, (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
       tglWp E pl(urand) Φ) := by
@@ -281,7 +281,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     fun σ₁ => show Cfg.uniformReal σ₁ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
   -- The real-literal injection: `primStep = uniformReal = unifUnit.map inj`, and `inj` embeds.
   have hps : ∀ σ₁ : State rT, primStep (⟨pl(urand), σ₁⟩ : Cfg rT)
-      = (ProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
+      = (ProbLangℝ.unifUnit).map (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))
   have hg : ∀ σ₁ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => Cfg.measurable_iff.mpr
@@ -333,12 +333,12 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     rw [hps σ₁, MeasureTheory.lintegral_map hφ (hg σ₁)]
     exact HInt
   iintro Herr Hcont
-  iapply (twp_glm_spend (R := R) (f := f) Hnv hbd hstate hred hrmeas hpgl hint) $$ Herr
+  iapply (twp_glm_spend Hnv hbd hstate hred hrmeas hpgl hint) $$ Herr
   -- The reached value is `.real r`, carrying `↯(ε₂ r)`; hand it to `Hcont`.
   iintro %σ₁ %ρ %HRρ Hcr
   obtain ⟨r, rfl, hrsupp⟩ := HRρ
   have hfe : f (⟨pl(#(.real r)), σ₁⟩ : Cfg rT) = ε₂ r := by simp only [hf]
-  iapply (ErisWpGS.tglWp_value_of_toVal (v := (.real r : Val rT)) rfl)
+  iapply (ErisWpGS.tglWp_value_of_toVal rfl)
   iapply Hcont $$ %r
   iframe %hrsupp
   rw [← hfe]; iexact Hcr
@@ -350,15 +350,15 @@ contradictory). -/
 theorem twp_urand_exp' {E : CoPset} {ε₁ : ENNReal}
     {ε₂ : rT → ENNReal} {Φ : Val rT → IProp GF}
     (hε₂ : Measurable ε₂)
-    (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁) :
+    (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit)) ≤ ε₁) :
     iprop(↯ε₁) ⊢
       iprop((∀ r, (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
       tglWp E pl(urand) Φ) := by
   iintro Herr Hcont
   -- Clamping shrinks the integrand pointwise, so the budget `HInt` survives.
-  have hint : (∫⁻ r, min (ε₂ r) 1 ∂(ProbLangℝ.unifUnit (T := rT))) ≤ ε₁ :=
+  have hint : (∫⁻ r, min (ε₂ r) 1 ∂(ProbLangℝ.unifUnit)) ≤ ε₁ :=
     (MeasureTheory.lintegral_mono fun r => min_le_left _ _).trans HInt
-  iapply (twp_urand_exp (ε₂ := fun r => min (ε₂ r) 1) (hε₂.min measurable_const)
+  iapply (twp_urand_exp (hε₂.min measurable_const)
     (fun r => min_le_right _ _) hint) $$ Herr
   -- Continuation: case-split on whether `ε₂ r` is already `≤ 1`.
   iintro %r ⟨%hrsupp, Hcr⟩
@@ -389,7 +389,7 @@ theorem twp_rand_exp' {E : CoPset} {z : Int} {ε₁ : ENNReal}
   have hsum : (∑ n ∈ Finset.range z.toNat, min (ε₂ n) 1) / (z.toNat : ENNReal) ≤ ε₁ :=
     (ENNReal.div_le_div_right
       (Finset.sum_le_sum fun n _ => min_le_left _ _) _).trans HSum
-  iapply (twp_rand_exp (ε₂ := fun n => min (ε₂ n) 1) Hz
+  iapply (twp_rand_exp Hz
     (fun n => min_le_right _ _) hsum) $$ Herr
   -- Continuation: case-split on whether `ε₂ n` is already `≤ 1`.
   iintro %n ⟨%Hn, Hcr⟩

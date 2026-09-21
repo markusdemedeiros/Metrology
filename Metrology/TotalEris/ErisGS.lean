@@ -40,7 +40,7 @@ noncomputable instance erisWpGS_of_components : ErisWpGS (rT := rT) GF where
 /-! ### Unfolding lemmas -/
 
 @[simp] theorem erisWpGS_stateInterp_eq :
-    (ErisWpGS.stateInterp (rT := rT) : State rT → IProp GF) = appStateAuth := rfl
+    (ErisWpGS.stateInterp : State rT → IProp GF) = appStateAuth := rfl
 
 @[simp] theorem erisWpGS_errInterp_eq :
     (ErisWpGS.errInterp (rT := rT) : ENNReal → IProp GF) = ecAuth := rfl

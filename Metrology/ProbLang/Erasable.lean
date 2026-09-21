@@ -56,7 +56,7 @@ namespace Erasable
 /-- The dirac distribution at `σ` is erasable at `σ`. -/
 theorem dret (σ : State rT) : Erasable (Measure.dirac σ) σ := by
   intro e m
-  rw [Measure.dirac_bind (f := fun σ' => execN m ⟨e, σ'⟩) (by measurability)]
+  rw [Measure.dirac_bind (by measurability)]
 
 theorem dbind
     {μ₁ : Measure (State rT)} {μ₂ : State rT → Measure (State rT)} {σ : State rT}
@@ -96,7 +96,7 @@ theorem dret_final {μ : Measure (State rT)} {σ : State rT} {e : Exp rT} (hv : 
   have hstep : ∀ σ' : State rT,
       execN 1 (⟨e, σ'⟩ : Cfg rT) = Measure.dirac (⟨e, σ'⟩ : Cfg rT) := by
     intro σ'
-    exact execN_succ_isValue (ρ := ⟨e, σ'⟩) hv.toIsValue 0
+    exact execN_succ_isValue hv.toIsValue 0
   calc μ.bind (fun σ' => Measure.dirac (⟨e, σ'⟩ : Cfg rT))
       = μ.bind (fun σ' => execN 1 ⟨e, σ'⟩) := by simp only [hstep]
     _ = execN 1 ⟨e, σ⟩ := h e 1
@@ -121,7 +121,7 @@ theorem mass
   have hv : IsVal (Exp.lit (rT := rT) .unit) := .lit
   have hstep : ∀ σ' : State rT,
       execN 1 ((⟨.lit .unit, σ'⟩ : Cfg rT)) = Measure.dirac (⟨.lit .unit, σ'⟩ : Cfg rT) :=
-    fun σ' => execN_succ_isValue (ρ := ⟨.lit .unit, σ'⟩) hv.toIsValue 0
+    fun σ' => execN_succ_isValue hv.toIsValue 0
   have h1 := h (.lit .unit) 1
   have hboth := congrArg (fun ν => ν (Set.univ : Set (Cfg rT))) h1
   rw [hstep σ] at hboth
@@ -171,7 +171,7 @@ namespace Rewritable
 /-- Dirac rewritability: `limExec ρ = dirac ρ >>= limExec`. -/
 theorem dret (ρ : Cfg rT) : Rewritable ρ (Measure.dirac ρ) := by
   show limExec ρ = (Measure.dirac ρ).bind limExec
-  rw [Measure.dirac_bind (f := limExec) limExec.measurable]
+  rw [Measure.dirac_bind limExec.measurable]
 
 /-- Every finite unfolding `pexecN m ρ` is rewritable at `ρ`. -/
 theorem ofPexecN (ρ : Cfg rT) (m : Nat) : Rewritable ρ (ProbLang.pexecN m ρ) :=
@@ -189,7 +189,7 @@ theorem of_erasable {ρ : Cfg rT} {μ : Measure (State rT)} (h : Erasable μ ρ.
   have hker : (fun σ : State rT => (Measure.dirac (⟨ρ.expr, σ⟩ : Cfg rT)).bind limExec)
        = (fun σ : State rT => limExec ⟨ρ.expr, σ⟩) := by
     funext σ
-    rw [Measure.dirac_bind (f := limExec) limExec.measurable]
+    rw [Measure.dirac_bind limExec.measurable]
   rw [hker, h.lim_exec ρ.expr]
 
 /-- Erasability combined with `pexecN`: push `μ` in on the state side,

@@ -124,8 +124,8 @@ theorem execN_succ_le' (n : ℕ) (ρ : Cfg rT) : execN n ρ ≤ execN (n + 1) ρ
   induction n generalizing ρ with
   | zero => exact bot_le
   | succ k ih =>
-    rw (occs := [2]) [execN]
-    rw (occs := [1]) [execN]
+    rw [execN]
+    rw [execN]
     split
     · exact le_refl _
     · apply Measure.bind_mono_right'
@@ -437,7 +437,7 @@ theorem limExec_map_AddCoupl
     {F : Cfg rT → γ} (hF : Measurable F)
     (H : ∀ n, AddCoupl ε Φ ((execN n ρ).map F) μ₂) :
     AddCoupl ε Φ ((limExec ρ).map F) μ₂ := by
-  refine AddCoupl.iSup_left (ν := fun n => (execN n ρ).map F) (fun f hf => ?_) H
+  refine AddCoupl.iSup_left (fun f hf => ?_) H
   simp_rw [lintegral_map hf hF]
   exact le_of_eq (lintegral_limExec' ρ (fun a => f (F a)))
 

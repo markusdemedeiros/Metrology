@@ -117,7 +117,7 @@ theorem shiftGeometricPMFCreditV_succ (γ : ↑unitInterval) (shift : ℤ) (F : 
       = ENNReal.ofReal (γ : ℝ) * shiftGeometricPMFCreditV γ (shift + 1) F
         + (1 - ENNReal.ofReal (γ : ℝ)) * F shift := by
   unfold shiftGeometricPMFCreditV
-  rw [tsum_eq_zero_add' (f := fun k : ℕ => F (shift + ↑k) * GeometricPMF γ k) ENNReal.summable,
+  rw [tsum_eq_zero_add' ENNReal.summable,
     add_comm]
   congr 1
   · rw [← ENNReal.tsum_mul_left]
@@ -134,7 +134,7 @@ section specification
 
 theorem twp_GeometricTrial (E : CoPset) {γ : ↑unitInterval} (shift : Int) (v : Val rT)
     (hγ0 : 0 < (γ : ℝ)) (hγ1 : (γ : ℝ) < 1)
-    (Hspec : AbstractBernoulli (hlc := hlc) (GF := GF) v γ) :
+    (Hspec : AbstractBernoulli (GF := GF) v γ) :
     ⊢@{IProp GF}
       ∀ (F : Int → ℝ≥0∞),
       ↯ (shiftGeometricPMFCreditV γ shift F) -∗
@@ -144,14 +144,14 @@ theorem twp_GeometricTrial (E : CoPset) {γ : ↑unitInterval} (shift : Int) (v 
   iapply twp_err_pos solve_not_value
   iintro %ε_term %Hε_term_pos Hε_term
   irevert! %shift
-  iapply ErrorCredit.Induction.simple (k := terminationFactor γ) Hε_term_pos
+  iapply ErrorCredit.Induction.simple Hε_term_pos
     (one_lt_terminationFactor γ hγ0 hγ1) $$ [] Hε_term
   iintro !> ⟨IH, Hε_term⟩ %shift Hε_spec
   twp_pures
   twp_bind pl({v.fst} #.unit)
   iapply tglWp_wand
   isplitl [Hε_spec Hε_term]
-  · iapply (Hspec.spec (E := E)) $$ %(geometricContAmp F γ shift ε_term)
+  · iapply (Hspec.spec) $$ %(geometricContAmp F γ shift ε_term)
     icombine Hε_term Hε_spec as Hε
     iapply ErrorCredit.ext $$ Hε
     simp only [geometricContAmp]
@@ -171,11 +171,10 @@ theorem twp_GeometricTrial (E : CoPset) {γ : ↑unitInterval} (shift : Int) (v 
   · twp_pure
     twp_pure
     twp_bind pl(&GeometricTrial &v.1 #(.int (shift + 1)))
-    iapply (tglWp_wand (Φ := fun w : Val rT => iprop(
-      ∃ z : ℤ, ⌜w.1 = pl(#(.int z))⌝ ∗ ⌜shift + 1 ≤ z⌝ ∗ ↯ (F z))))
+    iapply (tglWp_wand)
     isplitl [Hε IH]
     · rw [geometricContAmp]
-      ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hε
+      ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split $$ Hε
       iapply IH $$ Hterm
       iexact Hexp
     iintro %w ⟨%z, %hzeq, %hzle, Hf⟩

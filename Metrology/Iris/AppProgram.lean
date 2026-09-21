@@ -111,9 +111,9 @@ theorem app_state_lookup_heap {σ : State rT} {l : Loc} {v : Val rT} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↦ v -∗ ⌜σ.heap[l]? = some v⌝ := by
   unfold appStateAuth appHeapAuth appHeapFrag
   iintro ⟨Hh, -⟩ Hf
-  ihave Hv := iOwn_cmraValid_op (E := IApp.heap) $$ [Hh Hf]
+  ihave Hv := iOwn_cmraValid_op $$ [Hh Hf]
   · isplitl [Hh] <;> iassumption
-  ihave %hv := internalCmraValid_discrete (A := SpecHeap rT) (PROP := IProp GF) $$ Hv
+  ihave %hv := internalCmraValid_discrete $$ Hv
   ipureintro
   obtain ⟨v', _, _, Hlookup, _, Hinc⟩ := HeapView.auth_op_frag_valid_total_discrete_iff hv
   rw [LocHeap.asAgree_get?] at Hlookup
@@ -132,14 +132,14 @@ theorem app_state_update_heap {σ : State rT} {l : Loc} {v w : Val rT} :
       appStateAuth (σ.update_heap (fun h : LocHeap (Val rT) => PartialMap.insert h l w)) ∗
         l ↦ w := by
   iintro Ha Hf
-  ihave %Hlk := app_state_lookup_heap (GF := GF) $$ Ha Hf
+  ihave %Hlk := app_state_lookup_heap $$ Ha Hf
   unfold appStateAuth appHeapAuth appHeapFrag
   ihave ⟨Hh, Ht⟩ := Ha
   have Hval_toAgree : ✓ (toAgree w : Agree (Val rT)) := by
     intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.heap) •
-        HeapView.Frag (H := LocHeap) l (.own 1) (toAgree v) ~~>
+        HeapView.Frag l (.own 1) (toAgree v) ~~>
       HeapView.Auth (.own 1)
           (PartialMap.insert (LocHeap.asAgree σ.heap) l (toAgree w)) •
         HeapView.Frag l (.own 1) (toAgree w) :=
@@ -149,7 +149,7 @@ theorem app_state_update_heap {σ : State rT} {l : Loc} {v w : Val rT} :
   · isplitl [Hh] <;> iassumption
   imod Hu
   imodintro
-  ihave ⟨Hh, Hf⟩ := iOwn_op (E := IApp.heap) $$ Hu
+  ihave ⟨Hh, Hf⟩ := iOwn_op $$ Hu
   simp only [State.update_heap, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [Hh] <;> try iassumption
@@ -174,11 +174,11 @@ theorem app_state_heap_alloc {σ : State rT} (v : Val rT) :
           (PartialMap.insert (LocHeap.asAgree σ.heap) σ.heap.fresh (toAgree v)) •
         HeapView.Frag σ.heap.fresh (.own 1) (toAgree v) :=
     HeapView.update_one_alloc Hfresh DFrac.valid_own_one Hval_toAgree
-  ihave Hu := iOwn_update (E := IApp.heap) $$ Hh
+  ihave Hu := iOwn_update $$ Hh
   · exact Hupd
   imod Hu
   imodintro
-  ihave ⟨Hh, Hf⟩ := iOwn_op (E := IApp.heap) $$ Hu
+  ihave ⟨Hh, Hf⟩ := iOwn_op $$ Hu
   simp only [State.update_heap, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [Hh] <;> try iassumption
@@ -187,9 +187,9 @@ theorem app_state_lookup_tape {σ : State rT} {l : Loc} {t : Tape} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↪ₐ t -∗ ⌜σ.tapes[l]? = some t⌝ := by
   unfold appStateAuth appTapesAuth appTapesFrag
   iintro ⟨-, Ht⟩ Hf
-  ihave Hv := iOwn_cmraValid_op (E := IApp.tapes) $$ [Ht Hf]
+  ihave Hv := iOwn_cmraValid_op $$ [Ht Hf]
   · isplitl [Ht] <;> iassumption
-  ihave %hv := internalCmraValid_discrete (A := SpecTapes) (PROP := IProp GF) $$ Hv
+  ihave %hv := internalCmraValid_discrete $$ Hv
   ipureintro
   obtain ⟨v', _, _, Hlookup, _, Hinc⟩ := HeapView.auth_op_frag_valid_total_discrete_iff hv
   rw [LocHeap.asAgree_get?] at Hlookup
@@ -208,14 +208,14 @@ theorem app_state_update_tape {σ : State rT} {l : Loc} {t s : Tape} :
       appStateAuth (σ.update_tapes (fun h : LocHeap Tape => PartialMap.insert h l s)) ∗
         l ↪ₐ s := by
   iintro Ha Hf
-  ihave %Hlk := app_state_lookup_tape (GF := GF) $$ Ha Hf
+  ihave %Hlk := app_state_lookup_tape $$ Ha Hf
   unfold appStateAuth appTapesAuth appTapesFrag
   ihave ⟨Hh, Ht⟩ := Ha
   have Hval_toAgree : ✓ (toAgree s : Agree Tape) := by
     intro n; simp
   have Hupd :
       HeapView.Auth (.own 1) (LocHeap.asAgree σ.tapes) •
-        HeapView.Frag (H := LocHeap) l (.own 1) (toAgree t) ~~>
+        HeapView.Frag l (.own 1) (toAgree t) ~~>
       HeapView.Auth (.own 1)
           (PartialMap.insert (LocHeap.asAgree σ.tapes) l (toAgree s)) •
         HeapView.Frag l (.own 1) (toAgree s) :=
@@ -225,7 +225,7 @@ theorem app_state_update_tape {σ : State rT} {l : Loc} {t s : Tape} :
   · isplitl [Ht] <;> iassumption
   imod Hu
   imodintro
-  ihave ⟨Ht, Hf⟩ := iOwn_op (E := IApp.tapes) $$ Hu
+  ihave ⟨Ht, Hf⟩ := iOwn_op $$ Hu
   simp only [State.update_tapes, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [Hh] <;> try iassumption
@@ -250,11 +250,11 @@ theorem app_state_tape_alloc {σ : State rT} (t : Tape) :
           (PartialMap.insert (LocHeap.asAgree σ.tapes) σ.tapes.fresh (toAgree t)) •
         HeapView.Frag σ.tapes.fresh (.own 1) (toAgree t) :=
     HeapView.update_one_alloc Hfresh DFrac.valid_own_one Hval_toAgree
-  ihave Hu := iOwn_update (E := IApp.tapes) $$ Ht
+  ihave Hu := iOwn_update $$ Ht
   · exact Hupd
   imod Hu
   imodintro
-  ihave ⟨Ht, Hf⟩ := iOwn_op (E := IApp.tapes) $$ Hu
+  ihave ⟨Ht, Hf⟩ := iOwn_op $$ Hu
   simp only [State.update_tapes, LocHeap.asAgree_insert]
   isplitr [Hf] <;> try iassumption
   isplitl [Hh] <;> try iassumption
@@ -352,7 +352,7 @@ live separately from the spec ones). -/
 theorem app_ra_init {GF : BundledGFunctors} [IAPre : AppPreGS rT GF]
     (σ : State rT) :
     ⊢@{IProp GF} |==> ∃ IA : AppGS rT GF,
-      @appStateAuth rT _ GF IA σ := by
+      appStateAuth (IApp := IA) σ := by
   imod (iOwn_alloc (E := IAPre.heap)
     (HeapView.Auth (.own 1) (LocHeap.asAgree σ.heap))
     HeapView.auth_one_valid) with ⟨%γH, HH⟩
@@ -381,7 +381,7 @@ theorem appHeapFrag_valid_2 {l : Loc} {v1 v2 : Val rT} :
     ⊢@{IProp GF} appHeapFrag l v1 -∗ appHeapFrag l v2 -∗ False := by
   iintro H1 H2
   unfold appHeapFrag
-  ihave Hv := iOwn_cmraValid_op (E := IApp.heap) $$ [H1 H2]
+  ihave Hv := iOwn_cmraValid_op $$ [H1 H2]
   · isplitl [H1] <;> iassumption
   ihave %hv := internalCmraValid_discrete $$ Hv
   exfalso
@@ -397,7 +397,7 @@ theorem appTapesFrag_valid_2 {l : Loc} {t1 t2 : Tape} :
     ⊢@{IProp GF} appTapesFrag l t1 -∗ appTapesFrag l t2 -∗ False := by
   iintro H1 H2
   unfold appTapesFrag
-  ihave Hv := iOwn_cmraValid_op (E := IApp.tapes) $$ [H1 H2]
+  ihave Hv := iOwn_cmraValid_op $$ [H1 H2]
   · isplitl [H1] <;> iassumption
   ihave %hv := internalCmraValid_discrete $$ Hv
   exfalso

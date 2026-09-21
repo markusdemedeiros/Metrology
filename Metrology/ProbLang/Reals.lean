@@ -87,7 +87,7 @@ let `twp_pures` and the stepping display normalise them away. -/
 unpacks to the strict range `0 < r < 1`. Used by `urand` samplers to read off sample
 bounds from the strengthened `twp_urand_exp'` continuation. -/
 public theorem mem_unifUnitSupport_real {r : ℝ} :
-    r ∈ ProbLangℝ.unifUnitSupport (T := ℝ) ↔ 0 < r ∧ r < 1 := Set.mem_Ioo
+    r ∈ ProbLangℝ.unifUnitSupport ↔ 0 < r ∧ r < 1 := Set.mem_Ioo
 
 /-! ### Rotation invariance of `Uniform[0,1]`
 
@@ -102,7 +102,7 @@ open MeasureTheory Set in
 theorem measurePreserving_fracAdd_aux {m : ℝ} (hm0 : 0 ≤ m) (hm1 : m < 1) :
     MeasureTheory.MeasurePreserving
       (fun r : ℝ => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
-      (ProbLangℝ.unifUnit (T := ℝ)) (ProbLangℝ.unifUnit (T := ℝ)) := by
+      (ProbLangℝ.unifUnit) (ProbLangℝ.unifUnit) := by
   show MeasurePreserving (fun r : ℝ => Int.fract (m + r))
       (volume.restrict (Icc (0:ℝ) 1)) (volume.restrict (Icc (0:ℝ) 1))
   have hmeas : Measurable (fun r : ℝ => Int.fract (m + r)) :=
@@ -118,7 +118,7 @@ theorem measurePreserving_fracAdd_aux {m : ℝ} (hm0 : 0 ≤ m) (hm1 : m < 1) :
       rw [← Set.inter_union_distrib_left, Set.Ico_union_right (by norm_num : (0:ℝ) ≤ 1)]
     have hnull : volume (A ∩ {(1:ℝ)}) = 0 :=
       measure_mono_null Set.inter_subset_right
-        (measure_singleton (μ := (volume : Measure ℝ)) 1)
+        (measure_singleton 1)
     rw [hsplit]
     refine le_antisymm ?_ (measure_mono Set.subset_union_left)
     exact (measure_union_le _ _).trans (by rw [hnull, add_zero])
@@ -169,14 +169,14 @@ theorem measurePreserving_fracAdd_aux {m : ℝ} (hm0 : 0 ≤ m) (hm1 : m < 1) :
         + volume ((fun r : ℝ => Int.fract (m + r)) ⁻¹' S ∩ Ico (1 - m) (1:ℝ)) := by
     rw [← hunion1, Set.inter_union_distrib_left]
     exact measure_union
-      ((Set.Ico_disjoint_Ico_same (a := (0:ℝ)) (b := 1 - m) (c := 1)).mono
+      ((Set.Ico_disjoint_Ico_same).mono
         Set.inter_subset_right Set.inter_subset_right)
       ((hmeas hS).inter measurableSet_Ico)
   have hR : volume (S ∩ Ico (0:ℝ) 1)
       = volume (S ∩ Ico (0:ℝ) m) + volume (S ∩ Ico m (1:ℝ)) := by
     rw [← hunion2, Set.inter_union_distrib_left]
     exact measure_union
-      ((Set.Ico_disjoint_Ico_same (a := (0:ℝ)) (b := m) (c := 1)).mono
+      ((Set.Ico_disjoint_Ico_same).mono
         Set.inter_subset_right Set.inter_subset_right)
       (hS.inter measurableSet_Ico)
   rw [hL, hR, hA, hB, measure_preimage_add, measure_preimage_add]
@@ -190,7 +190,7 @@ theorem measurePreserving_fracAdd_aux {m : ℝ} (hm0 : 0 ≤ m) (hm1 : m < 1) :
 public theorem measurePreserving_fracAdd (m : ℝ) :
     MeasureTheory.MeasurePreserving
       (fun r : ℝ => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
-      (ProbLangℝ.unifUnit (T := ℝ)) (ProbLangℝ.unifUnit (T := ℝ)) := by
+      (ProbLangℝ.unifUnit) (ProbLangℝ.unifUnit) := by
   have hper : (fun r : ℝ => Int.fract (m + r))
       = fun r : ℝ => Int.fract (Int.fract m + r) := by
     funext r

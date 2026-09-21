@@ -98,9 +98,7 @@ theorem twp_Gauss (E : CoPset) (F : ℝ → ℝ≥0∞) (hFm : Measurable F) :
   iintro Hε
   twp_pure
   twp_bind pl(&G2 #.unit)
-  iapply (tglWp_wand (Φ := fun p : Val ℝ => iprop(∃ (k : ℕ) (r : ℝ),
-    ⌜0 ≤ r ∧ r < 1⌝ ∗
-    ⌜p.1 = .pair (.lit (.real r)) (.lit (.int (Int.ofNat k)))⌝ ∗ ↯ (GaussCredit F k r))))
+  iapply (tglWp_wand)
   isplitl [Hε]
   · iapply (twp_G2 E (GaussCredit F) (measurable_gaussCredit hFm))
     iapply (ErrorCredit.ext (GaussCreditV_eq F))
@@ -120,9 +118,7 @@ theorem twp_Gauss (E : CoPset) (F : ℝ → ℝ≥0∞) (hFm : Measurable F) :
   isimp only [FairCoin_openRec, FairCoin_closeRec, ProbLang.realAdd_real,
     ProbLang.realOfInt_real, Int.cast_natCast]
   twp_bind pl(&FairCoin #.unit)
-  iapply (tglWp_wand (Φ := fun v : Val ℝ => iprop(∃ b : Bool,
-    ⌜v.1 = .lit (.bool b)⌝ ∗
-    ↯ ((fun b => F (GaussSign (r + (k : ℝ)) b)) b))))
+  iapply (tglWp_wand)
   isplitl [Hcr]
   · iapply (twp_FairCoin E (fun b => F (GaussSign (r + (k : ℝ)) b)))
     iapply (ErrorCredit.ext (GaussCredit_eq F k r))
@@ -169,7 +165,7 @@ open MeasureTheory in
 /-- The law of `G2`'s sampled real: the half-normal. -/
 def halfNormal : Measure ℝ :=
   Measure.sum fun k : ℕ =>
-    ((ProbLangℝ.unifUnit (T := ℝ)).withDensity (G2pdf k)).map (fun x => x + (k : ℝ))
+    ((ProbLangℝ.unifUnit).withDensity (G2pdf k)).map (fun x => x + (k : ℝ))
 
 open MeasureTheory in
 instance : IsProbabilityMeasure halfNormal := by
@@ -229,7 +225,7 @@ open MeasureTheory in
 /-- `unifUnit` is the Lebesgue measure on the *half-open* unit interval too: the
 endpoints carry no mass. Half-open pieces are what tile `(0,∞)` disjointly. -/
 theorem unifUnit_eq_restrict_Ioc :
-    (ProbLangℝ.unifUnit (T := ℝ)) = volume.restrict (Set.Ioc (0 : ℝ) 1) := by
+    (ProbLangℝ.unifUnit) = volume.restrict (Set.Ioc (0 : ℝ) 1) := by
   show volume.restrict (Set.Icc (0 : ℝ) 1) = _
   exact (Measure.restrict_congr_set Ioc_ae_eq_Icc).symm
 
@@ -242,7 +238,7 @@ theorem halfNormal_eq_withDensity :
     Measure.restrict_restrict hS]
   -- Each summand is the density's mass over `S ∩ (k, k+1]`.
   have hpiece : ∀ k : ℕ,
-      (((ProbLangℝ.unifUnit (T := ℝ)).withDensity (G2pdf k)).map (fun x => x + (k : ℝ))) S
+      (((ProbLangℝ.unifUnit).withDensity (G2pdf k)).map (fun x => x + (k : ℝ))) S
         = ∫⁻ y in S ∩ Set.Ioc (k : ℝ) ((k : ℝ) + 1), halfDens y ∂volume := by
     intro k
     have hpreS : MeasurableSet ((fun x : ℝ => x + (k : ℝ)) ⁻¹' S) :=

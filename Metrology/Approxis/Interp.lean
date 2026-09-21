@@ -78,7 +78,7 @@ variable {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 @[reducible] noncomputable def map1 (F : lrel rT GF → lrel rT GF)
     [OFE.NonExpansive F] (A : NEFun rT GF) : NEFun rT GF :=
   { fn := fun Δ => F (A.fn Δ)
-    ne := fun h => OFE.NonExpansive.ne (f := F) (A.ne h) }
+    ne := fun h => OFE.NonExpansive.ne (A.ne h) }
 
 @[reducible] noncomputable def rec' (A : NEFun rT GF) : NEFun rT GF :=
   { fn := fun Δ => lrel_rec
@@ -113,11 +113,11 @@ noncomputable def interpNE : Ty → NEFun rT GF
   | .exists' τ'   => NEFun.exists' (interpNE τ')
 
 noncomputable def interp (τ : Ty) (Δ : TyEnv rT GF) : lrel rT GF :=
-  (interpNE (GF := GF) τ).fn Δ
+  (interpNE τ).fn Δ
 
 theorem interp_ne_env (τ : Ty) {n : Nat} {Δ Δ' : TyEnv rT GF}
     (h : Δ ≡{n}≡ Δ') : interp τ Δ ≡{n}≡ interp τ Δ' :=
-  (interpNE (GF := GF) τ).ne h
+  (interpNE τ).ne h
 
 /-! ### `interp` head-shape equations
 
@@ -244,8 +244,8 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType �
     show iprop(∃ _ _ _ _, _) ⊢ _
     iintro ⟨%a1, %a2, %b1, %b2, %h1, %h2, HA, HB⟩
     unfold interp at ih1 ih2
-    ihave %heq1 := ih1 (v := a1) (v' := a2) $$ HA
-    ihave %heq2 := ih2 (v := b1) (v' := b2) $$ HB
+    ihave %heq1 := ih1 $$ HA
+    ihave %heq2 := ih2 $$ HB
     ipureintro
     apply Val.ext
     rw [h1, h2, heq1, heq2]
@@ -254,11 +254,11 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType �
     show iprop(∃ _ _, _) ⊢ _
     iintro ⟨%w1, %w2, Hd⟩
     icases Hd with (⟨%h1, %h2, HA⟩ | ⟨%h1, %h2, HB⟩)
-    · ihave %heq := ih1 (v := w1) (v' := w2) $$ HA
+    · ihave %heq := ih1 $$ HA
       ipureintro
       apply Val.ext
       rw [h1, h2, heq]
-    · ihave %heq := ih2 (v := w1) (v' := w2) $$ HB
+    · ihave %heq := ih2 $$ HB
       ipureintro
       apply Val.ext
       rw [h1, h2, heq]
@@ -372,8 +372,8 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
           injection this with this; injection this
   · -- TTape case.
     unfold interp
-    show (lrel_tape (GF := GF)).car _ _ ⊢
-      (lrel_tape (GF := GF)).car _ _ -∗ _
+    show (lrel_tape).car _ _ ⊢
+      (lrel_tape).car _ _ -∗ _
     unfold lrel_tape
     iintro H1 H2
     icases H1 with ⟨%α1, %α2, %z1, %he1, %he1', Hinv1⟩

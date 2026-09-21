@@ -283,7 +283,7 @@ theorem flatten_inter_image₃ {ctor : T → T → T → T}
     (fun p : T × T × T => ctor p.1 p.2.1 p.2.2) '' (flatten a ×ˢ flatten b ×ˢ flatten d) ∩
         (fun p : T × T × T => ctor p.1 p.2.1 p.2.2) '' (flatten a' ×ˢ flatten b' ×ˢ flatten d') =
       oₜ.elim ∅ flatten := by
-  rw [← Set.image_inter (f := fun p : T × T × T => ctor p.1 p.2.1 p.2.2) hctor,
+  rw [← Set.image_inter hctor,
     Set.prod_inter_prod, Set.prod_inter_prod, hinner₁, hinner₂, hinner₃, hcomb]
   cases o₁ with
   | none => simp
@@ -313,7 +313,7 @@ theorem flatten_inter_image₄ {ctor : T → T → T → T → T}
         (fun p : T × T × T × T => ctor p.1 p.2.1 p.2.2.1 p.2.2.2) ''
         (flatten a' ×ˢ flatten b' ×ˢ flatten d' ×ˢ flatten e') =
       oₜ.elim ∅ flatten := by
-  rw [← Set.image_inter (f := fun p : T × T × T × T => ctor p.1 p.2.1 p.2.2.1 p.2.2.2) hctor,
+  rw [← Set.image_inter hctor,
     Set.prod_inter_prod, Set.prod_inter_prod, Set.prod_inter_prod,
     hinner₁, hinner₂, hinner₃, hinner₄, hcomb]
   cases o₁ with
@@ -391,7 +391,7 @@ theorem flatten_inter_scrut {D : Type _} {ctor : T → D → T}
     (hcomb : oₜ = o.map (fun r => wrap r (S ∩ S'))) :
     (fun p : T × D => ctor p.1 p.2) '' (flatten c ×ˢ S) ∩
         (fun p : T × D => ctor p.1 p.2) '' (flatten c' ×ˢ S') = oₜ.elim ∅ flatten := by
-  rw [← Set.image_inter (f := fun p : T × D => ctor p.1 p.2) hctor, Set.prod_inter_prod, hinner,
+  rw [← Set.image_inter hctor, Set.prod_inter_prod, hinner,
     hcomb]
   cases o with
   | none => simp
