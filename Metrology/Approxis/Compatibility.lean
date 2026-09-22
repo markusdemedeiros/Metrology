@@ -201,13 +201,12 @@ theorem refines_seq (A : lrel rT GF) {e1 e2 e1' e2' : Exp rT} {B : lrel rT GF}
     (e := .app (.lam e2) v.1) (e' := Exp.open' e2 v.1) (A := B)
     (n := 1) (φ := v.1.isValue ∧ (Exp.lam e2).IsLocallyClosed)
     (Hφ := ⟨⟨hv_iv⟩, by is_lc⟩))
-  simp only [Nat.repeat]
   have hopen : Exp.open' e2 v.1 = e2 := (Exp.open_lc 0 v.1 e2 he2).symm
   have hfill_empty : Ectx.fill [] (Exp.open' e2 v.1) = e2 := by
     show Exp.open' e2 v.1 = e2
     exact hopen
   rw [hfill_empty]
-  iintro !>
+  inext
   have hrhs : Exp.app (.lam e2') v'.1 = Ectx.fill [] (.app (.lam e2') v'.1) := rfl
   rw [hrhs]
   have hv'_iv : IsVal v'.1 := v'.2
@@ -307,8 +306,7 @@ theorem refines_fst {e e' : Exp rT} {A B : lrel rT GF} :
   have hφ2 : a2.1.isValue ∧ b2.1.isValue := ⟨a2.2.toIsValue, b2.2.toIsValue⟩
   iapply (refines_pure_l (e' := a1.1)
     (Hex := pureExec_fst_pair) hφ1)
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   iapply (refines_pure_r (e' := a2.1)
     (Hex := pureExec_fst_pair) hφ2)
   iapply refines_ret (e1 := Ectx.fill [] a1.1) (e2 := Ectx.fill [] a2.1)
@@ -342,8 +340,7 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp rT} {A B C : lrel rT GF} :
     have hf2 : (Exp.case (.inl w2.1) e1' e2') = Ectx.fill [] (Exp.case (.inl w2.1) e1' e2') := rfl
     rw [hf1, hf2]
     iapply (refines_pure_l (Hex := pureExec_case_inl) w1.2.toIsValue)
-    simp only [Nat.repeat]
-    iintro !>
+    inext
     iapply (refines_pure_r (Hex := pureExec_case_inl) w2.2.toIsValue)
     rw [show Ectx.fill [] (Exp.app e1 w1.1) = Exp.app e1 w1.1 from rfl,
         show Ectx.fill [] (Exp.app e1' w2.1) = Exp.app e1' w2.1 from rfl]
@@ -358,8 +355,7 @@ theorem refines_case {e0 e1 e2 e0' e1' e2' : Exp rT} {A B C : lrel rT GF} :
     have hf2 : (Exp.case (.inr w2.1) e1' e2') = Ectx.fill [] (Exp.case (.inr w2.1) e1' e2') := rfl
     rw [hf1, hf2]
     iapply (refines_pure_l (Hex := pureExec_case_inr) w1.2.toIsValue)
-    simp only [Nat.repeat]
-    iintro !>
+    inext
     iapply (refines_pure_r (Hex := pureExec_case_inr) w2.2.toIsValue)
     rw [show Ectx.fill [] (Exp.app e2 w1.1) = Exp.app e2 w1.1 from rfl,
         show Ectx.fill [] (Exp.app e2' w2.1) = Exp.app e2' w2.1 from rfl]
@@ -385,8 +381,7 @@ theorem refines_binop_pure (op : BinOp) (v1 v2 r : Exp rT)
   have hφ : v1.isValue ∧ v2.isValue ∧ op.eval v1 v2 = some r :=
     ⟨hv1.toIsValue, hv2.toIsValue, heval⟩
   iapply (refines_pure_l hφ)
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   iapply (refines_pure_r hφ)
   iapply refines_ret (e1 := Ectx.fill [] r) (e2 := Ectx.fill [] r)
     (v1 := ⟨r, hrv, hrv.lc⟩) (v2 := ⟨r, hrv, hrv.lc⟩) (hv1 := rfl) (hv2 := rfl)
@@ -405,8 +400,7 @@ theorem refines_unop_pure (op : UnOp) (v r : Exp rT)
   rw [hf]
   have hφ : v.isValue ∧ op.eval v = some r := ⟨hv.toIsValue, heval⟩
   iapply (refines_pure_l hφ)
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   iapply (refines_pure_r hφ)
   iapply refines_ret (e1 := Ectx.fill [] r) (e2 := Ectx.fill [] r)
     (v1 := ⟨r, hrv, hrv.lc⟩) (v2 := ⟨r, hrv, hrv.lc⟩) (hv1 := rfl) (hv2 := rfl)
@@ -550,8 +544,7 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
         Ectx.fill [] (Exp.cond pl(#(.bool true)) e1' e2') := rfl
     rw [hf1, hf2]
     iapply (refines_pure_l (Hex := pureExec_cond_true) trivial)
-    simp only [Nat.repeat]
-    iintro !>
+    inext
     iapply (refines_pure_r (Hex := pureExec_cond_true) trivial)
     rw [show Ectx.fill [] e1 = e1 from rfl, show Ectx.fill [] e1' = e1' from rfl]
     iexact IH1
@@ -562,8 +555,7 @@ theorem refines_if {e0 e1 e2 e0' e1' e2' : Exp rT} {A : lrel rT GF} :
         Ectx.fill [] (Exp.cond pl(#(.bool false)) e1' e2') := rfl
     rw [hf1, hf2]
     iapply (refines_pure_l (Hex := pureExec_cond_false) trivial)
-    simp only [Nat.repeat]
-    iintro !>
+    inext
     iapply (refines_pure_r (Hex := pureExec_cond_false) trivial)
     rw [show Ectx.fill [] e2 = e2 from rfl, show Ectx.fill [] e2' = e2' from rfl]
     iexact IH2
@@ -589,8 +581,7 @@ theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
   have hφ2 : a2.1.isValue ∧ b2.1.isValue := ⟨a2.2.toIsValue, b2.2.toIsValue⟩
   iapply (refines_pure_l (e' := b1.1)
     (Hex := pureExec_snd_pair) hφ1)
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   iapply (refines_pure_r (e' := b2.1)
     (Hex := pureExec_snd_pair) hφ2)
   iapply refines_ret (e1 := Ectx.fill [] b1.1) (e2 := Ectx.fill [] b2.1)
@@ -676,11 +667,10 @@ theorem refines_forall {e e' : Exp rT} {C : lrel rT GF → lrel rT GF}
     (e := .app (.lam e) u.1) (e' := Exp.open' e u.1) (A := C A)
     (n := 1) (φ := u.1.isValue ∧ (Exp.lam e).IsLocallyClosed)
     (Hφ := ⟨⟨hu_iv⟩, by is_lc⟩))
-  simp only [Nat.repeat]
   have hopenL : Exp.open' e u.1 = e := (Exp.open_lc 0 u.1 e he).symm
   have hfillL : Ectx.fill [] (Exp.open' e u.1) = e := hopenL
   rw [hfillL]
-  iintro !>
+  inext
   have hfR : Exp.app (.lam e') u'.1 = Ectx.fill [] (Exp.app (.lam e') u'.1) := rfl
   rw [hfR]
   have hu'_iv : IsVal u'.1 := u'.2

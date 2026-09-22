@@ -18,7 +18,7 @@ syntax "rel_pure_l" : tactic
 macro_rules
   | `(tactic| rel_pure_l) =>
     `(tactic| (iapply (refines_pure_l (K := []) (Hφ := by trivial));
-               simp only [Nat.repeat]; iintro !>))
+               inext))
 
 syntax "rel_pure_r" : tactic
 macro_rules

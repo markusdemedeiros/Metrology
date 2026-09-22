@@ -65,24 +65,21 @@ theorem otp_refines (m : rT)
   -- β-reduce the `let`.
   iapply (refines_pure_l
     (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   show ⊢@{IProp GF} refines ⊤
     (Kfrac.fill pl(#(.real m) + #(.real r)))
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
   -- Evaluate the addition.
   iapply (refines_pure_l
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   show ⊢@{IProp GF} refines ⊤
     (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m r)))))
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
   -- Evaluate `frac`.
   iapply (refines_pure_l
     ⟨IsVal.lit.toIsValue, rfl⟩)
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   show ⊢@{IProp GF} refines ⊤
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))))
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real

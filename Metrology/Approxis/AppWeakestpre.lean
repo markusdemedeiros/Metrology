@@ -2611,17 +2611,15 @@ countability-free. -/
 theorem wp_pure_step_later' {E : CoPset} {e₁ e₂ : Exp rT} {φ : Prop} {n : Nat}
     {Φ : Val rT → IProp GF}
     [Hex : PureExec φ n e₁ e₂] (Hφ : φ) :
-    Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (wp E e₂ Φ) ⊢@{IProp GF}
-      wp E e₁ Φ := by
+    iprop(▷^[n] wp E e₂ Φ) ⊢@{IProp GF} wp E e₁ Φ := by
   refine BI.Entails.trans ?_ (wp_pure_step_fupd' (E := E) (E' := E)
     (e₁ := e₁) (e₂ := e₂) (n := n) (Hex := Hex) Hφ)
   induction n with
   | zero =>
-    simp only [Nat.repeat]
     exact BI.BIBase.Entails.rfl
   | succ n ih =>
-    simp only [Nat.repeat]
     refine (BI.later_mono ih).trans ?_
+    simp only [Nat.repeat]
     iintro H
     imodintro; iintro !>; imodintro; iexact H
 

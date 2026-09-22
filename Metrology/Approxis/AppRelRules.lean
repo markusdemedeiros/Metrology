@@ -25,95 +25,53 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ## Forward reductions on the LHS -/
 
--- TODO: delete me
-theorem nat_repeat_later_eq_laterN (n : Nat) (P : IProp GF) :
-    Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n P = iprop(▷^[n] P) := by
-  induction n with
-  | zero => rfl
-  | succ m ih => simp only [Nat.repeat]; rw [ih]; rfl
-
-/-- `refines_pure_l` (app_rel_rules.v:27): if `e` pure-steps to `e'` in `n` steps,
-`▷^n (REL K[e'] << t : A) ⊢ REL K[e] << t : A`. -/
+/-- If `e` pure-steps to `e'` in `n` steps, `▷^n (REL K[e'] << t : A) ⊢ REL K[e] << t : A`. -/
 theorem refines_pure_l {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
     {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
-    Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n (refines E (K.fill e') t A)
-      ⊢@{IProp GF} refines E (K.fill e) t A := by
+    iprop(▷^[n] refines E (K.fill e') t A) ⊢@{IProp GF} refines E (K.fill e) t A := by
   have HexK : PureExec φ n (K.fill e) (K.fill e') := PureExec.fill K
   unfold refines
-  iintro H
-  iintro %K' %ε HK Hna Herr Hpos
+  iintro H %K' %ε HK Hna Herr Hpos
   iapply (ApproxisWpGS.wp_pure_step_later' (Hex := HexK) Hφ)
-  ihave H0 : iprop(▷^[n] (∀ (K₂ : Ectx rT) (ε₂ : ENNReal),
-      (⤇ K₂.fill t) -∗ (naOwnP E) -∗ (↯ ε₂) -∗ (⌜(0 : ENNReal) < ε₂⌝) -∗
-      wp ⊤ (K.fill e') (fun v => iprop(∃ v' ε',
-        (⤇ K₂.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v')))) $$ [H]
-  · rw [← nat_repeat_later_eq_laterN]; iexact H
-  rw [nat_repeat_later_eq_laterN]
-  ihave H1 := (BI.laterN_forall n).mp $$ H0
-  ispecialize H1 $$ %K'
-  ihave H2 := (BI.laterN_forall n).mp $$ H1
-  ispecialize H2 $$ %ε
-  ihave H3 := BI.laterN_wand n $$ H2
-  ihave HKLater : iprop(▷^[n] (⤇ K'.fill t)) $$ [HK]
-  · iapply BI.laterN_intro n; iexact HK
-  ispecialize H3 $$ HKLater
-  ihave H4 := BI.laterN_wand n $$ H3
-  ihave HnaLater : iprop(▷^[n] naOwnP E) $$ [Hna]
-  · iapply BI.laterN_intro n; iexact Hna
-  ispecialize H4 $$ HnaLater
-  ihave H5 := BI.laterN_wand n $$ H4
-  ihave HerrLater : iprop(▷^[n] (↯ ε)) $$ [Herr]
-  · iapply BI.laterN_intro n; iexact Herr
-  ispecialize H5 $$ HerrLater
-  ihave H6 := BI.laterN_wand n $$ H5
-  ihave HposLater : iprop(▷^[n] ⌜(0 : ENNReal) < ε⌝) $$ [Hpos]
-  · iapply BI.laterN_intro n; iexact Hpos
-  iapply H6 $$ HposLater
+  inext
+  iapply H $$ HK Hna Herr Hpos
 
 /-- `refines_pure_r` (app_rel_rules.v:73): RHS pure step. -/
 theorem refines_pure_r {E : CoPset} {K : Ectx rT} {e e' t : Exp rT} {A : lrel rT GF}
     {φ : Prop} {n : ℕ} [Hex : PureExec φ n e e'] (Hφ : φ) :
     refines E t (K.fill e') A ⊢@{IProp GF} refines E t (K.fill e) A := by
   unfold refines
-  iintro H
-  iintro %K' %ε Hj Hna Herr Hpos
-  have hfc : K'.fill (K.fill e) = (K'.comp K).fill e := Ectx.fill_comp K' K e
-  have hfc' : K'.fill (K.fill e') = (K'.comp K).fill e' := Ectx.fill_comp K' K e'
-  rw [hfc]
-  ihave HStep := step_pure (K'.comp K) (Hex := Hex) Hφ $$ Hj
+  iintro H %K' %ε Hj Hna Herr Hpos
+  rw [Ectx.fill_comp]
   iapply specUpdate_wp
-  iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
+  iapply specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl
+  ihave HStep := step_pure (K'.comp K) (Hex := Hex) Hφ $$ Hj
   iframe HStep
   iintro HK'
-  ihave HK'' : iprop(⤇ K'.fill (K.fill e')) $$ [HK']
-  · rw [hfc']; iexact HK'
   iapply specUpdate_ret
-  iapply H $$ %K' %ε HK'' Hna Herr Hpos
+  iapply H $$ %K' %ε [HK'] Hna Herr Hpos
+  rw [Ectx.fill_comp K' K e']
+  iexact HK'
 
 /-- `refines_step_r` (app_rel_rules.v): single-step RHS spec helper. The user
 provides, for any outer context `K''`, a `specUpdate` from `⤇ K''.fill e₂` to
 `∃ v, ⤇ K''.fill v ∗ refines E e₁ (K'.fill v) A`. -/
-theorem refines_step_r {E : CoPset} {K' : Ectx rT} {e1 e2 : Exp rT} {A : lrel rT GF} :
-    iprop(∀ (K : Ectx rT), (⤇ K.fill e2) -∗
-            specUpdate rT ⊤ (∃ (v : Val rT), iprop((⤇ K.fill v.1) ∗
-              refines E e1 (K'.fill v.1) A)))
+theorem refines_step_r {E : CoPset} {K' : Ectx rT} {e1 e2 : Exp rT} {A : lrel rT GF} : iprop%
+    (∀ (K : Ectx rT), (⤇ K.fill e2) -∗
+      specUpdate rT ⊤ (∃ (v : Val rT), iprop((⤇ K.fill v.1) ∗ refines E e1 (K'.fill v.1) A)))
       ⊢@{IProp GF} refines E e1 (K'.fill e2) A := by
-  iintro He
   unfold refines
-  iintro %K'' %ε Hj Hna Herr Hpos
-  have hfc : K''.fill (K'.fill e2) = (K''.comp K').fill e2 := Ectx.fill_comp K'' K' e2
-  ihave Hj' : iprop(⤇ (K''.comp K').fill e2) $$ [Hj]
-  · rw [← hfc]; iexact Hj
-  ihave HStep := He $$ %(K''.comp K') Hj'
+  iintro He %K'' %ε Hj Hna Herr Hpos
   iapply specUpdate_wp
-  iapply (specUpdate_bind (E1 := ⊤) (E2 := ⊤) Std.LawfulSet.subset_refl)
+  iapply specUpdate_bind Std.LawfulSet.subset_refl
+  ihave HStep := He $$ %(K''.comp K') [Hj]
+  · rw [← Ectx.fill_comp K'' K' e2]; iexact Hj
   iframe HStep
   iintro ⟨%v, HK'', Hrefines⟩
-  have hfcv : K''.fill (K'.fill v.1) = (K''.comp K').fill v.1 := Ectx.fill_comp K'' K' v.1
-  ihave HK''' : iprop(⤇ K''.fill (K'.fill v.1)) $$ [HK'']
-  · rw [hfcv]; iexact HK''
   iapply specUpdate_ret
-  iapply Hrefines $$ %K'' %ε HK''' Hna Herr Hpos
+  iapply Hrefines $$ %K'' %ε [HK''] Hna Herr Hpos
+  rw [Ectx.fill_comp K'' K' v.1]
+  iexact HK''
 
 /-- `refines_steps_r` (app_rel_rules.v): variant of `refines_step_r` where the
 RHS reduct `e₂'` is known. Useful when the value isn't fresh. -/

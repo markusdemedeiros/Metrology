@@ -80,20 +80,17 @@ theorem otp_refines (m N : Int) (HN : 0 < N) :
     (Ectx.fill ([] : Ectx rT) pl({otpLam m N} #(.int n)))
     pl(#(.int (addMod m N n))) lrel_int
   iapply refines_pure_l (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   show ⊢@{IProp GF} refines ⊤
     (Kmod.fill pl(#(.int m) + #(.int n)))
     pl(#(.int (addMod m N n))) lrel_int
   iapply refines_pure_l (Hex := pureExec_binop) ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   show ⊢@{IProp GF} refines ⊤
     (Ectx.fill ([] : Ectx rT) pl(#(.int (m + n)) % #(.int N)))
     pl(#(.int (addMod m N n))) lrel_int
   iapply refines_pure_l (Hex := pureExec_binop) ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
-  simp only [Nat.repeat]
-  iintro !>
+  inext
   rw [show (m + n) % N = addMod m N n by unfold addMod; ring_nf]
   show ⊢@{IProp GF}
     refines ⊤ pl(#(.int (addMod m N n))) pl(#(.int (addMod m N n))) lrel_int
