@@ -367,12 +367,11 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (B : ℝ) (hB0 
     · iapply (ErrorCredit.weaken hle); iexact Hcy
   · have hlt' : y < x := of_decide_eq_true hb
     twp_pure
-    ihave Hcy' : iprop(↯ (RealDecrTrialCreditV F (N + 1) y + (k : ℝ≥0∞) * ε_term)) $$ [Hcy]
-    · have heq : RealDecrTrialCreditV F (N + 1) y + (k : ℝ≥0∞) * ε_term
-          = RealDecrTrialCreditAmp F N x ((k : ℝ≥0∞) * ε_term) y := by
-        unfold RealDecrTrialCreditAmp RealDecrTrialCredit
-        rw [if_pos hlt'.le, if_neg (not_le.mpr hlt'), if_pos hlt', add_zero]
-      rw [heq]; iexact Hcy
+    have heq : RealDecrTrialCreditV F (N + 1) y + (k : ℝ≥0∞) * ε_term
+        = RealDecrTrialCreditAmp F N x ((k : ℝ≥0∞) * ε_term) y := by
+      unfold RealDecrTrialCreditAmp RealDecrTrialCredit
+      rw [if_pos hlt'.le, if_neg (not_le.mpr hlt'), if_pos hlt', add_zero]
+    ihave Hcy' := ErrorCredit.ext heq.symm $$ Hcy
     ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split $$ Hcy'
     twp_pure
     rw [← Nat.cast_add_one]
@@ -411,11 +410,10 @@ theorem twp_DecrTrial (E : CoPset) (F : ℕ → ℝ≥0∞) (N : ℕ) (x : ℝ) 
     · iapply (ErrorCredit.weaken hle); iexact Hcy
   · have hlt' : y < x := of_decide_eq_true hb
     twp_pure
-    ihave Hcy' : iprop(↯ (RealDecrTrialCreditV F (N + 1) y)) $$ [Hcy]
-    · have heq : RealDecrTrialCreditV F (N + 1) y = RealDecrTrialCredit F N x y := by
-        unfold RealDecrTrialCredit
-        rw [if_pos hlt'.le, if_neg (not_le.mpr hlt'), add_zero]
-      rw [heq]; iexact Hcy
+    have heq : RealDecrTrialCreditV F (N + 1) y = RealDecrTrialCredit F N x y := by
+      unfold RealDecrTrialCredit
+      rw [if_pos hlt'.le, if_neg (not_le.mpr hlt'), add_zero]
+    ihave Hcy' := ErrorCredit.ext heq.symm $$ Hcy
     have hy1 : y < 1 := lt_of_lt_of_le hlt' Hx.2
     twp_pure
     rw [← Nat.cast_add_one]

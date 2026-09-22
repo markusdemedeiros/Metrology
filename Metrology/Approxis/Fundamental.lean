@@ -1858,7 +1858,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
   | @wildcard τ =>
     -- tryMatch wildcard v = some v.1; bindings = v.1 (which is a Val).
     iintro Hvv
-    iapply BI.or_intro_l
+    ileft
     iexists v, v'
     isplitr
     · ipureintro
@@ -1871,7 +1871,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     ihave ⟨%n, %h⟩ := lrel_int_unfold v v' $$ Hv
     by_cases hzn : z = n
     · -- Match succeeds: tryMatch pl(#(.int z)) pl(#(.int n)) = some pl(#(.unit)) when z = n.
-      iapply BI.or_intro_l
+      ileft
       iexists (.unit : Val _), (.unit : Val _)
       isplitr
       · ipureintro
@@ -1885,7 +1885,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       ipureintro
       exact ⟨rfl, rfl⟩
     · -- Match fails: z ≠ n so the BaseLit beq is false.
-      iapply BI.or_intro_r
+      iright
       ipureintro
       have hbeq : ¬ ((BaseLit.int z : BaseLit rT) == BaseLit.int n) = true := by
         show ¬ (Int.decEq z n).decide = true
@@ -1899,7 +1899,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     iintro Hv
     ihave ⟨%b', %h⟩ := lrel_bool_unfold v v' $$ Hv
     by_cases hbb : b = b'
-    · iapply BI.or_intro_l
+    · ileft
       iexists (.unit : Val _), (.unit : Val _)
       isplitr
       · ipureintro
@@ -1911,7 +1911,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       unfold lrel_unit
       ipureintro
       exact ⟨rfl, rfl⟩
-    · iapply BI.or_intro_r
+    · iright
       ipureintro
       have hbeq : ¬ ((BaseLit.bool b : BaseLit rT) == BaseLit.bool b') = true := by
         show ¬ (Bool.decEq b b').decide = true
@@ -1923,7 +1923,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     rw [interp_unit]
     show iprop(⌜v.1 = pl(#(.unit)) ∧ v'.1 = pl(#(.unit))⌝) ⊢ _
     iintro %h
-    iapply BI.or_intro_l
+    ileft
     iexists (.unit : Val _), (.unit : Val _)
     isplitr
     · ipureintro
@@ -1954,7 +1954,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     icases Hresa with (⟨%ba, %ba', %hra, HBa⟩ | %hna)
     · icases Hresb with (⟨%bb, %bb', %hrb, HBb⟩ | %hnb)
       · -- Both succeed: bindings are .pair ba bb / .pair ba' bb'.
-        iapply BI.or_intro_l
+        ileft
         iexists ⟨.pair ba.1 bb.1, IsVal.pair ba.2 bb.2, (IsVal.pair ba.2 bb.2).lc⟩,
                 ⟨.pair ba'.1 bb'.1, IsVal.pair ba'.2 bb'.2, (IsVal.pair ba'.2 bb'.2).lc⟩
         isplitr
@@ -1971,11 +1971,11 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
         iframe HBa
         iexact HBb
       · -- p1 succeeds but p2 fails. Combined match fails.
-        iapply BI.or_intro_r
+        iright
         ipureintro
         simp [Pat.tryMatch, hv1, hv2, hra.1, hra.2, hnb.1, hnb.2]
     · -- p1 fails. Combined match fails (regardless of p2).
-      iapply BI.or_intro_r
+      iright
       ipureintro
       simp [Pat.tryMatch, hv1, hv2, hna.1, hna.2]
   | @inl τ1 τ2 p b Hpat' ih =>
@@ -1987,17 +1987,17 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     icases Hcase with (⟨%hv1, %hv2, HA⟩ | ⟨%hv1, %hv2, HB⟩)
     · -- v1 = inl w1, v2 = inl w2: tryMatch (.inl p) (.inl wi) = tryMatch p wi.
       icases ih w1 w2 $$ HA with (⟨%bb, %bb', %hr, Hbnd⟩ | %hn)
-      · iapply BI.or_intro_l
+      · ileft
         iexists bb, bb'
         isplitr
         · ipureintro
           simp [Pat.tryMatch, hv1, hv2, hr.1, hr.2]
         iexact Hbnd
-      · iapply BI.or_intro_r
+      · iright
         ipureintro
         simp [Pat.tryMatch, hv1, hv2, hn.1, hn.2]
     · -- v1 = inr w1, v2 = inr w2: tryMatch (.inl p) (.inr w) = none.
-      iapply BI.or_intro_r
+      iright
       ipureintro
       simp [Pat.tryMatch, hv1, hv2]
   | @inr τ1 τ2 p b Hpat' ih =>
@@ -2007,18 +2007,18 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
     iintro Hv
     ihave ⟨%w1, %w2, Hcase⟩ := lrel_sum_unfold (interp τ1 Δ) (interp τ2 Δ) v v' $$ Hv
     icases Hcase with (⟨%hv1, %hv2, HA⟩ | ⟨%hv1, %hv2, HB⟩)
-    · iapply BI.or_intro_r
+    · iright
       ipureintro
       simp [Pat.tryMatch, hv1, hv2]
     · ihave Hres := ih w1 w2 $$ HB
       icases Hres with (⟨%bb, %bb', %hr, Hbnd⟩ | %hn)
-      · iapply BI.or_intro_l
+      · ileft
         iexists bb, bb'
         isplitr
         · ipureintro
           simp [Pat.tryMatch, hv1, hv2, hr.1, hr.2]
         iexact Hbnd
-      · iapply BI.or_intro_r
+      · iright
         ipureintro
         simp [Pat.tryMatch, hv1, hv2, hn.1, hn.2]
 
@@ -2066,7 +2066,7 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     rw [hsum]
     unfold lrel_sum
     iexists bb, bb'
-    iapply BI.or_intro_l
+    ileft
     isplitr; · ipureintro; rfl
     isplitr; · ipureintro; rfl
     iexact Hbnd
@@ -2089,7 +2089,7 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     rw [hsum]
     unfold lrel_sum
     iexists (.unit : Val _), (.unit : Val _)
-    iapply BI.or_intro_r
+    iright
     isplitr; · ipureintro; rfl
     isplitr; · ipureintro; rfl
     unfold lrel_unit

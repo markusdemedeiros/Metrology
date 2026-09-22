@@ -72,18 +72,54 @@ instance specNatTape_timeless [MeasurableSingletonClass rT] [ISpec : SpecGS rT G
   unfold specNatTape
   infer_instance
 
-/-- Strip `▷` from a Timeless hypothesis when the continuation is in `fupd`
-position. Mirrors Rocq's `iMod ">Hα"` automation. -/
-theorem later_timeless_fupd {PROP : Type _} [BI PROP] [BIUpdate PROP] [BIFUpdate PROP]
-    {P : PROP} [BI.Timeless P] {E₁ E₂ : CoPset} {Q : PROP} :
-    (iprop(▷ P) ∗ (P -∗ |={E₁, E₂}=> Q)) ⊢ (iprop(|={E₁, E₂}=> Q) : PROP) := by
-  refine BIBase.Entails.trans ?_ IsExcept0.is_except0
-  refine BI.sep_mono_left BI.Timeless.timeless |>.trans ?_
-  refine BIBase.Entails.trans ?_ (BI.except0_mono (BI.wand_elim_right (P := P) (Q := iprop(|={E₁,E₂}=> Q))))
-  refine BIBase.Entails.trans ?_ BI.except0_sep.2
-  exact BI.sep_mono_right BI.except0_intro
-
 end TimelessTapes
+
+/-! ## Fold/unfold bridges for the user-level tape predicates
+
+`appNatTape`/`specNatTape` are `def`s, so `icases`/`iexists` do not see through them.
+These bridges name the one defeq step, in the style of `lrel_arr_unfold`
+(`Approxis/Compatibility.lean`) and `refines_unfold` (`Approxis/Model.lean`). -/
+
+section NatTapeBridges
+open scoped AppGS
+
+variable {GF : BundledGFunctors}
+
+/-- Unfold `appNatTape` to its existential form, so `icases` can destruct it. -/
+theorem appNatTape_unfold [AppGS rT GF] (l : Loc) (z : Int) (ns : List Int) :
+    appNatTape l z ns ⊢@{IProp GF}
+      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+        (⌜fs.map (fun x => x.val) = ns⌝) ∗ l ↪ₐ ⟨z, fs⟩) :=
+  BI.BIBase.Entails.rfl
+
+/-- Fold a backend app tape back into `appNatTape`. -/
+theorem appNatTape_fold [AppGS rT GF] {l : Loc} {z : Int} {ns : List Int}
+    {fs : List { z' : Int // 0 ≤ z' ∧ z' < z }} (hfs : fs.map (fun x => x.val) = ns) :
+    (l ↪ₐ ⟨z, fs⟩) ⊢@{IProp GF} appNatTape l z ns := by
+  iintro Hb
+  iunfold appNatTape
+  iexists fs
+  iframe %hfs
+  iexact Hb
+
+/-- Unfold `specNatTape` to its existential form, so `icases` can destruct it. -/
+theorem specNatTape_unfold [SpecGS rT GF] (l : Loc) (z : Int) (ns : List Int) :
+    specNatTape l z ns ⊢@{IProp GF}
+      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
+        (⌜fs.map (fun x => x.val) = ns⌝) ∗ l ↪ₛ ⟨z, fs⟩) :=
+  BI.BIBase.Entails.rfl
+
+/-- Fold a backend spec tape back into `specNatTape`. -/
+theorem specNatTape_fold [SpecGS rT GF] {l : Loc} {z : Int} {ns : List Int}
+    {fs : List { z' : Int // 0 ≤ z' ∧ z' < z }} (hfs : fs.map (fun x => x.val) = ns) :
+    (l ↪ₛ ⟨z, fs⟩) ⊢@{IProp GF} specNatTape l z ns := by
+  iintro Hb
+  iunfold specNatTape
+  iexists fs
+  iframe %hfs
+  iexact Hb
+
+end NatTapeBridges
 
 /-! ## Core probability fact: uniform coupling under bijection -/
 
@@ -545,22 +581,10 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
-  iapply (later_timeless_fupd (P := appNatTape α M xs))
-  iframe Hα
-  iintro Hα
-  iapply (later_timeless_fupd (P := specNatTape α' M ys))
-  iframe Hα'
-  iintro Hα'
-  ihave HαEx := show appNatTape α M xs ⊢@{IProp GF}
-      ∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
-        (⌜fs.map (fun x => x.val) = xs⌝) ∗ α ↪ₐ ⟨M, fs⟩ from
-    BI.BIBase.Entails.rfl $$ Hα
-  icases HαEx with ⟨%fs, %hmap_fs, Hα_b⟩
-  ihave Hα'Ex := show specNatTape α' M ys ⊢@{IProp GF}
-      ∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
-        (⌜fs.map (fun x => x.val) = ys⌝) ∗ α' ↪ₛ ⟨M, fs⟩ from
-    BI.BIBase.Entails.rfl $$ Hα'
-  icases Hα'Ex with ⟨%fs', %hmap_fs', Hα'_b⟩
+  imod Hα
+  imod Hα'
+  icases appNatTape_unfold α M xs $$ Hα with ⟨%fs, %hmap_fs, Hα_b⟩
+  icases specNatTape_unfold α' M ys $$ Hα' with ⟨%fs', %hmap_fs', Hα'_b⟩
   ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
   subst Heq
   ihave %Hlk_α := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hα_b
@@ -626,20 +650,8 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
   iframe Hs'
   iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
-  ihave HαNat := show (α ↪ₐ ⟨M, fs⟩) ⊢@{IProp GF} appNatTape α M xs by
-    iintro Hb
-    unfold appNatTape
-    iexists fs
-    iframe %hmap_fs
-    iexact Hb
-  ihave HαNat' := HαNat $$ Hα_b
-  ihave Hα'Nat := show (α' ↪ₛ ⟨M, fs'⟩) ⊢@{IProp GF} specNatTape α' M ys by
-    iintro Hb
-    unfold specNatTape
-    iexists fs'
-    iframe %hmap_fs'
-    iexact Hb
-  ihave Hα'Nat' := Hα'Nat $$ Hα'_b
+  ihave HαNat' := appNatTape_fold hmap_fs $$ Hα_b
+  ihave Hα'Nat' := specNatTape_fold hmap_fs' $$ Hα'_b
   iapply Hcnt
   iframe HαNat'
   iframe Hα'Nat'
@@ -663,22 +675,10 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
-  iapply (later_timeless_fupd (P := appNatTape α z []))
-  iframe Hα
-  iintro Hα
-  iapply (later_timeless_fupd (P := specNatTape α' z []))
-  iframe Hα'
-  iintro Hα'
-  ihave HαEx := show appNatTape α z [] ⊢@{IProp GF}
-      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
-        (⌜fs.map (fun x => x.val) = []⌝) ∗ α ↪ₐ ⟨z, fs⟩) from
-    BI.BIBase.Entails.rfl $$ Hα
-  icases HαEx with ⟨%fs, %hmap_fs, Hα_b⟩
-  ihave Hα'Ex := show specNatTape α' z [] ⊢@{IProp GF}
-      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
-        (⌜fs.map (fun x => x.val) = []⌝) ∗ α' ↪ₛ ⟨z, fs⟩) from
-    BI.BIBase.Entails.rfl $$ Hα'
-  icases Hα'Ex with ⟨%fs', %hmap_fs', Hα'_b⟩
+  imod Hα
+  imod Hα'
+  icases appNatTape_unfold α z [] $$ Hα with ⟨%fs, %hmap_fs, Hα_b⟩
+  icases specNatTape_unfold α' z [] $$ Hα' with ⟨%fs', %hmap_fs', Hα'_b⟩
   have hfs_nil : fs = [] := List.map_eq_nil_iff.mp hmap_fs
   have hfs'_nil : fs' = [] := List.map_eq_nil_iff.mp hmap_fs'
   subst hfs_nil; subst hfs'_nil
@@ -747,20 +747,8 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   iframe Hs'
   iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
-  ihave HαNat := show (α ↪ₐ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} appNatTape α z [] by
-    iintro Hb
-    unfold appNatTape
-    iexists ([] : List _)
-    isplitr; · ipureintro; simp
-    iexact Hb
-  ihave HαNat' := HαNat $$ Hα_b
-  ihave Hα'Nat := show (α' ↪ₛ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} specNatTape α' z [] by
-    iintro Hb
-    unfold specNatTape
-    iexists ([] : List _)
-    isplitr; · ipureintro; simp
-    iexact Hb
-  ihave Hα'Nat' := Hα'Nat $$ Hα'_b
+  ihave HαNat' := appNatTape_fold hmap_fs $$ Hα_b
+  ihave Hα'Nat' := specNatTape_fold hmap_fs' $$ Hα'_b
   iapply Hcnt
   iframe HαNat'
   iframe Hα'Nat'
@@ -785,14 +773,8 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
-  iapply (later_timeless_fupd (P := appNatTape α z []))
-  iframe Hα
-  iintro Hα
-  ihave HαEx := show appNatTape α z [] ⊢@{IProp GF}
-      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
-        (⌜fs.map (fun x => x.val) = []⌝) ∗ α ↪ₐ ⟨z, fs⟩) from
-    BI.BIBase.Entails.rfl $$ Hα
-  icases HαEx with ⟨%fs, %hmap_fs, Hα_b⟩
+  imod Hα
+  icases appNatTape_unfold α z [] $$ Hα with ⟨%fs, %hmap_fs, Hα_b⟩
   have hfs_nil : fs = [] := List.map_eq_nil_iff.mp hmap_fs
   subst hfs_nil
   ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
@@ -858,13 +840,7 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
   iframe Hs'
   iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
-  ihave HαNat := show (α ↪ₐ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} appNatTape α z [] by
-    iintro Hb
-    unfold appNatTape
-    iexists ([] : List _)
-    isplitr; · ipureintro; simp
-    iexact Hb
-  ihave HαNat' := HαNat $$ Hα_b
+  ihave HαNat' := appNatTape_fold hmap_fs $$ Hα_b
   iapply Hcnt
   iframe HαNat'
   iframe Hj'
@@ -887,14 +863,8 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
-  iapply (later_timeless_fupd (P := specNatTape α' z []))
-  iframe Hα'
-  iintro Hα'
-  ihave Hα'Ex := show specNatTape α' z [] ⊢@{IProp GF}
-      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
-        (⌜fs.map (fun x => x.val) = []⌝) ∗ α' ↪ₛ ⟨z, fs⟩) from
-    BI.BIBase.Entails.rfl $$ Hα'
-  icases Hα'Ex with ⟨%fs', %hmap_fs', Hα'_b⟩
+  imod Hα'
+  icases specNatTape_unfold α' z [] $$ Hα' with ⟨%fs', %hmap_fs', Hα'_b⟩
   have hfs'_nil : fs' = [] := List.map_eq_nil_iff.mp hmap_fs'
   subst hfs'_nil
   ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
@@ -960,13 +930,7 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
   iframe Hs'
   iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
-  ihave Hα'Nat := show (α' ↪ₛ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} specNatTape α' z [] by
-    iintro Hb
-    unfold specNatTape
-    iexists ([] : List _)
-    isplitr; · ipureintro; simp
-    iexact Hb
-  ihave Hα'Nat' := Hα'Nat $$ Hα'_b
+  ihave Hα'Nat' := specNatTape_fold hmap_fs' $$ Hα'_b
   iapply Hcnt
   iframe Hα'Nat'
   iframe Hj'

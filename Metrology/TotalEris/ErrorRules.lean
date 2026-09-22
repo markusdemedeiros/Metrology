@@ -153,19 +153,20 @@ theorem twp_glm_spend {E : CoPset} {e₁ : Exp rT} {ε₁ : ENNReal}
   iapply glm'_prim_step
   iexists (R σ₁), 0, (fun ρ : Cfg rT => (ε_now - ε₁) + f ρ), ((ε_now - ε₁) + 1)
   -- (1) reducible  (2) measurable reach set  (3) per-outcome credit bounded
-  isplitr; · ipureintro; exact Hred σ₁
-  isplitr; · ipureintro; exact hRmeas σ₁
-  isplitr; · ipureintro; exact fun ρ => add_le_add_right (Hbd ρ) _
+  specialize Hred σ₁
+  specialize hRmeas σ₁
+  have hbnd : ∀ ρ : Cfg rT, (ε_now - ε₁) + f ρ ≤ (ε_now - ε₁) + 1 :=
+    fun ρ => add_le_add_right (Hbd ρ) _
   -- (4) integral budget: `(ε_now - ε₁)·μ(univ) + ∫ f ≤ (ε_now - ε₁) + ε₁ = ε_now`.
-  isplitr
-  · ipureintro
+  have hexp : 0 + ∫⁻ ρ, ((ε_now - ε₁) + f ρ) ∂(primStep ⟨e₁, σ₁⟩) ≤ ε_now := by
     rw [zero_add, MeasureTheory.lintegral_add_left measurable_const,
         MeasureTheory.lintegral_const]
     calc (ε_now - ε₁) * (primStep ⟨e₁, σ₁⟩) Set.univ + ∫⁻ ρ, f ρ ∂primStep ⟨e₁, σ₁⟩
         ≤ (ε_now - ε₁) * 1 + ε₁ := by gcongr; exacts [primStep_univ_le_one _, HInt σ₁]
       _ = ε_now := by rw [mul_one]; exact tsub_add_cancel_of_le hLe
   -- (5) the `Pgl 0` certificate.
-  isplitr; · ipureintro; exact hPgl σ₁
+  specialize hPgl σ₁
+  iframe %Hred %hRmeas %hbnd %hexp %hPgl
   -- (6) per-outcome continuation: refund the spent supply, then either stutter or continue.
   iintro %ρ %HRρ
   ihave Hsupp1 : iprop(|==> ErisWpGS.errInterp (rT := rT) (ε_now - ε₁)) $$ [Hε_now Herr]
@@ -263,10 +264,10 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
   have hfe : f (⟨pl(#(.int n)), σ₁⟩ : Cfg rT) = ε₂ n.toNat := by
     simp only [hf]; exact dif_pos ⟨Hn₁, Hn₂⟩
   iapply (ErisWpGS.tglWp_value_of_toVal rfl)
+  have hn : 0 ≤ n ∧ n < z := ⟨Hn₁, Hn₂⟩
   iapply Hcont $$ %n
-  isplitr
-  · ipureintro; exact ⟨Hn₁, Hn₂⟩
-  rw [← hfe]; iexact Hcr
+  iframe %hn
+  iapply (ErrorCredit.ext hfe) $$ Hcr
 
 theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     {ε₂ : rT → ENNReal} {Φ : Val rT → IProp GF}
@@ -341,7 +342,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
   iapply (ErisWpGS.tglWp_value_of_toVal rfl)
   iapply Hcont $$ %r
   iframe %hrsupp
-  rw [← hfe]; iexact Hcr
+  iapply (ErrorCredit.ext hfe) $$ Hcr
 
 /-- Bound-free `urand` error rule: applies `twp_urand_exp` with the clamped credit
 `F r := min (ε₂ r) 1`. Clamping only shrinks the integral, so `HInt` still holds;

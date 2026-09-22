@@ -637,27 +637,15 @@ theorem interp_ref_funct {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
       intro p hp
       rw [CoPset.in_diff]
       exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-    imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+    iinv Hinv1 with HP1
+    iinv Hinv2 with HP2
     ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · ihave HP1a := later_exists.mpr $$ HP1
-      icases HP1a with ⟨%wa1, HP1b⟩
-      ihave HP1c := later_exists.mpr $$ HP1b
-      icases HP1c with ⟨%ws1, HP1d⟩
-      ihave HP1e := later_sep.mp $$ HP1d
-      icases HP1e with ⟨Hl1L, _⟩
-      ihave HP2a := later_exists.mpr $$ HP2
-      icases HP2a with ⟨%wa2, HP2b⟩
-      ihave HP2c := later_exists.mpr $$ HP2b
-      icases HP2c with ⟨%ws2, HP2d⟩
-      ihave HP2e := later_sep.mp $$ HP2d
-      icases HP2e with ⟨Hl2L, _⟩
+    · icases HP1 with ⟨%wa1, %ws1, Hl1L, -⟩
+      icases HP2 with ⟨%wa2, %ws2, Hl2L, -⟩
       inext
       iapply appHeapFrag_valid_2 $$ Hl1L Hl2L
-    iapply IsExcept0.is_except0
-    unfold BIBase.except0
-    iapply BI.or_intro_l
-    iexact HbotLater
+    imod HbotLater with %h
+    exact h.elim
 
 /-- Reference type is injective on the program-side location: if both `#l1`
 and `#l2` are related to `#l` at `ref A`, then `l1 = l2`. -/
@@ -690,31 +678,15 @@ theorem interp_ref_inj {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
       intro p hp
       rw [CoPset.in_diff]
       exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-    imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+    iinv Hinv1 with HP1
+    iinv Hinv2 with HP2
     ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · ihave HP1a := later_exists.mpr $$ HP1
-      icases HP1a with ⟨%wa1, HP1b⟩
-      ihave HP1c := later_exists.mpr $$ HP1b
-      icases HP1c with ⟨%ws1, HP1d⟩
-      ihave HP1e := later_sep.mp $$ HP1d
-      icases HP1e with ⟨_, HP1f⟩
-      ihave HP1g := later_sep.mp $$ HP1f
-      icases HP1g with ⟨Hs1L, _⟩
-      ihave HP2a := later_exists.mpr $$ HP2
-      icases HP2a with ⟨%wa2, HP2b⟩
-      ihave HP2c := later_exists.mpr $$ HP2b
-      icases HP2c with ⟨%ws2, HP2d⟩
-      ihave HP2e := later_sep.mp $$ HP2d
-      icases HP2e with ⟨_, HP2f⟩
-      ihave HP2g := later_sep.mp $$ HP2f
-      icases HP2g with ⟨Hs2L, _⟩
+    · icases HP1 with ⟨%wa1, %ws1, -, Hs1L, -⟩
+      icases HP2 with ⟨%wa2, %ws2, -, Hs2L, -⟩
       inext
       iapply specHeapFrag_valid_2 $$ Hs1L Hs2L
-    iapply IsExcept0.is_except0
-    unfold BIBase.except0
-    iapply BI.or_intro_l
-    iexact HbotLater
+    imod HbotLater with %h
+    exact h.elim
 
 /-- Tape type is functional in the program-side location. -/
 theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
@@ -744,19 +716,15 @@ theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
       intro p hp
       rw [CoPset.in_diff]
       exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-    imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+    iinv Hinv1 with HP1
+    iinv Hinv2 with HP2
     ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · ihave HP1e := later_sep.mp $$ HP1
-      icases HP1e with ⟨Hl1L, _⟩
-      ihave HP2e := later_sep.mp $$ HP2
-      icases HP2e with ⟨Hl2L, _⟩
+    · icases HP1 with ⟨Hl1L, -⟩
+      icases HP2 with ⟨Hl2L, -⟩
       inext
       iapply appTapesFrag_valid_2 $$ Hl1L Hl2L
-    iapply IsExcept0.is_except0
-    unfold BIBase.except0
-    iapply BI.or_intro_l
-    iexact HbotLater
+    imod HbotLater with %h
+    exact h.elim
 
 /-- Tape type is injective on the program-side location. -/
 theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
@@ -788,19 +756,15 @@ theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
       intro p hp
       rw [CoPset.in_diff]
       exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-    imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+    iinv Hinv1 with HP1
+    iinv Hinv2 with HP2
     ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · ihave HP1e := later_sep.mp $$ HP1
-      icases HP1e with ⟨_, Hs1L⟩
-      ihave HP2e := later_sep.mp $$ HP2
-      icases HP2e with ⟨_, Hs2L⟩
+    · icases HP1 with ⟨-, Hs1L⟩
+      icases HP2 with ⟨-, Hs2L⟩
       inext
       iapply specTapesFrag_valid_2 $$ Hs1L Hs2L
-    iapply IsExcept0.is_except0
-    unfold BIBase.except0
-    iapply BI.or_intro_l
-    iexact HbotLater
+    imod HbotLater with %h
+    exact h.elim
 
 end SemtypesProperties
 
@@ -989,9 +953,7 @@ theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp 
   imod Iris.NonAtomicInvariant.inv_acc (F := E) (E := ⊤)
     ((fun _ _ => CoPset.mem_full) : (↑N : CoPset) ⊆ ⊤) HNE $$ Hinv Hnais
     with ⟨HP, Hnais', Hclose⟩
-  ihave HPc : iprop((▷ P) ∗ naCloseP (rT := rT) (hlc := hlc) P N E) $$ [HP Hclose]
-  · isplitl [HP]; · iassumption
-    iassumption
+  ihave HPc : iprop((▷ P) ∗ naCloseP (rT := rT) (hlc := hlc) P N E) $$ [$HP $Hclose]
   ihave IH' := IH $$ HPc
   imodintro
   iapply IH' $$ %K %ε Hj Hnais' Herr Hpos
@@ -1003,9 +965,7 @@ theorem refines_na_close {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Ex
   unfold refines
   iintro ⟨HP, Hclose, IH⟩
   iintro %K %ε Hj HownFN Herr Hpos
-  ihave Hpair : iprop((▷ P) ∗ naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) $$ [HP HownFN]
-  · isplitl [HP]; · iassumption
-    iassumption
+  ihave Hpair : iprop((▷ P) ∗ naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) $$ [$HP $HownFN]
   ihave HownF := Hclose $$ Hpair
   iapply ApproxisWpGS.fupd_wp
   imod HownF with HownF'

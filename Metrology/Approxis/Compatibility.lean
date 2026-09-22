@@ -117,7 +117,7 @@ theorem refines_injl {e e' : Exp rT} {A B : lrel rT GF} :
   imodintro
   unfold lrel_sum
   iexists v, v'
-  iapply BI.or_intro_l
+  ileft
   isplitr; · ipureintro; rfl
   isplitr; · ipureintro; rfl
   iexact HA
@@ -141,7 +141,7 @@ theorem refines_injr {e e' : Exp rT} {A B : lrel rT GF} :
   imodintro
   unfold lrel_sum
   iexists v, v'
-  iapply BI.or_intro_r
+  iright
   isplitr; · ipureintro; rfl
   isplitr; · ipureintro; rfl
   iexact HB
@@ -748,21 +748,11 @@ theorem refines_store {e1 e2 e1' e2' : Exp rT} {A : lrel rT GF} :
     (t := Exp.store pl(#(.loc l')) w'.1)
     (A := lrel_unit) (OpenInv.of_atomic (Atomic.store' l w)))
   iintro %K' Hr
-  have hsub : (↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
-    fun _ _ => CoPset.mem_full
-  imod Iris.inv_acc hsub $$ Hinv with ⟨HInvBody, Hclose⟩
-  icases later_exists.mpr $$ HInvBody with ⟨%v1, HInvBody2⟩
-  icases later_exists.mpr $$ HInvBody2 with ⟨%v2, HInvBody4⟩
-  icases later_sep.mp $$ HInvBody4 with ⟨Hv1L, HInvBody6⟩
-  icases later_sep.mp $$ HInvBody6 with ⟨Hv2L, _HwAL⟩
-  imod Hv1L with Hv1
-  imod Hv2L with Hv2
+  iinv Hinv with ⟨%v1, %v2, >Hv1, >Hv2, -⟩ Hclose
   imodintro
   ihave HStep := step_store
     (E := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc))) K' (l := l') (v_old := v2) (v_new := w')
-    (hv := w'.2) (hnew := Exp.toVal?_ofVal w') $$ [Hr Hv2]
-  · isplitl [Hr]; · iexact Hr
-    iexact Hv2
+    (hv := w'.2) (hnew := Exp.toVal?_ofVal w') $$ [$Hr $Hv2]
   iapply specUpdate_wp
   iapply (specUpdate_bind (E1 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)))
     (E2 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc))) Std.LawfulSet.subset_refl)
@@ -826,20 +816,9 @@ theorem refines_load {e e' : Exp rT} {A : lrel rT GF} :
     (t := (pl(!#(.loc l')) : Exp rT))
     (A := A) (OpenInv.of_atomic (Atomic.load' l)))
   iintro %K' Hr
-  have hsub : (↑(logN.@ ((l, l') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
-    fun _ _ => CoPset.mem_full
-  imod Iris.inv_acc hsub $$ Hinv with ⟨HInvBody, Hclose⟩
-  icases later_exists.mpr $$ HInvBody with ⟨%w1, HInvBody2⟩
-  icases later_exists.mpr $$ HInvBody2 with ⟨%w2, HInvBody4⟩
-  icases later_sep.mp $$ HInvBody4 with ⟨Hw1L, HInvBody6⟩
-  icases later_sep.mp $$ HInvBody6 with ⟨Hw2L, #HwAL⟩
-  imod Hw1L with Hw1
-  imod Hw2L with Hw2
+  iinv Hinv with ⟨%w1, %w2, >Hw1, >Hw2, #HwAL⟩ Hclose
   imodintro
-  ihave HStep := step_load K'
-    $$ [Hr Hw2]
-  · isplitl [Hr]; · iexact Hr
-    iexact Hw2
+  ihave HStep := step_load K' $$ [$Hr $Hw2]
   iapply specUpdate_wp
   iapply (specUpdate_bind (E1 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc)))
     (E2 := ⊤ \ ↑(logN.@ ((l, l') : Loc × Loc))) Std.LawfulSet.subset_refl)
@@ -928,12 +907,7 @@ theorem refines_rand_tape {e1 e1' e2 e2' : Exp rT} :
     (t := (Exp.rand (pl(#(.int (M : Int)))) pl(#(.lbl α')) : Exp rT))
     (A := lrel_nat) (OpenInv.of_atomic (Atomic.rand_lbl' (M : Int) α)))
   iintro %K' Hr
-  have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
-    fun _ _ => CoPset.mem_full
-  imod Iris.inv_acc hsub $$ Hinv with ⟨HInvBody, Hclose⟩
-  icases later_sep.mp $$ HInvBody with ⟨HαL, Hα'L⟩
-  imod HαL with Hα
-  imod Hα'L with Hα'
+  iinv Hinv with ⟨>Hα, >Hα'⟩ Hclose
   imodintro
   ihave HαN := app_empty_to_natTape (z := N) $$ Hα
   ihave Hα'N := spec_empty_to_natTape (z := N) $$ Hα'
@@ -1107,12 +1081,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       (t := (pl(rand(#(.int n), #(.lbl α'))) : Exp rT))
       (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl' n α)))
     iintro %K' Hr
-    have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
-      fun _ _ => CoPset.mem_full
-    imod Iris.inv_acc hsub $$ Hinv with ⟨HInvBody, Hclose⟩
-    icases later_sep.mp $$ HInvBody with ⟨HαL, Hα'L⟩
-    imod HαL with Hα
-    imod Hα'L with Hα'
+    iinv Hinv with ⟨>Hα, >Hα'⟩ Hclose
     imodintro
     ihave HαN := app_empty_to_natTape $$ Hα
     ihave Hα'N := spec_empty_to_natTape $$ Hα'
@@ -1192,12 +1161,7 @@ theorem refines_rand_tape_int {e1 e1' e2 e2' : Exp rT} :
       (t := (pl(rand(#(.int n), #(.lbl α'))) : Exp rT))
       (A := lrel_int) (OpenInv.of_atomic (Atomic.rand_lbl' n α)))
     iintro %K' Hr
-    have hsub : (↑(logN.@ ((α, α') : Loc × Loc)) : CoPset) ⊆ (⊤ : CoPset) :=
-      fun _ _ => CoPset.mem_full
-    imod Iris.inv_acc hsub $$ Hinv with ⟨HInvBody, Hclose⟩
-    icases later_sep.mp $$ HInvBody with ⟨HαL, Hα'L⟩
-    imod HαL with Hα
-    imod Hα'L with Hα'
+    iinv Hinv with ⟨>Hα, >Hα'⟩ Hclose
     imodintro
     iapply (wp_rand_lbl_nonpos_r K' hnpos)
     iframe Hr

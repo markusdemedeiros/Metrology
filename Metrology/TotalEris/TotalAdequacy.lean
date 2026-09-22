@@ -406,23 +406,17 @@ theorem twp_step_fupd_tgl [ErisGS rT .hasNoLC GF]
   · iapply (tglWp_ind (E := ⊤) (Q := Q)
       (Φ := fun v => iprop(⌜φ v⌝)))
     · iintro !> %e' HPre %σ' %ε' ⟨Hσ', Hε'⟩
-      ihave HBody := HPre $$ %σ' %ε' [$Hσ' $Hε']
       cases htv : e'.toVal? with
       | some v =>
-        ihave HBody' : iprop(|={⊤}=> stateInterp σ' ∗ errInterp (rT := rT) ε' ∗ ⌜φ v⌝) $$ [HBody]
-        · iexact HBody
-        imod HBody' with ⟨_, _, %hφv⟩
+        obtain rfl : e' = Exp.ofVal v := (Exp.ofVal_of_toVal_some htv).symm
+        isimp only [tglWpPre_eq_value] at HPre
+        imod HPre $$ %σ' %ε' [$Hσ' $Hε'] with ⟨_, _, %hφv⟩
         imod (BIFUpdate.subset (E1 := ⊤) (E2 := ∅) Std.LawfulSet.empty_subset) with _
         imodintro; ipureintro
-        have heq : e' = Exp.ofVal v := (Exp.ofVal_of_toVal_some htv).symm
-        subst heq
         exact Tgl.mono_grading zero_le (Tgl.of_limExec_val hφv)
       | none =>
-        ihave HBody' : iprop(|={⊤,∅}=> glm' e' σ' ε'
-            (fun ρ ε₂ => iprop(|={∅,⊤}=>
-              stateInterp ρ.state ∗ errInterp (rT := rT) ε₂ ∗ Q ρ.expr))) $$ [HBody]
-        · iexact HBody
-        imod HBody' with HG
+        isimp only [tglWpPre_eq_step htv] at HPre
+        imod HPre $$ %σ' %ε' [$Hσ' $Hε'] with HG
         ihave HG' : iprop(glm' e' σ' ε'
             (fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝))) $$ [HG]
         · iapply (glm'_strong_mono (Z₁ := fun ρ ε₂ => iprop(|={∅,⊤}=>

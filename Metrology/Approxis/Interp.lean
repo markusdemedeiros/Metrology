@@ -284,59 +284,39 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
       · subst h_l1_r1
         have hN_disj : logN.@ ((l1, l2) : Loc × Loc) ## logN.@ ((l1, r2) : Loc × Loc) :=
           ndot_ne_disjoint _ (fun heq => h_l2_r2 (by injection heq))
-        have h1 : (↑(logN.@ ((l1, l2) : Loc × Loc)) : CoPset) ⊆ ⊤ :=
-          fun _ _ => CoPset.mem_full
         have h2' : (↑(logN.@ ((l1, r2) : Loc × Loc)) : CoPset) ⊆
                    ⊤ \ (↑(logN.@ ((l1, l2) : Loc × Loc)) : CoPset) := by
           intro p hp
           rw [CoPset.in_diff]
           exact ⟨CoPset.mem_full, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-        imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-        imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+        iinv Hinv1 with HP1
+        iinv Hinv2 with HP2
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-        · ihave HP1a := later_exists.mpr $$ HP1
-          icases HP1a with ⟨%wa1, HP1b⟩
-          icases later_exists.mpr $$ HP1b with ⟨%ws1, HP1d⟩
-          icases later_sep.mp $$ HP1d with ⟨Hl1L, _⟩
-          icases later_exists.mpr $$ HP2 with ⟨%wa2, HP2b⟩
-          icases later_exists.mpr $$ HP2b with ⟨%ws2, HP2d⟩
-          icases later_sep.mp $$ HP2d with ⟨Hl2L, _⟩
+        · icases HP1 with ⟨%wa1, %ws1, Hl1L, -⟩
+          icases HP2 with ⟨%wa2, %ws2, Hl2L, -⟩
           inext
           iapply appHeapFrag_valid_2 $$ Hl1L Hl2L
-        iapply IsExcept0.is_except0
-        unfold BIBase.except0
-        iapply BI.or_intro_l
-        iexact HbotLater
+        imod HbotLater with %h
+        exact h.elim
     · by_cases h_l2_r2 : l2 = r2
       · -- l1 ≠ r1 but l2 = r2: derive False from two specHeapFrag at r2.
         subst h_l2_r2
         have hN_disj : logN.@ ((l1, l2) : Loc × Loc) ## logN.@ ((r1, l2) : Loc × Loc) :=
           ndot_ne_disjoint _ (fun heq => h_l1_r1 (by injection heq))
-        have h1 : (↑(logN.@ ((l1, l2) : Loc × Loc)) : CoPset) ⊆ ⊤ :=
-          fun _ _ => CoPset.mem_full
         have h2' : (↑(logN.@ ((r1, l2) : Loc × Loc)) : CoPset) ⊆
                    ⊤ \ (↑(logN.@ ((l1, l2) : Loc × Loc)) : CoPset) := by
           intro p hp
           rw [CoPset.in_diff]
           exact ⟨CoPset.mem_full, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-        imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-        imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+        iinv Hinv1 with HP1
+        iinv Hinv2 with HP2
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-        · ihave HP1a := later_exists.mpr $$ HP1
-          icases HP1a with ⟨%wa1, HP1b⟩
-          icases later_exists.mpr $$ HP1b with ⟨%ws1, HP1d⟩
-          icases later_sep.mp $$ HP1d with ⟨_, HP1f⟩
-          icases later_sep.mp $$ HP1f with ⟨Hs1L, _⟩
-          icases later_exists.mpr $$ HP2 with ⟨%wa2, HP2b⟩
-          icases later_exists.mpr $$ HP2b with ⟨%ws2, HP2d⟩
-          icases later_sep.mp $$ HP2d with ⟨_, HP2f⟩
-          icases later_sep.mp $$ HP2f with ⟨Hs2L, _⟩
+        · icases HP1 with ⟨%wa1, %ws1, -, Hs1L, -⟩
+          icases HP2 with ⟨%wa2, %ws2, -, Hs2L, -⟩
           inext
           iapply specHeapFrag_valid_2 $$ Hs1L Hs2L
-        iapply IsExcept0.is_except0
-        unfold BIBase.except0
-        iapply BI.or_intro_l
-        iexact HbotLater
+        imod HbotLater with %h
+        exact h.elim
       · -- l1 ≠ r1 and l2 ≠ r2: both `v = w` inequalities hold.
         imodintro
         ipureintro
@@ -366,48 +346,38 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
       · subst h_α1_β1
         have hN_disj : logN.@ ((α1, α2) : Loc × Loc) ## logN.@ ((α1, β2) : Loc × Loc) :=
           ndot_ne_disjoint _ (fun heq => h_α2_β2 (by injection heq))
-        have h1 : (↑(logN.@ ((α1, α2) : Loc × Loc)) : CoPset) ⊆ ⊤ :=
-          fun _ _ => CoPset.mem_full
         have h2' : (↑(logN.@ ((α1, β2) : Loc × Loc)) : CoPset) ⊆
                    ⊤ \ (↑(logN.@ ((α1, α2) : Loc × Loc)) : CoPset) := by
           intro p hp
           rw [CoPset.in_diff]
           exact ⟨CoPset.mem_full, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-        imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-        imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+        iinv Hinv1 with HP1
+        iinv Hinv2 with HP2
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-        · ihave HP1e := later_sep.mp $$ HP1
-          icases HP1e with ⟨Ha1L, _⟩
-          icases later_sep.mp $$ HP2 with ⟨Ha2L, _⟩
+        · icases HP1 with ⟨Ha1L, -⟩
+          icases HP2 with ⟨Ha2L, -⟩
           inext
           iapply appTapesFrag_valid_2 $$ Ha1L Ha2L
-        iapply IsExcept0.is_except0
-        unfold BIBase.except0
-        iapply BI.or_intro_l
-        iexact HbotLater
+        imod HbotLater with %h
+        exact h.elim
     · by_cases h_α2_β2 : α2 = β2
       · subst h_α2_β2
         have hN_disj : logN.@ ((α1, α2) : Loc × Loc) ## logN.@ ((β1, α2) : Loc × Loc) :=
           ndot_ne_disjoint _ (fun heq => h_α1_β1 (by injection heq))
-        have h1 : (↑(logN.@ ((α1, α2) : Loc × Loc)) : CoPset) ⊆ ⊤ :=
-          fun _ _ => CoPset.mem_full
         have h2' : (↑(logN.@ ((β1, α2) : Loc × Loc)) : CoPset) ⊆
                    ⊤ \ (↑(logN.@ ((α1, α2) : Loc × Loc)) : CoPset) := by
           intro p hp
           rw [CoPset.in_diff]
           exact ⟨CoPset.mem_full, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-        imod Iris.inv_acc h1 $$ Hinv1 with ⟨HP1, _⟩
-        imod Iris.inv_acc h2' $$ Hinv2 with ⟨HP2, _⟩
+        iinv Hinv1 with HP1
+        iinv Hinv2 with HP2
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-        · ihave HP1e := later_sep.mp $$ HP1
-          icases HP1e with ⟨_, Hs1L⟩
-          icases later_sep.mp $$ HP2 with ⟨_, Hs2L⟩
+        · icases HP1 with ⟨-, Hs1L⟩
+          icases HP2 with ⟨-, Hs2L⟩
           inext
           iapply specTapesFrag_valid_2 $$ Hs1L Hs2L
-        iapply IsExcept0.is_except0
-        unfold BIBase.except0
-        iapply BI.or_intro_l
-        iexact HbotLater
+        imod HbotLater with %h
+        exact h.elim
       · imodintro
         ipureintro
         refine ⟨fun h => ?_, fun h => ?_⟩

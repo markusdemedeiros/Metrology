@@ -25,9 +25,8 @@ theorem twp_lift_step_fupd_glm {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : E
     ⊢ tglWp E e₁ Φ := by
   iintro HG
   iapply tglWp_unfold
-  unfold tglWpPre
+  isimp only [tglWpPre_eq_step hv]
   iintro %σ %ε ⟨Hσ, Hε⟩
-  isimp only [hv]
   iapply HG $$ %σ %ε [$Hσ $Hε]
 
 theorem twp_lift_step_fupd_gen {E : CoPset} {Φ : Val rT → IProp GF} {e₁ : Exp rT}

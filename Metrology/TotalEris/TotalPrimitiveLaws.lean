@@ -45,7 +45,7 @@ theorem twp_alloc {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hl hσ
     imod app_state_heap_alloc v $$ Hσ with ⟨Hσ', Hl⟩
     imodintro
-    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
+    isimp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
     iframe Hσ'
     iapply HΦ $$ %σ₁.heap.fresh Hl
 
@@ -64,7 +64,7 @@ theorem twp_load {E : CoPset} {l : Loc} {v : Val rT} {Φ : Val rT → IProp GF} 
   | LoadS hlook' hofv =>
     rw [hlook] at hlook'; cases hlook'; subst hofv
     imodintro
-    simp only [erisWpGS_stateInterp_eq, Exp.toVal?_ofVal]
+    isimp only [erisWpGS_stateInterp_eq, Exp.toVal?_ofVal]
     iframe Hσ
     iapply HΦ $$ Hl
 
@@ -86,7 +86,7 @@ theorem twp_store {E : CoPset} {l : Loc} {v v' : Val rT} {Φ : Val rT → IProp 
     rw [Exp.toVal?_ofVal] at hvd; cases hvd; subst hσ
     imod app_state_update_heap $$ Hσ Hl with ⟨Hσ', Hl'⟩
     imodintro
-    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
+    isimp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
     iframe Hσ'
     iapply HΦ $$ Hl'
 
@@ -108,7 +108,7 @@ theorem twp_alloctape {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} :
     subst hl hσ
     imod app_state_tape_alloc (Tape.empty z) $$ Hσ with ⟨Hσ', Hl⟩
     imodintro
-    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
+    isimp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
     iframe Hσ'
     iapply HΦ $$ %σ₁.tapes.fresh Hl
 
@@ -127,7 +127,7 @@ theorem twp_rand {E : CoPset} {z : Int} {Φ : Val rT → IProp GF} (Hz : 0 < z) 
   cases Possible.headStepSupport Hstep with
   | RandNoTapeS _ Hv0 Hvz =>
     imodintro
-    simp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
+    isimp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
     iframe Hσ
     iapply HΦ
     ipureintro; exact ⟨Hv0, Hvz⟩
@@ -154,7 +154,7 @@ theorem twp_rand_tape {E : CoPset} {l : Loc} {z : Int} {n : { z' : Int // 0 ≤ 
     subst hσ hv
     imod app_state_update_tape $$ Hσ Hl with ⟨Hσ', Hl'⟩
     imodintro
-    simp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
+    isimp only [erisWpGS_stateInterp_eq, ExtTreeMap.insert_eq_PartialMap_insert, Exp.toVal?_lit]
     iframe Hσ'
     iapply HΦ $$ Hl'
   | RandTapeEmptyS _ hlook' _ _ _ _ => rw [hlook] at hlook'; cases hlook'
@@ -181,7 +181,7 @@ theorem twp_rand_tape_empty {E : CoPset} {l : Loc} {z : Int}
   | RandTapeEmptyS _ _ _ Hv0 Hvz hσ =>
     subst hσ
     imodintro
-    simp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
+    isimp only [erisWpGS_stateInterp_eq, Exp.toVal?_lit]
     iframe Hσ
     iapply HΦ $$ Hl
     ipureintro; exact ⟨Hv0, Hvz⟩

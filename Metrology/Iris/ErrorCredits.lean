@@ -143,8 +143,7 @@ theorem zero : ⊢@{IProp GF} |==> ↯0 := iOwn_unit
 theorem supply_bound {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗ ⌜ε ≤ εₛ⌝ := by
   unfold ec ecAuth
   iintro Hs Hε
-  ihave Hv := iOwn_cmraValid_op $$ [Hs Hε]
-  · isplitl [Hs] <;> first | iexact Hs | iexact Hε
+  icombine Hs Hε gives Hv
   ihave %hv := internalCmraValid_discrete $$ Hv
   ipureintro
   obtain ⟨hinc, _⟩ := Auth.auth_both_valid.mp hv
@@ -154,8 +153,7 @@ theorem supply_decrease {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗
   iintro Hs Hε
   ihave %Hle := supply_bound $$ Hs Hε
   unfold ec ecAuth
-  ihave Hc := iOwn_op |>.mpr $$ [Hs Hε]
-  · isplitl [Hs] <;> first | iexact Hs | iexact Hε
+  ihave Hc := iOwn_op |>.mpr $$ [$Hs $Hε]
   refine iOwn_update <| Auth.auth_update_dealloc ?_
   simp only [UCMRA.unit]
   refine localUpdate (zero_le) ?_
@@ -253,8 +251,7 @@ theorem simple {ε : ℝ≥0∞} {k : ℝ≥0} {P : IProp GF} (hε : 0 < ε) (hk
     iapply Hamp
     isplitr [Hε₂] <;> try · iexact Hε₂
     iintro Hε
-    ihave Hε₃ := combine $$ [Hε₁ Hε]
-    · isplitl [Hε₁] <;> iassumption
+    icombine Hε₁ Hε as Hε₃
     iapply IH $$ %ε'' %(Hhle.trans le_self_add) %Hn'
     iapply ext Hε''eq $$ Hε₃
 

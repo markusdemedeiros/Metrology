@@ -304,7 +304,6 @@ theorem glm'_mono_pred {e : Exp rT} {σ : State rT} {ε : ENNReal}
     iprop((□ (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε')) ∗ glm' e σ ε Z₁) ⊢
       glm' e σ ε Z₂ := by
   iintro ⟨#HZ, HG⟩
-  unfold glm'
   iapply (least_fixpoint_strong_mono (glmPre' Z₁) (glmPre' Z₂)) $$ [] HG
   iintro !> %Φ %s HF
   obtain ⟨ρ, ε⟩ := s
@@ -401,7 +400,6 @@ theorem glm'_prim_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
     {Z : Cfg rT → ENNReal → IProp GF} :
     glmPrimStep' e σ ε Z ⊢ glm' e σ ε Z := by
   iintro HPS
-  unfold glm'
   iapply least_fixpoint_unfold_mpr (glmPre' Z)
   iright; ileft
   iexact HPS
@@ -411,7 +409,6 @@ theorem glm'_erasable_step {e : Exp rT} {σ : State rT} {ε : ENNReal}
     glmErasable' e σ ε (fun s => glm' s.1.expr s.1.state s.2 Z) ⊢
       glm' e σ ε Z := by
   iintro HES
-  unfold glm'
   iapply least_fixpoint_unfold_mpr (glmPre' Z)
   iright; iright
   iexact HES
@@ -422,7 +419,6 @@ theorem glm'_credit_bump {e : Exp rT} {σ : State rT} {ε : ENNReal}
     glmCreditBump' ⟨e, σ⟩ ε (fun s => glm' s.1.expr s.1.state s.2 Z) ⊢
       glm' e σ ε Z := by
   iintro HOT
-  unfold glm'
   iapply least_fixpoint_unfold_mpr (glmPre' Z)
   ileft
   iexact HOT

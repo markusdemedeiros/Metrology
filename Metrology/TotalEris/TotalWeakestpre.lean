@@ -115,9 +115,8 @@ theorem tglWp_value_fupd {E : CoPset} {v : Val rT} {Φ : Val rT → IProp GF} :
     iprop(|={E}=> Φ v) ⊢ tglWp E (Exp.ofVal v) Φ := by
   iintro HΦ
   iapply tglWp_unfold
-  unfold tglWpPre
+  isimp only [tglWpPre_eq_value]
   iintro %σ %ε ⟨Hσ, Hε⟩
-  rw [Exp.toVal?_ofVal]
   imod HΦ
   imodintro
   iframe

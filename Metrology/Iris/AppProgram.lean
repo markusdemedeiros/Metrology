@@ -111,8 +111,7 @@ theorem app_state_lookup_heap {σ : State rT} {l : Loc} {v : Val rT} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↦ v -∗ ⌜σ.heap[l]? = some v⌝ := by
   unfold appStateAuth appHeapAuth appHeapFrag
   iintro ⟨Hh, -⟩ Hf
-  ihave Hv := iOwn_cmraValid_op $$ [Hh Hf]
-  · isplitl [Hh] <;> iassumption
+  icombine Hh Hf gives Hv
   ihave %hv := internalCmraValid_discrete $$ Hv
   ipureintro
   obtain ⟨v', _, _, Hlookup, _, Hinc⟩ := HeapView.auth_op_frag_valid_total_discrete_iff hv
@@ -144,9 +143,8 @@ theorem app_state_update_heap {σ : State rT} {l : Loc} {v w : Val rT} :
           (PartialMap.insert (LocHeap.asAgree σ.heap) l (toAgree w)) •
         HeapView.Frag l (.own 1) (toAgree w) :=
     HeapView.update_replace Hval_toAgree
-  ihave Hu := iOwn_update_op (E := IApp.heap) $$ [Hh Hf]
+  ihave Hu := iOwn_update_op (E := IApp.heap) $$ [$Hh $Hf]
   · exact Hupd
-  · isplitl [Hh] <;> iassumption
   imod Hu
   imodintro
   ihave ⟨Hh, Hf⟩ := iOwn_op $$ Hu
@@ -187,8 +185,7 @@ theorem app_state_lookup_tape {σ : State rT} {l : Loc} {t : Tape} :
     ⊢@{IProp GF} appStateAuth σ -∗ l ↪ₐ t -∗ ⌜σ.tapes[l]? = some t⌝ := by
   unfold appStateAuth appTapesAuth appTapesFrag
   iintro ⟨-, Ht⟩ Hf
-  ihave Hv := iOwn_cmraValid_op $$ [Ht Hf]
-  · isplitl [Ht] <;> iassumption
+  icombine Ht Hf gives Hv
   ihave %hv := internalCmraValid_discrete $$ Hv
   ipureintro
   obtain ⟨v', _, _, Hlookup, _, Hinc⟩ := HeapView.auth_op_frag_valid_total_discrete_iff hv
@@ -220,9 +217,8 @@ theorem app_state_update_tape {σ : State rT} {l : Loc} {t s : Tape} :
           (PartialMap.insert (LocHeap.asAgree σ.tapes) l (toAgree s)) •
         HeapView.Frag l (.own 1) (toAgree s) :=
     HeapView.update_replace Hval_toAgree
-  ihave Hu := iOwn_update_op (E := IApp.tapes) $$ [Ht Hf]
+  ihave Hu := iOwn_update_op (E := IApp.tapes) $$ [$Ht $Hf]
   · exact Hupd
-  · isplitl [Ht] <;> iassumption
   imod Hu
   imodintro
   ihave ⟨Ht, Hf⟩ := iOwn_op $$ Hu
@@ -381,8 +377,7 @@ theorem appHeapFrag_valid_2 {l : Loc} {v1 v2 : Val rT} :
     ⊢@{IProp GF} appHeapFrag l v1 -∗ appHeapFrag l v2 -∗ False := by
   iintro H1 H2
   unfold appHeapFrag
-  ihave Hv := iOwn_cmraValid_op $$ [H1 H2]
-  · isplitl [H1] <;> iassumption
+  icombine H1 H2 gives Hv
   ihave %hv := internalCmraValid_discrete $$ Hv
   exfalso
   rw [HeapView.frag_op_valid_iff] at hv
@@ -397,8 +392,7 @@ theorem appTapesFrag_valid_2 {l : Loc} {t1 t2 : Tape} :
     ⊢@{IProp GF} appTapesFrag l t1 -∗ appTapesFrag l t2 -∗ False := by
   iintro H1 H2
   unfold appTapesFrag
-  ihave Hv := iOwn_cmraValid_op $$ [H1 H2]
-  · isplitl [H1] <;> iassumption
+  icombine H1 H2 gives Hv
   ihave %hv := internalCmraValid_discrete $$ Hv
   exfalso
   rw [HeapView.frag_op_valid_iff] at hv

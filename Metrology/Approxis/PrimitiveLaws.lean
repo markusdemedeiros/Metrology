@@ -321,11 +321,8 @@ theorem wp_rand_tape_wrong_bound {E : CoPset} {l : Loc} {z M : Int}
           Φ (.int n : Val rT)))
       ⊢@{IProp GF} wp E (pl(rand(#(.int z), #(.lbl l)))) Φ := by
   iintro ⟨Hl, HΦ⟩
-  ihave HlEx := show appNatTape l M ns ⊢@{IProp GF}
-      ∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
-        (⌜fs.map (fun x => x.val) = ns⌝) ∗ l ↪ₐ ⟨M, fs⟩ from
-    BI.BIBase.Entails.rfl $$ Hl
-  icases HlEx with ⟨%fs, %hmap, HlBack⟩
+  iunfold appNatTape at Hl
+  icases Hl with ⟨%fs, %hmap, HlBack⟩
   have Hv : (pl(rand(#(.int z), #(.lbl l))) : Exp rT).toVal? = none :=
     Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
   iapply (wp_lift_atomic_head_step Hv)
@@ -351,13 +348,11 @@ theorem wp_rand_tape_wrong_bound {E : CoPset} {l : Loc} {z M : Int}
     imodintro
     simp only [approxisWpGS_stateInterp_eq, Exp.toVal?_lit]
     iframe Hσ
-    ihave HlNat := show (l ↪ₐ ⟨M, fs⟩) ⊢@{IProp GF} appNatTape l M ns by
-      iintro Hb
-      unfold appNatTape
+    ihave HlNat' : iprop(appNatTape l M ns) $$ [HlBack]
+    · iunfold appNatTape
       iexists fs
       iframe %hmap
-      iexact Hb
-    ihave HlNat' := HlNat $$ HlBack
+      iexact HlBack
     iapply HΦ $$ HlNat'
     ipureintro; exact ⟨Hv0, Hvz⟩
 
@@ -638,10 +633,8 @@ theorem wp_alloc_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {e : Exp rT}
       ⊢@{IProp GF} wp E e Φ := by
   iintro ⟨Hj, Hwp⟩
   imod step_alloctape K z $$ Hj with ⟨%l, Hj', Hl⟩
-  ihave Hl' := show (l ↪ₛ Tape.empty z) ⊢@{IProp GF}
-      (l ↪ₛ ⟨z, ([] : List { z' : Int // 0 ≤ z' ∧ z' < z })⟩) from
-    BI.BIBase.Entails.rfl $$ Hl
-  ihave HlNat := spec_empty_to_natTape $$ Hl'
+  isimp only [Tape.empty] at Hl
+  ihave HlNat := spec_empty_to_natTape $$ Hl
   iapply Hwp $$ %l Hj' HlNat
 
 theorem wp_rand_tape_r {E : CoPset} (K : Ectx rT) {z : Int} {l : Loc}
@@ -714,12 +707,7 @@ theorem wp_rand_empty_r {E : CoPset} (K : Ectx rT) {z : Int} {l : Loc}
     iframe Hs'
     iframe Hε
     ihave HαNat := spec_empty_to_natTape $$ Hαb
-    ihave HwpArg := show
-        (specNatTape l z [] ∗ ⤇ K.fill pl(#(.int _))) ⊢@{IProp GF}
-        (specNatTape l z [] ∗ ⤇ K.fill pl(#(.int _))) from
-      BI.BIBase.Entails.rfl $$ [HαNat Hj']
-    · isplitl [HαNat] <;> iassumption
-    iapply Hwp $$ HwpArg
+    iapply Hwp $$ [$HαNat $Hj']
     ipureintro; exact ⟨Hv0, Hvz⟩
   | RandTapeOtherS _ Hlk' hne _ _ _ =>
     rw [Hlk] at Hlk'; cases Hlk'; exact absurd rfl hne
@@ -735,11 +723,8 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : Ectx rT) {z M : Int} {l : Loc}
           (⌜0 ≤ n ∧ n < z⌝) -∗ wp E e Φ))
       ⊢@{IProp GF} wp E e Φ := by
   iintro ⟨Hj, Hα, Hwp⟩
-  ihave HαEx := show specNatTape l M ns ⊢@{IProp GF}
-      ∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
-        (⌜fs.map (fun x => x.val) = ns⌝) ∗ l ↪ₛ ⟨M, fs⟩ from
-    BI.BIBase.Entails.rfl $$ Hα
-  icases HαEx with ⟨%fs, %hmap, Hαb⟩
+  iunfold specNatTape at Hα
+  icases Hα with ⟨%fs, %hmap, Hαb⟩
   iapply wp_lift_step_spec_couple
   iintro %σ₁ %e₁' %σ₁' %ε₁ ⟨Hσ, Hs, Hε⟩
   ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
@@ -787,19 +772,12 @@ theorem wp_rand_wrong_tape_r {E : CoPset} (K : Ectx rT) {z M : Int} {l : Loc}
     iframe Hσ
     iframe Hs'
     iframe Hε
-    ihave HαNat := show (l ↪ₛ ⟨M, fs⟩) ⊢@{IProp GF} specNatTape l M ns by
-      iintro Hb
-      unfold specNatTape
+    ihave HαNat' : iprop(specNatTape l M ns) $$ [Hαb]
+    · iunfold specNatTape
       iexists fs
       iframe %hmap
-      iexact Hb
-    ihave HαNat' := HαNat $$ Hαb
-    ihave HwpArg := show
-        (specNatTape l M ns ∗ ⤇ K.fill pl(#(.int _))) ⊢@{IProp GF}
-        (specNatTape l M ns ∗ ⤇ K.fill pl(#(.int _))) from
-      BI.BIBase.Entails.rfl $$ [HαNat' Hj']
-    · isplitl [HαNat'] <;> iassumption
-    iapply Hwp $$ HwpArg
+      iexact Hαb
+    iapply Hwp $$ [$HαNat' $Hj']
     ipureintro; exact ⟨Hv0, Hvz⟩
 
 
