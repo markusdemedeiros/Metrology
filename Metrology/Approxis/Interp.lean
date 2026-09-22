@@ -155,7 +155,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 /-- Every `interp τ Δ` value-relation only relates closed values. -/
 theorem interp_closed {Δ : TyEnv rT GF} (τ : Ty) (v v' : Val rT) :
     (interp τ Δ).car v v' ⊢@{IProp GF}
-      iprop(⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) :=
+      ⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝ :=
   (interp τ Δ).closed v v'
 
 end interp_closed
@@ -181,20 +181,16 @@ theorem unboxed_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
     (interp τ Δ).car v v' ⊢@{IProp GF} ⌜ Val.isUnboxed v ∧ Val.isUnboxed v' ⌝ := by
   cases H
   · show iprop(⌜ _ ⌝) ⊢ _
-    iintro ⟨%h1, %h2⟩
-    ipureintro
+    iintro ⟨%h1, %h2⟩ !%
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
   · show iprop(∃ _, _) ⊢ _
-    iintro ⟨%n, %h1, %h2⟩
-    ipureintro
+    iintro ⟨%n, %h1, %h2⟩ !%
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
   · show iprop(∃ _, _) ⊢ _
-    iintro ⟨%b, %h1, %h2⟩
-    ipureintro
+    iintro ⟨%b, %h1, %h2⟩ !%
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
   · show iprop(∃ _ _, _) ⊢ _
-    iintro ⟨%l1, %l2, %h1, %h2, _⟩
-    ipureintro
+    iintro ⟨%l1, %l2, %h1, %h2, _⟩ !%
     exact ⟨by simp [Val.isUnboxed, h1], by simp [Val.isUnboxed, h2]⟩
 
 /-- At an unboxed type, both related values are bare literals. Stronger than
@@ -205,20 +201,16 @@ theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
       ⌜∃ l l' : BaseLit rT, v.1 = .lit l ∧ v'.1 = .lit l'⌝ := by
   cases H
   · show iprop(⌜ _ ⌝) ⊢ _
-    iintro ⟨%h1, %h2⟩
-    ipureintro
+    iintro ⟨%h1, %h2⟩ !%
     exact ⟨_, _, h1, h2⟩
   · show iprop(∃ _, _) ⊢ _
-    iintro ⟨%n, %h1, %h2⟩
-    ipureintro
+    iintro ⟨%n, %h1, %h2⟩ !%
     exact ⟨_, _, h1, h2⟩
   · show iprop(∃ _, _) ⊢ _
-    iintro ⟨%b, %h1, %h2⟩
-    ipureintro
+    iintro ⟨%b, %h1, %h2⟩ !%
     exact ⟨_, _, h1, h2⟩
   · show iprop(∃ _ _, _) ⊢ _
-    iintro ⟨%l1, %l2, %h1, %h2, _⟩
-    ipureintro
+    iintro ⟨%l1, %l2, %h1, %h2, _⟩ !%
     exact ⟨_, _, h1, h2⟩
 
 /-- At equality-types, both related values are pointwise equal. -/
@@ -226,18 +218,15 @@ theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType �
     (interp τ Δ).car v v' ⊢@{IProp GF} ⌜ v = v' ⌝ := by
   induction H generalizing v v'
   · show iprop(⌜ _ ⌝) ⊢ _
-    iintro ⟨%h1, %h2⟩
-    ipureintro
+    iintro ⟨%h1, %h2⟩ !%
     apply Val.ext
     rw [h1, h2]
   · show iprop(∃ _, _) ⊢ _
-    iintro ⟨%n, %h1, %h2⟩
-    ipureintro
+    iintro ⟨%n, %h1, %h2⟩ !%
     apply Val.ext
     rw [h1, h2]
   · show iprop(∃ _, _) ⊢ _
-    iintro ⟨%b, %h1, %h2⟩
-    ipureintro
+    iintro ⟨%b, %h1, %h2⟩ !%
     apply Val.ext
     rw [h1, h2]
   · rename_i τ1 τ2 Hτ1 Hτ2 ih1 ih2
@@ -307,16 +296,11 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
         · ihave HP1a := later_exists.mpr $$ HP1
           icases HP1a with ⟨%wa1, HP1b⟩
-          ihave HP1c := later_exists.mpr $$ HP1b
-          icases HP1c with ⟨%ws1, HP1d⟩
-          ihave HP1e := later_sep.mp $$ HP1d
-          icases HP1e with ⟨Hl1L, _⟩
-          ihave HP2a := later_exists.mpr $$ HP2
-          icases HP2a with ⟨%wa2, HP2b⟩
-          ihave HP2c := later_exists.mpr $$ HP2b
-          icases HP2c with ⟨%ws2, HP2d⟩
-          ihave HP2e := later_sep.mp $$ HP2d
-          icases HP2e with ⟨Hl2L, _⟩
+          icases later_exists.mpr $$ HP1b with ⟨%ws1, HP1d⟩
+          icases later_sep.mp $$ HP1d with ⟨Hl1L, _⟩
+          icases later_exists.mpr $$ HP2 with ⟨%wa2, HP2b⟩
+          icases later_exists.mpr $$ HP2b with ⟨%ws2, HP2d⟩
+          icases later_sep.mp $$ HP2d with ⟨Hl2L, _⟩
           inext
           iapply appHeapFrag_valid_2 $$ Hl1L Hl2L
         iapply IsExcept0.is_except0
@@ -340,20 +324,13 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
         · ihave HP1a := later_exists.mpr $$ HP1
           icases HP1a with ⟨%wa1, HP1b⟩
-          ihave HP1c := later_exists.mpr $$ HP1b
-          icases HP1c with ⟨%ws1, HP1d⟩
-          ihave HP1e := later_sep.mp $$ HP1d
-          icases HP1e with ⟨_, HP1f⟩
-          ihave HP1g := later_sep.mp $$ HP1f
-          icases HP1g with ⟨Hs1L, _⟩
-          ihave HP2a := later_exists.mpr $$ HP2
-          icases HP2a with ⟨%wa2, HP2b⟩
-          ihave HP2c := later_exists.mpr $$ HP2b
-          icases HP2c with ⟨%ws2, HP2d⟩
-          ihave HP2e := later_sep.mp $$ HP2d
-          icases HP2e with ⟨_, HP2f⟩
-          ihave HP2g := later_sep.mp $$ HP2f
-          icases HP2g with ⟨Hs2L, _⟩
+          icases later_exists.mpr $$ HP1b with ⟨%ws1, HP1d⟩
+          icases later_sep.mp $$ HP1d with ⟨_, HP1f⟩
+          icases later_sep.mp $$ HP1f with ⟨Hs1L, _⟩
+          icases later_exists.mpr $$ HP2 with ⟨%wa2, HP2b⟩
+          icases later_exists.mpr $$ HP2b with ⟨%ws2, HP2d⟩
+          icases later_sep.mp $$ HP2d with ⟨_, HP2f⟩
+          icases later_sep.mp $$ HP2f with ⟨Hs2L, _⟩
           inext
           iapply specHeapFrag_valid_2 $$ Hs1L Hs2L
         iapply IsExcept0.is_except0
@@ -401,8 +378,7 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
         · ihave HP1e := later_sep.mp $$ HP1
           icases HP1e with ⟨Ha1L, _⟩
-          ihave HP2e := later_sep.mp $$ HP2
-          icases HP2e with ⟨Ha2L, _⟩
+          icases later_sep.mp $$ HP2 with ⟨Ha2L, _⟩
           inext
           iapply appTapesFrag_valid_2 $$ Ha1L Ha2L
         iapply IsExcept0.is_except0
@@ -425,8 +401,7 @@ theorem unboxed_type_eq {τ : Ty} {Δ : TyEnv rT GF} {v1 v2 w1 w2 : Val rT}
         ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
         · ihave HP1e := later_sep.mp $$ HP1
           icases HP1e with ⟨_, Hs1L⟩
-          ihave HP2e := later_sep.mp $$ HP2
-          icases HP2e with ⟨_, Hs2L⟩
+          icases later_sep.mp $$ HP2 with ⟨_, Hs2L⟩
           inext
           iapply specTapesFrag_valid_2 $$ Hs1L Hs2L
         iapply IsExcept0.is_except0
@@ -800,7 +775,7 @@ omit [ProbLangℝ rT] in
 /-- Domain agreement: `Γ.lookup x = some _ ↔ vs.lookup x = some _`. -/
 theorem env_ltyped2_domEq (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
-      iprop(⌜∀ x, (Γ.lookup x).isSome ↔ (vs.lookup x).isSome⌝) := by
+      ⌜∀ x, (Γ.lookup x).isSome ↔ (vs.lookup x).isSome⌝ := by
   unfold env_ltyped2
   iintro ⟨%H, _, _⟩
   ipureintro; exact H
@@ -809,7 +784,7 @@ omit [ProbLangℝ rT] in
 /-- Closedness: every binding in `vs` is closed. -/
 theorem env_ltyped2_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
-      iprop(⌜∀ p ∈ vs, p.2.1.1.isClosed .empty ∧ p.2.2.1.isClosed .empty⌝) := by
+      ⌜∀ p ∈ vs, p.2.1.1.isClosed .empty ∧ p.2.2.1.isClosed .empty⌝ := by
   unfold env_ltyped2
   iintro ⟨_, %Hc, _⟩
   ipureintro; exact Hc
@@ -820,13 +795,13 @@ and the pair is in `A`. -/
 theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (A : lrel rT GF)
     (hΓ : Γ.lookup x = some A) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
-      iprop(∃ (v1 v2 : Val rT), (⌜vs.lookup x = some (v1, v2)⌝) ∗ A v1 v2) := by
+      ∃ (v1 v2 : Val rT), (⌜vs.lookup x = some (v1, v2)⌝) ∗ A v1 v2 := by
   unfold env_ltyped2
   iintro ⟨%Hdom, %Hclosed, Hall⟩
   have hvs : (vs.lookup x).isSome := (Hdom x).mp (by rw [hΓ]; rfl)
   obtain ⟨⟨v1, v2⟩, hvs_eq⟩ := Option.isSome_iff_exists.mp hvs
   iexists v1, v2
-  isplitr; · ipureintro; exact hvs_eq
+  iframe %hvs_eq
   iapply Hall $$ %x %A %v1 %v2
   · ipureintro; exact hΓ
   · ipureintro; exact hvs_eq
@@ -847,8 +822,7 @@ omit [ProbLangℝ rT] in
 theorem env_ltyped2_empty_inv (vs : ValSubstMap rT) :
     env_ltyped2 ([] : RelCtx rT GF) vs ⊢@{IProp GF} ⌜vs = []⌝ := by
   unfold env_ltyped2
-  iintro ⟨%Hdom, _, _⟩
-  ipureintro
+  iintro ⟨%Hdom, _, _⟩ !%
   cases vs with
   | nil => rfl
   | cons p rest =>
@@ -1055,8 +1029,7 @@ theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx rT GF}
           | some B => some B
           | none => if y = y then some A else none) = some A
     rw [hΓy_lookup]; simp
-  ihave HvsAtY := env_ltyped2_lookup ((y, A) :: Γ) vs y A hyHeadLookup $$ Hvs
-  icases HvsAtY with ⟨%w1, %w2, %hvsLookupY, HA_w⟩
+  icases env_ltyped2_lookup ((y, A) :: Γ) vs y A hyHeadLookup $$ Hvs with ⟨%w1, %w2, %hvsLookupY, HA_w⟩
   -- Closedness of (w1, w2) extracted from env_ltyped2.
   ihave %Hvs_clos := env_ltyped2_allClosed _ vs $$ Hvs
   -- Build vs' := (x, (w1, w2)) :: vs.delete y. Need env_ltyped2 ((x, A) :: Γ) vs'.

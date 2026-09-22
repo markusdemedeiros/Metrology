@@ -31,6 +31,19 @@ variable [MeasurableSpace α] [MeasurableSpace β] [MeasurableSpace α'] [Measur
 def AddCoupl (ε : ENNReal) (Φ : Set (α × β)) (μₗ : Measure α) (μᵣ : Measure β) : Prop :=
   ARCoupling (· + ε) Φ μₗ μᵣ
 
+/-- Expectation ("Kantorovich dual") form of an additive coupling with variable cost `E₂`:
+every pair of `[0,1]`-bounded measurable test functions satisfying `h₁ a ≤ h₂ b + E₂ a b`
+pointwise also satisfies the matching bound on expectations, with slack `ε`.
+
+This is the side condition that `AddCoupl.bind_adv_kanto` consumes and that the Approxis
+lifting and coupling rules carry around; naming it keeps those statements to one line.
+Reducible, so an `ExpCoupl` hypothesis still applies directly to its six arguments. -/
+@[reducible] def ExpCoupl (ε : ENNReal) (E₂ : α → β → ENNReal)
+    (μ₁ : Measure α) (μ₂ : Measure β) : Prop :=
+  ∀ (h₁ : α → ENNReal) (h₂ : β → ENNReal), Measurable h₁ → Measurable h₂ →
+    (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) → (∀ a b, h₁ a ≤ h₂ b + E₂ a b) →
+    ∫⁻ a, h₁ a ∂μ₁ ≤ ∫⁻ b, h₂ b ∂μ₂ + ε
+
 namespace AddCoupl
 
 /-- Reflexivity of `ARcoupl` at the equality relation. -/
@@ -236,11 +249,7 @@ theorem bind_adv_kanto {ε : ENNReal} {S : Set (α' × β')}
     {f : α → Measure α'} {g : β → Measure β'} {E₂ : α → β → ENNReal}
     (Hfm : Measurable f) (Hgm : Measurable g)
     (Hfsprob : ∀ a, (f a) .univ ≤ 1) (Hgsprob : ∀ b, (g b) .univ ≤ 1)
-    (Hexp : ∀ (h₁ : α → ENNReal) (h₂ : β → ENNReal),
-        Measurable h₁ → Measurable h₂ →
-        (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
-        (∀ a b, h₁ a ≤ h₂ b + E₂ a b) →
-        ∫⁻ a, h₁ a ∂μ₁ ≤ ∫⁻ b, h₂ b ∂μ₂ + ε)
+    (Hexp : ExpCoupl ε E₂ μ₁ μ₂)
     (Hcont : ∀ a b, AddCoupl (E₂ a b) S (f a) (g b)) :
     AddCoupl ε S (μ₁.bind f) (μ₂.bind g) := by
   rintro ⟨f', Hf'm, Hf'b⟩ ⟨g', Hg'm, Hg'b⟩ Hf'g'

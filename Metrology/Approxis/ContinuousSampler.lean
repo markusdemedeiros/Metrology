@@ -91,8 +91,7 @@ theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
   iapply (wp_lift_atomic_step_concentrated (S := fun σ₁ =>
     {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)
       ∧ r ∈ ProbLangℝ.unifUnitSupport}) Hnv hSmeas hSconc)
-  iintro %σ₁ Hσ
-  imodintro
+  iintro %σ₁ Hσ !>
   isplitr
   · ipureintro
     exact reducible_of_headReducible (by is_lc) (hhead σ₁)
@@ -176,9 +175,9 @@ theorem wp_couple_urand_urand (f : rT → rT)
     fun τ => reducible_of_headReducible (by is_lc) (hhead τ)
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
-  ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
+  ihave %Heq := specAuth_specFrag_agree $$ Hs Hj
   subst Heq
-  imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset)
+  imod (BIFUpdate.subset Std.LawfulSet.empty_subset)
     with Hclose
   imodintro
   let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
@@ -210,9 +209,8 @@ theorem wp_couple_urand_urand (f : rT → rT)
   obtain ⟨r, hrsupp, heq1, heq2⟩ := HR
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
-  imodintro
-  iintro !>
-  ihave HUpd := specProg_update (GF := GF)
+  iintro !> !>
+  ihave HUpd := specProg_update
     (e3 := K.fill (pl(#(.real (f r))))) $$ Hs Hj
   imod HUpd with ⟨Hs', Hj'⟩
   imod Hclose
@@ -220,7 +218,7 @@ theorem wp_couple_urand_urand (f : rT → rT)
   isplitl [Hσ]; · iexact Hσ
   isplitl [Hs']; · iexact Hs'
   isplitl [Hε]; · iexact Hε
-  iapply (wp_value_of_toVal (v := (.real r : Val rT)) rfl)
+  iapply (wp_value_of_toVal rfl)
   iapply Hcnt $$ %r %hrsupp
   iexact Hj'
 
@@ -255,7 +253,7 @@ theorem refines_couple_urands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF}
       (K2.comp K').fill (pl(urand) : Exp rT) := Ectx.fill_comp K2 K' _
   ihave Hj' : iprop(⤇ (K2.comp K').fill (pl(urand) : Exp rT)) $$ [Hj]
   · rw [← hfc]; iexact Hj
-  iapply ApproxisWpGS.wp_bind (K := K)
+  iapply ApproxisWpGS.wp_bind
   iapply (wp_couple_urand_urand f hmp (K2.comp K') ⊤
     (fun v => wp ⊤ (K.fill (Exp.ofVal v))
       (fun v => iprop(∃ v' ε',

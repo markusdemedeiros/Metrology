@@ -278,16 +278,15 @@ theorem wp_couple_rand_rand (z : Int) (f : Int → Int)
   obtain ⟨n, hn0, hnz, heq1, heq2⟩ := HR
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
-  imodintro
-  iintro !>
+  iintro !> !>
   ihave HUpd := specProg_update (GF := GF)
     (e3 := K.fill (pl(#(.int (f n))))) $$ Hs Hj
   imod HUpd with ⟨Hs', Hj'⟩
   imod Hclose
   imodintro
-  isplitl [Hσ]; · iexact Hσ
-  isplitl [Hs']; · iexact Hs'
-  isplitl [Hε]; · iexact Hε
+  iframe Hσ
+  iframe Hs'
+  iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   iapply Hcnt
   · ipureintro; exact ⟨hn0, hnz⟩
@@ -347,10 +346,8 @@ theorem wp_couple_rand_rand_adv (z : Int) (f : Int → Int) (ε₁ : ENNReal) (�
     exact inf_le_right
   have hXoff : ∀ ρ₁ ρ₂, (¬ ∃ n, P ρ₁ ρ₂ n) → X ρ₁ ρ₂ = 1 := fun ρ₁ ρ₂ h =>
     _root_.le_antisymm inf_le_left (le_inf le_rfl (le_iInf₂ fun n hn => absurd ⟨n, hn⟩ h))
-  have Hkant : ∀ h₁ h₂ : Cfg rT → ENNReal, Measurable h₁ → Measurable h₂ →
-      (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) → (∀ a b, h₁ a ≤ h₂ b + X a b) →
-      (∫⁻ a, h₁ a ∂(primStep (⟨pl(rand(#(.int z), #(.unit))), σ₁⟩ : Cfg rT))) ≤
-        (∫⁻ b, h₂ b ∂(primStep (⟨K.fill pl(rand(#(.int z), #(.unit))), σ₁'⟩ : Cfg rT))) + ε₁ := by
+  have Hkant : ExpCoupl ε₁ X (primStep (⟨pl(rand(#(.int z), #(.unit))), σ₁⟩ : Cfg rT))
+      (primStep (⟨K.fill pl(rand(#(.int z), #(.unit))), σ₁'⟩ : Cfg rT)) := by
     intro h₁ h₂ hm₁ hm₂ _ _ hle
     have hR : (∫⁻ b, h₂ b ∂(primStep (⟨K.fill pl(rand(#(.int z), #(.unit))), σ₁'⟩ : Cfg rT)))
         = ((z.toNat : ENNReal))⁻¹ *
@@ -385,8 +382,8 @@ theorem wp_couple_rand_rand_adv (z : Int) (f : Int → Int) (ε₁ : ENNReal) (�
       _ ≤ _ := by
           gcongr
           rwa [← ENNReal.div_eq_inv_mul]
-  ihave %Hεle := ErrorCredit.supply_bound (GF := GF) $$ Hε Herr
-  ihave Hdec := ErrorCredit.supply_decrease (GF := GF) $$ Hε Herr
+  ihave %Hεle := ErrorCredit.supply_bound $$ Hε Herr
+  ihave Hdec := ErrorCredit.supply_decrease $$ Hε Herr
   imod Hdec
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
   imodintro
@@ -395,7 +392,7 @@ theorem wp_couple_rand_rand_adv (z : Int) (f : Int → Int) (ε₁ : ENNReal) (�
   isplitr; · ipureintro; exact HredL.toReducible
   isplitr; · ipureintro; exact HredR.toReducible
   isplitr; · ipureintro; exact hXle1
-  isplitr; · ipureintro; exact Hkant
+  iframe %Hkant
   iintro %e₂ %σ₂ %e₂' %σ₂'
   iintro !>
   by_cases hg : ∃ n : Int, P ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ n
@@ -418,22 +415,20 @@ theorem wp_couple_rand_rand_adv (z : Int) (f : Int → Int) (ε₁ : ENNReal) (�
       have hsum : (ε - ε₁) + ε₂ n < 1 := by
         rw [inf_eq_right.mpr hlt.le] at hbig
         rwa [add_comm]
-      ihave HUpd := specProg_update (GF := GF)
+      ihave HUpd := specProg_update
         (e3 := K.fill (pl(#(.int (f n))))) $$ Hs Hj
       imod HUpd with ⟨Hs', Hj'⟩
-      ihave Hinc := ErrorCredit.supply_increase (GF := GF) (ε₂ := ε₂ n) hsum $$ Hdec
-      imod Hinc with ⟨HdecA, Hfrag⟩
+      imod ErrorCredit.supply_increase hsum $$ Hdec with ⟨HdecA, Hfrag⟩
       imod Hclose
       imodintro
       iright
-      isplitl [Hσ]; · iexact Hσ
-      isplitl [Hs']; · iexact Hs'
+      iframe Hσ
+      iframe Hs'
       isplitl [HdecA]
       · iapply ErrorCredit.extAuth (add_comm _ _)
         iexact HdecA
-      iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
-      ispecialize Hcnt $$ %n %⟨hn0, hnz⟩ Hfrag Hj'
-      iexact Hcnt
+      iapply (wp_value_of_toVal rfl)
+      iapply Hcnt $$ %n %⟨hn0, hnz⟩ Hfrag Hj'
   · imod Hclose
     imodintro
     ileft
@@ -460,8 +455,8 @@ theorem wp_couple_rand_rand_avoid (z bad : Int) (Hz : 0 < z) (K : Ectx rT) (E : 
   iapply (wp_couple_rand_rand_adv z id ((z.toNat : ENNReal))⁻¹
     (fun n => if n = bad then 1 else 0) (fun _ h1 h2 => ⟨h1, h2⟩)
     (fun m h1 h2 => ⟨m, ⟨⟨h1, h2⟩, rfl⟩, fun _ hn' => hn'.2⟩) Hz hamort K E Φ)
-  isplitl [Hj]; · iexact Hj
-  isplitl [Herr]; · iexact Herr
+  iframe Hj
+  iframe Herr
   iintro %n %hn Hec Hj'
   by_cases hb : n = bad
   · rw [if_pos hb]
@@ -489,8 +484,8 @@ theorem wp_couple_tapes_bij {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
   icases Hαₛ with ⟨%fsₛ, %Hfsₛ, Hαₛ⟩
   iapply wp_couple_erasables
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
-  ihave %hlk := app_state_lookup_tape (GF := GF) (σ := σ₁) $$ Hσ Hα
-  ihave %hlk' := spec_auth_lookup_tape (GF := GF) (σ := σ₁') $$ Hs Hαₛ
+  ihave %hlk := app_state_lookup_tape $$ Hσ Hα
+  ihave %hlk' := spec_auth_lookup_tape $$ Hs Hαₛ
   imod (BIFUpdate.subset (E1 := E) (E2 := ∅) Std.LawfulSet.empty_subset) with Hclose
   imodintro
   iexists (fun σ₂ σ₂' => ∃ n : Int, 0 ≤ n ∧ n < z ∧
@@ -502,19 +497,19 @@ theorem wp_couple_tapes_bij {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
   isplitr; · ipureintro; exact tapePresample_addCoupl_bij hlk hlk' Hz f hdom hbij
   iintro %σ₂ %σ₂' %HR
   obtain ⟨n, hn0, hnz, rfl, rfl⟩ := HR
-  ihave HU := app_state_update_tape (GF := GF) (σ := σ₁)
+  ihave HU := app_state_update_tape
     (s := ⟨z, fs ++ [tapeIdxOf Hz n]⟩) $$ Hσ Hα
   imod HU with ⟨Hσ', Hα'⟩
-  ihave HU' := spec_auth_update_tape (GF := GF) (σ := σ₁')
+  ihave HU' := spec_auth_update_tape
     (s := ⟨z, fsₛ ++ [tapeIdxOf Hz (f n)]⟩) $$ Hs Hαₛ
   imod HU' with ⟨Hs', Hαₛ'⟩
   imod Hclose
   imodintro
   simp only [approxisWpGS_stateInterp_eq, approxisWpGS_specInterp_eq,
     ExtTreeMap.insert_eq_PartialMap_insert]
-  isplitl [Hσ']; · iexact Hσ'
-  isplitl [Hs']; · iexact Hs'
-  isplitl [Hε]; · iexact Hε
+  iframe Hσ'
+  iframe Hs'
+  iframe Hε
   ihave HnatA : iprop(∃ gs : List { z' : Int // 0 ≤ z' ∧ z' < z },
       (⌜gs.map (fun x => x.val) = ns ++ [n]⌝) ∗ α ↪ₐ ⟨z, gs⟩) $$ [Hα']
   · iexists (fs ++ [tapeIdxOf Hz n])
@@ -529,8 +524,7 @@ theorem wp_couple_tapes_bij {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
       have hd := hdom n hn0 hnz
       simp [← Hfsₛ, tapeIdxOf_val Hz hd.1 hd.2]
     · iexact Hαₛ'
-  ispecialize Hcnt $$ %n %⟨hn0, hnz⟩ HnatA HnatS
-  iexact Hcnt
+  iapply Hcnt $$ %n %⟨hn0, hnz⟩ HnatA HnatS
 
 /-- Labeled-rand coupling where both tapes have the wrong bound `M ≠ z`.
 Both tapes are unchanged; the draw is uniform and `f` links the values. -/
@@ -552,19 +546,19 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
   iapply (later_timeless_fupd (P := appNatTape α M xs))
-  isplitl [Hα]; · iexact Hα
+  iframe Hα
   iintro Hα
   iapply (later_timeless_fupd (P := specNatTape α' M ys))
-  isplitl [Hα']; · iexact Hα'
+  iframe Hα'
   iintro Hα'
   ihave HαEx := show appNatTape α M xs ⊢@{IProp GF}
-      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
-        (⌜fs.map (fun x => x.val) = xs⌝) ∗ α ↪ₐ ⟨M, fs⟩) from
+      ∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
+        (⌜fs.map (fun x => x.val) = xs⌝) ∗ α ↪ₐ ⟨M, fs⟩ from
     BI.BIBase.Entails.rfl $$ Hα
   icases HαEx with ⟨%fs, %hmap_fs, Hα_b⟩
   ihave Hα'Ex := show specNatTape α' M ys ⊢@{IProp GF}
-      iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
-        (⌜fs.map (fun x => x.val) = ys⌝) ∗ α' ↪ₛ ⟨M, fs⟩) from
+      ∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < M },
+        (⌜fs.map (fun x => x.val) = ys⌝) ∗ α' ↪ₛ ⟨M, fs⟩ from
     BI.BIBase.Entails.rfl $$ Hα'
   icases Hα'Ex with ⟨%fs', %hmap_fs', Hα'_b⟩
   ihave %Heq := specAuth_specFrag_agree (GF := GF) (σ := σ₁') $$ Hs Hj
@@ -622,35 +616,34 @@ theorem wp_couple_rand_lbl_rand_lbl_wrong (z M : Int) (f : Int → Int)
   obtain ⟨n, hn0, hnz, heq1, heq2⟩ := HR
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
-  imodintro
-  iintro !>
+  iintro !> !>
   ihave HUpd := specProg_update (GF := GF)
     (e3 := K.fill (pl(#(.int (f n))))) $$ Hs Hj
   imod HUpd with ⟨Hs', Hj'⟩
   imod Hclose
   imodintro
-  isplitl [Hσ]; · iexact Hσ
-  isplitl [Hs']; · iexact Hs'
-  isplitl [Hε]; · iexact Hε
+  iframe Hσ
+  iframe Hs'
+  iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave HαNat := show (α ↪ₐ ⟨M, fs⟩) ⊢@{IProp GF} appNatTape α M xs by
     iintro Hb
     unfold appNatTape
     iexists fs
-    isplitr; · ipureintro; exact hmap_fs
+    iframe %hmap_fs
     iexact Hb
   ihave HαNat' := HαNat $$ Hα_b
   ihave Hα'Nat := show (α' ↪ₛ ⟨M, fs'⟩) ⊢@{IProp GF} specNatTape α' M ys by
     iintro Hb
     unfold specNatTape
     iexists fs'
-    isplitr; · ipureintro; exact hmap_fs'
+    iframe %hmap_fs'
     iexact Hb
   ihave Hα'Nat' := Hα'Nat $$ Hα'_b
   iapply Hcnt
-  isplitl [HαNat']; · iexact HαNat'
-  isplitl [Hα'Nat']; · iexact Hα'Nat'
-  isplitl [Hj']; · iexact Hj'
+  iframe HαNat'
+  iframe Hα'Nat'
+  iframe Hj'
   ipureintro; exact ⟨hn0, hnz⟩
 
 /-- Fully labeled two-sided coupling via a bijection `f`, both tapes empty. -/
@@ -671,10 +664,10 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
   iapply (later_timeless_fupd (P := appNatTape α z []))
-  isplitl [Hα]; · iexact Hα
+  iframe Hα
   iintro Hα
   iapply (later_timeless_fupd (P := specNatTape α' z []))
-  isplitl [Hα']; · iexact Hα'
+  iframe Hα'
   iintro Hα'
   ihave HαEx := show appNatTape α z [] ⊢@{IProp GF}
       iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
@@ -744,16 +737,15 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
   obtain ⟨n, hn0, hnz, heq1, heq2⟩ := HR
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
-  imodintro
-  iintro !>
+  iintro !> !>
   ihave HUpd := specProg_update (GF := GF)
     (e3 := K.fill (pl(#(.int (f n))))) $$ Hs Hj
   imod HUpd with ⟨Hs', Hj'⟩
   imod Hclose
   imodintro
-  isplitl [Hσ]; · iexact Hσ
-  isplitl [Hs']; · iexact Hs'
-  isplitl [Hε]; · iexact Hε
+  iframe Hσ
+  iframe Hs'
+  iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave HαNat := show (α ↪ₐ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} appNatTape α z [] by
     iintro Hb
@@ -770,9 +762,9 @@ theorem wp_couple_rand_lbl_rand_lbl (z : Int) (f : Int → Int)
     iexact Hb
   ihave Hα'Nat' := Hα'Nat $$ Hα'_b
   iapply Hcnt
-  isplitl [HαNat']; · iexact HαNat'
-  isplitl [Hα'Nat']; · iexact Hα'Nat'
-  isplitl [Hj']; · iexact Hj'
+  iframe HαNat'
+  iframe Hα'Nat'
+  iframe Hj'
   ipureintro; exact ⟨hn0, hnz⟩
 
 /-! ## Mixed tape-rand couplings -/
@@ -794,7 +786,7 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
   iapply (later_timeless_fupd (P := appNatTape α z []))
-  isplitl [Hα]; · iexact Hα
+  iframe Hα
   iintro Hα
   ihave HαEx := show appNatTape α z [] ⊢@{IProp GF}
       iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
@@ -856,16 +848,15 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
   obtain ⟨n, hn0, hnz, heq1, heq2⟩ := HR
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
-  imodintro
-  iintro !>
+  iintro !> !>
   ihave HUpd := specProg_update (GF := GF)
     (e3 := K.fill (pl(#(.int (f n))))) $$ Hs Hj
   imod HUpd with ⟨Hs', Hj'⟩
   imod Hclose
   imodintro
-  isplitl [Hσ]; · iexact Hσ
-  isplitl [Hs']; · iexact Hs'
-  isplitl [Hε]; · iexact Hε
+  iframe Hσ
+  iframe Hs'
+  iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave HαNat := show (α ↪ₐ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} appNatTape α z [] by
     iintro Hb
@@ -875,8 +866,8 @@ theorem wp_couple_tape_rand (z : Int) (f : Int → Int)
     iexact Hb
   ihave HαNat' := HαNat $$ Hα_b
   iapply Hcnt
-  isplitl [HαNat']; · iexact HαNat'
-  isplitl [Hj']; · iexact Hj'
+  iframe HαNat'
+  iframe Hj'
   ipureintro; exact ⟨hn0, hnz⟩
 
 /-- Symmetric: couple LHS unit rand with RHS rand on empty tape. -/
@@ -897,7 +888,7 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
   iapply (wp_lift_prim_steps_coupl Hv)
   iintro %σ₁ %e₁' %σ₁' %ε ⟨Hσ, Hs, Hε⟩
   iapply (later_timeless_fupd (P := specNatTape α' z []))
-  isplitl [Hα']; · iexact Hα'
+  iframe Hα'
   iintro Hα'
   ihave Hα'Ex := show specNatTape α' z [] ⊢@{IProp GF}
       iprop(∃ fs : List { z' : Int // 0 ≤ z' ∧ z' < z },
@@ -959,16 +950,15 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
   obtain ⟨n, hn0, hnz, heq1, heq2⟩ := HR
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
-  imodintro
-  iintro !>
+  iintro !> !>
   ihave HUpd := specProg_update (GF := GF)
     (e3 := K.fill (pl(#(.int (f n))))) $$ Hs Hj
   imod HUpd with ⟨Hs', Hj'⟩
   imod Hclose
   imodintro
-  isplitl [Hσ]; · iexact Hσ
-  isplitl [Hs']; · iexact Hs'
-  isplitl [Hε]; · iexact Hε
+  iframe Hσ
+  iframe Hs'
+  iframe Hε
   iapply (wp_value_of_toVal (v := (.int n : Val rT)) rfl)
   ihave Hα'Nat := show (α' ↪ₛ ⟨z, ([] : List _)⟩) ⊢@{IProp GF} specNatTape α' z [] by
     iintro Hb
@@ -978,8 +968,8 @@ theorem wp_couple_rand_tape (z : Int) (f : Int → Int)
     iexact Hb
   ihave Hα'Nat' := Hα'Nat $$ Hα'_b
   iapply Hcnt
-  isplitl [Hα'Nat']; · iexact Hα'Nat'
-  isplitl [Hj']; · iexact Hj'
+  iframe Hα'Nat'
+  iframe Hj'
   ipureintro; exact ⟨hn0, hnz⟩
 
 end CouplingRules

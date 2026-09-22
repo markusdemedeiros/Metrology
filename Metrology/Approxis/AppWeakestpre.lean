@@ -297,12 +297,7 @@ abbrev progCoupl (e₁ : Exp rT) (σ₁ : State rT) (e₁' : Exp rT) (σ₁' : S
           (X₂ : Cfg rT → Cfg rT → ENNReal),
     (⌜Reducible e₁ σ₁⌝) ∗
     (⌜∃ r : ENNReal, ∀ ρ₁ ρ₂, X₂ ρ₁ ρ₂ ≤ r⌝) ∗
-    (⌜∀ (h₁ h₂ : Cfg rT → ENNReal),
-        Measurable h₁ → Measurable h₂ →
-        (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
-        (∀ a b, h₁ a ≤ h₂ b + X₂ a b) →
-        (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
-          (∫⁻ b, h₂ b ∂(μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))) + ε⌝) ∗
+    (⌜ExpCoupl ε X₂ (primStep ⟨e₁, σ₁⟩) (μ₁'.bind (fun σ => pexecN n ⟨e₁', σ⟩))⌝) ∗
     (⌜ErasableExpr μ₁' σ₁'⌝) ∗
     (∀ (e₂ : Exp rT) (σ₂ : State rT) (e₂' : Exp rT) (σ₂' : State rT),
       |={∅}=> Z e₂ σ₂ e₂' σ₂' (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩)))
@@ -1171,12 +1166,7 @@ theorem progCoupl_steps_adv' {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT}
     {X₂ : Cfg rT → Cfg rT → ENNReal}
     (Hred : Reducible e₁ σ₁) (Hred' : Reducible e₁' σ₁')
     (Hbnd : ∀ ρ₁ ρ₂, X₂ ρ₁ ρ₂ ≤ 1)
-    (Hcpl : ∀ (h₁ h₂ : Cfg rT → ENNReal),
-        Measurable h₁ → Measurable h₂ →
-        (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
-        (∀ a b, h₁ a ≤ h₂ b + X₂ a b) →
-        (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
-          (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε) :
+    (Hcpl : ExpCoupl ε X₂ (primStep ⟨e₁, σ₁⟩) (primStep ⟨e₁', σ₁'⟩)) :
     iprop(∀ (e₂ : Exp rT) (σ₂ : State rT) (e₂' : Exp rT) (σ₂' : State rT),
         |={∅}=> Z e₂ σ₂ e₂' σ₂' (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩)) ⊢@{IProp GF}
       progCoupl e₁ σ₁ e₁' σ₁' ε Z := by
@@ -1208,12 +1198,7 @@ theorem progCoupl_steps_adv {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT} 
     (Hε : ε₁ + ε₂ ≤ ε)
     (Hred : Reducible e₁ σ₁) (Hred' : Reducible e₁' σ₁')
     (Hbnd : ∀ ρ₁ ρ₂, X₂ ρ₁ ρ₂ ≤ 1)
-    (Hcpl : ∀ (h₁ h₂ : Cfg rT → ENNReal),
-        Measurable h₁ → Measurable h₂ →
-        (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
-        (∀ a b, h₁ a ≤ h₂ b + X₂ a b) →
-        (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
-          (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε₁) :
+    (Hcpl : ExpCoupl ε₁ X₂ (primStep ⟨e₁, σ₁⟩) (primStep ⟨e₁', σ₁'⟩)) :
     iprop(∀ (e₂ : Exp rT) (σ₂ : State rT) (e₂' : Exp rT) (σ₂' : State rT),
         |={∅}=> Z e₂ σ₂ e₂' σ₂' (X₂ ⟨e₂, σ₂⟩ ⟨e₂', σ₂'⟩ + ε₂)) ⊢@{IProp GF}
       progCoupl e₁ σ₁ e₁' σ₁' ε Z := by
@@ -1307,12 +1292,7 @@ theorem progCoupl_steps {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT} {σ�
     split_ifs with h
     · exact h.2
     · exact _root_.le_refl _
-  have HY_exp : ∀ (h₁ h₂ : Cfg rT → ENNReal),
-      Measurable h₁ → Measurable h₂ →
-      (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
-      (∀ a b, h₁ a ≤ h₂ b + Y a b) →
-      (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
-        (∫⁻ b, h₂ b ∂(primStep ⟨e₁', σ₁'⟩)) + ε := by
+  have HY_exp : ExpCoupl ε Y (primStep ⟨e₁, σ₁⟩) (primStep ⟨e₁', σ₁'⟩) := by
     intro h₁ h₂ Hh₁meas Hh₂meas Hh₁ Hh₂ Hh₁h₂
     -- Case on ε₂ ≤ 1.
     by_cases hε₂ : ε₂ ≤ 1
@@ -1387,12 +1367,8 @@ theorem progCoupl_step_l_erasable_adv {e₁ : Exp rT} {σ₁ : State rT} {e₁' 
     (Hred : Reducible e₁ σ₁)
     (Heras : ErasableExpr μ₁' σ₁')
     (Hbnd : ∀ ρ₁ σ₂', X₂ ρ₁ σ₂' ≤ 1)
-    (Hcpl : ∀ (h₁ h₂ : Cfg rT → ENNReal),
-        Measurable h₁ → Measurable h₂ →
-        (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
-        (∀ a b, h₁ a ≤ h₂ b + X₂ a b.state) →
-        (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
-          (∫⁻ b, h₂ b ∂(μ₁'.bind (fun σ => MeasureTheory.Measure.dirac ⟨e₁', σ⟩))) + ε) :
+    (Hcpl : ExpCoupl ε (fun a (b : Cfg rT) => X₂ a b.state) (primStep ⟨e₁, σ₁⟩)
+      (μ₁'.bind (fun σ => MeasureTheory.Measure.dirac ⟨e₁', σ⟩))) :
     iprop((□ ∀ e₂ σ₂ e₂' σ₂', Z e₂ σ₂ e₂' σ₂' 1) ∗
           (∀ (e₂ : Exp rT) (σ₂ : State rT) (σ₂' : State rT),
             |={∅}=> Z e₂ σ₂ e₁' σ₂' (X₂ ⟨e₂, σ₂⟩ σ₂'))) ⊢@{IProp GF}
@@ -1473,12 +1449,8 @@ theorem progCoupl_step_l_erasable {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Ex
     if R ρ₁ σ₂' ∧ ε₂ ≤ 1 then ε₂ else 1
   have HY_bnd : ∀ ρ₁ σ₂', Y ρ₁ σ₂' ≤ 1 := fun ρ₁ σ₂' => by
     simp only [Y]; split_ifs with h; exacts [h.2, _root_.le_refl _]
-  have HY_exp : ∀ (h₁ h₂ : Cfg rT → ENNReal),
-      Measurable h₁ → Measurable h₂ →
-      (∀ a, h₁ a ≤ 1) → (∀ b, h₂ b ≤ 1) →
-      (∀ a b, h₁ a ≤ h₂ b + Y a b.state) →
-      (∫⁻ a, h₁ a ∂(primStep ⟨e₁, σ₁⟩)) ≤
-        (∫⁻ b, h₂ b ∂(μ₁'.bind (fun σ => MeasureTheory.Measure.dirac ⟨e₁', σ⟩))) + ε := by
+  have HY_exp : ExpCoupl ε (fun a (b : Cfg rT) => Y a b.state) (primStep ⟨e₁, σ₁⟩)
+      (μ₁'.bind (fun σ => MeasureTheory.Measure.dirac ⟨e₁', σ⟩)) := by
     intro h₁ h₂ Hh₁meas Hh₂meas Hh₁ Hh₂ Hh₁h₂
     by_cases hε₂ : ε₂ ≤ 1
     · -- Apply Hcpl (AddCoupl ε₁ R) with (h₁, (h₂ ∘ ⟨e₁', ·⟩) + ε₂ ⊓ 1).

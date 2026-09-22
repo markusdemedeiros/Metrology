@@ -2222,12 +2222,7 @@ theorem AddCoupl_erasure_erasable_exp_lhs_kanto [MeasurableSingletonClass rT]
     {ε : ENNReal} {E₂ : Cfg rT → Cfg rT → ENNReal}
     {n m : Nat}
     (hErase₁' : ErasableExpr μ₁' σ₁')
-    (hExp : ∀ (h₁ h₂ : Cfg rT → ENNReal),
-        Measurable h₁ → Measurable h₂ →
-        (∀ ρ, h₁ ρ ≤ 1) → (∀ ρ, h₂ ρ ≤ 1) →
-        (∀ ρ ρ', h₁ ρ ≤ h₂ ρ' + E₂ ρ ρ') →
-        ∫⁻ ρ, h₁ ρ ∂(primStep ⟨e₁, σ₁⟩) ≤
-          ∫⁻ ρ', h₂ ρ' ∂(μ₁'.bind (fun σ => pexecN m ⟨e₁', σ⟩)) + ε)
+    (hExp : ExpCoupl ε E₂ (primStep ⟨e₁, σ₁⟩) (μ₁'.bind (fun σ => pexecN m ⟨e₁', σ⟩)))
     (hCont : ∀ ρ ρ',
         AddCoupl (E₂ ρ ρ') Φexp
           (asExpr (execN n ρ))

@@ -49,43 +49,43 @@ theorem otp_refines (m : rT)
       (fun r : rT => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
       (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT))) :
     ⊢@{IProp GF} refines (⊤ : CoPset)
-      (otp_enc (rT := rT) m) (otp_ideal (rT := rT)) lrel_real := by
+      (otp_enc m) (otp_ideal) lrel_real := by
   simp only [otp_enc, otp_ideal, Exp.close, Exp.closeRec, ↓reduceIte]
-  show ⊢@{IProp GF} iprop(refines ⊤
-    ((otpKLam (rT := rT) m).fill pl(urand))
-    (Ectx.fill ([] : Ectx rT) pl(urand)) lrel_real)
-  iapply (refines_couple_urands_lr (E := ⊤) (K := otpKLam (rT := rT) m)
+  show ⊢@{IProp GF} refines ⊤
+    ((otpKLam m).fill pl(urand))
+    (Ectx.fill ([] : Ectx rT) pl(urand)) lrel_real
+  iapply (refines_couple_urands_lr
     (K' := ([] : Ectx rT)) (A := lrel_real)
     (f := fun r : rT => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)) hmp)
   iintro %r %_hr
   let Kfrac : Ectx rT := [EctxItem.unop .frac]
-  show ⊢@{IProp GF} iprop(refines ⊤
-    (Ectx.fill ([] : Ectx rT) pl({otpLam (rT := rT) m} #(.real r)))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
+  show ⊢@{IProp GF} refines ⊤
+    (Ectx.fill ([] : Ectx rT) pl({otpLam m} #(.real r)))
+    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
   -- β-reduce the `let`.
-  iapply (refines_pure_l (K := ([] : Ectx rT))
+  iapply (refines_pure_l
     (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
   simp only [Nat.repeat]
   iintro !>
-  show ⊢@{IProp GF} iprop(refines ⊤
+  show ⊢@{IProp GF} refines ⊤
     (Kfrac.fill pl(#(.real m) + #(.real r)))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
+    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
   -- Evaluate the addition.
-  iapply (refines_pure_l (K := Kfrac) (Hex := pureExec_binop)
+  iapply (refines_pure_l
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
   simp only [Nat.repeat]
   iintro !>
-  show ⊢@{IProp GF} iprop(refines ⊤
+  show ⊢@{IProp GF} refines ⊤
     (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m r)))))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
+    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
   -- Evaluate `frac`.
-  iapply (refines_pure_l (K := ([] : Ectx rT)) (Hex := pureExec_unop)
+  iapply (refines_pure_l
     ⟨IsVal.lit.toIsValue, rfl⟩)
   simp only [Nat.repeat]
   iintro !>
-  show ⊢@{IProp GF} iprop(refines ⊤
+  show ⊢@{IProp GF} refines ⊤
     pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real)
+    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
   iapply (refines_ret
     (v1 := (.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)) : Val rT))
     (v2 := (.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)) : Val rT))
@@ -109,37 +109,37 @@ theorem otp_refines_rev (m : rT) (g : rT → rT)
     (hinv : ∀ r ∈ ProbLangℝ.unifUnitSupport,
       ProbLangℝ.realFrac (ProbLangℝ.realAdd m (g r)) = r) :
     ⊢@{IProp GF} refines (⊤ : CoPset)
-      (otp_ideal (rT := rT)) (otp_enc (rT := rT) m) lrel_real := by
+      (otp_ideal) (otp_enc m) lrel_real := by
   simp only [otp_enc, otp_ideal, Exp.close, Exp.closeRec, ↓reduceIte]
-  show ⊢@{IProp GF} iprop(refines ⊤
+  show ⊢@{IProp GF} refines ⊤
     (Ectx.fill ([] : Ectx rT) pl(urand))
-    ((otpKLam (rT := rT) m).fill pl(urand)) lrel_real)
-  iapply (refines_couple_urands_lr (E := ⊤) (K := ([] : Ectx rT))
-    (K' := otpKLam (rT := rT) m) (A := lrel_real) (f := g) hmp)
+    ((otpKLam m).fill pl(urand)) lrel_real
+  iapply (refines_couple_urands_lr
+    (K' := otpKLam m) (A := lrel_real) (f := g) hmp)
   iintro %r %hr
   let Kfrac : Ectx rT := [EctxItem.unop .frac]
-  show ⊢@{IProp GF} iprop(refines ⊤
+  show ⊢@{IProp GF} refines ⊤
     pl(#(.real r))
-    (Ectx.fill ([] : Ectx rT) pl({otpLam (rT := rT) m} #(.real (g r))))
-    lrel_real)
+    (Ectx.fill ([] : Ectx rT) pl({otpLam m} #(.real (g r))))
+    lrel_real
   -- β-reduce the RHS `let`.
-  iapply (refines_pure_r (K := ([] : Ectx rT))
+  iapply (refines_pure_r
     (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
-  show ⊢@{IProp GF} iprop(refines ⊤
+  show ⊢@{IProp GF} refines ⊤
     pl(#(.real r))
-    (Kfrac.fill pl(#(.real m) + #(.real (g r)))) lrel_real)
+    (Kfrac.fill pl(#(.real m) + #(.real (g r)))) lrel_real
   -- Evaluate the addition.
-  iapply (refines_pure_r (K := Kfrac) (Hex := pureExec_binop)
+  iapply (refines_pure_r
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
-  show ⊢@{IProp GF} iprop(refines ⊤
+  show ⊢@{IProp GF} refines ⊤
     pl(#(.real r))
     (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m (g r))))))
-    lrel_real)
+    lrel_real
   -- Evaluate `frac`; the inverse law collapses the result to `r`.
-  iapply (refines_pure_r (K := ([] : Ectx rT)) (Hex := pureExec_unop)
+  iapply (refines_pure_r
     ⟨IsVal.lit.toIsValue, rfl⟩)
   rw [hinv r hr]
-  show ⊢@{IProp GF} iprop(refines ⊤ pl(#(.real r)) pl(#(.real r)) lrel_real)
+  show ⊢@{IProp GF} refines ⊤ pl(#(.real r)) pl(#(.real r)) lrel_real
   iapply (refines_ret (v1 := (.real r : Val rT)) (v2 := (.real r : Val rT))
     (hv1 := rfl) (hv2 := rfl))
   imodintro
@@ -186,10 +186,9 @@ def otpφ (v v' : Val rT) : Prop :=
   ∃ r : rT, v.1 = pl(#(.real r)) ∧ v'.1 = pl(#(.real r))
 
 theorem lrel_real_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :
-    ⊢@{IProp GF} iprop((lrel_real (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝) := by
+    ⊢@{IProp GF} (lrel_real (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝ := by
   iintro Hr
-  ihave HrEx := lrel_real_unfold v v' $$ Hr
-  icases HrEx with ⟨%r, %hv, %hv'⟩
+  icases lrel_real_unfold v v' $$ Hr with ⟨%r, %hv, %hv'⟩
   ipureintro
   exact ⟨r, hv, hv'⟩
 
@@ -226,7 +225,7 @@ omit [ProbLangℝ rT] in
 /-- On value configurations, `adequacyRel otpφ` *is* equality: both sides are the
 same real literal. This is what lets the two couplings be eliminated. -/
 theorem adequacyRel_otpφ_subset_eq :
-    adequacyRel (otpφ (rT := rT)) ⊆ {p : Exp rT × Exp rT | p.1 = p.2} := by
+    adequacyRel (otpφ) ⊆ {p : Exp rT × Exp rT | p.1 = p.2} := by
   rintro ⟨e₁, e₂⟩ ⟨v, v', hv, hv', r, hr, hr'⟩
   have h1 : e₁ = v.1 := (Exp.ofVal_of_toVal_some hv).symm
   have h2 : e₂ = v'.1 := (Exp.ofVal_of_toVal_some hv').symm
@@ -267,7 +266,7 @@ theorem otp_ideal_mass (σ : State ℝ) :
     have hae : ∀ᵐ ρ' ∂(primStep (⟨pl(urand), σ⟩ : Cfg ℝ)),
         execN 1 ρ' Set.univ = 1 := by
       rw [MeasureTheory.ae_iff]
-      refine MeasureTheory.measure_mono_null ?_ (Atomic.urand' (rT := ℝ) σ)
+      refine MeasureTheory.measure_mono_null ?_ (Atomic.urand' σ)
       intro ρ' hρ'
       simp only [Set.mem_compl_iff, Set.mem_setOf_eq]
       intro hv
@@ -284,7 +283,7 @@ theorem otp_ideal_mass (σ : State ℝ) :
     limExec_leq_mass (fun n => execN_univ_le_one n _)
   have hge : (1 : ENNReal) ≤ (limExec (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ)) Set.univ := by
     rw [limExec_univ', ← hstep]
-    exact le_iSup (fun n => (execN n (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ)) Set.univ) 2
+    exact le_iSup (fun n => (execN n (⟨otp_ideal, σ⟩ : Cfg ℝ)) Set.univ) 2
   have hlim : (limExec (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ)) Set.univ = 1 :=
     le_antisymm hle hge
   show (asExpr (limExec _)) Set.univ = 1
@@ -314,14 +313,14 @@ theorem otp_ideal_typed : Typed (rT := rT) Tctx.empty otp_ideal .real := .urand
 
 omit [ProbLangℝ rT] in
 theorem otpLam_typed (m : rT) :
-    Typed (rT := rT) Tctx.empty (otpLam m) (.arrow .real .real) := by
+    Typed Tctx.empty (otpLam m) (.arrow .real .real) := by
   refine Typed.lam ∅ (fun x _ => ?_)
   exact .unop_real (.binop_real .lit_real (.fvar (by simp [Tctx.insert])) rfl) rfl
 
 omit [ProbLangℝ rT] in
 /-- `otp_enc m` reads as `(fun k, frac (m + k)) urand`. -/
 theorem otp_enc_typed (m : rT) :
-    Typed (rT := rT) Tctx.empty (otp_enc m) .real :=
+    Typed Tctx.empty (otp_enc m) .real :=
   .app (otpLam_typed m) .urand
 
 end Typing

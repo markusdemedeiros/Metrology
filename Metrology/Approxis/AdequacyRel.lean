@@ -68,44 +68,36 @@ theorem approximates_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     (A : ∀ (_ : ApproxisRGS rT .hasNoLC GF), lrel rT GF)
     (φ : Val rT → Val rT → Prop) (e e' : Exp rT) (σ σ' : State rT) (ε : ENNReal)
     (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
-      ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
+      ⊢@{IProp GF} (A IR).car v v' -∗ ⌜φ v v'⌝)
     (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),
-      ⊢@{IProp GF} iprop(↯ ε -∗ refines ⊤ e e' (A IR))) :
+      ⊢@{IProp GF} ↯ ε -∗ refines ⊤ e e' (A IR)) :
     AddCoupl ε (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) := by
   -- Reduce relational adequacy to the WP-level adequacy theorem.
   apply wp_adequacy_error_lim (GF := GF) e e' σ σ' ε φ
   intro IGS ε' Hε'pos
   iintro He' Herr
   -- Allocate the non-atomic invariant pool needed to build an `ApproxisRGS`.
-  imod (Iris.NonAtomicInvariant.alloc) with HnaEx
-  icases HnaEx with ⟨%γ, Htok⟩
+  imod Iris.NonAtomicInvariant.alloc with ⟨%γ, Htok⟩
   set IR : ApproxisRGS rT .hasNoLC GF :=
     { approxisGS := IGS, naInvG := _, nais := γ }
   -- Split the supply: `ε` for the refinement, `ε' - ε > 0` as its own slack.
-  ihave Hsplit := ErrorCredit.difference (le_of_lt Hε'pos) $$ Herr
-  icases Hsplit with ⟨Hεc, Hrest⟩
+  icases ErrorCredit.difference (le_of_lt Hε'pos) $$ Herr with ⟨Hεc, Hrest⟩
   have Hrestpos : (0 : ENNReal) < ε' - ε := tsub_pos_of_lt Hε'pos
   -- Specialize the parametric `refines` to this instance and unfold to a WP.
   ihave HlogR := Hlog IR $$ Hεc
   ihave Hwp := refines_unfold $$ HlogR
-  -- Adapt `He'` to the empty-context form expected by `Hwp`.
-  ihave He'' : iprop(⤇ Ectx.fill ([] : Ectx rT) e') $$ [He']
-  · rw [← spec_eq_fill_nil e']; iexact He'
-  ispecialize Hwp $$ %([] : Ectx rT) %(ε' - ε) He'' Htok Hrest %Hrestpos
+  -- `Hwp` quantifies over an evaluation context, so put `He'` in empty-context form.
+  rw [spec_eq_fill_nil e']
+  ispecialize Hwp $$ %([] : Ectx rT) %(ε' - ε) He' Htok Hrest %Hrestpos
   -- Weaken the WP post-condition from `(A IR).car v v'` to `φ v v'`.
-  iapply (ApproxisWpGS.wp_mono
-    (Φ := fun v => iprop(∃ (v' : Val rT) (ε'' : ENNReal),
-      (⤇ Ectx.fill ([] : Ectx rT) v'.1) ∗ (naOwnP (rT := rT) ⊤) ∗ (↯ ε'') ∗
-      (⌜(0 : ENNReal) < ε''⌝) ∗ (A IR).car v v')))
-  case HΦ =>
-    intro v
-    iintro Hpost
-    icases Hpost with ⟨%v', %_, Hspec, _, _, %_, HA_v⟩
-    iexists v'
-    isplitl [Hspec]
-    · rw [← spec_fill_nil_eq_ofVal v']; iexact Hspec
-    · iapply (HA IR v v') $$ HA_v
-  iexact Hwp
+  iapply ApproxisWpGS.wp_mono $$ Hwp
+  intro v
+  iintro Hpost
+  icases Hpost with ⟨%v', %_, Hspec, -, -, %_, HA_v⟩
+  iexists v'
+  isplitl [Hspec]
+  · rw [← spec_fill_nil_eq_ofVal v']; iexact Hspec
+  · iapply (HA IR v v') $$ HA_v
 
 /-- **Exact relational adequacy**, the `ε = 0` case of `approximates_coupling`.
 Approxis's top-level statement for refinements that spend no error. -/
@@ -113,18 +105,19 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     (A : ∀ (_ : ApproxisRGS rT .hasNoLC GF), lrel rT GF)
     (φ : Val rT → Val rT → Prop) (e e' : Exp rT) (σ σ' : State rT)
     (HA : ∀ (IR : ApproxisRGS rT .hasNoLC GF) (v v' : Val rT),
-      ⊢@{IProp GF} iprop((A IR).car v v' -∗ ⌜φ v v'⌝))
+      ⊢@{IProp GF} (A IR).car v v' -∗ ⌜φ v v'⌝)
     (Hlog : ∀ (IR : ApproxisRGS rT .hasNoLC GF),
       ⊢@{IProp GF} refines ⊤ e e' (A IR)) :
     AddCoupl 0 (adequacyRel φ) (limExecV ⟨e, σ⟩) (limExecV ⟨e', σ'⟩) :=
-  approximates_coupling A φ e e' σ σ' 0 HA (fun IR => by
-    iintro _
-    ihave H := Hlog IR
-    iexact H)
+  approximates_coupling A φ e e' σ σ' 0 HA fun IR => by
+    iintro -
+    iapply Hlog IR
+
+section ApproxisFunctor
+variable (rT : Type) [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-- Concrete model for Approxis -/
-noncomputable def ApproxisFunctor (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : BundledGFunctors := fun n =>
+noncomputable def ApproxisFunctor : BundledGFunctors := fun n =>
   match n with
   | 0 => ⟨InvMapF, by infer_instance⟩
   | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
@@ -139,41 +132,35 @@ noncomputable def ApproxisFunctor (rT : Type) [ProbLangℝ rT]
 
 /-! ### `RefinesPreGS` instances for `ApproxisFunctor` -/
 
-instance ApproxisFunctor_WsatGpreS (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : WsatGpreS (ApproxisFunctor rT) where
+instance ApproxisFunctor_WsatGpreS : WsatGpreS (ApproxisFunctor rT) where
   inv := ⟨0, rfl⟩
   enabled := ⟨1, rfl⟩
   disabled := ⟨2, rfl⟩
 
-instance ApproxisFunctor_LcGpreS (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : LcGpreS (ApproxisFunctor rT) where
+instance ApproxisFunctor_LcGpreS : LcGpreS (ApproxisFunctor rT) where
   lc_elem := ⟨3, rfl⟩
 
-instance ApproxisFunctor_InvGpreS (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : InvGpreS (ApproxisFunctor rT) where
+instance ApproxisFunctor_InvGpreS : InvGpreS (ApproxisFunctor rT) where
   toWsatGpreS := ApproxisFunctor_WsatGpreS rT
   toLcGpreS := ApproxisFunctor_LcGpreS rT
 
-instance ApproxisFunctor_AppPreGS (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : AppPreGS rT (ApproxisFunctor rT) where
+instance ApproxisFunctor_AppPreGS : AppPreGS rT (ApproxisFunctor rT) where
   heap := ⟨4, rfl⟩
   tapes := ⟨5, rfl⟩
 
-instance ApproxisFunctor_SpecPreGS (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : SpecPreGS rT (ApproxisFunctor rT) where
+instance ApproxisFunctor_SpecPreGS : SpecPreGS rT (ApproxisFunctor rT) where
   prog := ⟨6, rfl⟩
   heap := ⟨4, rfl⟩
   tapes := ⟨5, rfl⟩
 
-instance ApproxisFunctor_ECPreGS (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : ECPreGS (ApproxisFunctor rT) where
+instance ApproxisFunctor_ECPreGS : ECPreGS (ApproxisFunctor rT) where
   ec := ⟨7, rfl⟩
 
-instance ApproxisFunctor_NaInvG (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : NaInvG (ApproxisFunctor rT) where
+instance ApproxisFunctor_NaInvG : NaInvG (ApproxisFunctor rT) where
   inv := ⟨8, rfl⟩
 
-instance ApproxisFunctor_RefinesPreGS (rT : Type) [ProbLangℝ rT]
-    [MeasurableSingletonClass rT] : RefinesPreGS rT (ApproxisFunctor rT) where
+instance ApproxisFunctor_RefinesPreGS : RefinesPreGS rT (ApproxisFunctor rT) where
+
+end ApproxisFunctor
 
 end ProbLang

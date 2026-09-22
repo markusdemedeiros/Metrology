@@ -75,7 +75,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
   iapply specCoupl_mono_spatial
   iframe
   iintro %σ₂ %ρ' %ε₂ HBody
-  iapply (progCoupl_mono (e₁ := e) (σ₁ := σ₂) (e₁' := ρ'.expr) (σ₁' := ρ'.state) (ε := ε₂))
+  iapply (progCoupl_mono (σ₁ := σ₂) (e₁' := ρ'.expr) (σ₁' := ρ'.state) (ε := ε₂))
   isplitr
   swap
   · iapply (progCoupl_strengthen
@@ -91,7 +91,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
   rcases Hreach with he₃val | Hε1
   · -- `⟨e₃, σ₃⟩` lies in the value set, which *is* the fact we wanted.
     iintro !>
-    iapply (specCoupl_bind (E1 := ∅) (E2 := ∅) Std.LawfulSet.subset_refl)
+    iapply (specCoupl_bind (E2 := ∅) Std.LawfulSet.subset_refl)
     isplitr [HInner]
     swap
     · iexact HInner
@@ -127,7 +127,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
         iexact HΦv
     irevert HBody4
     refine BI.entails_wand ?_
-    exact fupd_open_cont (E1 := ∅) (E2 := E2) (E3 := ∅) Hbody
+    exact fupd_open_cont (E2 := E2) (E3 := ∅) Hbody
   · iintro !>
     iapply specCoupl_err_ge_1
     exact Hε1
@@ -168,7 +168,7 @@ theorem of_atomic {e : Exp rT} (h : Atomic' e) : OpenInv e := by
       irevert HW'
       refine BI.entails_wand ?_
       refine fupd_open_cont (E1 := E2) (E2 := ∅) (E3 := ∅) ?_
-      exact (specCoupl_atomic_bridge_some (Φ := Φ) (v := v)).trans Iris.fupd_intro
+      exact (specCoupl_atomic_bridge_some (v := v)).trans Iris.fupd_intro
     | none =>
       irevert HW'
       refine BI.entails_wand ?_
@@ -176,7 +176,7 @@ theorem of_atomic {e : Exp rT} (h : Atomic' e) : OpenInv e := by
       exact (specCoupl_atomic_bridge_none h).trans Iris.fupd_intro
   irevert HFR
   refine BI.entails_wand ?_
-  exact fupd_open_frame_cont (E1 := E1) (E2 := E2) (E3 := ∅) Hbody
+  exact fupd_open_frame_cont (E2 := E2) (E3 := ∅) Hbody
 
 end OpenInv
 
@@ -249,7 +249,7 @@ instance (priority := low) elimAcc_wp_atomic {X : Type} {e : Exp rT} [h : IsOpen
     imod Hacc with ⟨%x, Hα, Hclose⟩
     imodintro
     ispecialize Hinner $$ %x Hα
-    iapply (ApproxisWpGS.wp_frame_wand (R := iprop(β x -∗ |={E₂, E₁}=> ((γ x).getD BIBase.emp))))
+    iapply (ApproxisWpGS.wp_frame_wand)
     isplitl [Hclose]
     · iexact Hclose
     iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E₂}=> β x ∗ (γ x -∗? Φ v))))
@@ -281,7 +281,7 @@ instance elimAcc_wp_nonatomic {X : Type} {e : Exp rT}
     imodintro
     ispecialize Hinner $$ %x Hα
     iapply ApproxisWpGS.wp_fupd
-    iapply (ApproxisWpGS.wp_frame_wand (R := iprop(β x -∗ |={E, E}=> ((γ x).getD BIBase.emp))))
+    iapply (ApproxisWpGS.wp_frame_wand)
     isplitl [Hclose]
     · iexact Hclose
     iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E}=> β x ∗ (γ x -∗? Φ v))))
