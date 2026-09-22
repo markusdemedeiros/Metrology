@@ -25,6 +25,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ## Forward reductions on the LHS -/
 
+-- TODO: delete me
 theorem nat_repeat_later_eq_laterN (n : Nat) (P : IProp GF) :
     Nat.repeat (fun Q : IProp GF => iprop(▷ Q)) n P = iprop(▷^[n] P) := by
   induction n with
