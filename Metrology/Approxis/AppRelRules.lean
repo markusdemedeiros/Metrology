@@ -94,8 +94,10 @@ theorem refines_steps_r {E : CoPset} {K' : Ectx rT} {e1 e2 e2' : Exp rT} {A : lr
 
 /-- `refines_wp_l` (app_rel_rules.v:41): embed a `wp` into a `refines` on the LHS.
 
-Rocq: `iIntros "He" (K' ε) "Hs Hnais Herr Hpos"; ApproxisWpGS.wp_bind; iApply (ApproxisWpGS.wp_wand with "He")`.
-In Lean Iris, `ApproxisWpGS.wp_wand` requires a persistent wand so we use `ApproxisWpGS.wp_frame_l` to thread
+Rocq: `iIntros "He" (K' ε) "Hs Hnais Herr Hpos"; ApproxisWpGS.wp_bind; iApply (ApproxisWpGS.wp_wand
+  with "He")`.
+In Lean Iris, `ApproxisWpGS.wp_wand` requires a persistent wand, so we use
+`ApproxisWpGS.wp_frame_l` to thread
 the spatial context through.
 
 **Port notes**: bare `unfold refines` unfolds EVERYWHERE, including the post of
@@ -110,7 +112,8 @@ theorem refines_wp_l {E : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel rT GF}
   iunfold refines
   iintro %K' %ε HK Hna Herr Hpos
   iapply ApproxisWpGS.wp_bind (K := K)
-  let R : IProp GF := iprop((⤇ K'.fill t) ∗ (naOwnP (rT := rT) (hlc := hlc) E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
+  let R : IProp GF := iprop((⤇ K'.fill t) ∗ (naOwnP (rT := rT) (hlc := hlc) E) ∗ (↯ ε) ∗ (⌜(0 :
+    ENNReal) < ε⌝))
   ihave HR : R $$ [HK Hna Herr Hpos]
   · isplitl [HK]; · iassumption
     iframe Hna Herr
@@ -182,7 +185,7 @@ theorem refines_alloc_l {E : CoPset} {K : Ectx rT} {v : Val rT} {t : Exp rT} {A 
     iprop(∀ (l : Loc), (l ↦ v) -∗ refines E (K.fill pl(#(.loc l))) t A)
       ⊢@{IProp GF} refines E (K.fill (.alloc v.1)) t A := by
   iintro Hlog
-  iapply (refines_wp_l)
+  iapply refines_wp_l
   rw [show Exp.alloc v.1 = Exp.alloc (Exp.ofVal v) from rfl]
   iapply wp_alloc
   iintro %l Hl
@@ -195,8 +198,8 @@ theorem refines_load_l {E : CoPset} {K : Ectx rT} {l : Loc} {t : Exp rT} {A : lr
     iprop(∃ v : Val rT, (l ↦ v) ∗ ((l ↦ v) -∗ refines E (K.fill v.1) t A))
       ⊢@{IProp GF} refines E (K.fill pl(!#(.loc l))) t A := by
   iintro ⟨%v, Hl, Hlog⟩
-  iapply (refines_wp_l)
-  iapply (wp_load)
+  iapply refines_wp_l
+  iapply wp_load
   iframe Hl
   iintro Hl
   iapply Hlog $$ Hl
@@ -209,7 +212,7 @@ theorem refines_store_l {E : CoPset} {K : Ectx rT} {l : Loc} {v' : Val rT} {t : 
     iprop(∃ v : Val rT, (l ↦ v) ∗ ((l ↦ v') -∗ refines E (K.fill pl(#(.unit))) t A))
       ⊢@{IProp GF} refines E (K.fill (.store pl(#(.loc l)) v'.1)) t A := by
   iintro ⟨%v, Hl, Hlog⟩
-  iapply (refines_wp_l)
+  iapply refines_wp_l
   rw [show Exp.store pl(#(.loc l)) v'.1 =
         Exp.store pl(#(.loc l)) (Exp.ofVal v') from rfl]
   -- `wp_store`'s `v` is the NEW value, `v'` is the OLD; swapped here.
@@ -294,7 +297,7 @@ theorem refines_randU_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A : l
             refines E (K.fill pl(#(.int n))) t A)
       ⊢@{IProp GF} refines E (K.fill (pl(rand(#(.int z), #(.unit))))) t A := by
   iintro Hlog
-  iapply (refines_wp_l)
+  iapply refines_wp_l
   iapply (wp_rand Hz)
   iintro %n %Hbnds
   iapply Hlog $$ %n %Hbnds
@@ -389,8 +392,7 @@ theorem refines_randT_empty_r {E : CoPset} {K : Ectx rT} {l : Loc} {z : Int}
   iintro %K' %ε Hj Hna Herr Hpos
   isimp only [Ectx.fill_comp K' K] at Hj
   iapply (wp_rand_tape_empty_r (K'.comp K) Hz)
-  iframe Hj
-  iframe Hα
+  iframe Hj Hα
   iintro %n HαNew HKRes %Hbnds
   isimp only [← Ectx.fill_comp K' K] at HKRes
   iapply Hlog $$ %n HαNew %Hbnds %K' %ε HKRes Hna Herr Hpos
@@ -401,7 +403,7 @@ theorem refines_alloctape_l {E : CoPset} {K : Ectx rT} {z : Int} {t : Exp rT} {A
             refines E (K.fill pl(#(.lbl l))) t A)
       ⊢@{IProp GF} refines E (K.fill (pl(tape(#(.int z))))) t A := by
   iintro Hlog
-  iapply (refines_wp_l)
+  iapply refines_wp_l
   iapply wp_alloctape
   iintro %l Hl
   iapply Hlog $$ %l Hl
@@ -437,9 +439,7 @@ theorem refines_wand {E : CoPset} {e1 e2 : Exp rT} {A A' : lrel rT GF} :
   · rw [← Hfill1, ← Hfill2]; iexact He
   iintro %v %v' HA
   ihave HAA' := HAA $$ %v %v'
-  have Hfillv1 : v.1 = Ectx.empty.fill v.1 := rfl
-  have Hfillv2 : v'.1 = Ectx.empty.fill v'.1 := rfl
-  rw [← Hfillv1, ← Hfillv2]
+  rw [← (show v.1 = Ectx.empty.fill v.1 from rfl), ← (show v'.1 = Ectx.empty.fill v'.1 from rfl)]
   iapply refines_ret (v1 := v) (v2 := v') (hv1 := rfl) (hv2 := rfl)
   iapply HAA' $$ HA
 
@@ -518,8 +518,7 @@ theorem refines_ind_amp {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} {k : NNRea
   iapply refines_get_ec
   iintro %ε Herr %hpos
   iapply (ErrorCredit.Induction.amplifying hpos hk) $$ [] Herr
-  imodintro
-  iintro %ε' %hε' #Hstep Hε'
+  iintro !> %ε' %hε' #Hstep Hε'
   iapply Hamp $$ %ε' %hε' Hstep Hε'
 
 /-- `refines_arrow_val_err` (app_rel_rules.v): `refines_ind_amp` at arrow type.
@@ -604,8 +603,7 @@ theorem refines_couple_rands_lr_adv
     (fun n => wp ⊤ (K.fill (Exp.ofVal n))
       (fun v => iprop(∃ v' ε',
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
-  iframe Hj
-  iframe Hε
+  iframe Hj Hε
   iintro %n %Hn Hec HKres
   isimp only [← Ectx.fill_comp K2 K'] at HKres
   rw [show Exp.ofVal (.int n : Val rT) = pl(#(.int n)) from rfl]
@@ -659,8 +657,7 @@ theorem refines_couple_tapes_bij {E : CoPset} {e e' : Exp rT} {A : lrel rT GF}
   iintro %K %ε Hj Hna Herr Hpos
   iapply (wp_couple_tapes_bij (αₛ := αₛ) (ns := ns) (nsₛ := nsₛ)
     f hdom hbij Hz)
-  iframe Hα
-  iframe Hαₛ
+  iframe Hα Hαₛ
   iintro %n %hn HA HS
   iapply Hcnt $$ %n %hn HA HS %K %ε Hj Hna Herr Hpos
 
@@ -686,8 +683,7 @@ theorem refines_couple_TU {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
     (fun n => wp ⊤ (K.fill (Exp.ofVal n))
       (fun v => iprop(∃ v' ε',
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
-  iframe Hα
-  iframe Hj
+  iframe Hα Hj
   iintro %n ⟨HαNew, HKres, %Hn⟩
   isimp only [← Ectx.fill_comp K2 K'] at HKres
   rw [show Exp.ofVal (.int n : Val rT) = pl(#(.int n)) from rfl]
@@ -715,8 +711,7 @@ theorem refines_couple_UT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
     (fun n => wp ⊤ (K.fill (Exp.ofVal n))
       (fun v => iprop(∃ v' ε',
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
-  iframe Hα'
-  iframe Hj
+  iframe Hα' Hj
   iintro %n ⟨Hα'New, HKres, %Hn⟩
   isimp only [← Ectx.fill_comp K2 K'] at HKres
   rw [show Exp.ofVal (.int n : Val rT) = pl(#(.int n)) from rfl]
@@ -744,9 +739,7 @@ theorem refines_couple_TT {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF} {z : In
     (fun n => wp ⊤ (K.fill (Exp.ofVal n))
       (fun v => iprop(∃ v' ε',
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
-  iframe Hα
-  iframe Hα'
-  iframe Hj
+  iframe Hα Hα' Hj
   iintro %n ⟨HαNew, Hα'New, HKres, %Hn⟩
   isimp only [← Ectx.fill_comp K2 K'] at HKres
   rw [show Exp.ofVal (.int n : Val rT) = pl(#(.int n)) from rfl]

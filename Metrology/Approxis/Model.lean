@@ -118,7 +118,7 @@ attribute [reducible, instance] ApproxisRGS.approxisGS ApproxisRGS.naInvG
 structure lrel (rT : Type _) (GF : BundledGFunctors) where
   car : Val rT → Val rT → IProp GF
   persistent v1 v2 : Persistent (car v1 v2)
-  closed v1 v2 : car v1 v2 ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝)
+  closed v1 v2 : car v1 v2 ⊢@{IProp GF} ⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝
 
 attribute [instance] lrel.persistent
 
@@ -215,7 +215,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
   Iris.NonAtomicInvariant.inv (GF := GF) (ApproxisRGS.nais (rT := rT) (hlc := hlc) GF) N P
 
 @[reducible] noncomputable def naCloseP (P : IProp GF) (N : Namespace) (E : CoPset) : IProp GF :=
-  iprop((▷ P) ∗ (naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) ={⊤}=∗ naOwnP (rT := rT) (hlc := hlc) E)
+  iprop((▷ P) ∗ (naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) ={⊤}=∗
+    naOwnP (rT := rT) (hlc := hlc) E)
 
 end NaShorthand
 
@@ -266,8 +267,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
     iprop(⌜v1.1 = pl(#(.unit)) ∧ v2.1 = pl(#(.unit))⌝ : IProp GF)
       ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
-  iintro %h
-  ipureintro
+  iintro %h !%
   exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_unit : lrel rT GF where
@@ -279,16 +279,14 @@ noncomputable def lrel_bool : lrel rT GF where
   car v1 v2 := iprop(∃ b : Bool, ⌜ v1.1 = pl(#(.bool b)) ∧ v2.1 = pl(#(.bool b)) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
-    iintro ⟨%b, %h⟩
-    ipureintro
+    iintro ⟨%b, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_nat : lrel rT GF where
   car v1 v2 := iprop(∃ n : Nat, ⌜ v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
-    iintro ⟨%n, %h⟩
-    ipureintro
+    iintro ⟨%n, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- Both values are the same positive integer literal (`0 < n`). -/
@@ -297,16 +295,14 @@ noncomputable def lrel_pos_nat : lrel rT GF where
     v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
-    iintro ⟨%n, %h⟩
-    ipureintro
+    iintro ⟨%n, %h⟩ !%
     exact ⟨h.2.1 ▸ Exp.lit_isClosedEmpty _, h.2.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_int : lrel rT GF where
   car v1 v2 := iprop(∃ n : Int, ⌜ v1.1 = pl(#(.int n)) ∧ v2.1 = pl(#(.int n)) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
-    iintro ⟨%n, %h⟩
-    ipureintro
+    iintro ⟨%n, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- Relatedness at the real type: both sides are the *same* real literal.
@@ -316,8 +312,7 @@ noncomputable def lrel_real : lrel rT GF where
   car v1 v2 := iprop(∃ r : rT, ⌜ v1.1 = pl(#(.real r)) ∧ v2.1 = pl(#(.real r)) ⌝)
   persistent _ _ := inferInstance
   closed v1 v2 := by
-    iintro ⟨%r, %h⟩
-    ipureintro
+    iintro ⟨%r, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 omit [ProbLangℝ rT] in
@@ -400,8 +395,7 @@ noncomputable def lrel_forall (C : lrel rT GF → lrel rT GF) : lrel rT GF where
   closed v1 v2 := by
     iintro Hall
     ihave Hinst := Hall $$ %(default : lrel rT GF)
-    iapply ((lrel_arr lrel_unit (C default)).closed v1 v2)
-    iexact Hinst
+    iapply ((lrel_arr lrel_unit (C default)).closed v1 v2) $$ Hinst
 
 /-- Trivial relation that relates everything that's closed. -/
 noncomputable def lrel_true : lrel rT GF where
@@ -425,8 +419,7 @@ instance lrelRec1_contractive (C : lrel rT GF -n> lrel rT GF) : OFE.Contractive 
     refine sep_ne.ne .rfl ?_
     refine Contractive.distLater_dist (f := (Iris.BI.later : IProp GF → IProp GF)) ?_
     intro k hk
-    have hk' : P ≡{k}≡ Q := hPQ k hk
-    exact C.ne.ne hk' w1 w2
+    exact C.ne.ne (show P ≡{k}≡ Q from hPQ k hk) w1 w2
 
 noncomputable def lrelRec1Hom (C : lrel rT GF -n> lrel rT GF) : lrel rT GF -c> lrel rT GF where
   f := lrelRec1 C
@@ -545,8 +538,7 @@ noncomputable def lrel_ref (A : lrel rT GF) : lrel rT GF where
         (iprop(∃ (w1 w2 : Val rT), (appHeapFrag l1 w1) ∗ (specHeapFrag l2 w2) ∗ A w1 w2)))
   persistent _ _ := inferInstance
   closed v1 v2 := by
-    iintro ⟨%l1, %l2, %h1, %h2, _⟩
-    ipureintro
+    iintro ⟨%l1, %l2, %h1, %h2, _⟩ !%
     exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_tape`: tape values whose contents are empty and sampled from the
@@ -559,8 +551,7 @@ noncomputable def lrel_tape : lrel rT GF where
         (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩))))
   persistent _ _ := inferInstance
   closed v1 v2 := by
-    iintro ⟨%α1, %α2, %z, %h1, %h2, _⟩
-    ipureintro
+    iintro ⟨%α1, %α2, %z, %h1, %h2, _⟩ !%
     exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- `lrel_ref` is nonexpansive in its content type. -/
@@ -813,7 +804,7 @@ theorem refines_bind (K K' : Ectx rT) {E : CoPset} {A A' : lrel rT GF} {e e' : E
   iapply ApproxisWpGS.wp_bind (K := K)
   ihave Hstep : iprop(wp ⊤ e (fun v => iprop(HfTy ∗ ΦInner v))) $$ [Hf Hm]
   · iapply ApproxisWpGS.wp_frame_l (R := HfTy) (e := e) (E := ⊤) (Φ := ΦInner)
-    isplitl [Hf]; · iexact Hf
+    iframe Hf
     iexact Hm
   iapply ApproxisWpGS.wp_mono
     (Φ := fun v => iprop(HfTy ∗ ΦInner v))
@@ -832,15 +823,15 @@ theorem refines_bind (K K' : Ectx rT) {E : CoPset} {A A' : lrel rT GF} {e e' : E
 `na_own ⊤` together with `A v1 v2`. -/
 theorem refines_ret_na {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
-    iprop((naOwnP (rT := rT) (hlc := hlc) E) ={⊤}=∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ A v1 v2) ⊢@{IProp GF}
+    iprop((naOwnP (rT := rT) (hlc := hlc) E) ={⊤}=∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ A v1
+      v2) ⊢@{IProp GF}
     refines E e1 e2 A := by
   subst hv1 hv2
   unfold refines
   iintro HFA
   iintro %K %ε
   iintro HK Hnais Herr Hpos
-  have hv : v1.1 = Exp.ofVal v1 := rfl
-  rw [hv]
+  rw [(show v1.1 = Exp.ofVal v1 from rfl)]
   iapply wp_value_fupd_of_toVal (Exp.toVal?_ofVal v1)
   ispecialize HFA $$ Hnais
   imod HFA with ⟨HF, HA⟩
@@ -852,15 +843,15 @@ theorem refines_ret_na {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel 
 /-- Dual of `refines_ret_na` splitting `⊤ = E ∪ (⊤ \ E)`. -/
 theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
-    iprop(|={⊤}=> (naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff (⊤ : CoPset) E)) ∗ A v1 v2) ⊢@{IProp GF}
+    iprop(|={⊤}=> (naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff (⊤ : CoPset) E)) ∗ A v1 v2) ⊢@{IProp
+      GF}
     refines E e1 e2 A := by
   subst hv1 hv2
   unfold refines
   iintro HFA
   iintro %K %ε
   iintro Hj Hnais Herr Hpos
-  have hv : v1.1 = Exp.ofVal v1 := rfl
-  rw [hv]
+  rw [(show v1.1 = Exp.ofVal v1 from rfl)]
   iapply wp_value_fupd_of_toVal (Exp.toVal?_ofVal v1)
   imod HFA with ⟨HF, HA⟩
   imodintro
@@ -871,14 +862,13 @@ theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel
     LawfulSet.subset_union_diff (fun _ _ => CoPset.mem_full)
   ihave Hfull : iprop(naOwnP (rT := rT) (hlc := hlc) ⊤) $$ [Hnais HF]
   · have heq : (⊤ : CoPset) = E ∪ (SDiff.sdiff (⊤ : CoPset) E) := hunion.symm
-    rw [show (naOwnP (rT := rT) (hlc := hlc) (⊤ : CoPset)) = naOwnP (rT := rT) (hlc := hlc) (E ∪ (SDiff.sdiff (⊤ : CoPset) E)) from
+    rw [show (naOwnP (rT := rT) (hlc := hlc) (⊤ : CoPset)) = naOwnP (rT := rT) (hlc := hlc) (E ∪
+      (SDiff.sdiff (⊤ : CoPset) E)) from
         congrArg _ heq]
     iapply (Iris.NonAtomicInvariant.own_union hdisj).mpr
-    isplitl [Hnais]
-    · iexact Hnais
+    iframe Hnais
     · iexact HF
-  isplitl [Hfull]; · iexact Hfull
-  iframe Herr Hpos
+  iframe Hfull Herr Hpos
   iassumption
 
 /-- From `|={⊤}=> A v1 v2`, conclude `REL v1 << v2 : A`. -/
@@ -890,8 +880,7 @@ theorem refines_ret {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
   iintro HA
   iintro %K %ε
   iintro Hj Hna Herr Hpos
-  have hv : v1.1 = Exp.ofVal v1 := rfl
-  rw [hv]
+  rw [(show v1.1 = Exp.ofVal v1 from rfl)]
   iapply wp_value_fupd_of_toVal (Exp.toVal?_ofVal v1)
   imod HA
   imodintro
@@ -943,7 +932,8 @@ theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Ex
 
 theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp rT} {A : lrel rT GF}
     (HNE : (↑N : CoPset) ⊆ E) :
-    iprop((naInvP (rT := rT) (hlc := hlc) N P) ∗ ((▷ P) ∗ (naCloseP (rT := rT) (hlc := hlc) P N E) -∗
+    iprop((naInvP (rT := rT) (hlc := hlc) N P) ∗ ((▷ P) ∗ (naCloseP (rT := rT) (hlc := hlc) P N E)
+      -∗
         refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A)) ⊢@{IProp GF}
     refines E e1 e2 A := by
   unfold refines
@@ -965,7 +955,8 @@ theorem refines_na_close {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Ex
   unfold refines
   iintro ⟨HP, Hclose, IH⟩
   iintro %K %ε Hj HownFN Herr Hpos
-  ihave Hpair : iprop((▷ P) ∗ naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) $$ [$HP $HownFN]
+  ihave Hpair : iprop((▷ P) ∗ naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) :
+    CoPset))) $$ [$HP $HownFN]
   ihave HownF := Hclose $$ Hpair
   iapply ApproxisWpGS.fupd_wp
   imod HownF with HownF'

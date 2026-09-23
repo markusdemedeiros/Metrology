@@ -49,8 +49,7 @@ theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
     iprop(▷ ∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗ Φ (.real r : Val rT))
       ⊢@{IProp GF} wp E pl(urand) Φ := by
   iintro HΦ
-  have Hnv : (pl(urand) : Exp rT).toVal? = none :=
-    Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
+  have Hnv : (pl(urand) : Exp rT).toVal? = none := Exp.urand_toVal?_eq_none
   have hhead : ∀ σ₁ : State rT, HeadReducible (pl(urand) : Exp rT) σ₁ :=
     fun σ₁ => show Cfg.uniformReal σ₁ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
   have hps : ∀ σ₁ : State rT, primStep (⟨pl(urand), σ₁⟩ : Cfg rT)
@@ -100,7 +99,7 @@ theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
   cases heq
   imodintro
   simp only [Exp.toVal?_lit]
-  isplitl [Hσ]; · iexact Hσ
+  iframe Hσ
   iapply HΦ $$ %r
   ipureintro
   exact hr
@@ -163,8 +162,7 @@ theorem wp_couple_urand_urand (f : rT → rT)
           (⤇ K.fill (pl(#(.real (f r))))) -∗ Φ (.real r : Val rT)))
       ⊢@{IProp GF} wp E pl(urand) Φ := by
   iintro ⟨Hj, Hcnt⟩
-  have Hv : (pl(urand) : Exp rT).toVal? = none :=
-    Exp.toVal?_eq_none.mpr fun ⟨w⟩ => nomatch w
+  have Hv : (pl(urand) : Exp rT).toVal? = none := Exp.urand_toVal?_eq_none
   have Hnval : ¬ (pl(urand) : Exp rT).isValue := fun ⟨w⟩ => nomatch w
   have hhead : ∀ τ : State rT, HeadReducible (pl(urand) : Exp rT) τ :=
     fun τ => show Cfg.uniformReal τ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
@@ -191,7 +189,6 @@ theorem wp_couple_urand_urand (f : rT → rT)
   isplitr
   · ipureintro
     rw [hps σ₁, primStep_fill Hnval, hps σ₁']
-    have Hbase := Cfg.uniformReal_addCoupl_bij σ₁ σ₁' f hmp
     have hKm : Measurable (fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT)) := by
       measurability
     have hmap : AddCoupl 0
@@ -200,7 +197,7 @@ theorem wp_couple_urand_urand (f : rT → rT)
         ((Cfg.uniformReal σ₁').map (fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))) := by
       refine AddCoupl.map (f := id)
         (g := fun ρ : Cfg rT => (⟨K.fill ρ.expr, ρ.state⟩ : Cfg rT))
-        measurable_id hKm ?_ Hbase
+        measurable_id hKm ?_ (Cfg.uniformReal_addCoupl_bij σ₁ σ₁' f hmp)
       rintro a b ⟨r, hr, rfl, rfl⟩
       exact ⟨r, hr, rfl, rfl⟩
     rw [MeasureTheory.Measure.map_id] at hmap
@@ -210,17 +207,13 @@ theorem wp_couple_urand_urand (f : rT → rT)
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
   obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
   iintro !> !>
-  ihave HUpd := specProg_update
-    (e3 := K.fill (pl(#(.real (f r))))) $$ Hs Hj
-  imod HUpd with ⟨Hs', Hj'⟩
+  imod specProg_update
+    (e3 := K.fill (pl(#(.real (f r))))) $$ Hs Hj with ⟨Hs', Hj'⟩
   imod Hclose
   imodintro
-  isplitl [Hσ]; · iexact Hσ
-  isplitl [Hs']; · iexact Hs'
-  isplitl [Hε]; · iexact Hε
+  iframe Hσ Hs' Hε
   iapply (wp_value_of_toVal rfl)
-  iapply Hcnt $$ %r %hrsupp
-  iexact Hj'
+  iapply Hcnt $$ %r %hrsupp Hj'
 
 end Unary
 
@@ -258,15 +251,14 @@ theorem refines_couple_urands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF}
     (fun v => wp ⊤ (K.fill (Exp.ofVal v))
       (fun v => iprop(∃ v' ε',
         (⤇ K2.fill v'.1) ∗ naOwnP ⊤ ∗ (↯ ε') ∗ (⌜(0 : ENNReal) < ε'⌝) ∗ A.car v v'))))
-  isplitl [Hj']; · iexact Hj'
+  iframe Hj'
   iintro %r %hrsupp HKres
   have hfcN : K2.fill (K'.fill (pl(#(.real (f r))) : Exp rT)) =
       (K2.comp K').fill (pl(#(.real (f r))) : Exp rT) := Ectx.fill_comp K2 K' _
   ihave HKres' : iprop(⤇ K2.fill (K'.fill (pl(#(.real (f r))) : Exp rT))) $$ [HKres]
   · rw [hfcN]; iexact HKres
   ispecialize Hcnt $$ %r %hrsupp
-  have hfillN : Exp.ofVal (.real r : Val rT) = pl(#(.real r)) := rfl
-  rw [hfillN]
+  rw [(show Exp.ofVal (.real r : Val rT) = pl(#(.real r)) from rfl)]
   iapply Hcnt $$ %K2 %ε HKres' Hna Herr Hpos
 
 

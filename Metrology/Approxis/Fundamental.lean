@@ -14,7 +14,8 @@ public import Metrology.Approxis.Interp
 
 /-! # Fundamental Theorem
 
-Fundamental theorem of the logical relation: well-typed terms are related to themselves, plus per-constructor `bin_log_related_*` compatibility lemmas. -/
+Fundamental theorem of the logical relation: well-typed terms are related to themselves,
+plus per-constructor `bin_log_related_*` compatibility lemmas. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
@@ -41,19 +42,12 @@ theorem bin_log_related_var (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) (x : Var) (τ
   unfold bin_log_related_ty bin_log_related
   iintro %vs #Hvs
   icases env_ltyped2_lookup Γ vs x (interp τ Δ) hΓ $$ Hvs with ⟨%v1, %v2, %hvs_eq, HA⟩
-  ihave %Hclosed := env_ltyped2_allClosed Γ vs $$ Hvs
+  ihave %hfst_closed := env_ltyped2_fst_allClosed Γ vs $$ Hvs
+  ihave %hsnd_closed := env_ltyped2_snd_allClosed Γ vs $$ Hvs
   have hfst_lookup : SubstMap.lookup vs.fst x = some v1.1 := by
     rw [ValSubstMap.fst_lookup, hvs_eq]; rfl
   have hsnd_lookup : SubstMap.lookup vs.snd x = some v2.1 := by
     rw [ValSubstMap.snd_lookup, hvs_eq]; rfl
-  have hfst_closed : SubstMap.AllClosed vs.fst := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hclosed (z, w1, w2) hmem).1
-  have hsnd_closed : SubstMap.AllClosed vs.snd := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hclosed (z, w1, w2) hmem).2
   rw [Exp.substMap_fvar_lookup_some _ _ hfst_closed hfst_lookup,
       Exp.substMap_fvar_lookup_some _ _ hsnd_closed hsnd_lookup]
   iapply (refines_ret (hv1 := rfl) (hv2 := rfl))
@@ -72,9 +66,7 @@ theorem bin_log_related_pair (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_pair, Exp.substMap_pair, interp_prod]
-  iapply (refines_pair) $$ [IH1']
-  · iexact IH1'
-  iexact IH2'
+  iapply refines_pair $$ IH1' IH2'
 
 theorem bin_log_related_fst (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
@@ -85,11 +77,8 @@ theorem bin_log_related_fst (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_fst, Exp.substMap_fst]
-  ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-      (lrel_prod (interp τ1 Δ) (interp τ2 Δ))) $$ [IH']
-  · rw [← interp_prod]; iexact IH'
-  iapply (refines_fst)
-  iexact IH''
+  isimp only [interp_prod] at IH'
+  iapply refines_fst $$ IH'
 
 theorem bin_log_related_snd (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
@@ -100,11 +89,8 @@ theorem bin_log_related_snd (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_snd, Exp.substMap_snd]
-  ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-      (lrel_prod (interp τ1 Δ) (interp τ2 Δ))) $$ [IH']
-  · rw [← interp_prod]; iexact IH'
-  iapply (refines_snd)
-  iexact IH''
+  isimp only [interp_prod] at IH'
+  iapply refines_snd $$ IH'
 
 theorem bin_log_related_injl (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
@@ -115,7 +101,7 @@ theorem bin_log_related_injl (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_inl, Exp.substMap_inl, interp_sum]
-  iapply (refines_injl) $$ IH'
+  iapply refines_injl $$ IH'
 
 theorem bin_log_related_injr (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
@@ -126,7 +112,7 @@ theorem bin_log_related_injr (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_inr, Exp.substMap_inr, interp_sum]
-  iapply (refines_injr) $$ IH'
+  iapply refines_injr $$ IH'
 
 theorem bin_log_related_case (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e0 e1 e2 e0' e1' e2' : Exp rT} {τ1 τ2 τ3 : Ty} :
@@ -141,22 +127,16 @@ theorem bin_log_related_case (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_case, Exp.substMap_case]
-  ihave IH0'' : iprop(refines ⊤ (Exp.substMap vs.fst e0) (Exp.substMap vs.snd e0')
-      (lrel_sum (interp τ1 Δ) (interp τ2 Δ))) $$ [IH0']
-  · rw [← interp_sum]; iexact IH0'
-  ihave IH1'' : iprop(refines ⊤ (Exp.substMap vs.fst e1) (Exp.substMap vs.snd e1')
-      (lrel_arr (interp τ1 Δ) (interp τ3 Δ))) $$ [IH1']
-  · rw [← interp_arrow]; iexact IH1'
-  ihave IH2'' : iprop(refines ⊤ (Exp.substMap vs.fst e2) (Exp.substMap vs.snd e2')
-      (lrel_arr (interp τ2 Δ) (interp τ3 Δ))) $$ [IH2']
-  · rw [← interp_arrow]; iexact IH2'
+  isimp only [interp_sum] at IH0'
+  isimp only [interp_arrow] at IH1'
+  isimp only [interp_arrow] at IH2'
   ihave HRcaseApp := refines_case
     (e0 := Exp.substMap vs.fst e0) (e0' := Exp.substMap vs.snd e0')
     (e1 := Exp.substMap vs.fst e1) (e1' := Exp.substMap vs.snd e1')
-    (e2 := Exp.substMap vs.fst e2) (e2' := Exp.substMap vs.snd e2') $$ [IH0'']
-  · iexact IH0''
+    (e2 := Exp.substMap vs.fst e2) (e2' := Exp.substMap vs.snd e2') $$ [IH0']
+  · iexact IH0'
   ihave HRcaseApp1 := HRcaseApp $$ [$]
-  iapply HRcaseApp1 $$ IH2''
+  iapply HRcaseApp1 $$ IH2'
 
 theorem bin_log_related_if (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e0 e1 e2 e0' e1' e2' : Exp rT} {τ : Ty} :
@@ -171,14 +151,12 @@ theorem bin_log_related_if (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_cond, Exp.substMap_cond]
-  ihave IH0'' : iprop(refines ⊤ (Exp.substMap vs.fst e0) (Exp.substMap vs.snd e0')
-      lrel_bool) $$ [IH0']
-  · rw [← interp_bool]; iexact IH0'
+  isimp only [interp_bool] at IH0'
   ihave HRifApplied := refines_if
     (e0' := Exp.substMap vs.snd e0') (e1 := Exp.substMap vs.fst e1)
     (e1' := Exp.substMap vs.snd e1') (e2 := Exp.substMap vs.fst e2)
-    (e2' := Exp.substMap vs.snd e2') $$ [IH0'']
-  · iexact IH0''
+    (e2' := Exp.substMap vs.snd e2') $$ [IH0']
+  · iexact IH0'
   ihave HRif1 := HRifApplied $$ [$]
   iapply HRif1 $$ IH2'
 
@@ -193,12 +171,8 @@ theorem bin_log_related_app (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_app, Exp.substMap_app]
-  ihave IH1'' : iprop(refines ⊤ (Exp.substMap vs.fst e1) (Exp.substMap vs.snd e1')
-      (lrel_arr (interp τ1 Δ) (interp τ2 Δ))) $$ [IH1']
-  · rw [← interp_arrow]; iexact IH1'
-  iapply (refines_app) $$ [IH1'']
-  · iexact IH1''
-  iexact IH2'
+  isimp only [interp_arrow] at IH1'
+  iapply refines_app $$ IH1' IH2'
 
 theorem bin_log_related_lam (Δ : TyEnv rT GF)
     (Γ : RelCtx rT GF) {e e' : Exp rT} {τ1 τ2 : Ty} (L : Finset Var)
@@ -214,96 +188,19 @@ theorem bin_log_related_lam (Δ : TyEnv rT GF)
   iintro %vs #Hvs
   rw [Exp.substMap_lam, Exp.substMap_lam]
   rw [interp_arrow]
-  ihave %Hvs_closed := env_ltyped2_allClosed Γ vs $$ Hvs
-  have hvsfst_closed : SubstMap.AllClosed vs.fst := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).1
-  have hvssnd_closed : SubstMap.AllClosed vs.snd := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).2
-  have hlam_lc : (Exp.lam (Exp.substMap vs.fst e)).IsLocallyClosed := by
-    refine Exp.IsLocallyClosed.lam (L ∪ (vs.map (·.1)).toFinset) _ ?_
-    intro y hy
-    have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
-    have hyNotDom : y ∉ (vs.map (·.1)).toFinset :=
-      fun h => hy (Finset.mem_union_right _ h)
-    have hyVsFst : SubstMap.lookup vs.fst y = none := by
-      rw [ValSubstMap.fst_lookup]
-      have : ValSubstMap.lookup vs y = none := by
-        have aux : ∀ (ys : ValSubstMap rT), y ∉ (ys.map (·.1)).toFinset →
-            ValSubstMap.lookup ys y = none := by
-          intro ys
-          induction ys with
-          | nil => intro _; rfl
-          | cons p rest ih =>
-            obtain ⟨z, _⟩ := p
-            intro hyNot
-            simp only [List.map_cons, List.toFinset_cons,
-              Finset.mem_insert, not_or] at hyNot
-            simp only [ValSubstMap.lookup, ih hyNot.2]
-            simp [hyNot.1]
-        exact aux vs hyNotDom
-      rw [this]; rfl
-    have hbridge : Exp.substMap vs.fst (Exp.open' e (.fvar y)) =
-        Exp.open' (Exp.substMap vs.fst e) (.fvar y) := by
-      rw [Exp.substMap_open _ _ _ hvsfst_closed]
-      rw [Exp.substMap_fvar_lookup_none hyVsFst]
-    rw [← hbridge]
-    exact Exp.substMap_lc hvsfst_closed (he_lc y hyL)
-  have hlam'_lc : (Exp.lam (Exp.substMap vs.snd e')).IsLocallyClosed := by
-    refine Exp.IsLocallyClosed.lam (L ∪ (vs.map (·.1)).toFinset) _ ?_
-    intro y hy
-    have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
-    have hyNotDom : y ∉ (vs.map (·.1)).toFinset :=
-      fun h => hy (Finset.mem_union_right _ h)
-    have hyVsSnd : SubstMap.lookup vs.snd y = none := by
-      rw [ValSubstMap.snd_lookup]
-      have : ValSubstMap.lookup vs y = none := by
-        have aux : ∀ (ys : ValSubstMap rT), y ∉ (ys.map (·.1)).toFinset →
-            ValSubstMap.lookup ys y = none := by
-          intro ys
-          induction ys with
-          | nil => intro _; rfl
-          | cons p rest ih =>
-            obtain ⟨z, _⟩ := p
-            intro hyNot
-            simp only [List.map_cons, List.toFinset_cons,
-              Finset.mem_insert, not_or] at hyNot
-            simp only [ValSubstMap.lookup, ih hyNot.2]
-            simp [hyNot.1]
-        exact aux vs hyNotDom
-      rw [this]; rfl
-    have hbridge : Exp.substMap vs.snd (Exp.open' e' (.fvar y)) =
-        Exp.open' (Exp.substMap vs.snd e') (.fvar y) := by
-      rw [Exp.substMap_open _ _ _ hvssnd_closed]
-      rw [Exp.substMap_fvar_lookup_none hyVsSnd]
-    rw [← hbridge]
-    exact Exp.substMap_lc hvssnd_closed (he'_lc y hyL)
-  have hdom_eq_fst : (vs.fst.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
-    show ((vs.map fun p => (p.1, p.2.1.1)).map (·.1)).toFinset = _
-    simp only [List.map_map]; rfl
-  have hdom_eq_snd : (vs.snd.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
-    show ((vs.map fun p => (p.1, p.2.2.1)).map (·.1)).toFinset = _
-    simp only [List.map_map]; rfl
-  ihave %hDom := env_ltyped2_domEq Γ vs $$ Hvs
-  have hΓdomVs : (Γ.map (·.1)).toFinset ⊆ (vs.map (·.1)).toFinset := by
-    intro y hy
-    simp only [List.mem_toFinset, List.mem_map] at hy
-    obtain ⟨p, hpmem, hpeq⟩ := hy
-    subst hpeq
-    have hyΓlookup : (Γ.lookup p.1).isSome := RelCtx.lookup_isSome_of_mem hpmem
-    have hyVsLookup : (vs.lookup p.1).isSome := (hDom p.1).mp hyΓlookup
-    obtain ⟨q, hqmem, hqeq⟩ := ValSubstMap.mem_of_lookup_isSome hyVsLookup
-    simp only [List.mem_toFinset, List.mem_map]
-    exact ⟨q, hqmem, hqeq⟩
+  ihave %hvsfst_closed := env_ltyped2_fst_allClosed Γ vs $$ Hvs
+  ihave %hvssnd_closed := env_ltyped2_snd_allClosed Γ vs $$ Hvs
+  have hlam_lc : (Exp.lam (Exp.substMap vs.fst e)).IsLocallyClosed :=
+    Exp.lam_substMap_isLocallyClosed hvsfst_closed
+      (fun _ hy => ValSubstMap.fst_lookup_eq_none_of_not_mem hy) he_lc
+  have hlam'_lc : (Exp.lam (Exp.substMap vs.snd e')).IsLocallyClosed :=
+    Exp.lam_substMap_isLocallyClosed hvssnd_closed
+      (fun _ hy => ValSubstMap.snd_lookup_eq_none_of_not_mem hy) he'_lc
+  ihave %hΓdomVs := env_ltyped2_domSubset Γ vs $$ Hvs
   have he_dom_fst : e.fv ⊆ (vs.fst.map (·.1)).toFinset := by
-    rw [hdom_eq_fst]
-    exact he_fv.trans hΓdomVs
+    rw [ValSubstMap.fst_dom]; exact he_fv.trans hΓdomVs
   have he_dom_snd : e'.fv ⊆ (vs.snd.map (·.1)).toFinset := by
-    rw [hdom_eq_snd]
-    exact he'_fv.trans hΓdomVs
+    rw [ValSubstMap.snd_dom]; exact he'_fv.trans hΓdomVs
   have hlam_closed : (Exp.lam (Exp.substMap vs.fst e)).isClosedEmpty ∧
       (Exp.lam (Exp.substMap vs.snd e')).isClosedEmpty := by
     refine ⟨⟨hlam_lc, ?_⟩, ⟨hlam'_lc, ?_⟩⟩
@@ -319,16 +216,10 @@ theorem bin_log_related_lam (Δ : TyEnv rT GF)
   ihave %hv1v2_closed : iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF) $$ [HA]
   · iapply (interp_closed τ1 v1 v2)
     iexact HA
-  obtain ⟨x, hx⟩ := HasFresh.fresh_exists
-    (L ∪ e.fv ∪ e'.fv ∪ (vs.map (·.1)).toFinset)
-  have hxL : x ∉ L :=
-    fun h => hx (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_left _ h)))
-  have hxFvE : x ∉ e.fv :=
-    fun h => hx (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_right _ h)))
-  have hxFvE' : x ∉ e'.fv :=
-    fun h => hx (Finset.mem_union_left _ (Finset.mem_union_right _ h))
-  have hxNotDom : x ∉ (vs.map (·.1)).toFinset :=
-    fun h => hx (Finset.mem_union_right _ h)
+  obtain ⟨x, hx⟩ :=
+    HasFresh.fresh_exists (L ∪ e.fv ∪ e'.fv ∪ (vs.map (·.1)).toFinset)
+  simp only [Finset.mem_union, not_or] at hx
+  obtain ⟨⟨⟨hxL, hxFvE⟩, hxFvE'⟩, hxNotDom⟩ := hx
   have HbodyAtX := Hbody x hxL
   let vs' : ValSubstMap rT := (x, (v1, v2)) :: vs
   have hv1c : v1.1.isClosed .empty :=
@@ -337,59 +228,27 @@ theorem bin_log_related_lam (Δ : TyEnv rT GF)
     ⟨hv1v2_closed.2.1, by rw [hv1v2_closed.2.2]; exact Finset.empty_subset _⟩
   ihave Hvs' : iprop(env_ltyped2 ((x, interp τ1 Δ) :: Γ) vs') $$ [HA]
   · iapply (env_ltyped2_insert Γ vs x (interp τ1 Δ) v1 v2 hv1c hv2c)
-    isplitr [HA]
-    · iexact HA
+    iframe HA
     iexact Hvs
   unfold bin_log_related_ty bin_log_related at HbodyAtX
-  ihave HbodyAtX_iris := HbodyAtX
-  ihave HbodyApplied : iprop(refines (⊤ : CoPset)
-      (Exp.substMap vs'.fst (Exp.open' e (.fvar x)))
-      (Exp.substMap vs'.snd (Exp.open' e' (.fvar x)))
-      (interp τ2 Δ)) $$ [HbodyAtX_iris Hvs']
-  · iapply HbodyAtX_iris
-    iexact Hvs'
-  have hxDomVs : ValSubstMap.lookup vs x = none := by
-    have aux : ∀ (ys : ValSubstMap rT), x ∉ (ys.map (·.1)).toFinset →
-        ValSubstMap.lookup ys x = none := by
-      intro ys
-      induction ys with
-      | nil => intro _; rfl
-      | cons p rest ih =>
-        obtain ⟨y, _⟩ := p
-        intro hxNot
-        simp only [List.map_cons, List.toFinset_cons, Finset.mem_insert, not_or] at hxNot
-        have hxNeY : x ≠ y := hxNot.1
-        have hxNotRest : x ∉ (rest.map (·.1)).toFinset := hxNot.2
-        simp only [ValSubstMap.lookup]
-        rw [ih hxNotRest]
-        simp [hxNeY]
-    exact aux vs hxNotDom
-  have hxDomFst : SubstMap.lookup vs.fst x = none := by
-    rw [ValSubstMap.fst_lookup, hxDomVs]; rfl
-  have hxDomSnd : SubstMap.lookup vs.snd x = none := by
-    rw [ValSubstMap.snd_lookup, hxDomVs]; rfl
-  have hv1_lc : v1.1.IsLocallyClosed := hv1v2_closed.1.1
-  have hv2_lc : v2.1.IsLocallyClosed := hv1v2_closed.2.1
+  ihave HbodyApplied := HbodyAtX $$ Hvs'
+  have hxDomFst : SubstMap.lookup vs.fst x = none :=
+    ValSubstMap.fst_lookup_eq_none_of_not_mem hxNotDom
+  have hxDomSnd : SubstMap.lookup vs.snd x = none :=
+    ValSubstMap.snd_lookup_eq_none_of_not_mem hxNotDom
   have hbridge_fst : Exp.substMap vs'.fst (Exp.open' e (.fvar x)) =
       Exp.open' (Exp.substMap vs.fst e) v1.1 := by
     show Exp.substMap ((x, v1.1) :: vs.fst) (Exp.open' e (.fvar x)) =
         Exp.open' (Exp.substMap vs.fst e) v1.1
-    exact Exp.substMap_open_fresh hvsfst_closed hxFvE hxDomFst hv1_lc
+    exact Exp.substMap_open_fresh hvsfst_closed hxFvE hxDomFst hv1v2_closed.1.1
   have hbridge_snd : Exp.substMap vs'.snd (Exp.open' e' (.fvar x)) =
       Exp.open' (Exp.substMap vs.snd e') v2.1 := by
     show Exp.substMap ((x, v2.1) :: vs.snd) (Exp.open' e' (.fvar x)) =
         Exp.open' (Exp.substMap vs.snd e') v2.1
-    exact Exp.substMap_open_fresh hvssnd_closed hxFvE' hxDomSnd hv2_lc
-  ihave HbodyApplied' : iprop(refines (⊤ : CoPset)
-      (Exp.open' (Exp.substMap vs.fst e) v1.1)
-      (Exp.open' (Exp.substMap vs.snd e') v2.1)
-      (interp τ2 Δ)) $$ [HbodyApplied]
-  · rw [← hbridge_fst, ← hbridge_snd]; iexact HbodyApplied
-  have hL1 : Exp.app (Exp.lam (Exp.substMap vs.fst e)) v1.1 =
-    Ectx.fill ([] : Ectx rT) (Exp.app (Exp.lam (Exp.substMap vs.fst e)) v1.1) := rfl
-  have hR1 : Exp.app (Exp.lam (Exp.substMap vs.snd e')) v2.1 =
-    Ectx.fill ([] : Ectx rT) (Exp.app (Exp.lam (Exp.substMap vs.snd e')) v2.1) := rfl
-  rw [hL1, hR1]
+    exact Exp.substMap_open_fresh hvssnd_closed hxFvE' hxDomSnd hv1v2_closed.2.1
+  isimp only [hbridge_fst, hbridge_snd] at HbodyApplied
+  rw [Ectx.eq_fill_nil (Exp.app (Exp.lam (Exp.substMap vs.fst e)) v1.1),
+      Ectx.eq_fill_nil (Exp.app (Exp.lam (Exp.substMap vs.snd e')) v2.1)]
   iapply (refines_pure_l
     (e' := Exp.open' (Exp.substMap vs.fst e) v1.1)
     (Hex := pureExec_app_lam)
@@ -399,12 +258,8 @@ theorem bin_log_related_lam (Δ : TyEnv rT GF)
     (e' := Exp.open' (Exp.substMap vs.snd e') v2.1)
     (Hex := pureExec_app_lam)
     ⟨v2.2.toIsValue, by is_lc⟩)
-  have hf1 : (Ectx.fill ([] : Ectx rT) (Exp.open' (Exp.substMap vs.fst e) v1.1)) =
-      Exp.open' (Exp.substMap vs.fst e) v1.1 := rfl
-  have hf2 : (Ectx.fill ([] : Ectx rT) (Exp.open' (Exp.substMap vs.snd e') v2.1)) =
-      Exp.open' (Exp.substMap vs.snd e') v2.1 := rfl
-  rw [hf1, hf2]
-  iexact HbodyApplied'
+  simp only [Ectx.fill_nil]
+  iexact HbodyApplied
 
 theorem bin_log_related_fix (Δ : TyEnv rT GF)
     (Γ : RelCtx rT GF) {e e' : Exp rT} {τ1 τ2 : Ty} (L : Finset Var)
@@ -421,95 +276,20 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
   unfold bin_log_related_ty bin_log_related
   iintro %vs #Hvs
   rw [Exp.substMap_fix, Exp.substMap_fix, interp_arrow]
-  ihave %Hvs_closed := env_ltyped2_allClosed Γ vs $$ Hvs
-  have hvsfst_closed : SubstMap.AllClosed vs.fst := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).1
-  have hvssnd_closed : SubstMap.AllClosed vs.snd := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).2
-  have hfix_lc : (Exp.fix (Exp.substMap vs.fst e)).IsLocallyClosed := by
-    refine Exp.IsLocallyClosed.fix (L ∪ (vs.map (·.1)).toFinset) _ ?_
-    intro y hy
-    have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
-    have hyNotDom : y ∉ (vs.map (·.1)).toFinset :=
-      fun h => hy (Finset.mem_union_right _ h)
-    have hyVsFst : SubstMap.lookup vs.fst y = none := by
-      rw [ValSubstMap.fst_lookup]
-      have : ValSubstMap.lookup vs y = none := by
-        have aux : ∀ (ys : ValSubstMap rT), y ∉ (ys.map (·.1)).toFinset →
-            ValSubstMap.lookup ys y = none := by
-          intro ys
-          induction ys with
-          | nil => intro _; rfl
-          | cons p rest ih =>
-            obtain ⟨z, _⟩ := p
-            intro hyNot
-            simp only [List.map_cons, List.toFinset_cons,
-              Finset.mem_insert, not_or] at hyNot
-            simp only [ValSubstMap.lookup, ih hyNot.2]
-            simp [hyNot.1]
-        exact aux vs hyNotDom
-      rw [this]; rfl
-    have hbridge : Exp.substMap vs.fst (Exp.open' e (.fvar y)) =
-        Exp.open' (Exp.substMap vs.fst e) (.fvar y) := by
-      rw [Exp.substMap_open _ _ _ hvsfst_closed]
-      rw [Exp.substMap_fvar_lookup_none hyVsFst]
-    rw [← hbridge]
-    exact Exp.substMap_lc hvsfst_closed (he_lc y hyL)
-  have hfix'_lc : (Exp.fix (Exp.substMap vs.snd e')).IsLocallyClosed := by
-    refine Exp.IsLocallyClosed.fix (L ∪ (vs.map (·.1)).toFinset) _ ?_
-    intro y hy
-    have hyL : y ∉ L := fun h => hy (Finset.mem_union_left _ h)
-    have hyNotDom : y ∉ (vs.map (·.1)).toFinset :=
-      fun h => hy (Finset.mem_union_right _ h)
-    have hyVsSnd : SubstMap.lookup vs.snd y = none := by
-      rw [ValSubstMap.snd_lookup]
-      have : ValSubstMap.lookup vs y = none := by
-        have aux : ∀ (ys : ValSubstMap rT), y ∉ (ys.map (·.1)).toFinset →
-            ValSubstMap.lookup ys y = none := by
-          intro ys
-          induction ys with
-          | nil => intro _; rfl
-          | cons p rest ih =>
-            obtain ⟨z, _⟩ := p
-            intro hyNot
-            simp only [List.map_cons, List.toFinset_cons,
-              Finset.mem_insert, not_or] at hyNot
-            simp only [ValSubstMap.lookup, ih hyNot.2]
-            simp [hyNot.1]
-        exact aux vs hyNotDom
-      rw [this]; rfl
-    have hbridge : Exp.substMap vs.snd (Exp.open' e' (.fvar y)) =
-        Exp.open' (Exp.substMap vs.snd e') (.fvar y) := by
-      rw [Exp.substMap_open _ _ _ hvssnd_closed]
-      rw [Exp.substMap_fvar_lookup_none hyVsSnd]
-    rw [← hbridge]
-    exact Exp.substMap_lc hvssnd_closed (he'_lc y hyL)
+  ihave %hvsfst_closed := env_ltyped2_fst_allClosed Γ vs $$ Hvs
+  ihave %hvssnd_closed := env_ltyped2_snd_allClosed Γ vs $$ Hvs
+  have hfix_lc : (Exp.fix (Exp.substMap vs.fst e)).IsLocallyClosed :=
+    Exp.fix_substMap_isLocallyClosed hvsfst_closed
+      (fun _ hy => ValSubstMap.fst_lookup_eq_none_of_not_mem hy) he_lc
+  have hfix'_lc : (Exp.fix (Exp.substMap vs.snd e')).IsLocallyClosed :=
+    Exp.fix_substMap_isLocallyClosed hvssnd_closed
+      (fun _ hy => ValSubstMap.snd_lookup_eq_none_of_not_mem hy) he'_lc
   -- Domain agreement.
-  ihave %hDom := env_ltyped2_domEq Γ vs $$ Hvs
-  have hΓdomVs : (Γ.map (·.1)).toFinset ⊆ (vs.map (·.1)).toFinset := by
-    intro y hy
-    simp only [List.mem_toFinset, List.mem_map] at hy
-    obtain ⟨p, hpmem, hpeq⟩ := hy
-    subst hpeq
-    have hyΓlookup : (Γ.lookup p.1).isSome := RelCtx.lookup_isSome_of_mem hpmem
-    have hyVsLookup : (vs.lookup p.1).isSome := (hDom p.1).mp hyΓlookup
-    obtain ⟨q, hqmem, hqeq⟩ := ValSubstMap.mem_of_lookup_isSome hyVsLookup
-    simp only [List.mem_toFinset, List.mem_map]
-    exact ⟨q, hqmem, hqeq⟩
-  have hdom_eq_fst : (vs.fst.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
-    show ((vs.map fun p => (p.1, p.2.1.1)).map (·.1)).toFinset = _
-    simp only [List.map_map]; rfl
-  have hdom_eq_snd : (vs.snd.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
-    show ((vs.map fun p => (p.1, p.2.2.1)).map (·.1)).toFinset = _
-    simp only [List.map_map]; rfl
+  ihave %hΓdomVs := env_ltyped2_domSubset Γ vs $$ Hvs
   have he_dom_fst : e.fv ⊆ (vs.fst.map (·.1)).toFinset := by
-    rw [hdom_eq_fst]; exact he_fv.trans hΓdomVs
+    rw [ValSubstMap.fst_dom]; exact he_fv.trans hΓdomVs
   have he_dom_snd : e'.fv ⊆ (vs.snd.map (·.1)).toFinset := by
-    rw [hdom_eq_snd]; exact he'_fv.trans hΓdomVs
+    rw [ValSubstMap.snd_dom]; exact he'_fv.trans hΓdomVs
   have hfix_closed : (Exp.fix (Exp.substMap vs.fst e)).isClosedEmpty ∧
       (Exp.fix (Exp.substMap vs.snd e')).isClosedEmpty := by
     refine ⟨⟨hfix_lc, ?_⟩, ⟨hfix'_lc, ?_⟩⟩
@@ -517,16 +297,10 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
       exact Exp.substMap_fv_eq_empty hvsfst_closed he_dom_fst
     · simp only [Exp.fv]
       exact Exp.substMap_fv_eq_empty hvssnd_closed he_dom_snd
-  obtain ⟨f, hf⟩ := HasFresh.fresh_exists
-    (L ∪ e.fv ∪ e'.fv ∪ (vs.map (·.1)).toFinset)
-  have hfL : f ∉ L :=
-    fun h => hf (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_left _ h)))
-  have hfFvE : f ∉ e.fv :=
-    fun h => hf (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_right _ h)))
-  have hfFvE' : f ∉ e'.fv :=
-    fun h => hf (Finset.mem_union_left _ (Finset.mem_union_right _ h))
-  have hfNotDom : f ∉ (vs.map (·.1)).toFinset :=
-    fun h => hf (Finset.mem_union_right _ h)
+  obtain ⟨f, hf⟩ :=
+    HasFresh.fresh_exists (L ∪ e.fv ∪ e'.fv ∪ (vs.map (·.1)).toFinset)
+  simp only [Finset.mem_union, not_or] at hf
+  obtain ⟨⟨⟨hfL, hfFvE⟩, hfFvE'⟩, hfNotDom⟩ := hf
   iapply refines_ret
     (e1 := Exp.fix (Exp.substMap vs.fst e)) (e2 := Exp.fix (Exp.substMap vs.snd e'))
     (v1 := ⟨_, IsVal.fix (by is_lc), by is_lc⟩) (v2 := ⟨_, IsVal.fix (by is_lc), by is_lc⟩)
@@ -541,11 +315,8 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
   isplitr
   · ipureintro; exact hfix_closed
   iintro !> %v1 %v2 #HA
-  have hL1 : Exp.app (Exp.fix (Exp.substMap vs.fst e)) v1.1 =
-    Ectx.fill ([] : Ectx rT) (Exp.app (Exp.fix (Exp.substMap vs.fst e)) v1.1) := rfl
-  have hR1 : Exp.app (Exp.fix (Exp.substMap vs.snd e')) v2.1 =
-    Ectx.fill ([] : Ectx rT) (Exp.app (Exp.fix (Exp.substMap vs.snd e')) v2.1) := rfl
-  rw [hL1, hR1]
+  rw [Ectx.eq_fill_nil (Exp.app (Exp.fix (Exp.substMap vs.fst e)) v1.1),
+      Ectx.eq_fill_nil (Exp.app (Exp.fix (Exp.substMap vs.snd e')) v2.1)]
   iapply (refines_pure_l
     (e' := Exp.app (Exp.open' (Exp.substMap vs.fst e) (Exp.fix (Exp.substMap vs.fst e))) v1.1)
     (Hex := pureExec_app_fix)
@@ -572,30 +343,11 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
     iexact Hvs
   have HbodyAtF := Hbody f hfL
   unfold bin_log_related_ty bin_log_related at HbodyAtF
-  ihave HbodyAtF_iris := HbodyAtF
-  ihave HbodyApplied : iprop(refines (⊤ : CoPset)
-      (Exp.substMap vs'.fst (Exp.open' e (.fvar f)))
-      (Exp.substMap vs'.snd (Exp.open' e' (.fvar f)))
-      (interp (.arrow τ1 τ2) Δ)) $$ [HbodyAtF_iris Hvs']
-  · iapply HbodyAtF_iris
-    iexact Hvs'
-  have hxDomVs : ValSubstMap.lookup vs f = none := by
-    have aux : ∀ (ys : ValSubstMap rT), f ∉ (ys.map (·.1)).toFinset →
-        ValSubstMap.lookup ys f = none := by
-      intro ys
-      induction ys with
-      | nil => intro _; rfl
-      | cons p rest ih =>
-        obtain ⟨z, _⟩ := p
-        intro hxNot
-        simp only [List.map_cons, List.toFinset_cons, Finset.mem_insert, not_or] at hxNot
-        simp only [ValSubstMap.lookup, ih hxNot.2]
-        simp [hxNot.1]
-    exact aux vs hfNotDom
-  have hxDomFst : SubstMap.lookup vs.fst f = none := by
-    rw [ValSubstMap.fst_lookup, hxDomVs]; rfl
-  have hxDomSnd : SubstMap.lookup vs.snd f = none := by
-    rw [ValSubstMap.snd_lookup, hxDomVs]; rfl
+  ihave HbodyApplied := HbodyAtF $$ Hvs'
+  have hxDomFst : SubstMap.lookup vs.fst f = none :=
+    ValSubstMap.fst_lookup_eq_none_of_not_mem hfNotDom
+  have hxDomSnd : SubstMap.lookup vs.snd f = none :=
+    ValSubstMap.snd_lookup_eq_none_of_not_mem hfNotDom
   have hbridge_fst : Exp.substMap vs'.fst (Exp.open' e (.fvar f)) =
       Exp.open' (Exp.substMap vs.fst e) fixv.1 := by
     show Exp.substMap ((f, fixv.1) :: vs.fst) (Exp.open' e (.fvar f)) = _
@@ -604,27 +356,15 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
       Exp.open' (Exp.substMap vs.snd e') fixv'.1 := by
     show Exp.substMap ((f, fixv'.1) :: vs.snd) (Exp.open' e' (.fvar f)) = _
     exact Exp.substMap_open_fresh hvssnd_closed hfFvE' hxDomSnd hfix_closed.2.1
-  ihave HbodyApplied' : iprop(refines (⊤ : CoPset)
-      (Exp.open' (Exp.substMap vs.fst e) fixv.1)
-      (Exp.open' (Exp.substMap vs.snd e') fixv'.1)
-      (interp (.arrow τ1 τ2) Δ)) $$ [HbodyApplied]
-  · rw [← hbridge_fst, ← hbridge_snd]; iexact HbodyApplied
+  isimp only [hbridge_fst, hbridge_snd] at HbodyApplied
   ihave HArgs : iprop(refines ⊤ v1.1 v2.1 (interp τ1 Δ)) $$ [HA]
   · iapply refines_ret (hv1 := rfl) (hv2 := rfl)
     imodintro
     iexact HA
-  ihave HbodyApplied'' : iprop(refines (⊤ : CoPset)
-      (Exp.open' (Exp.substMap vs.fst e) fixv.1)
-      (Exp.open' (Exp.substMap vs.snd e') fixv'.1)
-      (lrel_arr (interp τ1 Δ) (interp τ2 Δ))) $$ [HbodyApplied']
-  · rw [← interp_arrow]; iexact HbodyApplied'
-  ihave Hgoal := refines_app $$ [HbodyApplied''] HArgs
-  · iexact HbodyApplied''
-  have hWrap_L : Ectx.fill ([] : Ectx rT) (Exp.app (Exp.open' (Exp.substMap vs.fst e) fixv.1) v1.1) =
-      Exp.app (Exp.open' (Exp.substMap vs.fst e) fixv.1) v1.1 := rfl
-  have hWrap_R : Ectx.fill ([] : Ectx rT) (Exp.app (Exp.open' (Exp.substMap vs.snd e') fixv'.1) v2.1) =
-      Exp.app (Exp.open' (Exp.substMap vs.snd e') fixv'.1) v2.1 := rfl
-  rw [hWrap_L, hWrap_R]
+  isimp only [interp_arrow] at HbodyApplied
+  ihave Hgoal := refines_app $$ [HbodyApplied] HArgs
+  · iexact HbodyApplied
+  simp only [Ectx.fill_nil]
   iexact Hgoal
 
 /-! ### Heap and tape cases
@@ -643,7 +383,7 @@ theorem bin_log_related_alloc (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_alloc, Exp.substMap_alloc, interp_ref]
-  iapply (refines_alloc) $$ IH'
+  iapply refines_alloc $$ IH'
 
 theorem bin_log_related_load (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ : Ty} :
@@ -654,10 +394,8 @@ theorem bin_log_related_load (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_load, Exp.substMap_load]
-  ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-      (lrel_ref (interp τ Δ))) $$ [IH']
-  · rw [← interp_ref]; iexact IH'
-  iapply (refines_load) $$ IH''
+  isimp only [interp_ref] at IH'
+  iapply refines_load $$ IH'
 
 theorem bin_log_related_store (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e1 e2 e1' e2' : Exp rT} {τ : Ty} :
@@ -670,12 +408,8 @@ theorem bin_log_related_store (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_store, Exp.substMap_store, interp_unit]
-  ihave IH1'' : iprop(refines ⊤ (Exp.substMap vs.fst e1) (Exp.substMap vs.snd e1')
-      (lrel_ref (interp τ Δ))) $$ [IH1']
-  · rw [← interp_ref]; iexact IH1'
-  iapply (refines_store) $$ [IH1'']
-  · iexact IH1''
-  iexact IH2'
+  isimp only [interp_ref] at IH1'
+  iapply refines_store $$ IH1' IH2'
 
 theorem bin_log_related_alloctape (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp rT} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' .int) ⊢@{IProp GF}
@@ -685,10 +419,8 @@ theorem bin_log_related_alloctape (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' :
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_tape, Exp.substMap_tape, interp_tape]
-  ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-      lrel_int) $$ [IH']
-  · rw [← interp_int]; iexact IH'
-  iapply refines_alloctape $$ IH''
+  isimp only [interp_int] at IH'
+  iapply refines_alloctape $$ IH'
 
 /-- `bin_log_related_rand_tape`: ports the labeled-rand compatibility from
 `fundamental.v:289`, but at `lrel_int` (not `lrel_nat` as in Rocq), to match
@@ -705,12 +437,8 @@ theorem bin_log_related_rand_tape (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_rand, Exp.substMap_rand, interp_int]
-  ihave IH2'' : iprop(refines ⊤ (Exp.substMap vs.fst e2) (Exp.substMap vs.snd e2')
-      lrel_tape) $$ [IH2']
-  · rw [← interp_tape]; iexact IH2'
-  iapply refines_rand_tape_int $$ [IH1']
-  · iexact IH1'
-  iexact IH2''
+  isimp only [interp_tape] at IH2'
+  iapply refines_rand_tape_int $$ IH1' IH2'
 
 /-- `bin_log_related_rand_unit`: ports unlabeled-rand compatibility, at
 `lrel_int`. Discharges via `refines_rand_unit_int`. -/
@@ -725,17 +453,11 @@ theorem bin_log_related_rand_unit (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_rand, Exp.substMap_rand]
-  have hb1 : Exp.rand (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
-      Ectx.fill [EctxItem.randR (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) := rfl
-  have hb2 : Exp.rand (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
-      Ectx.fill [EctxItem.randR (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') := rfl
-  rw [hb1, hb2]
-  ihave IH2'' : iprop(refines ⊤ (Exp.substMap vs.fst e2) (Exp.substMap vs.snd e2')
-      lrel_unit) $$ [IH2']
-  · rw [← interp_unit]; iexact IH2'
+  rw [← Ectx.fill_randR (Exp.substMap vs.fst e1), ← Ectx.fill_randR (Exp.substMap vs.snd e1')]
+  isimp only [interp_unit] at IH2'
   iapply (refines_bind [EctxItem.randR (Exp.substMap vs.fst e1)]
-    [EctxItem.randR (Exp.substMap vs.snd e1')] (A := lrel_unit)) $$ [IH2'']
-  · iexact IH2''
+    [EctxItem.randR (Exp.substMap vs.snd e1')] (A := lrel_unit)) $$ [IH2']
+  · iexact IH2'
   iintro %v2 %v2' Hu
   have hunit_unfold : (lrel_unit (GF := GF)).car v2 v2' =
       iprop(⌜v2.1 = pl(#(.unit)) ∧ v2'.1 = pl(#(.unit))⌝) := rfl
@@ -744,9 +466,11 @@ theorem bin_log_related_rand_unit (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   obtain ⟨hv2, hv2'⟩ := Hu'
   rw [hv2, hv2', interp_int]
   have hbk1 : Ectx.fill [EctxItem.randR (Exp.substMap vs.fst e1)] pl(#(.unit)) =
-      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) := rfl
+      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
+        vs.fst e1) := rfl
   have hbk2 : Ectx.fill [EctxItem.randR (Exp.substMap vs.snd e1')] pl(#(.unit)) =
-      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') := rfl
+      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
+        vs.snd e1') := rfl
   rw [hbk1, hbk2]
   iapply refines_rand_unit_int $$ IH1'
 
@@ -828,40 +552,17 @@ theorem bin_log_related_tlam (Δ : TyEnv rT GF)
   unfold bin_log_related_ty bin_log_related
   iintro %vs #Hvs
   rw [Exp.substMap_lam, Exp.substMap_lam]
-  ihave %Hvs_closed := env_ltyped2_allClosed Γ vs $$ Hvs
-  have hvsfst_closed : SubstMap.AllClosed vs.fst := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).1
-  have hvssnd_closed : SubstMap.AllClosed vs.snd := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).2
+  ihave %hvsfst_closed := env_ltyped2_fst_allClosed Γ vs $$ Hvs
+  ihave %hvssnd_closed := env_ltyped2_snd_allClosed Γ vs $$ Hvs
   have hbody_lc : (Exp.substMap vs.fst e).IsLocallyClosed :=
     Exp.substMap_lc hvsfst_closed he_lc
   have hbody'_lc : (Exp.substMap vs.snd e').IsLocallyClosed :=
     Exp.substMap_lc hvssnd_closed he'_lc
-  ihave %hDom := env_ltyped2_domEq Γ vs $$ Hvs
-  have hΓdomVs : (Γ.map (·.1)).toFinset ⊆ (vs.map (·.1)).toFinset := by
-    intro y hy
-    simp only [List.mem_toFinset, List.mem_map] at hy
-    obtain ⟨p, hpmem, hpeq⟩ := hy
-    subst hpeq
-    have hyΓlookup : (Γ.lookup p.1).isSome := RelCtx.lookup_isSome_of_mem hpmem
-    have hyVsLookup : (vs.lookup p.1).isSome := (hDom p.1).mp hyΓlookup
-    obtain ⟨q, hqmem, hqeq⟩ := ValSubstMap.mem_of_lookup_isSome hyVsLookup
-    simp only [List.mem_toFinset, List.mem_map]
-    exact ⟨q, hqmem, hqeq⟩
-  have hdom_eq_fst : (vs.fst.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
-    show ((vs.map fun p => (p.1, p.2.1.1)).map (·.1)).toFinset = _
-    simp only [List.map_map]; rfl
-  have hdom_eq_snd : (vs.snd.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
-    show ((vs.map fun p => (p.1, p.2.2.1)).map (·.1)).toFinset = _
-    simp only [List.map_map]; rfl
+  ihave %hΓdomVs := env_ltyped2_domSubset Γ vs $$ Hvs
   have he_dom_fst : e.fv ⊆ (vs.fst.map (·.1)).toFinset := by
-    rw [hdom_eq_fst]; exact he_fv.trans hΓdomVs
+    rw [ValSubstMap.fst_dom]; exact he_fv.trans hΓdomVs
   have he_dom_snd : e'.fv ⊆ (vs.snd.map (·.1)).toFinset := by
-    rw [hdom_eq_snd]; exact he'_fv.trans hΓdomVs
+    rw [ValSubstMap.snd_dom]; exact he'_fv.trans hΓdomVs
   have hbody_fv : (Exp.substMap vs.fst e).fv = ∅ :=
     Exp.substMap_fv_eq_empty hvsfst_closed he_dom_fst
   have hbody'_fv : (Exp.substMap vs.snd e').fv = ∅ :=
@@ -875,8 +576,7 @@ theorem bin_log_related_tlam (Δ : TyEnv rT GF)
   iintro !> %A
   have HbodyAtA := Hbody A
   unfold bin_log_related_ty bin_log_related at HbodyAtA
-  ihave HbodyAtA_iris := HbodyAtA
-  iapply HbodyAtA_iris $$ Hvs
+  iapply HbodyAtA $$ Hvs
 
 theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp rT} {τ τ' : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' (.forall' τ)) ⊢@{IProp GF}
@@ -888,9 +588,11 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_app, Exp.substMap_app, Exp.substMap_lit, Exp.substMap_lit]
   have hb1 : Exp.app (Exp.substMap vs.fst e) pl(#(.unit)) =
-      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e) := rfl
+      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
+        vs.fst e) := rfl
   have hb2 : Exp.app (Exp.substMap vs.snd e') pl(#(.unit)) =
-      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e') := rfl
+      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
+        vs.snd e') := rfl
   rw [hb1, hb2]
   iapply (refines_bind [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
     [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
@@ -900,16 +602,18 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   iintro %v %v' Hv
   have hbridge_forall : (interp (Ty.forall' τ) Δ).car v v' =
       (lrel_forall (fun A => interp τ (TyEnv.cons A Δ))).car v v' := rfl
-  ihave Hv' : iprop((lrel_forall (fun A => interp τ (TyEnv.cons A Δ))).car v v') $$ [Hv]
-  · rw [← hbridge_forall]; iexact Hv
-  ihave HvF := lrel_forall_unfold (fun A => interp τ (TyEnv.cons A Δ)) v v' $$ Hv'
+  isimp only [hbridge_forall] at Hv
+  ihave HvF := lrel_forall_unfold (fun A => interp τ (TyEnv.cons A Δ)) v v' $$ Hv
   ihave HvSpec := HvF $$ %(interp τ' Δ)
   ihave HvArr := lrel_arr_unfold_wand lrel_unit
     (interp τ (TyEnv.cons (interp τ' Δ) Δ)) v v' $$ HvSpec
-  ihave HvArr2 := HvArr $$ %⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ %⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩
+  ihave HvArr2 := HvArr $$ %⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ %⟨pl(#(.unit)),
+    IsVal.lit, Exp.IsLocallyClosed.lit _⟩
   have hUnit : ⊢@{IProp GF} (lrel_unit (rT := rT) (GF := GF)).car
-      ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ := by
-    show ⊢@{IProp GF} ⌜(pl(#(.unit)) : Exp rT) = pl(#(.unit)) ∧ (pl(#(.unit)) : Exp rT) = pl(#(.unit))⌝
+      ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨pl(#(.unit)), IsVal.lit,
+        Exp.IsLocallyClosed.lit _⟩ := by
+    show ⊢@{IProp GF} ⌜(pl(#(.unit)) : Exp rT) = pl(#(.unit)) ∧ (pl(#(.unit)) : Exp
+      rT) = pl(#(.unit))⌝
     ipureintro
     exact ⟨rfl, rfl⟩
   ihave HvApp : iprop(refines ⊤ (Exp.app v.1 pl(#(.unit))) (Exp.app v'.1 pl(#(.unit)))
@@ -920,9 +624,11 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
     (interp_subst τ' τ Δ).symm
   ihave HvAppFinal := refines_proper_entails ⊤ (Exp.app v.1 pl(#(.unit)))
     (Exp.app v'.1 pl(#(.unit))) hsub $$ HvApp
-  have hbridge1 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v.1 =
+  have hbridge1 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit
+    _⟩] v.1 =
       Exp.app v.1 pl(#(.unit)) := rfl
-  have hbridge2 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v'.1 =
+  have hbridge2 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit
+    _⟩] v'.1 =
       Exp.app v'.1 pl(#(.unit)) := rfl
   rw [hbridge1, hbridge2]
   iexact HvAppFinal
@@ -974,11 +680,7 @@ theorem bin_log_related_unfold (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Ex
     simp [Exp.substMap_lam, Exp.substMap_bvar, recUnfold]
   rw [hru1, hru2]
   -- Bind under [appR recUnfold] on each side to consume IH'.
-  have hb1 : Exp.app recUnfold (Exp.substMap vs.fst e) =
-      Ectx.fill [EctxItem.appR recUnfold] (Exp.substMap vs.fst e) := rfl
-  have hb2 : Exp.app recUnfold (Exp.substMap vs.snd e') =
-      Ectx.fill [EctxItem.appR recUnfold] (Exp.substMap vs.snd e') := rfl
-  rw [hb1, hb2]
+  rw [← Ectx.fill_appR recUnfold, ← Ectx.fill_appR recUnfold]
   iapply (refines_bind [EctxItem.appR recUnfold] [EctxItem.appR recUnfold]
     (A := interp (Ty.rec' τ) Δ)
     (A' := interp (Ty.single τ (.rec' τ)) Δ)) $$ [IH']
@@ -993,11 +695,9 @@ theorem bin_log_related_unfold (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Ex
       iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
         ▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') :=
     congrArg (fun A => A.car v v') (lrel_rec_unfold (GF := GF) CRec)
-  ihave HvUnfold : iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-      ▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') $$ [Hv]
-  · rw [← hunfold_eq]; iexact Hv
-  ihave HvL : iprop(▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') $$ [HvUnfold]
-  · icases HvUnfold with ⟨_, HvLater⟩
+  isimp only [hunfold_eq] at Hv
+  ihave HvL : iprop(▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') $$ [Hv]
+  · icases Hv with ⟨_, HvLater⟩
     iexact HvLater
   -- Hv : ▷ (interp τ (cons (rec' τ) Δ) Δ).car v v'.
   -- Pure-step `app recUnfold v → v` on each side. The pure_l step gives a ▷-budget.
@@ -1089,21 +789,13 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
   -- Specialize HIH1 (Lean-level) at vs.
   have HIH1_sp := HIH1
   unfold bin_log_related_ty bin_log_related at HIH1_sp
-  ihave HIH1_iris := HIH1_sp
-  ihave HIH1' := HIH1_iris $$ %vs Hvs
+  ihave HIH1' := HIH1_sp $$ %vs Hvs
   -- HIH1' : refines ⊤ (substMap vs.fst e1) (substMap vs.snd e1') (interp (.exists' τ) Δ)
   -- Bind to get values v, v' with (interp (.exists' τ) Δ).car v v'.
   rw [Exp.substMap_app, Exp.substMap_app, Exp.substMap_lam, Exp.substMap_lam]
   -- Closedness machinery (analogous to lam).
-  ihave %Hvs_closed := env_ltyped2_allClosed Γ vs $$ Hvs
-  have hvsfst_closed : SubstMap.AllClosed vs.fst := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).1
-  have hvssnd_closed : SubstMap.AllClosed vs.snd := by
-    intro p hp
-    obtain ⟨⟨z, ⟨w1, w2⟩⟩, hmem, hpeq⟩ := List.mem_map.mp hp
-    rw [← hpeq]; exact (Hvs_closed (z, w1, w2) hmem).2
+  ihave %hvsfst_closed := env_ltyped2_fst_allClosed Γ vs $$ Hvs
+  ihave %hvssnd_closed := env_ltyped2_snd_allClosed Γ vs $$ Hvs
   -- Bind under [appR (.lam (substMap vs.fst e2))] for e1, similarly for spec.
   have hlam2_lc : (Exp.lam (Exp.substMap vs.fst e2)).IsLocallyClosed :=
     Exp.lam_substMap_isLocallyClosed hvsfst_closed
@@ -1111,11 +803,8 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
   have hlam2'_lc : (Exp.lam (Exp.substMap vs.snd e2')).IsLocallyClosed :=
     Exp.lam_substMap_isLocallyClosed hvssnd_closed
       (fun _ hy => ValSubstMap.snd_lookup_eq_none_of_not_mem hy) he2'_lc
-  have hbL : Exp.app (Exp.lam (Exp.substMap vs.fst e2)) (Exp.substMap vs.fst e1) =
-      Ectx.fill [EctxItem.appR (Exp.lam (Exp.substMap vs.fst e2))] (Exp.substMap vs.fst e1) := rfl
-  have hbR : Exp.app (Exp.lam (Exp.substMap vs.snd e2')) (Exp.substMap vs.snd e1') =
-      Ectx.fill [EctxItem.appR (Exp.lam (Exp.substMap vs.snd e2'))] (Exp.substMap vs.snd e1') := rfl
-  rw [hbL, hbR]
+  rw [← Ectx.fill_appR (Exp.lam (Exp.substMap vs.fst e2)),
+      ← Ectx.fill_appR (Exp.lam (Exp.substMap vs.snd e2'))]
   iapply (refines_bind [EctxItem.appR (Exp.lam (Exp.substMap vs.fst e2))]
     [EctxItem.appR (Exp.lam (Exp.substMap vs.snd e2'))]
     (A := interp (Ty.exists' τ) Δ)) $$ [HIH1']
@@ -1126,28 +815,27 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
   have hex_unfold : (interp (Ty.exists' τ) Δ).car v v' =
       iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
         (∃ A : lrel rT GF, (interp τ (TyEnv.cons A Δ)).car v v')) := rfl
-  ihave Hv_unfold : iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-      (∃ A : lrel rT GF, (interp τ (TyEnv.cons A Δ)).car v v')) $$ [Hv]
-  · rw [← hex_unfold]; iexact Hv
-  icases Hv_unfold with ⟨%hvc, %A, #HvA⟩
-  -- Now Hv (we destructured): %hvc : closed; %A : witness lrel; HvA : (interp τ (cons A Δ)).car v v'.
+  isimp only [hex_unfold] at Hv
+  icases Hv with ⟨%hvc, %A, #HvA⟩
+  -- Now Hv (we destructured): %hvc : closed; %A : witness lrel; HvA : (interp τ (cons A Δ)).car v
+  -- v'.
   -- Pick fresh atom x.
   obtain ⟨x, hxFresh⟩ := HasFresh.fresh_exists
     (L ∪ e2.fv ∪ e2'.fv ∪ (vs.map (·.1)).toFinset)
   have hxL : x ∉ L :=
     fun h => hxFresh (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_left _ h)))
   have hxFvE2 : x ∉ e2.fv :=
-    fun h => hxFresh (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_right _ h)))
+    fun h => hxFresh (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_right _
+      h)))
   have hxFvE2' : x ∉ e2'.fv :=
     fun h => hxFresh (Finset.mem_union_left _ (Finset.mem_union_right _ h))
   have hxNotDom : x ∉ (vs.map (·.1)).toFinset :=
     fun h => hxFresh (Finset.mem_union_right _ h)
   -- Beta-step the application: (.lam e2).app v reduces to open' e2 v.
-  have hL2 : Ectx.fill [EctxItem.appR (Exp.lam (Exp.substMap vs.fst e2))] v.1 =
-    Ectx.fill ([] : Ectx rT) (Exp.app (Exp.lam (Exp.substMap vs.fst e2)) v.1) := rfl
-  have hR2 : Ectx.fill [EctxItem.appR (Exp.lam (Exp.substMap vs.snd e2'))] v'.1 =
-    Ectx.fill ([] : Ectx rT) (Exp.app (Exp.lam (Exp.substMap vs.snd e2')) v'.1) := rfl
-  rw [hL2, hR2]
+  rw [Ectx.fill_appR,
+      Ectx.eq_fill_nil (Exp.app (Exp.lam (Exp.substMap vs.fst e2)) v.1),
+      Ectx.fill_appR,
+      Ectx.eq_fill_nil (Exp.app (Exp.lam (Exp.substMap vs.snd e2')) v'.1)]
   iapply (refines_pure_l
     (e' := Exp.open' (Exp.substMap vs.fst e2) v.1)
     (Hex := pureExec_app_lam)
@@ -1156,7 +844,8 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
   iapply (refines_pure_r
     (e' := Exp.open' (Exp.substMap vs.snd e2') v'.1)
     (Hex := pureExec_app_lam) ⟨v'.2.toIsValue, by is_lc⟩)
-  -- Goal: refines ⊤ ([].fill (open' (substMap vs.fst e2) v.1)) ([].fill (open' (substMap vs.snd e2') v'.1)) (interp τ2 Δ).
+  -- Goal: refines ⊤ ([].fill (open' (substMap vs.fst e2) v.1)) ([].fill (open' (substMap vs.snd
+  -- e2') v'.1)) (interp τ2 Δ).
   -- Use HIH2 at A and x. vs' := (x, (v, v')) :: vs.
   let vs' : ValSubstMap rT := (x, (v, v')) :: vs
   have hv_c : v.1.isClosed .empty :=
@@ -1165,42 +854,22 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
     ⟨hvc.2.1, by rw [hvc.2.2]; exact Finset.empty_subset _⟩
   ihave Hvs' : iprop(env_ltyped2 ((x, interp τ (TyEnv.cons A Δ)) :: Γ) vs') $$ [HvA]
   · iapply (env_ltyped2_insert Γ vs x (interp τ (TyEnv.cons A Δ)) v v' hv_c hv'_c)
-    isplitr [HvA]
-    · iexact HvA
+    iframe HvA
     iexact Hvs
   -- Apply HIH2 at A and x.
   have HIH2AtAX := HIH2 A x hxL
   unfold bin_log_related_ty bin_log_related at HIH2AtAX
-  ihave HIH2_iris := HIH2AtAX
-  ihave HBody_shift : iprop(refines (⊤ : CoPset)
-      (Exp.substMap vs'.fst (Exp.open' e2 (.fvar x)))
-      (Exp.substMap vs'.snd (Exp.open' e2' (.fvar x)))
-      (interp τ2.shift (TyEnv.cons A Δ))) $$ [HIH2_iris Hvs']
-  · iapply HIH2_iris
-    iexact Hvs'
+  ihave HBody_shift := HIH2AtAX $$ Hvs'
   -- Bridge interp τ2.shift (cons A Δ) = interp τ2 Δ via interp_ren.
   have hshift : interp τ2.shift (TyEnv.cons A Δ) = interp τ2 Δ := interp_ren τ2 A Δ
   ihave HBody := refines_proper_entails ⊤
     (Exp.substMap vs'.fst (Exp.open' e2 (.fvar x)))
     (Exp.substMap vs'.snd (Exp.open' e2' (.fvar x))) hshift $$ HBody_shift
   -- Bridge via substMap_open_fresh.
-  have hxDomVs : ValSubstMap.lookup vs x = none := by
-    have aux : ∀ (ys : ValSubstMap rT), x ∉ (ys.map (·.1)).toFinset →
-        ValSubstMap.lookup ys x = none := by
-      intro ys
-      induction ys with
-      | nil => intro _; rfl
-      | cons p rest ih =>
-        obtain ⟨z, _⟩ := p
-        intro hxNot
-        simp only [List.map_cons, List.toFinset_cons, Finset.mem_insert, not_or] at hxNot
-        simp only [ValSubstMap.lookup, ih hxNot.2]
-        simp [hxNot.1]
-    exact aux vs hxNotDom
-  have hxDomFst : SubstMap.lookup vs.fst x = none := by
-    rw [ValSubstMap.fst_lookup, hxDomVs]; rfl
-  have hxDomSnd : SubstMap.lookup vs.snd x = none := by
-    rw [ValSubstMap.snd_lookup, hxDomVs]; rfl
+  have hxDomFst : SubstMap.lookup vs.fst x = none :=
+    ValSubstMap.fst_lookup_eq_none_of_not_mem hxNotDom
+  have hxDomSnd : SubstMap.lookup vs.snd x = none :=
+    ValSubstMap.snd_lookup_eq_none_of_not_mem hxNotDom
   have hbridge_fst : Exp.substMap vs'.fst (Exp.open' e2 (.fvar x)) =
       Exp.open' (Exp.substMap vs.fst e2) v.1 := by
     show Exp.substMap ((x, v.1) :: vs.fst) (Exp.open' e2 (.fvar x)) = _
@@ -1209,18 +878,10 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
       Exp.open' (Exp.substMap vs.snd e2') v'.1 := by
     show Exp.substMap ((x, v'.1) :: vs.snd) (Exp.open' e2' (.fvar x)) = _
     exact Exp.substMap_open_fresh hvssnd_closed hxFvE2' hxDomSnd hvc.2.1
-  ihave HBody' : iprop(refines (⊤ : CoPset)
-      (Exp.open' (Exp.substMap vs.fst e2) v.1)
-      (Exp.open' (Exp.substMap vs.snd e2') v'.1)
-      (interp τ2 Δ)) $$ [HBody]
-  · rw [← hbridge_fst, ← hbridge_snd]; iexact HBody
+  isimp only [hbridge_fst, hbridge_snd] at HBody
   -- Bridge ectx fill to bare expr.
-  have hf1 : (Ectx.fill ([] : Ectx rT) (Exp.open' (Exp.substMap vs.fst e2) v.1)) =
-      Exp.open' (Exp.substMap vs.fst e2) v.1 := rfl
-  have hf2 : (Ectx.fill ([] : Ectx rT) (Exp.open' (Exp.substMap vs.snd e2') v'.1)) =
-      Exp.open' (Exp.substMap vs.snd e2') v'.1 := rfl
-  rw [hf1, hf2]
-  iexact HBody'
+  simp only [Ectx.fill_nil]
+  iexact HBody
 
 /-! ### Operator / scrut compatibility -/
 
@@ -1236,20 +897,16 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_binop, Exp.substMap_binop]
-  ihave IH1'' : iprop(refines ⊤ (Exp.substMap vs.fst e1) (Exp.substMap vs.snd e1')
-      lrel_int) $$ [IH1']
-  · rw [← interp_int]; iexact IH1'
-  ihave IH2'' : iprop(refines ⊤ (Exp.substMap vs.fst e2) (Exp.substMap vs.snd e2')
-      lrel_int) $$ [IH2']
-  · rw [← interp_int]; iexact IH2'
+  isimp only [interp_int] at IH1'
+  isimp only [interp_int] at IH2'
   -- Bind e2/e2' first, then e1/e1', getting both int values n1, n2.
   rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
         Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
         Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') from rfl]
   iapply (refines_bind [EctxItem.binopR op (Exp.substMap vs.fst e1)]
-    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_int)) $$ [IH2'']
-  · iexact IH2''
+    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_int)) $$ [IH2']
+  · iexact IH2'
   iintro %v2 %v2' Hint2
   icases lrel_int_unfold v2 v2' $$ Hint2 with ⟨%n2, %hv2, %hv2'⟩
   rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
@@ -1258,18 +915,22 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
       hv2, hv2']
   rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.int n2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) from rfl,
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit
+          _⟩] (Exp.substMap vs.fst e1) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.int n2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit
+          _⟩] (Exp.substMap vs.snd e1') from rfl]
   iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
     [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    (A := lrel_int)) $$ [IH1'']
-  · iexact IH1''
+    (A := lrel_int)) $$ [IH1']
+  · iexact IH1'
   iintro %v1 %v1' Hint1
   icases lrel_int_unfold v1 v1' $$ Hint1 with ⟨%n1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
+  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    v1.1 =
         Exp.binop op v1.1 pl(#(.int n2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
+      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit
+        _⟩] v1'.1 =
         Exp.binop op v1'.1 pl(#(.int n2)) from rfl,
       hv1, hv1']
   -- Goal: refines ⊤ (.binop op #n1 #n2) (.binop op #n1 #n2) (interp τ Δ).
@@ -1373,20 +1034,16 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_binop, Exp.substMap_binop]
-  ihave IH1'' : iprop(refines ⊤ (Exp.substMap vs.fst e1) (Exp.substMap vs.snd e1')
-      lrel_bool) $$ [IH1']
-  · rw [← interp_bool]; iexact IH1'
-  ihave IH2'' : iprop(refines ⊤ (Exp.substMap vs.fst e2) (Exp.substMap vs.snd e2')
-      lrel_bool) $$ [IH2']
-  · rw [← interp_bool]; iexact IH2'
+  isimp only [interp_bool] at IH1'
+  isimp only [interp_bool] at IH2'
   -- Bind e2/e2' first, then e1/e1'.
   rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
         Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
         Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') from rfl]
   iapply (refines_bind [EctxItem.binopR op (Exp.substMap vs.fst e1)]
-    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_bool)) $$ [IH2'']
-  · iexact IH2''
+    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_bool)) $$ [IH2']
+  · iexact IH2'
   iintro %v2 %v2' Hbool2
   icases lrel_bool_unfold v2 v2' $$ Hbool2 with ⟨%b2, %hv2, %hv2'⟩
   rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
@@ -1395,18 +1052,22 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
       hv2, hv2']
   rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.bool b2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.fst e1) from rfl,
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit
+          _⟩] (Exp.substMap vs.fst e1) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.bool b2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap vs.snd e1') from rfl]
+        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit
+          _⟩] (Exp.substMap vs.snd e1') from rfl]
   iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
     [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    (A := lrel_bool)) $$ [IH1'']
-  · iexact IH1''
+    (A := lrel_bool)) $$ [IH1']
+  · iexact IH1'
   iintro %v1 %v1' Hbool1
   icases lrel_bool_unfold v1 v1' $$ Hbool1 with ⟨%b1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
+  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    v1.1 =
         Exp.binop op v1.1 pl(#(.bool b2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
+      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit
+        _⟩] v1'.1 =
         Exp.binop op v1'.1 pl(#(.bool b2)) from rfl,
       hv1, hv1']
   -- Bool-binops: and, or, xor, eq → all return bool. plus/minus/etc → none.
@@ -1469,16 +1130,14 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     iintro %vs #Hvs
     ihave IH' := IH $$ %vs Hvs
     rw [Exp.substMap_unop, Exp.substMap_unop, interp_real]
-    ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-        lrel_int) $$ [IH']
-    · rw [← interp_int (GF := GF) Δ]; iexact IH'
+    isimp only [interp_int (GF := GF) Δ] at IH'
     rw [show Exp.unop UnOp.toReal (Exp.substMap vs.fst e) =
           Ectx.fill [EctxItem.unop UnOp.toReal] (Exp.substMap vs.fst e) from rfl,
         show Exp.unop UnOp.toReal (Exp.substMap vs.snd e') =
           Ectx.fill [EctxItem.unop UnOp.toReal] (Exp.substMap vs.snd e') from rfl]
     iapply (refines_bind [EctxItem.unop UnOp.toReal] [EctxItem.unop UnOp.toReal]
-      (A := lrel_int)) $$ [IH'']
-    · iexact IH''
+      (A := lrel_int)) $$ [IH']
+    · iexact IH'
     iintro %v %v' Hint
     icases lrel_int_unfold v v' $$ Hint with ⟨%n, %hv, %hv'⟩
     rw [show Ectx.fill [EctxItem.unop UnOp.toReal] v.1 = Exp.unop UnOp.toReal v.1 from rfl,
@@ -1496,17 +1155,14 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     iintro %vs #Hvs
     ihave IH' := IH $$ %vs Hvs
     rw [Exp.substMap_unop, Exp.substMap_unop, interp_int]
-    ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-        lrel_int) $$ [IH']
-    · rw [← interp_int (GF := GF) Δ]; iexact IH'
     -- Bind e/e' to extract the int value n.
     rw [show Exp.unop UnOp.minus (Exp.substMap vs.fst e) =
           Ectx.fill [EctxItem.unop UnOp.minus] (Exp.substMap vs.fst e) from rfl,
         show Exp.unop UnOp.minus (Exp.substMap vs.snd e') =
           Ectx.fill [EctxItem.unop UnOp.minus] (Exp.substMap vs.snd e') from rfl]
     iapply (refines_bind [EctxItem.unop UnOp.minus] [EctxItem.unop UnOp.minus]
-      (A := lrel_int)) $$ [IH'']
-    · iexact IH''
+      (A := lrel_int)) $$ [IH']
+    · iexact IH'
     iintro %v %v' Hint
     icases lrel_int_unfold v v' $$ Hint with ⟨%n, %hv, %hv'⟩
     rw [show Ectx.fill [EctxItem.unop UnOp.minus] v.1 = Exp.unop UnOp.minus v.1 from rfl,
@@ -1514,7 +1170,8 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         hv, hv']
     -- Goal: refines ⊤ (.unop minus #n) (.unop minus #n) lrel_int.
     have heval : UnOp.eval .minus (pl(#(.int n)) : Exp rT) = some pl(#(.int n.neg)) := rfl
-    have hφ : (pl(#(.int n)) : Exp rT).isValue ∧ UnOp.eval .minus (pl(#(.int n)) : Exp rT) = some _ :=
+    have hφ : (pl(#(.int n)) : Exp rT).isValue ∧ UnOp.eval .minus (pl(#(.int n)) : Exp
+      rT) = some _ :=
       ⟨IsVal.lit.toIsValue, heval⟩
     have hf1 : (Exp.unop .minus pl(#(.int n)) : Exp rT) =
         Ectx.fill [] (Exp.unop .minus pl(#(.int n))) := rfl
@@ -1548,15 +1205,12 @@ theorem bin_log_related_real_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   iintro %vs #Hvs
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_unop, Exp.substMap_unop]
-  ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-      lrel_real) $$ [IH']
-  · rw [← interp_real Δ]; iexact IH'
+  isimp only [interp_real Δ] at IH'
   rw [show Exp.unop op (Exp.substMap vs.fst e) =
         Ectx.fill [EctxItem.unop op] (Exp.substMap vs.fst e) from rfl,
       show Exp.unop op (Exp.substMap vs.snd e') =
         Ectx.fill [EctxItem.unop op] (Exp.substMap vs.snd e') from rfl]
-  iapply (refines_bind [EctxItem.unop op] [EctxItem.unop op]) $$ [IH'']
-  · iexact IH''
+  iapply (refines_bind [EctxItem.unop op] [EctxItem.unop op]) $$ IH'
   iintro %v %v' Hreal
   icases lrel_real_unfold v v' $$ Hreal with ⟨%r, %hv, %hv'⟩
   rw [show Ectx.fill [EctxItem.unop op] v.1 = Exp.unop op v.1 from rfl,
@@ -1598,19 +1252,15 @@ theorem bin_log_related_real_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH1' := IH1 $$ %vs Hvs
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_binop, Exp.substMap_binop]
-  ihave IH1'' : iprop(refines ⊤ (Exp.substMap vs.fst e1) (Exp.substMap vs.snd e1')
-      lrel_real) $$ [IH1']
-  · rw [← interp_real]; iexact IH1'
-  ihave IH2'' : iprop(refines ⊤ (Exp.substMap vs.fst e2) (Exp.substMap vs.snd e2')
-      lrel_real) $$ [IH2']
-  · rw [← interp_real]; iexact IH2'
+  isimp only [interp_real] at IH1'
+  isimp only [interp_real] at IH2'
   rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
         Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
         Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') from rfl]
   iapply (refines_bind [EctxItem.binopR op (Exp.substMap vs.fst e1)]
-    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_real)) $$ [IH2'']
-  · iexact IH2''
+    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_real)) $$ [IH2']
+  · iexact IH2'
   iintro %v2 %v2' Hreal2
   icases lrel_real_unfold v2 v2' $$ Hreal2 with ⟨%r2, %hv2, %hv2'⟩
   rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
@@ -1626,13 +1276,15 @@ theorem bin_log_related_real_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
           (Exp.substMap vs.snd e1') from rfl]
   iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
     [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    (A := lrel_real)) $$ [IH1'']
-  · iexact IH1''
+    (A := lrel_real)) $$ [IH1']
+  · iexact IH1'
   iintro %v1 %v1' Hreal1
   icases lrel_real_unfold v1 v1' $$ Hreal1 with ⟨%r1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1.1 =
+  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+    v1.1 =
         Exp.binop op v1.1 pl(#(.real r2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] v1'.1 =
+      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit
+        _⟩] v1'.1 =
         Exp.binop op v1'.1 pl(#(.real r2)) from rfl,
       hv1, hv1']
   cases op
@@ -1708,23 +1360,21 @@ theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     iintro %vs #Hvs
     ihave IH' := IH $$ %vs Hvs
     rw [Exp.substMap_unop, Exp.substMap_unop, interp_bool]
-    ihave IH'' : iprop(refines ⊤ (Exp.substMap vs.fst e) (Exp.substMap vs.snd e')
-        lrel_bool) $$ [IH']
-    · rw [← interp_bool Δ]; iexact IH'
     rw [show Exp.unop UnOp.neg (Exp.substMap vs.fst e) =
           Ectx.fill [EctxItem.unop UnOp.neg] (Exp.substMap vs.fst e) from rfl,
         show Exp.unop UnOp.neg (Exp.substMap vs.snd e') =
           Ectx.fill [EctxItem.unop UnOp.neg] (Exp.substMap vs.snd e') from rfl]
     iapply (refines_bind [EctxItem.unop UnOp.neg] [EctxItem.unop UnOp.neg]
-      (A := lrel_bool)) $$ [IH'']
-    · iexact IH''
+      (A := lrel_bool)) $$ [IH']
+    · iexact IH'
     iintro %v %v' Hbool
     icases lrel_bool_unfold v v' $$ Hbool with ⟨%b, %hv, %hv'⟩
     rw [show Ectx.fill [EctxItem.unop UnOp.neg] v.1 = Exp.unop UnOp.neg v.1 from rfl,
         show Ectx.fill [EctxItem.unop UnOp.neg] v'.1 = Exp.unop UnOp.neg v'.1 from rfl,
         hv, hv']
     have heval : UnOp.eval .neg (pl(#(.bool b)) : Exp rT) = some (pl(#(.bool (¬b)))) := rfl
-    have hφ : (pl(#(.bool b)) : Exp rT).isValue ∧ UnOp.eval .neg (pl(#(.bool b)) : Exp rT) = some _ :=
+    have hφ : (pl(#(.bool b)) : Exp rT).isValue ∧ UnOp.eval .neg (pl(#(.bool b)) : Exp
+      rT) = some _ :=
       ⟨IsVal.lit.toIsValue, heval⟩
     have hf1 : (Exp.unop .neg pl(#(.bool b)) : Exp rT) =
         Ectx.fill [] (Exp.unop .neg pl(#(.bool b))) := rfl
@@ -1757,11 +1407,8 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   ihave IH2' := IH2 $$ %vs Hvs
   rw [Exp.substMap_binop, Exp.substMap_binop]
   -- Bind e2, e2' first.
-  have hbR : Exp.binop .eq (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
-      Ectx.fill [EctxItem.binopR .eq (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) := rfl
-  have hbR' : Exp.binop .eq (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
-      Ectx.fill [EctxItem.binopR .eq (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') := rfl
-  rw [hbR, hbR']
+  rw [← Ectx.fill_binopR .eq (Exp.substMap vs.fst e1),
+      ← Ectx.fill_binopR .eq (Exp.substMap vs.snd e1')]
   iapply (refines_bind [EctxItem.binopR .eq (Exp.substMap vs.fst e1)]
     [EctxItem.binopR .eq (Exp.substMap vs.snd e1')] (A := interp τ Δ)) $$ [IH2']
   · iexact IH2'
@@ -1772,8 +1419,7 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   have hbL' : Ectx.fill [EctxItem.binopR .eq (Exp.substMap vs.snd e1')] v2'.1 =
       Ectx.fill [EctxItem.binopL .eq v2'] (Exp.substMap vs.snd e1') := rfl
   rw [hbL, hbL']
-  iapply (refines_bind [EctxItem.binopL .eq v2] [EctxItem.binopL .eq v2']) $$ [IH1']
-  · iexact IH1'
+  iapply (refines_bind [EctxItem.binopL .eq v2] [EctxItem.binopL .eq v2']) $$ IH1'
   iintro %v1 %v1' #Hv1
   -- Now we have v1, v2 (LHS), v1', v2' (RHS), all related at τ.
   -- Use unboxed_type_eq to get pure: v1 = v2 ↔ v1' = v2'.
@@ -1820,11 +1466,8 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   have hφ_r : (Exp.lit l1').isValue ∧ (Exp.lit l2').isValue ∧
       BinOp.eval .eq (.lit l1') (.lit l2') = some _ :=
     ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, heval_r⟩
-  have hfL : Exp.binop .eq (.lit l1) (.lit l2) =
-      Ectx.fill ([] : Ectx rT) (Exp.binop .eq (.lit l1) (.lit l2)) := rfl
-  have hfR : Exp.binop .eq (.lit l1') (.lit l2') =
-      Ectx.fill ([] : Ectx rT) (Exp.binop .eq (.lit l1') (.lit l2')) := rfl
-  rw [hfL, hfR]
+  rw [Ectx.eq_fill_nil (Exp.binop .eq (.lit l1) (.lit l2)),
+      Ectx.eq_fill_nil (Exp.binop .eq (.lit l1') (.lit l2'))]
   iapply (refines_pure_l hφ_l)
   inext
   iapply (refines_pure_r hφ_r)
@@ -1932,7 +1575,8 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       · rw [h.2]; exact Pat.tryMatch_lit_eq .unit
     -- Goal: _ ⊢ lrel_unit.car ⟨lit unit, _⟩ ⟨lit unit, _⟩.
     -- def-eq to iprop(⌜...⌝).
-    have hrfl : (lrel_unit (GF := GF)).car ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩
+    have hrfl : (lrel_unit (GF := GF)).car ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit
+      _⟩ ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩
         = iprop(⌜(⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = pl(#(.unit)) ∧
                  (⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit
                  .unit⌝) := rfl
@@ -2032,11 +1676,7 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_scrut, Exp.substMap_scrut]
   -- Bind e, e' to get values v, v' at interp τs Δ.
-  have hb1 : Exp.scrut (Exp.substMap vs.fst e) p =
-      Ectx.fill [EctxItem.scrut p] (Exp.substMap vs.fst e) := rfl
-  have hb2 : Exp.scrut (Exp.substMap vs.snd e') p =
-      Ectx.fill [EctxItem.scrut p] (Exp.substMap vs.snd e') := rfl
-  rw [hb1, hb2]
+  rw [← Ectx.fill_scrut p, ← Ectx.fill_scrut p]
   iapply (refines_bind [EctxItem.scrut p] [EctxItem.scrut p]
     (A := interp τs Δ)) $$ [IH']
   · iexact IH'
@@ -2048,9 +1688,7 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
       show Ectx.fill [EctxItem.scrut p] v'.1 = .scrut v'.1 p from rfl]
   icases Hmatch with (⟨%bb, %bb', %hr, Hbnd⟩ | %hn)
   · -- Both match: step to .inl bb / .inl bb'.
-    have hf1 : Exp.scrut v.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v.1 p) := rfl
-    have hf2 : Exp.scrut v'.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v'.1 p) := rfl
-    rw [hf1, hf2]
+    rw [Ectx.eq_fill_nil (Exp.scrut v.1 p), Ectx.eq_fill_nil (Exp.scrut v'.1 p)]
     iapply (refines_pure_l (Hex := pureExec_scrut_some) ⟨v.2.toIsValue, hr.1⟩)
     inext
     iapply (refines_pure_r (Hex := pureExec_scrut_some) ⟨v'.2.toIsValue, hr.2⟩)
@@ -2071,9 +1709,7 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     isplitr; · ipureintro; rfl
     iexact Hbnd
   · -- Both fail: step to .inr ()
-    have hf1 : Exp.scrut v.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v.1 p) := rfl
-    have hf2 : Exp.scrut v'.1 p = Ectx.fill ([] : Ectx rT) (Exp.scrut v'.1 p) := rfl
-    rw [hf1, hf2]
+    rw [Ectx.eq_fill_nil (Exp.scrut v.1 p), Ectx.eq_fill_nil (Exp.scrut v'.1 p)]
     iapply (refines_pure_l (Hex := pureExec_scrut_none) ⟨v.2.toIsValue, hn.1⟩)
     inext
     iapply (refines_pure_r (Hex := pureExec_scrut_none) ⟨v'.2.toIsValue, hn.2⟩)
@@ -2191,8 +1827,7 @@ theorem fv_subset_relCtxDom {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT G
     (HCtx : TctxRelated Δ Γtc Γrc) {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ) :
     e.fv ⊆ (Γrc.map (·.1)).toFinset := by
   intro x hx
-  have hsome := Hty.fvSubset x hx
-  have hRcSome : (Γrc.lookup x).isSome := HCtx.lookup_isSome hsome
+  have hRcSome : (Γrc.lookup x).isSome := HCtx.lookup_isSome (Hty.fvSubset x hx)
   obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome hRcSome
   simp only [List.mem_toFinset, List.mem_map]
   exact ⟨p, hpmem, hpeq⟩
@@ -2243,16 +1878,13 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     rename_i op _ τ
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_real_unop Δ Γrc op Hres) $$ IH'
+    iapply (bin_log_related_real_unop Δ Γrc op Hres) $$ %IH
   | binop_real Hty1 Hty2 Hres ih1 ih2 =>
     rename_i op _ _ τ
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply (bin_log_related_real_binop Δ Γrc op Hres) $$ IH1' IH2'
+    iapply (bin_log_related_real_binop Δ Γrc op Hres) $$ %IH1 %IH2
   | @lit_bool _ b =>
     unfold bin_log_related_ty bin_log_related
     iintro %vs _
@@ -2285,149 +1917,113 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply (bin_log_related_int_binop Δ Γrc op Hres) $$ IH1' IH2'
+    iapply (bin_log_related_int_binop Δ Γrc op Hres) $$ %IH1 %IH2
   | binop_bool Hty1 Hty2 Hres ih1 ih2 =>
     rename_i op _ _ τ
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply (bin_log_related_bool_binop Δ Γrc op Hres) $$ IH1' IH2'
+    iapply (bin_log_related_bool_binop Δ Γrc op Hres) $$ %IH1 %IH2
   | unop_int Hty Hres ih =>
     rename_i op _ τ
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_int_unop Δ Γrc op Hres) $$ IH'
+    iapply (bin_log_related_int_unop Δ Γrc op Hres) $$ %IH
   | unop_bool Hty Hres ih =>
     rename_i op _ τ
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_bool_unop Δ Γrc op Hres) $$ IH'
+    iapply (bin_log_related_bool_unop Δ Γrc op Hres) $$ %IH
   | unboxed_eq HUnboxed _ _ ih1 ih2 =>
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply (bin_log_related_unboxed_eq Δ Γrc HUnboxed) $$ IH1' IH2'
+    iapply (bin_log_related_unboxed_eq Δ Γrc HUnboxed) $$ %IH1 %IH2
   | pair _ _ ih1 ih2 =>
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply bin_log_related_pair $$ IH1' IH2'
+    iapply bin_log_related_pair $$ %IH1 %IH2
   | fst _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_fst Δ Γrc) $$ IH'
+    iapply (bin_log_related_fst Δ Γrc) $$ %IH
   | snd _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_snd Δ Γrc) $$ IH'
+    iapply (bin_log_related_snd Δ Γrc) $$ %IH
   | inl _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_injl Δ Γrc) $$ IH'
+    iapply (bin_log_related_injl Δ Γrc) $$ %IH
   | inr _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_injr Δ Γrc) $$ IH'
+    iapply (bin_log_related_injr Δ Γrc) $$ %IH
   | «case» _ _ _ ih0 ih1 ih2 =>
     have IH0 := ih0 Δ Γrc HCtx
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH0' := IH0
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply bin_log_related_case $$ IH0' IH1' IH2'
+    iapply bin_log_related_case $$ %IH0 %IH1 %IH2
   | cond _ _ _ ih0 ih1 ih2 =>
     have IH0 := ih0 Δ Γrc HCtx
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH0' := IH0
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply bin_log_related_if $$ IH0' IH1' IH2'
+    iapply bin_log_related_if $$ %IH0 %IH1 %IH2
   | app _ _ ih1 ih2 =>
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply bin_log_related_app $$ IH1' IH2'
+    iapply bin_log_related_app $$ %IH1 %IH2
   | alloc _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_alloc Δ Γrc) $$ IH'
+    iapply (bin_log_related_alloc Δ Γrc) $$ %IH
   | load _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_load Δ Γrc) $$ IH'
+    iapply (bin_log_related_load Δ Γrc) $$ %IH
   | store _ _ ih1 ih2 =>
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply bin_log_related_store $$ IH1' IH2'
+    iapply bin_log_related_store $$ %IH1 %IH2
   | alloc_tape _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply bin_log_related_alloctape $$ IH'
+    iapply bin_log_related_alloctape $$ %IH
   | rand _ _ ih1 ih2 =>
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply bin_log_related_rand_tape $$ IH1' IH2'
+    iapply bin_log_related_rand_tape $$ %IH1 %IH2
   | rand_unit _ _ ih1 ih2 =>
     have IH1 := ih1 Δ Γrc HCtx
     have IH2 := ih2 Δ Γrc HCtx
     iintro
-    ihave IH1' := IH1
-    ihave IH2' := IH2
-    iapply bin_log_related_rand_unit $$ IH1' IH2'
+    iapply bin_log_related_rand_unit $$ %IH1 %IH2
   | «scrut» _ Hpat ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_scrut Δ Γrc Hpat) $$ IH'
+    iapply (bin_log_related_scrut Δ Γrc Hpat) $$ %IH
   | tfold _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_fold Δ Γrc) $$ IH'
+    iapply (bin_log_related_fold Δ Γrc) $$ %IH
   | tunfold _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_unfold Δ Γrc) $$ IH'
+    iapply (bin_log_related_unfold Δ Γrc) $$ %IH
   | tapp _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_tapp Δ Γrc) $$ IH'
+    iapply (bin_log_related_tapp Δ Γrc) $$ %IH
   | tpack _ ih =>
     have IH := ih Δ Γrc HCtx
     iintro
-    ihave IH' := IH
-    iapply (bin_log_related_pack Δ Γrc) $$ IH'
+    iapply (bin_log_related_pack Δ Γrc) $$ %IH
   -- Recursive binder cases (lam, fix).
   | @lam L Γtc' e τ1 τ2 Hbody ih =>
     -- Pick fresh atoms not in L ∪ dom(Γrc) ∪ e.fv to satisfy bin_log_related_lam.
@@ -2566,10 +2162,9 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     -- Goal: ⊢ □ bin_log_related_ty ⊤ (cons A Δ) Γrc e e τ
     -- IH at (cons A Δ, Γrc) using TctxRelated.shift.
     have HCtxShift := HCtx.shift A
-    have HFund := ih (TyEnv.cons A Δ) Γrc HCtxShift
     iintro
     imodintro
-    iapply HFund
+    iapply (ih (TyEnv.cons A Δ) Γrc HCtxShift)
   | @tunpack L Γtc' e1 e2 τ τ2 Hty1 Hbody2 ih1 ih2 =>
     have HIH1 : ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ Γrc e1 e1 (Ty.exists' τ) :=
       ih1 Δ Γrc HCtx

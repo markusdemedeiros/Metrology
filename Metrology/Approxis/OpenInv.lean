@@ -21,7 +21,8 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 /-- `OpenInv e`: `e` can be evaluated inside a `|={E1, E2}=>` mask-shift, with
 the mask closed back in the post. -/
 def OpenInv (e : Exp rT) : Prop :=
-  ∀ {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 : CoPset} {Φ : Val rT → IProp GF}, iprop%
+  ∀ {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 : CoPset} {Φ : Val rT → IProp
+    GF}, iprop%
     (|={E1, E2}=> wp E2 e (fun v => iprop% |={E2, E1}=> Φ v)) ⊢ wp E1 e Φ
 
 namespace OpenInv
@@ -41,9 +42,11 @@ theorem specCoupl_atomic_bridge_some {hlc : HasLC} {GF : BundledGFunctors}
     {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT} {ε₁ : ENNReal}
     {Φ : Val rT → IProp GF} {v : Val rT} :
     iprop% specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
-        |={∅, E2}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ (|={E2, E1}=> Φ v))
+        |={∅, E2}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT :=
+          rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ (|={E2, E1}=> Φ v))
       ⊢ specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
-        |={∅, E1}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ Φ v) := by
+        |={∅, E1}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT :=
+          rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ Φ v) := by
   iintro HSC
   iapply specCoupl_mono_spatial
   iframe
@@ -61,7 +64,8 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
           (fun e₃ σ₃ e₃' σ₃' ε₃ => iprop%
             ▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ => iprop%
               |={∅, E2}=>
-                stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
+                stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT
+                  := rT) ε₄ ∗
                   wp E2 e₃ (fun v => iprop(|={E2, E1}=> Φ v)))))
       ⊢@{IProp GF}
     specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
@@ -69,7 +73,8 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
           (fun e₃ σ₃ e₃' σ₃' ε₃ =>
             iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
               iprop(|={∅, E1}=>
-                stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
+                stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT
+                  := rT) ε₄ ∗
                   wp E1 e₃ Φ))))) := by
   iintro _
   iapply specCoupl_mono_spatial
@@ -97,13 +102,15 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
     · iexact HInner
     iintro %σ₄ %ρ'' %ε₄ HBody4
     iapply fupd_specCoupl
-    have Hbody : iprop(stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
+    have Hbody : iprop(stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗
+      errInterp (rT := rT) ε₄ ∗
         wp E2 e₃ (fun v => iprop(|={E2, E1}=> Φ v)))
         ⊢@{IProp GF}
         iprop(|={E2, ∅}=> specCoupl ∅ σ₄ ρ''.expr ρ''.state ε₄
           (fun σ₄' ρ''' ε₄' =>
             iprop(|={∅, E1}=>
-              stateInterp (rT := rT) σ₄' ∗ SpecUpdateGS.specInterp (rT := rT) ρ''' ∗ errInterp (rT := rT) ε₄' ∗
+              stateInterp (rT := rT) σ₄' ∗ SpecUpdateGS.specInterp (rT := rT) ρ''' ∗ errInterp (rT
+                := rT) ε₄' ∗
                 wp E1 e₃ Φ))) := by
       iintro ⟨Hσ4, Hs4, Hε4, HW4⟩
       ihave HW4' := (BI.equiv_iff.mp ApproxisWpGS.wp_unfold).1 $$ HW4
@@ -123,8 +130,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
         imod HΦc with HΦv
         imodintro
         iframe
-        iapply wp_value_of_toVal htv
-        iexact HΦv
+        iapply wp_value_of_toVal htv $$ HΦv
     irevert HBody4
     refine BI.entails_wand ?_
     exact fupd_open_cont (E2 := E2) (E3 := ∅) Hbody
@@ -141,24 +147,28 @@ theorem of_atomic {e : Exp rT} (h : Atomic' e) : OpenInv e := by
   iintro %σ₁ %e₁' %σ₁' %ε₁ Hres
   ihave HFR : iprop(
       (|={E1, E2}=> wp E2 e (fun v => iprop(|={E2, E1}=> Φ v))) ∗
-        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε₁))
+        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT
+          := rT) ε₁))
     $$ [HF Hres]
   · isplitl [HF]
     · iexact HF
     iexact Hres
   have Hbody : iprop(
       (wp E2 e (fun v => iprop(|={E2, E1}=> Φ v))) ∗
-        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε₁))
+        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT
+          := rT) ε₁))
       ⊢@{IProp GF}
     iprop(|={E2, ∅}=> specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
         match e.toVal? with
         | some v => iprop(|={∅, E1}=>
-            stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ Φ v)
+            stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗ errInterp (rT :=
+              rT) ε₂ ∗ Φ v)
         | none => progCoupl e σ₂ ρ'.expr ρ'.state ε₂
             (fun e₃ σ₃ e₃' σ₃' ε₃ =>
               iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
                 iprop(|={∅, E1}=>
-                  stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT := rT) ε₄ ∗
+                  stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT
+                    := rT) ε₄ ∗
                     wp E1 e₃ Φ)))))) := by
     iintro ⟨HW, HresInner⟩
     ihave HW' := (BI.equiv_iff.mp ApproxisWpGS.wp_unfold).1 $$ HW
@@ -224,7 +234,8 @@ end Instances
 
 /-- `imod`/`iinv` on a mask-shifting update in front of an *atomic* `wp`: the
 mask reopens in the post-condition. Rocq's `elim_modal_fupd_wp_atomic`. -/
-instance (priority := low) elimModal_fupd_wp_atomic {p : Bool} {io : InOut} {E1 E2 : CoPset} {e : Exp rT}
+instance (priority := low) elimModal_fupd_wp_atomic {p : Bool} {io : InOut} {E1 E2 : CoPset} {e :
+  Exp rT}
     [h : IsOpenInv e] {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
     {P : IProp GF} {Φ : Val rT → IProp GF} :
     ElimModal True p io false iprop(|={E1, E2}=> P) P
@@ -249,9 +260,8 @@ instance (priority := low) elimAcc_wp_atomic {X : Type} {e : Exp rT} [h : IsOpen
     imod Hacc with ⟨%x, Hα, Hclose⟩
     imodintro
     ispecialize Hinner $$ %x Hα
-    iapply (ApproxisWpGS.wp_frame_wand)
-    isplitl [Hclose]
-    · iexact Hclose
+    iapply ApproxisWpGS.wp_frame_wand
+    iframe Hclose
     iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E₂}=> β x ∗ (γ x -∗? Φ v))))
     case HΦ =>
       intro v
@@ -281,9 +291,8 @@ instance elimAcc_wp_nonatomic {X : Type} {e : Exp rT}
     imodintro
     ispecialize Hinner $$ %x Hα
     iapply ApproxisWpGS.wp_fupd
-    iapply (ApproxisWpGS.wp_frame_wand)
-    isplitl [Hclose]
-    · iexact Hclose
+    iapply ApproxisWpGS.wp_frame_wand
+    iframe Hclose
     iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E}=> β x ∗ (γ x -∗? Φ v))))
     case HΦ =>
       intro v

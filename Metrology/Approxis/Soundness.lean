@@ -13,7 +13,8 @@ public import Metrology.ProbLang.ContextualRefinement
 
 /-! # Soundness
 
-Soundness of the logical relation w.r.t. contextual refinement (precongruence + closed/open soundness theorems). -/
+Soundness of the logical relation w.r.t. contextual refinement (precongruence + closed/open
+  soundness theorems). -/
 
 namespace ProbLang
 
@@ -34,11 +35,11 @@ def Ctx.BindersFresh : Ctx rT → Finset Var → Prop
     Ctx.BindersFresh K' (S ∪ k.binderAtoms)
 
 /-- If a `CtxItem`'s binder atoms are empty, the freshness predicate at the
-extended union reduces to freshness at the original set. -/
+extended union reduces to freshness at the original set. Once the head item is a
+concrete constructor its binder set computes, so `hEmpty` is left to `rfl`. -/
 theorem Ctx.BindersFresh.cast_no_binder
     {K' : Ctx rT} {S : Finset Var} {bAtoms : Finset Var}
-    (hEmpty : bAtoms = ∅)
-    (h : Ctx.BindersFresh K' (S ∪ bAtoms)) :
+    (h : Ctx.BindersFresh K' (S ∪ bAtoms)) (hEmpty : bAtoms = ∅ := by rfl) :
     Ctx.BindersFresh K' S :=
   Finset.union_empty S ▸ hEmpty ▸ h
 
@@ -281,146 +282,112 @@ theorem bin_log_related_under_typed_ctx
     simp only [Ctx.fill_cons, CtxItem.fill]
     cases HKitem with
     | appL Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_app $$ IHk' IH2'
+      iapply bin_log_related_app $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | appR Hty1 =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_app $$ IH1' IHk'
+      iapply bin_log_related_app $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | pairL Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_pair $$ IHk' IH2'
+      iapply bin_log_related_pair $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | pairR Hty1 =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_pair $$ IH1' IHk'
+      iapply bin_log_related_pair $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | fst =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_fst $$ IHk'
+      iapply bin_log_related_fst $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | snd =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_snd $$ IHk'
+      iapply bin_log_related_snd $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | inl =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_injl $$ IHk'
+      iapply bin_log_related_injl $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | inr =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_injr $$ IHk'
+      iapply bin_log_related_injr $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | caseL Hty1 Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_case $$ IHk' IH1' IH2'
+      iapply bin_log_related_case $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+        %(fundamental Hty1 Δ Γrc' HCtx) %(fundamental Hty2 Δ Γrc' HCtx)
     | caseM Hty0 Hty2 =>
-      ihave IH0' := fundamental Hty0 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_case $$ IH0' IHk' IH2'
+      iapply bin_log_related_case $$
+        %(fundamental Hty0 Δ Γrc' HCtx)
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | caseR Hty0 Hty1 =>
-      ihave IH0' := fundamental Hty0 Δ Γrc' HCtx
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_case $$ IH0' IH1' IHk'
+      iapply bin_log_related_case $$
+        %(fundamental Hty0 Δ Γrc' HCtx)
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | ifL Hty1 Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_if $$ IHk' IH1' IH2'
+      iapply bin_log_related_if $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+        %(fundamental Hty1 Δ Γrc' HCtx) %(fundamental Hty2 Δ Γrc' HCtx)
     | ifM Hty0 Hty2 =>
-      ihave IH0' := fundamental Hty0 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_if $$ IH0' IHk' IH2'
+      iapply bin_log_related_if $$
+        %(fundamental Hty0 Δ Γrc' HCtx)
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | ifR Hty0 Hty1 =>
-      ihave IH0' := fundamental Hty0 Δ Γrc' HCtx
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_if $$ IH0' IH1' IHk'
+      iapply bin_log_related_if $$
+        %(fundamental Hty0 Δ Γrc' HCtx)
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | alloc =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_alloc Δ Γrc') $$ IHk'
+      iapply (bin_log_related_alloc Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | load =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_load Δ Γrc') $$ IHk'
+      iapply (bin_log_related_load Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | storeL Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_store $$ IHk' IH2'
+      iapply bin_log_related_store $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | storeR Hty1 =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_store $$ IH1' IHk'
+      iapply bin_log_related_store $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | allocTape =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_alloctape $$ IHk'
+      iapply bin_log_related_alloctape $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | randL_unit Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_rand_unit $$ IHk' IH2'
+      iapply bin_log_related_rand_unit $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | randL_tape Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply bin_log_related_rand_tape $$ IHk' IH2'
+      iapply bin_log_related_rand_tape $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | randR_unit Hty1 =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_rand_unit $$ IH1' IHk'
+      iapply bin_log_related_rand_unit $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | randR_tape Hty1 =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply bin_log_related_rand_tape $$ IH1' IHk'
+      iapply bin_log_related_rand_tape $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | @unop_int _ op _ Hres =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_int_unop Δ Γrc' op Hres) $$ IHk'
+      iapply (bin_log_related_int_unop Δ Γrc' op Hres) $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | @unop_real _ op _ Hres =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_real_unop Δ Γrc' op Hres) $$ IHk'
+      iapply (bin_log_related_real_unop Δ Γrc' op Hres) $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | @binopL_real _ op _ _ Hty2 Hres =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$ IHk' IH2'
+      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | @binopR_real _ op _ _ Hty1 Hres =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$ IH1' IHk'
+      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | @unop_bool _ op _ Hres =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_bool_unop Δ Γrc' op Hres) $$ IHk'
+      iapply (bin_log_related_bool_unop Δ Γrc' op Hres) $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | @binopL_int _ op _ _ Hty2 Hres =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$ IHk' IH2'
+      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | @binopR_int _ op _ _ Hty1 Hres =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$ IH1' IHk'
+      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | @binopL_bool _ op _ _ Hty2 Hres =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$ IHk' IH2'
+      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | @binopR_bool _ op _ _ Hty1 Hres =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$ IH1' IHk'
+      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | binopL_unboxedEq Hub Hty2 =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      ihave IH2' := fundamental Hty2 Δ Γrc' HCtx
-      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$ IHk' IH2'
+      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$
+        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
     | binopR_unboxedEq Hub Hty1 =>
-      ihave IH1' := fundamental Hty1 Δ Γrc' HCtx
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$ IH1' IHk'
+      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$
+        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | fold =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_fold Δ Γrc') $$ IHk'
+      iapply (bin_log_related_fold Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | unfold =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_unfold Δ Γrc') $$ IHk'
+      iapply (bin_log_related_unfold Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | tapp =>
-      ihave IHk' := IHinner Γrc' HCtx (Ctx.BindersFresh.cast_no_binder rfl HfreshTail)
-      iapply (bin_log_related_tapp Δ Γrc') $$ IHk'
+      iapply (bin_log_related_tapp Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
     | @lam _ x τ _ =>
       have hxRc : x ∉ (Γrc'.map (·.1)).toFinset :=
         HfreshHead x (Finset.mem_singleton_self _)
@@ -450,7 +417,7 @@ theorem bin_log_related_under_typed_ctx
       exact bin_log_related_fix_step hfRc hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv IHk_at_f
     | tlam =>
       have HfreshK'Outer : Ctx.BindersFresh K' (Γrc'.map (·.1)).toFinset :=
-        Ctx.BindersFresh.cast_no_binder rfl HfreshTail
+        HfreshTail.cast_no_binder
       obtain ⟨HbindersK'_e, HbindersK'_e'⟩ := binders_proj_pair HbindersK'
       have HCtxShift := HCtx.shift (default : lrel rT GF)
       obtain ⟨hKfe_lc, hKfe_fv⟩ :=
@@ -632,8 +599,7 @@ theorem refines_sound_open_fresh
     split at he
     · rw [← Option.some.inj he]
     · cases he
-  have hvbeq : v.1 = pl(#(.bool b)) := (toVal?_to_eq hv) ▸ ha
-  rw [hvbeq] at hvb1
+  rw [(show v.1 = pl(#(.bool b)) from (toVal?_to_eq hv) ▸ ha)] at hvb1
   injection hvb1 with hbool
   injection hbool with hbb
   subst hbb

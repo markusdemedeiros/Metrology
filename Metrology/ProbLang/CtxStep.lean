@@ -574,5 +574,57 @@ theorem Reducible.toDiscrete [ProbLangℝ rT] [MeasurableSingletonClass rT]
   rw [huniv] at this
   exact MeasureTheory.Measure.measure_univ_eq_zero.mp this
 
+/-- **A witnessed head step makes an expression discretely reducible.** Packages the
+`HeadStepSupport.pos` → `HeadReducible` → `Reducible` → `Discrete.Reducible` chain that
+every `rand` weakest-precondition rule would otherwise spell out in five lines. -/
+@[discrete]
+theorem Discrete.Reducible.of_headStepSupport [ProbLangℝ rT] [MeasurableSingletonClass rT]
+    {e e' : Exp rT} {σ σ' : State rT} (h : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e', σ'⟩)
+    (hlc : e.IsLocallyClosed) (hne : e.decomp.2 ≠ .urand := by no_urand)
+    (hu : e ≠ .urand := by nofun) :
+    Discrete.Reducible e σ := by
+  refine Reducible.toDiscrete hne (reducible_of_headReducible hlc ?_)
+  intro hz
+  have hpos := h.pos hu
+  rw [hz] at hpos
+  simp at hpos
+
+/-- **A head step witnesses head-reducibility.** -/
+@[discrete]
+theorem HeadReducible.of_headStepSupport [ProbLangℝ rT] [MeasurableSingletonClass rT]
+    {e e' : Exp rT} {σ σ' : State rT} (h : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e', σ'⟩)
+    (hu : e ≠ .urand := by nofun) : HeadReducible e σ := fun hz => by
+  have hpos := h.pos hu
+  rw [hz] at hpos
+  simp at hpos
+
+/-- **Invert a step of a filled redex into a head step.** `K.fill e` can only move by `e`
+moving, and for a head-reducible `e` a positive-mass primitive step *is* a head step. This
+packages `primStep_fill_inv` → `primStep_eq_headStep` → `Possible.headStepSupport`, which
+every spec-side `rand` rule performs on the step it is handed. -/
+@[discrete]
+theorem HeadStepSupport.of_primStep_fill [ProbLangℝ rT] [MeasurableSingletonClass rT]
+    {K : Ectx rT} {e e₀ e₂' : Exp rT} {σ σ₀ σ₂' : State rT}
+    (hwit : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e₀, σ₀⟩) (hlc : e.IsLocallyClosed)
+    (hstep : 0 < primStep (⟨K.fill e, σ⟩ : Cfg rT) {⟨e₂', σ₂'⟩})
+    (hv : ¬ e.isValue := by intro ⟨w⟩; nomatch w) (hu : e ≠ .urand := by nofun) :
+    ∃ e', e₂' = K.fill e' ∧ HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e', σ₂'⟩ := by
+  obtain ⟨e', rfl, hstep'⟩ := primStep_fill_inv hv hstep
+  refine ⟨e', rfl, Possible.headStepSupport (possible_iff_pos.mpr ?_)⟩
+  rwa [primStep_eq_headStep
+    (Exp.decompItem_none_of_lc_headReducible hlc (HeadReducible.of_headStepSupport hwit hu))]
+    at hstep'
+
+/-- `Discrete.Reducible.of_headStepSupport`, then filled into an evaluation context. -/
+@[discrete]
+theorem Discrete.Reducible.of_headStepSupport_fill [ProbLangℝ rT] [MeasurableSingletonClass rT]
+    {e e' : Exp rT} {σ σ' : State rT} (K : Ectx rT)
+    (h : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e', σ'⟩) (hlc : e.IsLocallyClosed)
+    (hne : e.decomp.2 ≠ .urand := by no_urand) (hu : e ≠ .urand := by nofun)
+    (hneK : (K.fill e).decomp.2 ≠ .urand := by no_urand) :
+    Discrete.Reducible (K.fill e) σ :=
+  Reducible.toDiscrete hneK
+    ((Discrete.Reducible.of_headStepSupport h hlc hne hu).toReducible.fill K)
+
 end ProbLang
 end

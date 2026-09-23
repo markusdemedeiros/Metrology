@@ -508,6 +508,18 @@ theorem snd_lookup_eq_none_of_not_mem {vs : ValSubstMap rT} {y : Var}
     (hy : y ∉ (vs.map (·.1)).toFinset) : SubstMap.lookup vs.snd y = none := by
   rw [snd_lookup, lookup_eq_none_of_not_mem vs hy]; rfl
 
+/-- Projecting to the left component leaves the domain unchanged. -/
+theorem fst_dom (vs : ValSubstMap rT) :
+    (vs.fst.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
+  show ((vs.map fun p => (p.1, p.2.1.1)).map (·.1)).toFinset = _
+  simp only [List.map_map]; rfl
+
+/-- Projecting to the right component leaves the domain unchanged. -/
+theorem snd_dom (vs : ValSubstMap rT) :
+    (vs.snd.map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
+  show ((vs.map fun p => (p.1, p.2.2.1)).map (·.1)).toFinset = _
+  simp only [List.map_map]; rfl
+
 omit [ProbLangℝ rT] in
 /-- A lookup that returns `some` implies the key appears in the list. -/
 theorem mem_of_lookup_isSome {vs : ValSubstMap rT} {x : Var}
@@ -694,8 +706,7 @@ theorem mem_of_lookup_eq_some {vs : ValSubstMap rT} {y : Var} {w1 w2 : Val rT}
       rw [hr] at h
       -- h : some q = some (w1, w2)
       have hqe : q = (w1, w2) := by injection h
-      have ihp := ih (by rw [hr, hqe])
-      exact List.mem_cons.mpr (.inr ihp)
+      exact List.mem_cons.mpr (.inr (ih (by rw [hr, hqe])))
     | none =>
       rw [hr] at h
       split_ifs at h with hyz
@@ -759,6 +770,42 @@ theorem env_ltyped2_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   iintro ⟨_, %Hc, _⟩
   ipureintro; exact Hc
 
+/-- `.fst` corollary of `env_ltyped2_allClosed`, in the form `Exp.substMap` lemmas want. -/
+theorem env_ltyped2_fst_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
+    env_ltyped2 Γ vs ⊢@{IProp GF} ⌜SubstMap.AllClosed vs.fst⌝ := by
+  iintro Hvs
+  ihave %Hc := env_ltyped2_allClosed Γ vs $$ Hvs
+  ipureintro
+  intro p hp
+  obtain ⟨⟨z, w1, w2⟩, hmem, hpeq⟩ := List.mem_map.mp hp
+  rw [← hpeq]; exact (Hc (z, w1, w2) hmem).1
+
+/-- `.snd` corollary of `env_ltyped2_allClosed`, in the form `Exp.substMap` lemmas want. -/
+theorem env_ltyped2_snd_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
+    env_ltyped2 Γ vs ⊢@{IProp GF} ⌜SubstMap.AllClosed vs.snd⌝ := by
+  iintro Hvs
+  ihave %Hc := env_ltyped2_allClosed Γ vs $$ Hvs
+  ipureintro
+  intro p hp
+  obtain ⟨⟨z, w1, w2⟩, hmem, hpeq⟩ := List.mem_map.mp hp
+  rw [← hpeq]; exact (Hc (z, w1, w2) hmem).2
+
+omit [ProbLangℝ rT] in
+/-- The domain of `Γ` is covered by the domain of any related substitution. -/
+theorem env_ltyped2_domSubset (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
+    env_ltyped2 Γ vs ⊢@{IProp GF}
+      ⌜(Γ.map (·.1)).toFinset ⊆ (vs.map (·.1)).toFinset⌝ := by
+  iintro Hvs
+  ihave %hDom := env_ltyped2_domEq Γ vs $$ Hvs
+  ipureintro
+  intro y hy
+  simp only [List.mem_toFinset, List.mem_map] at hy
+  obtain ⟨p, hpmem, rfl⟩ := hy
+  obtain ⟨q, hqmem, hqeq⟩ :=
+    ValSubstMap.mem_of_lookup_isSome ((hDom p.1).mp (RelCtx.lookup_isSome_of_mem hpmem))
+  simp only [List.mem_toFinset, List.mem_map]
+  exact ⟨q, hqmem, hqeq⟩
+
 omit [ProbLangℝ rT] in
 /-- Lookup-by-Γ: if `Γ x = some A`, the substitution has a matching pair
 and the pair is in `A`. -/
@@ -772,8 +819,7 @@ theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (
   obtain ⟨⟨v1, v2⟩, hvs_eq⟩ := Option.isSome_iff_exists.mp hvs
   iexists v1, v2
   iframe %hvs_eq
-  iapply Hall $$ %x %A %v1 %v2
-  · ipureintro; exact hΓ
+  iapply Hall $$ %x %A %v1 %v2 %(hΓ)
   · ipureintro; exact hvs_eq
 
 omit [ProbLangℝ rT] in
@@ -847,8 +893,7 @@ theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
     have hsome_vs : (vs.lookup y).isSome := (Hdom y).mp (by rw [hΓy]; rfl)
     obtain ⟨⟨w1', w2'⟩, hvy⟩ := Option.isSome_iff_exists.mp hsome_vs
     rw [hvy] at hvs'; injection hvs' with heq; obtain ⟨rfl, rfl⟩ := heq
-    iapply Hall $$ %y %Bold %w1 %w2
-    · ipureintro; exact hΓy
+    iapply Hall $$ %y %Bold %w1 %w2 %(hΓy)
     · ipureintro; exact hvy
   | none =>
     rw [hΓy] at hΓ'
@@ -945,8 +990,7 @@ theorem env_ltyped2_drop_head (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
           | some B' => some B'
           | none => if z = y then some A else none) = some B
     rw [hΓz]
-  iapply Hall $$ %z %B %v1 %v2
-  · ipureintro; exact hΓhead
+  iapply Hall $$ %z %B %v1 %v2 %(hΓhead)
   · ipureintro; exact hvsz
 
 end env_typed
@@ -999,7 +1043,8 @@ theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx rT GF}
           | some B => some B
           | none => if y = y then some A else none) = some A
     rw [hΓy_lookup]; simp
-  icases env_ltyped2_lookup ((y, A) :: Γ) vs y A hyHeadLookup $$ Hvs with ⟨%w1, %w2, %hvsLookupY, HA_w⟩
+  icases env_ltyped2_lookup ((y, A) :: Γ) vs y A hyHeadLookup $$ Hvs with ⟨%w1, %w2, %hvsLookupY,
+    HA_w⟩
   -- Closedness of (w1, w2) extracted from env_ltyped2.
   ihave %Hvs_clos := env_ltyped2_allClosed _ vs $$ Hvs
   -- Build vs' := (x, (w1, w2)) :: vs.delete y. Need env_ltyped2 ((x, A) :: Γ) vs'.
@@ -1013,8 +1058,7 @@ theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx rT GF}
   ihave Hvs' : iprop(env_ltyped2 ((x, A) :: Γ) ((x, (w1, w2)) :: vs.delete y))
       $$ [HA_w HvsDrop]
   · iapply (env_ltyped2_insert Γ (vs.delete y) x A w1 w2 hw1c hw2c)
-    isplitr [HA_w]
-    · iexact HA_w
+    iframe HA_w
     iexact HvsDrop
   -- Apply Hold at vs' := (x, (w1, w2)) :: vs.delete y.
   set vs' : ValSubstMap rT := (x, (w1, w2)) :: vs.delete y with hvs'_def
@@ -1092,8 +1136,10 @@ theorem bin_log_related_rename {E : CoPset} {Γ : RelCtx rT GF}
     rw [ValSubstMap.snd_delete]
   rw [hfilter1] at hswapFst
   rw [hfilter2] at hswapSnd
-  -- Now hswapFst : substMap vs.fst (subst τE x (.fvar y)) = subst (substMap (vs.delete y).fst τE) x w1.1.
-  -- And substMap vs'.fst τE = subst (substMap (vs.delete y).fst τE) x w1.1 (definitionally for cons).
+  -- Now hswapFst : substMap vs.fst (subst τE x (.fvar y)) = subst (substMap (vs.delete y).fst τE) x
+  -- w1.1.
+  -- And substMap vs'.fst τE = subst (substMap (vs.delete y).fst τE) x w1.1 (definitionally for
+  -- cons).
   -- So substMap vs.fst (subst τE x (.fvar y)) = substMap vs'.fst τE.
   have heqFst : Exp.substMap vs.fst (Exp.subst τE x (.fvar y)) = Exp.substMap vs'.fst τE := by
     rw [hswapFst]

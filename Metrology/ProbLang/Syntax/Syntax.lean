@@ -957,6 +957,34 @@ theorem Exp.toVal?_eq_some_of_isValue {e : Exp α} (h : e.isValue) : ∃ v, e.to
     exact IsVal.not_isValue_of_check?_none (by cases hc : IsVal.check? e <;> simp_all)
   · intro h; simp [toVal?, IsVal.check?_eq_none h]
 
+/-! ### Non-values
+
+The head symbols that never form a value. The weakest-precondition lifting rules all take
+`e.toVal? = none` (or `¬ e.isValue`) as a side condition, so each is named once here rather
+than re-proved by `fun ⟨w⟩ => nomatch w` at every call site. -/
+
+theorem Exp.alloc_not_isValue {e : Exp α} : ¬ (Exp.alloc e).isValue := fun ⟨w⟩ => nomatch w
+theorem Exp.load_not_isValue {e : Exp α} : ¬ (Exp.load e).isValue := fun ⟨w⟩ => nomatch w
+theorem Exp.store_not_isValue {e₁ e₂ : Exp α} :
+    ¬ (Exp.store e₁ e₂).isValue := fun ⟨w⟩ => nomatch w
+theorem Exp.tape_not_isValue {e : Exp α} : ¬ (Exp.tape e).isValue := fun ⟨w⟩ => nomatch w
+theorem Exp.rand_not_isValue {e₁ e₂ : Exp α} :
+    ¬ (Exp.rand e₁ e₂).isValue := fun ⟨w⟩ => nomatch w
+theorem Exp.urand_not_isValue : ¬ (Exp.urand : Exp α).isValue := fun ⟨w⟩ => nomatch w
+
+theorem Exp.alloc_toVal?_eq_none {e : Exp α} : (Exp.alloc e).toVal? = none :=
+  Exp.toVal?_eq_none.mpr Exp.alloc_not_isValue
+theorem Exp.load_toVal?_eq_none {e : Exp α} : (Exp.load e).toVal? = none :=
+  Exp.toVal?_eq_none.mpr Exp.load_not_isValue
+theorem Exp.store_toVal?_eq_none {e₁ e₂ : Exp α} : (Exp.store e₁ e₂).toVal? = none :=
+  Exp.toVal?_eq_none.mpr Exp.store_not_isValue
+theorem Exp.tape_toVal?_eq_none {e : Exp α} : (Exp.tape e).toVal? = none :=
+  Exp.toVal?_eq_none.mpr Exp.tape_not_isValue
+theorem Exp.rand_toVal?_eq_none {e₁ e₂ : Exp α} : (Exp.rand e₁ e₂).toVal? = none :=
+  Exp.toVal?_eq_none.mpr Exp.rand_not_isValue
+theorem Exp.urand_toVal?_eq_none : (Exp.urand : Exp α).toVal? = none :=
+  Exp.toVal?_eq_none.mpr Exp.urand_not_isValue
+
 def Exp.ofVal (v : Val α) : Exp α := v.1
 
 structure Tape where
@@ -1253,6 +1281,80 @@ theorem fill_app (K1 K2 : Ectx α) e : (K1 ++ K2).fill e = K2.fill (K1.fill e) :
 @[simp] theorem Ectx.fill_snoc (K : Ectx α) (Ki : EctxItem α) (e : Exp α) :
     Ectx.fill (K ++ [Ki]) e = Ki.fillItem (K.fill e) :=
   List.foldl_append
+
+/-! ### Decomposing an expression into a one-item evaluation context
+
+The `refines_bind` / `refines_pure_*` rules match `K.fill _` syntactically, so a goal
+about a bare redex has to be re-bracketed first. Each lemma below states the relevant
+definitional equality in the reducing direction; use `←` to re-bracket a goal. -/
+
+@[simp] theorem Ectx.fill_nil (e : Exp α) : Ectx.fill ([] : Ectx α) e = e := rfl
+
+/-- `e` seen as sitting in the empty evaluation context. -/
+theorem Ectx.eq_fill_nil (e : Exp α) : e = Ectx.fill ([] : Ectx α) e := rfl
+
+theorem Ectx.fill_appL (v2 : Val α) (e : Exp α) :
+    Ectx.fill [.appL v2] e = .app e (.ofVal v2) := rfl
+
+theorem Ectx.fill_appR (e1 : Exp α) (e : Exp α) :
+    Ectx.fill [.appR e1] e = .app e1 e := rfl
+
+theorem Ectx.fill_unop (op : UnOp) (e : Exp α) :
+    Ectx.fill [.unop op] e = .unop op e := rfl
+
+theorem Ectx.fill_binopL (op : BinOp) (v2 : Val α) (e : Exp α) :
+    Ectx.fill [.binopL op v2] e = .binop op e (.ofVal v2) := rfl
+
+theorem Ectx.fill_binopR (op : BinOp) (e1 : Exp α) (e : Exp α) :
+    Ectx.fill [.binopR op e1] e = .binop op e1 e := rfl
+
+theorem Ectx.fill_condC (e1 e2 : Exp α) (e : Exp α) :
+    Ectx.fill [.condC e1 e2] e = .cond e e1 e2 := rfl
+
+theorem Ectx.fill_pairL (v2 : Val α) (e : Exp α) :
+    Ectx.fill [.pairL v2] e = .pair e (.ofVal v2) := rfl
+
+theorem Ectx.fill_pairR (e1 : Exp α) (e : Exp α) :
+    Ectx.fill [.pairR e1] e = .pair e1 e := rfl
+
+theorem Ectx.fill_fst (e : Exp α) :
+    Ectx.fill [.fst] e = .fst e := rfl
+
+theorem Ectx.fill_snd (e : Exp α) :
+    Ectx.fill [.snd] e = .snd e := rfl
+
+theorem Ectx.fill_inl (e : Exp α) :
+    Ectx.fill [.inl] e = .inl e := rfl
+
+theorem Ectx.fill_inr (e : Exp α) :
+    Ectx.fill [.inr] e = .inr e := rfl
+
+theorem Ectx.fill_case (e1 e2 : Exp α) (e : Exp α) :
+    Ectx.fill [.case e1 e2] e = .case e e1 e2 := rfl
+
+theorem Ectx.fill_alloc (e : Exp α) :
+    Ectx.fill [.alloc] e = .alloc e := rfl
+
+theorem Ectx.fill_load (e : Exp α) :
+    Ectx.fill [.load] e = .load e := rfl
+
+theorem Ectx.fill_storeL (v2 : Val α) (e : Exp α) :
+    Ectx.fill [.storeL v2] e = .store e (.ofVal v2) := rfl
+
+theorem Ectx.fill_storeR (e1 : Exp α) (e : Exp α) :
+    Ectx.fill [.storeR e1] e = .store e1 e := rfl
+
+theorem Ectx.fill_tape (e : Exp α) :
+    Ectx.fill [.tape] e = .tape e := rfl
+
+theorem Ectx.fill_randL (v2 : Val α) (e : Exp α) :
+    Ectx.fill [.randL v2] e = .rand e (.ofVal v2) := rfl
+
+theorem Ectx.fill_randR (e1 : Exp α) (e : Exp α) :
+    Ectx.fill [.randR e1] e = .rand e1 e := rfl
+
+theorem Ectx.fill_scrut (p : Pat α) (e : Exp α) :
+    Ectx.fill [.scrut p] e = .scrut e p := rfl
 
 theorem Ectx.fill_comp (K1 K2 : Ectx α) (e : Exp α) :
     K1.fill (K2.fill e) = (K1.comp K2).fill e := by

@@ -215,8 +215,7 @@ theorem wp_adequacy_spec_coupl (n m : Nat) (e₁ : Exp rT) (σ₁ : State rT)
     iapply fupd_pure_wand_intro
     iintro %HS
     imod HCont $$ %HS with ⟨HΨ, -⟩
-    iapply HΨ
-    iexact HZ
+    iapply HΨ $$ HZ
 
 theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp rT) (σ₁ : State rT)
     (e₁' : Exp rT) (σ₁' : State rT)
@@ -254,8 +253,7 @@ theorem wp_adequacy_prog_coupl (n m : Nat) (e₁ : Exp rT) (σ₁ : State rT)
   iapply fupd_stepFupdN_plain_forall_4
   iintro %e₂ %σ₂ %e₂' %σ₂'
   imod Hcnt $$ %e₂ %σ₂ %e₂' %σ₂' with Hcnt
-  iapply Hcoupl
-  iexact Hcnt
+  iapply Hcoupl $$ Hcnt
 
 theorem wp_adequacy_spec_coupl_zero (m : Nat) (e₁ : Exp rT) (σ₁ : State rT)
     (e₁' : Exp rT) (σ₁' : State rT)
@@ -302,7 +300,8 @@ theorem wp_value_specCoupl_unfold {e : Exp rT} {v : Val rT} {Φ : Val rT → IPr
     (E : CoPset) (He : e.toVal? = some v) :
     wp (GF := GF) E e Φ ⊢@{IProp GF}
       ∀ σ₁ e₁' σ₁' ε₁,
-        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT := rT) ε₁) -∗
+        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT
+          := rT) ε₁) -∗
           |={E, ∅}=> specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
             iprop(|={∅, E}=>
               stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗

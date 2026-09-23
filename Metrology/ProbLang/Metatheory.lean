@@ -732,6 +732,21 @@ theorem Exp.lam_substMap_isLocallyClosed {e : Exp rT} {σ : SubstMap rT} {L D : 
   rw [← hbridge]
   exact Exp.substMap_lc hσ (he y hyL)
 
+/-- The `fix` twin of `Exp.lam_substMap_isLocallyClosed`: same hypotheses, same proof,
+`Exp.IsLocallyClosed.fix` in place of `.lam`. Needed by `bin_log_related_fix`. -/
+theorem Exp.fix_substMap_isLocallyClosed {e : Exp rT} {σ : SubstMap rT} {L D : Finset Var}
+    (hσ : SubstMap.AllClosed σ) (hdom : ∀ y ∉ D, SubstMap.lookup σ y = none)
+    (he : ∀ x ∉ L, (Exp.open' e (.fvar x)).IsLocallyClosed) :
+    (Exp.fix (Exp.substMap σ e)).IsLocallyClosed := by
+  refine Exp.IsLocallyClosed.fix (L ∪ D) _ ?_
+  intro y hy
+  have hbridge : Exp.substMap σ (Exp.open' e (.fvar y)) =
+      Exp.open' (Exp.substMap σ e) (.fvar y) := by
+    rw [Exp.substMap_open _ _ _ hσ,
+      Exp.substMap_fvar_lookup_none (hdom y fun h => hy (Finset.mem_union_right _ h))]
+  rw [← hbridge]
+  exact Exp.substMap_lc hσ (he y fun h => hy (Finset.mem_union_left _ h))
+
 /-- A free variable of `(substMap vs e)` either was already free in `e` (and
 not substituted out), or comes from one of the substituted values. -/
 theorem Exp.fv_substMap_subset (vs : SubstMap rT) (e : Exp rT) :
