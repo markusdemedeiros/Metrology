@@ -85,12 +85,12 @@ theorem approximates_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   have Hrestpos : (0 : ENNReal) < ε' - ε := tsub_pos_of_lt Hε'pos
   -- Specialize the parametric `refines` to this instance and unfold to a WP.
   ihave HlogR := Hlog IR $$ Hεc
-  ihave Hwp := refines_unfold $$ HlogR
-  -- `Hwp` quantifies over an evaluation context, so put `He'` in empty-context form.
+  iunfold refines at HlogR
+  -- `HlogR` quantifies over an evaluation context, so put `He'` in empty-context form.
   rw [spec_eq_fill_nil e']
-  ispecialize Hwp $$ %([] : Ectx rT) %(ε' - ε) He' Htok Hrest %Hrestpos
+  ispecialize HlogR $$ %([] : Ectx rT) %(ε' - ε) He' Htok Hrest %Hrestpos
   -- Weaken the WP post-condition from `(A IR).car v v'` to `φ v v'`.
-  iapply ApproxisWpGS.wp_mono $$ Hwp
+  iapply ApproxisWpGS.wp_mono $$ HlogR
   intro v
   iintro Hpost
   icases Hpost with ⟨%v', %_, Hspec, -, -, %_, HA_v⟩

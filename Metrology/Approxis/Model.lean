@@ -73,8 +73,6 @@ noncomputable def lrel.toFunChain {GF : BundledGFunctors}
   chain k := (c.chain k).car
   cauchy h := (c.cauchy h : _)
 
-/-- Evaluation at a fixed pair of values.  Naming it gives the `LimitPreserving`
-combinators below a head symbol to hang the nonexpansiveness instance on. -/
 abbrev lrel.appAt {GF : BundledGFunctors} (v1 v2 : Val rT) :
     (Val rT → Val rT → IProp GF) → IProp GF := (· v1 v2)
 
@@ -110,14 +108,14 @@ section NaShorthand
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 @[reducible] noncomputable def naOwnP (E : CoPset) : IProp GF :=
-  Iris.NonAtomicInvariant.own (GF := GF) (ApproxisRGS.nais (rT := rT) (hlc := hlc) GF) E
+  Iris.NonAtomicInvariant.own (GF := GF) (ApproxisRGS.nais (rT := rT) GF) E
 
 @[reducible] noncomputable def naInvP (N : Namespace) (P : IProp GF) : IProp GF :=
-  Iris.NonAtomicInvariant.inv (GF := GF) (ApproxisRGS.nais (rT := rT) (hlc := hlc) GF) N P
+  Iris.NonAtomicInvariant.inv (GF := GF) (ApproxisRGS.nais (rT := rT) GF) N P
 
 @[reducible] noncomputable def naCloseP (P : IProp GF) (N : Namespace) (E : CoPset) : IProp GF :=
-  iprop((▷ P) ∗ (naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) ={⊤}=∗
-    naOwnP (rT := rT) (hlc := hlc) E)
+  iprop% (▷ P) ∗ (naOwnP (rT := rT) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) ={⊤}=∗
+    naOwnP (rT := rT) E
 
 end NaShorthand
 
@@ -126,28 +124,19 @@ end NaShorthand
 section Refines
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-noncomputable def refines (E : CoPset) (e e' : Exp rT) (A : lrel rT GF) : IProp GF :=
-  iprop(∀ (K : Ectx rT) (ε : ENNReal),
-    (⤇ (K.fill e')) -∗
-    (naOwnP (rT := rT) (hlc := hlc) E) -∗
-    (↯ ε) -∗
-    (⌜ (0 : ENNReal) < ε ⌝) -∗
-    wp ⊤ e (fun v => iprop(∃ (v' : Val rT) (ε' : ENNReal),
-      (⤇ (K.fill v'.1)) ∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝) ∗ A
-      v v')))
-
-/-- Bridge between the folded and unfolded form of `refines` for `iapply`/`iexact`. -/
-theorem refines_unfold {E : CoPset} {e e' : Exp rT} {A : lrel rT GF} :
-    refines E e e' A ⊢@{IProp GF}
-      iprop(∀ (K : Ectx rT) (ε : ENNReal),
-        (⤇ (K.fill e')) -∗
-        (naOwnP (rT := rT) (hlc := hlc) E) -∗
-        (↯ ε) -∗
-        (⌜ (0 : ENNReal) < ε ⌝) -∗
-        wp ⊤ e (fun v => iprop(∃ (v' : Val rT) (ε' : ENNReal),
-          (⤇ (K.fill v'.1)) ∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ (↯ ε') ∗ (⌜ (0 : ENNReal) < ε' ⌝)
-          ∗ A v v'))) :=
-  BIBase.Entails.rfl
+noncomputable def refines (E : CoPset) (e e' : Exp rT) (A : lrel rT GF) : IProp GF := iprop%
+  ∀ (K : Ectx rT) (ε : ENNReal),
+    ⤇ K.fill e' -∗
+    naOwnP (rT := rT) E -∗
+    ↯ ε -∗
+    ⌜ (0 : ENNReal) < ε ⌝ -∗
+    wp ⊤ e (fun v => iprop%
+      ∃ (v' : Val rT) (ε' : ENNReal),
+        ⤇ K.fill v'.1 ∗
+        naOwnP (rT := rT) ⊤ ∗
+        ↯ ε' ∗
+        ⌜ (0 : ENNReal) < ε' ⌝ ∗
+        A v v')
 
 end Refines
 
@@ -166,8 +155,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 omit [ProbLangℝ rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
-    iprop(⌜v1.1 = pl(#(.unit)) ∧ v2.1 = pl(#(.unit))⌝ : IProp GF)
-      ⊢@{IProp GF} iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) := by
+    ⌜v1.1 = pl(#(.unit)) ∧ v2.1 = pl(#(.unit))⌝
+      ⊢@{IProp GF} ⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ := by
   iintro %h !%
   exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
@@ -192,8 +181,8 @@ noncomputable def lrel_nat : lrel rT GF where
 
 /-- Both values are the same positive integer literal (`0 < n`). -/
 noncomputable def lrel_pos_nat : lrel rT GF where
-  car v1 v2 := iprop(∃ n : Nat, ⌜ 0 < n ∧
-    v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝)
+  car v1 v2 := iprop% ∃ n : Nat, ⌜ 0 < n ∧
+    v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%n, %h⟩ !%
@@ -219,24 +208,24 @@ noncomputable def lrel_real : lrel rT GF where
 omit [ProbLangℝ rT] in
 theorem lrel_real_unfold (v v' : Val rT) :
     (lrel_real (GF := GF)).car v v'
-      ⊢@{IProp GF} iprop(∃ r : rT,
-        ⌜v.1 = pl(#(.real r)) ∧ v'.1 = pl(#(.real r))⌝) :=
+      ⊢@{IProp GF} ∃ r : rT,
+        ⌜v.1 = pl(#(.real r)) ∧ v'.1 = pl(#(.real r))⌝ :=
   BIBase.Entails.rfl
 
 noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
-    iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
+    iprop% (⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
       □ (∀ (w1 w2 : Val rT), A1 w1 w2 -∗
-        refines (⊤ : CoPset) (.app v1.1 w1.1) (.app v2.1 w2.1) A2))
+        refines (⊤ : CoPset) (.app v1.1 w1.1) (.app v2.1 w2.1) A2)
   persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
 noncomputable def lrel_prod (A B : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
-    iprop(∃ (a1 a2 b1 b2 : Val rT),
+    iprop% ∃ (a1 a2 b1 b2 : Val rT),
       (⌜ v1.1 = .pair a1.1 b1.1 ⌝) ∗
       (⌜ v2.1 = .pair a2.1 b2.1 ⌝) ∗
-      A a1 a2 ∗ B b1 b2)
+      A a1 a2 ∗ B b1 b2
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%a1, %a2, %b1, %b2, %h1, %h2, HA, HB⟩
@@ -255,10 +244,10 @@ noncomputable def lrel_prod (A B : lrel rT GF) : lrel rT GF where
 
 noncomputable def lrel_sum (A B : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
-    iprop(∃ (w1 w2 : Val rT),
+    iprop% ∃ (w1 w2 : Val rT),
       ((⌜ v1.1 = .inl w1.1 ⌝) ∗ (⌜ v2.1 = .inl w2.1 ⌝) ∗ A w1 w2)
       ∨
-      ((⌜ v1.1 = .inr w1.1 ⌝) ∗ (⌜ v2.1 = .inr w2.1 ⌝) ∗ B w1 w2))
+      ((⌜ v1.1 = .inr w1.1 ⌝) ∗ (⌜ v2.1 = .inr w2.1 ⌝) ∗ B w1 w2)
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%w1, %w2, Hd⟩
@@ -283,8 +272,8 @@ noncomputable def lrel_sum (A B : lrel rT GF) : lrel rT GF where
         · rw [h2]; simp [Exp.fv]; exact hBcl.2.2
 
 noncomputable def lrel_exists (C : lrel rT GF → lrel rT GF) : lrel rT GF where
-  car v1 v2 := iprop((⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
-    ∃ A : lrel rT GF, C A v1 v2)
+  car v1 v2 := iprop% (⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
+    ∃ A : lrel rT GF, C A v1 v2
   persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
@@ -309,8 +298,8 @@ noncomputable def lrel_true : lrel rT GF where
 /-- One-step unfolding of a recursive semantic type. Carries a closedness
 conjunct so `interp_closed` can project it without `▷`-stripping. -/
 noncomputable def lrelRec1 (C : lrel rT GF -n> lrel rT GF) (r : lrel rT GF) : lrel rT GF where
-  car w1 w2 := iprop((⌜w1.1.isClosedEmpty ∧ w2.1.isClosedEmpty⌝) ∗
-    ▷ (C r).car w1 w2)
+  car w1 w2 := iprop% (⌜w1.1.isClosedEmpty ∧ w2.1.isClosedEmpty⌝) ∗
+    ▷ (C r).car w1 w2
   persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
@@ -433,10 +422,10 @@ theorem refines_proper {E : CoPset} {e e' : Exp rT} {A B : lrel rT GF}
 guarded by an invariant at the log-namespace. Mirrors `lrel_ref` (model.v:108–110). -/
 noncomputable def lrel_ref (A : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
-    iprop(∃ (l1 l2 : Loc),
+    iprop% ∃ (l1 l2 : Loc),
       (⌜ v1.1 = pl(#(.loc l1)) ⌝) ∗ (⌜ v2.1 = pl(#(.loc l2)) ⌝) ∗
       Iris.inv (logN.@ ((l1, l2) : Loc × Loc))
-        (iprop(∃ (w1 w2 : Val rT), (appHeapFrag l1 w1) ∗ (specHeapFrag l2 w2) ∗ A w1 w2)))
+        (iprop(∃ (w1 w2 : Val rT), (appHeapFrag l1 w1) ∗ (specHeapFrag l2 w2) ∗ A w1 w2))
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%l1, %l2, %h1, %h2, _⟩ !%
@@ -446,10 +435,10 @@ noncomputable def lrel_ref (A : lrel rT GF) : lrel rT GF where
 same finite range. Mirrors `lrel_tape` (model.v:113–115). -/
 noncomputable def lrel_tape : lrel rT GF where
   car v1 v2 :=
-    iprop(∃ (α1 α2 : Loc) (z : Int),
+    iprop% ∃ (α1 α2 : Loc) (z : Int),
       (⌜ v1.1 = pl(#(.lbl α1)) ⌝) ∗ (⌜ v2.1 = pl(#(.lbl α2)) ⌝) ∗
       Iris.inv (logN.@ ((α1, α2) : Loc × Loc))
-        (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩))))
+        (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩)))
   persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%α1, %α2, %z, %h1, %h2, _⟩ !%
@@ -686,22 +675,22 @@ theorem refines_bind (K K' : Ectx rT) {E : CoPset} {A A' : lrel rT GF} {e e' : E
   ihave Hj2 : iprop(⤇ (K''.comp K').fill e') $$ [Hj]
   · rw [← hfc]; iassumption
   ispecialize Hm $$ Hj2 Hna Herr Hpos
-  let ΦInner : Val rT → IProp GF := fun v => iprop(
+  let ΦInner : Val rT → IProp GF := fun v => iprop% 
     ∃ (v' : Val rT) (ε' : ENNReal),
-      (⤇ (K''.comp K').fill v'.1) ∗ naOwnP (rT := rT) (hlc := hlc) ⊤ ∗ ↯ ε' ∗
-      ⌜(0 : ENNReal) < ε'⌝ ∗ A.car v v')
-  let ΦOuter : Val rT → IProp GF := fun v => iprop(
+      (⤇ (K''.comp K').fill v'.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε' ∗
+      ⌜(0 : ENNReal) < ε'⌝ ∗ A.car v v'
+  let ΦOuter : Val rT → IProp GF := fun v => iprop% 
     ∃ (v' : Val rT) (ε' : ENNReal),
-      (⤇ K''.fill v'.1) ∗ naOwnP (rT := rT) (hlc := hlc) ⊤ ∗ ↯ ε' ∗
-      ⌜(0 : ENNReal) < ε'⌝ ∗ A'.car v v')
-  let HfTy : IProp GF := iprop(
+      (⤇ K''.fill v'.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε' ∗
+      ⌜(0 : ENNReal) < ε'⌝ ∗ A'.car v v'
+  let HfTy : IProp GF := iprop% 
     ∀ (v v' : Val rT), A v v' -∗ ∀ (K_1 : Ectx rT) (ε : ENNReal),
-      (⤇ K_1.fill (K'.fill v'.1)) -∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) -∗ (↯ ε) -∗
+      (⤇ K_1.fill (K'.fill v'.1)) -∗ (naOwnP (rT := rT) ⊤) -∗ (↯ ε) -∗
       (⌜(0 : ENNReal) < ε⌝) -∗
       wp ⊤ (K.fill v.1) (fun v₂ => iprop(
         ∃ (v'' : Val rT) (ε'' : ENNReal),
-          (⤇ K_1.fill v''.1) ∗ naOwnP (rT := rT) (hlc := hlc) ⊤ ∗ ↯ ε'' ∗
-          ⌜(0 : ENNReal) < ε''⌝ ∗ A'.car v₂ v'')))
+          (⤇ K_1.fill v''.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε'' ∗
+          ⌜(0 : ENNReal) < ε''⌝ ∗ A'.car v₂ v''))
   iapply ApproxisWpGS.wp_bind (K := K)
   ihave Hstep : iprop(wp ⊤ e (fun v => iprop(HfTy ∗ ΦInner v))) $$ [Hf Hm]
   · iapply ApproxisWpGS.wp_frame_l (R := HfTy) (e := e) (E := ⊤) (Φ := ΦInner)
@@ -724,7 +713,7 @@ theorem refines_bind (K K' : Ectx rT) {E : CoPset} {A A' : lrel rT GF} {e e' : E
 `na_own ⊤` together with `A v1 v2`. -/
 theorem refines_ret_na {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
-    iprop((naOwnP (rT := rT) (hlc := hlc) E) ={⊤}=∗ (naOwnP (rT := rT) (hlc := hlc) ⊤) ∗ A v1
+    iprop((naOwnP (rT := rT) E) ={⊤}=∗ (naOwnP (rT := rT) ⊤) ∗ A v1
       v2) ⊢@{IProp GF}
     refines E e1 e2 A := by
   subst hv1 hv2
@@ -744,7 +733,7 @@ theorem refines_ret_na {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel 
 /-- Dual of `refines_ret_na` splitting `⊤ = E ∪ (⊤ \ E)`. -/
 theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
-    iprop(|={⊤}=> (naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff (⊤ : CoPset) E)) ∗ A v1 v2) ⊢@{IProp
+    iprop(|={⊤}=> (naOwnP (rT := rT) (SDiff.sdiff (⊤ : CoPset) E)) ∗ A v1 v2) ⊢@{IProp
       GF}
     refines E e1 e2 A := by
   subst hv1 hv2
@@ -761,9 +750,9 @@ theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel
   have hdisj : E ## (SDiff.sdiff (⊤ : CoPset) E) := LawfulSet.disjoint_diff_right
   have hunion : E ∪ (SDiff.sdiff (⊤ : CoPset) E) = (⊤ : CoPset) :=
     LawfulSet.subset_union_diff (fun _ _ => CoPset.mem_full)
-  ihave Hfull : iprop(naOwnP (rT := rT) (hlc := hlc) ⊤) $$ [Hnais HF]
+  ihave Hfull : iprop(naOwnP (rT := rT) ⊤) $$ [Hnais HF]
   · have heq : (⊤ : CoPset) = E ∪ (SDiff.sdiff (⊤ : CoPset) E) := hunion.symm
-    rw [show (naOwnP (rT := rT) (hlc := hlc) (⊤ : CoPset)) = naOwnP (rT := rT) (hlc := hlc) (E ∪
+    rw [show (naOwnP (rT := rT) (⊤ : CoPset)) = naOwnP (rT := rT) (E ∪
       (SDiff.sdiff (⊤ : CoPset) E)) from
         congrArg _ heq]
     iapply (Iris.NonAtomicInvariant.own_union hdisj).mpr
@@ -822,7 +811,7 @@ instance is_except_0_refines (E : CoPset) (e t : Exp rT) (A : lrel rT GF) :
 
 theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Exp rT}
     {A : lrel rT GF} :
-    iprop((▷ P) ∗ ((naInvP (rT := rT) (hlc := hlc) N P) -∗ refines E e1 e2 A)) ⊢@{IProp GF}
+    iprop((▷ P) ∗ ((naInvP (rT := rT) N P) -∗ refines E e1 e2 A)) ⊢@{IProp GF}
     refines E e1 e2 A := by
   iintro ⟨HP, Hcont⟩
   iapply fupd_refines
@@ -833,9 +822,9 @@ theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Ex
 
 theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp rT} {A : lrel rT GF}
     (HNE : (↑N : CoPset) ⊆ E) :
-    iprop((naInvP (rT := rT) (hlc := hlc) N P) ∗ ((▷ P) ∗ (naCloseP (rT := rT) (hlc := hlc) P N E)
+    iprop% (naInvP (rT := rT) N P) ∗ ((▷ P) ∗ (naCloseP (rT := rT) P N E)
       -∗
-        refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A)) ⊢@{IProp GF}
+        refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A) ⊢@{IProp GF}
     refines E e1 e2 A := by
   unfold refines
   iintro ⟨Hinv, IH⟩
@@ -844,20 +833,20 @@ theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp 
   imod Iris.NonAtomicInvariant.inv_acc (F := E) (E := ⊤)
     ((fun _ _ => CoPset.mem_full) : (↑N : CoPset) ⊆ ⊤) HNE $$ Hinv Hnais
     with ⟨HP, Hnais', Hclose⟩
-  ihave HPc : iprop((▷ P) ∗ naCloseP (rT := rT) (hlc := hlc) P N E) $$ [$HP $Hclose]
+  ihave HPc : iprop((▷ P) ∗ naCloseP (rT := rT) P N E) $$ [$HP $Hclose]
   ihave IH' := IH $$ HPc
   imodintro
   iapply IH' $$ %K %ε Hj Hnais' Herr Hpos
 
 theorem refines_na_close {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp rT}
     {A : lrel rT GF} :
-    iprop((▷ P) ∗ (naCloseP (rT := rT) (hlc := hlc) P N E) ∗ refines E e1 e2 A) ⊢@{IProp GF}
+    iprop((▷ P) ∗ (naCloseP (rT := rT) P N E) ∗ refines E e1 e2 A) ⊢@{IProp GF}
     refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A := by
   unfold refines
   iintro ⟨HP, Hclose, IH⟩
   iintro %K %ε Hj HownFN Herr Hpos
-  ihave Hpair : iprop((▷ P) ∗ naOwnP (rT := rT) (hlc := hlc) (SDiff.sdiff E ((↑N : CoPset) :
-    CoPset))) $$ [$HP $HownFN]
+  ihave Hpair : iprop% (▷ P) ∗ naOwnP (rT := rT) (SDiff.sdiff E ((↑N : CoPset) :
+    CoPset)) $$ [$HP $HownFN]
   ihave HownF := Hclose $$ Hpair
   iapply ApproxisWpGS.fupd_wp
   imod HownF with HownF'

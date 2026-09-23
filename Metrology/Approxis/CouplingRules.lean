@@ -78,7 +78,7 @@ end TimelessTapes
 
 `appNatTape`/`specNatTape` are `def`s, so `icases`/`iexists` do not see through them.
 These bridges name the one defeq step, in the style of `lrel_arr_unfold`
-(`Approxis/Compatibility.lean`) and `refines_unfold` (`Approxis/Model.lean`). -/
+(`Approxis/Compatibility.lean`). -/
 
 section NatTapeBridges
 open scoped AppGS

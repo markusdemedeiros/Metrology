@@ -112,7 +112,7 @@ theorem refines_wp_l {E : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel rT GF}
   iunfold refines
   iintro %K' %ε HK Hna Herr Hpos
   iapply ApproxisWpGS.wp_bind (K := K)
-  let R : IProp GF := iprop((⤇ K'.fill t) ∗ (naOwnP (rT := rT) (hlc := hlc) E) ∗ (↯ ε) ∗ (⌜(0 :
+  let R : IProp GF := iprop((⤇ K'.fill t) ∗ (naOwnP (rT := rT) E) ∗ (↯ ε) ∗ (⌜(0 :
     ENNReal) < ε⌝))
   ihave HR : R $$ [HK Hna Herr Hpos]
   · isplitl [HK]; · iassumption
@@ -128,8 +128,8 @@ theorem refines_wp_l {E : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel rT GF}
   intro v
   rw [show Exp.ofVal v = v.1 from rfl]
   iintro ⟨⟨HK', Hna', Herr', %Hpos'⟩, HRefv⟩
-  ihave HRefv' := refines_unfold $$ HRefv
-  iapply HRefv' $$ %K' %ε HK' Hna' Herr' %Hpos'
+  iunfold refines at HRefv
+  iapply HRefv $$ %K' %ε HK' Hna' Herr' %Hpos'
 
 /-- `refines_atomic_l` (app_rel_rules.v:54): atomic step on the LHS, opening the
 continuation to allow spec-side steps + invariant opening.
@@ -151,7 +151,7 @@ theorem refines_atomic_l {E E' : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel
   ispecialize Hlog $$ %K' HK
   imod Hlog with HW
   imodintro
-  let R : IProp GF := iprop((naOwnP (rT := rT) (hlc := hlc) E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
+  let R : IProp GF := iprop((naOwnP (rT := rT) E) ∗ (↯ ε) ∗ (⌜(0 : ENNReal) < ε⌝))
   ihave HR : R $$ [Hna Herr Hpos]
   · isplitl [Hna]; · iassumption
     iframe Herr
@@ -169,8 +169,8 @@ theorem refines_atomic_l {E E' : CoPset} {K : Ectx rT} {e1 t : Exp rT} {A : lrel
   iintro ⟨⟨Hna', Herr', %Hpos'⟩, HFup⟩
   imod HFup with ⟨%t', HKt', HRef⟩
   imodintro
-  ihave HRef' := refines_unfold $$ HRef
-  iapply HRef' $$ %K' %ε HKt' Hna' Herr' %Hpos'
+  iunfold refines at HRef
+  iapply HRef $$ %K' %ε HKt' Hna' Herr' %Hpos'
 
 /-! ## Stateful reductions on the LHS -/
 
