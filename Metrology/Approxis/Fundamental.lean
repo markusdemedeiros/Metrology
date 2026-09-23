@@ -460,17 +460,15 @@ theorem bin_log_related_rand_unit (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   · iexact IH2'
   iintro %v2 %v2' Hu
   have hunit_unfold : (lrel_unit (GF := GF)).car v2 v2' =
-      iprop(⌜v2.1 = pl(#(.unit)) ∧ v2'.1 = pl(#(.unit))⌝) := rfl
-  ihave %Hu' : (⌜v2.1 = pl(#(.unit)) ∧ v2'.1 = pl(#(.unit))⌝ : IProp GF) $$ [Hu]
+      iprop(⌜v2 = .unit ∧ v2' = .unit⌝) := rfl
+  ihave %Hu' : (⌜v2 = .unit ∧ v2' = .unit⌝ : IProp GF) $$ [Hu]
   · rw [← hunit_unfold]; iexact Hu
   obtain ⟨hv2, hv2'⟩ := Hu'
   rw [hv2, hv2', interp_int]
   have hbk1 : Ectx.fill [EctxItem.randR (Exp.substMap vs.fst e1)] pl(#(.unit)) =
-      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
-        vs.fst e1) := rfl
+      Ectx.fill [EctxItem.randL .unit] (Exp.substMap vs.fst e1) := rfl
   have hbk2 : Ectx.fill [EctxItem.randR (Exp.substMap vs.snd e1')] pl(#(.unit)) =
-      Ectx.fill [EctxItem.randL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
-        vs.snd e1') := rfl
+      Ectx.fill [EctxItem.randL .unit] (Exp.substMap vs.snd e1') := rfl
   rw [hbk1, hbk2]
   iapply refines_rand_unit_int $$ IH1'
 
@@ -588,15 +586,11 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   ihave IH' := IH $$ %vs Hvs
   rw [Exp.substMap_app, Exp.substMap_app, Exp.substMap_lit, Exp.substMap_lit]
   have hb1 : Exp.app (Exp.substMap vs.fst e) pl(#(.unit)) =
-      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
-        vs.fst e) := rfl
+      Ectx.fill [EctxItem.appL .unit] (Exp.substMap vs.fst e) := rfl
   have hb2 : Exp.app (Exp.substMap vs.snd e') pl(#(.unit)) =
-      Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩] (Exp.substMap
-        vs.snd e') := rfl
+      Ectx.fill [EctxItem.appL .unit] (Exp.substMap vs.snd e') := rfl
   rw [hb1, hb2]
-  iapply (refines_bind [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    (A := interp (Ty.forall' τ) Δ)
+  iapply (refines_bind [EctxItem.appL .unit] [EctxItem.appL .unit] (A := interp (Ty.forall' τ) Δ)
     (A' := interp (Ty.single τ τ') Δ)) $$ [IH']
   · iexact IH'
   iintro %v %v' Hv
@@ -607,13 +601,9 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   ihave HvSpec := HvF $$ %(interp τ' Δ)
   ihave HvArr := lrel_arr_unfold_wand lrel_unit
     (interp τ (TyEnv.cons (interp τ' Δ) Δ)) v v' $$ HvSpec
-  ihave HvArr2 := HvArr $$ %⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ %⟨pl(#(.unit)),
-    IsVal.lit, Exp.IsLocallyClosed.lit _⟩
-  have hUnit : ⊢@{IProp GF} (lrel_unit (rT := rT) (GF := GF)).car
-      ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ ⟨pl(#(.unit)), IsVal.lit,
-        Exp.IsLocallyClosed.lit _⟩ := by
-    show ⊢@{IProp GF} ⌜(pl(#(.unit)) : Exp rT) = pl(#(.unit)) ∧ (pl(#(.unit)) : Exp
-      rT) = pl(#(.unit))⌝
+  ihave HvArr2 := HvArr $$ %(.unit : Val rT) %(.unit : Val rT)
+  have hUnit : ⊢@{IProp GF} (lrel_unit (rT := rT) (GF := GF)).car .unit .unit := by
+    show ⊢@{IProp GF} ⌜(.unit : Val rT) = .unit ∧ (.unit : Val rT) = .unit⌝
     ipureintro
     exact ⟨rfl, rfl⟩
   ihave HvApp : iprop(refines ⊤ (Exp.app v.1 pl(#(.unit))) (Exp.app v'.1 pl(#(.unit)))
@@ -624,12 +614,8 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
     (interp_subst τ' τ Δ).symm
   ihave HvAppFinal := refines_proper_entails ⊤ (Exp.app v.1 pl(#(.unit)))
     (Exp.app v'.1 pl(#(.unit))) hsub $$ HvApp
-  have hbridge1 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit
-    _⟩] v.1 =
-      Exp.app v.1 pl(#(.unit)) := rfl
-  have hbridge2 : Ectx.fill [EctxItem.appL ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit
-    _⟩] v'.1 =
-      Exp.app v'.1 pl(#(.unit)) := rfl
+  have hbridge1 : Ectx.fill [EctxItem.appL .unit] v.1 = Exp.app v.1 pl(#(.unit)) := rfl
+  have hbridge2 : Ectx.fill [EctxItem.appL .unit] v'.1 = Exp.app v'.1 pl(#(.unit)) := rfl
   rw [hbridge1, hbridge2]
   iexact HvAppFinal
 
@@ -915,22 +901,17 @@ theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
       hv2, hv2']
   rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.int n2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit
-          _⟩] (Exp.substMap vs.fst e1) from rfl,
+        Ectx.fill [EctxItem.binopL op (.int n2)] (Exp.substMap vs.fst e1) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.int n2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit
-          _⟩] (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+        Ectx.fill [EctxItem.binopL op (.int n2)] (Exp.substMap vs.snd e1') from rfl]
+  iapply (refines_bind [EctxItem.binopL op (.int n2)] [EctxItem.binopL op (.int n2)]
     (A := lrel_int)) $$ [IH1']
   · iexact IH1'
   iintro %v1 %v1' Hint1
   icases lrel_int_unfold v1 v1' $$ Hint1 with ⟨%n1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    v1.1 =
+  rw [show Ectx.fill [EctxItem.binopL op (.int n2)] v1.1 =
         Exp.binop op v1.1 pl(#(.int n2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.int n2)), IsVal.lit, Exp.IsLocallyClosed.lit
-        _⟩] v1'.1 =
+      show Ectx.fill [EctxItem.binopL op (.int n2)] v1'.1 =
         Exp.binop op v1'.1 pl(#(.int n2)) from rfl,
       hv1, hv1']
   -- Goal: refines ⊤ (.binop op #n1 #n2) (.binop op #n1 #n2) (interp τ Δ).
@@ -1052,22 +1033,17 @@ theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
       hv2, hv2']
   rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.bool b2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit
-          _⟩] (Exp.substMap vs.fst e1) from rfl,
+        Ectx.fill [EctxItem.binopL op (.bool b2)] (Exp.substMap vs.fst e1) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.bool b2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit
-          _⟩] (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+        Ectx.fill [EctxItem.binopL op (.bool b2)] (Exp.substMap vs.snd e1') from rfl]
+  iapply (refines_bind [EctxItem.binopL op (.bool b2)] [EctxItem.binopL op (.bool b2)]
     (A := lrel_bool)) $$ [IH1']
   · iexact IH1'
   iintro %v1 %v1' Hbool1
   icases lrel_bool_unfold v1 v1' $$ Hbool1 with ⟨%b1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    v1.1 =
+  rw [show Ectx.fill [EctxItem.binopL op (.bool b2)] v1.1 =
         Exp.binop op v1.1 pl(#(.bool b2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.bool b2)), IsVal.lit, Exp.IsLocallyClosed.lit
-        _⟩] v1'.1 =
+      show Ectx.fill [EctxItem.binopL op (.bool b2)] v1'.1 =
         Exp.binop op v1'.1 pl(#(.bool b2)) from rfl,
       hv1, hv1']
   -- Bool-binops: and, or, xor, eq → all return bool. plus/minus/etc → none.
@@ -1269,22 +1245,17 @@ theorem bin_log_related_real_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
       hv2, hv2']
   rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.real r2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-          (Exp.substMap vs.fst e1) from rfl,
+        Ectx.fill [EctxItem.binopL op (.real r2)] (Exp.substMap vs.fst e1) from rfl,
       show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.real r2)) =
-        Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-          (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
+        Ectx.fill [EctxItem.binopL op (.real r2)] (Exp.substMap vs.snd e1') from rfl]
+  iapply (refines_bind [EctxItem.binopL op (.real r2)] [EctxItem.binopL op (.real r2)]
     (A := lrel_real)) $$ [IH1']
   · iexact IH1'
   iintro %v1 %v1' Hreal1
   icases lrel_real_unfold v1 v1' $$ Hreal1 with ⟨%r1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩]
-    v1.1 =
+  rw [show Ectx.fill [EctxItem.binopL op (.real r2)] v1.1 =
         Exp.binop op v1.1 pl(#(.real r2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op ⟨pl(#(.real r2)), IsVal.lit, Exp.IsLocallyClosed.lit
-        _⟩] v1'.1 =
+      show Ectx.fill [EctxItem.binopL op (.real r2)] v1'.1 =
         Exp.binop op v1'.1 pl(#(.real r2)) from rfl,
       hv1, hv1']
   cases op
@@ -1508,7 +1479,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       simp [Pat.tryMatch]
     iexact Hvv
   | @lit_int z =>
-    -- v ~ v' at lrel_int means v.1 = v'.1 = pl(#(.int n)) for same n.
+    -- v ~ v' at lrel_int means v.1 = v' = .int n for same n.
     rw [interp_int]
     iintro Hv
     ihave ⟨%n, %h⟩ := lrel_int_unfold v v' $$ Hv
@@ -1564,7 +1535,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       · rw [h.2]; exact Pat.tryMatch_lit_ne hbeq
   | lit_unit =>
     rw [interp_unit]
-    show iprop(⌜v.1 = pl(#(.unit)) ∧ v'.1 = pl(#(.unit))⌝) ⊢ _
+    show iprop(⌜v = .unit ∧ v' = .unit⌝) ⊢ _
     iintro %h
     ileft
     iexists (.unit : Val _), (.unit : Val _)
@@ -1573,13 +1544,9 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       refine ⟨?_, ?_⟩
       · rw [h.1]; exact Pat.tryMatch_lit_eq .unit
       · rw [h.2]; exact Pat.tryMatch_lit_eq .unit
-    -- Goal: _ ⊢ lrel_unit.car ⟨lit unit, _⟩ ⟨lit unit, _⟩.
-    -- def-eq to iprop(⌜...⌝).
-    have hrfl : (lrel_unit (GF := GF)).car ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit
-      _⟩ ⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩
-        = iprop(⌜(⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = pl(#(.unit)) ∧
-                 (⟨pl(#(.unit)), IsVal.lit, Exp.IsLocallyClosed.lit _⟩ : Val rT).1 = .lit
-                 .unit⌝) := rfl
+    -- Goal: `_ ⊢ lrel_unit.car .unit .unit`, def-eq to `iprop(⌜...⌝)`.
+    have hrfl : (lrel_unit (GF := GF)).car .unit .unit
+        = iprop(⌜(.unit : Val rT) = .unit ∧ (.unit : Val rT) = .unit⌝) := rfl
     rw [hrfl]
     iintro
     ipureintro

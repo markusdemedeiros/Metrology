@@ -157,7 +157,7 @@ are coupled by integer equality, with zero error. -/
 /-- The φ-relation we extract from `lrel_int`: the two values are the same
 integer literal. -/
 def otpφ (v v' : Val rT) : Prop :=
-  ∃ n : Int, v.1 = pl(#(.int n)) ∧ v'.1 = pl(#(.int n))
+  ∃ n : Int, v = .int n ∧ v' = .int n
 
 theorem lrel_int_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :
     ⊢@{IProp GF} (lrel_int (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝ := by

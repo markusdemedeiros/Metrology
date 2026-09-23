@@ -37,7 +37,7 @@ attribute [reducible, instance] ApproxisRGS.approxisGS ApproxisRGS.naInvG
 
 structure lrel (rT : Type _) (GF : BundledGFunctors) where
   car : Val rT → Val rT → IProp GF
-  persistent v1 v2 : Persistent (car v1 v2)
+  [persistent : ∀ v1 v2, Persistent (car v1 v2)]
   closed v1 v2 : car v1 v2 ⊢@{IProp GF} ⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝
 
 attribute [instance] lrel.persistent
@@ -49,8 +49,8 @@ instance {GF} : CoeFun (lrel rT GF) (fun _ => Val rT → Val rT → IProp GF) :=
 omit [ProbLangℝ rT] in
 theorem lrel.ext {GF : BundledGFunctors} {A B : lrel rT GF}
     (h : ∀ v1 v2, A.car v1 v2 = B.car v1 v2) : A = B := by
-  obtain ⟨carA, persA, closA⟩ := A
-  obtain ⟨carB, persB, closB⟩ := B
+  obtain ⟨carA, closA⟩ := A
+  obtain ⟨carB, closB⟩ := B
   have hcar : carA = carB := by funext v1 v2; exact h v1 v2
   subst hcar; rfl
 
@@ -94,7 +94,6 @@ noncomputable instance {GF : BundledGFunctors} : IsCOFE (lrel rT GF) where
 instance {GF : BundledGFunctors} : Inhabited (lrel rT GF) where
   default :=
     { car := fun _ _ => iprop(False)
-      persistent := fun _ _ => inferInstance
       closed := fun _ _ => Iris.BI.false_elim }
 
 instance lrel.car_ne {GF : BundledGFunctors} (v1 v2 : Val rT) :
@@ -155,42 +154,35 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 omit [ProbLangℝ rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
-    ⌜v1.1 = pl(#(.unit)) ∧ v2.1 = pl(#(.unit))⌝
-      ⊢@{IProp GF} ⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ := by
+    ⌜v1 = .unit ∧ v2 = .unit⌝ ⊢@{IProp GF} ⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ := by
   iintro %h !%
   exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_unit : lrel rT GF where
-  car v1 v2 := iprop(⌜ v1.1 = pl(#(.unit)) ∧ v2.1 = pl(#(.unit)) ⌝)
-  persistent _ _ := inferInstance
+  car v1 v2 := iprop% ⌜ v1 = .unit ∧ v2 = .unit ⌝
   closed v1 v2 := lrel_closed_lit_pair v1 v2
 
 noncomputable def lrel_bool : lrel rT GF where
-  car v1 v2 := iprop(∃ b : Bool, ⌜ v1.1 = pl(#(.bool b)) ∧ v2.1 = pl(#(.bool b)) ⌝)
-  persistent _ _ := inferInstance
+  car v1 v2 := iprop% ∃ b : Bool, ⌜ v1 = .bool b ∧ v2 = .bool b ⌝
   closed v1 v2 := by
     iintro ⟨%b, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_nat : lrel rT GF where
-  car v1 v2 := iprop(∃ n : Nat, ⌜ v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝)
-  persistent _ _ := inferInstance
+  car v1 v2 := iprop% ∃ n : Nat, ⌜ v1 = .int n ∧ v2 = .int n ⌝
   closed v1 v2 := by
     iintro ⟨%n, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 /-- Both values are the same positive integer literal (`0 < n`). -/
 noncomputable def lrel_pos_nat : lrel rT GF where
-  car v1 v2 := iprop% ∃ n : Nat, ⌜ 0 < n ∧
-    v1.1 = pl(#(.int (n : Int))) ∧ v2.1 = pl(#(.int (n : Int))) ⌝
-  persistent _ _ := inferInstance
+  car v1 v2 := iprop% ∃ n : Nat, ⌜ 0 < n ∧ v1 = .int n ∧ v2 = .int n ⌝
   closed v1 v2 := by
     iintro ⟨%n, %h⟩ !%
     exact ⟨h.2.1 ▸ Exp.lit_isClosedEmpty _, h.2.2 ▸ Exp.lit_isClosedEmpty _⟩
 
 noncomputable def lrel_int : lrel rT GF where
-  car v1 v2 := iprop(∃ n : Int, ⌜ v1.1 = pl(#(.int n)) ∧ v2.1 = pl(#(.int n)) ⌝)
-  persistent _ _ := inferInstance
+  car v1 v2 := iprop(∃ n : Int, ⌜ v1 = .int n ∧ v2 = .int n ⌝)
   closed v1 v2 := by
     iintro ⟨%n, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
@@ -199,8 +191,7 @@ noncomputable def lrel_int : lrel rT GF where
 
 The continuous counterpart of `lrel_int`. -/
 noncomputable def lrel_real : lrel rT GF where
-  car v1 v2 := iprop(∃ r : rT, ⌜ v1.1 = pl(#(.real r)) ∧ v2.1 = pl(#(.real r)) ⌝)
-  persistent _ _ := inferInstance
+  car v1 v2 := iprop(∃ r : rT, ⌜ v1 = .real r ∧ v2 = .real r ⌝)
   closed v1 v2 := by
     iintro ⟨%r, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
@@ -208,8 +199,7 @@ noncomputable def lrel_real : lrel rT GF where
 omit [ProbLangℝ rT] in
 theorem lrel_real_unfold (v v' : Val rT) :
     (lrel_real (GF := GF)).car v v'
-      ⊢@{IProp GF} ∃ r : rT,
-        ⌜v.1 = pl(#(.real r)) ∧ v'.1 = pl(#(.real r))⌝ :=
+      ⊢@{IProp GF} ∃ r : rT, ⌜v = .real r ∧ v' = .real r⌝ :=
   BIBase.Entails.rfl
 
 noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
@@ -217,7 +207,6 @@ noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
     iprop% (⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
       □ (∀ (w1 w2 : Val rT), A1 w1 w2 -∗
         refines (⊤ : CoPset) (.app v1.1 w1.1) (.app v2.1 w2.1) A2)
-  persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
 noncomputable def lrel_prod (A B : lrel rT GF) : lrel rT GF where
@@ -226,7 +215,6 @@ noncomputable def lrel_prod (A B : lrel rT GF) : lrel rT GF where
       (⌜ v1.1 = .pair a1.1 b1.1 ⌝) ∗
       (⌜ v2.1 = .pair a2.1 b2.1 ⌝) ∗
       A a1 a2 ∗ B b1 b2
-  persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%a1, %a2, %b1, %b2, %h1, %h2, HA, HB⟩
     ihave %hAcl := A.closed a1 a2 $$ HA
@@ -248,7 +236,6 @@ noncomputable def lrel_sum (A B : lrel rT GF) : lrel rT GF where
       ((⌜ v1.1 = .inl w1.1 ⌝) ∗ (⌜ v2.1 = .inl w2.1 ⌝) ∗ A w1 w2)
       ∨
       ((⌜ v1.1 = .inr w1.1 ⌝) ∗ (⌜ v2.1 = .inr w2.1 ⌝) ∗ B w1 w2)
-  persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%w1, %w2, Hd⟩
     icases Hd with (⟨%h1, %h2, HA⟩ | ⟨%h1, %h2, HB⟩)
@@ -274,14 +261,12 @@ noncomputable def lrel_sum (A B : lrel rT GF) : lrel rT GF where
 noncomputable def lrel_exists (C : lrel rT GF → lrel rT GF) : lrel rT GF where
   car v1 v2 := iprop% (⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝) ∗
     ∃ A : lrel rT GF, C A v1 v2
-  persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
 /-- Universal over semantic types, uniform via `lrel_arr lrel_unit`. -/
 noncomputable def lrel_forall (C : lrel rT GF → lrel rT GF) : lrel rT GF where
   car v1 v2 :=
     iprop(∀ (A : lrel rT GF), (lrel_arr lrel_unit (C A)).car v1 v2)
-  persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro Hall
     ihave Hinst := Hall $$ %(default : lrel rT GF)
@@ -290,7 +275,6 @@ noncomputable def lrel_forall (C : lrel rT GF → lrel rT GF) : lrel rT GF where
 /-- Trivial relation that relates everything that's closed. -/
 noncomputable def lrel_true : lrel rT GF where
   car v1 v2 := iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝)
-  persistent _ _ := inferInstance
   closed _ _ := BIBase.Entails.rfl
 
 /-! ### Recursive lrel via `fixpoint` -/
@@ -300,7 +284,6 @@ conjunct so `interp_closed` can project it without `▷`-stripping. -/
 noncomputable def lrelRec1 (C : lrel rT GF -n> lrel rT GF) (r : lrel rT GF) : lrel rT GF where
   car w1 w2 := iprop% (⌜w1.1.isClosedEmpty ∧ w2.1.isClosedEmpty⌝) ∗
     ▷ (C r).car w1 w2
-  persistent _ _ := inferInstance
   closed _ _ := by iintro ⟨%h, _⟩; ipureintro; exact h
 
 instance lrelRec1_contractive (C : lrel rT GF -n> lrel rT GF) : OFE.Contractive (lrelRec1 C) where
@@ -313,8 +296,6 @@ instance lrelRec1_contractive (C : lrel rT GF -n> lrel rT GF) : OFE.Contractive 
 
 noncomputable def lrelRec1Hom (C : lrel rT GF -n> lrel rT GF) : lrel rT GF -c> lrel rT GF where
   f := lrelRec1 C
-  ne := inferInstance
-  contractive := inferInstance
 
 noncomputable def lrel_rec (C : lrel rT GF -n> lrel rT GF) : lrel rT GF :=
   fixpoint (lrelRec1 C)
@@ -423,10 +404,9 @@ guarded by an invariant at the log-namespace. Mirrors `lrel_ref` (model.v:108–
 noncomputable def lrel_ref (A : lrel rT GF) : lrel rT GF where
   car v1 v2 :=
     iprop% ∃ (l1 l2 : Loc),
-      (⌜ v1.1 = pl(#(.loc l1)) ⌝) ∗ (⌜ v2.1 = pl(#(.loc l2)) ⌝) ∗
+      (⌜ v1 = .loc l1 ⌝) ∗ (⌜ v2 = .loc l2 ⌝) ∗
       Iris.inv (logN.@ ((l1, l2) : Loc × Loc))
         (iprop(∃ (w1 w2 : Val rT), (appHeapFrag l1 w1) ∗ (specHeapFrag l2 w2) ∗ A w1 w2))
-  persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%l1, %l2, %h1, %h2, _⟩ !%
     exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
@@ -436,10 +416,9 @@ same finite range. Mirrors `lrel_tape` (model.v:113–115). -/
 noncomputable def lrel_tape : lrel rT GF where
   car v1 v2 :=
     iprop% ∃ (α1 α2 : Loc) (z : Int),
-      (⌜ v1.1 = pl(#(.lbl α1)) ⌝) ∗ (⌜ v2.1 = pl(#(.lbl α2)) ⌝) ∗
+      (⌜ v1 = .lbl α1 ⌝) ∗ (⌜ v2 = .lbl α2 ⌝) ∗
       Iris.inv (logN.@ ((α1, α2) : Loc × Loc))
         (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩)))
-  persistent _ _ := inferInstance
   closed v1 v2 := by
     iintro ⟨%α1, %α2, %z, %h1, %h2, _⟩ !%
     exact ⟨h1 ▸ Exp.lit_isClosedEmpty _, h2 ▸ Exp.lit_isClosedEmpty _⟩
@@ -499,10 +478,10 @@ theorem interp_ref_funct {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l', %l1', %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l'', %l2', %Heq2, %Heq2', Hinv2⟩
-  have heq_l : l = l' := by simp at Heq1; exact Heq1
-  have heq_l' : l = l'' := by simp at Heq2; exact Heq2
-  have heq_l1 : l1 = l1' := by simp at Heq1'; exact Heq1'
-  have heq_l2 : l2 = l2' := by simp at Heq2'; exact Heq2'
+  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1
+  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2
+  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1'
+  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2'
   subst heq_l' heq_l1 heq_l2
   subst heq_l
   by_cases h : l1 = l2
@@ -539,10 +518,10 @@ theorem interp_ref_inj {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l1', %l', %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l2', %l'', %Heq2, %Heq2', Hinv2⟩
-  have heq_l1 : l1 = l1' := by simp at Heq1; exact Heq1
-  have heq_l : l = l' := by simp at Heq1'; exact Heq1'
-  have heq_l2 : l2 = l2' := by simp at Heq2; exact Heq2
-  have heq_l' : l = l'' := by simp at Heq2'; exact Heq2'
+  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1
+  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1'
+  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2
+  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2'
   subst heq_l1 heq_l heq_l2
   subst heq_l'
   by_cases h : l1 = l2
@@ -579,10 +558,10 @@ theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l', %l1', %z1, %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l'', %l2', %z2, %Heq2, %Heq2', Hinv2⟩
-  have heq_l : l = l' := by simp at Heq1; exact Heq1
-  have heq_l' : l = l'' := by simp at Heq2; exact Heq2
-  have heq_l1 : l1 = l1' := by simp at Heq1'; exact Heq1'
-  have heq_l2 : l2 = l2' := by simp at Heq2'; exact Heq2'
+  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1
+  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2
+  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1'
+  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2'
   subst heq_l' heq_l1 heq_l2 heq_l
   by_cases h : l1 = l2
   · imodintro; ipureintro; exact h
@@ -617,10 +596,10 @@ theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l1', %l', %z1, %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l2', %l'', %z2, %Heq2, %Heq2', Hinv2⟩
-  have heq_l1 : l1 = l1' := by simp at Heq1; exact Heq1
-  have heq_l : l = l' := by simp at Heq1'; exact Heq1'
-  have heq_l2 : l2 = l2' := by simp at Heq2; exact Heq2
-  have heq_l' : l = l'' := by simp at Heq2'; exact Heq2'
+  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1
+  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1'
+  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2
+  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2'
   subst heq_l1 heq_l heq_l2
   subst heq_l'
   by_cases h : l1 = l2
@@ -675,15 +654,15 @@ theorem refines_bind (K K' : Ectx rT) {E : CoPset} {A A' : lrel rT GF} {e e' : E
   ihave Hj2 : iprop(⤇ (K''.comp K').fill e') $$ [Hj]
   · rw [← hfc]; iassumption
   ispecialize Hm $$ Hj2 Hna Herr Hpos
-  let ΦInner : Val rT → IProp GF := fun v => iprop% 
+  let ΦInner : Val rT → IProp GF := fun v => iprop%
     ∃ (v' : Val rT) (ε' : ENNReal),
       (⤇ (K''.comp K').fill v'.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε' ∗
       ⌜(0 : ENNReal) < ε'⌝ ∗ A.car v v'
-  let ΦOuter : Val rT → IProp GF := fun v => iprop% 
+  let ΦOuter : Val rT → IProp GF := fun v => iprop%
     ∃ (v' : Val rT) (ε' : ENNReal),
       (⤇ K''.fill v'.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε' ∗
       ⌜(0 : ENNReal) < ε'⌝ ∗ A'.car v v'
-  let HfTy : IProp GF := iprop% 
+  let HfTy : IProp GF := iprop%
     ∀ (v v' : Val rT), A v v' -∗ ∀ (K_1 : Ectx rT) (ε : ENNReal),
       (⤇ K_1.fill (K'.fill v'.1)) -∗ (naOwnP (rT := rT) ⊤) -∗ (↯ ε) -∗
       (⌜(0 : ENNReal) < ε⌝) -∗

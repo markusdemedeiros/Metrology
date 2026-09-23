@@ -180,7 +180,7 @@ execution distributions, with no Iris in sight. -/
 
 /-- The relation extracted from `lrel_real`: both sides are the same real. -/
 def otpφ (v v' : Val rT) : Prop :=
-  ∃ r : rT, v.1 = pl(#(.real r)) ∧ v'.1 = pl(#(.real r))
+  ∃ r : rT, v = .real r ∧ v' = .real r
 
 theorem lrel_real_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :
     ⊢@{IProp GF} (lrel_real (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝ := by

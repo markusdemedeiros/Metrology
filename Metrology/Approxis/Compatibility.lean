@@ -220,7 +220,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_nat_unfold (v v' : Val rT) :
     (lrel_nat (GF := GF)).car v v'
       ⊢@{IProp GF} ∃ n : Nat,
-        ⌜v.1 = pl(#(.int (n : Int))) ∧ v'.1 = pl(#(.int (n : Int)))⌝ :=
+        ⌜v = .int n ∧ v' = .int n⌝ :=
   BIBase.Entails.rfl
 
 omit [ProbLangℝ rT] in
@@ -228,7 +228,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_pos_nat_unfold (v v' : Val rT) :
     (lrel_pos_nat (GF := GF)).car v v'
       ⊢@{IProp GF} ∃ n : Nat, ⌜0 < n ∧
-        v.1 = pl(#(.int (n : Int))) ∧ v'.1 = pl(#(.int (n : Int)))⌝ :=
+        v = .int n ∧ v' = .int n⌝ :=
   BIBase.Entails.rfl
 
 omit [ProbLangℝ rT] in
@@ -236,7 +236,7 @@ omit [ProbLangℝ rT] in
 theorem lrel_int_unfold (v v' : Val rT) :
     (lrel_int (GF := GF)).car v v'
       ⊢@{IProp GF} ∃ n : Int,
-        ⌜v.1 = pl(#(.int n)) ∧ v'.1 = pl(#(.int n))⌝ :=
+        ⌜v = .int n ∧ v' = .int n⌝ :=
   BIBase.Entails.rfl
 
 omit [ProbLangℝ rT] in
@@ -263,7 +263,7 @@ omit [ProbLangℝ rT] in
 /-- Helper: `(lrel_bool).car v v' ⊢ ∃ b : Bool, v=#b ∧ v'=#b`. -/
 theorem lrel_bool_unfold (v v' : Val rT) :
     (lrel_bool (GF := GF)).car v v' ⊢@{IProp GF}
-      ∃ b : Bool, ⌜v.1 = pl(#(.bool b)) ∧ v'.1 = pl(#(.bool b))⌝ :=
+      ∃ b : Bool, ⌜v = .bool b ∧ v' = .bool b⌝ :=
   BIBase.Entails.rfl
 
 /-! ### Symmetric refines lemmas for pure-step constructors
@@ -556,7 +556,7 @@ theorem refines_snd {e e' : Exp rT} {A B : lrel rT GF} :
 theorem lrel_tape_unfold (v v' : Val rT) :
     (lrel_tape (GF := GF)).car v v' ⊢@{IProp GF}
       ∃ (α1 α2 : Loc) (z : Int),
-        (⌜ v.1 = pl(#(.lbl α1)) ⌝) ∗ (⌜ v'.1 = pl(#(.lbl α2)) ⌝) ∗
+        (⌜ v = .lbl α1 ⌝) ∗ (⌜ v' = .lbl α2 ⌝) ∗
         Iris.inv (logN.@ ((α1, α2) : Loc × Loc))
           (iprop((appTapesFrag α1 ⟨z, []⟩) ∗ (specTapesFrag α2 ⟨z, []⟩))) :=
   BIBase.Entails.rfl
@@ -663,7 +663,7 @@ plus the heap invariant. -/
 theorem lrel_ref_unfold (A : lrel rT GF) (v v' : Val rT) :
     (lrel_ref A).car v v' ⊢@{IProp GF}
       ∃ (l l' : Loc),
-        (⌜ v.1 = pl(#(.loc l)) ⌝) ∗ (⌜ v'.1 = pl(#(.loc l')) ⌝) ∗
+        (⌜ v = .loc l ⌝) ∗ (⌜ v' = .loc l' ⌝) ∗
         Iris.inv (logN.@ ((l, l') : Loc × Loc))
           (iprop(∃ (w1 w2 : Val rT),
             (appHeapFrag l w1) ∗ (specHeapFrag l' w2) ∗ A w1 w2)) :=

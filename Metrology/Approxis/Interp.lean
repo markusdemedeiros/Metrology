@@ -202,16 +202,16 @@ theorem unboxed_type_lit_shape {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT}
   cases H
   · show iprop(⌜ _ ⌝) ⊢ _
     iintro ⟨%h1, %h2⟩ !%
-    exact ⟨_, _, h1, h2⟩
+    exact ⟨_, _, Val.ext_iff.mp h1, Val.ext_iff.mp h2⟩
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%n, %h1, %h2⟩ !%
-    exact ⟨_, _, h1, h2⟩
+    exact ⟨_, _, Val.ext_iff.mp h1, Val.ext_iff.mp h2⟩
   · show iprop(∃ _, _) ⊢ _
     iintro ⟨%b, %h1, %h2⟩ !%
-    exact ⟨_, _, h1, h2⟩
+    exact ⟨_, _, Val.ext_iff.mp h1, Val.ext_iff.mp h2⟩
   · show iprop(∃ _ _, _) ⊢ _
     iintro ⟨%l1, %l2, %h1, %h2, _⟩ !%
-    exact ⟨_, _, h1, h2⟩
+    exact ⟨_, _, Val.ext_iff.mp h1, Val.ext_iff.mp h2⟩
 
 /-- At equality-types, both related values are pointwise equal. -/
 theorem eq_type_sound {τ : Ty} {Δ : TyEnv rT GF} {v v' : Val rT} (H : EqType τ) :

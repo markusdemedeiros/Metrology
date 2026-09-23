@@ -491,7 +491,7 @@ variable {GF : BundledGFunctors} [RefinesPreGS rT GF]
 
 /-- The bool-equality value relation extracted from `lrel_bool`. -/
 def boolEqVal (v v' : Val rT) : Prop :=
-  ∃ b : Bool, v.1 = pl(#(.bool b)) ∧ v'.1 = pl(#(.bool b))
+  ∃ b : Bool, v = .bool b ∧ v' = .bool b
 
 omit [RefinesPreGS rT GF] in
 /-- `lrel_bool` extracts purely to `boolEqVal`. -/
@@ -599,12 +599,13 @@ theorem refines_sound_open_fresh
     split at he
     · rw [← Option.some.inj he]
     · cases he
-  rw [(show v.1 = pl(#(.bool b)) from (toVal?_to_eq hv) ▸ ha)] at hvb1
-  injection hvb1 with hbool
+  have hv1 : v.1 = pl(#(.bool b'')) := congrArg Val.fst hvb1
+  rw [(show v.1 = pl(#(.bool b)) from (toVal?_to_eq hv) ▸ ha)] at hv1
+  injection hv1 with hbool
   injection hbool with hbb
   subst hbb
   show b' ∈ ({pl(#(.bool b))} : Set (Exp rT))
-  exact (toVal?_to_eq hv').trans hvb2
+  exact (toVal?_to_eq hv').trans (congrArg Val.fst hvb2)
 
 /-- **Soundness of the logical relation (closed case), restricted to fresh contexts.** -/
 theorem refines_sound_fresh (e e' : Exp rT) (τ : Ty)
