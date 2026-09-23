@@ -185,7 +185,8 @@ def otpφ (v v' : Val rT) : Prop :=
 theorem lrel_real_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :
     ⊢@{IProp GF} (lrel_real (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝ := by
   iintro Hr
-  icases lrel_real_unfold v v' $$ Hr with ⟨%r, %hv, %hv'⟩
+  iunfold lrel_real at Hr
+  icases Hr with ⟨%r, %hv, %hv'⟩
   ipureintro
   exact ⟨r, hv, hv'⟩
 

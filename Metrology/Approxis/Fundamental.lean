@@ -1188,7 +1188,8 @@ theorem bin_log_related_real_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
         Ectx.fill [EctxItem.unop op] (Exp.substMap vs.snd e') from rfl]
   iapply (refines_bind [EctxItem.unop op] [EctxItem.unop op]) $$ IH'
   iintro %v %v' Hreal
-  icases lrel_real_unfold v v' $$ Hreal with ⟨%r, %hv, %hv'⟩
+  unfold lrel_real
+  icases Hreal with ⟨%r, %hv, %hv'⟩
   rw [show Ectx.fill [EctxItem.unop op] v.1 = Exp.unop op v.1 from rfl,
       show Ectx.fill [EctxItem.unop op] v'.1 = Exp.unop op v'.1 from rfl,
       hv, hv']
@@ -1238,7 +1239,8 @@ theorem bin_log_related_real_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_real)) $$ [IH2']
   · iexact IH2'
   iintro %v2 %v2' Hreal2
-  icases lrel_real_unfold v2 v2' $$ Hreal2 with ⟨%r2, %hv2, %hv2'⟩
+  iunfold lrel_real at Hreal2
+  icases Hreal2 with ⟨%r2, %hv2, %hv2'⟩
   rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
         Exp.binop op (Exp.substMap vs.fst e1) v2.1 from rfl,
       show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] v2'.1 =
@@ -1252,7 +1254,8 @@ theorem bin_log_related_real_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (A := lrel_real)) $$ [IH1']
   · iexact IH1'
   iintro %v1 %v1' Hreal1
-  icases lrel_real_unfold v1 v1' $$ Hreal1 with ⟨%r1, %hv1, %hv1'⟩
+  iunfold lrel_real at Hreal1
+  icases Hreal1 with ⟨%r1, %hv1, %hv1'⟩
   rw [show Ectx.fill [EctxItem.binopL op (.real r2)] v1.1 =
         Exp.binop op v1.1 pl(#(.real r2)) from rfl,
       show Ectx.fill [EctxItem.binopL op (.real r2)] v1'.1 =
