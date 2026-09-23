@@ -113,8 +113,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
   Iris.NonAtomicInvariant.inv (GF := GF) (ApproxisRGS.nais (rT := rT) GF) N P
 
 @[reducible] noncomputable def naCloseP (P : IProp GF) (N : Namespace) (E : CoPset) : IProp GF :=
-  iprop% (▷ P) ∗ (naOwnP (rT := rT) (SDiff.sdiff E ((↑N : CoPset) : CoPset))) ={⊤}=∗
-    naOwnP (rT := rT) E
+  iprop% (▷ P) ∗ naOwnP (rT := rT) (E \ (↑N : CoPset)) ={⊤}=∗ naOwnP (rT := rT) E
 
 end NaShorthand
 
@@ -421,8 +420,24 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 instance : Inhabited (Val rT) := ⟨.unit⟩
 
-/-- Reference type is functional in the program-side location: if `#l` is
-related to both `#l1` and `#l2` at `ref A`, then `l1 = l2`. -/
+private theorem fupd_of_inv_disj {E : CoPset} {P1 P2 Q : IProp GF} {p1 p2 : Loc × Loc}
+    (HE : (↑logN : CoPset) ⊆ E) (hne : p1 ≠ p2) (hfalse : ⊢@{IProp GF} P1 -∗ P2 -∗ False) :
+    ⊢@{IProp GF} Iris.inv (logN.@ p1) P1 -∗ Iris.inv (logN.@ p2) P2 -∗ |={E}=> Q := by
+  have hN_disj : logN.@ p1 ## logN.@ p2 := ndot_ne_disjoint _ hne
+  have h1 : (↑(logN.@ p1) : CoPset) ⊆ E := LawfulSet.subset_trans (nclose_subseteq _ _) HE
+  have h2 : (↑(logN.@ p2) : CoPset) ⊆ E := LawfulSet.subset_trans (nclose_subseteq _ _) HE
+  have h2' : (↑(logN.@ p2) : CoPset) ⊆ E \ (↑(logN.@ p1) : CoPset) :=
+    fun p hp => CoPset.in_diff.mpr ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
+  iintro Hinv1 Hinv2
+  iinv Hinv1 with HP1
+  iinv Hinv2 with HP2
+  ihave HbotLater : iprop% ▷ False $$ [HP1 HP2]
+  · inext
+    iapply hfalse $$ HP1 HP2
+  imod HbotLater with %h
+  exact h.elim
+
+/-- Reference type is functional in the program-side location. -/
 theorem interp_ref_funct {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
     ⊢@{IProp GF} (lrel_ref A).car (.loc l) (.loc l1) -∗
@@ -432,37 +447,15 @@ theorem interp_ref_funct {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l', %l1', %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l'', %l2', %Heq2, %Heq2', Hinv2⟩
-  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1
-  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2
-  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1'
-  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2'
-  subst heq_l' heq_l1 heq_l2
-  subst heq_l
+  obtain ⟨rfl, rfl, rfl, rfl⟩ : l = l' ∧ l = l'' ∧ l1 = l1' ∧ l2 = l2' := by
+    simp_all [Val.ext_iff]
   by_cases h : l1 = l2
   · imodintro; ipureintro; exact h
-  · have hN_disj : logN.@ ((l, l1) : Loc × Loc) ## logN.@ ((l, l2) : Loc × Loc) :=
-      ndot_ne_disjoint _ (fun heq => h (by injection heq))
-    have h1 : (↑(logN.@ ((l, l1) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2 : (↑(logN.@ ((l, l2) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2' : (↑(logN.@ ((l, l2) : Loc × Loc)) : CoPset) ⊆
-               E \ (↑(logN.@ ((l, l1) : Loc × Loc)) : CoPset) := by
-      intro p hp
-      rw [CoPset.in_diff]
-      exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    iinv Hinv1 with HP1
-    iinv Hinv2 with HP2
-    ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · icases HP1 with ⟨%wa1, %ws1, Hl1L, -⟩
-      icases HP2 with ⟨%wa2, %ws2, Hl2L, -⟩
-      inext
-      iapply appHeapFrag_valid_2 $$ Hl1L Hl2L
-    imod HbotLater with %h
-    exact h.elim
+  · iapply fupd_of_inv_disj HE (fun heq => h (by injection heq)) (by
+      iintro ⟨%wa1, %ws1, Hl1L, -⟩ ⟨%wa2, %ws2, Hl2L, -⟩
+      iapply appHeapFrag_valid_2 $$ Hl1L Hl2L) $$ Hinv1 Hinv2
 
-/-- Reference type is injective on the program-side location: if both `#l1`
-and `#l2` are related to `#l` at `ref A`, then `l1 = l2`. -/
+/-- Reference type is injective on the program-side location. -/
 theorem interp_ref_inj {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
     (HE : (↑logN : CoPset) ⊆ E) :
     ⊢@{IProp GF} (lrel_ref A).car (.loc l1) (.loc l) -∗
@@ -472,35 +465,13 @@ theorem interp_ref_inj {E : CoPset} (A : lrel rT GF) (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l1', %l', %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l2', %l'', %Heq2, %Heq2', Hinv2⟩
-  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1
-  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1'
-  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2
-  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2'
-  subst heq_l1 heq_l heq_l2
-  subst heq_l'
+  obtain ⟨rfl, rfl, rfl, rfl⟩ : l = l' ∧ l = l'' ∧ l1 = l1' ∧ l2 = l2' := by
+    simp_all [Val.ext_iff]
   by_cases h : l1 = l2
   · imodintro; ipureintro; exact h
-  · have hN_disj :
-        logN.@ ((l1, l) : Loc × Loc) ## logN.@ ((l2, l) : Loc × Loc) :=
-      ndot_ne_disjoint _ (fun heq => h (by injection heq))
-    have h1 : (↑(logN.@ ((l1, l) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2 : (↑(logN.@ ((l2, l) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2' : (↑(logN.@ ((l2, l) : Loc × Loc)) : CoPset) ⊆
-               E \ (↑(logN.@ ((l1, l) : Loc × Loc)) : CoPset) := by
-      intro p hp
-      rw [CoPset.in_diff]
-      exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    iinv Hinv1 with HP1
-    iinv Hinv2 with HP2
-    ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · icases HP1 with ⟨%wa1, %ws1, -, Hs1L, -⟩
-      icases HP2 with ⟨%wa2, %ws2, -, Hs2L, -⟩
-      inext
-      iapply specHeapFrag_valid_2 $$ Hs1L Hs2L
-    imod HbotLater with %h
-    exact h.elim
+  · iapply fupd_of_inv_disj HE (fun heq => h (by injection heq)) (by
+      iintro ⟨%wa1, %ws1, -, Hs1L, -⟩ ⟨%wa2, %ws2, -, Hs2L, -⟩
+      iapply specHeapFrag_valid_2 $$ Hs1L Hs2L) $$ Hinv1 Hinv2
 
 /-- Tape type is functional in the program-side location. -/
 theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
@@ -512,33 +483,13 @@ theorem interp_tape_funct {E : CoPset} (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l', %l1', %z1, %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l'', %l2', %z2, %Heq2, %Heq2', Hinv2⟩
-  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1
-  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2
-  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1'
-  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2'
-  subst heq_l' heq_l1 heq_l2 heq_l
+  obtain ⟨rfl, rfl, rfl, rfl⟩ : l = l' ∧ l = l'' ∧ l1 = l1' ∧ l2 = l2' := by
+    simp_all [Val.ext_iff]
   by_cases h : l1 = l2
   · imodintro; ipureintro; exact h
-  · have hN_disj : logN.@ ((l, l1) : Loc × Loc) ## logN.@ ((l, l2) : Loc × Loc) :=
-      ndot_ne_disjoint _ (fun heq => h (by injection heq))
-    have h1 : (↑(logN.@ ((l, l1) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2 : (↑(logN.@ ((l, l2) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2' : (↑(logN.@ ((l, l2) : Loc × Loc)) : CoPset) ⊆
-               E \ (↑(logN.@ ((l, l1) : Loc × Loc)) : CoPset) := by
-      intro p hp
-      rw [CoPset.in_diff]
-      exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    iinv Hinv1 with HP1
-    iinv Hinv2 with HP2
-    ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · icases HP1 with ⟨Hl1L, -⟩
-      icases HP2 with ⟨Hl2L, -⟩
-      inext
-      iapply appTapesFrag_valid_2 $$ Hl1L Hl2L
-    imod HbotLater with %h
-    exact h.elim
+  · iapply fupd_of_inv_disj HE (fun heq => h (by injection heq)) (by
+      iintro ⟨Hl1L, -⟩ ⟨Hl2L, -⟩
+      iapply appTapesFrag_valid_2 $$ Hl1L Hl2L) $$ Hinv1 Hinv2
 
 /-- Tape type is injective on the program-side location. -/
 theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
@@ -550,35 +501,13 @@ theorem interp_tape_inj {E : CoPset} (l l1 l2 : Loc)
   iintro H1 H2
   icases H1 with ⟨%l1', %l', %z1, %Heq1, %Heq1', Hinv1⟩
   icases H2 with ⟨%l2', %l'', %z2, %Heq2, %Heq2', Hinv2⟩
-  have heq_l1 : l1 = l1' := by simpa [Val.ext_iff] using Heq1
-  have heq_l : l = l' := by simpa [Val.ext_iff] using Heq1'
-  have heq_l2 : l2 = l2' := by simpa [Val.ext_iff] using Heq2
-  have heq_l' : l = l'' := by simpa [Val.ext_iff] using Heq2'
-  subst heq_l1 heq_l heq_l2
-  subst heq_l'
+  obtain ⟨rfl, rfl, rfl, rfl⟩ : l = l' ∧ l = l'' ∧ l1 = l1' ∧ l2 = l2' := by
+    simp_all [Val.ext_iff]
   by_cases h : l1 = l2
   · imodintro; ipureintro; exact h
-  · have hN_disj :
-        logN.@ ((l1, l) : Loc × Loc) ## logN.@ ((l2, l) : Loc × Loc) :=
-      ndot_ne_disjoint _ (fun heq => h (by injection heq))
-    have h1 : (↑(logN.@ ((l1, l) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2 : (↑(logN.@ ((l2, l) : Loc × Loc)) : CoPset) ⊆ E :=
-      LawfulSet.subset_trans (nclose_subseteq _ _) HE
-    have h2' : (↑(logN.@ ((l2, l) : Loc × Loc)) : CoPset) ⊆
-               E \ (↑(logN.@ ((l1, l) : Loc × Loc)) : CoPset) := by
-      intro p hp
-      rw [CoPset.in_diff]
-      exact ⟨h2 p hp, fun hp1 => hN_disj p ⟨hp1, hp⟩⟩
-    iinv Hinv1 with HP1
-    iinv Hinv2 with HP2
-    ihave HbotLater : iprop(▷ False) $$ [HP1 HP2]
-    · icases HP1 with ⟨-, Hs1L⟩
-      icases HP2 with ⟨-, Hs2L⟩
-      inext
-      iapply specTapesFrag_valid_2 $$ Hs1L Hs2L
-    imod HbotLater with %h
-    exact h.elim
+  · iapply fupd_of_inv_disj HE (fun heq => h (by injection heq)) (by
+      iintro ⟨-, Hs1L⟩ ⟨-, Hs2L⟩
+      iapply specTapesFrag_valid_2 $$ Hs1L Hs2L) $$ Hinv1 Hinv2
 
 end SemtypesProperties
 
@@ -590,201 +519,147 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 theorem fupd_refines {E : CoPset} {e t : Exp rT} {A : lrel rT GF} :
     iprop(|={⊤}=> refines E e t A) ⊢@{IProp GF} refines E e t A := by
   unfold refines
-  iintro H %K %ε HR Hna Herr Hpos
+  iintro H
   imod H
-  iapply H $$ %K %ε HR Hna Herr Hpos
+  iexact H
 
 /-- Sequence two refinements via evaluation-context framing. -/
 theorem refines_bind (K K' : Ectx rT) {E : CoPset} {A A' : lrel rT GF} {e e' : Exp rT} :
-    ⊢@{IProp GF} iprop((refines E e e' A) -∗
-      (∀ (v v' : Val rT), A v v' -∗ refines (⊤ : CoPset) (K.fill v.1) (K'.fill v'.1) A')
-      -∗ refines E (K.fill e) (K'.fill e') A') := by
-  unfold refines
+    ⊢@{IProp GF} iprop(refines E e e' A -∗
+      (∀ (v v' : Val rT), A v v' -∗ refines (⊤ : CoPset) (K.fill v.1) (K'.fill v'.1) A') -∗
+      refines E (K.fill e) (K'.fill e') A') := by
   iintro Hm Hf
+  iunfold refines at Hm
+  iunfold refines
   iintro %K'' %ε Hj Hna Herr Hpos
-  have hfc : ∀ x : Exp rT, K''.fill (K'.fill x) = (K''.comp K').fill x :=
-    fun x => Ectx.fill_comp K'' K' x
-  ispecialize Hm $$ %(K''.comp K') %ε
-  ihave Hj2 : iprop(⤇ (K''.comp K').fill e') $$ [Hj]
-  · rw [← hfc]; iassumption
-  ispecialize Hm $$ Hj2 Hna Herr Hpos
-  let ΦInner : Val rT → IProp GF := fun v => iprop%
-    ∃ (v' : Val rT) (ε' : ENNReal),
-      (⤇ (K''.comp K').fill v'.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε' ∗
-      ⌜(0 : ENNReal) < ε'⌝ ∗ A.car v v'
-  let ΦOuter : Val rT → IProp GF := fun v => iprop%
-    ∃ (v' : Val rT) (ε' : ENNReal),
-      (⤇ K''.fill v'.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε' ∗
-      ⌜(0 : ENNReal) < ε'⌝ ∗ A'.car v v'
-  let HfTy : IProp GF := iprop%
-    ∀ (v v' : Val rT), A v v' -∗ ∀ (K_1 : Ectx rT) (ε : ENNReal),
-      (⤇ K_1.fill (K'.fill v'.1)) -∗ (naOwnP (rT := rT) ⊤) -∗ (↯ ε) -∗
-      (⌜(0 : ENNReal) < ε⌝) -∗
-      wp ⊤ (K.fill v.1) (fun v₂ => iprop(
-        ∃ (v'' : Val rT) (ε'' : ENNReal),
-          (⤇ K_1.fill v''.1) ∗ naOwnP (rT := rT) ⊤ ∗ ↯ ε'' ∗
-          ⌜(0 : ENNReal) < ε''⌝ ∗ A'.car v₂ v''))
+  isimp only [Ectx.fill_comp K'' K' e'] at Hj
+  ispecialize Hm $$ %(K''.comp K') %ε Hj Hna Herr Hpos
   iapply ApproxisWpGS.wp_bind (K := K)
-  ihave Hstep : iprop(wp ⊤ e (fun v => iprop(HfTy ∗ ΦInner v))) $$ [Hf Hm]
-  · iapply ApproxisWpGS.wp_frame_l (R := HfTy) (e := e) (E := ⊤) (Φ := ΦInner)
+  iapply ApproxisWpGS.wp_mono
+  -- Take the `wp` premise first: it pins the intermediate postcondition to the one of `Hm`,
+  -- with the continuation `Hf` framed alongside it.
+  swap
+  · iapply ApproxisWpGS.wp_frame_l
     iframe Hf
     iexact Hm
-  iapply ApproxisWpGS.wp_mono
-    (Φ := fun v => iprop(HfTy ∗ ΦInner v))
-    (Ψ := fun v => wp ⊤ (K.fill (Exp.ofVal v)) ΦOuter)
-  case HΦ =>
-    intro v
-    change _ ⊢ wp ⊤ (K.fill v.1) _
-    iintro ⟨HfLoc, %v', %ε', Hj', Hna', Herr', Hpos', HA⟩
-    ihave Hj3 : iprop(⤇ K''.fill (K'.fill v'.1)) $$ [Hj']
-    · rw [hfc]; iassumption
-    ihave Hf'' := HfLoc $$ %v %v' HA
-    iapply Hf'' $$ %K'' %ε' Hj3 Hna' Herr' Hpos'
-  iexact Hstep
+  intro v
+  change _ ⊢ wp ⊤ (K.fill v.1) _
+  iintro ⟨Hf', %v', %ε', Hj', Hna', Herr', Hpos', HA⟩
+  ihave Hf'' := Hf' $$ %v %v' HA
+  iunfold refines at Hf''
+  isimp only [← Ectx.fill_comp K'' K' v'.1] at Hj'
+  iapply Hf'' $$ %K'' %ε' Hj' Hna' Herr' Hpos'
 
 /-- Value introduction that consumes the local `na_own E` to produce
 `na_own ⊤` together with `A v1 v2`. -/
 theorem refines_ret_na {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
-    iprop((naOwnP (rT := rT) E) ={⊤}=∗ (naOwnP (rT := rT) ⊤) ∗ A v1
-      v2) ⊢@{IProp GF}
-    refines E e1 e2 A := by
+    iprop(naOwnP (rT := rT) E ={⊤}=∗ naOwnP (rT := rT) ⊤ ∗ A v1 v2)
+      ⊢@{IProp GF} refines E e1 e2 A := by
   subst hv1 hv2
   unfold refines
-  iintro HFA
-  iintro %K %ε
-  iintro HK Hnais Herr Hpos
-  rw [(show v1.1 = Exp.ofVal v1 from rfl)]
-  iapply wp_value_fupd_of_toVal (Exp.toVal?_ofVal v1)
-  ispecialize HFA $$ Hnais
-  imod HFA with ⟨HF, HA⟩
+  iintro HFA %K %ε HK Hnais Herr Hpos
+  iapply wp_value_fupd_of_toVal (e := v1.1) (Exp.toVal?_ofVal v1)
+  imod HFA $$ Hnais with ⟨HF, HA⟩
   imodintro
   iexists v2, ε
-  iframe HK HF Herr Hpos
-  iassumption
+  iframe HK HF Herr Hpos HA
 
 /-- Dual of `refines_ret_na` splitting `⊤ = E ∪ (⊤ \ E)`. -/
 theorem refines_ret_na' {E : CoPset} {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
-    iprop(|={⊤}=> (naOwnP (rT := rT) (SDiff.sdiff (⊤ : CoPset) E)) ∗ A v1 v2) ⊢@{IProp
-      GF}
-    refines E e1 e2 A := by
-  subst hv1 hv2
-  unfold refines
+    iprop(|={⊤}=> naOwnP (rT := rT) ((⊤ : CoPset) \ E) ∗ A v1 v2)
+      ⊢@{IProp GF} refines E e1 e2 A := by
   iintro HFA
-  iintro %K %ε
-  iintro Hj Hnais Herr Hpos
-  rw [(show v1.1 = Exp.ofVal v1 from rfl)]
-  iapply wp_value_fupd_of_toVal (Exp.toVal?_ofVal v1)
+  iapply refines_ret_na hv1 hv2
+  iintro Hnais
   imod HFA with ⟨HF, HA⟩
   imodintro
-  iexists v2, ε
-  isplitl [Hj]; · iassumption
-  have hdisj : E ## (SDiff.sdiff (⊤ : CoPset) E) := LawfulSet.disjoint_diff_right
-  have hunion : E ∪ (SDiff.sdiff (⊤ : CoPset) E) = (⊤ : CoPset) :=
-    LawfulSet.subset_union_diff (fun _ _ => CoPset.mem_full)
-  ihave Hfull : iprop(naOwnP (rT := rT) ⊤) $$ [Hnais HF]
-  · have heq : (⊤ : CoPset) = E ∪ (SDiff.sdiff (⊤ : CoPset) E) := hunion.symm
-    rw [show (naOwnP (rT := rT) (⊤ : CoPset)) = naOwnP (rT := rT) (E ∪
-      (SDiff.sdiff (⊤ : CoPset) E)) from
-        congrArg _ heq]
-    iapply (Iris.NonAtomicInvariant.own_union hdisj).mpr
-    iframe Hnais
-    · iexact HF
-  iframe Hfull Herr Hpos
-  iassumption
+  have hun := (Iris.NonAtomicInvariant.own_union (GF := GF)
+    (p := ApproxisRGS.nais (rT := rT) GF) (E2 := (⊤ : CoPset) \ E)
+    LawfulSet.disjoint_diff_right).mpr
+  rw [LawfulSet.subset_union_diff (s₂ := (⊤ : CoPset)) (fun _ _ => CoPset.mem_full)] at hun
+  iframe HA
+  iapply hun
+  iframe Hnais HF
 
 /-- From `|={⊤}=> A v1 v2`, conclude `REL v1 << v2 : A`. -/
 theorem refines_ret {e1 e2 : Exp rT} {v1 v2 : Val rT} {A : lrel rT GF}
     (hv1 : e1 = v1.1) (hv2 : e2 = v2.1) :
     iprop(|={⊤}=> A v1 v2) ⊢@{IProp GF} refines (⊤ : CoPset) e1 e2 A := by
-  subst hv1 hv2
-  unfold refines
   iintro HA
-  iintro %K %ε
-  iintro Hj Hna Herr Hpos
-  rw [(show v1.1 = Exp.ofVal v1 from rfl)]
-  iapply wp_value_fupd_of_toVal (Exp.toVal?_ofVal v1)
+  iapply refines_ret_na hv1 hv2
+  iintro Hna
   imod HA
   imodintro
-  iexists v2, ε
-  iframe Hj Hna Herr Hpos
-  iassumption
+  iframe Hna HA
 
-instance elim_fupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp GF) (A : lrel rT GF)
-    :
+instance elim_fupd_refines {io : InOut} (E : CoPset) (e t : Exp rT)
+    (P : IProp GF) (A : lrel rT GF) :
     ElimModal True false io false (iprop(|={⊤}=> P)) P
       (refines E e t A) (refines E e t A) where
-  elim_modal _ := by
-    simp only [Iris.BI.intuitionisticallyIf_false']
-    iintro ⟨HP, HI⟩
-    iapply fupd_refines
-    imod HP
-    iapply HI $$ HP
+  elim_modal _ := calc
+    _ ⊢ (|={⊤}=> P) ∗ (P -∗ refines E e t A) := sep_mono_left intuitionisticallyIf_elim
+    _ ⊢ |={⊤}=> P ∗ (P -∗ refines E e t A)   := fupd_frame_right
+    _ ⊢ |={⊤}=> refines E e t A              := BIFUpdate.mono wand_elim_right
+    _ ⊢ refines E e t A                      := fupd_refines
 
-instance elim_bupd_refines {io : InOut} (E : CoPset) (e t : Exp rT) (P : IProp GF) (A : lrel rT GF)
-    :
+instance elim_bupd_refines {io : InOut} (E : CoPset) (e t : Exp rT)
+    (P : IProp GF) (A : lrel rT GF) :
     ElimModal True false io false (iprop(|==> P)) P
       (refines E e t A) (refines E e t A) where
-  elim_modal _ := by
-    simp only [Iris.BI.intuitionisticallyIf_false']
-    iintro ⟨HP, HI⟩
-    iapply fupd_refines
-    imod HP
-    iapply HI $$ HP
+  elim_modal h :=
+    (sep_mono_left (intuitionisticallyIf_mono BIUpdateFUpdate.fupd_of_bupd)).trans
+      ((elim_fupd_refines (io := io) E e t P A).elim_modal h)
 
 instance is_except_0_refines (E : CoPset) (e t : Exp rT) (A : lrel rT GF) :
     IsExcept0 (refines E e t A) where
-  is_except0 := by
-    iintro HL
-    iapply fupd_refines
-    imod HL
-    imodintro
-    iexact HL
+  is_except0 := (except0_mono fupd_intro).trans (BIFUpdate.except0.trans fupd_refines)
+
+theorem refines_na_update {E F : CoPset} {e1 e2 : Exp rT} {A : lrel rT GF} :
+    iprop(naOwnP (rT := rT) E ={⊤}=∗ naOwnP (rT := rT) F ∗ refines F e1 e2 A)
+      ⊢@{IProp GF} refines E e1 e2 A := by
+  unfold refines
+  iintro Hupd %K %ε Hj Hna Herr Hpos
+  iapply ApproxisWpGS.fupd_wp
+  imod Hupd $$ Hna with ⟨Hna', HR⟩
+  imodintro
+  iapply HR $$ %K %ε Hj Hna' Herr Hpos
 
 theorem refines_na_alloc {P : IProp GF} (N : Namespace) {E : CoPset} {e1 e2 : Exp rT}
     {A : lrel rT GF} :
-    iprop((▷ P) ∗ ((naInvP (rT := rT) N P) -∗ refines E e1 e2 A)) ⊢@{IProp GF}
-    refines E e1 e2 A := by
+    iprop% (▷ P) ∗ (naInvP (rT := rT) N P -∗ refines E e1 e2 A)
+      ⊢@{IProp GF} refines E e1 e2 A := by
   iintro ⟨HP, Hcont⟩
   iapply fupd_refines
-  imod (Iris.NonAtomicInvariant.inv_alloc (N := N) (E := ⊤)) $$ [HP] with Hinv
-  · iassumption
+  imod Iris.NonAtomicInvariant.inv_alloc $$ [$HP] with Hinv
   imodintro
   iapply Hcont $$ Hinv
 
 theorem refines_na_inv {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp rT} {A : lrel rT GF}
     (HNE : (↑N : CoPset) ⊆ E) :
-    iprop% (naInvP (rT := rT) N P) ∗ ((▷ P) ∗ (naCloseP (rT := rT) P N E)
-      -∗
-        refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A) ⊢@{IProp GF}
-    refines E e1 e2 A := by
-  unfold refines
+    iprop% naInvP (rT := rT) N P ∗
+        ((▷ P) ∗ naCloseP (rT := rT) P N E -∗ refines (E \ (↑N : CoPset)) e1 e2 A)
+      ⊢@{IProp GF} refines E e1 e2 A := by
   iintro ⟨Hinv, IH⟩
-  iintro %K %ε Hj Hnais Herr Hpos
-  iapply ApproxisWpGS.fupd_wp
-  imod Iris.NonAtomicInvariant.inv_acc (F := E) (E := ⊤)
-    ((fun _ _ => CoPset.mem_full) : (↑N : CoPset) ⊆ ⊤) HNE $$ Hinv Hnais
+  iapply refines_na_update
+  iintro Hnais
+  imod Iris.NonAtomicInvariant.inv_acc CoPset.subseteq_top HNE $$ Hinv Hnais
     with ⟨HP, Hnais', Hclose⟩
-  ihave HPc : iprop((▷ P) ∗ naCloseP (rT := rT) P N E) $$ [$HP $Hclose]
-  ihave IH' := IH $$ HPc
   imodintro
-  iapply IH' $$ %K %ε Hj Hnais' Herr Hpos
+  iframe Hnais'
+  iapply IH $$ [$HP $Hclose]
 
 theorem refines_na_close {P : IProp GF} {E : CoPset} {N : Namespace} {e1 e2 : Exp rT}
     {A : lrel rT GF} :
-    iprop((▷ P) ∗ (naCloseP (rT := rT) P N E) ∗ refines E e1 e2 A) ⊢@{IProp GF}
-    refines (SDiff.sdiff E ((↑N : CoPset) : CoPset)) e1 e2 A := by
-  unfold refines
+    iprop% (▷ P) ∗ naCloseP (rT := rT) P N E ∗ refines E e1 e2 A
+      ⊢@{IProp GF} refines (E \ (↑N : CoPset)) e1 e2 A := by
   iintro ⟨HP, Hclose, IH⟩
-  iintro %K %ε Hj HownFN Herr Hpos
-  ihave Hpair : iprop% (▷ P) ∗ naOwnP (rT := rT) (SDiff.sdiff E ((↑N : CoPset) :
-    CoPset)) $$ [$HP $HownFN]
-  ihave HownF := Hclose $$ Hpair
-  iapply ApproxisWpGS.fupd_wp
-  imod HownF with HownF'
+  iapply refines_na_update
+  iintro HownFN
+  imod Hclose $$ [$HP $HownFN] with HownF
   imodintro
-  iapply IH $$ %K %ε Hj HownF' Herr Hpos
+  iframe
 
 end Monadic
 
