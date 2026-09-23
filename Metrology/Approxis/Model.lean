@@ -6,98 +6,18 @@ public import Metrology.Approxis.PrimitiveLaws
 public import Metrology.ProbLang.Syntax.LocallyClosed
 public import Iris.Instances.Lib.NaInvariants
 public import Iris.Instances.Lib.Invariants
+public import Metrology.Iris.Countable
 
 @[expose] public section
 
 
-/-!
-# Semantic Model
-
-Semantic model for the binary logical relation: `ApproxisRGS`, `lrel`,
-`refines`, and type constructors.
--/
+/-! # Semantic Model -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 namespace ProbLang
 
-
 variable {rT : Type _} [ProbLangℝ rT]
-
-/-! ## `Pos.Countable` instances for namespace indexing -/
-
-theorem Pos.toNat_succ (p : Pos) : p.succ.toNat = p.toNat + 1 := by
-  induction p with
-  | xH => rfl
-  | xI p ih => show 2 * p.succ.toNat = _; rw [ih]; simp [Pos.toNat]; ring
-  | xO p => show 2 * p.toNat + 1 = _; simp [Pos.toNat]
-
-theorem Pos.toNat_ofNat (n : Nat) : (Pos.ofNat n).toNat = n + 1 := by
-  induction n with
-  | zero => rfl
-  | succ k ih => simp [Pos.ofNat, Pos.toNat_succ, ih]
-
-instance : Pos.Countable Nat where
-  encode n := Pos.ofNat n
-  decode p := some (p.toNat - 1)
-  decode_encode n := by
-    congr 1
-    rw [Pos.toNat_ofNat]; omega
-
-/-- Encode `Int` into `Nat` via the standard zigzag: `n ≥ 0 ↦ 2n`, `n < 0 ↦ -2n - 1`. -/
-instance : Pos.Countable Int where
-  encode z :=
-    Pos.Countable.encode (A := Nat)
-      (if 0 ≤ z then 2 * z.toNat else 2 * (-z - 1).toNat + 1)
-  decode p := (Pos.Countable.decode (A := Nat) p).bind fun k =>
-    some (if k % 2 = 0 then (k / 2 : Int) else -((k - 1) / 2 : Int) - 1)
-  decode_encode z := by
-    show Option.bind
-      (Pos.Countable.decode (A := Nat)
-        (Pos.Countable.encode (A := Nat)
-          (if 0 ≤ z then 2 * z.toNat else 2 * (-z - 1).toNat + 1))) _ = _
-    rw [Pos.Countable.decode_encode]
-    show (Option.bind (some _) _ : Option Int) = _
-    rw [Option.bind_some]
-    by_cases hz : 0 ≤ z
-    · rw [if_pos hz]
-      have hmod : (2 * z.toNat) % 2 = 0 := Nat.mul_mod_right 2 _
-      rw [if_pos hmod]
-      have htn : (z.toNat : Int) = z := Int.toNat_of_nonneg hz
-      have : (((2 * z.toNat : Nat) : Int) / 2) = z := by
-        push_cast; rw [Int.mul_ediv_cancel_left _ (by decide : (2 : Int) ≠ 0)]; exact htn
-      rw [this]
-    · rw [if_neg hz]
-      have hmod : (2 * (-z - 1).toNat + 1) % 2 ≠ 0 := by
-        intro h; omega
-      rw [if_neg hmod]
-      have hnn : (0 : Int) ≤ -z - 1 := by omega
-      have htn : ((-z - 1).toNat : Int) = -z - 1 := Int.toNat_of_nonneg hnn
-      have hd : ((((2 * (-z - 1).toNat + 1 : Nat) : Int) - 1) / 2) = -z - 1 := by
-        push_cast
-        rw [show (2 * ((-z - 1).toNat : Int) + 1 - 1) = 2 * (-z - 1) by rw [htn]; ring]
-        rw [Int.mul_ediv_cancel_left _ (by decide : (2 : Int) ≠ 0)]
-      rw [hd]
-      congr 1; omega
-
-instance {A B : Type} [Pos.Countable A] [Pos.Countable B] : Pos.Countable (A × B) where
-  encode p := Pos.flatten [Pos.Countable.encode p.1, Pos.Countable.encode p.2]
-  decode p := match Pos.unflatten p with
-    | some [a, b] =>
-      (Pos.Countable.decode a).bind fun x =>
-      (Pos.Countable.decode b).bind fun y =>
-      some (x, y)
-    | _ => none
-  decode_encode p := by
-    show (match Pos.unflatten
-        (Pos.flatten [Pos.Countable.encode p.1, Pos.Countable.encode p.2]) with
-      | _ => _) = _
-    rw [Pos.unflatten_flatten]
-    show Option.bind (Pos.Countable.decode (Pos.Countable.encode p.1)) _ = _
-    rw [Pos.Countable.decode_encode]
-    show Option.bind (Pos.Countable.decode (Pos.Countable.encode p.2)) _ = _
-    rw [Pos.Countable.decode_encode]
-    rfl
 
 /-! ## Log-relation namespace -/
 
@@ -126,6 +46,14 @@ instance {GF} : CoeFun (lrel rT GF) (fun _ => Val rT → Val rT → IProp GF) :=
 
 /-! ## OFE/COFE structure on `lrel` -/
 
+omit [ProbLangℝ rT] in
+theorem lrel.ext {GF : BundledGFunctors} {A B : lrel rT GF}
+    (h : ∀ v1 v2, A.car v1 v2 = B.car v1 v2) : A = B := by
+  obtain ⟨carA, persA, closA⟩ := A
+  obtain ⟨carB, persB, closB⟩ := B
+  have hcar : carA = carB := by funext v1 v2; exact h v1 v2
+  subst hcar; rfl
+
 instance {GF : BundledGFunctors} : OFE (lrel rT GF) where
   Dist n A B := ∀ v1 v2, A.car v1 v2 ≡{n}≡ B.car v1 v2
   dist_eqv := {
@@ -135,11 +63,8 @@ instance {GF : BundledGFunctors} : OFE (lrel rT GF) where
   }
   eq_dist' {A B} := by
     refine ⟨fun h _ _ _ => h ▸ .rfl, fun h => ?_⟩
-    obtain ⟨carA, persA, closA⟩ := A
-    obtain ⟨carB, persB, closB⟩ := B
-    have hcar : carA = carB := by
-      funext v1 v2; exact OFE.eq_dist.mpr fun n => h n v1 v2
-    subst hcar; rfl
+    refine lrel.ext fun v1 v2 => ?_
+    apply OFE.eq_dist.mpr fun _ => h _ _ _
   dist_lt hd hmn v1 v2 := OFE.dist_lt (hd v1 v2) hmn
 
 /-- Project an `lrel`-valued chain into the underlying function-space chain. -/
@@ -148,38 +73,24 @@ noncomputable def lrel.toFunChain {GF : BundledGFunctors}
   chain k := (c.chain k).car
   cauchy h := (c.cauchy h : _)
 
+/-- Evaluation at a fixed pair of values.  Naming it gives the `LimitPreserving`
+combinators below a head symbol to hang the nonexpansiveness instance on. -/
+abbrev lrel.appAt {GF : BundledGFunctors} (v1 v2 : Val rT) :
+    (Val rT → Val rT → IProp GF) → IProp GF := (· v1 v2)
+
+instance lrel.appAt_ne {GF : BundledGFunctors} (v1 v2 : Val rT) :
+    OFE.NonExpansive (lrel.appAt (rT := rT) (GF := GF) v1 v2) := ⟨fun _ _ _ h => h v1 v2⟩
+
 noncomputable instance {GF : BundledGFunctors} : IsCOFE (lrel rT GF) where
   compl c :=
-    let carC : Val rT → Val rT → IProp GF := IsCOFE.compl (lrel.toFunChain c)
-    { car := carC
-      persistent := fun v1 v2 => by
-        have hk : ∀ k, (c.chain k).car v1 v2 ⊢ iprop(<pers> (c.chain k).car v1 v2) :=
-          fun k => ((c.chain k).persistent v1 v2).persistent
-        refine ⟨?_⟩
-        have hne_Φ : OFE.NonExpansive
-          (fun f : Val rT → Val rT → IProp GF => f v1 v2) :=
-          ⟨fun _ _ _ hfg => hfg v1 v2⟩
-        have hne_Ψ : OFE.NonExpansive
-          (fun f : Val rT → Val rT → IProp GF => iprop(<pers> f v1 v2)) :=
-          ⟨fun _ _ _ hfg => persistently_ne.ne (hfg v1 v2)⟩
-        exact (Iris.BI.LimitPreserving.entails (Φne := hne_Φ) (Ψne := hne_Ψ)
-          (fun f => f v1 v2) (fun f => iprop(<pers> f v1 v2))).compl
-          (lrel.toFunChain c) hk
-      closed := fun v1 v2 => by
-        have hk : ∀ k, (c.chain k).car v1 v2 ⊢
-            iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF) :=
-          fun k => (c.chain k).closed v1 v2
-        have hne_Φ : OFE.NonExpansive
-          (fun f : Val rT → Val rT → IProp GF => f v1 v2) :=
-          ⟨fun _ _ _ hfg => hfg v1 v2⟩
-        have hne_Ψ : OFE.NonExpansive
-          (fun _ : Val rT → Val rT → IProp GF =>
-            iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF)) :=
-          ⟨fun _ _ _ _ => OFE.Dist.rfl⟩
-        exact (Iris.BI.LimitPreserving.entails (Φne := hne_Φ) (Ψne := hne_Ψ)
-          (fun f => f v1 v2)
-          (fun _ => iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ : IProp GF))).compl
-          (lrel.toFunChain c) hk }
+    { car := IsCOFE.compl (lrel.toFunChain c)
+      persistent v1 v2 :=
+        (limitPreserving_persistent (lrel.appAt v1 v2)).compl
+          (lrel.toFunChain c) fun k => (c.chain k).persistent v1 v2
+      closed v1 v2 :=
+        (Iris.BI.LimitPreserving.entails (lrel.appAt v1 v2)
+            (Function.const _ iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝))).compl
+          (lrel.toFunChain c) fun k => (c.chain k).closed v1 v2 }
   conv_compl {_ c} v1 v2 := IsCOFE.conv_compl (c := lrel.toFunChain c) v1 v2
 
 instance {GF : BundledGFunctors} : Inhabited (lrel rT GF) where
@@ -192,16 +103,6 @@ instance lrel.car_ne {GF : BundledGFunctors} (v1 v2 : Val rT) :
     OFE.NonExpansive (fun A : lrel rT GF => A.car v1 v2) where
   ne {_ _ _} hAB := hAB v1 v2
 
-omit [ProbLangℝ rT] in
-/-- Extensionality for `lrel`: two logical relations agreeing pointwise are equal.
-With the Leibniz OFE this replaces the old `Equiv`-unfolding, which used to let
-callers `intro v1 v2` on an `lrel` equivalence goal. -/
-theorem lrel.ext {GF : BundledGFunctors} {A B : lrel rT GF}
-    (h : ∀ v1 v2, A.car v1 v2 = B.car v1 v2) : A = B := by
-  obtain ⟨carA, persA, closA⟩ := A
-  obtain ⟨carB, persB, closB⟩ := B
-  have hcar : carA = carB := by funext v1 v2; exact h v1 v2
-  subst hcar; rfl
 
 /-! ## `na_own` / `na_inv` abbreviations keyed on the pool name -/
 
