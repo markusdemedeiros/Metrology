@@ -46,22 +46,17 @@ open ProbLang TotalEris.Examples
 
 /-! ## Markov chain Monte Carlo -/
 
-/-- The weights: a sum of three Gaussians, quantized to integers. They round to `0` far from the
-centres, so only finitely many are positive. -/
 def weightFn (x : Int) : Int :=
   let gauss (c : Int) (a : Float) := a * Float.exp (-Float.ofInt ((x - c) ^ 2) / 18)
   .ofNat (1000 * (gauss (-18) 0.6 + gauss 0 1 + gauss 18 0.8)).round.toUInt64.toNat
 
-/-- The integers where `weightFn` is positive: all within `[-40, 40]`. -/
 def support : List Int := ((List.range 81).map (Int.ofNat · - 40)).filter (0 < weightFn ·)
 
-/-- `weightFn` as a program: a table of its positive values, and `0` elsewhere. -/
 def weight {rT : Type _} : Exp rT :=
   let table := support.foldr (init := pl% #0) fun x rest =>
     pl% if z = #(.int x) then #(.int (weightFn x)) else &rest
   .lam (table.close (.named "z"))
 
-/-- The target distribution. -/
 def target (x : Int) : Float :=
   Float.ofInt (weightFn x) / Float.ofInt (support.map weightFn).sum
 
@@ -77,6 +72,17 @@ def metropolis {rT : Type _} : Exp rT := pl%
     title := "Metropolis–Hastings, 5000 steps"
     runs := 2000
     intFun := target
+
+/-! ## Estimating π -/
+
+#sample pl%
+    let x := rand(#1000000, #.unit);
+    let y := rand(#1000000, #.unit);
+    x * x + y * y < #1000000 * #1000000
+  with
+    title := "Estimating π"
+    runs := 1000000
+    boolFun := fun inside => if inside then 3.141592653589793 / 4 else 1 - 3.141592653589793 / 4
 
 -- A few blank lines so the last #sample doesn't collide with the restart file button
 #eval IO.println "\u00a0\n\u00a0\n\u00a0\n\u00a0"
