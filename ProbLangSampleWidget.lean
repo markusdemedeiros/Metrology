@@ -238,16 +238,21 @@ function merge(s, c) {
 // Charts are drawn on a grid of N × N square cells.
 const N = 10
 
-// The least `[a, a + N s]` that contains `[lo, hi]`, where the step `s` is 1, 2 or 5 times a power
-// of ten, and at least `min`, and `a` is a multiple of `s`: so the grid lines fall on round
-// numbers. `undefined` if there is none among the floats.
+// The least `[a, a + N s]` that contains `[lo, hi]` about its middle, where the step `s` is 1, 2
+// or 5 times a power of ten, and at least `min`, and `a` is a multiple of `s`: so the grid lines
+// fall on round numbers. `undefined` if there is none among the floats.
 function niceDomain(lo, hi, min = 0) {
   let e = Math.floor(Math.log10(Math.max((hi - lo) / N, min) || Math.abs(lo) / N || 1 / N))
   for (;;) {
     for (const m of [1, 2, 5]) {
-      const s = Math.max(min, m * 10 ** e), a = Math.floor(lo / s) * s
-      if (!Number.isFinite(a + N * s)) return undefined
-      if (a + N * s >= hi) return [a, a + N * s]
+      const s = Math.max(min, m * 10 ** e)
+      // The multiples of `s` from which N steps cover `[lo, hi]`; take the most central.
+      const first = Math.ceil(hi / s - N) * s, last = Math.floor(lo / s) * s
+      if (!Number.isFinite(first) || !Number.isFinite(last + N * s)) return undefined
+      if (first <= last) {
+        const a = Math.min(last, Math.max(first, Math.round((lo + hi) / 2 / s - N / 2) * s))
+        return [a, a + N * s]
+      }
     }
     e++
   }
@@ -354,7 +359,8 @@ function Chart({ x0, x1, y1, bars = [], line, ticks, message = [] }) {
       return text(`v${i}`, sx((b.x0 + b.x1) / 2), inside ? sy(b.y) + 9 : sy(b.y) - 3, 'middle',
                   b.value, { fontSize: 8, fill: inside ? bg : fg })
     }),
-    bars.filter(b => Number.isFinite(b.curve)).map((b, i) => h('circle', {
+    // A curve's value of 0 would only mark the axis.
+    bars.filter(b => Number.isFinite(b.curve) && b.curve !== 0).map((b, i) => h('circle', {
       key: `c${i}`, cx: sx((b.x0 + b.x1) / 2), cy: sy(b.curve), r: 2,
       fill: fg, stroke: bg, strokeWidth: 0.75 })),
     line && h('polyline', {
