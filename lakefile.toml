@@ -38,3 +38,7 @@ root = "Main"
 [[lean_exe]]
 name = "ProbLangTest"
 root = "ProbLangTest"
+
+[[lean_exe]]
+name = "bench"
+root = "BigStepBench"

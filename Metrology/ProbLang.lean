@@ -4,10 +4,16 @@ public meta import Metrology.Meta.Discrete
 public import Metrology.ProbLang.Advantage
 public import Metrology.ProbLang.BigStep
 public import Metrology.ProbLang.BigStepEquiv
+public import Metrology.ProbLang.Comp
+public import Metrology.ProbLang.Comp
 public import Metrology.ProbLang.ContextualRefinement
 public import Metrology.ProbLang.CtxStep
 public import Metrology.ProbLang.DetStep
 public import Metrology.ProbLang.Erasable
+public import Metrology.ProbLang.EnvStep
+public import Metrology.ProbLang.EnvStepEquiv
+public import Metrology.ProbLang.EnvStep
+public import Metrology.ProbLang.EnvStepEquiv
 public import Metrology.ProbLang.Erasure
 public import Metrology.ProbLang.Exec
 public import Metrology.ProbLang.HeadStep
