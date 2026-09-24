@@ -38,13 +38,3 @@ root = "Main"
 [[lean_exe]]
 name = "ProbLangTest"
 root = "ProbLangTest"
-
-# CtxInterpTest is parked, not deleted. `ProbLangℝ` bundles the computable real
-# operations (realAdd/realLt/…) together with a noncomputable
-# `MeasureTheory.Measure`, so every instance of it is noncomputable and the
-# interpreter's test harness cannot be compiled. Splitting a `ProbLangℝOps`
-# parent class out would make it buildable again.
-# [[lean_exe]]
-# name = "CtxInterpTest"
-# root = "CtxInterpTest"
-# supportInterpreter = true
