@@ -39,6 +39,7 @@ instance : ProbLangℝ Float where
   realAdd a b := a + b
   realNeg a := -a
   realOfInt z := Float.ofInt z
+  realOfRat q := Float.ofInt q.num / Float.ofNat q.den
   realFrac a := a - a.floor
 
 /-- Draw from the unit interval: `k · 2^-53` for `k` uniform on `[0, 2^53)`. -/

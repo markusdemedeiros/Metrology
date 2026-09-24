@@ -1,6 +1,6 @@
 name = "metrology"
 testDriver = "ProbLangTest"
-defaultTargets = ["Metrology"]
+defaultTargets = ["Metrology", "ProbLangSampleWidget"]
 
 [leanOptions]
 pp.unicode.fun = true
@@ -42,3 +42,13 @@ root = "ProbLangTest"
 [[lean_exe]]
 name = "bench"
 root = "BigStepBench"
+
+# Draws the samples for `#sample`.
+[[lean_exe]]
+name = "problang-sample"
+root = "ProbLangSample"
+
+# The `#sample` widget, which runs `problang-sample`: building the widget builds it first.
+[[lean_lib]]
+name = "ProbLangSampleWidget"
+needs = ["problang-sample"]

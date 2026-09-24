@@ -150,6 +150,8 @@ theorem twp_LeHalf (E : CoPset) (r : ℝ) :
   twp_value
   imodintro
   ipureintro
+  -- `LeHalf`'s constant is `realOfRat (1 / 2)`: at `ℝ`, the cast of the rational `1 / 2`.
+  simp only [LeHalfSpec, realOfRat_real, Rat.cast_div, Rat.cast_one, Rat.cast_ofNat]
   rfl
 
 theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
@@ -200,7 +202,6 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
       iframe Hcrn
       itrivial
     · rw [intOfNat_emod_two_eq_one hpar]
-      twp_pures
       twp_value
       imodintro
       iexists true
@@ -262,7 +263,7 @@ theorem FairCoin_fv : (FairCoin : Exp ℝ).fv = ∅ := by
     Exp.openRec k t FairCoin = FairCoin := (Exp.open_lc k t FairCoin FairCoin_lc).symm
 
 @[simp] theorem FairCoin_closeRec (k : ℕ) (x : Var) :
-    Exp.closeRec k x FairCoin = FairCoin :=
+    Exp.closeRec k x (FairCoin : Exp ℝ) = FairCoin :=
   Exp.closeRec_fresh x FairCoin k (by simp [FairCoin_fv])
 
 theorem twp_FairCoin (E : CoPset) (F : Bool → ℝ≥0∞) :

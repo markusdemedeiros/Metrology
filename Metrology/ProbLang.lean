@@ -18,6 +18,7 @@ public import Metrology.ProbLang.Erasure
 public import Metrology.ProbLang.Exec
 public import Metrology.ProbLang.HeadStep
 public import Metrology.ProbLang.Interp.BigStepIO
+public import Metrology.ProbLang.Interp.Sample
 public import Metrology.ProbLang.Measure
 public import Metrology.ProbLang.Metatheory
 public import Metrology.ProbLang.Reals

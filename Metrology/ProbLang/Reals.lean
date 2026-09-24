@@ -64,6 +64,7 @@ public noncomputable instance instProbLangℝReal : LawfulProbLangℝ ℝ where
   realAdd a b := a + b
   realNeg a := -a
   realOfInt z := (z : ℝ)
+  realOfRat q := (q : ℝ)
   realFrac r := Int.fract r
   measurable_realAdd := measurable_add
   measurable_realNeg := measurable_neg
@@ -71,15 +72,17 @@ public noncomputable instance instProbLangℝReal : LawfulProbLangℝ ℝ where
 
 /-! ### Arithmetic reduction lemmas
 
-`BinOp.eval`/`UnOp.eval` produce `ProbLangℝ.realAdd`/`realNeg`/`realOfInt`
-applications. At `rT = ℝ` these are Lean's own operations; these `simp` lemmas
-let `twp_pures` and the stepping display normalise them away. -/
+`BinOp.eval`/`UnOp.eval` produce `ProbLangℝ.realAdd`/`realNeg`/`realOfInt` applications,
+and programs write constants with `realOfRat`. At `rT = ℝ` these are Lean's own operations;
+these `simp` lemmas let `twp_pures` and the stepping display normalise them away. -/
 
 @[simp] public theorem realAdd_real (a b : ℝ) : ProbLangℝ.realAdd a b = a + b := rfl
 
 @[simp] public theorem realNeg_real (a : ℝ) : ProbLangℝ.realNeg a = -a := rfl
 
 @[simp] public theorem realOfInt_real (z : ℤ) : ProbLangℝ.realOfInt z = (z : ℝ) := rfl
+
+@[simp] public theorem realOfRat_real (q : ℚ) : ProbLangℝ.realOfRat q = (q : ℝ) := rfl
 
 @[simp] public theorem realFrac_real (r : ℝ) : ProbLangℝ.realFrac r = Int.fract r := rfl
 

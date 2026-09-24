@@ -694,7 +694,6 @@ theorem twp_B (E : CoPset) (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (Hx : 0
   twp_pures
   obtain hpar | hpar := Nat.mod_two_eq_zero_or_one n
   · rw [intOfNat_emod_two_eq_zero hpar]
-    twp_pures
     twp_value
     imodintro
     isimp only [BS0Credit, hpar, Nat.reduceEqDiff, reduceIte] at Hcn

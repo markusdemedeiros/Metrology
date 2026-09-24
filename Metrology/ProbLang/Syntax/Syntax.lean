@@ -126,6 +126,9 @@ class ProbLangℝ (T : Type _) extends BEq T, Inhabited T where
   /-- Injection of integers into the reals. Powers `UnOp.eval .toReal`, the
   coercion that lets a program combine an integer part with a real fraction. -/
   realOfInt : Int → T
+  /-- Injection of rationals into the reals. Lets a program generic in the reals write a
+  constant such as `1/2` as `#(.real (ProbLangℝ.realOfRat (1/2)))`. -/
+  realOfRat : ℚ → T
   /-- Fractional part of a real. Powers `UnOp.eval .frac`, the operation that lets
   a program compute *modulo 1* — which is what a combiner on the unit interval
   needs. Intended to satisfy `realFrac r ∈ [0,1)` with `r - realFrac r` integral,
