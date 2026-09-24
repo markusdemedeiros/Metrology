@@ -39,18 +39,6 @@ noncomputable section
 
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
-section program
-
-@[pl_fold]
-def Gauss : Exp ℝ := pl%
-  fun _u,
-    let p := &G2 #.unit;
-    let y := fst(p) + toReal(snd(p));
-    let b := &FairCoin #.unit;
-    if b then -y else y
-
-end program
-
 section credit
 
 /-- The sample with the coin's sign applied: `true` is heads, and negates. Kept

@@ -3,6 +3,7 @@ module
 public import Metrology.TotalEris
 import Metrology.ProbLang.Syntax.Notation
 public import Mathlib.Probability.Distributions.Geometric
+public import Metrology.Code.Samplers
 
 @[expose] public section
 
@@ -20,15 +21,6 @@ noncomputable section
 
 variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
-
-/-! ## Program -/
-section program
-
-@[pl_fold]
-def GeometricTrial : Exp rT := pl%
-  rec geo trial N := if trial #.unit then geo trial (N + #1) else N
-
-end program
 
 /-! ## Abstract Bernoulli trial -/
 section abstractBernoulli

@@ -2,6 +2,7 @@ module
 
 public import Metrology.TotalEris
 import Metrology.ProbLang.Syntax.Notation
+public import Metrology.Code.Geometric
 
 @[expose] public section
 
@@ -22,20 +23,6 @@ namespace Examples
 
 variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
-
-/-! ## The geometric sampler
-
-  Encoded under locally-nameless: `bvar 0` is the bound recursor argument
-  (we don't actually use it), and the body samples uniformly from
-  `[0, 3) = {0, 1, 2}`. -/
-
-/-- The geometric sampler. -/
-@[pl_names]
-def geometric : Exp rT :=
-  pl% rec geo n :=
-        if rand(#2, #.unit) = #0
-          then #0
-          else (geo n) + #1
 
 /-- The result-postcondition shared by all geometric specs: the sampler
 returns a non-negative integer. -/

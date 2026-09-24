@@ -44,16 +44,6 @@ theorem AbstractBernoulli.toAbstractBernoulliI {v : Val ℝ} {γ : ↑unitInterv
 
 end abstractBernoulli
 
-section program
-
-@[pl_fold]
-def IterTrial : Exp ℝ := pl%
-  rec iter b k :=
-    if k = #0 then #true
-    else if b #.unit then iter b (k - #1) else #false
-
-end program
-
 section distribution
 
 def IterPMF (γ : ↑unitInterval) (N : ℕ) : Bool → ℝ≥0∞

@@ -25,25 +25,6 @@ section program
 
 def LeHalfSpec (r : ℝ) : Bool := decide (r ≤ 1 / 2)
 
-@[pl_fold]
-def LeHalf : Exp ℝ := pl% fun x, x <= #(.real (1 / 2 : ℝ))
-
-/-- Unbiased coin: `urand ≤ ½`. -/
-@[pl_fold]
-def FairCoin : Exp ℝ := pl%
-  fun _u,
-    let u := urand;
-    &LeHalf u
-
-@[pl_fold]
-def BNEHalf : Exp ℝ := pl%
-  fun _u,
-    let x := urand;
-    if &LeHalf x then
-      let y := &DecrTrial #0 x;
-      (y % #2 = #1)
-    else #true
-
 end program
 
 section distribution

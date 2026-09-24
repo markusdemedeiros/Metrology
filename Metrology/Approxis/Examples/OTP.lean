@@ -4,6 +4,7 @@ public import Metrology.Approxis.Compatibility
 import Metrology.ProbLang.Syntax.Notation
 public import Metrology.Approxis.AppRelRules
 public import Metrology.Approxis.AdequacyRel
+public import Metrology.Code.OTP
 
 @[expose] public section
 
@@ -46,14 +47,6 @@ theorem addMod_bij (m N : Int) (HN : 0 < N) :
     rw [← hadd, Int.emod_sub_emod, Int.add_sub_cancel, Int.emod_eq_of_lt hn0 hnN]
 
 /-! ### The OTP refinement -/
-
-/-- The LHS program: sample a key, then output `(m + k) mod N`. -/
-def otp_enc (m N : Int) : Exp rT :=
-  pl% let k := rand(#(.int N), #(.unit)); (#(.int m) + k) % #(.int N)
-
-/-- The RHS program: just sample uniformly. -/
-def otp_ideal (N : Int) : Exp rT :=
-  pl% rand(#(.int N), #(.unit))
 
 /-- The β-redex body of `otp_enc m N`: `(m + bvar 0) % N`. Open at `bvar 0`,
 which gets bound by `otp_enc`'s outer `let k := …; …` (a `lam`-encoded let). -/

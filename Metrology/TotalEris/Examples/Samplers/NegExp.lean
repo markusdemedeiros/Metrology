@@ -20,17 +20,6 @@ noncomputable section
 
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
-section program
-
-@[pl_fold]
-def NegExp : Exp ℝ := pl%
-  rec trial L :=
-    let x := urand;
-    let y := &DecrTrial #0 x;
-    if (y % #2 = #0) then (L, x) else trial (L + #1)
-
-end program
-
 section distribution
 
 def NegExppdf₀ (k : ℕ) (x : ℝ) : ℝ≥0∞ :=

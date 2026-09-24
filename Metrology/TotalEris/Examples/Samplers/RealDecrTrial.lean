@@ -4,6 +4,7 @@ public import Metrology.TotalEris
 public import Metrology.ProbLang.Reals
 public import Mathlib.Analysis.SpecialFunctions.Integrals.Basic
 public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Series
+public import Metrology.Code.Samplers
 
 @[expose] public section
 
@@ -29,16 +30,6 @@ theorem intOfNat_emod_two_eq_one {n : ℕ} (hn : n % 2 = 1) : Int.ofNat n % 2 = 
 theorem mem_unifUnitSupport_real_le {r : ℝ} (hr : r ∈ LawfulProbLangℝ.unifUnitSupport) :
     0 ≤ r ∧ r ≤ 1 :=
   ⟨(mem_unifUnitSupport_real.mp hr).1.le, (mem_unifUnitSupport_real.mp hr).2.le⟩
-
-section program
-
-@[pl_fold]
-def DecrTrial : Exp ℝ := pl%
-  rec trial N x :=
-    let y := urand;
-    if y < x then trial (N + #1) y else N
-
-end program
 
 section distribution
 

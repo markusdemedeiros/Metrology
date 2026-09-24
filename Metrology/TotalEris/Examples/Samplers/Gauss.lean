@@ -27,19 +27,6 @@ section program
 
 def IterN (k : ℕ) : ℕ := k * (k - 1)
 
-@[pl_fold]
-def G1 : Exp ℝ := pl%
-  rec trial u :=
-    let k := &GeometricTrial &BNEHalf #0;
-    if &IterTrial &BNEHalf (k * (k - #1)) then k else trial #.unit
-
-@[pl_fold]
-def G2 : Exp ℝ := pl%
-  rec trial u :=
-    let k := &G1 #.unit;
-    let x := urand;
-    if &IterTrial (fun _u, &B k x) (k + #1) then (x, k) else trial #.unit
-
 end program
 
 section distribution

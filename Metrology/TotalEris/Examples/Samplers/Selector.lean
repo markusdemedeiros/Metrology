@@ -25,37 +25,6 @@ noncomputable section
 
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS ℝ hlc GF]
 
-section program
-
-@[pl_fold]
-def C : Exp ℝ := pl%
-  fun m, let v := rand(m + #2, #.unit); if v = #0 then #0 else if v = #1 then #1 else #2
-
-@[pl_fold]
-def Bii : Exp ℝ := pl%
-  fun k, fun x,
-    let f := &C (#2 * k);
-    let r := urand;
-    if f = #0 then #true else (if f = #1 then (x < r) else #false)
-
-@[pl_fold]
-def S : Exp ℝ := pl%
-  rec trial k x y N :=
-    let z := urand;
-    if y < z then N else (if &Bii k x then N else trial k x z (N + #1))
-
-@[pl_fold]
-def S0 : Exp ℝ := pl%
-  fun k, fun x,
-    let z := urand;
-    if x < z then #0 else (if &Bii k x then #0 else &S k x z #1)
-
-@[pl_fold]
-def B : Exp ℝ := pl%
-  fun k, fun x, (&S0 k x % #2 = #0)
-
-end program
-
 section distribution
 
 def BiiFailProb (k : ℕ) (x : ℝ) : ℝ := (2 * k + x) / (2 * k + 2)

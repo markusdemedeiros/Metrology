@@ -6,6 +6,7 @@ public import Metrology.ProbLang.Advantage
 import Metrology.ProbLang.Syntax.Notation
 public import Metrology.ProbLang.Reals
 public import Metrology.Approxis.AdequacyRel
+public import Metrology.Code.ContinuousOTP
 
 @[expose] public section
 
@@ -26,13 +27,6 @@ namespace ContinuousOTP
 
 variable {rT : Type} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
-
-/-- The LHS program: sample a uniform key `k`, output `frac (m + k)`. -/
-def otp_enc (m : rT) : Exp rT :=
-  pl% let k := urand; frac(#(.real m) + k)
-
-/-- The RHS program: just sample uniformly. -/
-def otp_ideal : Exp rT := pl% urand
 
 /-- The `lam` that `otp_enc m` exposes once its `let` is read as an application. -/
 abbrev otpLam (m : rT) : Exp rT := pl% fun k, frac(#(.real m) + k)
