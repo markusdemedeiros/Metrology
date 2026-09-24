@@ -43,6 +43,9 @@ The widget's controls can still change the engine, runs and bins.
 The widget is attached to an info message, so the infoview's *All Messages* shows every `#sample`
 of a file at once. A widget keeps its charts and controls while it is off screen, and pauses if
 it was running; `set_option sample.maxSaved n` bounds how many widgets are kept (default 16).
+Widgets keep their state across edits and reloads of the file, unless the file starts with
+`#sample_session`: then reloading it, or editing that command, starts every widget afresh.
+`#sample_session with maxSaved := n` also sets `sample.maxSaved` for the rest of the file.
 
 The runs happen in the `problang-sample` executable, which Lake builds before this module. Each
 Play starts one, which streams results back until it is done or paused. In a `module` file, the
@@ -586,6 +589,9 @@ register_option sample.maxSaved : Nat := {
     keeps every result of its runs, so this bounds the infoview's memory; 0 keeps none."
 }
 
+/-- The session set by the last `#sample_session`, if any. -/
+initialize sessionExt : EnvExtension (Option Nat) ← registerEnvExtension (pure none)
+
 /-- The props of `sampleWidget`. -/
 structure Props where
   job : WithRpcRef Job
@@ -653,12 +659,32 @@ def elabSample : Command.CommandElab
         "expected `title`, `engine`, `runs`, `bins`, `boolFun`, `intFun` or `realFun`"
     let props : Props := {
       job := ← WithRpcRef.mk job, engines := engines.map (·.1)
-      -- The same command in the same file, whatever its layout.
-      stateKey := toString (hash (← getFileName, toString stx))
+      -- The same command in the same file and session, whatever its layout.
+      stateKey := toString (hash (← getFileName, sessionExt.getState (← getEnv), toString stx))
       maxSaved := sample.maxSaved.get (← getOptions)
       title := opts.title, engine := opts.engine, runs := opts.runs, bins := opts.bins }
     let wi ← Widget.WidgetInstance.ofHash (hash sampleWidget.javascript) (rpcEncode props)
     logInfoAt tk (.ofWidget wi "#sample: open the infoview to run it")
+  | _ => throwUnsupportedSyntax
+
+/-- `#sample_session` starts a new session for the `#sample` widgets after it: they forget what
+they kept whenever it is elaborated again, as when the file is reloaded. Put it at the top of the
+file. `#sample_session with maxSaved := n` also sets `sample.maxSaved` to `n`, like `set_option`,
+for the rest of the file. -/
+syntax (name := sampleSessionCmd) "#sample_session" (" with " many1Indent(sampleOption))? : command
+
+@[command_elab sampleSessionCmd]
+def elabSampleSession : Command.CommandElab
+  | `(#sample_session $[with $options*]?) => do
+    modifyEnv (sessionExt.setState · (some (← IO.monoNanosNow)))
+    let mut seen := false
+    for option in options.getD #[] do
+      let `(sampleOption| $k:ident := $v $[,]?) := option | throwUnsupportedSyntax
+      unless k.getId == `maxSaved do throwErrorAt k "expected `maxSaved`"
+      if seen then throwErrorAt k "duplicate option {k}"
+      seen := true
+      let n ← Command.liftTermElabM (evalTerm Nat (mkConst ``Nat) v)
+      Command.modifyScope fun scope => { scope with opts := sample.maxSaved.set scope.opts n }
   | _ => throwUnsupportedSyntax
 
 end ProbLang.Interp.Sample
