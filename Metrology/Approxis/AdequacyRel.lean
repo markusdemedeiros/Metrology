@@ -18,13 +18,13 @@ namespace ProbLang
 open Iris Iris.BI Iris.ProofMode OFE COFE Iris.Std DisjointLeibnizSet Auth HeapView
 open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-- Bundle of the "pre" ghost-state classes needed to instantiate the relational
 adequacy theorem. Spelled with instance-implicit fields rather than `class abbrev`:
 `class abbrev` flattens each parent's *fields* into value parameters, which since
 Lean 4.32 is rejected because e.g. `SpecPreGS.prog` is then an uninferable argument. -/
-class RefinesPreGS (rT : outParam (Type _)) [ProbLangℝ rT]
+class RefinesPreGS (rT : outParam (Type _)) [LawfulProbLangℝ rT]
     [MeasurableSingletonClass rT] (GF : BundledGFunctors) where
   [app : AppPreGS rT GF]
   [spec : SpecPreGS rT GF]
@@ -111,7 +111,7 @@ theorem refines_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
     iapply Hlog IR
 
 section ApproxisFunctor
-variable (rT : Type) [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable (rT : Type) [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-- Concrete model for Approxis -/
 noncomputable def ApproxisFunctor : BundledGFunctors := fun

@@ -22,7 +22,7 @@ inductive Comp (rT : Type u) (C R : Type u) where
   | stuck (msg : String)
   /-- Sample an integer uniformly from `[0, z)`, or return `-1` when `z ≤ 0`. -/
   | sample (z : Int) (k : Int → Comp rT C R)
-  /-- Sample a real from `ProbLangℝ.unifUnit`. -/
+  /-- Sample a real from `LawfulProbLangℝ.unifUnit`. -/
   | sampleReal (k : rT → Comp rT C R)
 
 end ProbLang

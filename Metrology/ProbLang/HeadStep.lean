@@ -16,7 +16,7 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 def Option.unwrapM {α : Type _} [MeasurableSpace β] (f : α → Measure β) : Option α → Measure β
 | some v => f v
@@ -52,9 +52,9 @@ def Cfg.uniform (z : Int) (σ : State rT) : Measure (Cfg rT) :=
   | none => dirac ⟨.lit (.int (-1)), σ⟩
 
 /-- Continuous uniform distribution over `⟨.lit (.real r), σ⟩` for `r` drawn from the
-unit interval `[0,1]` (the `ProbLangℝ.unifUnit` probability measure on `rT`). -/
+unit interval `[0,1]` (the `LawfulProbLangℝ.unifUnit` probability measure on `rT`). -/
 def Cfg.uniformReal (σ : State rT) : Measure (Cfg rT) :=
-  (ProbLangℝ.unifUnit (T := rT)).map (⟨.lit <| .real ·, σ⟩)
+  (LawfulProbLangℝ.unifUnit (T := rT)).map (⟨.lit <| .real ·, σ⟩)
 
 -- TODO: Do we need these value checks? Finding the redex, and enforcing evalutation
 -- order, should be governed by the reduction context.
@@ -239,7 +239,7 @@ abbrev HeadReducible (e : Exp rT) (σ : State rT) : Prop :=
 /-! ### Measurability for arbitrary measurable `rT`.
 
 These stubs replace the discrete-`rT` `.of_discrete` shortcuts above with genuine
-measurability statements that hold for any `[ProbLangℝ rT]`. -/
+measurability statements that hold for any `[LawfulProbLangℝ rT]`. -/
 
 /-- `Option.unwrapM f` is measurable in its `Option α` argument when `f` is
 measurable. -/
@@ -467,7 +467,7 @@ the `σ`-parametrised embedding `(σ, r) ↦ ⟨.lit (.real r), σ⟩`. -/
 theorem Cfg.uniformReal.measurable :
     Measurable (fun σ : State rT => Cfg.uniformReal σ) := by
   unfold Cfg.uniformReal
-  set μ : Measure rT := ProbLangℝ.unifUnit (T := rT) with hμ_def
+  set μ : Measure rT := LawfulProbLangℝ.unifUnit (T := rT) with hμ_def
   have hk_const : Measurable (fun _ : State rT => μ) := measurable_const
   have hker_sfinite : ProbabilityTheory.IsSFiniteKernel
       (ProbabilityTheory.Kernel.mk (fun _ : State rT => μ) hk_const) := by
@@ -1781,7 +1781,7 @@ inductive HeadStepSupport : Cfg rT → Cfg rT → Prop
   Pat.tryMatch p e = none →
   HeadStepSupport ⟨.scrut e p, σ⟩ ⟨.inr (.lit .unit), σ⟩
 | UrandS :
-  ProbLangℝ.unifUnitSupport r →
+  LawfulProbLangℝ.unifUnitSupport r →
   HeadStepSupport ⟨.urand, σ⟩ ⟨.lit (.real r), σ⟩
 
 @[simp]
@@ -2081,9 +2081,9 @@ theorem headStep_support_of_pos [MeasurableSingletonClass rT]
     -- `r` carries positive `unifUnit`-mass, so it lies in `unifUnitSupport`:
     -- otherwise `{r} ⊆ unifUnitSupportᶜ` would force `unifUnit {r} = 0`.
     by_contra hr_notin
-    have hsub : ({r} : Set rT) ⊆ (ProbLangℝ.unifUnitSupport)ᶜ := Set.singleton_subset_iff.mpr hr_notin
+    have hsub : ({r} : Set rT) ⊆ (LawfulProbLangℝ.unifUnitSupport)ᶜ := Set.singleton_subset_iff.mpr hr_notin
     exact (ne_of_gt hpos)
-      (le_zero_iff.mp ((measure_mono hsub).trans_eq ProbLangℝ.unifUnitIsConcentrated))
+      (le_zero_iff.mp ((measure_mono hsub).trans_eq LawfulProbLangℝ.unifUnitIsConcentrated))
 
 /-- `→` direction of the continuous support characterisation. Needs
 `[MeasurableSingletonClass rT]` (to recover *which* outcome occurred), but **not**
@@ -2154,7 +2154,7 @@ theorem headStep_exists_support_of_ne_zero
     obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..) ▸ heq
     -- `unifUnit` is a probability measure concentrated on `unifUnitSupport`, so
     -- the support is nonempty; any of its points is a reachable real outcome.
-    obtain ⟨r, hr⟩ := ProbLangℝ.unifUnitSupport_nonempty rT
+    obtain ⟨r, hr⟩ := LawfulProbLangℝ.unifUnitSupport_nonempty rT
     exact ⟨_, HeadStepSupport.UrandS (r := r) hr⟩
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
@@ -2246,14 +2246,14 @@ theorem isAtomicSupport_dirac {α : Type _} [MeasurableSpace α] [MeasurableSing
     exact one_ne_zero hx
   · rw [Measure.dirac_apply' _ (measurableSet_singleton a).compl, Set.indicator_of_notMem (by simp)]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem isAtomicSupport_isValM {T : Type _} [MeasurableSpace T] (e : Exp rT) {m : Measure T}
     (hm : IsAtomicSupport m) : IsAtomicSupport (e.isValM m) := by
   by_cases hv : e.isValue
   · rw [Exp.isValM_some hv]; exact hm
   · rw [Exp.isValM_none hv]; exact isAtomicSupport_zero
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem isAtomicSupport_asValM {T : Type _} [MeasurableSpace T] (e : Exp rT)
     {f : Val rT → Measure T} (hf : ∀ v, IsAtomicSupport (f v)) :
     IsAtomicSupport (e.asValM f) := by

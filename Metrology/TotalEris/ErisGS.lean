@@ -17,7 +17,7 @@ namespace ProbLang
 namespace TotalEris
 
 /-- Concrete ghost-state class for Eris. -/
-class ErisGS (rT : outParam (Type _)) [ProbLangℝ rT] (hlc : outParam HasLC)
+class ErisGS (rT : outParam (Type _)) [LawfulProbLangℝ rT] (hlc : outParam HasLC)
     (GF : BundledGFunctors) where
   appGS : AppGS rT GF
   ecGS  : ECGS GF
@@ -27,7 +27,7 @@ attribute [reducible, instance] ErisGS.appGS ErisGS.ecGS ErisGS.invGS
 
 section ErisInstance
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 @[reducible]

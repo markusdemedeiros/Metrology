@@ -87,7 +87,7 @@ theorem presampleAdvCompX₂_le_one {σ : State rT} {α : Loc} {N : Int} {bs : L
   unfold presampleAdvCompX₂; split
   exacts [Hbd _, zero_le]
 
-variable [ProbLangℝ rT]
+variable [LawfulProbLangℝ rT]
 
 /-- The presample support is a countable set of tape-updated states, hence measurable. -/
 theorem measurableSet_presample_support {σ₁ : State rT} {α : Loc} {N : Int}

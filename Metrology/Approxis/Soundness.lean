@@ -22,7 +22,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 
 
 section Soundness
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- Recursive predicate: K's binder atoms are pairwise distinct AND each is
@@ -82,7 +82,7 @@ theorem ctx_fill_lc_fv
     (K.fill e).IsLocallyClosed ∧ (K.fill e).fv ⊆ (Γrc.map (·.1)).toFinset :=
   ⟨Hty.isLocallyClosed, fv_subset_relCtxDom HCtxRel Hty⟩
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Domain of `(x, A) :: Γrc` is `Γrc.dom ∪ {x}`. -/
 theorem RelCtx.dom_cons (x : Var) (A : lrel rT GF) (Γrc : RelCtx rT GF) :
     (((x, A) :: Γrc).map (·.1)).toFinset = (Γrc.map (·.1)).toFinset ∪ {x} := by
@@ -124,7 +124,7 @@ theorem bin_log_related_close_cofinite
     (bin_log_related_ty_rename (Ne.symm hyNotX) hxRc hyNotRc hyNotFvKe hyNotFvKe')
 
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- An element of `(Ke.close x).fv` came from `Γrc'.dom`, not from `{x}`
 (closing erases `x`). The `hKe_fv` hypothesis bounds `Ke.fv` by
 `((x, _) :: Γrc').dom = Γrc'.dom ∪ {x}`. -/
@@ -139,7 +139,7 @@ theorem close_fv_in_outer_dom
   · exact hz_outer
   · exact absurd (Finset.mem_singleton.mp hz_x ▸ hz) (Exp.close_var_not_fvar x Ke)
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Locally-closed-after-α-rename: if `Ke` is locally closed, so is its
 opening of `close x` at any fresh `y`. Used twice per binder case in
 `bin_log_related_lam_step` / `_fix_step`. -/
@@ -361,7 +361,7 @@ end Soundness
 
 section RefinesSound
 open MeasureTheory
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {GF : BundledGFunctors} [RefinesPreGS rT GF]
 
 /-- The bool-equality value relation extracted from `lrel_bool`. -/

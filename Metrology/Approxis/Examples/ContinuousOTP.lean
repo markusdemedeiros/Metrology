@@ -24,7 +24,7 @@ open Iris Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 namespace ContinuousOTP
 
-variable {rT : Type} [ProbLangℝ rT]
+variable {rT : Type} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-- The LHS program: sample a uniform key `k`, output `frac (m + k)`. -/
@@ -54,7 +54,7 @@ the combiner `frac (m + ·)` preserves `unifUnit`. -/
 theorem otp_refines (m : rT)
     (hmp : MeasureTheory.MeasurePreserving
       (fun r : rT => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
-      (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT))) :
+      (LawfulProbLangℝ.unifUnit (T := rT)) (LawfulProbLangℝ.unifUnit (T := rT))) :
     ⊢@{IProp GF} refines (⊤ : CoPset)
       (otp_enc m) (otp_ideal) lrel_real := by
   simp only [otp_enc, otp_ideal, Exp.close, Exp.closeRec, ↓reduceIte]
@@ -87,8 +87,8 @@ Couple the ideal sample against the encryption's key using the *inverse* rotatio
 fresh uniform key, given an inverse `g` for the combiner on the support. -/
 theorem otp_refines_rev (m : rT) (g : rT → rT)
     (hmp : MeasureTheory.MeasurePreserving g
-      (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT)))
-    (hinv : ∀ r ∈ ProbLangℝ.unifUnitSupport,
+      (LawfulProbLangℝ.unifUnit (T := rT)) (LawfulProbLangℝ.unifUnit (T := rT)))
+    (hinv : ∀ r ∈ LawfulProbLangℝ.unifUnitSupport,
       ProbLangℝ.realFrac (ProbLangℝ.realAdd m (g r)) = r) :
     ⊢@{IProp GF} refines (⊤ : CoPset)
       (otp_ideal) (otp_enc m) lrel_real := by
@@ -186,7 +186,7 @@ end Adequacy
 At the concrete model `ApproxisFunctor ℝ` every ghost-state hypothesis is
 discharged, leaving a self-contained theorem about `ℝ`-valued programs. -/
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- On value configurations, `adequacyRel otpφ` *is* equality: both sides are the
 same real literal. This is what lets the two couplings be eliminated. -/
 theorem adequacyRel_otpφ_subset_eq :
@@ -263,16 +263,16 @@ resources. -/
 
 section Typing
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem otp_ideal_typed : Typed (rT := rT) Tctx.empty otp_ideal .real := .urand
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem otpLam_typed (m : rT) :
     Typed Tctx.empty (otpLam m) (.arrow .real .real) := by
   refine Typed.lam ∅ (fun x _ => ?_)
   exact .unop_real (.binop_real .lit_real (.fvar (by simp [Tctx.insert])) rfl) rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- `otp_enc m` reads as `(fun k, frac (m + k)) urand`. -/
 theorem otp_enc_typed (m : rT) :
     Typed Tctx.empty (otp_enc m) .real :=

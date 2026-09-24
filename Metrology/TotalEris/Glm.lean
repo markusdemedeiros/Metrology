@@ -20,7 +20,7 @@ open scoped ENNReal
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 namespace TotalEris
 
@@ -102,7 +102,7 @@ theorem execStutter_mono_pred {P Q : ENNReal → IProp GF} {ε : ENNReal} :
 
 variable [ErisWpGS (rT := rT) GF]
 
-abbrev GlmState (rT : Type _) [ProbLangℝ rT] : Type _ := Cfg rT × ENNReal
+abbrev GlmState (rT : Type _) [LawfulProbLangℝ rT] : Type _ := Cfg rT × ENNReal
 
 instance : COFE (GlmState rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (GlmState rT) := ⟨id⟩

@@ -15,7 +15,7 @@ open scoped AppGS
 namespace ProbLang
 namespace TotalEris
 
-variable {rT : Type _} [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [LawfulProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-- `twp_bind` auto-discovers the evaluation context `K = [.fst]` and refocuses the

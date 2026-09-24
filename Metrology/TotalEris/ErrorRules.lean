@@ -14,7 +14,7 @@ open scoped ENNReal AppGS
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 -- TODO: Move me
 def Exp.asLit (default : ℝ≥0∞) (value : BaseLit rT → ℝ≥0∞) : Exp rT → ℝ≥0∞ :=
@@ -272,9 +272,9 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
 theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     {ε₂ : rT → ENNReal} {Φ : Val rT → IProp GF}
     (hε₂ : Measurable ε₂) (Hbd : ∀ r, ε₂ r ≤ 1)
-    (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit)) ≤ ε₁) :
+    (HInt : (∫⁻ r, ε₂ r ∂(LawfulProbLangℝ.unifUnit)) ≤ ε₁) :
     iprop(↯ε₁) ⊢
-      iprop((∀ r, (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
+      iprop((∀ r, (⌜r ∈ LawfulProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
       tglWp E pl(urand) Φ) := by
   -- `urand` is a non-value, head-reducible at every state (`primStep = uniformReal`).
   have Hnv : (pl(urand) : Exp rT).toVal? = none := solve_not_value
@@ -282,7 +282,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     fun σ₁ => show Cfg.uniformReal σ₁ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
   -- The real-literal injection: `primStep = uniformReal = unifUnit.map inj`, and `inj` embeds.
   have hps : ∀ σ₁ : State rT, primStep (⟨pl(urand), σ₁⟩ : Cfg rT)
-      = (ProbLangℝ.unifUnit).map (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
+      = (LawfulProbLangℝ.unifUnit).map (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => primStep_eq_headStep (Exp.decompItem_none_of_lc_headReducible (by is_lc) (hhead σ₁))
   have hg : ∀ σ₁ : State rT, Measurable (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) :=
     fun σ₁ => Cfg.measurable_iff.mpr
@@ -298,14 +298,14 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
         (Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding))
   -- Reach predicate `R` (the real-literal image) and per-outcome credit `f`.
   set R : State rT → Cfg rT → Prop :=
-    fun σ₁ ρ => ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT) ∧ r ∈ ProbLangℝ.unifUnitSupport
+    fun σ₁ ρ => ∃ r : rT, ρ = (⟨.lit (.real r), σ₁⟩ : Cfg rT) ∧ r ∈ LawfulProbLangℝ.unifUnitSupport
     with hR
   set f : Cfg rT → ENNReal := fun ρ => match ρ.expr with
     | .lit (.real r) => ε₂ r
     | _ => 0 with hf
   -- The reach set is exactly the image of the injection (used by `hrmeas` and `hpgl`).
   have hrange : ∀ σ₁ : State rT, {ρ : Cfg rT | R σ₁ ρ}
-      = (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) '' ProbLangℝ.unifUnitSupport := fun σ₁ => by
+      = (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) '' LawfulProbLangℝ.unifUnitSupport := fun σ₁ => by
     ext ρ; simp only [Set.mem_image, Set.mem_setOf_eq, hR]
     exact ⟨fun ⟨r, h, hr⟩ => ⟨r, hr, h.symm⟩, fun ⟨r, hr, h⟩ => ⟨r, h.symm, hr⟩⟩
   -- Discharge the six `twp_glm_spend` obligations, in signature order.
@@ -319,14 +319,14 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
     fun σ₁ => reducible_of_headReducible (by is_lc) (hhead σ₁)
   have hrmeas : ∀ σ₁ : State rT, MeasurableSet {ρ : Cfg rT | R σ₁ ρ} := fun σ₁ => by
     rw [hrange σ₁]
-    exact (hgemb σ₁).measurableSet_image.mpr ProbLangℝ.unifUnitSupportMeasurable
+    exact (hgemb σ₁).measurableSet_image.mpr LawfulProbLangℝ.unifUnitSupportMeasurable
   -- `Pgl 0`: the diffuse `uniformReal` is concentrated on the (co-null) image.
   have hpgl : ∀ σ₁ : State rT, Pgl 0 (R σ₁) (primStep ⟨Exp.urand, σ₁⟩) := fun σ₁ => by
     apply Pgl.of_concentrated
     rw [hps σ₁, hrange σ₁]
     exact concentratedOn_map (hg σ₁)
-      ((hgemb σ₁).measurableSet_image.mpr ProbLangℝ.unifUnitSupportMeasurable)
-      ProbLangℝ.unifUnitIsConcentrated
+      ((hgemb σ₁).measurableSet_image.mpr LawfulProbLangℝ.unifUnitSupportMeasurable)
+      LawfulProbLangℝ.unifUnitIsConcentrated
   -- Integral budget: push `f` through the real-literal map onto `unifUnit`, then `HInt`.
   have hint : ∀ σ₁ : State rT,
       (∫⁻ ρ, f ρ ∂(primStep ⟨Exp.urand, σ₁⟩)) ≤ ε₁ := fun σ₁ => by
@@ -351,13 +351,13 @@ contradictory). -/
 theorem twp_urand_exp' {E : CoPset} {ε₁ : ENNReal}
     {ε₂ : rT → ENNReal} {Φ : Val rT → IProp GF}
     (hε₂ : Measurable ε₂)
-    (HInt : (∫⁻ r, ε₂ r ∂(ProbLangℝ.unifUnit)) ≤ ε₁) :
+    (HInt : (∫⁻ r, ε₂ r ∂(LawfulProbLangℝ.unifUnit)) ≤ ε₁) :
     iprop(↯ε₁) ⊢
-      iprop((∀ r, (⌜r ∈ ProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
+      iprop((∀ r, (⌜r ∈ LawfulProbLangℝ.unifUnitSupport⌝ ∗ ↯(ε₂ r)) -∗ Φ (.real r)) -∗
       tglWp E pl(urand) Φ) := by
   iintro Herr Hcont
   -- Clamping shrinks the integrand pointwise, so the budget `HInt` survives.
-  have hint : (∫⁻ r, min (ε₂ r) 1 ∂(ProbLangℝ.unifUnit)) ≤ ε₁ :=
+  have hint : (∫⁻ r, min (ε₂ r) 1 ∂(LawfulProbLangℝ.unifUnit)) ≤ ε₁ :=
     (MeasureTheory.lintegral_mono fun r => min_le_left _ _).trans HInt
   iapply (twp_urand_exp (hε₂.min measurable_const)
     (fun r => min_le_right _ _) hint) $$ Herr

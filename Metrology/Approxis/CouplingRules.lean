@@ -22,7 +22,7 @@ open scoped AppGS
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT]
+variable {rT : Type _} [ProbLang.LawfulProbLangℝ rT]
 
 /-! ## Timeless instances for tape predicates -/
 

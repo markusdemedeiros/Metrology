@@ -97,7 +97,7 @@ section conservation
 
 open MeasureTheory in
 theorem BNEHalfCredit_lintegral {F : Bool → ℝ≥0∞} :
-    ∫⁻ r, BNEHalfCredit F r ∂(ProbLangℝ.unifUnit) = BNEHalfCreditV F := by
+    ∫⁻ r, BNEHalfCredit F r ∂(LawfulProbLangℝ.unifUnit) = BNEHalfCreditV F := by
   have hlift : LiftParity F = fun n => if n % 2 = 0 then F false else F true :=
     funext (LiftParity_eq_ite F)
   have hexphalf : ∫ r in (0 : ℝ)..(1 / 2), Real.exp (-r) = 1 - Real.exp (-1 / 2) := by
@@ -246,7 +246,7 @@ theorem measurable_fairCoinCredit (F : Bool → ℝ≥0∞) : Measurable (FairCo
 
 open MeasureTheory in
 theorem FairCoinCredit_lintegral (F : Bool → ℝ≥0∞) :
-    ∫⁻ r, FairCoinCredit F r ∂(ProbLangℝ.unifUnit) = FairCoinCreditV F := by
+    ∫⁻ r, FairCoinCredit F r ∂(LawfulProbLangℝ.unifUnit) = FairCoinCreditV F := by
   have hsetA : Set.Iic (1 / 2 : ℝ) ∩ Set.Icc (0 : ℝ) 1 = Set.Icc 0 (1 / 2) := by
     ext r; simp only [Set.mem_inter_iff, Set.mem_Iic, Set.mem_Icc]
     exact ⟨fun ⟨h2, h1, _⟩ => ⟨h1, h2⟩, fun ⟨h1, h2⟩ => ⟨h2, h1, by linarith⟩⟩

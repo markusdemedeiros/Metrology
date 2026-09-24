@@ -26,7 +26,7 @@ theorem intOfNat_emod_two_eq_zero {n : ℕ} (hn : n % 2 = 0) : Int.ofNat n % 2 =
 theorem intOfNat_emod_two_eq_one {n : ℕ} (hn : n % 2 = 1) : Int.ofNat n % 2 = 1 := by
   simp only [Int.ofNat_eq_natCast]; omega
 
-theorem mem_unifUnitSupport_real_le {r : ℝ} (hr : r ∈ ProbLangℝ.unifUnitSupport) :
+theorem mem_unifUnitSupport_real_le {r : ℝ} (hr : r ∈ LawfulProbLangℝ.unifUnitSupport) :
     0 ≤ r ∧ r ≤ 1 :=
   ⟨(mem_unifUnitSupport_real.mp hr).1.le, (mem_unifUnitSupport_real.mp hr).2.le⟩
 
@@ -249,7 +249,7 @@ section conservation
 
 open MeasureTheory in
 theorem RealDecrTrialCredit_lintegral {F : ℕ → ℝ≥0∞} {N : ℕ} {x : ℝ} (hx : 0 ≤ x ∧ x ≤ 1) :
-    ∫⁻ y, RealDecrTrialCredit F N x y ∂(ProbLangℝ.unifUnit) =
+    ∫⁻ y, RealDecrTrialCredit F N x y ∂(LawfulProbLangℝ.unifUnit) =
       RealDecrTrialCreditV F N x := by
   obtain ⟨hx0, hx1⟩ := hx
   have hset2 : Set.Ici x ∩ Set.Icc (0 : ℝ) 1 = Set.Icc x 1 := by
@@ -292,7 +292,7 @@ theorem RealDecrTrialCredit_lintegral {F : ℕ → ℝ≥0∞} {N : ℕ} {x : �
 open MeasureTheory in
 theorem RealDecrTrialCreditAmp_lintegral {F : ℕ → ℝ≥0∞} {N : ℕ} {x : ℝ} {c : ℝ≥0∞}
     (hx : 0 ≤ x ∧ x ≤ 1) :
-    ∫⁻ y, RealDecrTrialCreditAmp F N x c y ∂(ProbLangℝ.unifUnit) =
+    ∫⁻ y, RealDecrTrialCreditAmp F N x c y ∂(LawfulProbLangℝ.unifUnit) =
       RealDecrTrialCreditV F N x + c * ENNReal.ofReal x := by
   obtain ⟨hx0, hx1⟩ := hx
   have hset : Set.Iio x ∩ Set.Icc (0 : ℝ) 1 = Set.Ico 0 x := by

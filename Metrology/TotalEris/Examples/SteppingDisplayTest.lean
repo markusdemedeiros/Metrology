@@ -48,7 +48,7 @@ omitting the local hypothesis block, so display-golden values stay focused. -/
 elab "show_goal_render" : tactic => do
   logInfo m!"{← getMainTarget}"
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 variable (E : CoPset) (Φ : Val rT → IProp GF)
 

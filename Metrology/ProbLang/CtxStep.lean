@@ -14,24 +14,24 @@ namespace ProbLang
 
 variable {rT : Type _}
 
-@[simp] def Ectx.fillCfg [ProbLangℝ rT] (K : Ectx rT) (ρ : Cfg rT) : Cfg rT :=
+@[simp] def Ectx.fillCfg [LawfulProbLangℝ rT] (K : Ectx rT) (ρ : Cfg rT) : Cfg rT :=
   ⟨K.fill ρ.expr, ρ.state⟩
 
-theorem Ectx.fillCfg_comp [ProbLangℝ rT] (K1 K2 : Ectx rT) :
+theorem Ectx.fillCfg_comp [LawfulProbLangℝ rT] (K1 K2 : Ectx rT) :
     (K1.comp K2).fillCfg = K1.fillCfg ∘ K2.fillCfg := by
   funext ⟨e, σ⟩; simp [Ectx.fill_comp]
 
 @[simp]
-theorem Ectx.fillCfg_empty [ProbLangℝ rT] : Ectx.fillCfg ([] : Ectx rT) = id := by
+theorem Ectx.fillCfg_empty [LawfulProbLangℝ rT] : Ectx.fillCfg ([] : Ectx rT) = id := by
   funext ⟨e, σ⟩; simp [Ectx.fillCfg, Ectx.fill]
 
-theorem Ectx.fillCfg_injective [ProbLangℝ rT] (K : Ectx rT) :
+theorem Ectx.fillCfg_injective [LawfulProbLangℝ rT] (K : Ectx rT) :
     Function.Injective K.fillCfg := by
   rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ h
   simpa [Cfg.mk.injEq, Ectx.fill_injective K |>.eq_iff] using h
 
 @[fun_prop]
-theorem Ectx.fillCfg.measurable [ProbLangℝ rT] (K : Ectx rT) :
+theorem Ectx.fillCfg.measurable [LawfulProbLangℝ rT] (K : Ectx rT) :
     Measurable K.fillCfg := by
   rw [Cfg.measurable_iff]
   exact ⟨Exp.Ectx_fill.measurable.comp (measurable_const.prodMk Cfg.measurable_expr),
@@ -42,8 +42,8 @@ hole is a measurable embedding `Exp rT → Exp rT`: it is the corresponding `Exp
 constructor embedding precomposed with inserting `e` into the appropriate slot
 (the remaining slots being constants). Each constant-insertion is itself a
 measurable embedding because `Exp rT` has measurable singletons (from
-`ProbLangℝ.toMeasurableEq`). -/
-theorem EctxItem.fillItem.measurableEmbedding [ProbLangℝ rT] (Ki : EctxItem rT) :
+`LawfulProbLangℝ.toMeasurableEq`). -/
+theorem EctxItem.fillItem.measurableEmbedding [LawfulProbLangℝ rT] (Ki : EctxItem rT) :
     MeasurableEmbedding Ki.fillItem := by
   cases Ki with
   | appL v2 => exact Exp.app.measurableEmbedding.comp (measurableEmbedding_prod_mk_right _)
@@ -78,14 +78,14 @@ theorem EctxItem.fillItem.measurableEmbedding [ProbLangℝ rT] (Ki : EctxItem rT
 `Exp rT → Exp rT`. By induction on `K` (as a `foldl` of per-item fills): the
 empty context is the identity and `K = Ki :: K'` is `K'.fill ∘ Ki.fillItem`, a
 composition of measurable embeddings. -/
-theorem Ectx.fill.measurableEmbedding [ProbLangℝ rT] (K : Ectx rT) :
+theorem Ectx.fill.measurableEmbedding [LawfulProbLangℝ rT] (K : Ectx rT) :
     MeasurableEmbedding K.fill := by
   induction K with
   | nil => exact MeasurableEmbedding.id
   | cons Ki K ih => exact ih.comp (EctxItem.fillItem.measurableEmbedding Ki)
 
 /-- `Cfg rT` is measurably isomorphic to `Exp rT × State rT`. -/
-def Cfg.measurableEquivProd [ProbLangℝ rT] : Cfg rT ≃ᵐ Exp rT × State rT where
+def Cfg.measurableEquivProd [LawfulProbLangℝ rT] : Cfg rT ≃ᵐ Exp rT × State rT where
   toFun ρ := (ρ.expr, ρ.state)
   invFun p := ⟨p.1, p.2⟩
   left_inv _ := rfl
@@ -96,7 +96,7 @@ def Cfg.measurableEquivProd [ProbLangℝ rT] : Cfg rT ≃ᵐ Exp rT × State rT 
 /-- `K.fillCfg` is a measurable embedding: under the measurable isomorphism
 `Cfg rT ≃ᵐ Exp rT × State rT` it is `Prod.map K.fill id`, a composition of
 measurable embeddings. -/
-theorem Ectx.fillCfg.measurableEmbedding [ProbLangℝ rT] (K : Ectx rT) :
+theorem Ectx.fillCfg.measurableEmbedding [LawfulProbLangℝ rT] (K : Ectx rT) :
     MeasurableEmbedding K.fillCfg := by
   have h : K.fillCfg
       = Cfg.measurableEquivProd.symm ∘ Prod.map K.fill id ∘ Cfg.measurableEquivProd := by
@@ -113,21 +113,21 @@ measurable embedding (`Ectx.fill.measurableEmbedding`, built per-constructor fro
 the `Exp` constructor embeddings). This is the single remaining fact behind the
 countability-free `glm'_bind` (the transported support predicate
 `K.fillCfg '' {R}` must be measurable). -/
-theorem Ectx.measurableSet_fillCfg_image [ProbLangℝ rT] (K : Ectx rT)
+theorem Ectx.measurableSet_fillCfg_image [LawfulProbLangℝ rT] (K : Ectx rT)
     {S : Set (Cfg rT)} (hS : MeasurableSet S) : MeasurableSet (K.fillCfg '' S) :=
   (Ectx.fillCfg.measurableEmbedding K).measurableSet_image' hS
 
-@[simp] def EctxItem.fillItemCfg [ProbLangℝ rT] (K : EctxItem rT) (ρ : Cfg rT) : Cfg rT :=
+@[simp] def EctxItem.fillItemCfg [LawfulProbLangℝ rT] (K : EctxItem rT) (ρ : Cfg rT) : Cfg rT :=
   ⟨K.fillItem ρ.expr, ρ.state⟩
 
-theorem Ectx.fillItemCfg_injective [ProbLangℝ rT] (K : EctxItem rT) :
+theorem Ectx.fillItemCfg_injective [LawfulProbLangℝ rT] (K : EctxItem rT) :
     Function.Injective K.fillItemCfg  := by
   rintro ⟨e1, σ1⟩ ⟨e2, σ2⟩ ha
   simp only [EctxItem.fillItemCfg, Cfg.mk.injEq] at ha
   have _ := @Ectx.fillItem_injective rT K e1 e2
   grind
 
-def primStep [ProbLangℝ rT] (cfg : Cfg rT) : Measure (Cfg rT) :=
+def primStep [LawfulProbLangℝ rT] (cfg : Cfg rT) : Measure (Cfg rT) :=
   let (K, e') := cfg.expr.decomp
   (headStep ⟨e', cfg.state⟩).map K.fillCfg
 
@@ -144,7 +144,7 @@ measurability to joint measurability of:
 - the "headStep input" map `cfg ↦ ⟨cfg.expr.decomp.2, cfg.state⟩` composed
   with `headStep.measurable`. -/
 @[fun_prop]
-theorem primStep.measurable [ProbLangℝ rT] : Measurable (primStep : Cfg rT → Measure (Cfg rT)) := by
+theorem primStep.measurable [LawfulProbLangℝ rT] : Measurable (primStep : Cfg rT → Measure (Cfg rT)) := by
   -- Source kernel `k : Cfg rT → Measure (Cfg rT)`.
   have hk_inner : Measurable
       (fun cfg : Cfg rT => (Cfg.mk cfg.expr.decomp.2 cfg.state : Cfg rT)) := by
@@ -169,23 +169,23 @@ theorem primStep.measurable [ProbLangℝ rT] : Measurable (primStep : Cfg rT →
       headStep (Cfg.mk cfg.expr.decomp.2 cfg.state)) hk) := inferInstance
   exact Measure.measurable_map_uncurry hh hk
 
-def primStepKernel [ProbLangℝ rT] : Kernel (Cfg rT) (Cfg rT) where
+def primStepKernel [LawfulProbLangℝ rT] : Kernel (Cfg rT) (Cfg rT) where
   measurable' := primStep.measurable
   toFun := primStep
 
 -- -> Use Reducible
 @[discrete]
-abbrev Discrete.Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+abbrev Discrete.Reducible [LawfulProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ∃ ρ : Cfg rT, 0 < primStep ⟨e, σ⟩ {ρ}
 
-abbrev Reducible [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+abbrev Reducible [LawfulProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   primStep ⟨e, σ⟩ ≠ 0
 
 /-- One atom is already enough to make the step measure nonzero. The converse is
 `Reducible.toDiscrete`, which needs the fragment condition rather than
 countability. -/
 @[discrete]
-theorem Discrete.Reducible.toReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem Discrete.Reducible.toReducible [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (h : Discrete.Reducible e σ) : _root_.ProbLang.Reducible e σ := by
   obtain ⟨ρ, hρ⟩ := h
   intro hz
@@ -194,7 +194,7 @@ theorem Discrete.Reducible.toReducible [ProbLangℝ rT] {e : Exp rT} {σ : State
 
 /-! ## Values can't step -/
 
-theorem val_stuck [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem val_stuck [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (h : primStep ⟨e, σ⟩ ≠ 0) : ¬e.isValue := by
   simp only [primStep] at h
   set d := e.decomp with hd
@@ -206,7 +206,7 @@ theorem val_stuck [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
 -- use val_stuck (old proof deleted)
 /-- `primStep` is a sub-probability measure: total mass is at most 1.
 Follows from `headStep_univ_le_one` via `Measure.map` preserving total mass. -/
-theorem primStep_univ_le_one [ProbLangℝ rT] (ρ : Cfg rT) : (primStep ρ) Set.univ ≤ 1 := by
+theorem primStep_univ_le_one [LawfulProbLangℝ rT] (ρ : Cfg rT) : (primStep ρ) Set.univ ≤ 1 := by
   obtain ⟨e, σ⟩ := ρ
   simp only [primStep]
   have Hmeas : Measurable e.decomp.1.fillCfg := by measurability
@@ -217,7 +217,7 @@ theorem primStep_univ_le_one [ProbLangℝ rT] (ρ : Cfg rT) : (primStep ρ) Set.
 analogue of `prim_step_mass_discrete`: `Reducible e σ` means `primStep ⟨e,σ⟩ ≠ 0`, which
 forces the underlying `headStep` to be nonzero, hence (by `head_step_mass`) a probability
 measure; pushing forward under the measurable `fillCfg` preserves total mass `1`. -/
-theorem prim_step_mass [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem prim_step_mass [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (hred : Reducible e σ) : IsProbabilityMeasure (primStep ⟨e, σ⟩) := by
   have hmeas : Measurable e.decomp.1.fillCfg := by measurability
   have hhs : headStep ⟨e.decomp.2, σ⟩ ≠ 0 := by
@@ -234,7 +234,7 @@ theorem prim_step_mass [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
 head: every focusing position is either a non-value (focus continues) or a genuine
 value. The only way this fails is a value-*shaped* but non-closed subterm (e.g. a
 non-closed `lam`/`fix`); local closedness rules that out. -/
-theorem Exp.decompItem_none_of_lc_headReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem Exp.decompItem_none_of_lc_headReducible [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (he : e.IsLocallyClosed) (hred : headStep ⟨e, σ⟩ ≠ 0) : e.decompItem = none := by
   cases H : e.decompItem with
   | none => rfl
@@ -250,13 +250,13 @@ theorem Exp.decompItem_none_of_lc_headReducible [ProbLangℝ rT] {e : Exp rT} {�
 /-- When `e` is a head-redex (decomposition does not focus, `decompItem e = none`),
 `primStep` coincides with `headStep`. This is the precise hypothesis (weaker than full
 local closedness — e.g. the branches of an `if` need not be closed). -/
-theorem primStep_eq_headStep [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem primStep_eq_headStep [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (hdec : e.decompItem = none) :
     primStep ⟨e, σ⟩ = headStep ⟨e, σ⟩ := by
   suffices hd : e.decomp = ([], e) by simp [primStep, hd]
   unfold Exp.decomp; rw [hdec]
 
-theorem reducible_of_headReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem reducible_of_headReducible [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (he : e.IsLocallyClosed)
     (h : HeadReducible e σ) : Reducible e σ := by
   unfold Reducible
@@ -265,7 +265,7 @@ theorem reducible_of_headReducible [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
 
 /-! ## Context fill interaction with primStep -/
 
-theorem primStep_fill [ProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : State rT} (hv : ¬e.isValue) :
+theorem primStep_fill [LawfulProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : State rT} (hv : ¬e.isValue) :
     primStep ⟨K.fill e, σ⟩ = (primStep ⟨e, σ⟩).map (fun ρ => ⟨K.fill ρ.expr, ρ.state⟩) := by
   simp only [primStep]
   set d := e.decomp with hd
@@ -278,7 +278,7 @@ theorem primStep_fill [ProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : State rT
   funext ⟨e', σ'⟩
   simp [Function.comp, fill_app]
 
-theorem primStep_fillItem [ProbLangℝ rT]
+theorem primStep_fillItem [LawfulProbLangℝ rT]
     (Ki : EctxItem rT) {e : Exp rT} {σ : State rT} (hv : ¬e.isValue) :
     primStep ⟨Ki.fillItem e, σ⟩ = (primStep ⟨e, σ⟩).map (fun ρ => ⟨Ki.fillItem ρ.expr, ρ.state⟩) := by
   have : Ki.fillItem e = Ectx.fill [Ki] e := by simp [Ectx.fill, List.foldl, flip]
@@ -286,7 +286,7 @@ theorem primStep_fillItem [ProbLangℝ rT]
 
 -- TODO: This generalized to continuous, though really I imagine it can't be used in any continuous way.
 -- I won't mark it as discrete, but I'd guess this should really be changed to be primStep_fill
-theorem primStep_fill_singleton [ProbLangℝ rT] {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+theorem primStep_fill_singleton [LawfulProbLangℝ rT] {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (hv : ¬e1.isValue) : primStep ⟨e1, σ1⟩ {⟨e2, σ2⟩} = primStep ⟨K.fill e1, σ1⟩ {⟨K.fill e2, σ2⟩}
     := by
   rw [primStep_fill hv, Measure.map_apply ?G1 ?G2]
@@ -296,7 +296,7 @@ theorem primStep_fill_singleton [ProbLangℝ rT] {K : Ectx rT} {e1 e2 : Exp rT} 
   ext ⟨e', σ'⟩
   simp [(Ectx.fill_injective K).eq_iff]
 
-theorem primStep_fill_pos [ProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : State rT}
+theorem primStep_fill_pos [LawfulProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : State rT}
     (h : primStep ⟨e, σ⟩ ≠ 0) : primStep ⟨K.fill e, σ⟩ ≠ 0 := by
   by_cases hk : e.isValue
   · exact val_stuck h hk |>.elim
@@ -307,7 +307,7 @@ theorem primStep_fill_pos [ProbLangℝ rT] {K : Ectx rT} {e : Exp rT} {σ : Stat
     have := H ▸ Measure.map_apply hm .univ
     simpa using this.symm
 
-theorem primStep_fill_inv [ProbLangℝ rT]  {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
+theorem primStep_fill_inv [LawfulProbLangℝ rT]  {K : Ectx rT} {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (hv : ¬e1.isValue) (h : 0 < primStep ⟨K.fill e1, σ1⟩ {⟨e2, σ2⟩}) :
     ∃ e2', e2 = K.fill e2' ∧ 0 < primStep ⟨e1, σ1⟩ {⟨e2', σ2⟩} := by
   rw [primStep_fill hv] at h
@@ -317,51 +317,51 @@ theorem primStep_fill_inv [ProbLangℝ rT]  {K : Ectx rT} {e1 e2 : Exp rT} {σ1 
 
 /-! ## Reducible: fill interaction -/
 
-theorem Reducible.fill [ProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
+theorem Reducible.fill [LawfulProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hred : Reducible e σ) : Reducible (K.fill e) σ :=
   primStep_fill_pos hred
 
-theorem Reducible.of_fill [ProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
+theorem Reducible.of_fill [LawfulProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hv : ¬e.isValue) (hred : Reducible (K.fill e) σ) : Reducible e σ := by
   unfold Reducible at hred ⊢
   rw [primStep_fill hv] at hred
   exact fun h0 => hred (by rw [h0]; simp)
 
-theorem Reducible.of_head [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem Reducible.of_head [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (he : e.IsLocallyClosed) (hred : HeadReducible e σ) :
     Reducible e σ := reducible_of_headReducible he hred
 
-theorem Reducible.of_head_fill [ProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
+theorem Reducible.of_head_fill [LawfulProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (he : e.IsLocallyClosed)
     (hred : HeadReducible e σ) : Reducible (K.fill e) σ :=
   Reducible.of_head he hred |>.fill K
 
 /-! ## Irreducible: contrapositives -/
 
-theorem irreducible_fill [ProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
+theorem irreducible_fill [LawfulProbLangℝ rT] (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hv : ¬e.isValue) (hirr : ¬ Reducible e σ) : ¬ Reducible (K.fill e) σ :=
   fun hr => hirr (hr.of_fill K hv)
 
-theorem irreducible_fill_inv [ProbLangℝ rT]
+theorem irreducible_fill_inv [LawfulProbLangℝ rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (hirr : ¬ Reducible (K.fill e) σ) : ¬ Reducible e σ :=
   fun hred => hirr (hred.fill K)
 
-theorem Reducible.headStep_zero [ProbLangℝ rT] {e : Exp rT} {σ : State rT}
+theorem Reducible.headStep_zero [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (he : e.IsLocallyClosed) (hirr : ¬ Reducible e σ) :
     headStep ⟨e, σ⟩ = 0 := by
   by_contra h; exact hirr <| reducible_of_headReducible he h
 
 /-! ## Context decomposition -/
 
-theorem head_ctx_step_val_ectx [ProbLangℝ rT] (K : Ectx rT) (e : Exp rT) (σ : State rT)
+theorem head_ctx_step_val_ectx [LawfulProbLangℝ rT] (K : Ectx rT) (e : Exp rT) (σ : State rT)
     (hstep : HeadReducible (K.fill e) σ) : e.isValueR ∨ K = [] := by
   rcases List.eq_nil_or_snoc K with rfl | ⟨K'', Ki, rfl⟩
   · exact .inr rfl
   · simp only [Ectx.fill_snoc] at hstep
     exact .inl (Ectx.fill_isValueR (head_ctx_step_val hstep))
 
-theorem step_by_val [ProbLangℝ rT] (K' K_redex : Ectx rT) (e1' e1_redex : Exp rT) (σ : State rT)
+theorem step_by_val [LawfulProbLangℝ rT] (K' K_redex : Ectx rT) (e1' e1_redex : Exp rT) (σ : State rT)
     (hfill : K'.fill e1' = K_redex.fill e1_redex)
     (hv : ¬e1'.isValueR)
     (hstep : HeadReducible e1_redex σ) :
@@ -381,12 +381,12 @@ theorem step_by_val [ProbLangℝ rT] (K' K_redex : Ectx rT) (e1' e1_redex : Exp 
       obtain ⟨K'', hK''⟩ := ih K_redex_rest e1_redex (Ectx.fillItem_injective hfill) hstep
       exact ⟨K'', by rw [hK'']; simp [Ectx.comp, List.append_assoc]⟩
 
-theorem not_headReducible_iff [ProbLangℝ rT] {e : Exp rT} {σ : State rT} :
+theorem not_headReducible_iff [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT} :
     (¬ HeadReducible e σ) ↔ (headStep ⟨e, σ⟩ = 0) := by
   push Not
   rfl
 
-theorem head_redex_unique [ProbLangℝ rT] (K K' : Ectx rT) (e e' : Exp rT) (σ : State rT)
+theorem head_redex_unique [LawfulProbLangℝ rT] (K K' : Ectx rT) (e e' : Exp rT) (σ : State rT)
     (hfill : K.fill e = K'.fill e') (hred  : HeadReducible e σ) (hred' : HeadReducible e' σ) :
     -- FIXME: Make this just be K = K'
     K = K'.comp [] ∧ e = e' := by
@@ -405,7 +405,7 @@ theorem head_redex_unique [ProbLangℝ rT] (K K' : Ectx rT) (e e' : Exp rT) (σ 
 /-- Forward direction of `prim_step_iff`: any possible `primStep` result arises from a
 head step at the decomposition redex. Needs **no** local closedness (decomposition is
 always well-defined); only the reverse direction does. -/
-theorem prim_step_imp [ProbLangℝ rT]
+theorem prim_step_imp [LawfulProbLangℝ rT]
     {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     (h : Possible (⟨e2, σ2⟩ : Cfg rT) (primStep ⟨e1, σ1⟩)) :
     ∃ (K : Ectx rT) (e1' e2' : Exp rT),
@@ -421,10 +421,10 @@ theorem prim_step_imp [ProbLangℝ rT]
   exact ⟨K, e1', e2', Exp.decomp_fill hd.symm, heq.1, possible_iff_pos.mpr (heq.2 ▸ hpos)⟩
 
 /-- Countable-free version of `prim_step_iff_discrete`, stated with the
-measurability-free `Possible` predicate. Needs only `[ProbLangℝ rT]` (the
+measurability-free `Possible` predicate. Needs only `[LawfulProbLangℝ rT]` (the
 `MeasurableSingletonClass (Cfg rT)` that `map_singleton_pos`/`possible_iff_pos`
 want is derivable from it), not the full discrete structure. -/
-theorem prim_step_iff [ProbLangℝ rT]
+theorem prim_step_iff [LawfulProbLangℝ rT]
     {e1 e2 : Exp rT} {σ1 σ2 : State rT} (he1 : e1.IsLocallyClosed) :
     Possible (⟨e2, σ2⟩ : Cfg rT) (primStep ⟨e1, σ1⟩) ↔
     ∃ (K : Ectx rT) (e1' e2' : Exp rT),
@@ -441,10 +441,10 @@ theorem prim_step_iff [ProbLangℝ rT]
 
 /-! ## subRedexesAreValues -/
 
-def subRedexesAreValues [ProbLangℝ rT] (e : Exp rT) : Prop :=
+def subRedexesAreValues [LawfulProbLangℝ rT] (e : Exp rT) : Prop :=
   ∀ (K : Ectx rT) (e' : Exp rT), e = K.fill e' → ¬e'.isValue → K = []
 
-theorem ectxi_language_subRedexesAreValues [ProbLangℝ rT] {e : Exp rT}
+theorem ectxi_language_subRedexesAreValues [LawfulProbLangℝ rT] {e : Exp rT}
     (h : ∀ (Ki : EctxItem rT) (e' : Exp rT), e = Ki.fillItem e' → e'.isValue) :
     subRedexesAreValues e := by
   intro K e' hfill hv
@@ -455,10 +455,10 @@ theorem ectxi_language_subRedexesAreValues [ProbLangℝ rT] {e : Exp rT}
 
 /-! ## notStuck_discrete / stuck_discrete -/
 
-def notStuck [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+def notStuck [LawfulProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   e.isValue ∨ Reducible e σ
 
-theorem NotStuck.of_fill [ProbLangℝ rT]
+theorem NotStuck.of_fill [LawfulProbLangℝ rT]
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (h : notStuck (K.fill e) σ) : notStuck e σ := by
   rcases h with hv | hred
@@ -466,13 +466,13 @@ theorem NotStuck.of_fill [ProbLangℝ rT]
   · exact if hv : e.isValue then .inl hv
     else .inr (hred.of_fill K hv)
 
-def stuck [ProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
+def stuck [LawfulProbLangℝ rT] (e : Exp rT) (σ : State rT) : Prop :=
   ¬ e.isValue ∧ ¬ Reducible e σ
 
-theorem stuck_iff_not_notStuck [ProbLangℝ rT] {e : Exp rT} {σ : State rT} :
+theorem stuck_iff_not_notStuck [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT} :
     stuck e σ ↔ ¬ notStuck e σ := by simp [stuck, notStuck]
 
-theorem Stuck.fill [ProbLangℝ rT] 
+theorem Stuck.fill [LawfulProbLangℝ rT] 
     (K : Ectx rT) {e : Exp rT} {σ : State rT}
     (h : stuck e σ) : stuck (K.fill e) σ :=
   ⟨fun hv => h.1 (Ectx.fill_isValue hv),
@@ -484,7 +484,7 @@ so its support is countable, hence measurable in the `MeasurableSingletonClass`
 space `Cfg rT`. Establishing the countable support countability-free is the
 remaining structural fact (it follows from the `headStep` atomicity enumeration
 `headStep_exists_support_of_ne_zero`). -/
-theorem measurableSet_primStep_support [ProbLangℝ rT] (e : Exp rT) (σ : State rT) :
+theorem measurableSet_primStep_support [LawfulProbLangℝ rT] (e : Exp rT) (σ : State rT) :
     MeasurableSet {ρ : Cfg rT | 0 < primStep ⟨e, σ⟩ {ρ}} := by
   -- `primStep` is a finite measure, so its set of positive-mass points (atoms) is
   -- countable (`Measure.countable_meas_level_set_pos`), hence measurable.
@@ -496,7 +496,7 @@ theorem measurableSet_primStep_support [ProbLangℝ rT] (e : Exp rT) (σ : State
     simpa only [id_eq, Set.setOf_eq_eq_singleton] using h
   exact hc.measurableSet
 
-theorem measurableSet_possible_support [ProbLangℝ rT] :
+theorem measurableSet_possible_support [LawfulProbLangℝ rT] :
     MeasurableSet {ρ | (fun σ₁ ρ ↦ Possible ρ (primStep (rT := rT) { expr := e₁, state := σ₁ })) σ₁ ρ} := by
   have hset : {ρ : Cfg rT | Possible ρ (primStep ⟨e₁, σ₁⟩)} = {ρ | 0 < primStep ⟨e₁, σ₁⟩ {ρ}} :=
     Set.ext fun ρ => possible_iff_pos
@@ -508,7 +508,7 @@ redex is not the diffuse sampler `urand`: it gives zero mass to the set of
 points it gives zero mass to. Transfers `headStep_atomic` through the
 injective pushforward `K.fillCfg` (so the co-support pulls back to `headStep`'s
 co-support, with no need for `fillCfg`-image measurability). -/
-theorem primStep_atomic [ProbLangℝ rT] (e : Exp rT) (σ : State rT)
+theorem primStep_atomic [LawfulProbLangℝ rT] (e : Exp rT) (σ : State rT)
     (hne : e.decomp.2 ≠ .urand) :
     IsAtomicSupport (primStep ⟨e, σ⟩) := by
   have hmeas : Measurable e.decomp.1.fillCfg := by measurability
@@ -558,7 +558,7 @@ null the whole space would be the co-support, which `IsAtomicSupport` says is
 null. Away from `urand` that atomicity is exactly `primStep_atomic`, so the
 fragment condition does all the work countability used to. -/
 @[discrete]
-theorem Reducible.toDiscrete [ProbLangℝ rT] [MeasurableSingletonClass rT]
+theorem Reducible.toDiscrete [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     {e : Exp rT} {σ : State rT} (hne : e.decomp.2 ≠ .urand)
     (h : _root_.ProbLang.Reducible e σ) : Discrete.Reducible e σ := by
   by_contra hcon
@@ -578,7 +578,7 @@ theorem Reducible.toDiscrete [ProbLangℝ rT] [MeasurableSingletonClass rT]
 `HeadStepSupport.pos` → `HeadReducible` → `Reducible` → `Discrete.Reducible` chain that
 every `rand` weakest-precondition rule would otherwise spell out in five lines. -/
 @[discrete]
-theorem Discrete.Reducible.of_headStepSupport [ProbLangℝ rT] [MeasurableSingletonClass rT]
+theorem Discrete.Reducible.of_headStepSupport [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     {e e' : Exp rT} {σ σ' : State rT} (h : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e', σ'⟩)
     (hlc : e.IsLocallyClosed) (hne : e.decomp.2 ≠ .urand := by no_urand)
     (hu : e ≠ .urand := by nofun) :
@@ -591,7 +591,7 @@ theorem Discrete.Reducible.of_headStepSupport [ProbLangℝ rT] [MeasurableSingle
 
 /-- **A head step witnesses head-reducibility.** -/
 @[discrete]
-theorem HeadReducible.of_headStepSupport [ProbLangℝ rT] [MeasurableSingletonClass rT]
+theorem HeadReducible.of_headStepSupport [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     {e e' : Exp rT} {σ σ' : State rT} (h : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e', σ'⟩)
     (hu : e ≠ .urand := by nofun) : HeadReducible e σ := fun hz => by
   have hpos := h.pos hu
@@ -603,7 +603,7 @@ moving, and for a head-reducible `e` a positive-mass primitive step *is* a head 
 packages `primStep_fill_inv` → `primStep_eq_headStep` → `Possible.headStepSupport`, which
 every spec-side `rand` rule performs on the step it is handed. -/
 @[discrete]
-theorem HeadStepSupport.of_primStep_fill [ProbLangℝ rT] [MeasurableSingletonClass rT]
+theorem HeadStepSupport.of_primStep_fill [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     {K : Ectx rT} {e e₀ e₂' : Exp rT} {σ σ₀ σ₂' : State rT}
     (hwit : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e₀, σ₀⟩) (hlc : e.IsLocallyClosed)
     (hstep : 0 < primStep (⟨K.fill e, σ⟩ : Cfg rT) {⟨e₂', σ₂'⟩})
@@ -617,7 +617,7 @@ theorem HeadStepSupport.of_primStep_fill [ProbLangℝ rT] [MeasurableSingletonCl
 
 /-- `Discrete.Reducible.of_headStepSupport`, then filled into an evaluation context. -/
 @[discrete]
-theorem Discrete.Reducible.of_headStepSupport_fill [ProbLangℝ rT] [MeasurableSingletonClass rT]
+theorem Discrete.Reducible.of_headStepSupport_fill [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     {e e' : Exp rT} {σ σ' : State rT} (K : Ectx rT)
     (h : HeadStepSupport (⟨e, σ⟩ : Cfg rT) ⟨e', σ'⟩) (hlc : e.IsLocallyClosed)
     (hne : e.decomp.2 ≠ .urand := by no_urand) (hu : e ≠ .urand := by nofun)

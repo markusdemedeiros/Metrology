@@ -10,7 +10,7 @@ namespace ProbLang
 open Cslib Exp
 
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-! ## Group A — Closed contexts and the `isClosed` predicate
 
@@ -63,7 +63,7 @@ binder bookkeeping is needed: `subst` is capture-free.
 -/
 
 /-- Finite substitution map from atoms to expressions. -/
-abbrev SubstMap (rT : Type _) [ProbLangℝ rT] := List (Var × Exp rT)
+abbrev SubstMap (rT : Type _) [LawfulProbLangℝ rT] := List (Var × Exp rT)
 
 namespace SubstMap
 
@@ -1183,7 +1183,7 @@ theorem HeadStepPred_iff_exists_support (e : Exp rT) (σ : State rT) :
       | randTapeNonposOther hz htape hzN =>
           exact ⟨_, .RandTapeNonposOtherS hz htape hzN⟩
       | urand =>
-          obtain ⟨r, hr⟩ := ProbLangℝ.unifUnitSupport_nonempty rT
+          obtain ⟨r, hr⟩ := LawfulProbLangℝ.unifUnitSupport_nonempty rT
           exact ⟨_, .UrandS (r := r) hr⟩
   · rintro ⟨ρ', hsupp⟩
     cases hsupp with

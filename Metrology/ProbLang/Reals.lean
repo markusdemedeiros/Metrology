@@ -5,7 +5,7 @@ public import Mathlib.MeasureTheory.Measure.Lebesgue.Basic
 public import Mathlib.MeasureTheory.Measure.Restrict
 public import Mathlib.MeasureTheory.Function.Floor
 
-/-! # The continuous `ProbLangℝ ℝ` instance -/
+/-! # The continuous `LawfulProbLangℝ ℝ` instance -/
 namespace ProbLang
 
 open MeasureTheory
@@ -13,7 +13,7 @@ open MeasureTheory
 
 /-- ProbLang's real parameter instantiated with `ℝ`, the continuous semantics.
 The measurable structure is the Borel σ-algebra; `unifUnit` is `Uniform[0,1]`. -/
-public noncomputable instance instProbLangℝReal : ProbLangℝ ℝ where
+public noncomputable instance instProbLangℝReal : LawfulProbLangℝ ℝ where
   -- `BEq`/`LawfulBEq` via classical decidable equality on `ℝ`.
   beq a b := decide (a = b)
   eq_of_beq h := of_decide_eq_true h
@@ -87,7 +87,7 @@ let `twp_pures` and the stepping display normalise them away. -/
 unpacks to the strict range `0 < r < 1`. Used by `urand` samplers to read off sample
 bounds from the strengthened `twp_urand_exp'` continuation. -/
 public theorem mem_unifUnitSupport_real {r : ℝ} :
-    r ∈ ProbLangℝ.unifUnitSupport ↔ 0 < r ∧ r < 1 := Set.mem_Ioo
+    r ∈ LawfulProbLangℝ.unifUnitSupport ↔ 0 < r ∧ r < 1 := Set.mem_Ioo
 
 /-! ### Rotation invariance of `Uniform[0,1]`
 
@@ -102,7 +102,7 @@ open MeasureTheory Set in
 theorem measurePreserving_fracAdd_aux {m : ℝ} (hm0 : 0 ≤ m) (hm1 : m < 1) :
     MeasureTheory.MeasurePreserving
       (fun r : ℝ => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
-      (ProbLangℝ.unifUnit) (ProbLangℝ.unifUnit) := by
+      (LawfulProbLangℝ.unifUnit) (LawfulProbLangℝ.unifUnit) := by
   show MeasurePreserving (fun r : ℝ => Int.fract (m + r))
       (volume.restrict (Icc (0:ℝ) 1)) (volume.restrict (Icc (0:ℝ) 1))
   have hmeas : Measurable (fun r : ℝ => Int.fract (m + r)) :=
@@ -190,7 +190,7 @@ theorem measurePreserving_fracAdd_aux {m : ℝ} (hm0 : 0 ≤ m) (hm1 : m < 1) :
 public theorem measurePreserving_fracAdd (m : ℝ) :
     MeasureTheory.MeasurePreserving
       (fun r : ℝ => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
-      (ProbLangℝ.unifUnit) (ProbLangℝ.unifUnit) := by
+      (LawfulProbLangℝ.unifUnit) (LawfulProbLangℝ.unifUnit) := by
   have hper : (fun r : ℝ => Int.fract (m + r))
       = fun r : ℝ => Int.fract (Int.fract m + r) := by
     funext r

@@ -35,7 +35,7 @@ distribution `μ` is rewritable at `ρ` when `limExec ρ = μ >>= limExec`.
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 open MeasureTheory Measure
 

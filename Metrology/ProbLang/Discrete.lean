@@ -78,8 +78,8 @@ example : DiscreteMeasurableSpace (ProbLang.State rT) := inferInstance
 example : DiscreteMeasurableSpace (ProbLang.Cfg rT)   := inferInstance
 end SynthCheck
 
-/-! ## Default `ProbLangℝ` instance on `Int` -/
-instance instProbLangℝInt : ProbLang.ProbLangℝ Int where
+/-! ## Default `LawfulProbLangℝ` instance on `Int` -/
+instance instProbLangℝInt : ProbLang.LawfulProbLangℝ Int where
   instDecidableEq := inferInstance
   unifUnit := (PMF.uniformOfFinset ({0, 1} : Finset Int) (by decide)).toMeasure
   unifUnit_isProbabilityMeasure := PMF.toMeasure.isProbabilityMeasure _

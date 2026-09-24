@@ -20,7 +20,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 section TyEnvSetup
 variable {GF : BundledGFunctors}
@@ -31,13 +31,13 @@ def TyEnv.cons (X : lrel rT GF) (Δ : TyEnv rT GF) : TyEnv rT GF
   | 0 => X
   | n + 1 => Δ n
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem TyEnv.cons_ne_head {n : Nat} {X Y : lrel rT GF} {Δ : TyEnv rT GF}
     (h : X ≡{n}≡ Y) : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons Y Δ)
   | 0 => h
   | _ + 1 => Dist.rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem TyEnv.cons_ne_tail {n : Nat} {X : lrel rT GF} {Δ Δ' : TyEnv rT GF}
     (h : Δ ≡{n}≡ Δ') : (TyEnv.cons X Δ) ≡{n}≡ (TyEnv.cons X Δ')
   | 0 => Dist.rfl
@@ -52,7 +52,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
 /-- A function `TyEnv rT GF → lrel rT GF` paired with its pointwise
 nonexpansiveness witness. -/
-structure NEFun (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT]
+structure NEFun (rT : Type _) [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     (GF : BundledGFunctors) where
   fn  : TyEnv rT GF → lrel rT GF
   ne  : ∀ {n : Nat} {Δ Δ' : TyEnv rT GF}, Δ ≡{n}≡ Δ' → fn Δ ≡{n}≡ fn Δ'
@@ -309,7 +309,7 @@ abbrev RelCtx (rT : Type _) (GF : BundledGFunctors) := List (Var × lrel rT GF)
 abbrev ValSubstMap (rT : Type _) := List (Var × (Val rT × Val rT))
 
 namespace RelCtx
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {GF : BundledGFunctors}
 
 /-- Lookup in a relational context. **Rightmost** binding wins (matching
@@ -321,7 +321,7 @@ def lookup : RelCtx rT GF → Var → Option (lrel rT GF)
     | some B => some B
     | none => if x = y then some A else none
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- An entry's existence in `Γ` implies the lookup at its key is some. -/
 theorem lookup_isSome_of_mem {Γ : RelCtx rT GF} {p : Var × lrel rT GF}
     (h : p ∈ Γ) : (Γ.lookup p.1).isSome := by
@@ -337,7 +337,7 @@ theorem lookup_isSome_of_mem {Γ : RelCtx rT GF} {p : Var × lrel rT GF}
 end RelCtx
 
 namespace ValSubstMap
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-- Lookup in a value substitution. **Rightmost** binding wins. -/
 def lookup : ValSubstMap rT → Var → Option (Val rT × Val rT)
@@ -367,7 +367,7 @@ theorem proj_lookup : ∀ (vs : ValSubstMap rT) (x : Var),
     simp only [List.map_cons, SubstMap.lookup, ValSubstMap.lookup, proj_lookup rest x]
     cases ValSubstMap.lookup rest x <;> simp
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- A pointwise projection leaves the domain unchanged. -/
 theorem proj_dom (vs : ValSubstMap rT) :
     (((vs.map fun p => (p.1, (f p.2).1))).map (·.1)).toFinset = (vs.map (·.1)).toFinset := by
@@ -387,7 +387,7 @@ theorem fst_lookup (vs : ValSubstMap rT) (x : Var) :
     SubstMap.lookup vs.fst x = (vs.lookup x).map (fun p => p.1.1) :=
   proj_lookup Prod.fst vs x
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- A variable outside the domain is unbound. Feeds the `hdom` premise of
 `Exp.lam_substMap_isLocallyClosed`. -/
 theorem lookup_eq_none_of_not_mem {y : Var} : ∀ (vs : ValSubstMap rT),
@@ -424,7 +424,7 @@ theorem snd_dom (vs : ValSubstMap rT) :
     (vs.snd.map (·.1)).toFinset = (vs.map (·.1)).toFinset :=
   proj_dom Prod.snd vs
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- The pair returned by `lookup` is the rightmost matching member. -/
 theorem mem_of_lookup_eq_some {vs : ValSubstMap rT} {y : Var} {w1 w2 : Val rT}
     (h : vs.lookup y = some (w1, w2)) : (y, (w1, w2)) ∈ vs := by
@@ -448,14 +448,14 @@ theorem mem_of_lookup_eq_some {vs : ValSubstMap rT} {y : Var} {w1 w2 : Val rT}
         subst h1; subst h2
         exact List.mem_cons.mpr (.inl rfl)
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- A lookup that returns `some` implies the key appears in the list. -/
 theorem mem_of_lookup_isSome {vs : ValSubstMap rT} {x : Var}
     (h : (vs.lookup x).isSome) : ∃ p ∈ vs, p.1 = x := by
   obtain ⟨⟨w1, w2⟩, hw⟩ := Option.isSome_iff_exists.mp h
   exact ⟨(x, (w1, w2)), mem_of_lookup_eq_some hw, rfl⟩
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- If a key appears in vs, lookup is some. -/
 theorem lookup_isSome_of_mem {vs : ValSubstMap rT} {x : Var}
     (hmem : ∃ w, (x, w) ∈ vs) : (vs.lookup x).isSome := by
@@ -478,14 +478,14 @@ theorem lookup_isSome_of_mem {vs : ValSubstMap rT} {x : Var}
 def delete (vs : ValSubstMap rT) (x : Var) : ValSubstMap rT :=
   vs.filter (fun p => !decide (p.1 = x))
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- `delete` in cons form: drop the head when its key matches, else recurse. -/
 theorem delete_cons (z : Var) (w : Val rT × Val rT) (rest : ValSubstMap rT) (x : Var) :
     ValSubstMap.delete ((z, w) :: rest) x
       = if z = x then rest.delete x else (z, w) :: rest.delete x := by
   by_cases hzx : z = x <;> simp [ValSubstMap.delete, hzx]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- After deleting `x`, lookup at `x` returns `none`. -/
 theorem lookup_delete_self (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).lookup x = none := by
@@ -499,7 +499,7 @@ theorem lookup_delete_self (vs : ValSubstMap rT) (x : Var) :
     · rename_i hzx
       simp [ValSubstMap.lookup, ih, Ne.symm hzx]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- After deleting `x`, lookup at any other key is unchanged. -/
 theorem lookup_delete_other (vs : ValSubstMap rT) (x z : Var) (hxz : z ≠ x) :
     (vs.delete x).lookup z = vs.lookup z := by
@@ -516,7 +516,7 @@ theorem lookup_delete_other (vs : ValSubstMap rT) (x z : Var) (hxz : z ≠ x) :
       cases ValSubstMap.lookup rest z <;> simp [hxz]
     · simp [ValSubstMap.lookup, ih]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Membership in `vs.delete x` excludes any pair with key `x`. -/
 theorem mem_delete (vs : ValSubstMap rT) (x : Var) (p : Var × (Val rT × Val rT)) :
     p ∈ vs.delete x ↔ p ∈ vs ∧ p.1 ≠ x := by
@@ -524,7 +524,7 @@ theorem mem_delete (vs : ValSubstMap rT) (x : Var) (p : Var × (Val rT × Val rT
   rw [List.mem_filter]
   simp
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- A pointwise projection commutes with `delete`. -/
 theorem proj_delete (f : Val rT × Val rT → Val rT) (vs : ValSubstMap rT) (x : Var) :
     (vs.delete x).map (fun p => (p.1, (f p.2).1))
@@ -570,7 +570,7 @@ instance env_ltyped2_persistent (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   unfold env_ltyped2
   infer_instance
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Domain agreement: `Γ.lookup x = some _ ↔ vs.lookup x = some _`. -/
 theorem env_ltyped2_domEq (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
@@ -579,7 +579,7 @@ theorem env_ltyped2_domEq (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   iintro ⟨%H, _, _⟩
   ipureintro; exact H
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Closedness: every binding in `vs` is closed. -/
 theorem env_ltyped2_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
@@ -604,7 +604,7 @@ theorem env_ltyped2_snd_allClosed (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   ipureintro
   exact ValSubstMap.proj_allClosed Prod.snd fun p hp => (Hc p hp).2
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- The domain of `Γ` is covered by the domain of any related substitution. -/
 theorem env_ltyped2_domSubset (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
     env_ltyped2 Γ vs ⊢@{IProp GF}
@@ -620,7 +620,7 @@ theorem env_ltyped2_domSubset (Γ : RelCtx rT GF) (vs : ValSubstMap rT) :
   simp only [List.mem_toFinset, List.mem_map]
   exact ⟨q, hqmem, hqeq⟩
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Lookup-by-Γ: if `Γ x = some A`, the substitution has a matching pair
 and the pair is in `A`. -/
 theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (A : lrel rT GF)
@@ -636,7 +636,7 @@ theorem env_ltyped2_lookup (Γ : RelCtx rT GF) (vs : ValSubstMap rT) (x : Var) (
   iapply Hall $$ %x %A %v1 %v2 %(hΓ)
   · ipureintro; exact hvs_eq
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Empty-Γ empty-vs. -/
 theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx rT GF) [] := by
   unfold env_ltyped2
@@ -647,7 +647,7 @@ theorem env_ltyped2_empty : ⊢@{IProp GF} env_ltyped2 ([] : RelCtx rT GF) [] :=
   iintro %x %A %v1 %v2 %hΓ %hvs
   simp [RelCtx.lookup] at hΓ
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Empty-Γ forces vs empty. -/
 theorem env_ltyped2_empty_inv (vs : ValSubstMap rT) :
     env_ltyped2 ([] : RelCtx rT GF) vs ⊢@{IProp GF} ⌜vs = []⌝ := by
@@ -663,7 +663,7 @@ theorem env_ltyped2_empty_inv (vs : ValSubstMap rT) :
     have := (Hdom p.1).mpr hsome
     simp [RelCtx.lookup] at this
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Extending both contexts preserves `env_ltyped2`. Requires the new values
 to be closed (since `env_ltyped2` records closedness of all bindings). -/
 theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
@@ -723,7 +723,7 @@ theorem env_ltyped2_insert (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
       obtain ⟨rfl, rfl⟩ := heq
       iexact HA
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: a `RelCtx.lookup` that returns `some` implies the key appears in the list. -/
 theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx rT GF} {y : Var}
     (h : (Γ.lookup y).isSome) : y ∈ (Γ.map (·.1)).toFinset := by
@@ -736,7 +736,7 @@ theorem RelCtx.mem_of_lookup_isSome {Γ : RelCtx rT GF} {y : Var}
     | some _ => simp [ih (by rw [hr]; rfl)]
     | none => rw [hr] at h; split_ifs at h with hyk <;> simp_all
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Cons equation for `RelCtx.lookup`: the tail wins, the head is the fallback. -/
 theorem RelCtx.lookup_cons (y : Var) (A : lrel rT GF) (Γ : RelCtx rT GF) (z : Var) :
     RelCtx.lookup ((y, A) :: Γ) z
@@ -744,7 +744,7 @@ theorem RelCtx.lookup_cons (y : Var) (A : lrel rT GF) (Γ : RelCtx rT GF) (z : V
         | some B => some B
         | none => if z = y then some A else none := rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Contrapositive of `RelCtx.mem_of_lookup_isSome`. -/
 theorem RelCtx.lookup_eq_none_of_not_mem {Γ : RelCtx rT GF} {y : Var}
     (hyNotDom : y ∉ (Γ.map (·.1)).toFinset) : Γ.lookup y = none := by
@@ -752,7 +752,7 @@ theorem RelCtx.lookup_eq_none_of_not_mem {Γ : RelCtx rT GF} {y : Var}
   | none => rfl
   | some _ => exact absurd (RelCtx.mem_of_lookup_isSome (by rw [hΓ]; rfl)) hyNotDom
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Drop a head binding for a fresh atom: if `y ∉ Γ.dom`, then
 `env_ltyped2 ((y, A) :: Γ) vs ⊢ env_ltyped2 Γ (vs.delete y)`. -/
 theorem env_ltyped2_drop_head (Γ : RelCtx rT GF) (vs : ValSubstMap rT)
@@ -940,7 +940,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 @[reducible] def TyEnv.comp (Δ : TyEnv rT GF) (ξ : Nat → Nat) : TyEnv rT GF :=
   fun n => Δ (ξ n)
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- `cons X (Δ ∘ ξ) = cons X Δ ∘ upren ξ`. -/
 theorem TyEnv.comp_upren (X : lrel rT GF) (Δ : TyEnv rT GF) (ξ : Nat → Nat) :
     TyEnv.cons X (TyEnv.comp Δ ξ) = TyEnv.comp (TyEnv.cons X Δ) (Renaming.under ξ) := by

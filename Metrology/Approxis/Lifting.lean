@@ -12,7 +12,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 /-! For the Approxis layer, carry the abstract real type `rT` as a section variable. -/
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT]
+variable {rT : Type _} [ProbLang.LawfulProbLangℝ rT]
 
 namespace ProbLang.ApproxisWpGS
 

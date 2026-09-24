@@ -12,7 +12,7 @@ open Classical MeasureTheory ProbabilityTheory Measure
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 def nsteps (r : α → α → Prop) : ℕ → α → α → Prop
   | 0,   a, b => a = b

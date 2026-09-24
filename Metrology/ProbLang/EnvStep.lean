@@ -100,7 +100,7 @@ structure StepOps (rT : Type _) (α : Type _) where
   stuck : String → α
   /-- Return `lit (int n)` for `n` uniform in `[0, z)`, or `n = -1` when `z ≤ 0`. -/
   uniform : Int → State rT → α
-  /-- Return `lit (real r)` for `r` drawn from `ProbLangℝ.unifUnit`. -/
+  /-- Return `lit (real r)` for `r` drawn from `LawfulProbLangℝ.unifUnit`. -/
   uniformReal : State rT → α
 
 /-- A machine step as data: the `StepOps` whose operations are constructors. -/

@@ -32,7 +32,7 @@ propagates here: `CTX_Fold` fills as the identity on its body, while
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 open MeasureTheory
 
@@ -45,7 +45,7 @@ Under locally-nameless, binder frames carry the atoms to close over. For
 `lam x` the hole is the body (open at `x`); `fill` closes: `.lam (close hole x)`.
 `fix f` is similar. The Clutch `letrec f x body` corresponds to `fix f .
 lam x . body`, i.e. two nested `CtxItem` frames: `fix f :: lam x :: K`. -/
-inductive CtxItem (rT : Type _) [ProbLangℝ rT]
+inductive CtxItem (rT : Type _) [LawfulProbLangℝ rT]
   -- Base lambda calculus: `lam x` frame takes body open at atom `x`.
   | lam (x : Var)
   -- `fix f` frame: body is a `.lam …` open at recursive atom `f`.
@@ -144,7 +144,7 @@ end CtxItem
 
 /-- A context is a list of frames, innermost first (matching Clutch's
 `foldr` convention). -/
-abbrev Ctx (rT : Type _) [ProbLangℝ rT] := List (CtxItem rT)
+abbrev Ctx (rT : Type _) [LawfulProbLangℝ rT] := List (CtxItem rT)
 
 namespace Ctx
 

@@ -284,7 +284,7 @@ instance instMeasurableSingletonClassBinOp : MeasurableSingletonClass BinOp wher
 This is a nested two-level pattern match: outer on `v : Exp rT` via
 `Exp.measurable_rec`, inner on `BaseLit rT` (in the `.lit` branch) via
 `BaseLit.measurable_rec`. -/
-theorem UnOp.eval_op_measurable [ProbLangℝ rT] (op : UnOp) :
+theorem UnOp.eval_op_measurable [LawfulProbLangℝ rT] (op : UnOp) :
     Measurable (fun v : Exp rT => UnOp.eval op v) := by
   -- Unfold `UnOp.eval op` into `Exp.casesOn` form, then apply `measurable_rec`.
   -- The only non-constant branches are `.lit`, which inner-recurses on `BaseLit`.
@@ -382,7 +382,7 @@ theorem UnOp.eval_op_measurable [ProbLangℝ rT] (op : UnOp) :
         (f_unit := fun _ => none) (f_loc := fun _ => none) (f_lbl := fun _ => none)
         (f_real := fun r => some (Exp.lit (.real (ProbLangℝ.realNeg r))))
       exact MeasurableEmbedding.some_mk.measurable.comp
-        (Exp.lit.measurable.comp (BaseLit.real.measurable.comp ProbLangℝ.measurable_realNeg))
+        (Exp.lit.measurable.comp (BaseLit.real.measurable.comp LawfulProbLangℝ.measurable_realNeg))
     all_goals exact measurable_const
 
   | toReal =>
@@ -485,10 +485,10 @@ theorem UnOp.eval_op_measurable [ProbLangℝ rT] (op : UnOp) :
         (f_real := fun r => some (Exp.lit (.real (ProbLangℝ.realFrac r))))
       exact MeasurableEmbedding.some_mk.measurable.comp
         (Exp.lit.measurable.comp
-          (BaseLit.real.measurable.comp ProbLangℝ.measurable_realFrac))
+          (BaseLit.real.measurable.comp LawfulProbLangℝ.measurable_realFrac))
     all_goals exact measurable_const
 
-theorem UnOp_eval.measurable [ProbLangℝ rT] :
+theorem UnOp_eval.measurable [LawfulProbLangℝ rT] :
     Measurable (Function.uncurry (UnOp.eval (α := rT))) := by
   -- `UnOp × Exp rT → Option (Exp rT)`. `UnOp` is Countable + has `⊤` σ-alg
   -- (hence `MeasurableSingletonClass`). Split over it via `_right` form.
@@ -2384,7 +2384,7 @@ private theorem liftIB_def_eq (f : Int → Int → Bool) (v1 v2 : Exp rT) :
   rename_i l2
   cases l2 <;> simp
 
-private theorem liftRB_def_eq [ProbLangℝ rT] (f : rT → rT → Bool) (v1 v2 : Exp rT) :
+private theorem liftRB_def_eq [LawfulProbLangℝ rT] (f : rT → rT → Bool) (v1 v2 : Exp rT) :
     liftRB f (v1, v2) =
       (match v1, v2 with
        | .lit (.real r1), .lit (.real r2) => some (Exp.lit (.bool (f r1 r2)))
@@ -2397,7 +2397,7 @@ private theorem liftRB_def_eq [ProbLangℝ rT] (f : rT → rT → Bool) (v1 v2 :
   rename_i l2
   cases l2 <;> simp
 
-private theorem liftRR_def_eq [ProbLangℝ rT] (f : rT → rT → rT) (v1 v2 : Exp rT) :
+private theorem liftRR_def_eq [LawfulProbLangℝ rT] (f : rT → rT → rT) (v1 v2 : Exp rT) :
     liftRR f (v1, v2) =
       (match v1, v2 with
        | .lit (.real r1), .lit (.real r2) => some (Exp.lit (.real (f r1 r2)))
@@ -2410,7 +2410,7 @@ private theorem liftRR_def_eq [ProbLangℝ rT] (f : rT → rT → rT) (v1 v2 : E
   rename_i l2
   cases l2 <;> simp
 
-private theorem liftIIorRR_def_eq [ProbLangℝ rT] (fi : Int → Int → Int) (f : rT → rT → rT)
+private theorem liftIIorRR_def_eq [LawfulProbLangℝ rT] (fi : Int → Int → Int) (f : rT → rT → rT)
     (v1 v2 : Exp rT) :
     liftIIorRR fi f (v1, v2) =
       (match v1, v2 with
@@ -2427,7 +2427,7 @@ private theorem liftIIorRR_def_eq [ProbLangℝ rT] (fi : Int → Int → Int) (f
             | rfl
             | (rename_i l2; cases l2 <;> rfl)))
 
-private theorem liftLtLe_def_eq [ProbLangℝ rT] (fi : Int → Int → Bool) (f : rT → rT → Bool)
+private theorem liftLtLe_def_eq [LawfulProbLangℝ rT] (fi : Int → Int → Bool) (f : rT → rT → Bool)
     (v1 v2 : Exp rT) :
     liftLtLe fi f (v1, v2) =
       (match v1, v2 with
@@ -2445,7 +2445,7 @@ private theorem liftLtLe_def_eq [ProbLangℝ rT] (fi : Int → Int → Bool) (f 
             | (rename_i l2; cases l2 <;> rfl)))
 
 /-- Helper for the `plus` arm of `BinOp.eval_eq_lift`: integer *or* real operands. -/
-private theorem BinOp.eval_plus_eq_liftIIorRR [ProbLangℝ rT] (v1 v2 : Exp rT) :
+private theorem BinOp.eval_plus_eq_liftIIorRR [LawfulProbLangℝ rT] (v1 v2 : Exp rT) :
     BinOp.eval .plus v1 v2 = liftIIorRR (· + ·) ProbLangℝ.realAdd (v1, v2) := by
   rw [liftIIorRR_def_eq]
   cases v1 <;> first
@@ -2457,7 +2457,7 @@ private theorem BinOp.eval_plus_eq_liftIIorRR [ProbLangℝ rT] (v1 v2 : Exp rT) 
             | (rename_i l2; cases l2 <;> rfl)))
 
 /-- Helper for the `lt` arm of `BinOp.eval_eq_lift`. -/
-private theorem BinOp.eval_lt_eq_liftLtLe [ProbLangℝ rT] (v1 v2 : Exp rT) :
+private theorem BinOp.eval_lt_eq_liftLtLe [LawfulProbLangℝ rT] (v1 v2 : Exp rT) :
     BinOp.eval .lt v1 v2 = liftLtLe (decide <| · < ·) ProbLangℝ.realLt (v1, v2) := by
   rw [liftLtLe_def_eq]
   cases v1 <;> first
@@ -2469,7 +2469,7 @@ private theorem BinOp.eval_lt_eq_liftLtLe [ProbLangℝ rT] (v1 v2 : Exp rT) :
             | (rename_i l2; cases l2 <;> rfl)))
 
 /-- Helper for the `le` arm of `BinOp.eval_eq_lift`. -/
-private theorem BinOp.eval_le_eq_liftLtLe [ProbLangℝ rT] (v1 v2 : Exp rT) :
+private theorem BinOp.eval_le_eq_liftLtLe [LawfulProbLangℝ rT] (v1 v2 : Exp rT) :
     BinOp.eval .le v1 v2 = liftLtLe (decide <| · ≤ ·) ProbLangℝ.realLe (v1, v2) := by
   rw [liftLtLe_def_eq]
   cases v1 <;> first
@@ -2483,9 +2483,10 @@ private theorem BinOp.eval_le_eq_liftLtLe [ProbLangℝ rT] (v1 v2 : Exp rT) :
 /-- Helper for the `eq` arm of `BinOp.eval_eq_lift`: `BinOp.eval .eq v1 v2 = liftEq (v1, v2)`.
 Split as a separate lemma so its proof time is bounded and doesn't blow the
 parent's heartbeat budget. -/
-private theorem BinOp.eval_eq_eq_liftEq [ProbLangℝ rT] (v1 v2 : Exp rT) :
+private theorem BinOp.eval_eq_eq_liftEq [LawfulProbLangℝ rT] (v1 v2 : Exp rT) :
     BinOp.eval .eq v1 v2 = liftEq (v1, v2) := by
-  cases v1 <;> cases v2 <;> (try simp [BinOp.eval, liftEq]) <;>
+  have h (l1 l2 : BaseLit rT) : (l1 == l2) = decide (l1 = l2) := Bool.beq_eq_decide_eq l1 l2
+  cases v1 <;> cases v2 <;> (try simp [BinOp.eval, liftEq, h]) <;>
     -- For `.inl _, .inl _`, `.inl _, .inr _`, `.inr _, .inl _`, `.inr _, .inr _`:
     -- inner Exp may or may not be a `.lit`; recurse one more level.
     (rename_i ein1 ein2; cases ein1 <;> cases ein2 <;> simp)
@@ -2493,7 +2494,7 @@ private theorem BinOp.eval_eq_eq_liftEq [ProbLangℝ rT] (v1 v2 : Exp rT) :
 /-- `BinOp.eval` is equal to a per-op dispatch through `liftII`/`liftBB`/`liftIB`/`liftEq`.
 The proof is per-op: discrete `cases op` then unfold each side to the same
 nested-`match` form via the `liftXY_def_eq` helpers (`rfl` for `liftEq`). -/
-theorem BinOp.eval_eq_lift [ProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
+theorem BinOp.eval_eq_lift [LawfulProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
     BinOp.eval op v1 v2 =
       (match op with
        | .plus  => liftIIorRR (· + ·) ProbLangℝ.realAdd
@@ -2532,7 +2533,7 @@ theorem BinOp.eval_eq_lift [ProbLangℝ rT] (op : BinOp) (v1 v2 : Exp rT) :
       | exact BinOp.eval_le_eq_liftLtLe v1 v2
       | exact BinOp.eval_eq_eq_liftEq v1 v2
 
-theorem BinOp_eval.measurable [ProbLangℝ rT] :
+theorem BinOp_eval.measurable [LawfulProbLangℝ rT] :
     Measurable (fun (q : BinOp × Exp rT × Exp rT) => BinOp.eval q.1 q.2.1 q.2.2) := by
   have hrw : (fun (q : BinOp × Exp rT × Exp rT) => BinOp.eval q.1 q.2.1 q.2.2)
       = fun q : BinOp × Exp rT × Exp rT =>
@@ -2556,7 +2557,7 @@ theorem BinOp_eval.measurable [ProbLangℝ rT] :
   intro op
   cases op
   all_goals dsimp only
-  · exact liftIIorRR.measurable _ _ ProbLangℝ.measurable_realAdd
+  · exact liftIIorRR.measurable _ _ LawfulProbLangℝ.measurable_realAdd
   · exact liftII.measurable _
   · exact liftII.measurable _
   · exact liftII.measurable _
@@ -2565,15 +2566,15 @@ theorem BinOp_eval.measurable [ProbLangℝ rT] :
   · exact liftBB.measurable _
   · exact liftBB.measurable _
   · exact liftEq.measurable
-  · exact liftLtLe.measurable _ _ ProbLangℝ.measurable_realLt
-  · exact liftLtLe.measurable _ _ ProbLangℝ.measurable_realLe
+  · exact liftLtLe.measurable _ _ LawfulProbLangℝ.measurable_realLt
+  · exact liftLtLe.measurable _ _ LawfulProbLangℝ.measurable_realLe
   · exact liftII.measurable _
   · exact liftII.measurable _
 
 /-- For each fixed `p : Pat rT`, `e ↦ Pat.tryMatch p e` is measurable. Proved
 by structural induction on `p`; each arm uses `Exp.measurable_rec` to dispatch
 on the shape of `e`. -/
-theorem tryMatch_fixed.measurable [ProbLangℝ rT] (p : Pat rT) :
+theorem tryMatch_fixed.measurable [LawfulProbLangℝ rT] (p : Pat rT) :
     Measurable (fun e : Exp rT => Pat.tryMatch p e) := by
   induction p with
   | wildcard =>
@@ -2770,7 +2771,7 @@ theorem tryMatch_fixed.measurable [ProbLangℝ rT] (p : Pat rT) :
       exact ih
     all_goals exact measurable_const
 
-theorem tryMatch.measurable [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
+theorem tryMatch.measurable [LawfulProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] :
     Measurable (fun (q : Pat rT × Exp rT) => Pat.tryMatch q.1 q.2) := by
   -- Pat rT is Countable (from Pat's deriving + Countable rT) and MeasurableSingletonClass
   -- (from CoreMeasures/Pat.lean). Split on the Pat factor (left position) via
@@ -2788,7 +2789,7 @@ result via `Exp.casesOn` on the Exp factor. The recursive Pat cases use the cell
 (at sub-Pat-shape) applied to a measurable subset that emerges after extracting the
 sub-Exps via Exp's constructor embeddings — handling the doubly-recursive structure
 of `tryMatch` that the standard `Pat.measurable_struct_rec_param` can't reach. -/
-theorem tryMatch.measurable_joint [ProbLangℝ rT] :
+theorem tryMatch.measurable_joint [LawfulProbLangℝ rT] :
     Measurable (Function.uncurry (fun (p : Pat rT) (e : Exp rT) => Pat.tryMatch p e)) := by
   -- We work with `g : Exp rT → Pat rT → Option (Exp rT)` defined by `g e p = tryMatch p e`,
   -- and prove `Measurable (uncurry g) : Exp × Pat → Option Exp`. The framework gives us

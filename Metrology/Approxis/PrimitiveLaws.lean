@@ -26,12 +26,12 @@ open scoped AppGS
 namespace ProbLang
 
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
-variable {rT : Type _} [ProbLang.ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type _} [ProbLang.LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-! ## Bundled ghost-state class -/
 /-- Embeds `SpecGS` as a non-extends field to avoid Lean's diamond-inheritance
 field collapse, which would force program and spec heaps to share γ-names. -/
-class ApproxisGS (rT : Type _) [ProbLang.ProbLangℝ rT]
+class ApproxisGS (rT : Type _) [ProbLang.LawfulProbLangℝ rT]
     [MeasurableSingletonClass rT]
     (hlc : outParam HasLC) (GF : BundledGFunctors) where
   appGS    : AppGS rT GF

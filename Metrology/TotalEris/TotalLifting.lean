@@ -11,7 +11,7 @@ namespace ProbLang
 namespace TotalEris
 namespace ErisWpGS
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
 
 /-! # Total-WP lifting lemmas -/

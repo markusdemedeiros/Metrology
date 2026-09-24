@@ -15,7 +15,7 @@ public import Metrology.ProbLang.Discrete
 section SpecRA
 open Std Iris Iris.Std COFE ProbLang
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT]
+variable {rT : Type _} [ProbLang.LawfulProbLangℝ rT]
 
 instance : COFE (Exp rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (Exp rT) := ⟨id⟩
@@ -29,9 +29,9 @@ instance : COFE (Val rT) := COFE.ofDiscrete _
 instance : OFE.Discrete (Val rT) := ⟨id⟩
 instance (x : Val rT) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-abbrev SpecProg (α : Type _) [ProbLang.ProbLangℝ α] :=
+abbrev SpecProg (α : Type _) [ProbLang.LawfulProbLangℝ α] :=
   Auth (Option (Excl (Exp α)))
-abbrev SpecHeap (rT : Type _) [ProbLang.ProbLangℝ rT] :=
+abbrev SpecHeap (rT : Type _) [ProbLang.LawfulProbLangℝ rT] :=
   HeapView Loc (Agree (Val rT)) LocHeap
 abbrev SpecTapes := HeapView Loc (Agree Tape) LocHeap
 
@@ -59,14 +59,14 @@ theorem LocHeap.asAgree_insert [OFE V] (h : LocHeap V) (l : Loc) (v : V) :
   · rw [LocHeap.asAgree_get?, LawfulPartialMap.get?_insert_ne hk,
         LawfulPartialMap.get?_insert_ne hk, LocHeap.asAgree_get?]
 
-class SpecPreGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors) where
+class SpecPreGS (rT : outParam (Type _)) [ProbLang.LawfulProbLangℝ rT] (GF : BundledGFunctors) where
   prog : ElemG GF (constOF (SpecProg rT))
   heap : ElemG GF (constOF (SpecHeap rT))
   tapes : ElemG GF (constOF SpecTapes)
 
 attribute [reducible, instance] SpecPreGS.prog SpecPreGS.heap SpecPreGS.tapes
 
-class SpecGS (rT : outParam (Type _)) [ProbLang.ProbLangℝ rT] (GF : BundledGFunctors)
+class SpecGS (rT : outParam (Type _)) [ProbLang.LawfulProbLangℝ rT] (GF : BundledGFunctors)
    extends SpecPreGS rT GF where
   γprog : GName
   γheap : GName
@@ -107,7 +107,7 @@ variable {GF : BundledGFunctors} [ISpec : SpecGS rT GF]
 
 open ProbLang.Cfg
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem some_excl_inc_excl_exp_eq {e1 e2 : Exp rT} (H : some (Excl.excl e1) ≼ some (Excl.excl e2)) :
     e1 = e2 := by
   have H' := Option.inc_iff.mp H

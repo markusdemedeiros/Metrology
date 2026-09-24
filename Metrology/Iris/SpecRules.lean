@@ -15,7 +15,7 @@ open Std Iris Iris.Std Iris.BI COFE ProbLang
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-! ## Bridge: `DetStep` ⇒ `pexecN 1 ρ = MeasureTheory.Measure.dirac ρ'` -/
 

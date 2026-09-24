@@ -20,7 +20,7 @@ namespace ProbLang
 namespace TotalEris
 namespace Examples
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors.{0,0,0}} [ErisGS rT hlc GF]
 
 /-! ## The geometric sampler

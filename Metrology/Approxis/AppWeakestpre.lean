@@ -23,7 +23,7 @@ namespace ProbLang
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
 
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT]
+variable {rT : Type _} [ProbLang.LawfulProbLangℝ rT]
 
 
 /-! ## Approxis ghost state class -/
@@ -31,7 +31,7 @@ variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 /-- Resources required by the Approxis weakest precondition: the spec-side
 update modality, the invariant ghost state, a state interpretation, and an
 error-credit interpretation. -/
-class ApproxisWpGS {rT : Type _} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+class ApproxisWpGS {rT : Type _} [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     (GF : BundledGFunctors) extends SpecUpdateGS rT GF where
   hlc : HasLC
   invGS : InvGS_gen hlc GF
@@ -50,7 +50,7 @@ distributions on both sides before establishing the body `Z`. -/
 
 /-- The packaged state for `spec_coupl`'s fixpoint: `(σ, (e', σ'), ε)` collapsed
 into a single tuple so we can write a `BIMonoPred` over it. -/
-abbrev SpecCouplState (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT] :
+abbrev SpecCouplState (rT : Type _) [LawfulProbLangℝ rT] [MeasurableSingletonClass rT] :
     Type _ := (State rT) × (Cfg rT) × ENNReal
 
 instance : COFE (SpecCouplState rT) := COFE.ofDiscrete _

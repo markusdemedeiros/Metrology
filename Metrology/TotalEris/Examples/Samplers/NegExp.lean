@@ -72,7 +72,7 @@ theorem NegExpRejectProb_mul_NegExpFactor :
 
 open MeasureTheory in
 theorem NegExpReject_lintegral :
-    ∫⁻ x, ENNReal.ofReal (1 - Real.exp (-x)) ∂(ProbLangℝ.unifUnit (T := ℝ))
+    ∫⁻ x, ENNReal.ofReal (1 - Real.exp (-x)) ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (Real.exp (-1)) := by
   have h_exp : ∫ x in (0 : ℝ)..1, Real.exp (-x) = 1 - Real.exp (-1) := by
     rw [intervalIntegral.integral_comp_neg fun t => Real.exp t, integral_exp]
@@ -93,15 +93,15 @@ section creditExpectation
 
 open MeasureTheory in
 def NegExpCreditV (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) : ℝ≥0∞ :=
-  ∑' k : ℕ, ∫⁻ x, NegExppdf L k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
+  ∑' k : ℕ, ∫⁻ x, NegExppdf L k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
 
 open MeasureTheory in
 theorem NegExpCreditV_reindex (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
     NegExpCreditV F L
-      = ∑' j : ℕ, ∫⁻ x, NegExppdf₀ j x * F (L + j) x ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
+      = ∑' j : ℕ, ∫⁻ x, NegExppdf₀ j x * F (L + j) x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) := by
   unfold NegExpCreditV
   rw [← (add_right_injective L).tsum_eq
-        (f := fun k => ∫⁻ x, NegExppdf L k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))) ?supp]
+        (f := fun k => ∫⁻ x, NegExppdf L k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))) ?supp]
   · exact tsum_congr fun j => lintegral_congr fun x => by
       simp only [NegExppdf, if_pos (Nat.le_add_right L j), Nat.add_sub_cancel_left]
   · intro k hk
@@ -112,11 +112,11 @@ theorem NegExpCreditV_reindex (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
 open MeasureTheory in
 theorem NegExpCreditV_recurrence (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
     NegExpCreditV F L
-      = (∫⁻ x, ENNReal.ofReal (Real.exp (-x)) * F L x ∂(ProbLangℝ.unifUnit (T := ℝ)))
+      = (∫⁻ x, ENNReal.ofReal (Real.exp (-x)) * F L x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)))
         + ENNReal.ofReal (Real.exp (-1)) * NegExpCreditV F (L + 1) := by
   rw [NegExpCreditV_reindex F L,
     tsum_eq_zero_add'
-      (f := fun j => ∫⁻ x, NegExppdf₀ j x * F (L + j) x ∂(ProbLangℝ.unifUnit (T := ℝ)))
+      (f := fun j => ∫⁻ x, NegExppdf₀ j x * F (L + j) x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)))
       ENNReal.summable]
   congr 1
   · rw [Nat.add_zero]
@@ -156,13 +156,13 @@ section conservation
 
 open MeasureTheory in
 theorem NegExpCredit_recurrence (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) (c : ℝ≥0∞) :
-    ∫⁻ x, RealDecrTrialCreditV (NegExpContAmp F x L c) 0 x ∂(ProbLangℝ.unifUnit (T := ℝ))
+    ∫⁻ x, RealDecrTrialCreditV (NegExpContAmp F x L c) 0 x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
       = NegExpCreditV F L + NegExpRejectProb * c := by
   have key : ∫⁻ x, RealDecrTrialCreditV (NegExpContAmp F x L c) 0 x
-        ∂(ProbLangℝ.unifUnit (T := ℝ))
+        ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
       = ∫⁻ x, (ENNReal.ofReal (Real.exp (-x)) * F L x
           + ENNReal.ofReal (1 - Real.exp (-x)) * (NegExpCreditV F (L + 1) + c))
-          ∂(ProbLangℝ.unifUnit (T := ℝ)) :=
+          ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) :=
     setLIntegral_congr_fun measurableSet_Icc fun x hx =>
       RealDecrTrialCreditV_parity (F L x) (NegExpCreditV F (L + 1) + c) hx.1 hx.2
   have hmof : Measurable (fun x : ℝ => ENNReal.ofReal (1 - Real.exp (-x))) :=

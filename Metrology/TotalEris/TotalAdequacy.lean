@@ -25,7 +25,7 @@ open scoped AppGS ENNReal
 namespace ProbLang
 namespace TotalEris
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {GF : BundledGFunctors}
 
 /-- `Exp.ofVal` is a measurable embedding. It is the injective, measurable

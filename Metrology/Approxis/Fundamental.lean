@@ -24,7 +24,7 @@ namespace ProbLang
 open Cslib Exp
 
 section Fundamental
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ## Tctx → RelCtx lifting -/
@@ -462,7 +462,7 @@ theorem refines_proper_entails (E : CoPset) (e e' : Exp rT) {A B : lrel rT GF}
     refines E e e' A ⊢@{IProp GF} refines E e e' B :=
   (Iris.BI.equiv_iff.mp (refines_proper h)).1
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- lrel-level OFE-rewrite at a value pair: bridge `A v v'` and `B v v'`
 when `A = B`. Used for value-relation level rewrites under e.g.
 `lrel_exists` instantiation. -/
@@ -1036,10 +1036,10 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   -- β-step both sides via pureExec_binop_discrete.
   have hφ_l : (Exp.lit l1).isValue ∧ (Exp.lit l2).isValue ∧
       BinOp.eval .eq (.lit l1) (.lit l2) = some pl(#(.bool (decide (l1 = l2)))) :=
-    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
+    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, by rw [← Bool.beq_eq_decide_eq]; rfl⟩
   have hφ_r : (Exp.lit l1').isValue ∧ (Exp.lit l2').isValue ∧
       BinOp.eval .eq (.lit l1') (.lit l2') = some pl(#(.bool (decide (l1' = l2')))) :=
-    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
+    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, by rw [← Bool.beq_eq_decide_eq]; rfl⟩
   rw [Ectx.eq_fill_nil (Exp.binop .eq (.lit l1) (.lit l2)),
       Ectx.eq_fill_nil (Exp.binop .eq (.lit l1') (.lit l2'))]
   iapply (refines_pure_l hφ_l)
@@ -1323,7 +1323,7 @@ theorem TctxRelated.insert {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT GF
         show some (interp τ' Δ) = some A
         rw [heq]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: an `isSome` lookup in a `RelCtx` gives a list-membership witness. -/
 theorem RelCtx.exists_mem_of_lookup_isSome {Γ : RelCtx rT GF} {x : Var}
     (h : (Γ.lookup x).isSome) : ∃ p ∈ Γ, p.1 = x := by
@@ -1352,7 +1352,7 @@ theorem fv_subset_relCtxDom {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT G
   simp only [List.mem_toFinset, List.mem_map]
   exact ⟨p, hpmem, hpeq⟩
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: an atom outside `Γ`'s domain is not bound by `Γ`. -/
 private theorem RelCtx.lookup_eq_none {Γ : RelCtx rT GF} {x : Var}
     (h : x ∉ (Γ.map (·.1)).toFinset) : Γ.lookup x = none := by

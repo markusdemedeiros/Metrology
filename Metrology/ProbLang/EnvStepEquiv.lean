@@ -182,7 +182,7 @@ theorem RVal.ofExp_spec {e : Exp rT} (he : e.isValue) :
   | inl _ ih => exact ⟨by simp [RVal.ofExp, RVal.rb, ih.1], ih.2⟩
   | inr _ ih => exact ⟨by simp [RVal.ofExp, RVal.rb, ih.1], ih.2⟩
 
-theorem Pat.tryMatchR_spec [ProbLangℝ rT] (p : Pat rT) {v : RVal rT} (hv : v.WF) :
+theorem Pat.tryMatchR_spec [LawfulProbLangℝ rT] (p : Pat rT) {v : RVal rT} (hv : v.WF) :
     (p.tryMatchR v).map RVal.rb = p.tryMatch v.rb ∧ ∀ b, p.tryMatchR v = some b → b.WF := by
   induction p generalizing v with
   | wildcard => simp_all [Pat.tryMatchR, Pat.tryMatch]
@@ -307,7 +307,7 @@ end BindLemmas
 
 /-! ## The measure semantics of the machine -/
 
-variable [ProbLangℝ rT]
+variable [LawfulProbLangℝ rT]
 
 instance : MeasurableSpace (RCfg rT) := ⊤
 
@@ -327,7 +327,7 @@ def Step.interp (X : EnvCfg rT → Measure (RCfg rT)) : Step rT → Measure (RCf
   | .apply f v σ => X (.apply f v σ)
   | .stuck _ => 0
   | .uniform z σ => (intUniform z).map fun n => ⟨.lit (.int n), σ⟩
-  | .uniformReal σ => (ProbLangℝ.unifUnit (T := rT)).map fun r => ⟨.lit (.real r), σ⟩
+  | .uniformReal σ => (LawfulProbLangℝ.unifUnit (T := rT)).map fun r => ⟨.lit (.real r), σ⟩
 
 /-- One unfolding of the machine's measure semantics. -/
 def envΦ (X : EnvCfg rT → Measure (RCfg rT)) (c : EnvCfg rT) : Measure (RCfg rT) :=
@@ -565,7 +565,7 @@ theorem RetVal.bind_rb {Z : Cfg rT → Measure (Cfg rT)} (hZ : RetVal Z) {v : RV
     (Z ⟨v.rb, σ⟩).bind f = f ⟨v.rb, σ⟩ :=
   hZ.bind_eq hv.isValue f
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [LawfulProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem RVal.rb_clo_open {env : Env rT} {body : Exp rT} {v : RVal rT} (henv : RVal.WFEnv env) :
     (body.substEnv 1 (RVal.rbEnv env)).open' v.rb = body.substEnv 0 (RVal.rbEnv (v :: env)) := by
   simp only [Exp.open', RVal.rbEnv]
@@ -679,7 +679,7 @@ theorem bigStepF_eq_bnd {Z : Cfg rT → Measure (Cfg rT)} (hZ : RetVal Z) {c : E
 
 /-! ## `envBig ≤ bigStep` after readback -/
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [LawfulProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 /-- A well-formed frame reads back to an evaluation-context item. -/
 theorem Frame.exists_item {f : Frame rT} (hf : f.WF) :
     ∃ Ki : EctxItem rT, ∀ x, f.fill x = Ki.fillItem x := by
@@ -796,7 +796,7 @@ theorem envBig_le {c : EnvCfg rT} (hc : c.WF) : (envBig c).map RCfg.rb ≤ bigSt
 
 /-! ## The machine on configurations that read back to values -/
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [LawfulProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem dirac_bind_rcfg (r : RCfg rT) (f : RCfg rT → Measure (RCfg rT)) :
     (dirac r).bind f = f r :=
   dirac_bind Measurable.of_discrete r

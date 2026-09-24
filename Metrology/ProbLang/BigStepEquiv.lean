@@ -29,7 +29,7 @@ open MeasureTheory Measure
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-- `bigStepF` read in the Giry monad. -/
 def measureOps : EvalOps rT (Measure (Cfg rT)) where
@@ -197,7 +197,7 @@ theorem bigStepF_val {R : Cfg rT → Measure (Cfg rT)} (hR : RetVal R) {e : Exp 
   | inl w => simp only [bigStepF, measureOps]; rw [hR.bind_eq w.toIsValue]
   | inr w => simp only [bigStepF, measureOps]; rw [hR.bind_eq w.toIsValue]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 private theorem Option.casesOn_some_eq_none {α β : Type _} {o : Option α} {b : β}
     {f : α → Option β} (h : o.casesOn (some b) f = none) : ∃ a, o = some a ∧ f a = none := by
   cases o <;> simp_all
@@ -514,7 +514,7 @@ def Exp.pendingArgs : Exp rT → Nat
   | _ => 0
 where pending (e : Exp rT) : Nat := if e.isValue then 0 else 1
 
-omit [ProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
+omit [LawfulProbLangℝ rT] [Countable rT] [MeasurableSingletonClass rT] in
 theorem Exp.pendingArgs_fillItem_lt (Ki : EctxItem rT) {e v : Exp rT} (he : ¬e.isValue)
     (hv : v.isValue) : (Ki.fillItem v).pendingArgs < (Ki.fillItem e).pendingArgs := by
   cases Ki <;>

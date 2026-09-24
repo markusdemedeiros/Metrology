@@ -26,7 +26,7 @@ namespace TotalEris
 
 section Lifting
 
-variable {hlc : HasLC} {GF : BundledGFunctors} [ProbLangℝ rT] [ErisGS rT hlc GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [LawfulProbLangℝ rT] [ErisGS rT hlc GF]
 
 /-! ## Heap operations -/
 

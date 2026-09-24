@@ -34,7 +34,7 @@ namespace ProbLang
 namespace TotalEris
 namespace Examples
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 
 /-! ## The recursive random-walk body -/

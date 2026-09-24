@@ -35,7 +35,7 @@ evaluation context `K` via `PureExec.fill`, so the tactic can step a redex in pl
 Total WP has no `▷`, so there is no later-credit accounting to thread. -/
 
 section
-variable {rT : Type _} [ProbLangℝ rT] {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
+variable {rT : Type _} [LawfulProbLangℝ rT] {GF : BundledGFunctors} [ErisWpGS (rT := rT) GF]
 
 public theorem ErisWpGS.twp_pure_step_ctx (K : Ectx rT) (φ : Prop) {n : ℕ} {e₁ e₂ : Exp rT}
     [PureExec φ n e₁ e₂] (Hφ : φ) {E : CoPset} {Φ : Val rT → IProp GF} :
@@ -140,7 +140,7 @@ components. ProbLang has no language hierarchy, so we match the concrete
 meta structure TglWpGoal where
   {u : Level}
   {α : Q(Type)}
-  instPL : Q(ProbLang.ProbLangℝ $α)
+  instPL : Q(ProbLang.LawfulProbLangℝ $α)
   {GF : Q(BundledGFunctors.{0, 0, 0})}
   instWp : Q(ErisWpGS (rT := $α) $GF)
   {prop : Q(Type u)}
@@ -174,7 +174,7 @@ meta def runTacticTglWp {β : Type} (k : MVarId → TglWpGoal → ProofModeM β)
     unless args.size == 7 do
       throwError "unexpected `tglWp` arity ({args.size}) in goal {goal}"
     have α : Q(Type) := args[0]!
-    have instPL : Q(ProbLang.ProbLangℝ $α) := args[1]!
+    have instPL : Q(ProbLang.LawfulProbLangℝ $α) := args[1]!
     have instWp : Q(ErisWpGS (rT := $α) $GF) := args[3]!
     have E : Q(CoPset) := args[4]!
     have e : Q(Exp $α) := args[5]!
@@ -274,7 +274,7 @@ meta partial def reattachNames (names : Array Name) (i : Nat) (e : LeanExpr) :
     return (mkAppN e.getAppFn args, i')
   else return (e, i)
 
-meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
+meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.LawfulProbLangℝ $α))
     (e : Q(Exp $α)) : MetaM (Option (Q(Exp $α) × Q(Exp $α) × Array Name)) := do
   -- Returns `(e₁', e₂syn, names)`: the redex to step (`e₁'`, defeq to `e` but possibly
   -- with a head recursive constant unfolded), the synthesis result `e₂syn` (`Exp.open'`
@@ -351,7 +351,8 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
     | ~q(Exp.inr $v) => return some (q(Exp.case $s0 $el $er), q(Exp.app $er $v), #[])
     | _              => return none
   | ~q(.binop $op $e1 $e2)                => do
-    let r : Q(Option (Exp $α)) ← whnf q(@BinOp.eval $α $instPL $op $e1 $e2)
+    let r : Q(Option (Exp $α)) ← whnf q(@BinOp.eval $α
+      (@LawfulProbLangℝ.toProbLangℝ $α $instPL) $op $e1 $e2)
     match r with
     -- A boolean result (`b₁ && b₂`, `decide (z₁ < z₂)`, …) has no reducing simproc in
     -- this toolchain, so reduce it to a `true`/`false` constructor here (defeq, so the
@@ -370,7 +371,8 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
     | ~q(some $res)                 => return some (e, res, #[])
     | _                             => return none
   | ~q(.unop $op $e1)                     => do
-    let r : Q(Option (Exp $α)) ← whnf q(@UnOp.eval $α $instPL $op $e1)
+    let r : Q(Option (Exp $α)) ← whnf q(@UnOp.eval $α
+      (@LawfulProbLangℝ.toProbLangℝ $α $instPL) $op $e1)
     match r with
     | ~q(some (Exp.lit (.bool $b)))          => do
         let b' : Q(Bool) ← Lean.Meta.reduce b
@@ -381,7 +383,8 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
     | ~q(some $res)                          => return some (e, res, #[])
     | _                                      => return none
   | ~q(.scrut $v $p)                      => do
-    let r : Q(Option (Exp $α)) ← whnf q(@Pat.tryMatch $α $instPL $p $v)
+    let r : Q(Option (Exp $α)) ← whnf q(@Pat.tryMatch $α
+      (@LawfulProbLangℝ.toProbLangℝ $α $instPL) $p $v)
     match r with
     | ~q(some $b) => return some (e, q(Exp.inl $b), #[])
     | ~q(none)    => return some (e, q(Exp.inr (.lit .unit)), #[])
@@ -393,7 +396,7 @@ meta def pureStepResult {α : Q(Type)} (instPL : Q(ProbLang.ProbLangℝ $α))
 reduct in the form the `PureExec` instance `inst` (with precondition `φ` and step count
 `n`) matches syntactically, and `names` are the source binder names to re-attach to the
 reduced result. -/
-meta structure PureStepAt (α : Q(Type)) (instPL : Q(ProbLang.ProbLangℝ $α)) where
+meta structure PureStepAt (α : Q(Type)) (instPL : Q(ProbLang.LawfulProbLangℝ $α)) where
   e₁ : Q(Exp $α)
   e₂syn : Q(Exp $α)
   names : Array Name

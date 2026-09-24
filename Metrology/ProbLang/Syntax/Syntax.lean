@@ -107,27 +107,16 @@ abbrev Loc : Type := Int
 abbrev Lbl : Type := Int
 
 
-/-- Type of real numbers equipped with some base sigma algebra.
-ProbLang is parameterized by this type, and the type of expressions is discrete
-when the type of reals is also discrete.
-
-This allows us to gradually port the development to use a continuous semantics. -/
-class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, Inhabited T,
-    MeasurableEq T where
-  instDecidableEq : DecidableEq T
-  unifUnit : MeasureTheory.Measure T
-  unifUnit_isProbabilityMeasure : MeasureTheory.IsProbabilityMeasure unifUnit
-  unifUnitSupport : Set T
-  unifUnitSupportMeasurable : MeasurableSet unifUnitSupport
-  unifUnitIsConcentrated : unifUnit unifUnitSupportᶜ = 0
-  /-- Decidable strict comparison of two reals, as `Bool`-valued *data* (not an
-  order instance, to avoid `DecidableEq`/`LE` diamonds with the fields above).
-  Powers the `.lt` case of `BinOp.eval` on real literals. -/
+/-- The operations ProbLang needs on its type of reals. This class is pure data, so a
+computable type such as `Float` can be an instance and run in the interpreter; the laws
+the semantics needs live in `LawfulProbLangℝ`. -/
+class ProbLangℝ (T : Type _) extends BEq T, Inhabited T where
+  /-- Strict comparison of two reals, as `Bool`-valued *data* (not an order instance, to
+  avoid `DecidableEq`/`LE` diamonds). Powers the `.lt` case of `BinOp.eval` on real
+  literals. -/
   realLt : T → T → Bool
-  /-- Decidable `≤` comparison of two reals. Powers `.le` in `BinOp.eval`. -/
+  /-- `≤` comparison of two reals. Powers `.le` in `BinOp.eval`. -/
   realLe : T → T → Bool
-  measurable_realLt : Measurable (Function.uncurry realLt)
-  measurable_realLe : Measurable (Function.uncurry realLe)
   /-- Addition of two reals. Powers the `.plus` case of `BinOp.eval` on real
   literals. Like the comparisons above this is *data*, not an `Add` instance, so
   that `ProbLangℝ` stays free of algebraic-structure diamonds. -/
@@ -143,24 +132,40 @@ class ProbLangℝ (T : Type _) extends MeasurableSpace T, BEq T, LawfulBEq T, In
   but the class demands only measurability; laws that depend on it (notably
   rotation-invariance of `unifUnit`) are proved per instance. -/
   realFrac : T → T
+
+/-- Type of real numbers equipped with some base sigma algebra and the laws the
+semantics needs. ProbLang is parameterized by this type, and the type of expressions is
+discrete when the type of reals is also discrete.
+
+This allows us to gradually port the development to use a continuous semantics. -/
+class LawfulProbLangℝ (T : Type _) extends ProbLangℝ T, MeasurableSpace T, LawfulBEq T,
+    MeasurableEq T where
+  instDecidableEq : DecidableEq T
+  unifUnit : MeasureTheory.Measure T
+  unifUnit_isProbabilityMeasure : MeasureTheory.IsProbabilityMeasure unifUnit
+  unifUnitSupport : Set T
+  unifUnitSupportMeasurable : MeasurableSet unifUnitSupport
+  unifUnitIsConcentrated : unifUnit unifUnitSupportᶜ = 0
+  measurable_realLt : Measurable (Function.uncurry realLt)
+  measurable_realLe : Measurable (Function.uncurry realLe)
   measurable_realAdd : Measurable (Function.uncurry realAdd)
   measurable_realNeg : Measurable realNeg
   measurable_realFrac : Measurable realFrac
 
-attribute [reducible, instance] ProbLangℝ.instDecidableEq
-attribute [instance] ProbLangℝ.unifUnit_isProbabilityMeasure
+attribute [reducible, instance] LawfulProbLangℝ.instDecidableEq
+attribute [instance] LawfulProbLangℝ.unifUnit_isProbabilityMeasure
 
 /-- The unit-interval sampling support is nonempty: `unifUnit` is a probability
 measure (`unifUnit univ = 1`) yet it is concentrated on `unifUnitSupport`
 (`unifUnit unifUnitSupportᶜ = 0`), so an empty support would force
 `unifUnit univ = 0`. -/
-theorem ProbLangℝ.unifUnitSupport_nonempty (T : Type _) [ProbLangℝ T] :
-    (ProbLangℝ.unifUnitSupport (T := T)).Nonempty := by
+theorem LawfulProbLangℝ.unifUnitSupport_nonempty (T : Type _) [LawfulProbLangℝ T] :
+    (LawfulProbLangℝ.unifUnitSupport (T := T)).Nonempty := by
   rw [Set.nonempty_iff_ne_empty]
   rintro hempty
-  have h1 : ProbLangℝ.unifUnit (Set.univ : Set T) = 0 := by
-    have : (ProbLangℝ.unifUnitSupport (T := T))ᶜ = Set.univ := by rw [hempty]; simp
-    rw [← this]; exact ProbLangℝ.unifUnitIsConcentrated
+  have h1 : LawfulProbLangℝ.unifUnit (Set.univ : Set T) = 0 := by
+    have : (LawfulProbLangℝ.unifUnitSupport (T := T))ᶜ = Set.univ := by rw [hempty]; simp
+    rw [← this]; exact LawfulProbLangℝ.unifUnitIsConcentrated
   rw [MeasureTheory.measure_univ] at h1
   exact one_ne_zero h1
 
@@ -667,7 +672,7 @@ def Pat.tryMatch : Pat rT → Exp rT → Option (Exp rT)
   | .inr p, .inr e => p.tryMatch e
   | _, _ => none
 
-theorem BaseLit.beq_self_true (l : BaseLit rT) : (l == l) = true := by
+theorem BaseLit.beq_self_true [LawfulBEq rT] (l : BaseLit rT) : (l == l) = true := by
   cases l with
   | int z =>
     show (Int.decEq z z).decide = true
@@ -684,7 +689,7 @@ theorem BaseLit.beq_self_true (l : BaseLit rT) : (l == l) = true := by
 
 /-- `LawfulBEq` for `BaseLit rT` lifted from `LawfulBEq rT`. The derived BEq is
 structural; equality of components implies equality. -/
-instance instLawfulBEqBaseLit : LawfulBEq (BaseLit rT) where
+instance instLawfulBEqBaseLit [LawfulBEq rT] : LawfulBEq (BaseLit rT) where
   eq_of_beq {l1 l2} h := by
     cases l1 <;> cases l2 <;> simp_all <;>
       first
@@ -693,7 +698,7 @@ instance instLawfulBEqBaseLit : LawfulBEq (BaseLit rT) where
   rfl {l} := BaseLit.beq_self_true l
 
 /-- `tryMatch (.lit l) (.lit l) = some (.lit .unit)`. -/
-theorem Pat.tryMatch_lit_eq (l : BaseLit rT) :
+theorem Pat.tryMatch_lit_eq [LawfulBEq rT] (l : BaseLit rT) :
     Pat.tryMatch (.lit l) (.lit l) = some (.lit .unit) := by
   show (if (l == l) = true then some (Exp.lit BaseLit.unit) else none) = _
   refine Option.ite_some_none_eq_some.mpr ⟨?_, rfl⟩
@@ -1160,11 +1165,11 @@ def BinOp.eval (op : BinOp) (v1 v2 : Exp rT) : Option (Exp rT) :=
   | and,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 && b2)
   | or,    .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 || b2)
   | xor,   .lit (.bool b1), .lit (.bool b2) => some <| .lit <| .bool (b1 ^^ b2)
-  | eq,    .lit l1,         .lit l2         => some <| .lit <| .bool (decide (l1 = l2))
+  | eq,    .lit l1,         .lit l2         => some <| .lit <| .bool (l1 == l2)
   -- Equality on tagged unboxed values (inl/inr of literals): tags differ → false;
   -- tags match → recurse on payload literals.
-  | eq,    .inl (.lit l1),  .inl (.lit l2)  => some <| .lit <| .bool (decide (l1 = l2))
-  | eq,    .inr (.lit l1),  .inr (.lit l2)  => some <| .lit <| .bool (decide (l1 = l2))
+  | eq,    .inl (.lit l1),  .inl (.lit l2)  => some <| .lit <| .bool (l1 == l2)
+  | eq,    .inr (.lit l1),  .inr (.lit l2)  => some <| .lit <| .bool (l1 == l2)
   | eq,    .inl (.lit _),   .inr (.lit _)   => some <| .lit <| .bool false
   | eq,    .inr (.lit _),   .inl (.lit _)   => some <| .lit <| .bool false
   | lt,    .lit (.int z1),  .lit (.int z2)  => some <| .lit <| .bool (decide (z1 < z2))

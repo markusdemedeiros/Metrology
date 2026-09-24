@@ -17,7 +17,7 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-! ## Log-relation namespace -/
 
@@ -25,7 +25,7 @@ def logN : Namespace := nroot.@ (1 : Pos)
 
 /-! ## `ApproxisRGS` ghost-state bundle -/
 
-class ApproxisRGS (rT : Type _) [ProbLangℝ rT] [MeasurableSingletonClass rT]
+class ApproxisRGS (rT : Type _) [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
     (hlc : outParam HasLC) (GF : BundledGFunctors) where
   approxisGS : ApproxisGS rT hlc GF
   naInvG     : NaInvG GF
@@ -46,7 +46,7 @@ instance {GF} : CoeFun (lrel rT GF) (fun _ => Val rT → Val rT → IProp GF) :=
 
 /-! ## OFE/COFE structure on `lrel` -/
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel.ext {GF : BundledGFunctors} {A B : lrel rT GF}
     (h : ∀ v1 v2, A.car v1 v2 = B.car v1 v2) : A = B := by
   obtain ⟨carA, closA⟩ := A
@@ -151,7 +151,7 @@ scoped notation:100 "REL " e1 " << " e2 " : " A =>
 section SimpleLRels
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisRGS rT hlc GF]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_closed_lit_pair (v1 v2 : Val rT) :
     ⌜v1 = .unit ∧ v2 = .unit⌝ ⊢@{IProp GF} ⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ := by
   iintro %h !%
@@ -193,15 +193,15 @@ noncomputable def lrel_real : lrel rT GF where
 
 /-! ### A literal is related to itself -/
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_unit_lit : ⊢@{IProp GF} lrel_unit.car (.unit : Val rT) .unit := by
   unfold lrel_unit; ipureintro; exact ⟨rfl, rfl⟩
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_int_lit (n : Int) : ⊢@{IProp GF} lrel_int.car (.int n : Val rT) (.int n) := by
   unfold lrel_int; iexists n; ipureintro; exact ⟨rfl, rfl⟩
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_nat_lit {n : Int} (hn : 0 ≤ n) :
     ⊢@{IProp GF} lrel_nat.car (.int n : Val rT) (.int n) := by
   unfold lrel_nat
@@ -209,11 +209,11 @@ theorem lrel_nat_lit {n : Int} (hn : 0 ≤ n) :
   ipureintro
   refine ⟨?_, ?_⟩ <;> rw [Int.toNat_of_nonneg hn]
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_bool_lit (b : Bool) : ⊢@{IProp GF} lrel_bool.car (.bool b : Val rT) (.bool b) := by
   unfold lrel_bool; iexists b; ipureintro; exact ⟨rfl, rfl⟩
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_real_lit (r : rT) : ⊢@{IProp GF} lrel_real.car (.real r : Val rT) (.real r) := by
   unfold lrel_real; iexists r; ipureintro; exact ⟨rfl, rfl⟩
 
@@ -309,13 +309,13 @@ noncomputable def lrel_rec (C : lrel rT GF -n> lrel rT GF) : lrel rT GF :=
   fixpoint (lrelRec1 C)
 
 -- TODO: Tweak when fixpoints land
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_rec_unfold (C : lrel rT GF -n> lrel rT GF) :
     lrel_rec C = lrelRec1 C (lrel_rec C) :=
   fixpoint_unfold (lrelRec1Hom C)
 
 -- TODO: Attempt to simplify once nonexp lands
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- `lrel_rec` is nonexpansive in the functional.  `lrelRec1` guards the recursive
 occurrence under `▷`, so this is just `fixpoint_dist` for its contractive body. -/
 theorem lrel_rec_ne {n : Nat} {C1 C2 : lrel rT GF -n> lrel rT GF}
@@ -426,7 +426,7 @@ theorem lrel_forall_ne {n : Nat} {C1 C2 : lrel rT GF → lrel rT GF}
   refine forall_ne fun A => ?_
   exact lrel_arr_ne_2.ne .rfl (h A) v1 v2
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem lrel_exists_ne {n : Nat} {C1 C2 : lrel rT GF → lrel rT GF}
     (h : ∀ A, C1 A ≡{n}≡ C2 A) :
     (lrel_exists C1 : lrel rT GF) ≡{n}≡ lrel_exists C2 := by

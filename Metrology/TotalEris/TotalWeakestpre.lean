@@ -12,7 +12,7 @@ open scoped ENNReal
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 namespace TotalEris
 namespace ErisWpGS

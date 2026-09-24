@@ -12,68 +12,27 @@ file runs them.
 
 Ported from the test suite of the old context-decomposing interpreter. Where that interpreter departed from the
 formal semantics, the tests now follow the semantics: `rand(z, ())` samples `[0, z)` and
-returns `-1` when `z ≤ 0`, and tapes are supported.
-
-## A computable `ProbLangℝ Int` for testing
-
-`instProbLangℝInt` is noncomputable because its `unifUnit` field is a `Measure`, so no
-program over it can be compiled. `testInst` restates its computable fields and hides
-`unifUnit` behind `implemented_by`: the interpreter never reads `unifUnit` (it samples
-through `UnifUnitSampler`), so the placeholder is never touched at runtime. The clean fix
-is to split the computable operations of `ProbLangℝ` into a parent class. -/
-
-unsafe def testUnifUnitImpl : Measure Int := unsafeCast ()
-
-@[implemented_by testUnifUnitImpl]
-def testUnifUnit : Measure Int := instProbLangℝInt.unifUnit
-
-instance (priority := high) testInst : ProbLangℝ Int where
-  toMeasurableSpace := Int.instMeasurableSpace
-  beq a b := decide (a = b)
-  eq_of_beq := instProbLangℝInt.eq_of_beq
-  rfl := instProbLangℝInt.rfl
-  default := 0
-  measurableSet_diagonal := instProbLangℝInt.measurableSet_diagonal
-  instDecidableEq := Int.decEq
-  unifUnit := testUnifUnit
-  unifUnit_isProbabilityMeasure := instProbLangℝInt.unifUnit_isProbabilityMeasure
-  unifUnitSupport := instProbLangℝInt.unifUnitSupport
-  unifUnitSupportMeasurable := instProbLangℝInt.unifUnitSupportMeasurable
-  unifUnitIsConcentrated := instProbLangℝInt.unifUnitIsConcentrated
-  realLt a b := decide (a < b)
-  realLe a b := decide (a ≤ b)
-  measurable_realLt := instProbLangℝInt.measurable_realLt
-  measurable_realLe := instProbLangℝInt.measurable_realLe
-  realAdd a b := a + b
-  realNeg a := -a
-  realOfInt z := z
-  realFrac _ := 0
-  measurable_realAdd := instProbLangℝInt.measurable_realAdd
-  measurable_realNeg := instProbLangℝInt.measurable_realNeg
-  measurable_realFrac := instProbLangℝInt.measurable_realFrac
-
-/-- On `Int`, `unifUnit` is uniform on `{0, 1}`. -/
-instance : UnifUnitSampler Int := ⟨do return (← IO.rand 0 1)⟩
+returns `-1` when `z ≤ 0`, and tapes are supported. -/
 
 /-- Run a closed program from the empty state on the environment machine. -/
-private def runTest (prog : Exp Int) : IO (Exp Int × State Int) := do
+private def runTest (prog : Exp Float) : IO (Exp Float × State Float) := do
   let r ← run (.eval [] prog default)
   return (r.val.rb, r.state)
 
 /-- Run a closed program from the empty state on the reference substitution evaluator. -/
-private def runTestSubst (prog : Exp Int) : IO (Exp Int × State Int) := do
+private def runTestSubst (prog : Exp Float) : IO (Exp Float × State Float) := do
   let ⟨v, σ⟩ ← runSubst ⟨prog, default⟩
   return (v, σ)
 
 /-- Both engines return `expected`. -/
-private def check (name : String) (prog : Exp Int) (expected : Exp Int) : IO Unit := do
+private def check (name : String) (prog : Exp Float) (expected : Exp Float) : IO Unit := do
   for (engine, runner) in [("env", runTest), ("subst", runTestSubst)] do
     let v ← runner prog
     if v.1 != expected then
       throw (IO.userError s!"FAIL [{name}, {engine}]: got {repr v.1}, expected {repr expected}")
 
 /-- Both engines raise an error. -/
-private def checkError (name : String) (prog : Exp Int) : IO Unit := do
+private def checkError (name : String) (prog : Exp Float) : IO Unit := do
   for (engine, runner) in [("env", runTest), ("subst", runTestSubst)] do
     match ← (runner prog |>.toBaseIO) with
     | .ok v => throw (IO.userError s!"FAIL [{name}, {engine}]: expected error, got {repr v.1}")
@@ -190,7 +149,7 @@ private def checkError (name : String) (prog : Exp Int) : IO Unit := do
 -- Recursion: factorial 5 = 120
 -- ---------------------------------------------------------------------------
 
-private def factExp : Exp Int := pl(rec fact n := if n = #0 then #1 else n * fact (n - #1))
+private def factExp : Exp Float := pl(rec fact n := if n = #0 then #1 else n * fact (n - #1))
 
 #eval check "factorial 5"
   pl({factExp} #5)
@@ -446,13 +405,13 @@ private def factExp : Exp Int := pl(rec fact n := if n = #0 then #1 else n * fac
   pl(#2)
 
 -- Recursive: sum 1..10 = 55
-private def sumExp : Exp Int := pl(rec sum n := if n = #0 then #0 else n + sum (n - #1))
+private def sumExp : Exp Float := pl(rec sum n := if n = #0 then #0 else n + sum (n - #1))
 #eval check "sum 1..10"
   pl({sumExp} #10)
   pl(#55)
 
 -- Mutual recursion via pairs: is_even/is_odd
-private def isEvenOdd : Exp Int :=
+private def isEvenOdd : Exp Float :=
   pl(rec eo n := if n = #0 then (#true, #false) else (snd(eo (n - #1)), fst(eo (n - #1))))
 #eval check "is_even 4"
   pl(fst({isEvenOdd} #4))
@@ -906,7 +865,7 @@ private def String.hasSubstr (haystack needle : String) : Bool :=
   (haystack.splitOn needle).length > 1
 
 /-- Like `checkError` but also checks the error message contains `needle`. -/
-private def checkErrorMsg (name : String) (prog : Exp Int) (needle : String) : IO Unit := do
+private def checkErrorMsg (name : String) (prog : Exp Float) (needle : String) : IO Unit := do
   for (engine, runner) in [("env", runTest), ("subst", runTestSubst)] do
     match ← (runner prog |>.toBaseIO) with
     | .ok v =>
@@ -1182,10 +1141,10 @@ private def checkErrorMsg (name : String) (prog : Exp Int) (needle : String) : I
 
 -- Presampled values are consumed in order.
 #eval do
-  let σ : State Int := default
+  let σ : State Float := default
   let t : Tape := ⟨5, [⟨3, by decide⟩, ⟨1, by decide⟩]⟩
   let σ := σ.update_tapes (·.insert 7 t)
-  let prog : Exp Int := pl(let a := rand(#5, #(.lbl 7)); let b := rand(#5, #(.lbl 7)); (a, b))
+  let prog : Exp Float := pl(let a := rand(#5, #(.lbl 7)); let b := rand(#5, #(.lbl 7)); (a, b))
   let r ← run (.eval [] prog σ)
   let (v, σ') := (r.val.rb, r.state)
   if v != pl((#3, #1)) then
@@ -1197,13 +1156,13 @@ private def checkErrorMsg (name : String) (prog : Exp Int) (needle : String) : I
 -- Continuous sampling
 -- ---------------------------------------------------------------------------
 
--- On `Int` the unit sampler draws from {0, 1}.
+-- `urand` lands in [0, 1).
 #eval do
   let v ← runTest pl(urand)
   match v.1 with
   | .lit (.real r) =>
-    if r != 0 && r != 1 then
-      throw (IO.userError s!"FAIL [urand range]: got {r}, expected 0 or 1")
+    if !(0 ≤ r && r < 1) then
+      throw (IO.userError s!"FAIL [urand range]: got {r}, expected a value in [0, 1)")
   | e => throw (IO.userError s!"FAIL [urand type]: got {repr e}")
 
 def main : IO Unit :=

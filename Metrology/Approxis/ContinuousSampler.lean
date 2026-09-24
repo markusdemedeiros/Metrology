@@ -28,7 +28,7 @@ open scoped AppGS
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLang.ProbLangℝ rT]
+variable {rT : Type _} [ProbLang.LawfulProbLangℝ rT]
 
 /-! ## The real-literal injection
 
@@ -50,18 +50,18 @@ theorem Cfg.measurableEmbedding_realLit (σ : State rT) :
       (Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding))
 
 theorem Cfg.realLit_image_eq (σ : State rT) :
-    {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ⟩ : Cfg rT) ∧ r ∈ ProbLangℝ.unifUnitSupport}
-      = (fun r : rT => (⟨pl(#(.real r)), σ⟩ : Cfg rT)) '' ProbLangℝ.unifUnitSupport := by
+    {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ⟩ : Cfg rT) ∧ r ∈ LawfulProbLangℝ.unifUnitSupport}
+      = (fun r : rT => (⟨pl(#(.real r)), σ⟩ : Cfg rT)) '' LawfulProbLangℝ.unifUnitSupport := by
   ext ρ
   simp only [Set.mem_image, Set.mem_setOf_eq]
   exact ⟨fun ⟨r, h, hr⟩ => ⟨r, hr, h.symm⟩, fun ⟨r, hr, h⟩ => ⟨r, h.symm, hr⟩⟩
 
 theorem Cfg.measurableSet_realLit_image (σ : State rT) :
     MeasurableSet {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ⟩ : Cfg rT)
-      ∧ r ∈ ProbLangℝ.unifUnitSupport} := by
+      ∧ r ∈ LawfulProbLangℝ.unifUnitSupport} := by
   rw [Cfg.realLit_image_eq]
   exact (Cfg.measurableEmbedding_realLit σ).measurableSet_image.mpr
-    ProbLangℝ.unifUnitSupportMeasurable
+    LawfulProbLangℝ.unifUnitSupportMeasurable
 
 theorem headReducible_urand (σ : State rT) : HeadReducible (pl(urand) : Exp rT) σ :=
   show Cfg.uniformReal σ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _
@@ -79,12 +79,12 @@ theorem primStep_urand (σ : State rT) :
 theorem Cfg.concentrated_primStep_urand (σ : State rT) :
     Concentrated (primStep (⟨pl(urand), σ⟩ : Cfg rT))
       {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ⟩ : Cfg rT)
-        ∧ r ∈ ProbLangℝ.unifUnitSupport} := by
+        ∧ r ∈ LawfulProbLangℝ.unifUnitSupport} := by
   rw [primStep_urand σ, Cfg.uniformReal, Cfg.realLit_image_eq]
   exact concentratedOn_map (Cfg.measurable_realLit σ)
     ((Cfg.measurableEmbedding_realLit σ).measurableSet_image.mpr
-      ProbLangℝ.unifUnitSupportMeasurable)
-    ProbLangℝ.unifUnitIsConcentrated
+      LawfulProbLangℝ.unifUnitSupportMeasurable)
+    LawfulProbLangℝ.unifUnitIsConcentrated
 
 section Unary
 variable {hlc : HasLC} {GF : BundledGFunctors} [ApproxisGS rT hlc GF]
@@ -102,12 +102,12 @@ Note the absence of `[Countable rT]`: the whole point is that this rule holds fo
 a diffuse `rT`. Follows the same shape as `TotalEris.twp_urand_exp`, minus the
 error credits (a plain atomic lift spends none). -/
 theorem wp_urand {E : CoPset} {Φ : Val rT → IProp GF} :
-    iprop(▷ ∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗ Φ (.real r : Val rT))
+    iprop(▷ ∀ (r : rT), (⌜r ∈ LawfulProbLangℝ.unifUnitSupport⌝) -∗ Φ (.real r : Val rT))
       ⊢@{IProp GF} wp E pl(urand) Φ := by
   iintro HΦ
   iapply (wp_lift_atomic_step_concentrated
     (S := fun σ => {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ⟩ : Cfg rT)
-      ∧ r ∈ ProbLangℝ.unifUnitSupport})
+      ∧ r ∈ LawfulProbLangℝ.unifUnitSupport})
     Exp.urand_toVal?_eq_none Cfg.measurableSet_realLit_image Cfg.concentrated_primStep_urand)
   iintro %σ₁ Hσ !>
   isplitr
@@ -139,9 +139,9 @@ Countability-free analogue of `Cfg.uniform_addCoupl_bij`. Note `f` need not be a
 bijection on the nose — measure preservation is exactly what the argument uses. -/
 theorem Cfg.uniformReal_addCoupl_bij (σ σ' : State rT) (f : rT → rT)
     (hmp : MeasureTheory.MeasurePreserving f
-      (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT))) :
+      (LawfulProbLangℝ.unifUnit (T := rT)) (LawfulProbLangℝ.unifUnit (T := rT))) :
     AddCoupl 0
-      {p : Cfg rT × Cfg rT | ∃ r : rT, r ∈ ProbLangℝ.unifUnitSupport ∧
+      {p : Cfg rT × Cfg rT | ∃ r : rT, r ∈ LawfulProbLangℝ.unifUnitSupport ∧
         p.1 = (⟨pl(#(.real r)), σ⟩ : Cfg rT) ∧ p.2 = (⟨pl(#(.real (f r))), σ'⟩ : Cfg rT)}
       (Cfg.uniformReal σ) (Cfg.uniformReal σ') := by
   rintro ⟨φ, Hφm, Hφb⟩ ⟨ψ, Hψm, Hψb⟩ Hle
@@ -155,8 +155,8 @@ theorem Cfg.uniformReal_addCoupl_bij (σ σ' : State rT) (f : rT → rT)
     Hψm.comp (Cfg.measurable_realLit σ')
   rw [← hmp.lintegral_comp hψ']
   -- `unifUnit` lives on its support, so the pointwise bound is only needed there.
-  have hae : ∀ᵐ r ∂(ProbLangℝ.unifUnit (T := rT)), r ∈ ProbLangℝ.unifUnitSupport :=
-    MeasureTheory.ae_iff.mpr ProbLangℝ.unifUnitIsConcentrated
+  have hae : ∀ᵐ r ∂(LawfulProbLangℝ.unifUnit (T := rT)), r ∈ LawfulProbLangℝ.unifUnitSupport :=
+    MeasureTheory.ae_iff.mpr LawfulProbLangℝ.unifUnitIsConcentrated
   refine MeasureTheory.lintegral_mono_ae ?_
   filter_upwards [hae] with r hr
   exact Hle ⟨r, hr, rfl, rfl⟩
@@ -166,10 +166,10 @@ theorem Cfg.uniformReal_addCoupl_bij (σ σ' : State rT) (f : rT → rT)
 `wp_couple_rand_rand`, and the rule that makes continuous *refinement* expressible. -/
 theorem wp_couple_urand_urand (f : rT → rT)
     (hmp : MeasureTheory.MeasurePreserving f
-      (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT)))
+      (LawfulProbLangℝ.unifUnit (T := rT)) (LawfulProbLangℝ.unifUnit (T := rT)))
     (K : Ectx rT) (E : CoPset) (Φ : Val rT → IProp GF) :
     iprop((⤇ K.fill pl(urand)) ∗
-        (∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗
+        (∀ (r : rT), (⌜r ∈ LawfulProbLangℝ.unifUnitSupport⌝) -∗
           (⤇ K.fill (pl(#(.real (f r))))) -∗ Φ (.real r : Val rT)))
       ⊢@{IProp GF} wp E pl(urand) Φ := by
   iintro ⟨Hj, Hcnt⟩
@@ -180,7 +180,7 @@ theorem wp_couple_urand_urand (f : rT → rT)
   imod (BIFUpdate.subset Std.LawfulSet.empty_subset) with Hclose
   imodintro
   let R : Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
-    ∃ r : rT, r ∈ ProbLangℝ.unifUnitSupport
+    ∃ r : rT, r ∈ LawfulProbLangℝ.unifUnitSupport
       ∧ c₁ = (⟨pl(#(.real r)), σ₁⟩ : Cfg rT)
       ∧ c₂ = (⟨K.fill (pl(#(.real (f r)))), σ₁'⟩ : Cfg rT)
   iexists R, 0, ε
@@ -230,8 +230,8 @@ carried by `f`'s measure preservation instead. -/
 theorem refines_couple_urands_lr {E : CoPset} {K K' : Ectx rT} {A : lrel rT GF}
     (f : rT → rT)
     (hmp : MeasureTheory.MeasurePreserving f
-      (ProbLangℝ.unifUnit (T := rT)) (ProbLangℝ.unifUnit (T := rT))) :
-    iprop(∀ (r : rT), (⌜r ∈ ProbLangℝ.unifUnitSupport⌝) -∗
+      (LawfulProbLangℝ.unifUnit (T := rT)) (LawfulProbLangℝ.unifUnit (T := rT))) :
+    iprop(∀ (r : rT), (⌜r ∈ LawfulProbLangℝ.unifUnitSupport⌝) -∗
             refines E (K.fill pl(#(.real r))) (K'.fill (pl(#(.real (f r))))) A)
       ⊢@{IProp GF}
         refines E (K.fill pl(urand)) (K'.fill pl(urand)) A := by

@@ -210,15 +210,15 @@ def BiiCredit (F : Bool → ℝ≥0∞) (x : ℝ) (n : ℕ) (r : ℝ) : ℝ≥0�
   if n = 0 then F true else if n = 1 then (if x < r then F true else F false) else F false
 
 def BiiCCredit (F : Bool → ℝ≥0∞) (x : ℝ) (n : ℕ) : ℝ≥0∞ :=
-  ∫⁻ r, BiiCredit F x n r ∂(ProbLangℝ.unifUnit (T := ℝ))
+  ∫⁻ r, BiiCredit F x n r ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
 
 theorem BiiCCredit_zero (F : Bool → ℝ≥0∞) (x : ℝ) : BiiCCredit F x 0 = F true := by
-  show ∫⁻ r, BiiCredit F x 0 r ∂(ProbLangℝ.unifUnit (T := ℝ)) = F true
+  show ∫⁻ r, BiiCredit F x 0 r ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) = F true
   have hfn : (fun r => BiiCredit F x 0 r) = (fun _ => F true) := by funext r; rfl
   rw [hfn, lintegral_const, measure_univ, mul_one]
 
 theorem BiiCCredit_two (F : Bool → ℝ≥0∞) (x : ℝ) : BiiCCredit F x 2 = F false := by
-  show ∫⁻ r, BiiCredit F x 2 r ∂(ProbLangℝ.unifUnit (T := ℝ)) = F false
+  show ∫⁻ r, BiiCredit F x 2 r ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) = F false
   have hfn : (fun r => BiiCredit F x 2 r) = (fun _ => F false) := by funext r; rfl
   rw [hfn, lintegral_const, measure_univ, mul_one]
 
@@ -325,7 +325,7 @@ theorem BiiFailProb_mul_setLIntegral_SCreditV (F : ℕ → ℝ≥0∞) (k : ℕ)
 
 theorem SCreditAmp_lintegral_eq (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (N : ℕ) (y : ℝ) (c : ℝ≥0∞)
     (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (hy0 : 0 ≤ y) (hy1 : y ≤ 1) :
-    ∫⁻ z, SCreditAmp F k x N y c z ∂(ProbLangℝ.unifUnit (T := ℝ))
+    ∫⁻ z, SCreditAmp F k x N y c z ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
       = SCreditV F k x y N + ENNReal.ofReal (BiiFailProb k x * y) * c := by
   have hqnn := BiiFailProb_nonneg k hx0
   have hset_ioi : Set.Ioi y ∩ Set.Icc (0 : ℝ) 1 = Set.Ioc y 1 := by
@@ -369,7 +369,7 @@ theorem SCreditAmp_lintegral_eq (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (N 
 
 theorem SCreditAmp_lintegral_le (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (N : ℕ) (y : ℝ) (c : ℝ≥0∞)
     (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (hy0 : 0 ≤ y) (hy1 : y ≤ 1) (B : ℝ) (hyB : y ≤ B) :
-    ∫⁻ z, SCreditAmp F k x N y c z ∂(ProbLangℝ.unifUnit (T := ℝ))
+    ∫⁻ z, SCreditAmp F k x N y c z ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
       ≤ SCreditV F k x y N + ENNReal.ofReal B * c := by
   rw [SCreditAmp_lintegral_eq F k x N y c hx0 hx1 hy0 hy1]
   have hq1 := BiiFailProb_le_one k hx1
@@ -423,9 +423,8 @@ end conservation
 
 section specification
 
-theorem decide_int_lit_eq {n m : Int} :
-    decide ((BaseLit.int n : BaseLit ℝ) = BaseLit.int m) = decide (n = m) := by
-  simp only [BaseLit.int.injEq]
+theorem beq_int_lit {n m : Int} :
+    ((BaseLit.int n : BaseLit ℝ) == BaseLit.int m) = (n == m) := rfl
 
 theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
     ⊢@{IProp GF} ↯ (CCreditV F m) -∗
@@ -444,7 +443,7 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
   obtain ⟨Hn0, Hnz⟩ := Hn
   twp_pures
   by_cases h0 : n = 0
-  · rw [decide_int_lit_eq, decide_eq_true h0]
+  · rw [beq_int_lit, beq_iff_eq.mpr h0]
     twp_pures
     twp_value
     imodintro
@@ -453,10 +452,10 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
     isimp only [hc] at Hcr
     iframe Hcr
     itrivial
-  · rw [decide_int_lit_eq, decide_eq_false h0]
+  · rw [beq_int_lit, beq_eq_false_iff_ne.mpr h0]
     twp_pures
     by_cases h1 : n = 1
-    · rw [decide_int_lit_eq, decide_eq_true h1]
+    · rw [beq_int_lit, beq_iff_eq.mpr h1]
       twp_pures
       twp_value
       imodintro
@@ -465,7 +464,7 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
       isimp only [hc] at Hcr
       iframe Hcr
       itrivial
-    · rw [decide_int_lit_eq, decide_eq_false h1]
+    · rw [beq_int_lit, beq_eq_false_iff_ne.mpr h1]
       twp_pures
       twp_value
       imodintro
@@ -497,7 +496,7 @@ theorem twp_Bii (E : CoPset) (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx0 
   iapply (twp_urand_exp' (ε₂ := BiiCredit F x n) (measurable_biiCredit F x n) ?hint) $$ Hcn
   case hint =>
     have hBc : BiiCCredit F x n
-        = ∫⁻ r, BiiCredit F x n r ∂(ProbLangℝ.unifUnit (T := ℝ)) := rfl
+        = ∫⁻ r, BiiCredit F x n r ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) := rfl
     rw [hBc]
   iintro %r ⟨%-, Hcr⟩
   twp_pure
@@ -565,7 +564,7 @@ theorem twp_S_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx
       rw [← mul_assoc, hkf,
           ← ENNReal.ofReal_mul hB0.le, mul_one_div, div_self (ne_of_gt hB0),
           ENNReal.ofReal_one, one_mul]
-    calc ∫⁻ r, SCreditAmp F k x N y (↑kf * ε_term) r ∂(ProbLangℝ.unifUnit (T := ℝ))
+    calc ∫⁻ r, SCreditAmp F k x N y (↑kf * ε_term) r ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
         ≤ SCreditV F k x y N + ENNReal.ofReal B * (↑kf * ε_term) :=
           SCreditAmp_lintegral_le F k x N y (↑kf * ε_term) hx0 hx1 Hy0 hy1 B HyB
       _ = SCreditV F k x y N + ε_term := by rw [hBkf]

@@ -15,7 +15,7 @@ open Iris Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 namespace OTP
 
-variable {rT : Type} [ProbLangℝ rT] [MeasurableSingletonClass rT]
+variable {rT : Type} [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-! ### The bijection -/

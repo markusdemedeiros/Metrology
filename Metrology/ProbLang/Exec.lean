@@ -14,7 +14,7 @@ open Classical MeasureTheory ProbabilityTheory Measure ProbLang
 namespace ProbLang
 
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 def execN (n : Nat) (ρ : Cfg rT) : Measure (Cfg rT) :=
   match n with

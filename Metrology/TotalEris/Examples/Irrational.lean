@@ -33,7 +33,7 @@ theorem irratErr_le_one (r : ℝ) : irratErr r ≤ 1 := by
   by_cases h : Irrational r <;> simp [h]
 
 open MeasureTheory in
-theorem lintegral_irratErr_eq_zero : ∫⁻ r, irratErr r ∂(ProbLangℝ.unifUnit) = 0 := by
+theorem lintegral_irratErr_eq_zero : ∫⁻ r, irratErr r ∂(LawfulProbLangℝ.unifUnit) = 0 := by
   have hrange : {r : ℝ | ¬ Irrational r} = Set.range ((↑) : ℚ → ℝ) := by
     ext r; simp [Irrational]
   rw [irratErr, lintegral_indicator_const measurableSet_not_irrational, one_mul]

@@ -10,7 +10,7 @@ public import Metrology.ProbLang.CtxStep
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-- Atomic: Each atom that can be prim-stepped to is a value.
 
@@ -157,7 +157,7 @@ theorem urand' : Atomic' (rT := rT) .urand := by
   rw [primStep_eq_headStep_of_decomp_nil hd]
   show (Cfg.uniformReal σ) {ρ : Cfg rT | ρ.1.isValue}ᶜ = 0
   rw [Cfg.uniformReal, MeasureTheory.Measure.map_apply (by fun_prop) Cfg.isValue_measurableSet.compl]
-  convert MeasureTheory.measure_empty (μ := ProbLangℝ.unifUnit)
+  convert MeasureTheory.measure_empty (μ := LawfulProbLangℝ.unifUnit)
   ext r
   simp only [Set.mem_preimage, Set.mem_compl_iff, Set.mem_setOf_eq, Set.mem_empty_iff_false,
     iff_false, not_not]

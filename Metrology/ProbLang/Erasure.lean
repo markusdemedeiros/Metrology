@@ -11,7 +11,7 @@ public import Metrology.ProbLang.Metatheory
 
 namespace ProbLang
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 open MeasureTheory Measure
 
@@ -29,7 +29,7 @@ noncomputable def tapeIndexUniform (N : Int) : Measure { z : Int // 0 ≤ z ∧ 
 
 def getActive (σ : State rT) : List Loc := σ.tapes.keys
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem getActive_mem_iff {σ : State rT} {α : Loc} :
     α ∈ getActive σ ↔ α ∈ σ.tapes := by
   unfold getActive
@@ -93,7 +93,7 @@ theorem lintegral_tapeIndexUniform {N : Int} (hN : 0 < N)
       PMF.uniformOfFinset_apply_of_mem _ hn, hcard, mul_comm]
 
 /-- `tapePresample σ α` is a probability measure when `α` is an existing
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 tape with positive bound. -/
 theorem tapePresample_univ_eq_one {σ : State rT} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) (hN : 0 < t.bound) :
@@ -406,7 +406,7 @@ with `σ.tapes[α]? = some ⟨N, bs⟩` has the form
 `σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)` for some sampled `n`. Proving
 a property `P` holds a.e. on `tapePresample σ α` therefore reduces to
 checking it at every such update — bypassing the `bind`/`lintegral`/
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 `indicator` scaffolding. -/
 theorem tapePresample_ae
     {σ : State rT} {α : Loc} {N : Int}
@@ -568,7 +568,7 @@ theorem tapePresample_update_tapes_ne_comm
 /-- Lintegral over `tapePresample σ α` unfolds to a lintegral over
 `tapeIndexUniform N` against the presampled-state integrand. Combines the
 unfolding of `tapePresample` with `lintegral_bind` + `lintegral_dirac'` so
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 call sites don't re-do the same 3-line scaffold. -/
 theorem tapePresample_lintegral
     {σ : State rT} {α : Loc} {N : Int}
@@ -751,7 +751,7 @@ This is Clutch's `prim_coupl_upd_tapes_dom` almost verbatim: Clutch states
 it as an `Rcoupl` under `eq` on the `dmap (λ x, x.1)` projection, which is
 the same thing. -/
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Inserting the same tape value at an existing key is the identity on `(State rT)`. -/
 theorem State.update_tapes_insert_id {σ : State rT} {α : Loc} {t : Tape}
     (h : σ.tapes[α]? = some t) :
@@ -760,7 +760,7 @@ theorem State.update_tapes_insert_id {σ : State rT} {α : Loc} {t : Tape}
 
 /-- Mapping `tapeIndexUniform N` through the (Cfg rT) embedding `a ↦ ⟨lit (int ↑a), σ⟩`
 gives `Cfg.uniform N σ`. Both are the uniform distribution on
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 `{⟨lit (int n), σ⟩ | n ∈ [0, N)}`. -/
 theorem tapeIndexUniform_lintegral_eq_cfg_uniform
     {N : Int} (hN : 0 < N) (σ : State rT)
@@ -954,7 +954,7 @@ theorem erasure_uniformReal_close
   haveI : IsProbabilityMeasure (tapePresample σ α) :=
     ⟨tapePresample_univ_eq_one h hN⟩
   have hunif : ∀ σ₀ : State rT, Cfg.uniformReal σ₀ =
-      (ProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₀⟩ : Cfg rT)) :=
+      (LawfulProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₀⟩ : Cfg rT)) :=
     fun _ => rfl
   calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
                 ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α

@@ -61,7 +61,7 @@ def G1CreditV (F : ℕ → ℝ≥0∞) : ℝ≥0∞ := ∑' k : ℕ, G1PMF k * F
 
 open MeasureTheory in
 def G2CreditV (F : ℕ → ℝ → ℝ≥0∞) : ℝ≥0∞ :=
-  ∑' k : ℕ, ∫⁻ x, G2pdf k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
+  ∑' k : ℕ, ∫⁻ x, G2pdf k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
 
 end creditExpectation
 
@@ -154,7 +154,7 @@ def G2CreditAmp (F : ℕ → ℝ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) (x :
 
 open MeasureTheory in
 def G2G1Credit (F : ℕ → ℝ → ℝ≥0∞) (c : ℝ≥0∞) (k : ℕ) : ℝ≥0∞ :=
-  ∫⁻ x, G2CreditAmp F c k x ∂(ProbLangℝ.unifUnit (T := ℝ))
+  ∫⁻ x, G2CreditAmp F c k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
 
 def G2p (k : ℕ) (x : ℝ) : ℝ≥0∞ := ENNReal.ofReal ((γBkx k x : ℝ) ^ (k + 1))
 
@@ -180,13 +180,13 @@ end measurability
 section unifUnit
 
 open MeasureTheory in
-theorem unifUnit_univ : (ProbLangℝ.unifUnit (T := ℝ)) Set.univ = 1 := by
+theorem unifUnit_univ : (LawfulProbLangℝ.unifUnit (T := ℝ)) Set.univ = 1 := by
   show (volume.restrict (Set.Icc (0 : ℝ) 1)) Set.univ = 1
   rw [Measure.restrict_apply_univ, Real.volume_Icc]; norm_num
 
 open MeasureTheory in
 theorem unifUnit_lintegral_one :
-    ∫⁻ _x : ℝ, (1 : ℝ≥0∞) ∂(ProbLangℝ.unifUnit (T := ℝ)) = 1 := by
+    ∫⁻ _x : ℝ, (1 : ℝ≥0∞) ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) = 1 := by
   rw [lintegral_one, unifUnit_univ]
 
 end unifUnit
@@ -202,8 +202,8 @@ theorem G2G1Credit_le (F : ℕ → ℝ → ℝ≥0∞) {M : ℝ≥0∞}
     (Hbd : ∀ x k, 0 ≤ x → x ≤ 1 → F k x ≤ M) (c : ℝ≥0∞) (n : ℕ) :
     G2G1Credit F c n ≤ M + G2CreditV F + c := by
   rw [G2G1Credit]
-  calc ∫⁻ x, G2CreditAmp F c n x ∂(ProbLangℝ.unifUnit (T := ℝ))
-      ≤ ∫⁻ _x, (M + (G2CreditV F + c)) ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
+  calc ∫⁻ x, G2CreditAmp F c n x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
+      ≤ ∫⁻ _x, (M + (G2CreditV F + c)) ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) := by
         apply lintegral_mono_ae
         filter_upwards [ae_restrict_mem measurableSet_Icc] with x hx
         have ht : G2IterContAmp F c n x true = F n x := by simp [G2IterContAmp]
@@ -427,7 +427,7 @@ theorem G1PMF_tsum : ∑' k : ℕ, G1PMF k = 1 := by
 
 open MeasureTheory in
 theorem G2pdf_setLIntegral (k : ℕ) :
-    ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ))
+    ∫⁻ x, G2pdf k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (∫ x in (0 : ℝ)..1, Real.exp (-((x + k) ^ 2) / 2) / Norm2) := by
   show ∫⁻ x in Set.Icc (0 : ℝ) 1, G2pdf k x ∂volume = _
   simp only [G2pdf]
@@ -435,7 +435,7 @@ theorem G2pdf_setLIntegral (k : ℕ) :
     (fun r _ => div_nonneg (Real.exp_pos _).le Norm2_pos.le)
 
 open MeasureTheory in
-theorem G2pdf_total : ∑' k : ℕ, ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) = 1 := by
+theorem G2pdf_total : ∑' k : ℕ, ∫⁻ x, G2pdf k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) = 1 := by
   simp_rw [G2pdf_setLIntegral, intervalIntegral.integral_div]
   rw [← ENNReal.ofReal_tsum_of_nonneg
         (fun k => div_nonneg (intervalIntegral.integral_nonneg (by norm_num)
@@ -462,9 +462,9 @@ theorem G1PMF_mul_accept (k : ℕ) {x : ℝ} (hx : 0 ≤ x) :
 
 open MeasureTheory in
 theorem G2_accept_lintegral (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) :
-    G1PMF k * ∫⁻ x, G2p k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ))
+    G1PMF k * ∫⁻ x, G2p k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
       = ENNReal.ofReal (Norm2 / Norm1)
-          * ∫⁻ x, G2pdf k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
+          * ∫⁻ x, G2pdf k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) := by
   rw [← lintegral_const_mul' (G1PMF k) _ (by rw [G1PMF]; exact ENNReal.ofReal_ne_top),
       ← lintegral_const_mul' _ _ ENNReal.ofReal_ne_top]
   show ∫⁻ x in Set.Icc (0 : ℝ) 1, _ ∂volume = ∫⁻ x in Set.Icc (0 : ℝ) 1, _ ∂volume
@@ -474,8 +474,8 @@ theorem G2_accept_lintegral (F : ℕ → ℝ → ℝ≥0∞) (k : ℕ) :
 
 open MeasureTheory in
 theorem G2_accept_mass (k : ℕ) :
-    G1PMF k * ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))
-      = ENNReal.ofReal (Norm2 / Norm1) * ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
+    G1PMF k * ∫⁻ x, G2p k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))
+      = ENNReal.ofReal (Norm2 / Norm1) * ∫⁻ x, G2pdf k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) := by
   have h := G2_accept_lintegral (fun _ _ => 1) k
   simpa only [mul_one] using h
 
@@ -550,26 +550,26 @@ theorem G2G1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable 
   have hρ_le : ENNReal.ofReal (Norm2 / Norm1) ≤ 1 := by
     rw [← ENNReal.ofReal_one]
     exact ENNReal.ofReal_le_ofReal Norm2_div_Norm1_lt_one.le
-  have hq1 : ∀ k, (∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) ≤ 1 := fun k =>
+  have hq1 : ∀ k, (∫⁻ x, G2p k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))) ≤ 1 := fun k =>
     (lintegral_mono (fun x => G2p_le_one k x)).trans unifUnit_lintegral_one.le
   have hgm_mul : ∀ k, ENNReal.ofReal (Norm2 / Norm1)
-      * ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) ≤ G1PMF k := fun k => by
+      * ∫⁻ x, G2pdf k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) ≤ G1PMF k := fun k => by
     rw [← G2_accept_mass k]
     exact (mul_le_mul_right (hq1 k) (G1PMF k)).trans (le_of_eq (mul_one _))
-  have h1mp : ∀ k, (∫⁻ x, (1 - G2p k x) ∂(ProbLangℝ.unifUnit (T := ℝ)))
-      = 1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := fun k => by
+  have h1mp : ∀ k, (∫⁻ x, (1 - G2p k x) ∂(LawfulProbLangℝ.unifUnit (T := ℝ)))
+      = 1 - ∫⁻ x, G2p k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) := fun k => by
     rw [MeasureTheory.lintegral_sub (measurable_g2p k)
           (ne_top_of_le_ne_top ENNReal.one_ne_top (hq1 k))
           (Filter.Eventually.of_forall (fun x => G2p_le_one k x)), unifUnit_lintegral_one]
   have hfun :
-      (fun k : ℕ => (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1PMF k)
+      (fun k : ℕ => (1 - ∫⁻ x, G2p k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))) * G1PMF k)
         = fun k => G1PMF k
             - ENNReal.ofReal (Norm2 / Norm1)
-              * ∫⁻ x, G2pdf k x ∂(ProbLangℝ.unifUnit (T := ℝ)) := by
+              * ∫⁻ x, G2pdf k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)) := by
     funext k
     rw [ENNReal.sub_mul (fun _ _ => by rw [G1PMF]; exact ENNReal.ofReal_ne_top), one_mul,
-        mul_comm (∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) (G1PMF k), G2_accept_mass k]
-  have hrejsum : (∑' k : ℕ, (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1PMF k)
+        mul_comm (∫⁻ x, G2p k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))) (G1PMF k), G2_accept_mass k]
+  have hrejsum : (∑' k : ℕ, (1 - ∫⁻ x, G2p k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))) * G1PMF k)
       = 1 - ENNReal.ofReal (Norm2 / Norm1) := by
     rw [hfun,
       ENNReal.tsum_sub
@@ -577,12 +577,12 @@ theorem G2G1_collapse (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, Measurable 
             exact ne_top_of_le_ne_top ENNReal.one_ne_top hρ_le) hgm_mul,
       G1PMF_tsum, ENNReal.tsum_mul_left, G2pdf_total, mul_one]
   have haccsum : (∑' k : ℕ, ENNReal.ofReal (Norm2 / Norm1)
-      * ∫⁻ x, G2pdf k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)))
+      * ∫⁻ x, G2pdf k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)))
       = ENNReal.ofReal (Norm2 / Norm1) * G2CreditV F := by
     rw [ENNReal.tsum_mul_left]; rfl
   have hsplit : ∀ k : ℕ, G1PMF k * G2G1Credit F c k
-      = ENNReal.ofReal (Norm2 / Norm1) * (∫⁻ x, G2pdf k x * F k x ∂(ProbLangℝ.unifUnit (T := ℝ)))
-        + (1 - ∫⁻ x, G2p k x ∂(ProbLangℝ.unifUnit (T := ℝ))) * G1PMF k * (G2CreditV F + c) := by
+      = ENNReal.ofReal (Norm2 / Norm1) * (∫⁻ x, G2pdf k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ)))
+        + (1 - ∫⁻ x, G2p k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))) * G1PMF k * (G2CreditV F + c) := by
     intro k
     have hamp : (fun x => G2CreditAmp F c k x)
         = fun x => G2p k x * F k x + (1 - G2p k x) * (G2CreditV F + c) := by

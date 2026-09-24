@@ -29,7 +29,7 @@ namespace ProbLang
 
 
 section Compatibility
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 
 /-- Helper: unfold `lrel_arr` application. Proves that `(lrel_arr A B).car v v'` is
@@ -205,7 +205,7 @@ theorem refines_seq (A : lrel rT GF) {e1 e2 e1' e2' : Exp rT} {B : lrel rT GF}
   iapply (refines_beta_r (u := v') he2')
   iexact IH2
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: build `(lrel_exists C).car v v'` from a closedness witness and the
 existential body. Defeq via `lrel.mk` projection. -/
 theorem lrel_exists_unfold (C : lrel rT GF → lrel rT GF) (v v' : Val rT) :
@@ -214,7 +214,7 @@ theorem lrel_exists_unfold (C : lrel rT GF → lrel rT GF) (v v' : Val rT) :
       ⊢@{IProp GF} (lrel_exists C).car v v' :=
   .rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: `(lrel_pos_nat).car v v' ⊢ ∃ n : Nat, 0 < n ∧ v = #n ∧ v' = #n`. -/
 theorem lrel_pos_nat_unfold (v v' : Val rT) :
     (lrel_pos_nat (GF := GF)).car v v'
@@ -222,7 +222,7 @@ theorem lrel_pos_nat_unfold (v v' : Val rT) :
         v = .int n ∧ v' = .int n⌝ :=
   .rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: `(lrel_int).car v v' ⊢ ∃ n : Int, v = #n ∧ v' = #n`. -/
 theorem lrel_int_unfold (v v' : Val rT) :
     (lrel_int (GF := GF)).car v v'
@@ -230,7 +230,7 @@ theorem lrel_int_unfold (v v' : Val rT) :
         ⌜v = .int n ∧ v' = .int n⌝ :=
   .rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: `(lrel_prod A
   B).car v v' ⊢ ∃ a1 a2 b1 b2, v=(a1,b1) ∧ v'=(a2,b2) ∧ A a1 a2 ∧ B b1 b2`. -/
 theorem lrel_prod_unfold (A B : lrel rT GF) (v v' : Val rT) :
@@ -240,7 +240,7 @@ theorem lrel_prod_unfold (A B : lrel rT GF) (v v' : Val rT) :
         A a1 a2 ∗ B b1 b2 :=
   .rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: `(lrel_sum A B).car v v' ⊢ ∃ w1 w2, ((inl form) ∨ (inr form))`. -/
 theorem lrel_sum_unfold (A B : lrel rT GF) (v v' : Val rT) :
     (lrel_sum A B).car v v' ⊢@{IProp GF}
@@ -250,20 +250,20 @@ theorem lrel_sum_unfold (A B : lrel rT GF) (v v' : Val rT) :
         (⌜v.1 = .inr w1.1⌝ ∗ ⌜v'.1 = .inr w2.1⌝ ∗ B w1 w2) :=
   .rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: `(lrel_unit).car v v' ⊢ v = () ∧ v' = ()`. -/
 theorem lrel_unit_unfold (v v' : Val rT) :
     (lrel_unit (GF := GF)).car v v' ⊢@{IProp GF} ⌜v = .unit ∧ v' = .unit⌝ :=
   .rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: `(lrel_real).car v v' ⊢ ∃ r, v=#r ∧ v'=#r`. -/
 theorem lrel_real_unfold (v v' : Val rT) :
     (lrel_real : lrel rT GF).car v v' ⊢@{IProp GF}
       ∃ r : rT, ⌜v = .real r ∧ v' = .real r⌝ :=
   .rfl
 
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 /-- Helper: `(lrel_bool).car v v' ⊢ ∃ b : Bool, v=#b ∧ v'=#b`. -/
 theorem lrel_bool_unfold (v v' : Val rT) :
     (lrel_bool (GF := GF)).car v v' ⊢@{IProp GF}

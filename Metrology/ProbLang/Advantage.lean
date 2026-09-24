@@ -81,7 +81,7 @@ theorem tvDist_le_of_addCoupl_eq {ε : ENNReal} {μ ν : Measure α}
     sup_le (tsub_le_iff_left.mpr (AddCoupl.eq_elim h₁ hS))
       (tsub_le_iff_left.mpr (AddCoupl.eq_elim h₂ hS))
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 /-- **Distinguishing advantage** of `X` against `Y`: the largest total-variation
 distance between their result distributions over all initial states. An

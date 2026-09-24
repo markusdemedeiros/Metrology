@@ -100,7 +100,7 @@ namespace ProbLang
 
 open ProbLang.AdequacyHelpers
 
-variable {rT : Type _} [ProbLangℝ rT]
+variable {rT : Type _} [LawfulProbLangℝ rT]
 
 def adequacyRel (φ : Val rT → Val rT → Prop) : Set ((Exp rT) × (Exp rT)) :=
   fun p => ∃ (v v' : Val rT), p.1.toVal? = some v ∧ p.2.toVal? = some v' ∧ φ v v'
@@ -237,7 +237,7 @@ theorem wpPre_value_Z_eq {v : Val rT} {Φ : Val rT → IProp GF} (E : CoPset) :
 -- Bridging two match-compiler artifacts is the whole point of this lemma, so the
 -- reference to `.match_1` is deliberate rather than an accident to be refactored away.
 set_option linter.auxLemma false in
-omit [ProbLangℝ rT] in
+omit [LawfulProbLangℝ rT] in
 theorem wpPre_match_eq (motive : Option (Val rT) → Sort u)
     (x : Option (Val rT)) (some_f : (v : Val rT) → motive (some v))
     (none_f : Unit → motive none) :
