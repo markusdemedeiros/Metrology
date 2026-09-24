@@ -84,7 +84,7 @@ theorem BiiFailProb_mul_setLIntegral_SPMF₀ (k : ℕ) {x y : ℝ} (hx0 : 0 ≤ 
           - BiiFailProb k x ^ (m + 1) * y ^ (m + 2) / (m + 2).factorial) := by
     rw [← hint, ← lintegral_ofReal_Icc hy0 (by fun_prop) (fun z hz =>
           RealDecrTrialPMF₀_real_nonneg (mul_nonneg hz.1 hqnn)
-            (mul_le_one₀ (hz.2.trans hy1) hqnn hq1) m)]
+            ((mul_le_of_le_one_left hqnn (hz.2.trans hy1)).trans hq1) m)]
     refine setLIntegral_congr_fun measurableSet_Icc (fun z hz => ?_)
     rw [SPMF₀_eq_RealDecrTrialPMF₀]; rfl
   rw [hbridge, ← ENNReal.ofReal_mul hqnn]
@@ -117,8 +117,8 @@ theorem SCreditV_eq_RealDecrTrialCreditV (F : ℕ → ℝ≥0∞) (k : ℕ) (x y
   congr 1
   unfold SPMF RealDecrTrialPMF
   by_cases h : N ≤ n
-  · rw [if_pos h, if_pos h, SPMF₀_eq_RealDecrTrialPMF₀]
-  · rw [if_neg h, if_neg h]
+  · rw [ite_eq_left h, ite_eq_left h, SPMF₀_eq_RealDecrTrialPMF₀]
+  · rw [ite_eq_right h, ite_eq_right h]
 
 theorem SCreditV_peel (F : ℕ → ℝ≥0∞) (k : ℕ) (x y : ℝ) (N : ℕ) :
     SCreditV F k x y N
@@ -241,8 +241,8 @@ theorem measurable_sPMF (k : ℕ) (x : ℝ) (N n : ℕ) :
     Measurable (fun y : ℝ => SPMF k x y N n) := by
   unfold SPMF
   by_cases h : N ≤ n
-  · simpa only [h, if_true] using measurable_sPMF₀ k x (n - N)
-  · simpa only [h, if_false] using measurable_const
+  · simpa only [h, ite_true] using measurable_sPMF₀ k x (n - N)
+  · simpa only [h, ite_false] using measurable_const
 
 theorem measurable_sCreditV (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (N : ℕ) :
     Measurable (fun y : ℝ => SCreditV F k x y N) :=
@@ -311,11 +311,10 @@ theorem SCreditAmp_lintegral_eq (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (N 
     funext z
     simp only [SCreditAmp, Set.piecewise, Set.mem_Ioi]
     by_cases h : y < z
-    · simp only [if_pos h]
-    · simp only [if_neg h]
-      show BiiCreditV (SbiiCredit F k x N z c) k x = _
+    · simp only [ite_eq_left h]
+    · simp only [ite_eq_right h]
       unfold BiiCreditV SbiiCredit BiiPMF
-      simp only [Bool.false_eq_true, if_false, if_true]
+      simp only [Bool.false_eq_true, ite_false, ite_true]
       ring
   rw [hfun,
     lintegral_piecewise measurableSet_Ioi, Set.compl_Ioi,
@@ -369,14 +368,14 @@ theorem BCreditV_S0_eq (F : Bool → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx0 : 0 �
     BCreditV F k x = SCreditV (BS0Credit F) k x x 0 := by
   have hp0 : (0 : ℝ) ≤ x * BiiFailProb k x := mul_nonneg hx0 (BiiFailProb_nonneg k hx0)
   have hp1 : x * BiiFailProb k x ≤ 1 :=
-    mul_le_one₀ hx1 (BiiFailProb_nonneg k hx0) (BiiFailProb_le_one k hx1)
+    (mul_le_of_le_one_left (BiiFailProb_nonneg k hx0) hx1).trans (BiiFailProb_le_one k hx1)
   have hSeq : SCreditV (BS0Credit F) k x x 0
       = RealDecrTrialCreditV (fun n => if n % 2 = 0 then F true else F false) 0
           (x * BiiFailProb k x) := by
     unfold SCreditV RealDecrTrialCreditV
     refine tsum_congr fun n => ?_
     have hSPMF : SPMF k x x 0 n = RealDecrTrialPMF₀ (x * BiiFailProb k x) n := by
-      rw [SPMF, if_pos (Nat.zero_le n), Nat.sub_zero, SPMF₀_eq_RealDecrTrialPMF₀]
+      rw [SPMF, ite_eq_left (Nat.zero_le n), Nat.sub_zero, SPMF₀_eq_RealDecrTrialPMF₀]
     rw [hSPMF, RealDecrTrialPMF_base]
     simp only [BS0Credit]
   rw [hSeq, RealDecrTrialCreditV_parity (F true) (F false) hp0 hp1]
@@ -417,7 +416,7 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
     twp_value
     imodintro
     have hc : CCredit F n.toNat = F 0 := by
-      simp only [CCredit]; rw [if_pos (by omega : n.toNat = 0)]
+      simp only [CCredit]; rw [ite_eq_left (by omega : n.toNat = 0)]
     isimp only [hc] at Hcr
     iframe Hcr
     itrivial
@@ -429,7 +428,7 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
       twp_value
       imodintro
       have hc : CCredit F n.toNat = F 1 := by
-        simp only [CCredit]; rw [if_neg (by omega), if_pos (by omega : n.toNat = 1)]
+        simp only [CCredit]; rw [ite_eq_right (by omega), ite_eq_left (by omega : n.toNat = 1)]
       isimp only [hc] at Hcr
       iframe Hcr
       itrivial
@@ -438,7 +437,7 @@ theorem twp_C (E : CoPset) (F : ℕ → ℝ≥0∞) (m : ℕ) :
       twp_value
       imodintro
       have hc : CCredit F n.toNat = F 2 := by
-        simp only [CCredit]; rw [if_neg (by omega), if_neg (by omega)]
+        simp only [CCredit]; rw [ite_eq_right (by omega), ite_eq_right (by omega)]
       isimp only [hc] at Hcr
       iframe Hcr
       itrivial
@@ -505,7 +504,7 @@ theorem twp_S_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx
       tglWp E pl(&S #(.int (k : ℤ)) #(.real x) #(.real y) #(.int (N : ℤ)))
         (fun v : Val ℝ => iprop(∃ n : ℕ, ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))) := by
   have hkpos : (0 : ℝ) ≤ 1 / B := by positivity
-  set kf : ℝ≥0 := ⟨1 / B, hkpos⟩ with hkf_def
+  set kf : ℝ≥0 := ⟨1 / B, hkpos⟩
   have Hk1 : 1 < kf := by
     have h : (1 : ℝ) < 1 / B := by rw [lt_div_iff₀ hB0]; linarith
     exact_mod_cast h
@@ -529,7 +528,7 @@ theorem twp_S_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (k : ℕ) (x : ℝ) (hx
     have hy1 : y ≤ 1 := by linarith
     have hBkf : ENNReal.ofReal B * (↑kf * ε_term) = ε_term := by
       have hkf : (↑kf : ℝ≥0∞) = ENNReal.ofReal (1 / B) := by
-        rw [hkf_def, ← ENNReal.ofReal_coe_nnreal]; rfl
+        rw [← ENNReal.ofReal_coe_nnreal]; rfl
       rw [← mul_assoc, hkf,
           ← ENNReal.ofReal_mul hB0.le, mul_one_div, div_self (ne_of_gt hB0),
           ENNReal.ofReal_one, one_mul]

@@ -127,7 +127,7 @@ theorem specUpdate_mono {E : CoPset} {P Q : IProp GF} : iprop%
     specUpdate rT E P ∗ (P -∗ Q) ⊢ specUpdate rT E Q := by
   iintro ⟨HP, HPQ⟩
   iapply specUpdate_mono_fupd
-  iframe
+  iframe HP
   iintro _ !>
   iapply HPQ $$ [$]
 

@@ -345,7 +345,7 @@ theorem flatten_inter_mixed₁ {L : Type _} [DecidableEq L] {ctor : L → T → 
     cases o with
     | none => simp
     | some r => simp [hwrap u r]
-  · simp only [hu, if_false, Option.elim_none]
+  · simp only [hu, ite_false, Option.elim_none]
     ext z
     simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false, not_and]
     rintro ⟨x, _, rfl⟩ ⟨y, _, hh⟩
@@ -373,7 +373,7 @@ theorem flatten_inter_mixed₂ {L : Type _} [DecidableEq L] {ctor : L → T → 
     | some r₁ => cases o₂ with
       | none => simp
       | some r₂ => simp [hwrap u r₁ r₂]
-  · simp only [hu, if_false, Option.elim_none]
+  · simp only [hu, ite_false, Option.elim_none]
     ext z
     simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false, not_and]
     rintro ⟨x, _, rfl⟩ ⟨y, _, hh⟩
@@ -420,8 +420,8 @@ theorem flatten_inter_mixed_data {L D : Type _} [DecidableEq L] {ctor : L → D 
   subst hcomb
   by_cases hu : u = u'
   · subst hu
-    rw [if_pos rfl, Option.elim_some, hwrap u (S ∩ S'), ← Set.image_inter (hctor u)]
-  · simp only [hu, if_false, Option.elim_none]
+    rw [ite_eq_left rfl, Option.elim_some, hwrap u (S ∩ S'), ← Set.image_inter (hctor u)]
+  · simp only [hu, ite_false, Option.elim_none]
     ext z
     simp only [Set.mem_inter_iff, Set.mem_image, Set.mem_empty_iff_false, iff_false, not_and]
     rintro ⟨x, _, rfl⟩ ⟨y, _, hh⟩
@@ -439,7 +439,7 @@ theorem flatten_inter_leaf {L : Type _} [DecidableEq L] {ctor : L → T}
   subst hcomb
   by_cases hu : u = u'
   · subst hu; simp [hwrap u]
-  · simp only [hu, if_false, Option.elim_none]
+  · simp only [hu, ite_false, Option.elim_none]
     ext z; simp only [Set.mem_inter_iff, Set.mem_singleton_iff, Set.mem_empty_iff_false, iff_false,
       not_and]
     rintro rfl h; exact hu (hctor h)

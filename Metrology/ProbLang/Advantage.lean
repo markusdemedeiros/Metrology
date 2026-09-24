@@ -97,7 +97,7 @@ theorem advantage_le {X Y : Exp rT} {ε : ENNReal}
 
 theorem le_advantage (X Y : Exp rT) (σ : State rT) :
     tvDist (limExecV ⟨X, σ⟩) (limExecV ⟨Y, σ⟩) ≤ advantage X Y :=
-  le_iSup (α := ENNReal) _ σ
+  le_iSup (fun σ : State rT => tvDist (limExecV ⟨X, σ⟩) (limExecV ⟨Y, σ⟩)) σ
 
 theorem advantage_comm (X Y : Exp rT) : advantage X Y = advantage Y X :=
   iSup_congr fun _ => tvDist_comm _ _

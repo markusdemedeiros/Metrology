@@ -1,6 +1,6 @@
 module
 
-public import Mathlib.Data.ENNReal.Basic
+public import Mathlib.Basic.ENNReal.Basic
 public import Iris
 public import Iris.Algebra.HeapView
 public import Iris.Instances.IProp.Instance
@@ -43,7 +43,6 @@ def LocHeap.asAgree [OFE V] (h : LocHeap V) : LocHeap (Agree V) :=
 
 theorem LocHeap.asAgree_get? [OFE V] (h : LocHeap V) (l : Loc) :
     PartialMap.get? (LocHeap.asAgree h) l = (PartialMap.get? h l).map toAgree := by
-  show PartialMap.get? _ _ = _
   simp only [LocHeap.asAgree, PartialMap.map, LawfulPartialMap.get?_bindAlter]
   cases PartialMap.get? h l <;> rfl
 

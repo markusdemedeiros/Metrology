@@ -37,7 +37,7 @@ namespace ProbLang
 
 variable {rT : Type _} [LawfulProbLangℝ rT]
 
-open MeasureTheory Measure
+open MeasureTheory MeasureTheory.Measure ProbLang.Measure
 
 /-! ## Erasable -/
 

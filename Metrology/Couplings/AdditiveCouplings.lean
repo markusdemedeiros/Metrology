@@ -1,11 +1,10 @@
 module
 
-public import Mathlib.Data.Real.Basic
+public import Mathlib.Basic.Real.Basic
 public import Mathlib.Data.EReal.Basic
-public import Mathlib.MeasureTheory.Measure.MeasureSpace
 public import Mathlib.MeasureTheory.Constructions.BorelSpace.Basic
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Basic
-public import Mathlib.MeasureTheory.Measure.Dirac
+public import Mathlib.MeasureTheory.Measure.Dirac.Basic
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
 public import Mathlib.Analysis.SpecialFunctions.Log.ERealExp
 public import Mathlib.MeasureTheory.Measure.GiryMonad
@@ -472,7 +471,7 @@ theorem concentrated_R {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} 
     intro b hb
     simp only [Set.mem_compl_iff]
     intro hbT
-    exact hb (by simp only [g', if_pos hbT])
+    exact hb (by simp only [g', ite_eq_left hbT])
   have Hgeq : ∫⁻ b, g b ∂μᵣ = ∫⁻ b, g' b ∂μᵣ := lintegral_congr_ae hae
   rw [Hgeq]
   exact H ⟨f, Hfm, Hfb⟩ G HFG
@@ -510,7 +509,7 @@ theorem concentrated_L {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} 
     intro a ha
     simp only [Set.mem_compl_iff]
     intro haT
-    exact ha (by simp only [f', if_pos haT])
+    exact ha (by simp only [f', ite_eq_left haT])
   have Hfeq : ∫⁻ a, f a ∂μₗ = ∫⁻ a, f' a ∂μₗ := lintegral_congr_ae hae
   rw [Hfeq]
   exact H F ⟨g, Hgm, Hgb⟩ HFG

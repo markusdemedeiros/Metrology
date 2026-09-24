@@ -53,7 +53,7 @@ theorem Cfg.realLit_image_eq (σ : State rT) :
     {ρ : Cfg rT | ∃ r : rT, ρ = (⟨pl(#(.real r)), σ⟩ : Cfg rT) ∧ r ∈ LawfulProbLangℝ.unifUnitSupport}
       = (fun r : rT => (⟨pl(#(.real r)), σ⟩ : Cfg rT)) '' LawfulProbLangℝ.unifUnitSupport := by
   ext ρ
-  simp only [Set.mem_image, Set.mem_setOf_eq]
+  simp only [Set.mem_image, Set.mem_ofPred_eq]
   exact ⟨fun ⟨r, h, hr⟩ => ⟨r, hr, h.symm⟩, fun ⟨r, hr, h⟩ => ⟨r, h.symm, hr⟩⟩
 
 theorem Cfg.measurableSet_realLit_image (σ : State rT) :

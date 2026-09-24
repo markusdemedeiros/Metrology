@@ -1,6 +1,6 @@
 module
 
-public import Mathlib.Data.ENNReal.Basic
+public import Mathlib.Basic.ENNReal.Basic
 public import Iris
 public import Iris.Algebra.HeapView
 public import Iris.Instances.IProp.Instance
@@ -384,7 +384,6 @@ theorem appHeapFrag_valid_2 {l : Loc} {v1 v2 : Val rT} :
   obtain ⟨hdq, _⟩ := hv
   -- `hdq : ✓ (DFrac.own 1 • DFrac.own 1 : DFrac ℕ+)` unfolds to `(1 + 1 : ℕ+) ≤ 1`.
   -- PNat: `(1 + 1).1 = 2`, `2 ≤ 1` is false.
-  show False
   -- `hdq : ✓ (DFrac.own 1 • DFrac.own 1)`; `valid_own_op` gives `(1 : Qp).val < 1`.
   exact absurd (DFrac.valid_own_op hdq) (lt_irrefl _)
 
@@ -399,7 +398,6 @@ theorem appTapesFrag_valid_2 {l : Loc} {t1 t2 : Tape} :
   obtain ⟨hdq, _⟩ := hv
   -- `hdq : ✓ (DFrac.own 1 • DFrac.own 1 : DFrac ℕ+)` unfolds to `(1 + 1 : ℕ+) ≤ 1`.
   -- PNat: `(1 + 1).1 = 2`, `2 ≤ 1` is false.
-  show False
   -- `hdq : ✓ (DFrac.own 1 • DFrac.own 1)`; `valid_own_op` gives `(1 : Qp).val < 1`.
   exact absurd (DFrac.valid_own_op hdq) (lt_irrefl _)
 

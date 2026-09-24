@@ -495,10 +495,10 @@ macro_rules
 -- reducing `check?`.)
 @[simp] theorem Exp.toVal?_lam (e : Exp rT) (h : (Exp.lam e).IsLocallyClosed) :
     (Exp.lam e).toVal? = some ⟨.lam e, IsVal.lam h, h⟩ := by
-  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
+  simp only [Exp.toVal?, IsVal.check?, dite_eq_left (Exp.lc_imp_lcb h)]
 
 @[simp] theorem Exp.toVal?_fix (e : Exp rT) (h : (Exp.fix e).IsLocallyClosed) :
     (Exp.fix e).toVal? = some ⟨.fix e, IsVal.fix h, h⟩ := by
-  simp only [Exp.toVal?, IsVal.check?, dif_pos (Exp.lc_imp_lcb h)]
+  simp only [Exp.toVal?, IsVal.check?, dite_eq_left (Exp.lc_imp_lcb h)]
 
 end ProbLang

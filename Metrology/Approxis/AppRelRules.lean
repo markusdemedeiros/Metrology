@@ -587,7 +587,7 @@ theorem refines_couple_rands_lr_avoid
   iframe Hε
   iintro %n %hn Hec
   by_cases hb : n = bad
-  · rw [if_pos hb]
+  · rw [ite_eq_left hb]
     iexfalso
     iapply ErrorCredit.contradict (_root_.le_refl 1) $$ Hec
   · simp only [id_eq]

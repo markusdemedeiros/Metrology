@@ -3,7 +3,7 @@ module
 public meta import Metrology.Meta.Discrete
 public import Std
 public import Std.Data.ExtTreeMap.Lemmas
-public import Mathlib.Data.Countable.Basic
+public import Mathlib.Basic.Countable.Basic
 public import Mathlib.MeasureTheory.MeasurableSpace.Basic
 public import Mathlib.MeasureTheory.MeasurableSpace.Defs
 public import Mathlib.Tactic.DeriveCountable
@@ -711,7 +711,7 @@ theorem Pat.tryMatch_lit_eq [LawfulBEq rT] (l : BaseLit rT) :
 theorem Pat.tryMatch_lit_ne {l1 l2 : BaseLit rT} (h : ¬ (l1 == l2) = true) :
     Pat.tryMatch (.lit l1) (.lit l2) = none := by
   show (if (l1 == l2) = true then some (Exp.lit BaseLit.unit) else none) = _
-  rw [if_neg h]
+  rw [ite_eq_right h]
 
 /- ## Sublanguages -/
 
@@ -853,8 +853,8 @@ noncomputable def IsVal.ofIsValue (h : e.isValue) : IsVal e := h.some
 
 theorem IsVal.check?_some : (w : IsVal e) → ∃ w', IsVal.check? e = some w'
   | .lit => ⟨.lit, rfl⟩
-  | .lam h => ⟨.lam h, by simp only [check?, dif_pos (Exp.lc_imp_lcb h)]⟩
-  | .fix h => ⟨.fix h, by simp only [check?, dif_pos (Exp.lc_imp_lcb h)]⟩
+  | .lam h => ⟨.lam h, by simp only [check?, dite_eq_left (Exp.lc_imp_lcb h)]⟩
+  | .fix h => ⟨.fix h, by simp only [check?, dite_eq_left (Exp.lc_imp_lcb h)]⟩
   | .pair h1 h2 => by
       obtain ⟨w1, hw1⟩ := check?_some h1; obtain ⟨w2, hw2⟩ := check?_some h2
       exact ⟨.pair w1 w2, by simp [check?, hw1, hw2]⟩

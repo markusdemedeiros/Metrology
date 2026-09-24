@@ -30,13 +30,13 @@ def Exp.isValM [MeasurableSpace T] (e : Exp rT) (m : Measure T) : Measure T :=
   if e.isValue then m else 0
 
 @[simp] theorem Exp.isValM_some [MeasurableSpace T] {e : Exp α} {m : Measure T} (He : e.isValue) :
-    e.isValM m = m := if_pos He
+    e.isValM m = m := ite_eq_left He
 
 theorem Exp.isValM_some' [MeasurableSpace T] {e : Exp α} {m : Measure T} (w : IsVal e) :
     e.isValM m = m := isValM_some w.toIsValue
 
 @[simp] theorem Exp.isValM_none [MeasurableSpace T] {e : Exp α} {m : Measure T} (He : ¬ e.isValue) :
-    e.isValM m = 0 := if_neg He
+    e.isValM m = 0 := ite_eq_right He
 
 def Int.isPos (z : Int) : Option { z : Int // 0 < z } :=
   if H : 0 < z then some ⟨z, H⟩ else none
@@ -330,7 +330,7 @@ both measurable (`isValueR` via the structural recursion, `expr` via
 `Cfg.measurable_expr`). -/
 @[fun_prop]
 theorem Cfg.isValue_measurable : Measurable (fun a : Cfg rT => a.expr.isValue) := by
-  rw [← measurableSet_setOf]
+  rw [← measurableSet_setOfPred]
   have h : {a : Cfg rT | a.expr.isValue} =
       Cfg.expr ⁻¹' ({e : Exp rT | e.isValueR} ∩ {e | Exp.lcb 0 e = true}) := by
     ext a; simp [Exp.isValue_iff_isValueR, Set.mem_inter_iff]
@@ -1799,8 +1799,8 @@ theorem isValM_singleton_pos [MeasurableSpace T] {e : Exp α} {m : Measure T} {s
     0 < (e.isValM m) s ↔ e.isValue ∧ 0 < m s := by
   simp only [Exp.isValM]
   by_cases He : e.isValue
-  · rw [if_pos He]; exact ⟨fun h => ⟨He, h⟩, And.right⟩
-  · rw [if_neg He]; exact ⟨fun h => absurd h (by simp), fun ⟨hv, _⟩ => absurd hv He⟩
+  · rw [ite_eq_left He]; exact ⟨fun h => ⟨He, h⟩, And.right⟩
+  · rw [ite_eq_right He]; exact ⟨fun h => absurd h (by simp), fun ⟨hv, _⟩ => absurd hv He⟩
 
 @[simp]
 theorem unwrapM_singleton_pos {α β : Type _} [MeasurableSpace β]
@@ -1882,12 +1882,9 @@ theorem HeadStepSupport.ne_zero {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     headStep ⟨e1, σ1⟩ ≠ 0 := by
   cases h with
   | UrandS _ =>
-    have hg : Measurable (fun r : rT => (⟨.lit (.real r), σ1⟩ : Cfg rT)) := by
-      rw [Cfg.measurable_iff]
-      exact ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
     have hprob : IsProbabilityMeasure (headStep ⟨Exp.urand, σ1⟩) := by
       show IsProbabilityMeasure (Cfg.uniformReal σ1)
-      rw [Cfg.uniformReal]; exact isProbabilityMeasure_map hg.aemeasurable
+      rw [Cfg.uniformReal]; infer_instance
     exact hprob.ne_zero
   | BetaLamS hv he | BetaFixS hv he =>
     subst he; simp [headStep, Exp.isValM, hv]
@@ -1925,13 +1922,13 @@ theorem HeadStepSupport.ne_zero {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     subst hσ; subst hz; simp only [headStep, htape, ↓reduceIte]
     exact (Cfg.uniform_possible Hz Hv0 Hvz).ne_zero
   | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
-    subst hσ; simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    subst hσ; simp only [headStep, htape, ite_eq_right (Ne.symm hzN)]
     exact (Cfg.uniform_possible Hz Hv0 Hvz).ne_zero
   | RandTapeNonposEmptyS Hz htape hz =>
     subst hz
     simp [headStep, htape, Cfg.uniform, Int.isPos, Hz]
   | RandTapeNonposOtherS Hz htape hzN =>
-    simp [headStep, htape, if_neg (Ne.symm hzN), Cfg.uniform, Int.isPos, Hz]
+    simp [headStep, htape, ite_eq_right (Ne.symm hzN), Cfg.uniform, Int.isPos, Hz]
 
 /-- A support point carries positive mass — the **atom-based** support fact, stated
 measurability-free as `Possible`. This is the discrete-fragment counterpart of the
@@ -1984,13 +1981,13 @@ theorem HeadStepSupport.possible {e1 e2 : Exp rT} {σ1 σ2 : State rT}
     subst hσ; subst hz; simp only [headStep, htape, ↓reduceIte]
     exact Cfg.uniform_possible Hz Hv0 Hvz
   | RandTapeOtherS Hz htape hzN Hv0 Hvz hσ =>
-    subst hσ; simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    subst hσ; simp only [headStep, htape, ite_eq_right (Ne.symm hzN)]
     exact Cfg.uniform_possible Hz Hv0 Hvz
   | RandTapeNonposEmptyS Hz htape hz =>
     subst hz; exact Possible.of_dirac_eq (by simp [headStep, htape, Cfg.uniform, Int.isPos, Hz])
   | RandTapeNonposOtherS Hz htape hzN =>
     refine Possible.of_dirac_eq ?_
-    simp only [headStep, htape, if_neg (Ne.symm hzN)]
+    simp only [headStep, htape, ite_eq_right (Ne.symm hzN)]
     simp [Cfg.uniform, Int.isPos, Hz]
 
 /-- `HeadStepSupport` as positive singleton mass — the form every discrete
@@ -2159,7 +2156,7 @@ theorem headStep_exists_support_of_ne_zero
 
 theorem isValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {m : Measure T}
     (he : e.isValue) [IsProbabilityMeasure m] : IsProbabilityMeasure (e.isValM m) := by
-  rw [Exp.isValM, if_pos he]; infer_instance
+  rw [Exp.isValM, ite_eq_left he]; infer_instance
 
 theorem asValM_isProbabilityMeasure [MeasurableSpace T] {e : Exp α} {f : Val α → Measure T}
     {v : Val α} (hv : e.toVal? = some v) [IsProbabilityMeasure (f v)] :
@@ -2171,17 +2168,13 @@ instance Cfg.uniform_isProbabilityMeasure {z : Int} {σ : State rT} :
   unfold Cfg.uniform Int.isPos
   by_cases Hz : 0 < z
   · simp only [Hz, dite_true]
-    exact Measure.isProbabilityMeasure_map (μ := (PMF.uniformOfFinset _ _).toMeasure)
-      AEMeasurable.of_discrete
+    infer_instance
   · simp only [Hz, dite_false]; infer_instance
 
 instance Cfg.uniformReal_isProbabilityMeasure {σ : State rT} :
     IsProbabilityMeasure (Cfg.uniformReal σ) := by
   unfold Cfg.uniformReal
-  have hg : Measurable (fun r : rT => (⟨.lit (.real r), σ⟩ : Cfg rT)) := by
-    rw [Cfg.measurable_iff]
-    exact ⟨Exp.lit.measurable.comp BaseLit.real.measurable, measurable_const⟩
-  exact Measure.isProbabilityMeasure_map hg.aemeasurable
+  infer_instance
 
 theorem head_step_mass {e : Exp rT} {σ : State rT} :
     (headStep ⟨e, σ⟩ ≠ 0) → IsProbabilityMeasure (headStep ⟨e, σ⟩) := by
@@ -2230,7 +2223,7 @@ theorem PMF.toMeasure_isAtomicSupport {α : Type _} [MeasurableSpace α]
   unfold IsAtomicSupport
   have hset : {x : α | p.toMeasure {x} = 0} = (p.support : Set α)ᶜ := by
     ext x
-    rw [Set.mem_setOf_eq, p.toMeasure_apply_singleton x (measurableSet_singleton x),
+    rw [Set.mem_ofPred_eq, p.toMeasure_apply_singleton x (measurableSet_singleton x),
       Set.mem_compl_iff, PMF.mem_support_iff, not_not]
   rw [hset, p.toMeasure_apply_eq_zero_iff p.support_countable.measurableSet.compl]
   exact disjoint_compl_right
@@ -2242,7 +2235,7 @@ theorem isAtomicSupport_dirac {α : Type _} [MeasurableSpace α] [MeasurableSing
   · intro x hx
     rw [Set.mem_compl_iff, Set.mem_singleton_iff]
     rintro rfl
-    rw [Set.mem_setOf_eq, Measure.dirac_apply_of_mem (Set.mem_singleton x)] at hx
+    rw [Set.mem_ofPred_eq, Measure.dirac_apply_of_mem (Set.mem_singleton x)] at hx
     exact one_ne_zero hx
   · rw [Measure.dirac_apply' _ (measurableSet_singleton a).compl, Set.indicator_of_notMem (by simp)]
 
@@ -2274,11 +2267,11 @@ theorem isAtomicSupport_uniform (z : Int) (σ : State rT) :
         = ((PMF.uniformOfFinset (Finset.Ico (0:Int) z) (Finset.nonempty_Ico.mpr hz)).map
             (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg rT))).toMeasure := by
       unfold Cfg.uniform
-      simp only [Int.isPos, dif_pos hz]
+      simp only [Int.isPos, dite_eq_left hz]
       rw [PMF.toMeasure_map _ _ Measurable.of_discrete]
     rw [hrw]; exact PMF.toMeasure_isAtomicSupport _
   · have hrw : Cfg.uniform z σ = Measure.dirac (⟨.lit (.int (-1)), σ⟩ : Cfg rT) := by
-      unfold Cfg.uniform; simp only [Int.isPos, dif_neg hz]
+      unfold Cfg.uniform; simp only [Int.isPos, dite_eq_right hz]
     rw [hrw]; exact isAtomicSupport_dirac _
 
 set_option maxHeartbeats 1000000 in

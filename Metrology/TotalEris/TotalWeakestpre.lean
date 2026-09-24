@@ -176,8 +176,8 @@ theorem tglWp_ind {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
       tglWpPre (fun _ e'' _ => Q e'') E e' Φ -∗ Q e')) ⊢
         (tglWp E e Φ -∗ Q e) := by
   iintro #HInd HW
-  letI Q' : TglWpState rT → IProp GF := fun s => iprop(⌜s.1 = E⌝ -∗ Q s.2)
-  letI : NonExpansive Q' := nonExpansive_of_discrete_leibniz Q'
+  let Q' : TglWpState rT → IProp GF := fun s => iprop(⌜s.1 = E⌝ -∗ Q s.2)
+  let : NonExpansive Q' := nonExpansive_of_discrete_leibniz Q'
   ihave HQ' : iprop(Q' ⟨E, e⟩) $$ [HW]
   · iapply (least_fixpoint_iter (F := tglWpPreFixed Φ) (Φ := Q'))
     · iintro !> %s HF
@@ -208,9 +208,9 @@ theorem tglWp_ind {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
 theorem tglWp_strong_mono {E : CoPset} {e : Exp rT} {Φ Ψ : Val rT → IProp GF} :
     iprop(tglWp E e Φ ∗ (∀ v, Φ v ={E}=∗ Ψ v)) ⊢ tglWp E e Ψ := by
   iintro ⟨HW, Hwand⟩
-  letI Q : Exp rT → IProp GF := fun e' => iprop(
+  let Q : Exp rT → IProp GF := fun e' => iprop(
     ∀ (Ψ' : Val rT → IProp GF), (∀ v, Φ v ={E}=∗ Ψ' v) -∗ tglWp E e' Ψ')
-  letI : NonExpansive Q := nonExpansive_of_discrete_leibniz Q
+  let : NonExpansive Q := nonExpansive_of_discrete_leibniz Q
   ihave HQe : iprop(Q e) $$ [HW]
   · iapply (tglWp_ind (E := E) (Φ := Φ) (Q := Q))
     · iintro !> %e' HF %Ψ' Hwand'
@@ -320,7 +320,7 @@ theorem tglWp_bind {K : Ectx rT} {E : CoPset} {e : Exp rT} {Φ : Val rT → IPro
     tglWp E e (fun v => tglWp E (K.fill (Exp.ofVal v)) Φ) ⊢
       tglWp E (K.fill e) Φ := by
   iintro HW
-  letI : NonExpansive (fun e' => tglWp E (K.fill e') Φ) :=
+  let : NonExpansive (fun e' => tglWp E (K.fill e') Φ) :=
     nonExpansive_of_discrete_leibniz _
   iapply (tglWp_ind (E := E)
     (Φ := fun v => tglWp E (K.fill (Exp.ofVal v)) Φ)

@@ -189,8 +189,8 @@ theorem bigStepF_val {R : Cfg rT → Measure (Cfg rT)} (hR : RetVal R) {e : Exp 
   obtain ⟨w⟩ := he
   cases w with
   | lit => rfl
-  | lam h => exact if_pos ⟨.lam h⟩
-  | fix h => exact if_pos ⟨.fix h⟩
+  | lam h => exact ite_eq_left ⟨.lam h⟩
+  | fix h => exact ite_eq_left ⟨.fix h⟩
   | pair w1 w2 =>
     simp only [bigStepF, measureOps]
     rw [hR.bind_eq w2.toIsValue, hR.bind_eq w1.toIsValue]
@@ -209,8 +209,8 @@ theorem bigStepF_head {R : Cfg rT → Measure (Cfg rT)} (hR : RetVal R) {e : Exp
   cases e with
   | bvar | fvar | fail => simp [bigStepF, measureOps, headStep]
   | lit => exact absurd ⟨.lit⟩ hnv
-  | lam e => simp only [bigStepF, measureOps, if_neg hnv]; simp [headStep]
-  | fix e => simp only [bigStepF, measureOps, if_neg hnv]; simp [headStep]
+  | lam e => simp only [bigStepF, measureOps, ite_eq_right hnv]; simp [headStep]
+  | fix e => simp only [bigStepF, measureOps, ite_eq_right hnv]; simp [headStep]
   | urand => exact (hR.uniformReal_bind σ).symm
   | pair e1 e2 =>
     simp only [Exp.decompItem] at hdec
@@ -449,8 +449,8 @@ theorem bigStep_retVal : RetVal (bigStep (rT := rT)) := by
   rintro e σ ⟨w⟩
   induction w generalizing σ with
   | lit => rw [bigStep_unfold]; rfl
-  | lam h => rw [bigStep_unfold]; exact if_pos ⟨.lam h⟩
-  | fix h => rw [bigStep_unfold]; exact if_pos ⟨.fix h⟩
+  | lam h => rw [bigStep_unfold]; exact ite_eq_left ⟨.lam h⟩
+  | fix h => rw [bigStep_unfold]; exact ite_eq_left ⟨.fix h⟩
   | pair w1 w2 ih1 ih2 =>
     rw [bigStep_unfold]; simp only [bigStepF, measureOps]
     rw [ih2, dirac_bind_discrete]; dsimp only; rw [ih1, dirac_bind_discrete]

@@ -1,10 +1,10 @@
 module
 
-public import Mathlib.Data.Countable.Basic
+public import Mathlib.Basic.Countable.Basic
 public import Mathlib.Tactic.DeriveCountable
 public import Mathlib.Logic.Equiv.List
 public import Mathlib.MeasureTheory.MeasurableSpace.Defs
-public import Mathlib.MeasureTheory.Measure.Dirac
+public import Mathlib.MeasureTheory.Measure.Dirac.Basic
 public import Mathlib.MeasureTheory.Measure.GiryMonad
 public import Mathlib.MeasureTheory.Integral.Lebesgue.Countable
 public import Mathlib.Probability.ProbabilityMassFunction.Basic
@@ -499,8 +499,8 @@ theorem lim_distr_pmf {α : Type _}
         Measure.smul_apply, smul_eq_mul, Measure.dirac_apply' _ MeasurableSet.of_discrete,
         Set.mem_singleton_iff, Set.indicator_apply, Pi.one_apply]
       simp only [mul_ite, mul_one, mul_zero]
-      rw [tsum_eq_single a (fun b hb => if_neg hb)]
-      rw [if_pos rfl]
+      rw [tsum_eq_single a (fun b hb => ite_eq_right hb)]
+      rw [ite_eq_left rfl]
     have hub : ∀ i, f i ≤ μ := by
       intro i
       rw [Measure.le_iff]
@@ -591,7 +591,7 @@ theorem ddiag_pmf {α : Type _}
       lintegral_countable' (fun x => (Measure.dirac (x, x)) {(a, a')})]
   by_cases hne : a = a'
   · subst hne
-    rw [if_pos rfl, tsum_eq_single a]
+    rw [ite_eq_left rfl, tsum_eq_single a]
     · rw [Measure.dirac_apply' _ (MeasurableSet.singleton _),
           Set.indicator_of_mem (Set.mem_singleton _), Pi.one_apply, one_mul]
     · intro b hba
@@ -599,7 +599,7 @@ theorem ddiag_pmf {α : Type _}
         rw [Set.mem_singleton_iff, Prod.mk.injEq, not_and]; intro h _; exact hba h
       rw [Measure.dirac_apply' _ (MeasurableSet.singleton _),
           Set.indicator_of_notMem hnotmem, zero_mul]
-  · rw [if_neg hne]
+  · rw [ite_eq_right hne]
     refine ENNReal.tsum_eq_zero.mpr fun x => ?_
     have hnotmem : (x, x) ∉ ({(a, a')} : Set (α × α)) := by
       rw [Set.mem_singleton_iff, Prod.mk.injEq, not_and]
@@ -626,7 +626,7 @@ theorem dprod_pmf {α β : Type _}
     rw [Measure.bind_apply (MeasurableSet.singleton _) Measurable.of_discrete.aemeasurable,
         lintegral_countable' (fun y => (Measure.dirac (x, y)) {(a, b)})]
     by_cases hxa : x = a
-    · rw [hxa, if_pos rfl, tsum_eq_single b]
+    · rw [hxa, ite_eq_left rfl, tsum_eq_single b]
       · rw [Measure.dirac_apply' _ (MeasurableSet.singleton _),
             Set.indicator_of_mem (Set.mem_singleton _), Pi.one_apply, one_mul]
       · intro y hyb
@@ -634,7 +634,7 @@ theorem dprod_pmf {α β : Type _}
           rw [Set.mem_singleton_iff, Prod.mk.injEq, not_and]; intro _; exact hyb
         rw [Measure.dirac_apply' _ (MeasurableSet.singleton _),
             Set.indicator_of_notMem hnotmem, zero_mul]
-    · rw [if_neg hxa]
+    · rw [ite_eq_right hxa]
       refine ENNReal.tsum_eq_zero.mpr fun y => ?_
       have hnotmem : (x, y) ∉ ({(a, b)} : Set (α × β)) := by
         rw [Set.mem_singleton_iff, Prod.mk.injEq, not_and]
@@ -646,9 +646,9 @@ theorem dprod_pmf {α β : Type _}
       lintegral_countable' (fun x => (μ₂.bind (fun y => Measure.dirac (x, y))) {(a, b)})]
   simp_rw [key]
   rw [tsum_eq_single a]
-  · rw [if_pos rfl, mul_comm]
+  · rw [ite_eq_left rfl, mul_comm]
   · intro x hxa
-    rw [if_neg hxa, zero_mul]
+    rw [ite_eq_right hxa, zero_mul]
 
 /-- Rocq `dprod_pos`: support of the product is the conjunction of supports. -/
 theorem dprod_pos {α β : Type _}
@@ -820,9 +820,9 @@ theorem ddiag_lmarg {α : Type _}
   rw [lmarg_pmf]
   simp_rw [ddiag_pmf]
   rw [tsum_eq_single a]
-  · rw [if_pos rfl]
+  · rw [ite_eq_left rfl]
   · intro b hba
-    exact if_neg (fun h => hba h.symm)
+    exact ite_eq_right (fun h => hba h.symm)
 
 /-- Rocq `ddiag_rmarg`: right marginal of the diagonal. -/
 theorem ddiag_rmarg {α : Type _}
@@ -835,9 +835,9 @@ theorem ddiag_rmarg {α : Type _}
   rw [rmarg_pmf]
   simp_rw [ddiag_pmf]
   rw [tsum_eq_single a]
-  · rw [if_pos rfl]
+  · rw [ite_eq_left rfl]
   · intro b hba
-    exact if_neg hba
+    exact ite_eq_right hba
 
 /-- Rocq `lmarg_dswap`. -/
 theorem lmarg_dswap {α β : Type _}
@@ -1039,8 +1039,8 @@ theorem prob_Sup_seq {α : Type _}
         tsum_subtype {a | P a = true} (fun a => ν {a})]
     refine tsum_congr fun a => ?_
     by_cases hP : P a = true
-    · rw [Set.indicator_of_mem (show a ∈ {a | P a = true} from hP), if_pos hP]
-    · rw [Set.indicator_of_notMem (show a ∉ {a | P a = true} from hP), if_neg hP]
+    · rw [Set.indicator_of_mem (show a ∈ {a | P a = true} from hP), ite_eq_left hP]
+    · rw [Set.indicator_of_notMem (show a ∉ {a | P a = true} from hP), ite_eq_right hP]
   simp_rw [hprob]
   -- LHS: ∑' a, (if P a then μ {a} else 0)
   --    = ∑' a, (if P a then ⨆ n, (μ' n) {a} else 0)       [using hsup]
@@ -1050,19 +1050,19 @@ theorem prob_Sup_seq {α : Type _}
                  ⨆ n, (if P a = true then (μ' n) {a} else 0) := by
     intro a
     by_cases hP : P a = true
-    · simp only [if_pos hP]; exact hsup a
-    · simp only [if_neg hP, iSup_const]
+    · simp only [ite_eq_left hP]; exact hsup a
+    · simp only [ite_eq_right hP, iSup_const]
   simp_rw [h1]
   rw [ENNReal.tsum_iSup_of_monotone'
     (fun a i j hij => by
       by_cases hP : P a = true
-      · simp only [if_pos hP]
+      · simp only [ite_eq_left hP]
         clear h1 hprob
         induction hij with
         | refl => exact le_refl _
         | step _ ih => exact ih.trans (hmono _ a)
       · show (if P a = true then (μ' i) {a} else 0) ≤ (if P a = true then (μ' j) {a} else 0)
-        rw [if_neg hP, if_neg hP])]
+        rw [ite_eq_right hP, ite_eq_right hP])]
 
 /-- Rocq `SeriesC_zero_dzero`: a measure with zero total mass is the zero
 measure. (We take the countable-singleton extensionality view.) -/

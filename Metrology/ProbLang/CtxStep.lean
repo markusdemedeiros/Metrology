@@ -219,14 +219,13 @@ forces the underlying `headStep` to be nonzero, hence (by `head_step_mass`) a pr
 measure; pushing forward under the measurable `fillCfg` preserves total mass `1`. -/
 theorem prim_step_mass [LawfulProbLangℝ rT] {e : Exp rT} {σ : State rT}
     (hred : Reducible e σ) : IsProbabilityMeasure (primStep ⟨e, σ⟩) := by
-  have hmeas : Measurable e.decomp.1.fillCfg := by measurability
   have hhs : headStep ⟨e.decomp.2, σ⟩ ≠ 0 := by
     intro h
     apply hred
     simp only [primStep, h, Measure.map_zero]
-  haveI := head_step_mass hhs
+  have := head_step_mass hhs
   simp only [primStep]
-  exact isProbabilityMeasure_map hmeas.aemeasurable
+  infer_instance
 
 /-! ## Bridge: headStep ↔ primStep -/
 
@@ -488,12 +487,12 @@ theorem measurableSet_primStep_support [LawfulProbLangℝ rT] (e : Exp rT) (σ :
     MeasurableSet {ρ : Cfg rT | 0 < primStep ⟨e, σ⟩ {ρ}} := by
   -- `primStep` is a finite measure, so its set of positive-mass points (atoms) is
   -- countable (`Measure.countable_meas_level_set_pos`), hence measurable.
-  haveI : IsFiniteMeasure (primStep ⟨e, σ⟩) :=
+  have : IsFiniteMeasure (primStep ⟨e, σ⟩) :=
     ⟨lt_of_le_of_lt (primStep_univ_le_one _) ENNReal.one_lt_top⟩
   have hc : {ρ : Cfg rT | 0 < primStep ⟨e, σ⟩ {ρ}}.Countable := by
     have h := MeasureTheory.Measure.countable_meas_level_set_pos
       (μ := primStep ⟨e, σ⟩) measurable_id
-    simpa only [id_eq, Set.setOf_eq_eq_singleton] using h
+    simpa only [id_eq, Set.ofPred_eq_eq_singleton] using h
   exact hc.measurableSet
 
 theorem measurableSet_possible_support [LawfulProbLangℝ rT] :
@@ -535,7 +534,7 @@ theorem primStep_atomic [LawfulProbLangℝ rT] (e : Exp rT) (σ : State rT)
   rw [Measure.map_apply hmeas hcomeas]
   have hpre : e.decomp.1.fillCfg ⁻¹' {ρ : Cfg rT | (primStep ⟨e, σ⟩) {ρ} = 0}
       = {ρ' : Cfg rT | (headStep ⟨e.decomp.2, σ⟩) {ρ'} = 0} := by
-    ext ρ'; simp only [Set.mem_preimage, Set.mem_setOf_eq, hsingle ρ']
+    ext ρ'; simp only [Set.mem_preimage, Set.mem_ofPred_eq, hsingle ρ']
   rw [hpre]
   exact headStep_atomic e.decomp.2 σ hne
 

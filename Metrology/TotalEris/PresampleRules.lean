@@ -62,12 +62,12 @@ theorem presampleAdvCompX₂_eq_tsum (σ : State rT) (α : Loc) (N : Int) (bs : 
   funext σ'
   unfold presampleAdvCompX₂
   by_cases h : ∃ n : TapeIdx N, σ' = presampleUpdate σ α N bs n
-  · rw [dif_pos h, tsum_eq_single (Classical.choose h) ?_,
+  · rw [dite_eq_left h, tsum_eq_single (Classical.choose h) ?_,
       Set.indicator_of_mem (Set.mem_singleton_iff.mpr (Classical.choose_spec h))]
     intro n hn
     refine Set.indicator_of_notMem (fun hmem => hn ?_) _
     exact (presample_choose_eq h (Set.mem_singleton_iff.mp hmem)).symm
-  · rw [dif_neg h]
+  · rw [dite_eq_right h]
     refine (ENNReal.tsum_eq_zero.mpr fun n => ?_).symm
     exact Set.indicator_of_notMem (fun hmem => h ⟨n, Set.mem_singleton_iff.mp hmem⟩) _
 
@@ -77,7 +77,7 @@ open Classical in
     (bs : List (TapeIdx N)) (ε₂ : TapeIdx N → ENNReal) (n : TapeIdx N) :
     presampleAdvCompX₂ σ α N bs ε₂ (presampleUpdate σ α N bs n) = ε₂ n := by
   unfold presampleAdvCompX₂
-  rw [dif_pos ⟨n, rfl⟩]
+  rw [dite_eq_left ⟨n, rfl⟩]
   exact congrArg ε₂ (presample_choose_eq _ rfl)
 
 /-- `presampleAdvCompX₂` inherits the per-outcome bound `ε₂ n ≤ 1`. -/
@@ -119,7 +119,7 @@ theorem presampleAdvCompX₂_lintegral_le {σ₁ : State rT} {α : Loc} {N : Int
     rw [tapeIdxFinset, Finset.sum_image fun x _ y _ hxy =>
           Subtype.ext (by simpa using congrArg Subtype.val hxy),
         ← Finset.sum_attach (Finset.Ico (0:Int) N) F]
-    exact Finset.sum_congr rfl fun a _ => by simp only [hF, dif_pos (Finset.mem_Ico.mp a.2)]
+    exact Finset.sum_congr rfl fun a _ => by simp only [hF, dite_eq_left (Finset.mem_Ico.mp a.2)]
   calc ∫⁻ σ', presampleAdvCompX₂ σ₁ α N bs ε₂ σ' ∂(tapePresample σ₁ α)
       = ∫⁻ n : TapeIdx N, ε₂ n ∂tapeIndexUniform N := by
         rw [tapePresample_lintegral hlookup _ (measurable_presampleAdvCompX₂ σ₁ α N bs ε₂)]
@@ -127,7 +127,7 @@ theorem presampleAdvCompX₂_lintegral_le {σ₁ : State rT} {α : Loc} {N : Int
     _ = ∑ z ∈ Finset.Ico (0:Int) N, F z / (N.toNat : ℝ≥0∞) := by
         have hf_eq : ∀ n : TapeIdx N,
             ε₂ n = (fun ρ : Cfg rT => match ρ.expr with | .lit (.int m) => F m | _ => 0)
-              ⟨.lit (.int (↑n)), σ₁⟩ := fun n => by rw [hF]; simp only [dif_pos n.2]
+              ⟨.lit (.int (↑n)), σ₁⟩ := fun n => by rw [hF]; simp only [dite_eq_left n.2]
         have hIndic : (fun z : Int => (match (⟨.lit (.int z), σ₁⟩ : Cfg rT).expr with
               | .lit (.int m) => F m | _ => 0))
             = ((Finset.Ico (0:Int) N) : Set Int).indicator F := by
@@ -137,7 +137,7 @@ theorem presampleAdvCompX₂_lintegral_le {σ₁ : State rT} {α : Loc} {N : Int
           · rw [Set.indicator_of_notMem hz]
             show F z = 0
             simp only [hF]
-            exact dif_neg fun h => hz (Finset.mem_Ico.mpr h)
+            exact dite_eq_right fun h => hz (Finset.mem_Ico.mpr h)
         simp_rw [hf_eq]
         rw [tapeIndexUniform_lintegral_eq_cfg_uniform hN σ₁
               (fun ρ => match ρ.expr with | .lit (.int m) => F m | _ => 0)
@@ -149,7 +149,7 @@ theorem presampleAdvCompX₂_lintegral_le {σ₁ : State rT} {α : Loc} {N : Int
             MeasureTheory.lintegral_finset]
         refine Finset.sum_congr rfl fun z hz => ?_
         rw [PMF.toMeasure_apply_singleton _ _ (measurableSet_singleton z),
-            PMF.uniformOfFinset_apply, if_pos hz, hCard, ENNReal.div_eq_inv_mul, mul_comm]
+            PMF.uniformOfFinset_apply, ite_eq_left hz, hCard, ENNReal.div_eq_inv_mul, mul_comm]
     _ = (∑ z ∈ Finset.Ico (0:Int) N, F z) / (N.toNat : ℝ≥0∞) := by
         simp_rw [div_eq_mul_inv]; rw [← Finset.sum_mul]
     _ ≤ ε₁ := by rw [← hSumImage]; exact HSum
@@ -189,7 +189,7 @@ theorem twp_presample_adv_comp {E : CoPset} {e : Exp rT} {α : Loc}
   have hInt : (0 : ℝ≥0∞) +
       ∫⁻ σ', ((ε_now - ε₁) + presampleAdvCompX₂ σ₁ α N bs ε₂ σ') ∂(tapePresample σ₁ α)
         ≤ ε_now := by
-    haveI : MeasureTheory.IsProbabilityMeasure (tapePresample σ₁ α) :=
+    have : MeasureTheory.IsProbabilityMeasure (tapePresample σ₁ α) :=
       ⟨tapePresample_univ_eq_one hlookup hN⟩
     rw [zero_add, MeasureTheory.lintegral_add_left measurable_const,
         MeasureTheory.lintegral_const, MeasureTheory.measure_univ, mul_one]

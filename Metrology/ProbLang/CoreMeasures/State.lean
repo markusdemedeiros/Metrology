@@ -31,7 +31,7 @@ theorem LocHeap.measurableSet_mem {V : Type _} [MeasurableSpace V] (ℓ : Loc) :
   have hset : {m : LocHeap V | ℓ ∈ m}
               = (fun m => m[ℓ]?) ⁻¹' (({none} : Set (Option V))ᶜ) := by
     ext m
-    simp only [Set.mem_setOf_eq, Std.ExtTreeMap.mem_iff_isSome_getElem?,
+    simp only [Set.mem_ofPred_eq, Std.ExtTreeMap.mem_iff_isSome_getElem?,
       Set.mem_preimage, Set.mem_compl_iff, Set.mem_singleton_iff]
     cases (m[ℓ]? : Option V) <;> simp
   rw [hset]
@@ -77,7 +77,7 @@ theorem LocHeap.maxKey?_preimage_none {V : Type _} :
     (fun m : LocHeap V => m.maxKey?) ⁻¹' ({none} : Set (Option Loc))
       = {m | ∀ k : Loc, k ∉ m} := by
   ext m
-  simp only [Set.mem_preimage, Set.mem_singleton_iff, Set.mem_setOf_eq,
+  simp only [Set.mem_preimage, Set.mem_singleton_iff, Set.mem_ofPred_eq,
     Std.ExtTreeMap.maxKey?_eq_none_iff]
   exact ⟨fun h k => h ▸ Std.ExtTreeMap.not_mem_empty,
     fun h => Std.ExtTreeMap.ext_getElem? fun k => by
@@ -90,7 +90,7 @@ theorem LocHeap.maxKey?_preimage_some {V : Type _} (S : Set Loc) :
       = ⋃ n ∈ S, {m : LocHeap V | n ∈ m} ∩ ⋂ k ∈ {k : Loc | n < k}, {m | k ∉ m} := by
   ext m
   simp only [Set.mem_preimage, Set.mem_image, Set.mem_iUnion, exists_prop,
-    Set.mem_inter_iff, Set.mem_setOf_eq, Set.mem_iInter]
+    Set.mem_inter_iff, Set.mem_ofPred_eq, Set.mem_iInter]
   refine exists_congr fun n => and_congr_right fun _ => ?_
   rw [eq_comm, Std.ExtTreeMap.maxKey?_eq_some_iff_getElem?,
       ← Std.ExtTreeMap.mem_iff_isSome_getElem?]

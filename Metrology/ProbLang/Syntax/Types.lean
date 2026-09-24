@@ -539,7 +539,7 @@ theorem Typed.fvSubset {Γ : Tctx} {e : Exp rT} {τ : Ty}
     have hxopen : x ∈ (Exp.open' e (.fvar y)).fv := Exp.fv_subset_open e y hx
     have hres := ih y hyL x hxopen
     unfold Tctx.insert at hres
-    rw [if_neg hxy] at hres
+    rw [ite_eq_right hxy] at hres
     exact hres
   | @fix L Γ e τ1 τ2 _ ih =>
     intro x hx
@@ -551,7 +551,7 @@ theorem Typed.fvSubset {Γ : Tctx} {e : Exp rT} {τ : Ty}
     have hxopen : x ∈ (Exp.open' e (.fvar y)).fv := Exp.fv_subset_open e y hx
     have hres := ih y hyL x hxopen
     unfold Tctx.insert at hres
-    rw [if_neg hxy] at hres
+    rw [ite_eq_right hxy] at hres
     exact hres
   | app _ _ ih1 ih2 =>
     intro x hx; simp only [Exp.fv] at hx
@@ -585,7 +585,7 @@ theorem Typed.fvSubset {Γ : Tctx} {e : Exp rT} {τ : Ty}
       have hxopen : x ∈ (Exp.open' e2 (.fvar y)).fv := Exp.fv_subset_open e2 y hx
       have hres := ih2 y hyL x hxopen
       unfold Tctx.insert Tctx.shift at hres
-      rw [if_neg hxy, Option.isSome_map] at hres
+      rw [ite_eq_right hxy, Option.isSome_map] at hres
       exact hres
     · exact ih1 x hx
   | alloc _ ih | load _ ih | alloc_tape _ ih | scrut _ _ ih =>
@@ -611,27 +611,27 @@ theorem Tctx.insert_swap (Γ : Tctx) {x z : Var} (hxz : x ≠ z) (τ τ' : Ty) :
   by_cases hwz : w = z
   · subst hwz
     have : ¬ (w = x) := fun h => hxz (h ▸ rfl)
-    rw [if_pos rfl, if_neg this, if_pos rfl]
-  · rw [if_neg hwz]
+    rw [ite_eq_left rfl, ite_eq_right this, ite_eq_left rfl]
+  · rw [ite_eq_right hwz]
     by_cases hwx : w = x
-    · rw [if_pos hwx, if_pos hwx]
-    · rw [if_neg hwx, if_neg hwx, if_neg hwz]
+    · rw [ite_eq_left hwx, ite_eq_left hwx]
+    · rw [ite_eq_right hwx, ite_eq_right hwx, ite_eq_right hwz]
 
 theorem Tctx.insert_overwrite (Γ : Tctx) (x : Var) (τ τ' : Ty) :
     (Γ.insert x τ).insert x τ' = Γ.insert x τ' := by
   funext y
   simp only [Tctx.insert]
   by_cases h : y = x
-  · subst h; rw [if_pos rfl, if_pos rfl]
-  · rw [if_neg h, if_neg h, if_neg h]
+  · subst h; rw [ite_eq_left rfl, ite_eq_left rfl]
+  · rw [ite_eq_right h, ite_eq_right h, ite_eq_right h]
 
 theorem Tctx.shift_insert (Γ : Tctx) (x : Var) (τ : Ty) :
     (Γ.insert x τ).shift = Γ.shift.insert x τ.shift := by
   funext y
   simp only [Tctx.shift, Tctx.insert]
   by_cases h : y = x
-  · subst h; rw [if_pos rfl, if_pos rfl]; rfl
-  · rw [if_neg h, if_neg h]
+  · subst h; rw [ite_eq_left rfl, ite_eq_left rfl]; rfl
+  · rw [ite_eq_right h, ite_eq_right h]
 
 /-! ## `Typed.rename`: single-atom α-renaming preservation
 
@@ -658,17 +658,17 @@ theorem Typed.rename_aux {e : Exp rT} {τ : Ty}
       simp only [Exp.subst]
       by_cases hxz : x = z
       · subst hxz
-        rw [if_pos rfl]
+        rw [ite_eq_left rfl]
         simp only [Tctx.insert] at hz
         have : τ = τ_x := (Option.some.inj hz).symm
         subst this
         exact .fvar (by simp [Tctx.insert])
-      · rw [if_neg hxz]
+      · rw [ite_eq_right hxz]
         simp only [Tctx.insert] at hz
-        rw [if_neg (Ne.symm hxz)] at hz
+        rw [ite_eq_right (Ne.symm hxz)] at hz
         refine .fvar ?_
         simp only [Tctx.insert]
-        rw [if_neg (fun h : z = y => hyz' h.symm)]
+        rw [ite_eq_right (fun h : z = y => hyz' h.symm)]
         exact hz
   | lit_int =>
       intros; subst_vars; simp only [Exp.subst]; exact .lit_int

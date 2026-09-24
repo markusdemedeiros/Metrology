@@ -147,8 +147,8 @@ theorem subst.measurable [MeasurableSpace rT] :
       apply measurable_from_prod_countable_right
       intro xy
       by_cases hxy : xy.1 = xy.2
-      · simp only [hxy, if_true]; exact measurable_id
-      · simp only [hxy, if_false]; exact measurable_const
+      · simp only [hxy, ite_true]; exact measurable_id
+      · simp only [hxy, ite_false]; exact measurable_const
     exact h1.comp (by fun_prop : Measurable
       (fun (p : (Var × Exp rT) × Var) => ((p.1.1, p.2), p.1.2)))
   all_goals first | (intros; rfl) | fun_prop
@@ -699,8 +699,8 @@ theorem openRec.measurable [MeasurableSpace rT] :
       apply measurable_from_prod_countable_right
       intro ij
       by_cases h : ij.1 = ij.2
-      · simp only [h, if_true]; exact measurable_id
-      · simp only [h, if_false]; exact measurable_const
+      · simp only [h, ite_true]; exact measurable_id
+      · simp only [h, ite_false]; exact measurable_const
     exact h1.comp (by fun_prop : Measurable
       (fun (p : (Nat × Exp rT) × Nat) => ((p.1.1, p.2), p.1.2)))
   case h_t_lam => fun_prop
@@ -758,8 +758,8 @@ theorem closeRec.measurable [MeasurableSpace rT] :
       apply measurable_from_prod_countable_right
       intro xy
       by_cases h : xy.1 = xy.2
-      · simp only [h, if_true]; exact Exp.bvar.measurable
-      · simp only [h, if_false]; exact measurable_const
+      · simp only [h, ite_true]; exact Exp.bvar.measurable
+      · simp only [h, ite_false]; exact measurable_const
     exact h1.comp (by fun_prop : Measurable
       (fun (p : (Nat × Var) × Var) => ((p.1.2, p.2), p.1.1)))
   case h_t_lam => fun_prop
@@ -809,12 +809,12 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
       fun e => if h : e.isValue then some (Val.mk e (Classical.choice h) (Classical.choice h).lc) else none := by
     funext e
     by_cases h : e.isValue
-    · simp only [Exp.toVal?, dif_pos h]
+    · simp only [Exp.toVal?, dite_eq_left h]
       cases hc : IsVal.check? e with
       | none => exact absurd (IsVal.not_isValue_of_check?_none hc) (not_not.mpr h)
       | some w => exact congrArg some (Val.ext rfl)
     · have hnone : Exp.toVal? e = none := Exp.toVal?_eq_none.mpr h
-      simp only [hnone, dif_neg h]
+      simp only [hnone, dite_eq_right h]
   rw [hrw]
   intro S hS
   -- Step 2: decompose S via `optionEquivSumPUnit`. `S` is measurable in `instLocalOption`
@@ -846,9 +846,9 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
       (fun e : Exp rT => if h : e.isValue then some (Val.mk e (Classical.choice h) (Classical.choice h).lc) else none) ⁻¹' S =
         ({e | e.isValue} ∩ Uval) ∪ (if noneIn then {e | ¬e.isValue} else ∅) := by
     ext e
-    simp only [Set.mem_preimage, Set.mem_union, Set.mem_inter_iff, Set.mem_setOf_eq]
+    simp only [Set.mem_preimage, Set.mem_union, Set.mem_inter_iff, Set.mem_ofPred_eq]
     by_cases hv : e.isValue
-    · simp only [dif_pos hv]
+    · simp only [dite_eq_left hv]
       rw [← hSeq]
       simp only [Set.mem_preimage]
       have heqv : Equiv.optionEquivSumPUnit (Val rT) (some (Val.mk e (Classical.choice hv) (Classical.choice hv).lc)) =
@@ -869,7 +869,7 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
         · split_ifs at hcontra with hni
           · exact absurd hv hcontra
           · exact absurd hcontra (Set.notMem_empty _)
-    · simp only [dif_neg hv]
+    · simp only [dite_eq_right hv]
       rw [← hSeq]
       simp only [Set.mem_preimage]
       have heqv : Equiv.optionEquivSumPUnit (Val rT) none = .inr ⟨⟩ := by
@@ -879,7 +879,7 @@ theorem toVal_question.measurable [MeasurableSpace rT] :
       rw [hmem_iff]
       constructor
       · intro hni
-        right; rw [if_pos hni]; exact hv
+        right; rw [ite_eq_left hni]; exact hv
       · rintro (⟨hcontra, _⟩ | hcase)
         · exact absurd hcontra hv
         · split_ifs at hcase with hni
@@ -913,7 +913,7 @@ theorem _root_.Option.measurable_elim_param
     rcases hfa : f a with _ | b
     · simp [hfa]
     · simp only [hfa, Set.mem_preimage, Set.mem_union, Set.mem_inter_iff,
-        Set.mem_setOf_eq, Set.mem_image, Prod.mk.injEq]
+        Set.mem_ofPred_eq, Set.mem_image, Prod.mk.injEq]
       constructor
       · intro h; right; exact ⟨(a, b), h, rfl, rfl⟩
       · rintro (⟨hcontra, _⟩ | ⟨⟨a', b'⟩, hab, haeq, hbeq⟩)
@@ -2808,7 +2808,7 @@ theorem tryMatch.measurable_joint [LawfulProbLangℝ rT] :
           = ((Option.some : Exp rT → Option (Exp rT)) ⁻¹' U) ×ˢ
             ({Pat.wildcard} : Set (Pat rT)) := by
         ext ⟨e, p⟩
-        simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_prod, Set.mem_preimage,
+        simp only [Set.mem_ofPred_eq, Function.uncurry, Set.mem_prod, Set.mem_preimage,
           Set.mem_singleton_iff]
         cases p <;> simp [Pat.shape, Pat.tryMatch]
       rw [hcell]
@@ -2923,7 +2923,7 @@ theorem tryMatch.measurable_joint [LawfulProbLangℝ rT] :
                   (fun _ _ _ => none) (fun _ => none) (fun _ => none) (fun _ _ => none)
                   (fun _ => none) (fun _ _ => none) none none (fun _ _ => none))).join ∈ U} := by
         ext ⟨e, p'⟩
-        simp only [Set.mem_setOf_eq]
+        simp only [Set.mem_ofPred_eq]
         constructor
         · rintro ⟨hsh, hp⟩; exact ⟨hsh, by rw [← hinl_pat]; exact hp⟩
         · rintro ⟨hsh, hp⟩; exact ⟨hsh, by rw [hinl_pat]; exact hp⟩
@@ -2963,7 +2963,7 @@ theorem tryMatch.measurable_joint [LawfulProbLangℝ rT] :
             ∪ ({q : Exp rT × Pat rT | q.1 ∉ Set.range (Exp.inl : Exp rT → Exp rT) ∧
                 Pat.shape q.2 = s' ∧ (none : Option (Exp rT)) ∈ U}) := by
         ext ⟨e, p'⟩
-        simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range]
+        simp only [Set.mem_ofPred_eq, Set.mem_union, Set.mem_image, Set.mem_range]
         constructor
         · rintro ⟨hsh, hp⟩
           by_cases hrange : ∃ e', Exp.inl e' = e
@@ -3054,7 +3054,7 @@ theorem tryMatch.measurable_joint [LawfulProbLangℝ rT] :
             ∪ ({q : Exp rT × Pat rT | q.1 ∉ Set.range (Exp.inr : Exp rT → Exp rT) ∧
                 Pat.shape q.2 = s' ∧ (none : Option (Exp rT)) ∈ U}) := by
         ext ⟨e, p'⟩
-        simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range]
+        simp only [Set.mem_ofPred_eq, Set.mem_union, Set.mem_image, Set.mem_range]
         constructor
         · rintro ⟨hsh, hp⟩
           by_cases hrange : ∃ e', Exp.inr e' = e
@@ -3164,7 +3164,7 @@ theorem tryMatch.measurable_joint [LawfulProbLangℝ rT] :
                 q.1 ∉ (Set.range (Function.uncurry (Exp.pair : Exp rT → Exp rT → Exp rT))) ∧
                 Pat.shape q.2.1 = s1 ∧ Pat.shape q.2.2 = s2 ∧ (none : Option (Exp rT)) ∈ U}) := by
         ext ⟨e, p1, p2⟩
-        simp only [Set.mem_setOf_eq, Set.mem_union, Set.mem_image, Set.mem_range,
+        simp only [Set.mem_ofPred_eq, Set.mem_union, Set.mem_image, Set.mem_range,
           Function.uncurry, Prod.mk.injEq]
         constructor
         · rintro ⟨hs1, hs2, hp⟩
@@ -3325,7 +3325,7 @@ theorem tryMatch.measurable_joint [LawfulProbLangℝ rT] :
           show MeasurableSet (Joint (⋃ i, F i))
           have heq : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
             ext q
-            simp only [hJoint_def, Set.mem_iUnion, Set.mem_setOf_eq]
+            simp only [hJoint_def, Set.mem_iUnion, Set.mem_ofPred_eq]
             tauto
           rw [heq]
           exact MeasurableSet.iUnion IH

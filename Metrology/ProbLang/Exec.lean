@@ -78,7 +78,7 @@ theorem execExactN_mono_continuous {n : Nat} {ρ : Cfg rT} {S} (HS : MeasurableS
     execExactN n ρ S ≤ execN (n + 1) ρ S := by
   have Hunfold : execExactN n ρ S = (if n < n + 1 then execExactN n ρ S else 0) := by simp
   rw [execExactN_sum_continuous HS, Hunfold]
-  exact ENNReal.le_tsum n
+  exact ENNReal.le_tsum (f := fun N => if N < n + 1 then execExactN N ρ S else 0) n
 
 -- DISCRETE: `Discrete.tsum_dirac_mul [Countable rT] [MeasurableSingletonClass rT]`
 --   `(ρ : Cfg rT) (f : Cfg rT → ENNReal) : ∑' ρ', dirac ρ {ρ'} * f ρ' = f ρ`

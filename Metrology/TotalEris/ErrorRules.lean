@@ -255,14 +255,14 @@ theorem twp_rand_exp {E : CoPset} {z : Int} {ε₁ : ENNReal} {ε₂ : ℕ → E
     · intro n hn
       simp only [Finset.mem_Ico] at hn
       show (if h : 0 ≤ n ∧ n < z then ε₂ n.toNat else 0) = ε₂ n.toNat
-      exact dif_pos ⟨hn.1, hn.2⟩
+      exact dite_eq_left ⟨hn.1, hn.2⟩
   iintro Herr Hcont
   iapply (twp_glm_spend Hnv hbd hstate hred hrmeas hpgl hint) $$ Herr
   -- The reached value is `.int n`, carrying `↯(ε₂ n.toNat)`; hand it to `Hcont`.
   iintro %σ₁ %ρ %HRρ Hcr
   obtain ⟨n, Hn₁, Hn₂, rfl⟩ := HRρ
   have hfe : f (⟨pl(#(.int n)), σ₁⟩ : Cfg rT) = ε₂ n.toNat := by
-    simp only [hf]; exact dif_pos ⟨Hn₁, Hn₂⟩
+    simp only [hf]; exact dite_eq_left ⟨Hn₁, Hn₂⟩
   iapply (ErisWpGS.tglWp_value_of_toVal rfl)
   have hn : 0 ≤ n ∧ n < z := ⟨Hn₁, Hn₂⟩
   iapply Hcont $$ %n
@@ -306,7 +306,7 @@ theorem twp_urand_exp {E : CoPset} {ε₁ : ENNReal}
   -- The reach set is exactly the image of the injection (used by `hrmeas` and `hpgl`).
   have hrange : ∀ σ₁ : State rT, {ρ : Cfg rT | R σ₁ ρ}
       = (fun r : rT => (⟨.lit (.real r), σ₁⟩ : Cfg rT)) '' LawfulProbLangℝ.unifUnitSupport := fun σ₁ => by
-    ext ρ; simp only [Set.mem_image, Set.mem_setOf_eq, hR]
+    ext ρ; simp only [Set.mem_image, Set.mem_ofPred_eq, hR]
     exact ⟨fun ⟨r, h, hr⟩ => ⟨r, hr, h.symm⟩, fun ⟨r, hr, h⟩ => ⟨r, h.symm, hr⟩⟩
   -- Discharge the six `twp_glm_spend` obligations, in signature order.
   have hbd : ∀ ρ : Cfg rT, f ρ ≤ 1 := by

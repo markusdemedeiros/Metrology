@@ -297,7 +297,7 @@ theorem SubstMap.filter_notMem_dom (vs : SubstMap rT) {y : Var}
       simp at h' ⊢; exact Or.inr h'
     have hcond : (!decide ((k, w).1 = y)) = true := by simp [hky]
     simp only [List.filter_cons]
-    rw [if_pos hcond]
+    rw [ite_eq_left hcond]
     congr 1
     exact ih hyRest
 
@@ -662,7 +662,7 @@ theorem Exp.substMap_fvar_lookup_none {vs : SubstMap rT} {x : Var}
       show (Exp.fvar x).subst y w = .fvar x
       simp only [Exp.subst]
       have : ¬ y = x := fun h => hxy h.symm
-      rw [if_neg this]
+      rw [ite_eq_right this]
 
 /-- Closedness of looked-up values in an `AllClosed` SubstMap. -/
 theorem SubstMap.lookup_closed {vs : SubstMap rT} {x : Var} {v : Exp rT}
@@ -892,7 +892,7 @@ theorem Exp.substMap_subst_fvar_lookup
           show List.filter _ _ = List.filter _ _
           rw [List.filter_cons]
           have : (!decide ((z, v).1 = y)) = false := by simp [hzy]
-          rw [if_neg (by rw [this]; simp)]
+          rw [ite_eq_right (by rw [this]; simp)]
         rw [hfilter_cons]
         rw [hzy]
         have hfilter_closed : SubstMap.AllClosed (rest.filter (fun p => !decide (p.1 = y))) :=
@@ -916,7 +916,7 @@ theorem Exp.substMap_subst_fvar_lookup
           show List.filter _ _ = List.filter _ _
           rw [List.filter_cons]
           have : (!decide ((z, v).1 = y)) = false := by simp [hzy]
-          rw [if_neg (by rw [this]; simp)]
+          rw [ite_eq_right (by rw [this]; simp)]
         rw [hfilter_cons]
         have hyNotRest : y ∉ (rest.map (·.1)).toFinset := by
           intro h
@@ -942,7 +942,7 @@ theorem Exp.substMap_subst_fvar_lookup
           show List.filter _ _ = _
           rw [List.filter_cons]
           have : (!decide ((z, v).1 = y)) = true := by simp [hzy]
-          rw [if_pos this]
+          rw [ite_eq_left this]
         rw [hfilter_cons]
         have hxz : x ≠ z := fun h => hzx h.symm
         have hzNotW : z ∉ w.fv := fun h => by
@@ -1348,7 +1348,7 @@ theorem State.fresh_loc_lookup {σ : State α} {α : Loc} {bs : Tape} {t : Tape}
 theorem Cfg.uniform_nonpos_eq {z : Int} {σ : State rT} (hz : ¬ 0 < z) :
     Cfg.uniform z σ = MeasureTheory.Measure.dirac ⟨.lit (.int (-1)), σ⟩ := by
   unfold Cfg.uniform Int.isPos
-  rw [dif_neg hz]
+  rw [dite_eq_right hz]
 
 theorem Cfg.uniform_ne_zero
     (z : Int) (σ : State rT) : Cfg.uniform z σ ≠ 0 := by
@@ -1384,7 +1384,7 @@ theorem Cfg.uniform_eq_map_uniformOfFinset {z : Int} (hz : 0 < z) (σ : State rT
     Cfg.uniform z σ = (PMF.uniformOfFinset (Finset.Ico (0 : Int) z)
         (Finset.nonempty_Ico.mpr hz)).toMeasure.map
       (fun n : Int => (⟨.lit (.int n), σ⟩ : Cfg rT)) := by
-  unfold Cfg.uniform Int.isPos; simp only [dif_pos hz]
+  unfold Cfg.uniform Int.isPos; simp only [dite_eq_left hz]
 
 /-- **Countability-free `lintegral` against `Cfg.uniform`.** For a *measurable* `φ`
 the integral is the `Ico`-average. `rand` branches over a finite set of integers,

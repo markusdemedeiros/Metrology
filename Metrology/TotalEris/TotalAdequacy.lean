@@ -38,7 +38,7 @@ theorem measurableEmbedding_ofVal :
   obtain ⟨U, hU, rfl⟩ := MeasurableSpace.measurableSet_comap.mp hs
   have hrange : Set.range (Val.fst : Val rT → Exp rT) = {e : Exp rT | e.isValue} := by
     ext e
-    simp only [Set.mem_range, Set.mem_setOf_eq]
+    simp only [Set.mem_range, Set.mem_ofPred_eq]
     constructor
     · rintro ⟨v, rfl⟩; exact Val.isValue v
     · intro h; exact ⟨Val.mk e h.some h.some.lc, rfl⟩
@@ -55,7 +55,7 @@ theorem measurableSet_ofValSet {φ : Val rT → Prop}
     (hφ : MeasurableSet {v : Val rT | φ v}) :
     MeasurableSet {e : Exp rT | ∃ v, e = Exp.ofVal v ∧ φ v} := by
   have heq : {e : Exp rT | ∃ v, e = Exp.ofVal v ∧ φ v} = Exp.ofVal '' {v | φ v} := by
-    ext e; simp only [Set.mem_setOf_eq, Set.mem_image]
+    ext e; simp only [Set.mem_ofPred_eq, Set.mem_image]
     exact ⟨fun ⟨v, he, hv⟩ => ⟨v, hv, he.symm⟩, fun ⟨v, hv, he⟩ => ⟨v, he.symm, hv⟩⟩
   rw [heq]
   exact measurableEmbedding_ofVal.measurableSet_image' hφ
@@ -224,7 +224,7 @@ theorem tgl_prim_step
     (Hpgl : Pgl ε₁ R (primStep ⟨e, σ⟩))
     (Hcont : ∀ ρ, R ρ → 1 - ε₂ ρ ≤ (limExec ρ) P) :
     1 - ε ≤ ∫⁻ ρ, (limExec ρ) P ∂primStep ⟨e, σ⟩ :=
-  haveI : MeasureTheory.IsProbabilityMeasure (primStep ⟨e, σ⟩) := prim_step_mass Hred
+  have : MeasureTheory.IsProbabilityMeasure (primStep ⟨e, σ⟩) := prim_step_mass Hred
   tgl_lift_prob (M := primStep ⟨e, σ⟩) (R := R) (ε₂ := ε₂)
     (k := fun ρ => (limExec ρ) P) hR
     ((MeasureTheory.Measure.measurable_coe hP).comp limExec.measurable)
@@ -246,7 +246,7 @@ theorem tgl_erasable
     (Hpgl : Pgl ε₁ R μ)
     (Hcont : ∀ σ', R σ' → 1 - ε₂ σ' ≤ (limExec ⟨e, σ'⟩) P) :
     1 - ε ≤ ∫⁻ σ', (limExec ⟨e, σ'⟩) P ∂μ :=
-  haveI : MeasureTheory.IsProbabilityMeasure μ :=
+  have : MeasureTheory.IsProbabilityMeasure μ :=
     ⟨ErasableExpr.mass heras⟩
   tgl_lift_prob (M := μ) (R := R) (ε₂ := ε₂)
     (k := fun σ' => (limExec ⟨e, σ'⟩) P) hR
@@ -336,11 +336,11 @@ theorem glm_implies_tgl [ErisGS rT .hasNoLC GF]
     glm' (GF := GF) e σ ε
         (fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝))
       ⊢@{IProp GF} iprop(|={∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
-  letI Z : Cfg rT → ENNReal → IProp GF :=
+  let Z : Cfg rT → ENNReal → IProp GF :=
     fun ρ ε₂ => iprop(|={∅}=> ⌜Tgl (limExec ρ) φ ε₂⌝)
-  letI Ψ : GlmState rT → IProp GF :=
+  let Ψ : GlmState rT → IProp GF :=
     fun s => iprop(|={∅}=> ⌜Tgl (limExec s.1) φ s.2⌝)
-  letI : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
+  let : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
   iintro HG
   ihave HInd : iprop(□ (∀ s, glmPre' Z
       (fun s' => iprop(Ψ s' ∧ bi_least_fixpoint (glmPre' Z) s')) s -∗ Ψ s)) $$ []
@@ -398,10 +398,10 @@ theorem twp_step_fupd_tgl [ErisGS rT .hasNoLC GF]
     iprop(stateInterp σ ∗ errInterp (rT := rT) ε ∗ tglWp ⊤ e (fun v => iprop(⌜φ v⌝)))
       ⊢@{IProp GF} iprop(|={⊤,∅}=> ⌜Tgl (limExec ⟨e, σ⟩) φ ε⌝) := by
   iintro ⟨Hσ, Hε, HW⟩
-  letI Q : Exp rT → IProp GF := fun e' => iprop(
+  let Q : Exp rT → IProp GF := fun e' => iprop(
     ∀ σ' ε', stateInterp σ' ∗ errInterp (rT := rT) ε' -∗
       |={⊤,∅}=> ⌜Tgl (limExec ⟨e', σ'⟩) φ ε'⌝)
-  letI : NonExpansive Q := nonExpansive_of_discrete_leibniz Q
+  let : NonExpansive Q := nonExpansive_of_discrete_leibniz Q
   ihave Hq : Q e $$ [HW]
   · iapply (tglWp_ind (E := ⊤) (Q := Q)
       (Φ := fun v => iprop(⌜φ v⌝)))
@@ -453,7 +453,7 @@ theorem twp_tgl [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
   iintro _
   imod (app_ra_init (GF := GF) σ) with ⟨%IA, HappAuth⟩
   imod (ec_alloc (GF := GF) ε hε) with ⟨%γec, HecAuth, HecFrag⟩
-  letI IES : ErisGS rT .hasNoLC GF := {
+  let IES : ErisGS rT .hasNoLC GF := {
     appGS := IA
     ecGS := { toECPreGS := inferInstance, γec := γec }
     invGS := Hinv }
@@ -478,7 +478,7 @@ theorem twp_tgl_value [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
   iintro _
   imod (app_ra_init (GF := GF) σ) with ⟨%IA, HappAuth⟩
   imod (ec_alloc (GF := GF) ε hε) with ⟨%γec, HecAuth, HecFrag⟩
-  letI IES : ErisGS rT .hasNoLC GF := {
+  let IES : ErisGS rT .hasNoLC GF := {
     appGS := IA
     ecGS := { toECPreGS := inferInstance, γec := γec }
     invGS := Hinv }

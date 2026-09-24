@@ -388,7 +388,7 @@ theorem one_lt_G2Factor : 1 < G2Factor := by
 
 theorem G1Factor_coe :
     (G1Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - (1 - (γBNE : ℝ)) * Norm1)) := by
-  rw [G1Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
+  rw [← ENNReal.ofReal_coe_nnreal]; rfl
 
 theorem G1Factor_mul_reject :
     (G1Factor : ℝ≥0∞) * ENNReal.ofReal (1 - (1 - (γBNE : ℝ)) * Norm1) = 1 := by
@@ -397,7 +397,7 @@ theorem G1Factor_mul_reject :
     ENNReal.ofReal_one]
 
 theorem G2Factor_coe : (G2Factor : ℝ≥0∞) = ENNReal.ofReal (1 / (1 - Norm2 / Norm1)) := by
-  rw [G2Factor, ← ENNReal.ofReal_coe_nnreal]; rfl
+  rw [← ENNReal.ofReal_coe_nnreal]; rfl
 
 theorem G2Factor_mul_reject :
     (G2Factor : ℝ≥0∞) * ENNReal.ofReal (1 - Norm2 / Norm1) = 1 := by

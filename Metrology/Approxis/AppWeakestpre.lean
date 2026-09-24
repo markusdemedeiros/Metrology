@@ -760,7 +760,6 @@ theorem fupd_specCoupl_of_le {E : CoPset} {σ : State rT} {e' : Exp rT} {σ' : S
     (μ₁ := MeasureTheory.Measure.dirac σ) (μ₁' := MeasureTheory.Measure.dirac σ')
     (ε₁ := ε₂ - ε₁) (X₂ := fun _ => ε₁) (r := ε₁)
     (Hcpl := by
-      show AddCoupl (ε₂ - ε₁) _ (MeasureTheory.Measure.dirac σ) _
       rw [MeasureTheory.Measure.dirac_bind (by fun_prop)]
       simp only [pexecN_zero]
       exact AddCoupl.dirac _ ⟨rfl, rfl⟩)
@@ -930,7 +929,6 @@ theorem specCoupl_steps_det {E : CoPset} {σ : State rT} {e₁' : Exp rT} {σ₁
     (μ₁ := MeasureTheory.Measure.dirac σ) (μ₁' := MeasureTheory.Measure.dirac σ₁')
     (ε₁ := 0) (X₂ := fun _ => ε) (r := ε)
     (Hcpl := by
-      show AddCoupl 0 _ (MeasureTheory.Measure.dirac σ) _
       rw [MeasureTheory.Measure.dirac_bind (by fun_prop), Hstep]
       exact AddCoupl.dirac _ ⟨rfl, rfl⟩)
     (HX₂meas := measurable_const) (Hbnd := fun _ => _root_.le_refl _)
@@ -962,7 +960,7 @@ theorem specCoupl_step_concentrated {E : CoPset} {σ₁ : State rT} {e₁' : Exp
   iintro H
   have Hε : (0 : ENNReal) + ε ≤ ε := by rw [zero_add]
   have hprob_rhs : (primStep ⟨e₁', σ₁'⟩) Set.univ = 1 := by
-    haveI := prim_step_mass Hred
+    have := prim_step_mass Hred
     exact MeasureTheory.IsProbabilityMeasure.measure_univ
   have Htrivial : AddCoupl 0 Set.univ (MeasureTheory.Measure.dirac σ₁) (primStep ⟨e₁', σ₁'⟩) :=
     RelCoupl.exact (RelCoupl.trivial (by simp) hprob_rhs)
@@ -1087,7 +1085,7 @@ theorem progCoupl_strong_mono {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT
       refine ⟨S, ?_, ?_⟩
       · rw [MeasureTheory.mem_ae_iff]; exact hSconc
       · intro a ha
-        simp only [h₁', if_pos ha]
+        simp only [h₁', ite_eq_left ha]
     rw [hcongr]
     have hh₁'meas : Measurable h₁' :=
       Measurable.ite hSmeas Hh₁meas measurable_const
@@ -1097,7 +1095,7 @@ theorem progCoupl_strong_mono {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT
       simp only [h₁']
       split_ifs with h
       · have hb := Hh₁h₂ a b
-        simp only [if_pos h] at hb
+        simp only [ite_eq_left h] at hb
         exact hb
       · exact (zero_le).trans le_self_add
   iapply (progCoupl_intro (r := max r 1) Hred Hbnd' Hexp' Heras)
@@ -1105,7 +1103,7 @@ theorem progCoupl_strong_mono {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT
   iintro %e₂ %σ₂ %e₂' %σ₂'
   by_cases hmem : (⟨e₂, σ₂⟩ : Cfg rT) ∈ S
   · -- In the carrying set: use Hm ∘ HCont.
-    simp only [if_pos hmem]
+    simp only [ite_eq_left hmem]
     ihave HZ₁ := HCont $$ %e₂ %σ₂ %e₂' %σ₂'
     imod HZ₁ with HZ₁
     imodintro
@@ -1113,7 +1111,7 @@ theorem progCoupl_strong_mono {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT
     isplitr; · ipureintro; exact hmem
     iexact HZ₁
   · -- Outside: X₂' = 1, use the catchall.
-    simp only [if_neg hmem]
+    simp only [ite_eq_right hmem]
     imodintro
     iexact H1F
 
@@ -1346,7 +1344,7 @@ theorem progCoupl_step_l_erasable_adv {e₁ : Exp rT} {σ₁ : State rT} {e₁' 
     simp only [↓reduceIte]
     ihave HZ := Hcnt $$ %e₂ %σ₂ %σ₂'
     iexact HZ
-  · simp only [if_neg he]
+  · simp only [ite_eq_right he]
     imodintro
     iexact H1F
 
@@ -1457,7 +1455,7 @@ theorem progCoupl_step_l_concentrated {e₁ : Exp rT} {σ₁ : State rT} {e₁' 
   iintro ⟨#H1F, H⟩
   classical
   have hprob_lhs : (primStep ⟨e₁, σ₁⟩) Set.univ = 1 := by
-    haveI := prim_step_mass Hred
+    have := prim_step_mass Hred
     exact MeasureTheory.IsProbabilityMeasure.measure_univ
   have Htrivial : AddCoupl 0 Set.univ (primStep ⟨e₁, σ₁⟩)
       (MeasureTheory.Measure.dirac σ₁') :=
@@ -2433,7 +2431,7 @@ theorem wp_lift_head_step_concentrated {E : CoPset} {e₁ : Exp rT} {Φ : Val rT
   imodintro
   isplitr; · ipureintro; exact reducible_of_headReducible Hlc Hhred
   iintro !> %e₂ %σ₂ %Hmem
-  rw [if_pos Hhred] at Hmem
+  rw [ite_eq_left Hhred] at Hmem
   iapply H $$ %e₂ %σ₂ %Hmem
 
 open scoped Classical in
@@ -2461,7 +2459,7 @@ theorem wp_lift_atomic_head_step_fupd_concentrated {E1 E2 : CoPset} {e₁ : Exp 
   imodintro
   isplitr; · ipureintro; exact reducible_of_headReducible Hlc Hhred
   iintro %e₂ %σ₂ %Hmem
-  rw [if_pos Hhred] at Hmem
+  rw [ite_eq_left Hhred] at Hmem
   iapply H $$ %e₂ %σ₂ %Hmem
 
 open scoped Classical in

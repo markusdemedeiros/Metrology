@@ -1306,13 +1306,13 @@ theorem TctxRelated.insert {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT GF
       | none => rfl
       | some τ' => rw [h] at heq; simp at heq
     simp [hfresh]
-  · rw [if_neg hxy]
+  · rw [ite_eq_right hxy]
     cases hRc : Γrc.lookup y with
     | none =>
       rw [hRc] at heq
       cases hΓy : Γtc y with
       | none =>
-        simp [if_neg hxy]
+        simp [ite_eq_right hxy]
       | some τ' => rw [hΓy] at heq; simp at heq
     | some A =>
       rw [hRc] at heq
@@ -1340,7 +1340,7 @@ theorem RelCtx.exists_mem_of_lookup_isSome {Γ : RelCtx rT GF} {x : Var}
       rw [hr] at h
       by_cases hxq : x = q.1
       · exact ⟨q, List.mem_cons_self, hxq.symm⟩
-      · rw [if_neg hxq] at h; simp at h
+      · rw [ite_eq_right hxq] at h; simp at h
 
 /-- Helper: `e.fv ⊆ (Γrc.map ·.1).toFinset` follows from `Typed Γtc e τ` + `TctxRelated`. -/
 theorem fv_subset_relCtxDom {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT GF}

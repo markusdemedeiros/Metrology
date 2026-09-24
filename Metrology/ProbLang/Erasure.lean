@@ -13,7 +13,7 @@ namespace ProbLang
 
 variable {rT : Type _} [LawfulProbLangℝ rT]
 
-open MeasureTheory Measure
+open MeasureTheory MeasureTheory.Measure ProbLang.Measure
 
 /-! ## Local uniform-presample distribution -/
 noncomputable def tapeIndexUniform (N : Int) : Measure { z : Int // 0 ≤ z ∧ z < N } :=
@@ -54,8 +54,8 @@ theorem tapeIndexUniform_univ_eq_one {N : Int} (hN : 0 < N) :
   unfold tapeIndexUniform
   have hNonempty : (Finset.Ico 0 N).Nonempty := by
     refine ⟨0, Finset.mem_Ico.mpr ⟨le_refl _, hN⟩⟩
-  rw [dif_pos hNonempty]
-  haveI : IsProbabilityMeasure
+  rw [dite_eq_left hNonempty]
+  have : IsProbabilityMeasure
       (PMF.uniformOfFinset (Finset.Ico 0 N) hNonempty).toMeasure :=
     PMF.toMeasure.isProbabilityMeasure _
   rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
@@ -72,9 +72,9 @@ noncomputable def tapeIdxOf {N : Int} (hN : 0 < N) (n : Int) : { z : Int // 0 �
 theorem tapeIndexUniform_eq_map {N : Int} (hN : 0 < N) :
     tapeIndexUniform N =
       (PMF.uniformOfFinset (Finset.Ico (0 : Int) N)
-        ⟨0, Finset.mem_Ico.mpr ⟨_root_.le_refl _, hN⟩⟩).toMeasure.map (tapeIdxOf hN) := by
+        (Finset.nonempty_Ico.mpr hN)).toMeasure.map (tapeIdxOf hN) := by
   unfold tapeIndexUniform tapeIdxOf
-  rw [dif_pos ⟨0, Finset.mem_Ico.mpr ⟨_root_.le_refl _, hN⟩⟩]
+  rw [dite_eq_left ⟨0, Finset.mem_Ico.mpr ⟨_root_.le_refl _, hN⟩⟩]
 
 /-- Countability-free `lintegral` against `tapeIndexUniform`. -/
 theorem lintegral_tapeIndexUniform {N : Int} (hN : 0 < N)
@@ -184,7 +184,7 @@ theorem tapeIndexUniform_univ_le_one {N : Int} :
   unfold tapeIndexUniform
   split
   · rename_i h
-    haveI : IsProbabilityMeasure
+    have : IsProbabilityMeasure
         (PMF.uniformOfFinset (Finset.Ico 0 N) h).toMeasure :=
       PMF.toMeasure.isProbabilityMeasure _
     rw [Measure.map_apply Measurable.of_discrete MeasurableSet.univ]
@@ -228,7 +228,7 @@ theorem tapePresample_bind_dirac_measurable {α : Loc}
   rw [hconv]
   have hk : Measurable (fun ρ : Cfg rT => tapePresample ρ.state α) :=
     tapePresample.measurable.comp Cfg.measurable_state
-  haveI hFin : ProbabilityTheory.IsFiniteKernel
+  have hFin : ProbabilityTheory.IsFiniteKernel
       (ProbabilityTheory.Kernel.mk (fun ρ : Cfg rT => tapePresample ρ.state α) hk) :=
     ⟨1, ENNReal.one_lt_top, fun _ => tapePresample_univ_le_one⟩
   exact Measure.measurable_map_uncurry hg hk
@@ -423,7 +423,7 @@ theorem tapePresample_ae
   show (Measure.dirac (σ.update_tapes (·.insert α ⟨N, bs ++ [n]⟩)))
         {a | ¬P a} = 0
   rw [Measure.dirac_apply' _ hPc, Set.indicator_of_notMem]
-  simp only [Set.mem_setOf_eq, not_not]
+  simp only [Set.mem_ofPred_eq, not_not]
   exact hP n
 
 /-- `tapePresample σ α` is heap-preserving: every state in its support has
@@ -622,7 +622,7 @@ theorem Cfg.uniform_eq_bind {z : Int} {σ : State rT} (hz : 0 < z) :
             (Finset.nonempty_Ico.mpr hz)).toMeasure).bind
         (fun n => Measure.dirac (⟨.lit (.int n), σ⟩ : Cfg rT)) := by
   unfold Cfg.uniform Int.isPos
-  rw [dif_pos hz]
+  rw [dite_eq_left hz]
   rw [Measure.bind_dirac_eq_map _ Measurable.of_discrete]
 
 /-- **Commutation helper for `rand.plain` and `rand.tape.*`**.
@@ -710,7 +710,7 @@ theorem tapePresample_bind_cfgUniform_comm
     simp_rw [hLlint, hRlint]
     -- Apply lintegral_lintegral_swap: outer is tapePresample σ α (finite, hence
     -- SFinite), inner is the PMF measure.
-    haveI : IsFiniteMeasure (tapePresample σ α) :=
+    have : IsFiniteMeasure (tapePresample σ α) :=
       ⟨lt_of_le_of_lt tapePresample_univ_le_one ENNReal.one_lt_top⟩
     have hcfgbuild : Measurable (fun p : State rT × Int =>
         (⟨.lit (.int p.2), p.1⟩ : Cfg rT)) :=
@@ -771,7 +771,7 @@ theorem tapeIndexUniform_lintegral_eq_cfg_uniform
   -- Unfold both definitions to PMF.uniformOfFinset level
   unfold tapeIndexUniform Cfg.uniform Int.isPos
   have hNonempty : (Finset.Ico 0 N).Nonempty := ⟨0, Finset.mem_Ico.mpr ⟨le_refl _, hN⟩⟩
-  rw [dif_pos hNonempty, dif_pos hN]
+  rw [dite_eq_left hNonempty, dite_eq_left hN]
   simp only
   -- Now both sides are lintegrals over `Measure.map` of the same PMF.toMeasure
   -- LHS: ∫⁻ a, f ⟨lit (int ↑a), σ⟩ ∂(pmf.toMeasure.map (subtypeEmbed))
@@ -804,7 +804,7 @@ theorem tapeIndexUniform_lintegral_eq_cfg_uniform
     have hmem : a ∈ Finset.Ico 0 N := by
       rwa [PMF.mem_support_uniformOfFinset_iff] at ha
     have hab : 0 ≤ a ∧ a < N := Finset.mem_Ico.mp hmem
-    simp [dif_pos hab]
+    simp [dite_eq_left hab]
 
 /-! ## Case-closing helpers for the main erasure induction
 
@@ -867,7 +867,7 @@ theorem erasure_det_close_ae
               ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
       = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
           ∂headStep ⟨e_h, σ⟩ := by
-  haveI : IsProbabilityMeasure (tapePresample σ α) :=
+  have : IsProbabilityMeasure (tapePresample σ α) :=
     ⟨tapePresample_univ_eq_one h hN⟩
   rw [hs_σ, lintegral_dirac]
   calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
@@ -901,13 +901,13 @@ theorem erasure_uniform_close
               ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
       = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
           ∂headStep ⟨e_h, σ⟩ := by
-  haveI : IsProbabilityMeasure (tapePresample σ α) :=
+  have : IsProbabilityMeasure (tapePresample σ α) :=
     ⟨tapePresample_univ_eq_one h hN⟩
   have hNonempty : (Finset.Ico (0 : Int) z_r).Nonempty := Finset.nonempty_Ico.mpr hz
   set pmf := PMF.uniformOfFinset (Finset.Ico (0 : Int) z_r) hNonempty
   have hunif : ∀ σ₀ : State rT, Cfg.uniform z_r σ₀ =
       pmf.toMeasure.map (fun n : Int => (⟨.lit (.int n), σ₀⟩ : Cfg rT)) := fun σ₀ => by
-    unfold Cfg.uniform Int.isPos; rw [dif_pos hz]
+    unfold Cfg.uniform Int.isPos; rw [dite_eq_left hz]
   calc ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
                 ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
       = ∫⁻ σ', ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
@@ -951,7 +951,7 @@ theorem erasure_uniformReal_close
               ∂headStep ⟨e_h, σ'⟩ ∂tapePresample σ α
       = ∫⁻ ρ, ((execN m ∘ K.fillCfg) ρ) ((fun x => x.expr) ⁻¹' S)
           ∂headStep ⟨e_h, σ⟩ := by
-  haveI : IsProbabilityMeasure (tapePresample σ α) :=
+  have : IsProbabilityMeasure (tapePresample σ α) :=
     ⟨tapePresample_univ_eq_one h hN⟩
   have hunif : ∀ σ₀ : State rT, Cfg.uniformReal σ₀ =
       (LawfulProbLangℝ.unifUnit (T := rT)).map (fun r : rT => (⟨.lit (.real r), σ₀⟩ : Cfg rT)) :=
@@ -1570,7 +1570,7 @@ theorem execN_tape_presample_expr_eq
                 = Cfg.uniform z_r σ₀ := by
             intro σ₀ M ns ht hne
             show (match σ₀.tapes[α_lbl]? with | none => _ | some ⟨M, _⟩ => _) = _
-            rw [ht]; simp only; rw [if_neg hne]
+            rw [ht]; simp only; rw [ite_eq_right hne]
           refine uniform_close _ z_r hz ?_ (hrand_uniform σ htapes (Ne.symm hzN))
           obtain ⟨N, bs⟩ := t
           by_cases hαeq : α = α_lbl
@@ -1627,7 +1627,7 @@ theorem execN_tape_presample_expr_eq
                 Measure.dirac ⟨.lit (.int (-1)), σ'⟩ := by
             intro σ' hσ'
             simp only [headStep, hσ']
-            rw [if_neg (Ne.symm hzN)]
+            rw [ite_eq_right (Ne.symm hzN)]
             exact Cfg.uniform_nonpos_eq hz
           refine erasure_det_close_ae h hN ih_fill _ (.lit (.int (-1))) ?_ (hstep htapes)
           by_cases hαeq : α = α_lbl
@@ -1650,7 +1650,7 @@ theorem execN_tape_presample_expr_eq
             · simp [hq] at hb
             · simp only [hq, Option.map_some, Option.some.injEq] at hb
               simp only [headStep, hq]
-              rw [if_neg (show ¬ M = z_r by omega)]
+              rw [ite_eq_right (show ¬ M = z_r by omega)]
               exact Cfg.uniform_nonpos_eq hz
           · filter_upwards [tapePresample_tape_ne_ae h (Ne.symm hαeq)] with σ' htape_eq
             exact hstep (htape_eq.trans htapes)
@@ -1685,7 +1685,7 @@ theorem tapePresampleIter_tape_bound_ae [Countable rT] [MeasurableSingletonClass
     show ∀ᵐ σ' ∂(Measure.dirac σ), _
     rw [MeasureTheory.ae_iff, Measure.dirac_apply' _ MeasurableSet.of_discrete,
         Set.indicator_of_notMem]
-    simp only [Set.mem_setOf_eq, not_not]
+    simp only [Set.mem_ofPred_eq, not_not]
     exact ⟨t, h, rfl⟩
   | succ k ihk =>
     rw [tapePresampleIter, MeasureTheory.ae_iff,

@@ -653,7 +653,7 @@ theorem cell_binary
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Shape-partition assembly**: glues per-shape cell measurability into global
@@ -665,7 +665,7 @@ theorem measurable_of_cells [Countable Sh]
   intro S hS
   rw [show (f ⁻¹' S) = ⋃ s : Sh, {p : T | shape p = s ∧ f p ∈ S} from by
     ext p
-    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_setOf_eq]
+    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_ofPred_eq]
     exact ⟨fun h => ⟨_, rfl, h⟩, fun ⟨_, _, h⟩ => h⟩]
   exact MeasurableSet.iUnion fun s => h_cell s hS
 
@@ -758,7 +758,7 @@ theorem cell_ternary
       · simpa using ih3 MeasurableSet.univ
     · intro F _ _ IH
       have : J23 (⋃ i, F i) = ⋃ i, J23 (F i) := by
-        ext ⟨p2, p3⟩; simp only [hJ23, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        ext ⟨p2, p3⟩; simp only [hJ23, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   -- Now the outer induction on S using rectangles V × W in α × (α × α).
   refine MeasurableSpace.induction_on_inter
@@ -783,7 +783,7 @@ theorem cell_ternary
       ext ⟨p2, p3⟩; simp
   · intro F _ _ IH
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Quaternary joint-recursive cell** (arity-extension appendix, §21): copied from
@@ -890,7 +890,7 @@ theorem cell_quaternary
       · intro F _ _ IH
 
         have : J34 (⋃ i, F i) = ⋃ i, J34 (F i) := by
-          ext ⟨p3, p4⟩; simp only [hJ34, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+          ext ⟨p3, p4⟩; simp only [hJ34, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
         rw [this]; exact MeasurableSet.iUnion IH
     refine MeasurableSpace.induction_on_inter
       (C := fun W'' _ => MeasurableSet (J234 W'')) hgen' hpi' ?_ ?_ ?_ ?_ W' hW'
@@ -915,7 +915,7 @@ theorem cell_quaternary
     · intro F _ _ IH
 
       have : J234 (⋃ i, F i) = ⋃ i, J234 (F i) := by
-        ext ⟨p2, p3, p4⟩; simp only [hJ234, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        ext ⟨p2, p3, p4⟩; simp only [hJ234, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   -- Outer induction on S using rectangles V × W in α × (α × α × α).
   refine MeasurableSpace.induction_on_inter
@@ -942,7 +942,7 @@ theorem cell_quaternary
       ext ⟨p2, p3, p4⟩; simp
   · intro F _ _ IH
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨p1, p2, p3, p4⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨p1, p2, p3, p4⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Mixed unary (discrete + recursive)**: e.g. `unop (op : UnOp) (e : Exp)`.
@@ -963,7 +963,7 @@ theorem cell_unaryMixed {β : Type _} [MeasurableSpace β]
   have heq : {p : T | shape p = s ∧ f p ∈ U}
       = ⋃ b : β, ctor b '' {p' : T | shape p' = sChild b ∧ f p' ∈ (c b ⁻¹' U)} := by
     ext p
-    simp only [Set.mem_iUnion, Set.mem_image, Set.mem_setOf_eq]
+    simp only [Set.mem_iUnion, Set.mem_image, Set.mem_ofPred_eq]
     constructor
     · rintro ⟨hs, hp⟩
       obtain ⟨b, p', rfl, hs'⟩ := (h_shape p).mp hs
@@ -1019,7 +1019,7 @@ theorem cell_binaryMixed {β : Type _} [MeasurableSpace β]
           {q : T × T | shape q.1 = sChild1 b ∧ shape q.2 = sChild2 b ∧
             Function.uncurry (c b) (f q.1, f q.2) ∈ U} := by
     ext p
-    simp only [Set.mem_iUnion, Set.mem_image, Set.mem_setOf_eq]
+    simp only [Set.mem_iUnion, Set.mem_image, Set.mem_ofPred_eq]
     constructor
     · rintro ⟨hs, hp⟩
       obtain ⟨b, p1, p2, rfl, hs1, hs2⟩ := (h_shape p).mp hs
@@ -1068,7 +1068,7 @@ theorem cell_binaryMixed {β : Type _} [MeasurableSpace β]
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Recursive + foreign data leaf**: e.g. `scrut (e : Exp) (p : Pat)`. The recursive
@@ -1133,7 +1133,7 @@ theorem cell_scrutLike {γ : Type _} [MeasurableSpace γ]
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨p, g⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨p, g⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-! ## Param-threaded variants.
@@ -1154,7 +1154,7 @@ theorem cell_nullary_param {ctor : T} {s : Sh} {c : β → α} {U : Set α}
   have : {q : β × T | shape q.2 = s ∧ Function.uncurry g q ∈ U}
       = (c ⁻¹' U) ×ˢ ({ctor} : Set T) := by
     ext ⟨b, p⟩
-    simp only [Set.mem_setOf_eq, Function.uncurry, Set.mem_prod, Set.mem_preimage,
+    simp only [Set.mem_ofPred_eq, Function.uncurry, Set.mem_prod, Set.mem_preimage,
       Set.mem_singleton_iff]
     constructor
     · rintro ⟨hs, hp⟩
@@ -1183,14 +1183,14 @@ theorem cell_dataLeaf_param {γ : Type _} [MeasurableSpace γ]
     · rintro ⟨hs, hp⟩
       obtain ⟨d, rfl⟩ := (h_shape p).mp hs
       refine ⟨(b, d), ?_, rfl⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry] at hp ⊢
+      simp only [Set.mem_ofPred_eq, Function.uncurry] at hp ⊢
       rw [h_eq] at hp; exact hp
     · rintro ⟨⟨b', d⟩, hd, heq⟩
       have hbeq : b' = b := by simpa using (Prod.mk.injEq ..).mp heq |>.1
       have hpeq : ctor d = p := by simpa using (Prod.mk.injEq ..).mp heq |>.2
       subst hbeq hpeq
       refine ⟨(h_shape _).mpr ⟨d, rfl⟩, ?_⟩
-      simp only [Set.mem_setOf_eq, Function.uncurry] at hd ⊢
+      simp only [Set.mem_ofPred_eq, Function.uncurry] at hd ⊢
       rw [h_eq]; exact hd
   rw [heq]
   -- Prod.map id ctor is a measurable embedding.
@@ -1270,7 +1270,7 @@ theorem cell_unary_param {ctor : T → T} {s s' : Sh}
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨b, p⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨b, p⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Binary joint-recursive cell (param)**: e.g. `app e1 e2`. Both children share
@@ -1393,7 +1393,7 @@ theorem cell_binary_param
     · intro F _ _ IH
       show MeasurableSet (J12 (⋃ i, F i))
       have : J12 (⋃ i, F i) = ⋃ i, J12 (F i) := by
-        ext ⟨b, p1, p2⟩; simp only [hJ12, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        ext ⟨b, p1, p2⟩; simp only [hJ12, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   refine MeasurableSpace.induction_on_inter
     (C := fun W _ => MeasurableSet (Joint W)) hgen hpi ?_ ?_ ?_ ?_ W hW
@@ -1423,7 +1423,7 @@ theorem cell_binary_param
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨b, p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨b, p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-! ### Binder-shifting variants.
@@ -1510,7 +1510,7 @@ theorem cell_unary_param_shift {ctor : T → T} {s s' : Sh}
     have hslice : {q : β × T | shape q.2 = s'}
         = (fun q : β × T => q.2) ⁻¹' (Prod.snd '' {q : β × T | shape q.2 = s' ∧ Function.uncurry g q ∈ Set.univ}) := by
       ext ⟨b, p⟩
-      simp only [Set.mem_setOf_eq, Set.mem_preimage, Set.mem_image]
+      simp only [Set.mem_ofPred_eq, Set.mem_preimage, Set.mem_image]
       constructor
       · intro hs; exact ⟨(b, p), ⟨hs, by simp [Function.uncurry]⟩, rfl⟩
       · rintro ⟨⟨b', p'⟩, ⟨hs', _⟩, rfl⟩; exact hs'
@@ -1535,7 +1535,7 @@ theorem cell_unary_param_shift {ctor : T → T} {s s' : Sh}
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨b, p⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨b, p⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Ternary recursive cell (param)**: e.g. `cond ec et ef`. Three children share `b`. -/
@@ -1689,7 +1689,7 @@ theorem cell_ternary_param
       · intro F _ _ IH
         show MeasurableSet (K (⋃ i, F i))
         have : K (⋃ i, F i) = ⋃ i, K (F i) := by
-          ext ⟨b, p1, p2, p3⟩; simp only [hK, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+          ext ⟨b, p1, p2, p3⟩; simp only [hK, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
         rw [this]; exact MeasurableSet.iUnion IH
     refine MeasurableSpace.induction_on_inter
       (C := fun R'' _ => MeasurableSet (J R'')) hgen' hpi' ?_ ?_ ?_ ?_ R' hR'
@@ -1719,7 +1719,7 @@ theorem cell_ternary_param
     · intro F _ _ IH
       show MeasurableSet (J (⋃ i, F i))
       have : J (⋃ i, F i) = ⋃ i, J (F i) := by
-        ext ⟨b, p1, p2, p3⟩; simp only [hJ, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        ext ⟨b, p1, p2, p3⟩; simp only [hJ, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   refine MeasurableSpace.induction_on_inter
     (C := fun W _ => MeasurableSet (Joint W)) hgen hpi ?_ ?_ ?_ ?_ W hW
@@ -1748,7 +1748,7 @@ theorem cell_ternary_param
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨b, p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨b, p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 set_option maxHeartbeats 1000000 in
@@ -1935,7 +1935,7 @@ theorem cell_quaternary_param
         · intro F _ _ IH
           show MeasurableSet (K (⋃ i, F i))
           have : K (⋃ i, F i) = ⋃ i, K (F i) := by
-            ext ⟨b, p1, p2, p3, p4⟩; simp only [hK, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+            ext ⟨b, p1, p2, p3, p4⟩; simp only [hK, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
           rw [this]; exact MeasurableSet.iUnion IH
       refine MeasurableSpace.induction_on_inter
         (C := fun R'' _ => MeasurableSet (J R'')) hgen' hpi' ?_ ?_ ?_ ?_ R' hR'
@@ -1966,7 +1966,7 @@ theorem cell_quaternary_param
       · intro F _ _ IH
         show MeasurableSet (J (⋃ i, F i))
         have : J (⋃ i, F i) = ⋃ i, J (F i) := by
-          ext ⟨b, p1, p2, p3, p4⟩; simp only [hJ, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+          ext ⟨b, p1, p2, p3, p4⟩; simp only [hJ, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
         rw [this]; exact MeasurableSet.iUnion IH
     -- outer induction (over Rₒ ⊆ α × α × α × α) for hjoint1234, factoring s1.
     refine MeasurableSpace.induction_on_inter
@@ -1998,7 +1998,7 @@ theorem cell_quaternary_param
     · intro F _ _ IH
       show MeasurableSet (Jouter (⋃ i, F i))
       have : Jouter (⋃ i, F i) = ⋃ i, Jouter (F i) := by
-        rw [hJouter]; ext ⟨b, p1, p2, p3, p4⟩; simp only [Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        rw [hJouter]; ext ⟨b, p1, p2, p3, p4⟩; simp only [Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   refine MeasurableSpace.induction_on_inter
     (C := fun W _ => MeasurableSet (Joint W)) hgen hpi ?_ ?_ ?_ ?_ W hW
@@ -2030,7 +2030,7 @@ theorem cell_quaternary_param
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      rw [hJoint]; ext ⟨b, p1, p2, p3, p4⟩; simp only [Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      rw [hJoint]; ext ⟨b, p1, p2, p3, p4⟩; simp only [Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Mixed unary (param)**: e.g. `unop (op : UnOp) (e : T)`. Discrete `γ` arg + recursion. -/
@@ -2051,7 +2051,7 @@ theorem cell_unaryMixed_param {γ : Type _} [MeasurableSpace γ]
       = ⋃ d : γ, {q : β × T | (∃ p', q.2 = ctor d p' ∧ shape p' = sChild d)
                               ∧ Function.uncurry g q ∈ U} := by
     ext ⟨b, p⟩
-    simp only [Set.mem_iUnion, Set.mem_setOf_eq]
+    simp only [Set.mem_iUnion, Set.mem_ofPred_eq]
     constructor
     · rintro ⟨hs, hp⟩
       obtain ⟨d, p', rfl, hs'⟩ := (h_shape p).mp hs
@@ -2141,7 +2141,7 @@ theorem cell_unaryMixed_param {γ : Type _} [MeasurableSpace γ]
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨b, p⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨b, p⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Mixed binary (param)**: e.g. `binop (op : BinOp) e1 e2`. -/
@@ -2168,7 +2168,7 @@ theorem cell_binaryMixed_param {γ : Type _} [MeasurableSpace γ]
                                 ∧ shape p1 = sChild1 d ∧ shape p2 = sChild2 d)
                               ∧ Function.uncurry g q ∈ U} := by
     ext ⟨b, p⟩
-    simp only [Set.mem_iUnion, Set.mem_setOf_eq]
+    simp only [Set.mem_iUnion, Set.mem_ofPred_eq]
     constructor
     · rintro ⟨hs, hp⟩
       obtain ⟨d, p1, p2, rfl, hs1, hs2⟩ := (h_shape p).mp hs
@@ -2284,7 +2284,7 @@ theorem cell_binaryMixed_param {γ : Type _} [MeasurableSpace γ]
     · intro F _ _ IH
       show MeasurableSet (J12 (⋃ i, F i))
       have : J12 (⋃ i, F i) = ⋃ i, J12 (F i) := by
-        ext ⟨b, p1, p2⟩; simp only [hJ12, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        ext ⟨b, p1, p2⟩; simp only [hJ12, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   refine MeasurableSpace.induction_on_inter
     (C := fun W _ => MeasurableSet (Joint W)) hgen hpi ?_ ?_ ?_ ?_ W hW
@@ -2315,7 +2315,7 @@ theorem cell_binaryMixed_param {γ : Type _} [MeasurableSpace γ]
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨b, p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨b, p1, p2⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Foreign data leaf (param)**: e.g. `scrut (e : T) (p : Pat)`. -/
@@ -2423,7 +2423,7 @@ theorem cell_scrutLike_param {γ : Type _} [MeasurableSpace γ]
     · intro F _ _ IH
       show MeasurableSet (J (⋃ i, F i))
       have : J (⋃ i, F i) = ⋃ i, J (F i) := by
-        ext ⟨b, p, d⟩; simp only [hJ, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+        ext ⟨b, p, d⟩; simp only [hJ, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
       rw [this]; exact MeasurableSet.iUnion IH
   refine MeasurableSpace.induction_on_inter
     (C := fun W _ => MeasurableSet (Joint W)) hgen hpi ?_ ?_ ?_ ?_ W hW
@@ -2451,7 +2451,7 @@ theorem cell_scrutLike_param {γ : Type _} [MeasurableSpace γ]
   · intro F _ _ IH
     show MeasurableSet (Joint (⋃ i, F i))
     have : Joint (⋃ i, F i) = ⋃ i, Joint (F i) := by
-      ext ⟨b, p, d⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_setOf_eq]; tauto
+      ext ⟨b, p, d⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
 /-- **Shape-partition assembly (param)**: glues per-shape joint cell measurability
@@ -2464,7 +2464,7 @@ theorem measurable_of_cells_param [Countable Sh]
   rw [show (Function.uncurry g ⁻¹' S)
         = ⋃ s : Sh, {q : β × T | shape q.2 = s ∧ Function.uncurry g q ∈ S} from by
     ext q
-    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_setOf_eq]
+    simp only [Set.mem_preimage, Set.mem_iUnion, Set.mem_ofPred_eq]
     exact ⟨fun h => ⟨_, rfl, h⟩, fun ⟨_, _, h⟩ => h⟩]
   exact MeasurableSet.iUnion fun s => h_cell s hS
 
@@ -2540,7 +2540,7 @@ theorem List.measurable_foldlOfFn {α β : Type _}
       (measurable_pi_apply 0).comp measurable_fst
     have hsucc : Measurable
         (fun p : (Fin (n+1) → β) × α => (fun i : Fin n => p.1 i.succ)) := by
-      refine measurable_pi_lambda _ ?_
+      refine Measurable.of_eval ?_
       intro i
       exact (measurable_pi_apply _).comp measurable_fst
     have hfa : Measurable (fun p : (Fin (n+1) → β) × α => f p.2 (p.1 0)) := by
@@ -2652,7 +2652,7 @@ theorem List.measurable_foldl {α β : Type _} [MeasurableSpace α] [MeasurableS
 @[fun_prop]
 theorem Fin.measurable_snoc {n : ℕ} {β : Type _} [MeasurableSpace β] :
     Measurable (fun (p : (Fin n → β) × β) => (@Fin.snoc n (fun _ => β) p.1 p.2) : (Fin n → β) × β → (Fin (n+1) → β)) := by
-  refine measurable_pi_lambda _ fun i => ?_
+  refine Measurable.of_eval fun i => ?_
   by_cases h : i.val < n
   · have heq : ∀ p : (Fin n → β) × β,
         ((@Fin.snoc n (fun _ => β) p.1 p.2) i : β) = p.1 ⟨i.val, h⟩ := by

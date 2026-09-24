@@ -159,7 +159,7 @@ theorem urand' : Atomic' (rT := rT) .urand := by
   rw [Cfg.uniformReal, MeasureTheory.Measure.map_apply (by fun_prop) Cfg.isValue_measurableSet.compl]
   convert MeasureTheory.measure_empty (μ := LawfulProbLangℝ.unifUnit)
   ext r
-  simp only [Set.mem_preimage, Set.mem_compl_iff, Set.mem_setOf_eq, Set.mem_empty_iff_false,
+  simp only [Set.mem_preimage, Set.mem_compl_iff, Set.mem_ofPred_eq, Set.mem_empty_iff_false,
     iff_false, not_not]
   exact IsVal.lit.toIsValue
 

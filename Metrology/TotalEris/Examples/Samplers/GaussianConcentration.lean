@@ -2,6 +2,7 @@ module
 
 public import Metrology.TotalEris.Examples.Samplers.GaussianAdequacy
 public import Mathlib.Probability.Moments.SubGaussian
+public import Mathlib.MeasureTheory.Order.Group.Lattice
 
 @[expose] public section
 
@@ -219,7 +220,7 @@ theorem gaussianReal_abs_ge_eq_halfNormal_Ici {t : ℝ} :
   rw [gaussianReal_eq_halfNormal_of_neg (measurableSet_abs_ge t) fun y => by simp [abs_neg]]
   have hint : {y : ℝ | t ≤ |y|} ∩ Set.Ioi (0 : ℝ) = Set.Ici t ∩ Set.Ioi (0 : ℝ) := by
     ext y
-    simp only [Set.mem_inter_iff, Set.mem_setOf_eq, Set.mem_Ici, Set.mem_Ioi]
+    simp only [Set.mem_inter_iff, Set.mem_ofPred_eq, Set.mem_Ici, Set.mem_Ioi]
     exact and_congr_left fun hy0 => by rw [abs_of_pos hy0]
   rw [halfNormal_eq_withDensity, withDensity_apply _ (measurableSet_abs_ge t),
     withDensity_apply _ measurableSet_Ici, Measure.restrict_restrict (measurableSet_abs_ge t),

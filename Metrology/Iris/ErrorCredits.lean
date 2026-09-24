@@ -1,6 +1,6 @@
 module
 
-public import Mathlib.Data.ENNReal.Basic
+public import Mathlib.Basic.ENNReal.Basic
 public import Iris
 public import Iris.Algebra.View
 public import Iris.Instances.IProp.Instance

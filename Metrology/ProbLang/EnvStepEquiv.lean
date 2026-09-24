@@ -73,17 +73,17 @@ theorem openRec_substEnv {k : Nat} {v : Exp rT} {vs : List (Exp rT)} (e : Exp rT
   | bvar j =>
     simp only [substEnv]
     by_cases hj : k + 1 ≤ j
-    · rw [if_pos hj, if_pos (by omega)]
+    · rw [ite_eq_left hj, ite_eq_left (by omega)]
       obtain ⟨i, rfl⟩ : ∃ i, j = k + 1 + i := ⟨j - (k + 1), by omega⟩
       rw [show k + 1 + i - k = i + 1 by omega, show k + 1 + i - (k + 1) = i by omega,
         List.getElem?_cons_succ]
       cases hi : vs[i]? with
       | none => simp [openRec]; omega
       | some u => exact (open_lc k v u (hvs u (List.mem_of_getElem? hi))).symm
-    · rw [if_neg hj]
+    · rw [ite_eq_right hj]
       by_cases hkj : k = j
       · subst hkj; simp [openRec]
-      · rw [if_neg (by omega)]; simp [openRec, hkj]
+      · rw [ite_eq_right (by omega)]; simp [openRec, hkj]
   | lam e ih | fix e ih => simp only [substEnv, openRec]; rw [ih]
   | _ => simp_all [substEnv, openRec]
 
@@ -582,7 +582,7 @@ theorem bigStepF_eq_bnd {Z : Cfg rT → Measure (Cfg rT)} (hZ : RetVal Z) {c : E
       simp only [Exp.lcb, decide_eq_true_eq] at he
       obtain ⟨v, hj⟩ : ∃ v, env[j]? = some v := ⟨env[j], List.getElem?_eq_getElem he⟩
       have hv := henv.getElem? hj
-      simp only [EnvCfg.rb, Exp.substEnv, Nat.zero_le, if_true, Nat.sub_zero,
+      simp only [EnvCfg.rb, Exp.substEnv, Nat.zero_le, ite_true, Nat.sub_zero,
         RVal.rbEnv_getElem?, hj, Option.map_some, Option.getD_some, envStep, evalK, stepOps,
         Step.bnd]
       exact bigStepF_val hZ σ hv.isValue
@@ -1083,7 +1083,8 @@ theorem claimGe_resume {f : Frame rT} {v : RVal rT} {σ : State rT}
     unfold ClaimGe
     rw [envBig_apply]
     simp only [envStep, resumeK, stepOps]
-    refine claimGe_chain hfw hv fun w σ' hw => hval _ (by simp) w σ' ⟨hv, hw⟩
+    refine le_of_eq_of_le ?_ (claimGe_chain hfw hv fun w σ' hw => hval _ (by simp) w σ' ⟨hv, hw⟩)
+    rfl
   all_goals exact claimGe_resume_value ⟨hfw, hv⟩ (by simp)
 
 theorem claimGe_eval {env : Env rT} {e : Exp rT} {σ : State rT}
@@ -1096,8 +1097,8 @@ theorem claimGe_eval {env : Env rT} {e : Exp rT} {σ : State rT}
   cases e <;> simp only [EnvCfg.IsHead, not_true_eq_false] at hhead <;>
     simp only [Exp.lcb, Bool.and_eq_true] at he <;>
     simp only [envStep, evalK, stepOps] <;>
-    exact claimGe_chain (by simp_all [EnvCfg.WF]) (by simp_all [Frame.WF])
-      fun w σ' hw => claimGe_resume ⟨by simp_all [Frame.WF], hw⟩
+    exact le_of_eq_of_le (by rfl) (claimGe_chain (by simp_all [EnvCfg.WF]) (by simp_all [Frame.WF])
+      fun w σ' hw => claimGe_resume ⟨by simp_all [Frame.WF], hw⟩)
 
 theorem claimGe {c : EnvCfg rT} (hc : c.WF) : ClaimGe c := by
   cases c with

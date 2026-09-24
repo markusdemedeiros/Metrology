@@ -238,9 +238,9 @@ theorem glm'_strong_mono
     iprop((∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') ∗ glm' e σ ε Z₁) ⊢
       glm' e σ ε Z₂ := by
   iintro ⟨HZ, HG⟩
-  letI Ψ : GlmState rT → IProp GF := fun s => iprop(
+  let Ψ : GlmState rT → IProp GF := fun s => iprop(
     (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') -∗ bi_least_fixpoint (glmPre' Z₂) s)
-  letI : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
+  let : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
   ihave HΨ : iprop(Ψ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
   · iapply (least_fixpoint_iter (F := glmPre' Z₁))
     · iintro !> %s HF Hwand
@@ -330,11 +330,11 @@ theorem glm'_bind
   let Kinv : Exp rT → Option (Exp rT) := Function.partialInv K.fill
   have Kinv_left : ∀ e', Kinv (K.fill e') = some e' :=
     Function.partialInv_left (Ectx.fill_injective K)
-  letI Z' : Cfg rT → ENNReal → IProp GF :=
+  let Z' : Cfg rT → ENNReal → IProp GF :=
     fun ρ ε' => Z ⟨K.fill ρ.expr, ρ.state⟩ ε'
-  letI Φ : GlmState rT → IProp GF :=
+  let Φ : GlmState rT → IProp GF :=
     fun s => bi_least_fixpoint (glmPre' Z) ((⟨K.fill s.1.expr, s.1.state⟩, s.2) : GlmState rT)
-  letI : NonExpansive Φ := nonExpansive_of_discrete_leibniz Φ
+  let : NonExpansive Φ := nonExpansive_of_discrete_leibniz Φ
   ihave HΦ : iprop(Φ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
   · iapply (least_fixpoint_iter (F := glmPre' Z'))
     · iintro !> %s HF
@@ -349,7 +349,7 @@ theorem glm'_bind
         set X₂' : Cfg rT → ENNReal :=
           fun ρ' => (Kinv ρ'.expr).elim 0 (fun e' => X₂ ⟨e', ρ'.state⟩) with hX₂'def
         have hR'set : {ρ' | R' ρ'} = K.fillCfg '' {ρ'' | R ρ''} := by
-          ext ρ'; simp only [hR'def, Set.mem_setOf_eq, Set.mem_image]
+          ext ρ'; simp only [hR'def, Set.mem_ofPred_eq, Set.mem_image]
           exact ⟨fun ⟨ρ'', heq, hR⟩ => ⟨ρ'', hR, heq.symm⟩,
             fun ⟨ρ'', hR, heq⟩ => ⟨ρ'', heq.symm, hR⟩⟩
         have hR'meas : MeasurableSet {ρ' | R' ρ'} :=
@@ -367,7 +367,8 @@ theorem glm'_bind
           rw [primStep_fill Hsv]
           refine le_trans ?_ Hexp
           gcongr ε₁ + ?_
-          refine (MeasureTheory.lintegral_map_le _ K.fillCfg).trans (Eq.le ?_)
+          refine (MeasureTheory.lintegral_map_le _ (Ectx.fillCfg.measurable K).aemeasurable).trans
+            (Eq.le ?_)
           exact MeasureTheory.lintegral_congr_ae
             (Filter.Eventually.of_forall fun a => hX₂'fill a)
         have hpgl' : Pgl ε₁ R' (primStep ⟨K.fill ρ.expr, ρ.state⟩) := by
@@ -378,7 +379,7 @@ theorem glm'_bind
           refine (Eq.le ?_).trans Hpgl
           congr 1
           ext a
-          simp only [hR'def, Set.mem_preimage, Set.mem_setOf_eq, not_exists, not_and]
+          simp only [hR'def, Set.mem_preimage, Set.mem_ofPred_eq, not_exists, not_and]
           refine ⟨fun h hR => h a rfl hR, fun hR ρ₃ hEq hR₃ => ?_⟩
           exact hR (Ectx.fillCfg_injective K hEq.symm ▸ hR₃)
         iexists R', ε₁, X₂', r

@@ -24,7 +24,7 @@ theorem irratErr_of_not_irrational {r : ℝ} (h : ¬ Irrational r) : irratErr r 
   rw [irratErr, Set.indicator_of_mem h]
 
 theorem measurableSet_not_irrational : MeasurableSet {r : ℝ | ¬ Irrational r} :=
-  (IsGδ.setOf_irrational.measurableSet).compl.congr (by ext r; simp)
+  (IsGδ.setOfPred_irrational.measurableSet).compl.congr (by ext r; simp)
 
 theorem measurable_irratErr : Measurable irratErr :=
   measurable_const.indicator measurableSet_not_irrational
@@ -71,17 +71,17 @@ theorem measurableSet_irrational_val :
     MeasurableSet {v : Val ℝ | ∃ r : ℝ, v = .real r ∧ Irrational r} := by
   have hval : {v : Val ℝ | ∃ r : ℝ, v = .real r ∧ Irrational r}
       = Val.fst ⁻¹' {e : Exp ℝ | ∃ r : ℝ, e = .lit (.real r) ∧ Irrational r} := by
-    ext v; simp only [Set.mem_setOf_eq, Set.mem_preimage]
+    ext v; simp only [Set.mem_ofPred_eq, Set.mem_preimage]
     exact ⟨fun ⟨r, hvr, hr⟩ => ⟨r, hvr ▸ rfl, hr⟩, fun ⟨r, hvr, hr⟩ => ⟨r, Val.ext hvr, hr⟩⟩
   have hexp : {e : Exp ℝ | ∃ r : ℝ, e = .lit (.real r) ∧ Irrational r}
       = (fun r : ℝ => (Exp.lit (.real r) : Exp ℝ)) '' {r | Irrational r} := by
-    ext e; simp only [Set.mem_setOf_eq, Set.mem_image]
+    ext e; simp only [Set.mem_ofPred_eq, Set.mem_image]
     exact ⟨fun ⟨r, he, hr⟩ => ⟨r, hr, he.symm⟩, fun ⟨r, hr, he⟩ => ⟨r, he.symm, hr⟩⟩
   rw [hval]
   refine Val.fst.measurable ?_
   rw [hexp]
   exact (Exp.lit.measurableEmbedding.comp BaseLit.real.measurableEmbedding).measurableSet_image'
-    IsGδ.setOf_irrational.measurableSet
+    IsGδ.setOfPred_irrational.measurableSet
 
 theorem urand_irrational_pgl (σ : State ℝ) :
     Pgl 0 (fun ρ => ∃ v : Val ℝ,

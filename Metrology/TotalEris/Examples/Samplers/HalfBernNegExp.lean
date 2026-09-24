@@ -180,11 +180,11 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
     twp_value
     imodintro
     iexists true
-    isimp only [BNEHalfCredit, if_neg hle, if_pos hle, zero_add] at Hcr
+    isimp only [BNEHalfCredit, ite_eq_right hle, ite_eq_left hle, zero_add] at Hcr
     iframe Hcr
     itrivial
   · have hle : r ≤ 1 / 2 := of_decide_eq_true hbdef
-    isimp only [BNEHalfCredit, if_pos hle, if_neg (not_not_intro hle), add_zero] at Hcr
+    isimp only [BNEHalfCredit, ite_eq_left hle, ite_eq_right (not_not_intro hle), add_zero] at Hcr
     twp_pure
     twp_bind pl(&DecrTrial #(.int (0 : ℤ)) #(.real r))
     iapply (tglWp_wand)
@@ -198,14 +198,14 @@ theorem twp_BNEHalf (E : CoPset) (F : Bool → ℝ≥0∞) :
       twp_value
       imodintro
       iexists false
-      isimp only [LiftParity_eq_ite, if_pos hpar] at Hcrn
+      isimp only [LiftParity_eq_ite, ite_eq_left hpar] at Hcrn
       iframe Hcrn
       itrivial
     · rw [intOfNat_emod_two_eq_one hpar]
       twp_value
       imodintro
       iexists true
-      isimp only [LiftParity_eq_ite, if_neg (show ¬ n % 2 = 0 by omega)] at Hcrn
+      isimp only [LiftParity_eq_ite, ite_eq_right (show ¬ n % 2 = 0 by omega)] at Hcrn
       iframe Hcrn
       itrivial
 
@@ -241,8 +241,8 @@ theorem FairCoinCredit_lintegral (F : Bool → ℝ≥0∞) :
     funext r
     simp only [FairCoinCredit, Set.indicator_apply, Set.mem_Iic, Set.mem_Ioi]
     by_cases hr : r ≤ 1 / 2
-    · rw [if_pos hr, if_pos hr, if_neg (not_lt.mpr hr), add_zero]
-    · rw [if_neg hr, if_neg hr, if_pos (not_le.mp hr), zero_add]
+    · rw [ite_eq_left hr, ite_eq_left hr, ite_eq_right (not_lt.mpr hr), add_zero]
+    · rw [ite_eq_right hr, ite_eq_right hr, ite_eq_left (not_le.mp hr), zero_add]
   show ∫⁻ r, FairCoinCredit F r ∂(volume.restrict (Set.Icc (0 : ℝ) 1)) = _
   rw [hsplit, lintegral_add_left (measurable_const.indicator measurableSet_Iic),
     lintegral_indicator_restrict measurableSet_Iic (fun _ => F true),
@@ -289,12 +289,12 @@ theorem twp_FairCoin (E : CoPset) (F : Bool → ℝ≥0∞) :
   imodintro
   obtain _ | _ := b
   · iexists false
-    isimp only [FairCoinCredit, if_neg (of_decide_eq_false hbdef)] at Hcr
+    isimp only [FairCoinCredit, ite_eq_right (of_decide_eq_false hbdef)] at Hcr
     iframe Hcr
     ipureintro
     rfl
   · iexists true
-    isimp only [FairCoinCredit, if_pos (of_decide_eq_true hbdef)] at Hcr
+    isimp only [FairCoinCredit, ite_eq_left (of_decide_eq_true hbdef)] at Hcr
     iframe Hcr
     ipureintro
     rfl

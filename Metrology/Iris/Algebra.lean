@@ -2,7 +2,7 @@ module
 
 public import Iris
 public import Mathlib.Probability.Kernel.Basic
-public import Mathlib.Data.ENNReal.Basic
+public import Mathlib.Basic.ENNReal.Basic
 public import Mathlib.MeasureTheory.Measure.Sub
 public import Mathlib.MeasureTheory.Measure.MeasureSpaceDef
 public import Iris.Algebra.View

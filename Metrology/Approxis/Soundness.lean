@@ -18,7 +18,7 @@ Soundness of the logical relation w.r.t. contextual refinement (precongruence + 
 
 namespace ProbLang
 
-open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
+open ProbLang.Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
 
 
 section Soundness

@@ -81,7 +81,7 @@ theorem measurableSet_RSet' (hgExp : Measurable gExp) {S : Set ℝ} (hS : Measur
 
 theorem RSet'_union (A B : Set ℝ) : RSet' gExp (A ∪ B) = RSet' gExp A ∪ RSet' gExp B := by
   ext ρ
-  simp only [RSet', Set.mem_setOf_eq, Set.mem_union]
+  simp only [RSet', Set.mem_ofPred_eq, Set.mem_union]
   grind
 
 /-- `RSet' S = (gExp ∘ ·.expr)⁻¹'(S) ∩ {returns a value}`: on value configs the
@@ -89,7 +89,7 @@ config-level extraction `gExp ρ.expr` agrees with `gExp v.fst`. -/
 theorem RSet'_eq_preimage (S : Set ℝ) :
     RSet' gExp S = (fun ρ : Cfg ℝ => gExp ρ.expr) ⁻¹' S ∩ RSet' gExp Set.univ := by
   ext ρ
-  simp only [RSet', Set.mem_setOf_eq, Set.mem_inter_iff, Set.mem_preimage, Set.mem_univ, and_true]
+  simp only [RSet', Set.mem_ofPred_eq, Set.mem_inter_iff, Set.mem_preimage, Set.mem_univ, and_true]
   constructor
   · rintro ⟨v, he, hr⟩
     exact ⟨by rw [he]; exact hr, v, he⟩
@@ -176,7 +176,7 @@ theorem twp_dist_adequacy' [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF]
       exact (ENNReal.add_le_add_iff_right hy_ne).mp hsum_le
     exact le_antisymm hx_le hle1
   -- The execution measure is proper.
-  haveI hprob : IsProbabilityMeasure (limExec ⟨e, σ⟩) := by
+  have hprob : IsProbabilityMeasure (limExec ⟨e, σ⟩) := by
     refine ⟨le_antisymm hUniv_le ?_⟩
     calc (1 : ℝ≥0∞) = (limExec ⟨e, σ⟩) (RSet' gExp Set.univ) := hRSetUniv1.symm
       _ ≤ (limExec ⟨e, σ⟩) Set.univ := measure_mono (Set.subset_univ _)
@@ -206,8 +206,8 @@ theorem twp_dist_adequacy' [AppPreGS ℝ GF] [ECPreGS GF] [InvGpreS GF]
     intro b
     rw [Measure.map_apply hmg measurableSet_Iic, ← hconull (Set.Iic b), ← RSet'_eq_preimage]
     exact hpin (Set.Iic b) measurableSet_Iic
-  haveI : IsProbabilityMeasure ((limExec ⟨e, σ⟩).map (fun ρ => gExp ρ.expr)) :=
-    Measure.isProbabilityMeasure_map hmg.aemeasurable
+  have : IsProbabilityMeasure ((limExec ⟨e, σ⟩).map (fun ρ => gExp ρ.expr)) :=
+    inferInstance
   exact Measure.ext_of_Iic _ _ hIic
 
 end General

@@ -44,25 +44,20 @@ instance : Pos.Countable Int where
   decode p := (Pos.Countable.decode (A := Nat) p).bind fun k =>
     some (if k % 2 = 0 then (k / 2 : Int) else -((k - 1) / 2 : Int) - 1)
   decode_encode z := by
-    show Option.bind
-      (Pos.Countable.decode (A := Nat)
-        (Pos.Countable.encode (A := Nat)
-          (if 0 ≤ z then 2 * z.toNat else 2 * (-z - 1).toNat + 1))) _ = _
     rw [Pos.Countable.decode_encode]
-    show (Option.bind (some _) _ : Option Int) = _
     rw [Option.bind_some]
     by_cases hz : 0 ≤ z
-    · rw [if_pos hz]
+    · rw [ite_eq_left hz]
       have hmod : (2 * z.toNat) % 2 = 0 := Nat.mul_mod_right 2 _
-      rw [if_pos hmod]
+      rw [ite_eq_left hmod]
       have htn : (z.toNat : Int) = z := Int.toNat_of_nonneg hz
       have : (((2 * z.toNat : Nat) : Int) / 2) = z := by
         push_cast; rw [Int.mul_ediv_cancel_left _ (by decide : (2 : Int) ≠ 0)]; exact htn
       rw [this]
-    · rw [if_neg hz]
+    · rw [ite_eq_right hz]
       have hmod : (2 * (-z - 1).toNat + 1) % 2 ≠ 0 := by
         intro h; omega
-      rw [if_neg hmod]
+      rw [ite_eq_right hmod]
       have hnn : (0 : Int) ≤ -z - 1 := by omega
       have htn : ((-z - 1).toNat : Int) = -z - 1 := Int.toNat_of_nonneg hnn
       have hd : ((((2 * (-z - 1).toNat + 1 : Nat) : Int) - 1) / 2) = -z - 1 := by

@@ -233,7 +233,7 @@ theorem primStep_rand_lbl_wrong [MeasurableSingletonClass rT] {z M : Int}
     (Hlk : σ.tapes[l]? = some ⟨M, fs⟩) :
     primStep (⟨pl(rand(#(.int z), #(.lbl l))), σ⟩ : Cfg rT) = Cfg.uniform z σ := by
   rw [primStep_rand_lbl_eq (.RandTapeOtherS Hz Hlk HneM (_root_.le_refl _) Hz rfl), Hlk]
-  simp only [if_neg (Ne.symm HneM)]
+  simp only [ite_eq_right (Ne.symm HneM)]
 
 /-- `primStep` of `rand #z (lbl α)` when the tape has the correct bound and is empty. -/
 theorem primStep_rand_lbl_empty [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z)
@@ -501,7 +501,7 @@ theorem wp_couple_rand_rand_avoid (z bad : Int) (Hz : 0 < z) (K : Ectx rT) (E : 
   iframe Hj Herr
   iintro %n %hn Hec Hj'
   by_cases hb : n = bad
-  · rw [if_pos hb]
+  · rw [ite_eq_left hb]
     iexfalso
     iapply ErrorCredit.contradict (_root_.le_refl 1) $$ Hec
   · simp only [id_eq]

@@ -349,8 +349,8 @@ theorem Exp.closeRec_fv_subset (e : Exp α) (x : Var) (k : Nat) (y : Var)
   | fvar z =>
       simp [Exp.closeRec] at hy
       by_cases hxz : x = z
-      · rw [if_pos hxz] at hy; simp [Exp.fv] at hy
-      · rw [if_neg hxz] at hy; exact hy
+      · rw [ite_eq_left hxz] at hy; simp [Exp.fv] at hy
+      · rw [ite_eq_right hxz] at hy; exact hy
   | lit _ | fail | urand => simp [Exp.closeRec, Exp.fv] at hy
   | lam e ih | fix e ih =>
       simp only [Exp.closeRec, Exp.fv] at hy ⊢

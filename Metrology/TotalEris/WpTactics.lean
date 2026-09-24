@@ -40,7 +40,7 @@ variable {rT : Type _} [LawfulProbLangℝ rT] {GF : BundledGFunctors} [ErisWpGS 
 public theorem ErisWpGS.twp_pure_step_ctx (K : Ectx rT) (φ : Prop) {n : ℕ} {e₁ e₂ : Exp rT}
     [PureExec φ n e₁ e₂] (Hφ : φ) {E : CoPset} {Φ : Val rT → IProp GF} :
     tglWp E (K.fill e₂) Φ ⊢ tglWp E (K.fill e₁) Φ := by
-  letI : PureExec φ n (K.fill e₁) (K.fill e₂) := PureExec.fill K
+  let : PureExec φ n (K.fill e₁) (K.fill e₂) := PureExec.fill K
   exact twp_pure_step_fupd φ Hφ
 
 end

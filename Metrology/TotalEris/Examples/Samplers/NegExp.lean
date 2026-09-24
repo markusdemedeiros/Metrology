@@ -31,12 +31,12 @@ def NegExppdf (L k : ℕ) (x : ℝ) : ℝ≥0∞ :=
 theorem NegExppdf₀_zero {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) :
     NegExppdf₀ 0 x = ENNReal.ofReal (Real.exp (-x)) := by
   unfold NegExppdf₀
-  rw [if_pos ⟨hx0, hx1⟩, Nat.cast_zero, add_zero]
+  rw [ite_eq_left ⟨hx0, hx1⟩, Nat.cast_zero, add_zero]
 
 theorem NegExppdf₀_succ {x : ℝ} (hx0 : 0 ≤ x) (hx1 : x ≤ 1) (j : ℕ) :
     NegExppdf₀ (j + 1) x = ENNReal.ofReal (Real.exp (-1)) * NegExppdf₀ j x := by
   unfold NegExppdf₀
-  rw [if_pos ⟨hx0, hx1⟩, if_pos ⟨hx0, hx1⟩, ← ENNReal.ofReal_mul (Real.exp_pos _).le,
+  rw [ite_eq_left ⟨hx0, hx1⟩, ite_eq_left ⟨hx0, hx1⟩, ← ENNReal.ofReal_mul (Real.exp_pos _).le,
     ← Real.exp_add]
   congr 2
   push_cast
@@ -92,11 +92,11 @@ theorem NegExpCreditV_reindex (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
   rw [← (add_right_injective L).tsum_eq
         (f := fun k => ∫⁻ x, NegExppdf L k x * F k x ∂(LawfulProbLangℝ.unifUnit (T := ℝ))) ?supp]
   · exact tsum_congr fun j => lintegral_congr fun x => by
-      simp only [NegExppdf, if_pos (Nat.le_add_right L j), Nat.add_sub_cancel_left]
+      simp only [NegExppdf, ite_eq_left (Nat.le_add_right L j), Nat.add_sub_cancel_left]
   · intro k hk
     refine ⟨k - L, Nat.add_sub_of_le ?_⟩
     by_contra h
-    exact hk (by simp only [NegExppdf, if_neg h, zero_mul, lintegral_zero])
+    exact hk (by simp only [NegExppdf, ite_eq_right h, zero_mul, lintegral_zero])
 
 open MeasureTheory in
 theorem NegExpCreditV_recurrence (F : ℕ → ℝ → ℝ≥0∞) (L : ℕ) :
@@ -200,7 +200,7 @@ theorem twp_NegExp (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, M
   iintro %⟨w, _⟩ ⟨%n, %rfl, Hcn⟩
   twp_pures
   obtain hpar | hpar := Nat.mod_two_eq_zero_or_one n
-  · isimp only [NegExpContAmp, if_pos hpar] at Hcn
+  · isimp only [NegExpContAmp, ite_eq_left hpar] at Hcn
     rw [intOfNat_emod_two_eq_zero hpar]
     twp_pures
     twp_value
@@ -210,7 +210,7 @@ theorem twp_NegExp (E : CoPset) (F : ℕ → ℝ → ℝ≥0∞) (hFm : ∀ a, M
     ipureintro
     exact ⟨rfl, Hx0.le, Hx1⟩
   · rw [intOfNat_emod_two_eq_one hpar]
-    isimp only [NegExpContAmp, if_neg (show ¬ n % 2 = 0 by omega)] at Hcn
+    isimp only [NegExpContAmp, ite_eq_right (show ¬ n % 2 = 0 by omega)] at Hcn
     ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split (GF := GF) $$ Hcn
     twp_pure
     twp_pure

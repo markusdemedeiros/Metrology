@@ -41,15 +41,15 @@ def RealDecrTrialPMF (x : ℝ) (i n : ℕ) : ℝ≥0∞ :=
 
 theorem RealDecrTrialPMF_not_supp {x : ℝ} {i n : ℕ} (h : n < i) :
     RealDecrTrialPMF x i n = 0 := by
-  simp only [RealDecrTrialPMF, if_neg (Nat.not_le.mpr h)]
+  simp only [RealDecrTrialPMF, ite_eq_right (Nat.not_le.mpr h)]
 
 theorem RealDecrTrialPMF_supp {x : ℝ} {i n : ℕ} (h : i ≤ n) :
     RealDecrTrialPMF x i n = RealDecrTrialPMF₀ x (n - i) := by
-  simp only [RealDecrTrialPMF, if_pos h]
+  simp only [RealDecrTrialPMF, ite_eq_left h]
 
 theorem RealDecrTrialPMF_base {x : ℝ} {n : ℕ} :
     RealDecrTrialPMF x 0 n = RealDecrTrialPMF₀ x n := by
-  simp only [RealDecrTrialPMF, Nat.zero_le, if_pos, Nat.sub_zero]
+  simp only [RealDecrTrialPMF, Nat.zero_le, ite_eq_left, Nat.sub_zero]
 
 open MeasureTheory in
 theorem RealDecrTrialPMF₀_real_integral (m : ℕ) (t : ℝ) :
@@ -155,11 +155,11 @@ theorem RealDecrTrialCreditV_parity (A B : ℝ≥0∞) {x : ℝ} (hx0 : 0 ≤ x)
       ENNReal.summable ENNReal.summable]
   congr 1
   · have heq : ∀ k, RealDecrTrialPMF₀ x (2 * k) * (if (2 * k) % 2 = 0 then A else B)
-        = RealDecrTrialPMF₀ x (2 * k) * A := fun k => by rw [if_pos (by omega : (2 * k) % 2 = 0)]
+        = RealDecrTrialPMF₀ x (2 * k) * A := fun k => by rw [ite_eq_left (by omega : (2 * k) % 2 = 0)]
     rw [tsum_congr heq, ENNReal.tsum_mul_right, hEven]
   · have heq : ∀ k, RealDecrTrialPMF₀ x (2 * k + 1) * (if (2 * k + 1) % 2 = 0 then A else B)
         = RealDecrTrialPMF₀ x (2 * k + 1) * B := fun k => by
-      rw [if_neg (by omega : ¬ (2 * k + 1) % 2 = 0)]
+      rw [ite_eq_right (by omega : ¬ (2 * k + 1) % 2 = 0)]
     rw [tsum_congr heq, ENNReal.tsum_mul_right, hOdd]
 
 end creditExpectation
@@ -185,8 +185,8 @@ theorem measurable_realDecrTrialPMF (i n : ℕ) :
     Measurable (fun x : ℝ => RealDecrTrialPMF x i n) := by
   unfold RealDecrTrialPMF
   by_cases h : i ≤ n
-  · simpa only [h, if_true] using measurable_realDecrTrialPMF₀ (n - i)
-  · simpa only [h, if_false] using measurable_const
+  · simpa only [h, ite_true] using measurable_realDecrTrialPMF₀ (n - i)
+  · simpa only [h, ite_false] using measurable_const
 
 theorem measurable_realDecrTrialCreditV (F : ℕ → ℝ≥0∞) (i : ℕ) :
     Measurable (fun x : ℝ => RealDecrTrialCreditV F i x) :=
@@ -307,7 +307,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (B : ℝ) (hB0 
       tglWp E pl(&DecrTrial #(.int (N : ℤ)) #(.real x))
         (fun v : Val ℝ => iprop(∃ n : ℕ, ⌜v.1 = .lit (.int (Int.ofNat n))⌝ ∗ ↯ (F n))) := by
   have hkpos : (0 : ℝ) ≤ 1 / B := by positivity
-  set k : ℝ≥0 := ⟨1 / B, hkpos⟩ with hk_def
+  set k : ℝ≥0 := ⟨1 / B, hkpos⟩
   have Hk1 : 1 < k := by
     have h : (1 : ℝ) < 1 / B := by rw [lt_div_iff₀ hB0]; linarith
     exact_mod_cast h
@@ -332,7 +332,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (B : ℝ) (hB0 
     rw [RealDecrTrialCreditAmp_lintegral ⟨Hx0, HxB.trans hB1.le⟩]
     have hkx : (↑k : ℝ≥0∞) * ENNReal.ofReal x ≤ 1 := by
       have hkcast : (↑k : ℝ≥0∞) = ENNReal.ofReal (1 / B) := by
-        rw [hk_def, ← ENNReal.ofReal_coe_nnreal]; rfl
+        rw [← ENNReal.ofReal_coe_nnreal]; rfl
       rw [hkcast, ← ENNReal.ofReal_mul (by positivity), ENNReal.ofReal_le_one,
         div_mul_eq_mul_div, one_mul, div_le_one hB0]
       exact HxB
@@ -351,7 +351,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (B : ℝ) (hB0 
       have hnlt : ¬ y < x := of_decide_eq_false hb
       have hxy : x ≤ y := not_lt.mp hnlt
       unfold RealDecrTrialCreditAmp RealDecrTrialCredit
-      rw [if_pos hxy, if_neg hnlt, add_zero]
+      rw [ite_eq_left hxy, ite_eq_right hnlt, add_zero]
       exact le_add_self
     isplitr [Hcy]
     · itrivial
@@ -361,7 +361,7 @@ theorem twp_DecrTrial_tail (E : CoPset) (F : ℕ → ℝ≥0∞) (B : ℝ) (hB0 
     have heq : RealDecrTrialCreditV F (N + 1) y + (k : ℝ≥0∞) * ε_term
         = RealDecrTrialCreditAmp F N x ((k : ℝ≥0∞) * ε_term) y := by
       unfold RealDecrTrialCreditAmp RealDecrTrialCredit
-      rw [if_pos hlt'.le, if_neg (not_le.mpr hlt'), if_pos hlt', add_zero]
+      rw [ite_eq_left hlt'.le, ite_eq_right (not_le.mpr hlt'), ite_eq_left hlt', add_zero]
     ihave Hcy' := ErrorCredit.ext heq.symm $$ Hcy
     ihave ⟨Hexp, Hterm⟩ := ErrorCredit.split $$ Hcy'
     twp_pure
@@ -394,7 +394,7 @@ theorem twp_DecrTrial (E : CoPset) (F : ℕ → ℝ≥0∞) (N : ℕ) (x : ℝ) 
     have hle : F N ≤ RealDecrTrialCredit F N x y := by
       have hxy : x ≤ y := not_lt.mp (of_decide_eq_false hb)
       unfold RealDecrTrialCredit
-      rw [if_pos hxy]
+      rw [ite_eq_left hxy]
       exact le_add_self
     isplitr [Hcy]
     · itrivial
@@ -403,7 +403,7 @@ theorem twp_DecrTrial (E : CoPset) (F : ℕ → ℝ≥0∞) (N : ℕ) (x : ℝ) 
     twp_pure
     have heq : RealDecrTrialCreditV F (N + 1) y = RealDecrTrialCredit F N x y := by
       unfold RealDecrTrialCredit
-      rw [if_pos hlt'.le, if_neg (not_le.mpr hlt'), add_zero]
+      rw [ite_eq_left hlt'.le, ite_eq_right (not_le.mpr hlt'), add_zero]
     ihave Hcy' := ErrorCredit.ext heq.symm $$ Hcy
     have hy1 : y < 1 := lt_of_lt_of_le hlt' Hx.2
     twp_pure
