@@ -41,6 +41,13 @@ abbrev otpLam (m : rT) : Exp rT := pl% fun k, frac(#(.real m) + k)
 `lam`-application. -/
 def otpKLam (m : rT) : Ectx rT := [EctxItem.appR (otpLam m)]
 
+/-- Every real literal refines itself at `lrel_real`. -/
+private theorem refines_lit_real (r : rT) :
+    ⊢@{IProp GF} refines (⊤ : CoPset) (pl(#(.real r)) : Exp rT) pl(#(.real r)) lrel_real := by
+  iapply refines_ret (v1 := .real r) (v2 := .real r) (hv1 := rfl) (hv2 := rfl)
+  imodintro
+  iapply lrel_real_lit
+
 /-- **Continuous OTP refinement**: encrypting `m` with a fresh uniform key on the
 unit interval is observationally equivalent to a fresh uniform sample, provided
 the combiner `frac (m + ·)` preserves `unifUnit`. -/
@@ -54,44 +61,22 @@ theorem otp_refines (m : rT)
   show ⊢@{IProp GF} refines ⊤
     ((otpKLam m).fill pl(urand))
     (Ectx.fill ([] : Ectx rT) pl(urand)) lrel_real
-  iapply (refines_couple_urands_lr
-    (K' := ([] : Ectx rT)) (A := lrel_real)
-    (f := fun r : rT => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)) hmp)
+  iapply refines_couple_urands_lr (K' := ([] : Ectx rT))
+    (f := fun r : rT => ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)) hmp
   iintro %r %_hr
+  -- Three pure steps on the left: β-reduce the `let`, add, then take `frac`.
+  show ⊢@{IProp GF} refines ⊤ (Ectx.fill ([] : Ectx rT) pl({otpLam m} #(.real r))) _ lrel_real
+  iapply refines_pure_l (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩
+  inext
   let Kfrac : Ectx rT := [EctxItem.unop .frac]
-  show ⊢@{IProp GF} refines ⊤
-    (Ectx.fill ([] : Ectx rT) pl({otpLam m} #(.real r)))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
-  -- β-reduce the `let`.
-  iapply (refines_pure_l
-    (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
+  show ⊢@{IProp GF} refines ⊤ (Kfrac.fill pl(#(.real m) + #(.real r))) _ lrel_real
+  iapply refines_pure_l ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
   inext
   show ⊢@{IProp GF} refines ⊤
-    (Kfrac.fill pl(#(.real m) + #(.real r)))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
-  -- Evaluate the addition.
-  iapply (refines_pure_l
-    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
+    (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m r))))) _ lrel_real
+  iapply refines_pure_l ⟨IsVal.lit.toIsValue, rfl⟩
   inext
-  show ⊢@{IProp GF} refines ⊤
-    (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m r)))))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
-  -- Evaluate `frac`.
-  iapply (refines_pure_l
-    ⟨IsVal.lit.toIsValue, rfl⟩)
-  inext
-  show ⊢@{IProp GF} refines ⊤
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))))
-    pl(#(.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)))) lrel_real
-  iapply (refines_ret
-    (v1 := (.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)) : Val rT))
-    (v2 := (.real (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r)) : Val rT))
-    (hv1 := rfl) (hv2 := rfl))
-  imodintro
-  unfold lrel_real
-  iexists (ProbLangℝ.realFrac (ProbLangℝ.realAdd m r))
-  ipureintro
-  exact ⟨rfl, rfl⟩
+  exact refines_lit_real _
 
 /-! ### The reverse direction
 
@@ -111,39 +96,21 @@ theorem otp_refines_rev (m : rT) (g : rT → rT)
   show ⊢@{IProp GF} refines ⊤
     (Ectx.fill ([] : Ectx rT) pl(urand))
     ((otpKLam m).fill pl(urand)) lrel_real
-  iapply (refines_couple_urands_lr
-    (K' := otpKLam m) (A := lrel_real) (f := g) hmp)
+  iapply refines_couple_urands_lr (K' := otpKLam m) (f := g) hmp
   iintro %r %hr
+  -- The same three pure steps, now on the right.
+  show ⊢@{IProp GF} refines ⊤ _
+    (Ectx.fill ([] : Ectx rT) pl({otpLam m} #(.real (g r)))) lrel_real
+  iapply refines_pure_r (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩
   let Kfrac : Ectx rT := [EctxItem.unop .frac]
-  show ⊢@{IProp GF} refines ⊤
-    pl(#(.real r))
-    (Ectx.fill ([] : Ectx rT) pl({otpLam m} #(.real (g r))))
-    lrel_real
-  -- β-reduce the RHS `let`.
-  iapply (refines_pure_r
-    (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩)
-  show ⊢@{IProp GF} refines ⊤
-    pl(#(.real r))
-    (Kfrac.fill pl(#(.real m) + #(.real (g r)))) lrel_real
-  -- Evaluate the addition.
-  iapply (refines_pure_r
-    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩)
-  show ⊢@{IProp GF} refines ⊤
-    pl(#(.real r))
-    (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m (g r))))))
-    lrel_real
-  -- Evaluate `frac`; the inverse law collapses the result to `r`.
-  iapply (refines_pure_r
-    ⟨IsVal.lit.toIsValue, rfl⟩)
+  show ⊢@{IProp GF} refines ⊤ _ (Kfrac.fill pl(#(.real m) + #(.real (g r)))) lrel_real
+  iapply refines_pure_r ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
+  show ⊢@{IProp GF} refines ⊤ _
+    (Ectx.fill ([] : Ectx rT) pl(frac(#(.real (ProbLangℝ.realAdd m (g r)))))) lrel_real
+  iapply refines_pure_r ⟨IsVal.lit.toIsValue, rfl⟩
+  -- The inverse law collapses the RHS value to `r`.
   rw [hinv r hr]
-  show ⊢@{IProp GF} refines ⊤ pl(#(.real r)) pl(#(.real r)) lrel_real
-  iapply (refines_ret (v1 := (.real r : Val rT)) (v2 := (.real r : Val rT))
-    (hv1 := rfl) (hv2 := rfl))
-  imodintro
-  unfold lrel_real
-  iexists r
-  ipureintro
-  exact ⟨rfl, rfl⟩
+  exact refines_lit_real r
 
 /-! ### At `rT = ℝ`
 
@@ -171,7 +138,7 @@ theorem otp_refines_rev_real (m : ℝ)
       have hr' : r ∈ Set.Ioo (0:ℝ) 1 := hr
       show Int.fract (m + Int.fract (-m + r)) = r
       rw [fract_add_fract_right, show m + (-m + r) = r by ring]
-      exact Int.fract_eq_self.mpr ⟨le_of_lt hr'.1, hr'.2⟩)
+      exact Int.fract_eq_self.mpr ⟨hr'.1.le, hr'.2⟩)
 
 /-! ## Adequacy: exiting the logic
 
@@ -185,10 +152,10 @@ def otpφ (v v' : Val rT) : Prop :=
 theorem lrel_real_to_otpφ {GF : BundledGFunctors} [ApproxisRGS rT hlc GF] (v v' : Val rT) :
     ⊢@{IProp GF} (lrel_real (GF := GF)).car v v' -∗ ⌜otpφ v v'⌝ := by
   iintro Hr
+  -- `iunfold … at Hr`, not a bare `unfold`: the goal must stay folded.
   iunfold lrel_real at Hr
   icases Hr with ⟨%r, %hv, %hv'⟩
-  ipureintro
-  exact ⟨r, hv, hv'⟩
+  ipureintro; exact ⟨r, hv, hv'⟩
 
 section Adequacy
 variable {GF : BundledGFunctors.{0, 0, 0}}
@@ -265,28 +232,18 @@ theorem otp_ideal_mass (σ : State ℝ) :
         execN 1 ρ' Set.univ = 1 := by
       rw [MeasureTheory.ae_iff]
       refine MeasureTheory.measure_mono_null ?_ (Atomic.urand' σ)
-      intro ρ' hρ'
-      simp only [Set.mem_compl_iff, Set.mem_setOf_eq]
-      intro hv
+      intro ρ' hρ' hv
       exact hρ' (by rw [execN_succ_isValue hv]; simp)
-    rw [MeasureTheory.lintegral_congr_ae hae]
-    simp only [MeasureTheory.lintegral_const, one_mul]
-    have : primStep (⟨pl(urand), σ⟩ : Cfg ℝ) = Cfg.uniformReal σ :=
-      primStep_eq_headStep
-        (Exp.decompItem_none_of_lc_headReducible (by is_lc)
-          (show Cfg.uniformReal σ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _))
-    rw [this]
+    rw [MeasureTheory.lintegral_congr_ae hae, MeasureTheory.lintegral_const, one_mul,
+        show primStep (⟨pl(urand), σ⟩ : Cfg ℝ) = Cfg.uniformReal σ from primStep_eq_headStep
+          (Exp.decompItem_none_of_lc_headReducible (by is_lc)
+            (show Cfg.uniformReal σ ≠ 0 from MeasureTheory.IsProbabilityMeasure.ne_zero _))]
     exact Cfg.uniformReal_isProbabilityMeasure.measure_univ
-  have hle : (limExec (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ)) Set.univ ≤ 1 :=
-    limExec_leq_mass (fun n => execN_univ_le_one n _)
-  have hge : (1 : ENNReal) ≤ (limExec (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ)) Set.univ := by
-    rw [limExec_univ', ← hstep]
-    exact le_iSup (fun n => (execN n (⟨otp_ideal, σ⟩ : Cfg ℝ)) Set.univ) 2
-  have hlim : (limExec (⟨otp_ideal (rT := ℝ), σ⟩ : Cfg ℝ)) Set.univ = 1 :=
-    le_antisymm hle hge
+  -- Full mass at a finite stage pins `limExec` to that stage.
   show (asExpr (limExec _)) Set.univ = 1
-  rw [asExpr, MeasureTheory.Measure.map_apply Cfg.measurable_expr MeasurableSet.univ]
-  simpa using hlim
+  rw [asExpr, MeasureTheory.Measure.map_apply Cfg.measurable_expr MeasurableSet.univ,
+      limExec_term hstep]
+  simpa using hstep
 
 /-- Hence so is the encryption's — by `otp_distribution_eq`. The equivalence is
 therefore between two genuine probability distributions, not a vacuous identity

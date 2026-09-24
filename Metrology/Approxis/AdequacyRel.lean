@@ -11,11 +11,9 @@ public import Iris.Instances.Lib.FUpd
 
 @[expose] public section
 
-
 /-! # Relational adequacy: bridging parametric `refines` to an `AddCoupl` on `limExec`. -/
 
 namespace ProbLang
-
 
 open Iris Iris.BI Iris.ProofMode OFE COFE Iris.Std DisjointLeibnizSet Auth HeapView
 open ProbLang.AdequacyHelpers ProbLang.ApproxisWpGS
@@ -37,14 +35,13 @@ class RefinesPreGS (rT : outParam (Type _)) [ProbLangℝ rT]
 attribute [reducible, instance] RefinesPreGS.app RefinesPreGS.spec RefinesPreGS.ec
   RefinesPreGS.inv RefinesPreGS.nainv
 
-/-- `⤇ e` and `⤇ Ectx.fill [] e` are definitionally equal. Named for use in
-`rw` rewrites where Lean's defeq is not exposed (e.g. when adapting hypotheses
-to fit lemmas that universally quantify over an evaluation context). -/
+/-- `⤇ e = ⤇ Ectx.fill [] e`, named so that `rw` can use a defeq Lean does not expose --
+e.g. when adapting a hypothesis to a lemma that quantifies over evaluation contexts. -/
 theorem spec_eq_fill_nil {GF : BundledGFunctors} [SpecGS rT GF] (e : Exp rT) :
     (iprop(⤇ e) : IProp GF) = iprop(⤇ Ectx.fill ([] : Ectx rT) e) :=
   rfl
 
-/-- `⤇ Ectx.fill [] v.1` and `⤇ Exp.ofVal v` are definitionally equal. -/
+/-- `⤇ Ectx.fill [] v.1 = ⤇ Exp.ofVal v`, likewise named for `rw`. -/
 theorem spec_fill_nil_eq_ofVal {GF : BundledGFunctors} [SpecGS rT GF] (v : Val rT) :
     (iprop(⤇ Ectx.fill ([] : Ectx rT) v.1) : IProp GF) = iprop(⤇ Exp.ofVal v) :=
   rfl
@@ -78,12 +75,12 @@ theorem approximates_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   iintro He' Herr
   -- Allocate the non-atomic invariant pool needed to build an `ApproxisRGS`.
   imod Iris.NonAtomicInvariant.alloc with ⟨%γ, Htok⟩
-  set IR : ApproxisRGS rT .hasNoLC GF :=
-    { approxisGS := IGS, naInvG := _, nais := γ }
+  set IR : ApproxisRGS rT .hasNoLC GF := { approxisGS := IGS, naInvG := _, nais := γ }
   -- Split the supply: `ε` for the refinement, `ε' - ε > 0` as its own slack.
   icases ErrorCredit.difference (le_of_lt Hε'pos) $$ Herr with ⟨Hεc, Hrest⟩
   have Hrestpos : (0 : ENNReal) < ε' - ε := tsub_pos_of_lt Hε'pos
-  -- Specialize the parametric `refines` to this instance and unfold to a WP.
+  -- Specialize the parametric `refines` to this instance and unfold to a WP.  `iunfold … at`
+  -- is deliberate: a bare `unfold refines` opens the goal and desynchronises `He'`/`Htok`.
   ihave HlogR := Hlog IR $$ Hεc
   iunfold refines at HlogR
   -- `HlogR` quantifies over an evaluation context, so put `He'` in empty-context form.
@@ -95,9 +92,9 @@ theorem approximates_coupling {GF : BundledGFunctors} [RefinesPreGS rT GF]
   iintro Hpost
   icases Hpost with ⟨%v', %_, Hspec, -, -, %_, HA_v⟩
   iexists v'
-  isplitl [Hspec]
-  · rw [← spec_fill_nil_eq_ofVal v']; iexact Hspec
-  · iapply (HA IR v v') $$ HA_v
+  rw [← spec_fill_nil_eq_ofVal v']
+  iframe Hspec
+  iapply (HA IR v v') $$ HA_v
 
 /-- **Exact relational adequacy**, the `ε = 0` case of `approximates_coupling`.
 Approxis's top-level statement for refinements that spend no error. -/
@@ -117,8 +114,7 @@ section ApproxisFunctor
 variable (rT : Type) [ProbLangℝ rT] [MeasurableSingletonClass rT]
 
 /-- Concrete model for Approxis -/
-noncomputable def ApproxisFunctor : BundledGFunctors := fun n =>
-  match n with
+noncomputable def ApproxisFunctor : BundledGFunctors := fun
   | 0 => ⟨InvMapF, by infer_instance⟩
   | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
   | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
@@ -137,8 +133,7 @@ instance ApproxisFunctor_WsatGpreS : WsatGpreS (ApproxisFunctor rT) where
   enabled := ⟨1, rfl⟩
   disabled := ⟨2, rfl⟩
 
-instance ApproxisFunctor_LcGpreS : LcGpreS (ApproxisFunctor rT) where
-  lc_elem := ⟨3, rfl⟩
+instance ApproxisFunctor_LcGpreS : LcGpreS (ApproxisFunctor rT) where lc_elem := ⟨3, rfl⟩
 
 instance ApproxisFunctor_InvGpreS : InvGpreS (ApproxisFunctor rT) where
   toWsatGpreS := ApproxisFunctor_WsatGpreS rT
@@ -153,11 +148,9 @@ instance ApproxisFunctor_SpecPreGS : SpecPreGS rT (ApproxisFunctor rT) where
   heap := ⟨4, rfl⟩
   tapes := ⟨5, rfl⟩
 
-instance ApproxisFunctor_ECPreGS : ECPreGS (ApproxisFunctor rT) where
-  ec := ⟨7, rfl⟩
+instance ApproxisFunctor_ECPreGS : ECPreGS (ApproxisFunctor rT) where ec := ⟨7, rfl⟩
 
-instance ApproxisFunctor_NaInvG : NaInvG (ApproxisFunctor rT) where
-  inv := ⟨8, rfl⟩
+instance ApproxisFunctor_NaInvG : NaInvG (ApproxisFunctor rT) where inv := ⟨8, rfl⟩
 
 instance ApproxisFunctor_RefinesPreGS : RefinesPreGS rT (ApproxisFunctor rT) where
 

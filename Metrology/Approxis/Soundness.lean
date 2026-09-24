@@ -34,15 +34,6 @@ def Ctx.BindersFresh : Ctx rT → Finset Var → Prop
     (∀ x ∈ k.binderAtoms, x ∉ S) ∧
     Ctx.BindersFresh K' (S ∪ k.binderAtoms)
 
-/-- If a `CtxItem`'s binder atoms are empty, the freshness predicate at the
-extended union reduces to freshness at the original set. Once the head item is a
-concrete constructor its binder set computes, so `hEmpty` is left to `rfl`. -/
-theorem Ctx.BindersFresh.cast_no_binder
-    {K' : Ctx rT} {S : Finset Var} {bAtoms : Finset Var}
-    (h : Ctx.BindersFresh K' (S ∪ bAtoms)) (hEmpty : bAtoms = ∅ := by rfl) :
-    Ctx.BindersFresh K' S :=
-  Finset.union_empty S ▸ hEmpty ▸ h
-
 /-- Anti-monotonicity in the freshness set: if `K`'s binders are fresh in a
 larger set `T`, they're fresh in any subset `S ⊆ T`. -/
 theorem Ctx.BindersFresh.mono {K : Ctx rT} {S T : Finset Var}
@@ -62,9 +53,8 @@ theorem binders_tail
     ∀ x ∈ Ctx.binderAtoms K',
       x ∉ e.fv ∧ x ∉ e'.fv ∧ x ∉ Ctx.payloadFv K' := by
   intro x hxK'
-  have hxK : x ∈ Ctx.binderAtoms (k :: K') := Finset.mem_union_right _ hxK'
-  obtain ⟨h1, h2, h3⟩ := Hb x hxK
-  refine ⟨h1, h2, fun hPay => h3 (Finset.mem_union_right _ hPay)⟩
+  obtain ⟨h1, h2, h3⟩ := Hb x (Finset.mem_union_right _ hxK')
+  exact ⟨h1, h2, fun hPay => h3 (Finset.mem_union_right _ hPay)⟩
 
 /-- The empty typing context relates to the empty relational context at any
 type environment. -/
@@ -78,25 +68,9 @@ theorem TctxRelated.eq_nil_of_empty {Δ : TyEnv rT GF} {Γrc : RelCtx rT GF}
   cases Γrc with
   | nil => rfl
   | cons p rest =>
-    exfalso
     have h := HCtx p.1
-    simp [Tctx.empty, RelCtx.lookup] at h
-    cases hr : RelCtx.lookup rest p.1 with
-    | some _ => rw [hr] at h; cases h
-    | none => rw [hr] at h; simp at h
-
-omit [ProbLangℝ rT] in
-/-- A name not in the relational context's domain has no lookup result. -/
-theorem RelCtx.lookup_eq_none_of_notMem
-    {Γrc : RelCtx rT GF} {x : Var}
-    (hxRc : x ∉ (Γrc.map (·.1)).toFinset) :
-    Γrc.lookup x = none := by
-  cases hRc : Γrc.lookup x with
-  | none => rfl
-  | some _ =>
-    have hsome : (Γrc.lookup x).isSome := by rw [hRc]; rfl
-    obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome hsome
-    exact absurd (List.mem_toFinset.mpr (List.mem_map.mpr ⟨p, hpmem, hpeq⟩)) hxRc
+    simp only [Tctx.empty, RelCtx.lookup] at h
+    cases hr : RelCtx.lookup rest p.1 <;> rw [hr] at h <;> simp at h
 
 /-- Bundle the typing/LC/fv-bound facts for a context-filled expression.
 Used by the `lam`, `fix`, and `unpackR` cases to package what
@@ -107,17 +81,6 @@ theorem ctx_fill_lc_fv
     (Hty : Typed Γtc (K.fill e) τ) :
     (K.fill e).IsLocallyClosed ∧ (K.fill e).fv ⊆ (Γrc.map (·.1)).toFinset :=
   ⟨Hty.isLocallyClosed, fv_subset_relCtxDom HCtxRel Hty⟩
-
-/-- Project the per-hole binder-disjointness premise out of the combined
-`Hbinders` predicate. Used in every binder case of the precongruence
-induction to feed `TypedCtx.fill_typed` for both `e` and `e'`. -/
-theorem binders_proj_pair
-    {K : Ctx rT} {e₁ e₂ : Exp rT}
-    (Hb : ∀ y ∈ Ctx.binderAtoms K, y ∉ e₁.fv ∧ y ∉ e₂.fv ∧ y ∉ Ctx.payloadFv K) :
-    (∀ y ∈ Ctx.binderAtoms K, y ∉ e₁.fv ∧ y ∉ Ctx.payloadFv K) ∧
-    (∀ y ∈ Ctx.binderAtoms K, y ∉ e₂.fv ∧ y ∉ Ctx.payloadFv K) :=
-  ⟨fun y hy => ⟨(Hb y hy).1, (Hb y hy).2.2⟩,
-   fun y hy => ⟨(Hb y hy).2.1, (Hb y hy).2.2⟩⟩
 
 omit [ProbLangℝ rT] in
 /-- Domain of `(x, A) :: Γrc` is `Γrc.dom ∪ {x}`. -/
@@ -156,11 +119,9 @@ theorem bin_log_related_close_cofinite
   intro y hyNotL
   simp only [Finset.mem_union, Finset.mem_singleton, not_or] at hyNotL
   obtain ⟨⟨⟨hyNotRc, hyNotX⟩, hyNotFvKe⟩, hyNotFvKe'⟩ := hyNotL
-  have hRename := bin_log_related_ty_rename (E := ⊤) (Δ := Δ) (Γ := Γrc')
-    (x := x) (y := y) (A := A) (τE := Ke) (τE' := Ke') (τ := τ)
-    (Ne.symm hyNotX) hxRc hyNotRc hyNotFvKe hyNotFvKe'
   rw [Exp.open_close_subst_lc x y _ hKe_lc, Exp.open_close_subst_lc x y _ hKe'_lc]
-  exact BIBase.Entails.trans Hbody hRename
+  exact Hbody.trans
+    (bin_log_related_ty_rename (Ne.symm hyNotX) hxRc hyNotRc hyNotFvKe hyNotFvKe')
 
 
 omit [ProbLangℝ rT] in
@@ -236,10 +197,10 @@ theorem bin_log_related_fix_step
   · exact fun _ => close_fv_in_outer_dom hKe'_fv
   exact bin_log_related_close_cofinite hfRc hKe_lc hKe'_lc Hbody
 
--- Threading `Val`'s local-closedness field through the `unpack` cases adds enough
--- unification work to exceed the default budget; this proof was already close to it
--- (see the `cases HK` note below).
-set_option maxHeartbeats 4000000 in
+-- Measured cost of this proof is between 10k and 20k heartbeats (it fits inside Lean's
+-- 200k default); the raised budget is headroom for the `unpack` cases, whose unification
+-- over `Val`'s local-closedness field is what made this proof expensive to begin with.
+set_option maxHeartbeats 400000 in
 /-- **Precongruence**: if `e ~ e'` at `(Γ, τ)` and `K` takes `(Γ, τ)` to
 `(Γ', τ')`, then `K[e] ~ K[e']` at `(Γ', τ')`. The hypothesis is universal
 in both `Δ` and the relational context (the latter via `TctxRelated`).
@@ -279,208 +240,122 @@ theorem bin_log_related_under_typed_ctx
     obtain ⟨HfreshHead, HfreshTail⟩ := Hfresh
     have HbindersK' := binders_tail Hbinders
     have IHinner := ih HKtail HbindersK' Δ
+    -- Every non-binder case below relates the hole by `IHinner` and the remaining subterms
+    -- by `fundamental`, always at `Δ`/`Γrc'`: name those two specialisations once. The
+    -- binder cases reuse `HtyK`/`HtyK'`, whose contexts `cases HKitem` refines for them.
+    have Hfr : Ctx.BindersFresh K' (Γrc'.map (·.1)).toFinset :=
+      HfreshTail.mono Finset.subset_union_left
+    have Fund := fun {e₀ : Exp rT} {τ₀ : Ty} (h : Typed Γtc' e₀ τ₀) =>
+      fundamental h Δ Γrc' HCtx
+    have HtyK := TypedCtx.fill_typed Hty_e HKtail
+      fun y hy => ⟨(HbindersK' y hy).1, (HbindersK' y hy).2.2⟩
+    have HtyK' := TypedCtx.fill_typed Hty_e' HKtail
+      fun y hy => ⟨(HbindersK' y hy).2.1, (HbindersK' y hy).2.2⟩
     simp only [Ctx.fill_cons, CtxItem.fill]
     cases HKitem with
-    | appL Hty2 =>
-      iapply bin_log_related_app $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
-    | appR Hty1 =>
-      iapply bin_log_related_app $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | pairL Hty2 =>
-      iapply bin_log_related_pair $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
-    | pairR Hty1 =>
-      iapply bin_log_related_pair $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | fst =>
-      iapply bin_log_related_fst $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | snd =>
-      iapply bin_log_related_snd $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | inl =>
-      iapply bin_log_related_injl $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | inr =>
-      iapply bin_log_related_injr $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+    | appL Hty2 => iapply bin_log_related_app $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
+    | appR Hty1 => iapply bin_log_related_app $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
+    | pairL Hty2 => iapply bin_log_related_pair $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
+    | pairR Hty1 => iapply bin_log_related_pair $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
+    | fst => iapply bin_log_related_fst $$ %(IHinner Γrc' HCtx Hfr)
+    | snd => iapply bin_log_related_snd $$ %(IHinner Γrc' HCtx Hfr)
+    | inl => iapply bin_log_related_injl $$ %(IHinner Γrc' HCtx Hfr)
+    | inr => iapply bin_log_related_injr $$ %(IHinner Γrc' HCtx Hfr)
     | caseL Hty1 Hty2 =>
-      iapply bin_log_related_case $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-        %(fundamental Hty1 Δ Γrc' HCtx) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply bin_log_related_case $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty1) %(Fund Hty2)
     | caseM Hty0 Hty2 =>
-      iapply bin_log_related_case $$
-        %(fundamental Hty0 Δ Γrc' HCtx)
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply bin_log_related_case $$ %(Fund Hty0) %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
     | caseR Hty0 Hty1 =>
-      iapply bin_log_related_case $$
-        %(fundamental Hty0 Δ Γrc' HCtx)
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply bin_log_related_case $$ %(Fund Hty0) %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
     | ifL Hty1 Hty2 =>
-      iapply bin_log_related_if $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-        %(fundamental Hty1 Δ Γrc' HCtx) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply bin_log_related_if $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty1) %(Fund Hty2)
     | ifM Hty0 Hty2 =>
-      iapply bin_log_related_if $$
-        %(fundamental Hty0 Δ Γrc' HCtx)
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply bin_log_related_if $$ %(Fund Hty0) %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
     | ifR Hty0 Hty1 =>
-      iapply bin_log_related_if $$
-        %(fundamental Hty0 Δ Γrc' HCtx)
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | alloc =>
-      iapply (bin_log_related_alloc Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | load =>
-      iapply (bin_log_related_load Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | storeL Hty2 =>
-      iapply bin_log_related_store $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
-    | storeR Hty1 =>
-      iapply bin_log_related_store $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | allocTape =>
-      iapply bin_log_related_alloctape $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | randL_unit Hty2 =>
-      iapply bin_log_related_rand_unit $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
-    | randL_tape Hty2 =>
-      iapply bin_log_related_rand_tape $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
-    | randR_unit Hty1 =>
-      iapply bin_log_related_rand_unit $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | randR_tape Hty1 =>
-      iapply bin_log_related_rand_tape $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply bin_log_related_if $$ %(Fund Hty0) %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
+    | alloc => iapply (bin_log_related_alloc Δ Γrc') $$ %(IHinner Γrc' HCtx Hfr)
+    | load => iapply (bin_log_related_load Δ Γrc') $$ %(IHinner Γrc' HCtx Hfr)
+    | storeL Hty2 => iapply bin_log_related_store $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
+    | storeR Hty1 => iapply bin_log_related_store $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
+    | allocTape => iapply bin_log_related_alloctape $$ %(IHinner Γrc' HCtx Hfr)
+    | randL_unit Hty2 => iapply bin_log_related_rand_unit $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
+    | randL_tape Hty2 => iapply bin_log_related_rand_tape $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
+    | randR_unit Hty1 => iapply bin_log_related_rand_unit $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
+    | randR_tape Hty1 => iapply bin_log_related_rand_tape $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
     | @unop_int _ op _ Hres =>
-      iapply (bin_log_related_int_unop Δ Γrc' op Hres) $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply (bin_log_related_int_unop Δ Γrc' op Hres) $$ %(IHinner Γrc' HCtx Hfr)
     | @unop_real _ op _ Hres =>
-      iapply (bin_log_related_real_unop Δ Γrc' op Hres) $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply (bin_log_related_real_unop Δ Γrc' op Hres) $$ %(IHinner Γrc' HCtx Hfr)
     | @binopL_real _ op _ _ Hty2 Hres =>
-      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
     | @binopR_real _ op _ _ Hty1 Hres =>
-      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply (bin_log_related_real_binop Δ Γrc' op Hres) $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
     | @unop_bool _ op _ Hres =>
-      iapply (bin_log_related_bool_unop Δ Γrc' op Hres) $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply (bin_log_related_bool_unop Δ Γrc' op Hres) $$ %(IHinner Γrc' HCtx Hfr)
     | @binopL_int _ op _ _ Hty2 Hres =>
-      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
     | @binopR_int _ op _ _ Hty1 Hres =>
-      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply (bin_log_related_int_binop Δ Γrc' op Hres) $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
     | @binopL_bool _ op _ _ Hty2 Hres =>
-      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
     | @binopR_bool _ op _ _ Hty1 Hres =>
-      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply (bin_log_related_bool_binop Δ Γrc' op Hres) $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
     | binopL_unboxedEq Hub Hty2 =>
-      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$
-        %(IHinner Γrc' HCtx HfreshTail.cast_no_binder) %(fundamental Hty2 Δ Γrc' HCtx)
+      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$ %(IHinner Γrc' HCtx Hfr) %(Fund Hty2)
     | binopR_unboxedEq Hub Hty1 =>
-      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$
-        %(fundamental Hty1 Δ Γrc' HCtx) %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | fold =>
-      iapply (bin_log_related_fold Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | unfold =>
-      iapply (bin_log_related_unfold Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
-    | tapp =>
-      iapply (bin_log_related_tapp Δ Γrc') $$ %(IHinner Γrc' HCtx HfreshTail.cast_no_binder)
+      iapply (bin_log_related_unboxed_eq Δ Γrc' Hub) $$ %(Fund Hty1) %(IHinner Γrc' HCtx Hfr)
+    | fold => iapply (bin_log_related_fold Δ Γrc') $$ %(IHinner Γrc' HCtx Hfr)
+    | unfold => iapply (bin_log_related_unfold Δ Γrc') $$ %(IHinner Γrc' HCtx Hfr)
+    | tapp => iapply (bin_log_related_tapp Δ Γrc') $$ %(IHinner Γrc' HCtx Hfr)
     | @lam _ x τ _ =>
-      have hxRc : x ∉ (Γrc'.map (·.1)).toFinset :=
-        HfreshHead x (Finset.mem_singleton_self _)
+      have hxRc : x ∉ (Γrc'.map (·.1)).toFinset := HfreshHead x (Finset.mem_singleton_self _)
       have HCtxInner : TctxRelated Δ (Γtc'.insert x τ) ((x, interp τ Δ) :: Γrc') :=
-        HCtx.insert x τ (RelCtx.lookup_eq_none_of_notMem hxRc)
-      have IHk_at_x := IHinner ((x, interp τ Δ) :: Γrc') HCtxInner
-        (Ctx.BindersFresh.cons_extend rfl HfreshTail)
-      obtain ⟨HbindersK'_e, HbindersK'_e'⟩ := binders_proj_pair HbindersK'
-      obtain ⟨hKfe_lc, hKfe_fv⟩ :=
-        ctx_fill_lc_fv HCtxInner (TypedCtx.fill_typed Hty_e HKtail HbindersK'_e)
-      obtain ⟨hKfe'_lc, hKfe'_fv⟩ :=
-        ctx_fill_lc_fv HCtxInner (TypedCtx.fill_typed Hty_e' HKtail HbindersK'_e')
-      exact bin_log_related_lam_step hxRc hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv IHk_at_x
+        HCtx.insert x τ (RelCtx.lookup_eq_none_of_not_mem hxRc)
+      obtain ⟨hKfe_lc, hKfe_fv⟩ := ctx_fill_lc_fv HCtxInner HtyK
+      obtain ⟨hKfe'_lc, hKfe'_fv⟩ := ctx_fill_lc_fv HCtxInner HtyK'
+      exact bin_log_related_lam_step hxRc hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv
+        (IHinner _ HCtxInner (Ctx.BindersFresh.cons_extend rfl HfreshTail))
     | @fix _ f τ τ' =>
-      have hfRc : f ∉ (Γrc'.map (·.1)).toFinset :=
-        HfreshHead f (Finset.mem_singleton_self _)
+      have hfRc : f ∉ (Γrc'.map (·.1)).toFinset := HfreshHead f (Finset.mem_singleton_self _)
       have HCtxInner : TctxRelated Δ (Γtc'.insert f (.arrow τ τ'))
           ((f, interp (.arrow τ τ') Δ) :: Γrc') :=
-        HCtx.insert f (.arrow τ τ') (RelCtx.lookup_eq_none_of_notMem hfRc)
-      have IHk_at_f := IHinner ((f, interp (.arrow τ τ') Δ) :: Γrc') HCtxInner
-        (Ctx.BindersFresh.cons_extend rfl HfreshTail)
-      obtain ⟨HbindersK'_e, HbindersK'_e'⟩ := binders_proj_pair HbindersK'
-      obtain ⟨hKfe_lc, hKfe_fv⟩ :=
-        ctx_fill_lc_fv HCtxInner (TypedCtx.fill_typed Hty_e HKtail HbindersK'_e)
-      obtain ⟨hKfe'_lc, hKfe'_fv⟩ :=
-        ctx_fill_lc_fv HCtxInner (TypedCtx.fill_typed Hty_e' HKtail HbindersK'_e')
-      exact bin_log_related_fix_step hfRc hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv IHk_at_f
+        HCtx.insert f (.arrow τ τ') (RelCtx.lookup_eq_none_of_not_mem hfRc)
+      obtain ⟨hKfe_lc, hKfe_fv⟩ := ctx_fill_lc_fv HCtxInner HtyK
+      obtain ⟨hKfe'_lc, hKfe'_fv⟩ := ctx_fill_lc_fv HCtxInner HtyK'
+      exact bin_log_related_fix_step hfRc hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv
+        (IHinner _ HCtxInner (Ctx.BindersFresh.cons_extend rfl HfreshTail))
     | tlam =>
-      have HfreshK'Outer : Ctx.BindersFresh K' (Γrc'.map (·.1)).toFinset :=
-        HfreshTail.cast_no_binder
-      obtain ⟨HbindersK'_e, HbindersK'_e'⟩ := binders_proj_pair HbindersK'
       have HCtxShift := HCtx.shift (default : lrel rT GF)
-      obtain ⟨hKfe_lc, hKfe_fv⟩ :=
-        ctx_fill_lc_fv HCtxShift (TypedCtx.fill_typed Hty_e HKtail HbindersK'_e)
-      obtain ⟨hKfe'_lc, hKfe'_fv⟩ :=
-        ctx_fill_lc_fv HCtxShift (TypedCtx.fill_typed Hty_e' HKtail HbindersK'_e')
+      obtain ⟨hKfe_lc, hKfe_fv⟩ := ctx_fill_lc_fv HCtxShift HtyK
+      obtain ⟨hKfe'_lc, hKfe'_fv⟩ := ctx_fill_lc_fv HCtxShift HtyK'
       apply bin_log_related_tlam Δ Γrc' hKfe_lc hKfe'_lc hKfe_fv hKfe'_fv
       intro A
-      have IHk_at_A := ih HKtail HbindersK' (TyEnv.cons A Δ) Γrc'
-        (HCtx.shift A) HfreshK'Outer
       imodintro
-      iapply IHk_at_A
+      iapply ih HKtail HbindersK' (TyEnv.cons A Δ) Γrc' (HCtx.shift A) Hfr
     | @unpackL x e2 _ τ_pkg _ hxFvE2 Hty_e2 =>
-      have hxRc : x ∉ (Γrc'.map (·.1)).toFinset :=
-        HfreshHead x (Finset.mem_singleton_self _)
-      have HfreshK'Outer : Ctx.BindersFresh K' (Γrc'.map (·.1)).toFinset :=
-        Ctx.BindersFresh.mono Finset.subset_union_left HfreshTail
-      have HIH1 := IHinner Γrc' HCtx HfreshK'Outer
-      let L : Finset Var := insert x e2.fv ∪ (Γrc'.map (·.1)).toFinset
-      apply bin_log_related_unpack Δ Γrc' L HIH1
-        (he2_lc := fun y hyL => (Typed.rename_unpack hxFvE2 Hty_e2 y
-          (fun h => hyL (Finset.mem_union_left _ h))).isLocallyClosed)
-        (he2'_lc := fun y hyL => (Typed.rename_unpack hxFvE2 Hty_e2 y
-          (fun h => hyL (Finset.mem_union_left _ h))).isLocallyClosed)
+      have hRen := fun y (hy : y ∉ insert x e2.fv) => Typed.rename_unpack hxFvE2 Hty_e2 y hy
+      apply bin_log_related_unpack Δ Γrc' (insert x e2.fv ∪ (Γrc'.map (·.1)).toFinset)
+        (IHinner Γrc' HCtx Hfr)
+        (he2_lc := fun y hyL => (hRen y (hyL ∘ Finset.mem_union_left _)).isLocallyClosed)
+        (he2'_lc := fun y hyL => (hRen y (hyL ∘ Finset.mem_union_left _)).isLocallyClosed)
       intro A y hyL
-      have hyFresh : y ∉ insert x e2.fv := fun h => hyL (Finset.mem_union_left _ h)
-      have hyNotInDom : y ∉ (Γrc'.map (·.1)).toFinset :=
-        fun h => hyL (Finset.mem_union_right _ h)
-      have HCtxIns : TctxRelated (TyEnv.cons A Δ) ((Γtc'.shift).insert y τ_pkg)
-          ((y, interp τ_pkg (TyEnv.cons A Δ)) :: Γrc') :=
-        (HCtx.shift A).insert y τ_pkg (RelCtx.lookup_eq_none_of_notMem hyNotInDom)
-      exact fundamental (Typed.rename_unpack hxFvE2 Hty_e2 y hyFresh)
-        (TyEnv.cons A Δ) _ HCtxIns
+      exact fundamental (hRen y (hyL ∘ Finset.mem_union_left _)) (TyEnv.cons A Δ) _
+        ((HCtx.shift A).insert y τ_pkg
+          (RelCtx.lookup_eq_none_of_not_mem (hyL ∘ Finset.mem_union_right _)))
     | @unpackR x e1 _ τ_pkg _ Hty_e1 =>
-      have hxRc : x ∉ (Γrc'.map (·.1)).toFinset :=
-        HfreshHead x (Finset.mem_singleton_self _)
-      have HIH1 := fundamental Hty_e1 Δ Γrc' HCtx
-      obtain ⟨HbindersK'_e, HbindersK'_e'⟩ := binders_proj_pair HbindersK'
-      have hKfe_lc := (TypedCtx.fill_typed Hty_e HKtail HbindersK'_e).isLocallyClosed
-      have hKfe'_lc := (TypedCtx.fill_typed Hty_e' HKtail HbindersK'_e').isLocallyClosed
+      have hxRc : x ∉ (Γrc'.map (·.1)).toFinset := HfreshHead x (Finset.mem_singleton_self _)
       refine bin_log_related_unpack Δ Γrc'
-        ((Γrc'.map (·.1)).toFinset ∪ {x} ∪ (Ctx.fill K' e).fv ∪ (Ctx.fill K' e').fv) HIH1
-        ?_ ?_ ?_
-      -- `K'` filled with a well-typed term is already locally closed, so opening is a no-op.
-      -- `Exp.open'` must be unfolded first: `rw` does not see `openRec` through it.
-      -- `K'` filled with a well-typed term is already locally closed, so opening is a
-      -- no-op. `apply`/`assumption` rather than `rw`: the two `Ctx.fill` occurrences
-      -- carry different (defeq but not syntactically equal) `ProbLangℝ` instances.
-      -- `K'` filled with a well-typed term is already locally closed, so opening is a no-op.
+        ((Γrc'.map (·.1)).toFinset ∪ {x} ∪ (Ctx.fill K' e).fv ∪ (Ctx.fill K' e').fv)
+        (Fund Hty_e1) ?_ ?_ ?_
       -- `unpackR`'s body is `close (K'[e]) x`; opening that is a renaming substitution,
       -- which preserves the local closedness `K'[e]` already has by typing.
-      · intro y _
-        exact Exp.open_close_isLocallyClosed x y hKfe_lc
-      · intro y _
-        exact Exp.open_close_isLocallyClosed x y hKfe'_lc
+      · exact fun y _ => Exp.open_close_isLocallyClosed x y HtyK.isLocallyClosed
+      · exact fun y _ => Exp.open_close_isLocallyClosed x y HtyK'.isLocallyClosed
       intro A y hyL
-      have HCtxIns : TctxRelated (TyEnv.cons A Δ) ((Γtc'.shift).insert x τ_pkg)
-          ((x, interp τ_pkg (TyEnv.cons A Δ)) :: Γrc') :=
-        (HCtx.shift A).insert x τ_pkg (RelCtx.lookup_eq_none_of_notMem hxRc)
-      have IHk_at_x := ih HKtail HbindersK' (TyEnv.cons A Δ)
-        ((x, interp τ_pkg (TyEnv.cons A Δ)) :: Γrc') HCtxIns
-        (Ctx.BindersFresh.cons_extend rfl HfreshTail)
-      exact bin_log_related_close_cofinite hxRc hKfe_lc hKfe'_lc IHk_at_x y hyL
+      exact bin_log_related_close_cofinite hxRc HtyK.isLocallyClosed HtyK'.isLocallyClosed
+        (ih HKtail HbindersK' (TyEnv.cons A Δ) _
+          ((HCtx.shift A).insert x τ_pkg (RelCtx.lookup_eq_none_of_not_mem hxRc))
+          (Ctx.BindersFresh.cons_extend rfl HfreshTail)) y hyL
 
 end Soundness
 
@@ -500,10 +375,10 @@ theorem lrel_bool_to_boolEqVal [ApproxisRGS rT .hasNoLC GF] (v v' : Val rT) :
   iintro Hbool
   ihave ⟨%b, %h⟩ := lrel_bool_unfold v v' $$ Hbool
   ipureintro
-  exact ⟨b, h.1, h.2⟩
+  exact ⟨b, h⟩
 
 /-- Set-level monotonicity from `AddCoupl 0`: if `S(a, b) → a ∈ T → b ∈ T'`, then
-`μₗ T ≤ μᵣ T'`. Specialization tactic, not yet a standalone lemma. -/
+`μₗ T ≤ μᵣ T'`. -/
 theorem AddCoupl.set_leq_zero {α β} [MeasurableSpace α] [MeasurableSpace β]
     {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β}
     {T : Set α} {T' : Set β}
@@ -513,28 +388,14 @@ theorem AddCoupl.set_leq_zero {α β} [MeasurableSpace α] [MeasurableSpace β]
     μₗ T ≤ μᵣ T' := by
   classical
   let fInd : CouplingFunction α :=
-    .mk (T.indicator (fun _ => 1))
-        ⟨measurable_const.indicator hT,
-         fun x => Set.indicator_le_self _ _ x⟩
+    .mk (T.indicator 1) ⟨measurable_const.indicator hT, fun x => Set.indicator_le_self _ _ x⟩
   let gInd : CouplingFunction β :=
-    .mk (T'.indicator (fun _ => 1))
-        ⟨measurable_const.indicator hT',
-         fun x => Set.indicator_le_self _ _ x⟩
-  have hCmp : ∀ a b, S (a, b) → fInd.1 a ≤ gInd.1 b := by
-    intro a b hS
+    .mk (T'.indicator 1) ⟨measurable_const.indicator hT', fun x => Set.indicator_le_self _ _ x⟩
+  have hMain := Hcpl fInd gInd fun {a b} hS => by
     by_cases ha : a ∈ T
-    · have hb : b ∈ T' := Himp a b hS ha
-      simp [fInd, gInd, Set.indicator_of_mem ha, Set.indicator_of_mem hb]
+    · simp [fInd, gInd, Set.indicator_of_mem ha, Set.indicator_of_mem (Himp a b hS ha)]
     · simp [fInd, Set.indicator_of_notMem ha]
-  have hMain := Hcpl fInd gInd (fun {a b} => hCmp a b)
-  simp only [add_zero] at hMain
-  rw [show (∫⁻ x, fInd.1 x ∂μₗ) = μₗ T by
-        simp [fInd, MeasureTheory.lintegral_indicator hT, lintegral_const,
-              MeasureTheory.Measure.restrict_apply MeasurableSet.univ, Set.univ_inter],
-      show (∫⁻ x, gInd.1 x ∂μᵣ) = μᵣ T' by
-        simp [gInd, MeasureTheory.lintegral_indicator hT', lintegral_const,
-              MeasureTheory.Measure.restrict_apply MeasurableSet.univ, Set.univ_inter]] at hMain
-  exact hMain
+  simpa [fInd, gInd, lintegral_indicator_one hT, lintegral_indicator_one hT'] using hMain
 
 /-- **Soundness of the logical relation w.r.t. contextual refinement (open),
 restricted to fresh contexts.**
@@ -589,23 +450,16 @@ theorem refines_sound_open_fresh
         (Exp.substMap (ValSubstMap.fst ([] : ValSubstMap rT)) (K.fill e))
         (Exp.substMap (ValSubstMap.snd ([] : ValSubstMap rT)) (K.fill e'))
         (interp Ty.bool (default : TyEnv rT GF))
-      ihave Hf := HrelClosed
-      iapply Hf $$ %([] : ValSubstMap rT)
+      iapply HrelClosed $$ %([] : ValSubstMap rT)
       iapply env_ltyped2_empty
   apply AddCoupl.set_leq_zero (MeasurableSet.singleton _) (MeasurableSet.singleton _) hCpl
-  rintro a b' ⟨v, v', hv, hv', ⟨b'', hvb1, hvb2⟩⟩ ha
-  have toVal?_to_eq : ∀ {e : Exp rT} {w : Val rT}, e.toVal? = some w → e = w.1 := fun he => by
-    unfold Exp.toVal? at he
-    split at he
-    · rw [← Option.some.inj he]
-    · cases he
+  rintro a b' ⟨v, v', hv, hv', b'', hvb1, hvb2⟩ ha
+  -- `hvb1 : v = .bool b''` is a `Val` equation while `ha` and the goal live at the `Exp`
+  -- level, so push both through `Val.fst` to read off `b'' = b`.
   have hv1 : v.1 = pl(#(.bool b'')) := congrArg Val.fst hvb1
-  rw [(show v.1 = pl(#(.bool b)) from (toVal?_to_eq hv) ▸ ha)] at hv1
-  injection hv1 with hbool
-  injection hbool with hbb
-  subst hbb
-  show b' ∈ ({pl(#(.bool b))} : Set (Exp rT))
-  exact (toVal?_to_eq hv').trans (congrArg Val.fst hvb2)
+  rw [show v.1 = pl(#(.bool b)) from (Exp.ofVal_of_toVal_some hv).trans ha] at hv1
+  obtain rfl : b'' = b := by simpa using hv1.symm
+  exact (Exp.ofVal_of_toVal_some hv').symm.trans (congrArg Val.fst hvb2)
 
 /-- **Soundness of the logical relation (closed case), restricted to fresh contexts.** -/
 theorem refines_sound_fresh (e e' : Exp rT) (τ : Ty)

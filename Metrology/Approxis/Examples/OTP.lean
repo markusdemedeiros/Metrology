@@ -23,9 +23,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [IR : ApproxisRGS rT hlc GF]
 /-- Modular addition: `(n + m) mod N`. -/
 def addMod (m N : Int) (n : Int) : Int := (n + m) % N
 
+/-- Euclidean remainder lands in `[0, N)`. -/
+private theorem emod_bounds (a : Int) {N : Int} (HN : 0 < N) : 0 ≤ a % N ∧ a % N < N :=
+  ⟨Int.emod_nonneg _ (Int.ne_of_gt HN), Int.emod_lt_of_pos _ HN⟩
+
 theorem addMod_dom (m N : Int) (HN : 0 < N) :
     ∀ n : Int, 0 ≤ n → n < N → 0 ≤ addMod m N n ∧ addMod m N n < N :=
-  fun _ _ _ => ⟨Int.emod_nonneg _ (Int.ne_of_gt HN), Int.emod_lt_of_pos _ HN⟩
+  fun _ _ _ => emod_bounds _ HN
 
 /-- Bijection witness: for every `m' ∈ [0, N)`, there's a unique `n ∈ [0, N)`
 with `(n + m) mod N = m'`. The unique `n` is `(m' - m) mod N`. -/
@@ -33,18 +37,13 @@ theorem addMod_bij (m N : Int) (HN : 0 < N) :
     ∀ m' : Int, 0 ≤ m' → m' < N →
       ∃! n : Int, (0 ≤ n ∧ n < N) ∧ addMod m N n = m' := by
   intro m' hm'0 hm'N
-  refine ⟨(m' - m) % N, ?_, ?_⟩
-  · refine ⟨⟨Int.emod_nonneg _ (Int.ne_of_gt HN),
-            Int.emod_lt_of_pos _ HN⟩, ?_⟩
-    unfold addMod
-    rw [Int.add_emod, Int.emod_emod_of_dvd _ (dvd_refl N), ← Int.add_emod,
-        Int.sub_add_cancel, Int.emod_eq_of_lt hm'0 hm'N]
+  refine ⟨(m' - m) % N, ⟨emod_bounds _ HN, ?_⟩, ?_⟩
+  · unfold addMod
+    rw [Int.emod_add_emod, Int.sub_add_cancel, Int.emod_eq_of_lt hm'0 hm'N]
   · rintro n ⟨⟨hn0, hnN⟩, hadd⟩
     unfold addMod at hadd
-    -- Goal: n = (m' - m) % N. From `(n+m)%N = m'`, derive `(m' - m) % N = n` by:
-    -- `(m'-m) % N = ((n+m)%N - m) % N = (n+m-m) % N = n % N = n`.
-    rw [← hadd, Int.sub_emod, Int.emod_emod_of_dvd _ (dvd_refl N), ← Int.sub_emod,
-        Int.add_sub_cancel, Int.emod_eq_of_lt hn0 hnN]
+    -- `(m' - m) % N = ((n+m)%N - m) % N = (n+m-m) % N = n % N = n`.
+    rw [← hadd, Int.emod_sub_emod, Int.add_sub_cancel, Int.emod_eq_of_lt hn0 hnN]
 
 /-! ### The OTP refinement -/
 
@@ -64,41 +63,38 @@ abbrev otpLam (m N : Int) : Exp rT := pl% fun k, (#(.int m) + k) % #(.int N)
 β-encoded as `(λ k. body) (rand …)`: applying `(λ. otpBody)` to its argument. -/
 def otpKLam (m N : Int) : Ectx rT := [EctxItem.appR (otpLam m N)]
 
+/-- Every integer literal refines itself at `lrel_int`. -/
+private theorem refines_lit_int (n : Int) :
+    ⊢@{IProp GF} refines (⊤ : CoPset) (pl(#(.int n)) : Exp rT) pl(#(.int n)) lrel_int := by
+  iapply refines_ret (v1 := .int n) (v2 := .int n) (hv1 := rfl) (hv2 := rfl)
+  iintro !>
+  iapply lrel_int_lit
+
 /-- **OTP refinement**: for any fixed `m ∈ [0, N)`, encrypting `m` with a fresh
 random key is observationally equivalent to a fresh random sample. -/
 theorem otp_refines (m N : Int) (HN : 0 < N) :
   ⊢@{IProp GF} refines (⊤ : CoPset) (otp_enc (rT := rT) m N) (otp_ideal N) lrel_int := by
   simp only [otp_enc, otp_ideal, Exp.close, Exp.closeRec, ↓reduceIte]
-  let Kmod : Ectx rT := [EctxItem.binopL .mod (.int N)]
   show ⊢@{IProp GF} refines ⊤
     ((otpKLam m N).fill pl(rand(#(.int N), #(.unit))))
     (Ectx.fill ([] : Ectx rT) pl(rand(#(.int N), #(.unit)))) lrel_int
   iapply refines_couple_rands_lr (f := addMod m N)
     (hdom := addMod_dom m N HN) (hbij := addMod_bij m N HN) (Hz := HN)
   iintro %n ⟨%_, %_⟩
-  show ⊢@{IProp GF} refines ⊤
-    (Ectx.fill ([] : Ectx rT) pl({otpLam m N} #(.int n)))
-    pl(#(.int (addMod m N n))) lrel_int
+  -- Three pure steps on the left: β-reduce the `let`, add, then take the remainder.
+  show ⊢@{IProp GF} refines ⊤ (Ectx.fill ([] : Ectx rT) pl({otpLam m N} #(.int n))) _ lrel_int
   iapply refines_pure_l (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩
   inext
-  show ⊢@{IProp GF} refines ⊤
-    (Kmod.fill pl(#(.int m) + #(.int n)))
-    pl(#(.int (addMod m N n))) lrel_int
-  iapply refines_pure_l (Hex := pureExec_binop) ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
+  let Kmod : Ectx rT := [EctxItem.binopL .mod (.int N)]
+  show ⊢@{IProp GF} refines ⊤ (Kmod.fill pl(#(.int m) + #(.int n))) _ lrel_int
+  iapply refines_pure_l ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
   inext
   show ⊢@{IProp GF} refines ⊤
-    (Ectx.fill ([] : Ectx rT) pl(#(.int (m + n)) % #(.int N)))
-    pl(#(.int (addMod m N n))) lrel_int
-  iapply refines_pure_l (Hex := pureExec_binop) ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
+    (Ectx.fill ([] : Ectx rT) pl(#(.int (m + n)) % #(.int N))) _ lrel_int
+  iapply refines_pure_l ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
   inext
   rw [show (m + n) % N = addMod m N n by unfold addMod; ring_nf]
-  show ⊢@{IProp GF}
-    refines ⊤ pl(#(.int (addMod m N n))) pl(#(.int (addMod m N n))) lrel_int
-  iapply refines_ret (v1 := .int (addMod m N n)) (v2 := .int (addMod m N n)) (hv1 := rfl) (hv2 := rfl)
-  iintro !>
-  unfold lrel_int
-  iexists (addMod m N n)
-  ipureintro; exact ⟨rfl, rfl⟩
+  exact refines_lit_int _
 
 /-! ### Reverse direction -/
 
@@ -106,47 +102,32 @@ theorem otp_refines (m N : Int) (HN : 0 < N) :
 theorem addMod_neg_inv (m N : Int) :
     ∀ n : Int, 0 ≤ n → n < N → (m + (n + (-m)) % N) % N = n := by
   intro n hn0 hnN
-  rw [Int.add_emod m ((n + -m) % N) N, Int.emod_emod_of_dvd _ (dvd_refl N),
-      ← Int.add_emod, show m + (n + -m) = n by ring, Int.emod_eq_of_lt hn0 hnN]
+  rw [Int.add_emod_emod, show m + (n + -m) = n by ring, Int.emod_eq_of_lt hn0 hnN]
 
 /-- **Reverse OTP refinement**: a fresh random sample refines encrypting `m`
 with a fresh random key. -/
 theorem otp_refines_rev (m N : Int) (HN : 0 < N) :
     ⊢@{IProp GF} refines (⊤ : CoPset) (otp_ideal (rT := rT) N) (otp_enc m N) lrel_int := by
   simp only [otp_enc, otp_ideal, Exp.close, Exp.closeRec, ↓reduceIte]
-  let Kmod : Ectx rT := [EctxItem.binopL .mod (.int N)]
   show ⊢@{IProp GF} refines ⊤
     (Ectx.fill ([] : Ectx rT) pl(rand(#(.int N), #(.unit))))
     ((otpKLam m N).fill pl(rand(#(.int N), #(.unit)))) lrel_int
   iapply refines_couple_rands_lr (f := addMod (-m) N)
     (hdom := addMod_dom (-m) N HN) (hbij := addMod_bij (-m) N HN) (Hz := HN)
   iintro %n ⟨%Hn0, %HnN⟩
-  -- β-reduce LHS literal-fill, then expose β-redex on RHS.
-  show ⊢@{IProp GF} refines ⊤
-    pl(#(.int n))
-    (Ectx.fill ([] : Ectx rT) pl({otpLam m N} #(.int (addMod (-m) N n))))
-    lrel_int
+  -- The same three pure steps, now on the right.
+  show ⊢@{IProp GF} refines ⊤ _
+    (Ectx.fill ([] : Ectx rT) pl({otpLam m N} #(.int (addMod (-m) N n)))) lrel_int
   iapply refines_pure_r (Hex := pureExec_app_lam) ⟨IsVal.lit.toIsValue, by is_lc⟩
-  -- Step 2 (inner plus).
-  show ⊢@{IProp GF} refines ⊤
-    pl(#(.int n))
-    (Kmod.fill pl(#(.int m) + #(.int (addMod (-m) N n))))
-    lrel_int
-  iapply refines_pure_r (Hex := pureExec_binop) ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
-  -- Step 3 (outer mod).
-  show ⊢@{IProp GF} refines ⊤
-    pl(#(.int n))
-    (Ectx.fill ([] : Ectx rT) pl(#(.int (m + addMod (-m) N n)) % #(.int N)))
-    lrel_int
-  iapply refines_pure_r (Hex := pureExec_binop) ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
-  -- The RHS-reduced value is `(m + (n + (-m)) % N) % N = n` by addMod_neg_inv.
+  let Kmod : Ectx rT := [EctxItem.binopL .mod (.int N)]
+  show ⊢@{IProp GF} refines ⊤ _ (Kmod.fill pl(#(.int m) + #(.int (addMod (-m) N n)))) lrel_int
+  iapply refines_pure_r ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
+  show ⊢@{IProp GF} refines ⊤ _
+    (Ectx.fill ([] : Ectx rT) pl(#(.int (m + addMod (-m) N n)) % #(.int N))) lrel_int
+  iapply refines_pure_r ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
+  -- The RHS-reduced value is `(m + (n + (-m)) % N) % N = n` by `addMod_neg_inv`.
   rw [show (m + addMod (-m) N n) % N = n from addMod_neg_inv m N n Hn0 HnN]
-  show ⊢@{IProp GF} refines ⊤ pl(#(.int n)) pl(#(.int n)) lrel_int
-  iapply refines_ret (v1 := .int n) (v2 := .int n) (hv1 := rfl) (hv2 := rfl)
-  iintro !>
-  unfold lrel_int
-  iexists n
-  ipureintro; exact ⟨rfl, rfl⟩
+  exact refines_lit_int n
 
 /-! ## Adequacy: exit the logic
 
@@ -173,7 +154,8 @@ theorem otp_adequate
     [RefinesPreGS rT GF]
     (m N : Int) (HN : 0 < N)
     (σ σ' : State rT) :
-    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_enc m N, σ⟩) (limExecV ⟨otp_ideal N, σ'⟩) :=
+    AddCoupl 0 (adequacyRel otpφ)
+      (limExecV ⟨otp_enc m N, σ⟩) (limExecV ⟨otp_ideal N, σ'⟩) :=
   ProbLang.refines_coupling (A := fun _ => lrel_int) (φ := otpφ)
     (otp_enc m N) (otp_ideal N) σ σ'
     (fun _ v v' => lrel_int_to_otpφ v v')
@@ -187,7 +169,8 @@ theorem otp_adequate_rev
     [RefinesPreGS rT GF]
     (m N : Int) (HN : 0 < N)
     (σ σ' : State rT) :
-    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_ideal N, σ⟩) (limExecV ⟨otp_enc m N, σ'⟩) :=
+    AddCoupl 0 (adequacyRel otpφ)
+      (limExecV ⟨otp_ideal N, σ⟩) (limExecV ⟨otp_enc m N, σ'⟩) :=
   ProbLang.refines_coupling (A := fun _ => lrel_int) (φ := otpφ)
     (otp_ideal N) (otp_enc m N) σ σ'
     (fun _ v v' => lrel_int_to_otpφ v v')
@@ -204,13 +187,15 @@ the encrypted-message and uniform distributions are coupled with zero error. -/
 theorem otp_adequate_closed
     (m N : Int) (HN : 0 < N)
     (σ σ' : State rT) :
-    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_enc m N, σ⟩) (limExecV ⟨otp_ideal N, σ'⟩) :=
+    AddCoupl 0 (adequacyRel otpφ)
+      (limExecV ⟨otp_enc m N, σ⟩) (limExecV ⟨otp_ideal N, σ'⟩) :=
   otp_adequate (ApproxisFunctor rT) m N HN σ σ'
 
 theorem otp_adequate_rev_closed
     (m N : Int) (HN : 0 < N)
     (σ σ' : State rT) :
-    AddCoupl 0 (adequacyRel otpφ) (limExecV ⟨otp_ideal N, σ⟩) (limExecV ⟨otp_enc m N, σ'⟩) :=
+    AddCoupl 0 (adequacyRel otpφ)
+      (limExecV ⟨otp_ideal N, σ⟩) (limExecV ⟨otp_enc m N, σ'⟩) :=
   otp_adequate_rev (ApproxisFunctor rT) m N HN σ σ'
 
 end OTP

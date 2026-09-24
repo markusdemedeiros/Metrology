@@ -36,6 +36,11 @@ def TctxRelated (Δ : TyEnv rT GF) (Γtc : Tctx) (Γrc : RelCtx rT GF) : Prop :=
 
 /-! ## Compatibility lemmas -/
 
+/-! ### Intro and elim for the literal value relations
+
+`lrel_unit`, `lrel_int`, `lrel_bool` and `lrel_real` each relate two values exactly
+when both are the *same* literal. These are the two directions of that reading. -/
+
 theorem bin_log_related_var (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) (x : Var) (τ : Ty)
     (hΓ : Γ.lookup x = some (interp τ Δ)) :
     ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ Γ (.fvar x) (.fvar x) τ := by
@@ -54,125 +59,141 @@ theorem bin_log_related_var (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) (x : Var) (τ
   imodintro
   iexact HA
 
+/-- The fresh-atom bridge shared by the binder cases (`lam`, `fix`, `unpack`). Extending
+`vs` at a fresh `x` with the pair `(v, v')` and then substituting into an opened body is
+the same as opening the already-substituted body at `v`/`v'`. -/
+private theorem substMap_open_fresh_pair {vs vs' : ValSubstMap rT} {x : Var} {v v' : Val rT}
+    {e e' : Exp rT} (hvs' : vs' = (x, (v, v')) :: vs)
+    (hfst : SubstMap.AllClosed vs.fst) (hsnd : SubstMap.AllClosed vs.snd)
+    (hxe : x ∉ e.fv) (hxe' : x ∉ e'.fv) (hxdom : x ∉ (vs.map (·.1)).toFinset)
+    (hv : v.1.isClosedEmpty) (hv' : v'.1.isClosedEmpty) :
+    Exp.substMap vs'.fst (Exp.open' e (.fvar x)) = Exp.open' (Exp.substMap vs.fst e) v.1 ∧
+      Exp.substMap vs'.snd (Exp.open' e' (.fvar x)) =
+        Exp.open' (Exp.substMap vs.snd e') v'.1 := by
+  subst hvs'
+  exact ⟨Exp.substMap_open_fresh hfst hxe
+      (ValSubstMap.fst_lookup_eq_none_of_not_mem hxdom) hv.1,
+    Exp.substMap_open_fresh hsnd hxe'
+      (ValSubstMap.snd_lookup_eq_none_of_not_mem hxdom) hv'.1⟩
+
+/-! ### Lifting `refines` compatibility to `bin_log_related`
+
+Every non-binder compatibility lemma shares one envelope: specialise the induction
+hypotheses at `vs`, push `substMap` through the constructor, then apply the matching
+`refines_*` rule. `bin_log_related_lift{1,2,3}` package that envelope, parameterised
+by the constructor `f` and its `substMap` commutation lemma. -/
+
+private theorem bin_log_related_lift1 {Γ : RelCtx rT GF} {e e' : Exp rT}
+    {A B : lrel rT GF} {f : Exp rT → Exp rT}
+    (hf : ∀ (σ : SubstMap rT) (t : Exp rT), Exp.substMap σ (f t) = f (Exp.substMap σ t))
+    (H : ∀ t t' : Exp rT, iprop(refines ⊤ t t' A) ⊢@{IProp GF} refines ⊤ (f t) (f t') B) :
+    bin_log_related ⊤ Γ e e' A ⊢@{IProp GF} bin_log_related ⊤ Γ (f e) (f e') B := by
+  unfold bin_log_related
+  iintro IH %vs #Hvs
+  ihave IH' := IH $$ %vs Hvs
+  rw [hf, hf]
+  iapply (H _ _) $$ IH'
+
+private theorem bin_log_related_lift2 {Γ : RelCtx rT GF} {e1 e2 e1' e2' : Exp rT}
+    {A1 A2 B : lrel rT GF} {f : Exp rT → Exp rT → Exp rT}
+    (hf : ∀ (σ : SubstMap rT) (t1 t2 : Exp rT),
+      Exp.substMap σ (f t1 t2) = f (Exp.substMap σ t1) (Exp.substMap σ t2))
+    (H : ∀ t1 t2 t1' t2' : Exp rT, iprop(refines ⊤ t1 t1' A1) ⊢@{IProp GF}
+      refines ⊤ t2 t2' A2 -∗ refines ⊤ (f t1 t2) (f t1' t2') B) :
+    bin_log_related ⊤ Γ e1 e1' A1 ⊢@{IProp GF}
+      bin_log_related ⊤ Γ e2 e2' A2 -∗ bin_log_related ⊤ Γ (f e1 e2) (f e1' e2') B := by
+  unfold bin_log_related
+  iintro IH1 IH2 %vs #Hvs
+  ihave IH1' := IH1 $$ %vs Hvs
+  ihave IH2' := IH2 $$ %vs Hvs
+  rw [hf, hf]
+  iapply (H _ _ _ _) $$ IH1' IH2'
+
+private theorem bin_log_related_lift3 {Γ : RelCtx rT GF} {e0 e1 e2 e0' e1' e2' : Exp rT}
+    {A0 A1 A2 B : lrel rT GF} {f : Exp rT → Exp rT → Exp rT → Exp rT}
+    (hf : ∀ (σ : SubstMap rT) (t0 t1 t2 : Exp rT), Exp.substMap σ (f t0 t1 t2) =
+      f (Exp.substMap σ t0) (Exp.substMap σ t1) (Exp.substMap σ t2))
+    (H : ∀ t0 t1 t2 t0' t1' t2' : Exp rT, iprop(refines ⊤ t0 t0' A0) ⊢@{IProp GF}
+      refines ⊤ t1 t1' A1 -∗ refines ⊤ t2 t2' A2 -∗
+        refines ⊤ (f t0 t1 t2) (f t0' t1' t2') B) :
+    bin_log_related ⊤ Γ e0 e0' A0 ⊢@{IProp GF}
+      bin_log_related ⊤ Γ e1 e1' A1 -∗ bin_log_related ⊤ Γ e2 e2' A2 -∗
+        bin_log_related ⊤ Γ (f e0 e1 e2) (f e0' e1' e2') B := by
+  unfold bin_log_related
+  iintro IH0 IH1 IH2 %vs #Hvs
+  ihave IH0' := IH0 $$ %vs Hvs
+  ihave IH1' := IH1 $$ %vs Hvs
+  ihave IH2' := IH2 $$ %vs Hvs
+  rw [hf, hf]
+  iapply (H _ _ _ _ _ _) $$ IH0' IH1' IH2'
+
+/-- A literal is related to itself whenever `A` relates it to itself: substitution is
+a no-op on literals, so the pair is already a value. -/
+private theorem bin_log_related_lit (Γ : RelCtx rT GF) (l : BaseLit rT) {A : lrel rT GF}
+    (HA : ⊢@{IProp GF} A.car (.ofBaseLit l) (.ofBaseLit l)) :
+    ⊢@{IProp GF} bin_log_related ⊤ Γ (.lit l) (.lit l) A := by
+  unfold bin_log_related
+  iintro %vs _
+  rw [Exp.substMap_lit, Exp.substMap_lit,
+      show (Exp.lit l : Exp rT) = (Val.ofBaseLit l).1 from rfl]
+  iapply (refines_ret (hv1 := rfl) (hv2 := rfl))
+  imodintro
+  iapply HA
+
 theorem bin_log_related_pair (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e1 e2 e1' e2' : Exp rT} {τ1 τ2 : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' τ1) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' τ2 -∗
         bin_log_related_ty (⊤ : CoPset) Δ Γ (.pair e1 e2) (.pair e1' e2')
-          (.prod τ1 τ2) := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_pair, Exp.substMap_pair, interp_prod]
-  iapply refines_pair $$ IH1' IH2'
+          (.prod τ1 τ2) :=
+  bin_log_related_lift2 Exp.substMap_pair fun _ _ _ _ => refines_pair
 
 theorem bin_log_related_fst (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' (.prod τ1 τ2)) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.fst e) (.fst e') τ1 := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_fst, Exp.substMap_fst]
-  isimp only [interp_prod] at IH'
-  iapply refines_fst $$ IH'
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.fst e) (.fst e') τ1 :=
+  bin_log_related_lift1 Exp.substMap_fst fun _ _ => refines_fst
 
 theorem bin_log_related_snd (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' (.prod τ1 τ2)) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.snd e) (.snd e') τ2 := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_snd, Exp.substMap_snd]
-  isimp only [interp_prod] at IH'
-  iapply refines_snd $$ IH'
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.snd e) (.snd e') τ2 :=
+  bin_log_related_lift1 Exp.substMap_snd fun _ _ => refines_snd
 
 theorem bin_log_related_injl (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' τ1) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.inl e) (.inl e') (.sum τ1 τ2) := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_inl, Exp.substMap_inl, interp_sum]
-  iapply refines_injl $$ IH'
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.inl e) (.inl e') (.sum τ1 τ2) :=
+  bin_log_related_lift1 Exp.substMap_inl fun _ _ => refines_injl
 
 theorem bin_log_related_injr (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ1 τ2 : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' τ2) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.inr e) (.inr e') (.sum τ1 τ2) := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_inr, Exp.substMap_inr, interp_sum]
-  iapply refines_injr $$ IH'
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.inr e) (.inr e') (.sum τ1 τ2) :=
+  bin_log_related_lift1 Exp.substMap_inr fun _ _ => refines_injr
 
 theorem bin_log_related_case (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e0 e1 e2 e0' e1' e2' : Exp rT} {τ1 τ2 τ3 : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e0 e0' (.sum τ1 τ2)) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' (.arrow τ1 τ3) -∗
         bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' (.arrow τ2 τ3) -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.case e0 e1 e2) (.case e0' e1' e2') τ3 := by
-  iintro IH0 IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH0' := IH0 $$ %vs Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_case, Exp.substMap_case]
-  isimp only [interp_sum] at IH0'
-  isimp only [interp_arrow] at IH1'
-  isimp only [interp_arrow] at IH2'
-  ihave HRcaseApp := refines_case
-    (e0 := Exp.substMap vs.fst e0) (e0' := Exp.substMap vs.snd e0')
-    (e1 := Exp.substMap vs.fst e1) (e1' := Exp.substMap vs.snd e1')
-    (e2 := Exp.substMap vs.fst e2) (e2' := Exp.substMap vs.snd e2') $$ [IH0']
-  · iexact IH0'
-  ihave HRcaseApp1 := HRcaseApp $$ [$]
-  iapply HRcaseApp1 $$ IH2'
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.case e0 e1 e2) (.case e0' e1' e2') τ3 :=
+  bin_log_related_lift3 Exp.substMap_case fun _ _ _ _ _ _ => refines_case
 
 theorem bin_log_related_if (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e0 e1 e2 e0' e1' e2' : Exp rT} {τ : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e0 e0' .bool) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' τ -∗
         bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' τ -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.cond e0 e1 e2) (.cond e0' e1' e2') τ := by
-  iintro IH0 IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH0' := IH0 $$ %vs Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_cond, Exp.substMap_cond]
-  isimp only [interp_bool] at IH0'
-  ihave HRifApplied := refines_if
-    (e0' := Exp.substMap vs.snd e0') (e1 := Exp.substMap vs.fst e1)
-    (e1' := Exp.substMap vs.snd e1') (e2 := Exp.substMap vs.fst e2)
-    (e2' := Exp.substMap vs.snd e2') $$ [IH0']
-  · iexact IH0'
-  ihave HRif1 := HRifApplied $$ [$]
-  iapply HRif1 $$ IH2'
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.cond e0 e1 e2) (.cond e0' e1' e2') τ :=
+  bin_log_related_lift3 Exp.substMap_cond fun _ _ _ _ _ _ => refines_if
 
 theorem bin_log_related_app (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e1 e2 e1' e2' : Exp rT} {τ1 τ2 : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' (.arrow τ1 τ2)) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' τ1 -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.app e1 e2) (.app e1' e2') τ2 := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_app, Exp.substMap_app]
-  isimp only [interp_arrow] at IH1'
-  iapply refines_app $$ IH1' IH2'
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.app e1 e2) (.app e1' e2') τ2 :=
+  bin_log_related_lift2 Exp.substMap_app fun _ _ _ _ => refines_app
 
 theorem bin_log_related_lam (Δ : TyEnv rT GF)
     (Γ : RelCtx rT GF) {e e' : Exp rT} {τ1 τ2 : Ty} (L : Finset Var)
@@ -202,12 +223,9 @@ theorem bin_log_related_lam (Δ : TyEnv rT GF)
   have he_dom_snd : e'.fv ⊆ (vs.snd.map (·.1)).toFinset := by
     rw [ValSubstMap.snd_dom]; exact he'_fv.trans hΓdomVs
   have hlam_closed : (Exp.lam (Exp.substMap vs.fst e)).isClosedEmpty ∧
-      (Exp.lam (Exp.substMap vs.snd e')).isClosedEmpty := by
-    refine ⟨⟨hlam_lc, ?_⟩, ⟨hlam'_lc, ?_⟩⟩
-    · simp only [Exp.fv]
-      exact Exp.substMap_fv_eq_empty hvsfst_closed he_dom_fst
-    · simp only [Exp.fv]
-      exact Exp.substMap_fv_eq_empty hvssnd_closed he_dom_snd
+      (Exp.lam (Exp.substMap vs.snd e')).isClosedEmpty :=
+    ⟨⟨hlam_lc, Exp.substMap_fv_eq_empty hvsfst_closed he_dom_fst⟩,
+      ⟨hlam'_lc, Exp.substMap_fv_eq_empty hvssnd_closed he_dom_snd⟩⟩
   iapply (refines_arrow_val
     (v := ⟨Exp.lam (Exp.substMap vs.fst e), IsVal.lam (by is_lc), by is_lc⟩)
     (v' := ⟨Exp.lam (Exp.substMap vs.snd e'), IsVal.lam (by is_lc), by is_lc⟩)
@@ -222,30 +240,15 @@ theorem bin_log_related_lam (Δ : TyEnv rT GF)
   obtain ⟨⟨⟨hxL, hxFvE⟩, hxFvE'⟩, hxNotDom⟩ := hx
   have HbodyAtX := Hbody x hxL
   let vs' : ValSubstMap rT := (x, (v1, v2)) :: vs
-  have hv1c : v1.1.isClosed .empty :=
-    ⟨hv1v2_closed.1.1, by rw [hv1v2_closed.1.2]; exact Finset.empty_subset _⟩
-  have hv2c : v2.1.isClosed .empty :=
-    ⟨hv1v2_closed.2.1, by rw [hv1v2_closed.2.2]; exact Finset.empty_subset _⟩
   ihave Hvs' : iprop(env_ltyped2 ((x, interp τ1 Δ) :: Γ) vs') $$ [HA]
-  · iapply (env_ltyped2_insert Γ vs x (interp τ1 Δ) v1 v2 hv1c hv2c)
+  · iapply (env_ltyped2_insert Γ vs x (interp τ1 Δ) v1 v2
+      hv1v2_closed.1.toFvSubsetEmpty hv1v2_closed.2.toFvSubsetEmpty)
     iframe HA
     iexact Hvs
   unfold bin_log_related_ty bin_log_related at HbodyAtX
   ihave HbodyApplied := HbodyAtX $$ Hvs'
-  have hxDomFst : SubstMap.lookup vs.fst x = none :=
-    ValSubstMap.fst_lookup_eq_none_of_not_mem hxNotDom
-  have hxDomSnd : SubstMap.lookup vs.snd x = none :=
-    ValSubstMap.snd_lookup_eq_none_of_not_mem hxNotDom
-  have hbridge_fst : Exp.substMap vs'.fst (Exp.open' e (.fvar x)) =
-      Exp.open' (Exp.substMap vs.fst e) v1.1 := by
-    show Exp.substMap ((x, v1.1) :: vs.fst) (Exp.open' e (.fvar x)) =
-        Exp.open' (Exp.substMap vs.fst e) v1.1
-    exact Exp.substMap_open_fresh hvsfst_closed hxFvE hxDomFst hv1v2_closed.1.1
-  have hbridge_snd : Exp.substMap vs'.snd (Exp.open' e' (.fvar x)) =
-      Exp.open' (Exp.substMap vs.snd e') v2.1 := by
-    show Exp.substMap ((x, v2.1) :: vs.snd) (Exp.open' e' (.fvar x)) =
-        Exp.open' (Exp.substMap vs.snd e') v2.1
-    exact Exp.substMap_open_fresh hvssnd_closed hxFvE' hxDomSnd hv1v2_closed.2.1
+  obtain ⟨hbridge_fst, hbridge_snd⟩ := substMap_open_fresh_pair (vs' := vs') rfl
+    hvsfst_closed hvssnd_closed hxFvE hxFvE' hxNotDom hv1v2_closed.1 hv1v2_closed.2
   isimp only [hbridge_fst, hbridge_snd] at HbodyApplied
   rw [Ectx.eq_fill_nil (Exp.app (Exp.lam (Exp.substMap vs.fst e)) v1.1),
       Ectx.eq_fill_nil (Exp.app (Exp.lam (Exp.substMap vs.snd e')) v2.1)]
@@ -291,12 +294,9 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
   have he_dom_snd : e'.fv ⊆ (vs.snd.map (·.1)).toFinset := by
     rw [ValSubstMap.snd_dom]; exact he'_fv.trans hΓdomVs
   have hfix_closed : (Exp.fix (Exp.substMap vs.fst e)).isClosedEmpty ∧
-      (Exp.fix (Exp.substMap vs.snd e')).isClosedEmpty := by
-    refine ⟨⟨hfix_lc, ?_⟩, ⟨hfix'_lc, ?_⟩⟩
-    · simp only [Exp.fv]
-      exact Exp.substMap_fv_eq_empty hvsfst_closed he_dom_fst
-    · simp only [Exp.fv]
-      exact Exp.substMap_fv_eq_empty hvssnd_closed he_dom_snd
+      (Exp.fix (Exp.substMap vs.snd e')).isClosedEmpty :=
+    ⟨⟨hfix_lc, Exp.substMap_fv_eq_empty hvsfst_closed he_dom_fst⟩,
+      ⟨hfix'_lc, Exp.substMap_fv_eq_empty hvssnd_closed he_dom_snd⟩⟩
   obtain ⟨f, hf⟩ :=
     HasFresh.fresh_exists (L ∪ e.fv ∪ e'.fv ∪ (vs.map (·.1)).toFinset)
   simp only [Finset.mem_union, not_or] at hf
@@ -329,14 +329,10 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
   let fixv : Val rT := ⟨Exp.fix (Exp.substMap vs.fst e), IsVal.fix (by is_lc), by is_lc⟩
   let fixv' : Val rT := ⟨Exp.fix (Exp.substMap vs.snd e'), IsVal.fix (by is_lc), by is_lc⟩
   let vs' : ValSubstMap rT := (f, (fixv, fixv')) :: vs
-  have hfixv_c : fixv.1.isClosed .empty :=
-    ⟨hfix_closed.1.1, by rw [hfix_closed.1.2]; exact Finset.empty_subset _⟩
-  have hfixv'_c : fixv'.1.isClosed .empty :=
-    ⟨hfix_closed.2.1, by rw [hfix_closed.2.2]; exact Finset.empty_subset _⟩
   ihave Hvs' : iprop(env_ltyped2 ((f, interp (Ty.arrow τ1 τ2) Δ) :: Γ) vs') $$ [IH]
   · rw [interp_arrow]
     iapply (env_ltyped2_insert Γ vs f (lrel_arr (interp τ1 Δ) (interp τ2 Δ))
-      fixv fixv' hfixv_c hfixv'_c)
+      fixv fixv' hfix_closed.1.toFvSubsetEmpty hfix_closed.2.toFvSubsetEmpty)
     isplitr [IH]
     · iapply (lrel_arr_fold (interp τ1 Δ) (interp τ2 Δ) fixv fixv')
       iexact IH
@@ -344,26 +340,15 @@ theorem bin_log_related_fix (Δ : TyEnv rT GF)
   have HbodyAtF := Hbody f hfL
   unfold bin_log_related_ty bin_log_related at HbodyAtF
   ihave HbodyApplied := HbodyAtF $$ Hvs'
-  have hxDomFst : SubstMap.lookup vs.fst f = none :=
-    ValSubstMap.fst_lookup_eq_none_of_not_mem hfNotDom
-  have hxDomSnd : SubstMap.lookup vs.snd f = none :=
-    ValSubstMap.snd_lookup_eq_none_of_not_mem hfNotDom
-  have hbridge_fst : Exp.substMap vs'.fst (Exp.open' e (.fvar f)) =
-      Exp.open' (Exp.substMap vs.fst e) fixv.1 := by
-    show Exp.substMap ((f, fixv.1) :: vs.fst) (Exp.open' e (.fvar f)) = _
-    exact Exp.substMap_open_fresh hvsfst_closed hfFvE hxDomFst hfix_closed.1.1
-  have hbridge_snd : Exp.substMap vs'.snd (Exp.open' e' (.fvar f)) =
-      Exp.open' (Exp.substMap vs.snd e') fixv'.1 := by
-    show Exp.substMap ((f, fixv'.1) :: vs.snd) (Exp.open' e' (.fvar f)) = _
-    exact Exp.substMap_open_fresh hvssnd_closed hfFvE' hxDomSnd hfix_closed.2.1
+  obtain ⟨hbridge_fst, hbridge_snd⟩ := substMap_open_fresh_pair (vs' := vs') rfl
+    hvsfst_closed hvssnd_closed hfFvE hfFvE' hfNotDom hfix_closed.1 hfix_closed.2
   isimp only [hbridge_fst, hbridge_snd] at HbodyApplied
   ihave HArgs : iprop(refines ⊤ v1.1 v2.1 (interp τ1 Δ)) $$ [HA]
   · iapply refines_ret (hv1 := rfl) (hv2 := rfl)
     imodintro
     iexact HA
   isimp only [interp_arrow] at HbodyApplied
-  ihave Hgoal := refines_app $$ [HbodyApplied] HArgs
-  · iexact HbodyApplied
+  ihave Hgoal := refines_app $$ HbodyApplied HArgs
   simp only [Ectx.fill_nil]
   iexact Hgoal
 
@@ -377,50 +362,26 @@ section Discrete
 theorem bin_log_related_alloc (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' τ) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.alloc e) (.alloc e') (.ref τ) := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_alloc, Exp.substMap_alloc, interp_ref]
-  iapply refines_alloc $$ IH'
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.alloc e) (.alloc e') (.ref τ) :=
+  bin_log_related_lift1 Exp.substMap_alloc fun _ _ => refines_alloc
 
 theorem bin_log_related_load (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e e' : Exp rT} {τ : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' (.ref τ)) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.load e) (.load e') τ := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_load, Exp.substMap_load]
-  isimp only [interp_ref] at IH'
-  iapply refines_load $$ IH'
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.load e) (.load e') τ :=
+  bin_log_related_lift1 Exp.substMap_load fun _ _ => refines_load
 
 theorem bin_log_related_store (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e1 e2 e1' e2' : Exp rT} {τ : Ty} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' (.ref τ)) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' τ -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.store e1 e2) (.store e1' e2') .unit := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_store, Exp.substMap_store, interp_unit]
-  isimp only [interp_ref] at IH1'
-  iapply refines_store $$ IH1' IH2'
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.store e1 e2) (.store e1' e2') .unit :=
+  bin_log_related_lift2 Exp.substMap_store fun _ _ _ _ => refines_store
 
 theorem bin_log_related_alloctape (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp rT} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' .int) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.tape e) (.tape e') .tape := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_tape, Exp.substMap_tape, interp_tape]
-  isimp only [interp_int] at IH'
-  iapply refines_alloctape $$ IH'
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.tape e) (.tape e') .tape :=
+  bin_log_related_lift1 Exp.substMap_tape fun _ _ => refines_alloctape
 
 /-- `bin_log_related_rand_tape`: ports the labeled-rand compatibility from
 `fundamental.v:289`, but at `lrel_int` (not `lrel_nat` as in Rocq), to match
@@ -430,47 +391,32 @@ theorem bin_log_related_rand_tape (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e1 e1' e2 e2' : Exp rT} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' .int) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' .tape -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.rand e1 e2) (.rand e1' e2') .int := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_rand, Exp.substMap_rand, interp_int]
-  isimp only [interp_tape] at IH2'
-  iapply refines_rand_tape_int $$ IH1' IH2'
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.rand e1 e2) (.rand e1' e2') .int :=
+  bin_log_related_lift2 Exp.substMap_rand fun _ _ _ _ => refines_rand_tape_int
 
-/-- `bin_log_related_rand_unit`: ports unlabeled-rand compatibility, at
-`lrel_int`. Discharges via `refines_rand_unit_int`. -/
+/-- `bin_log_related_rand_unit`: ports unlabeled-rand compatibility, at `lrel_int`.
+The second argument is `()`, so binding it exposes the `randL` redex that
+`refines_rand_unit_int` consumes. -/
 theorem bin_log_related_rand_unit (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     {e1 e1' e2 e2' : Exp rT} :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' .int) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' .unit -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.rand e1 e2) (.rand e1' e2') .int := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_rand, Exp.substMap_rand]
-  rw [← Ectx.fill_randR (Exp.substMap vs.fst e1), ← Ectx.fill_randR (Exp.substMap vs.snd e1')]
-  isimp only [interp_unit] at IH2'
-  iapply (refines_bind [EctxItem.randR (Exp.substMap vs.fst e1)]
-    [EctxItem.randR (Exp.substMap vs.snd e1')] (A := lrel_unit)) $$ [IH2']
-  · iexact IH2'
-  iintro %v2 %v2' Hu
-  have hunit_unfold : (lrel_unit (GF := GF)).car v2 v2' =
-      iprop(⌜v2 = .unit ∧ v2' = .unit⌝) := rfl
-  ihave %Hu' : (⌜v2 = .unit ∧ v2' = .unit⌝ : IProp GF) $$ [Hu]
-  · rw [← hunit_unfold]; iexact Hu
-  obtain ⟨hv2, hv2'⟩ := Hu'
-  rw [hv2, hv2', interp_int]
-  have hbk1 : Ectx.fill [EctxItem.randR (Exp.substMap vs.fst e1)] pl(#(.unit)) =
-      Ectx.fill [EctxItem.randL .unit] (Exp.substMap vs.fst e1) := rfl
-  have hbk2 : Ectx.fill [EctxItem.randR (Exp.substMap vs.snd e1')] pl(#(.unit)) =
-      Ectx.fill [EctxItem.randL .unit] (Exp.substMap vs.snd e1') := rfl
-  rw [hbk1, hbk2]
-  iapply refines_rand_unit_int $$ IH1'
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.rand e1 e2) (.rand e1' e2') .int :=
+  bin_log_related_lift2 Exp.substMap_rand fun t1 t2 t1' _ => by
+    -- `iapply` matches syntactically, so expose `lrel_int`/`lrel_unit` first.
+    rw [interp_int, interp_unit]
+    iintro IH1 IH2
+    rw [← Ectx.fill_randR t1, ← Ectx.fill_randR t1']
+    iapply (refines_bind [EctxItem.randR t1] [EctxItem.randR t1'] (A := lrel_unit)) $$ [IH2]
+    · iexact IH2
+    iintro %v2 %v2' Hu
+    icases lrel_unit_unfold v2 v2' $$ Hu with ⟨%hv2, %hv2'⟩
+    rw [hv2, hv2',
+        show Ectx.fill [EctxItem.randR t1] pl(#(.unit)) =
+          Ectx.fill [EctxItem.randL .unit] t1 from rfl,
+        show Ectx.fill [EctxItem.randR t1'] pl(#(.unit)) =
+          Ectx.fill [EctxItem.randL .unit] t1' from rfl]
+    iapply refines_rand_unit_int $$ IH1
 
 /-! ### Polymorphic / recursive type compatibility -/
 
@@ -516,13 +462,6 @@ theorem refines_proper_entails (E : CoPset) (e e' : Exp rT) {A B : lrel rT GF}
     refines E e e' A ⊢@{IProp GF} refines E e e' B :=
   (Iris.BI.equiv_iff.mp (refines_proper h)).1
 
-/-- Wand form of `refines_proper_entails`, suitable for `iapply` inside
-the iris proofmode. -/
-theorem refines_proper_wand (E : CoPset) (e e' : Exp rT) {A B : lrel rT GF}
-    (h : A = B) :
-    refines E e e' A ⊢@{IProp GF} refines E e e' B :=
-  refines_proper_entails E e e' h
-
 omit [ProbLangℝ rT] in
 /-- lrel-level OFE-rewrite at a value pair: bridge `A v v'` and `B v v'`
 when `A = B`. Used for value-relation level rewrites under e.g.
@@ -537,7 +476,7 @@ iris-tactic unification doesn't reduce through `.car`/`lrel.mk`. -/
 theorem lrel_forall_unfold (C : lrel rT GF → lrel rT GF) (v v' : Val rT) :
     (lrel_forall C).car v v' ⊢@{IProp GF}
       ∀ (A : lrel rT GF), (lrel_arr lrel_unit (C A)).car v v' :=
-  BIBase.Entails.rfl
+  .rfl
 
 theorem bin_log_related_tlam (Δ : TyEnv rT GF)
     (Γ : RelCtx rT GF) {e e' : Exp rT} {τ : Ty}
@@ -602,13 +541,9 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   ihave HvArr := lrel_arr_unfold_wand lrel_unit
     (interp τ (TyEnv.cons (interp τ' Δ) Δ)) v v' $$ HvSpec
   ihave HvArr2 := HvArr $$ %(.unit : Val rT) %(.unit : Val rT)
-  have hUnit : ⊢@{IProp GF} (lrel_unit (rT := rT) (GF := GF)).car .unit .unit := by
-    show ⊢@{IProp GF} ⌜(.unit : Val rT) = .unit ∧ (.unit : Val rT) = .unit⌝
-    ipureintro
-    exact ⟨rfl, rfl⟩
   ihave HvApp : iprop(refines ⊤ (Exp.app v.1 pl(#(.unit))) (Exp.app v'.1 pl(#(.unit)))
       (interp τ (TyEnv.cons (interp τ' Δ) Δ))) $$ [HvArr2]
-  · ihave HUnit := hUnit
+  · ihave HUnit := lrel_unit_lit
     iapply HvArr2 $$ HUnit
   have hsub : interp τ (TyEnv.cons (interp τ' Δ) Δ) = interp (Ty.single τ τ') Δ :=
     (interp_subst τ' τ Δ).symm
@@ -618,6 +553,23 @@ theorem bin_log_related_tapp (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp 
   have hbridge2 : Ectx.fill [EctxItem.appL .unit] v'.1 = Exp.app v'.1 pl(#(.unit)) := rfl
   rw [hbridge1, hbridge2]
   iexact HvAppFinal
+
+/-- One-step unfolding of `interp (.rec' τ) Δ` at a value pair: `lrel_rec_unfold`
+at the non-expansive functor `X ↦ interp τ (X :: Δ)`. -/
+private theorem interp_rec_car (Δ : TyEnv rT GF) (τ : Ty) (v v' : Val rT) :
+    (interp (Ty.rec' τ) Δ).car v v' =
+      iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
+        ▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') :=
+  congrArg (fun A => A.car v v') (lrel_rec_unfold (GF := GF)
+    { f := fun X => interp τ (TyEnv.cons X Δ)
+      ne := ⟨fun {_ _ _} hXY => (interpNE τ).ne (TyEnv.cons_ne_head hXY)⟩ })
+
+/-- `interp (.exists' τ) Δ` at a value pair. -/
+private theorem interp_exists_car (Δ : TyEnv rT GF) (τ : Ty) (v v' : Val rT) :
+    (interp (Ty.exists' τ) Δ).car v v' =
+      iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
+        (∃ A : lrel rT GF, (interp τ (TyEnv.cons A Δ)).car v v')) :=
+  rfl
 
 theorem bin_log_related_fold (Δ : TyEnv rT GF)
     (Γ : RelCtx rT GF) {e e' : Exp rT} {τ : Ty} :
@@ -634,14 +586,7 @@ theorem bin_log_related_fold (Δ : TyEnv rT GF)
     (Exp.substMap vs.snd e') hsub $$ IH'
   iapply refines_wand $$ IH''
   iintro %v %v' #Hv !>
-  let CRec : lrel rT GF -n> lrel rT GF :=
-    { f := fun X => interp τ (TyEnv.cons X Δ)
-      ne := ⟨fun {_ _ _} hXY => (interpNE τ).ne (TyEnv.cons_ne_head hXY)⟩ }
-  have hunfold_eq : (interp (Ty.rec' τ) Δ).car v v' =
-      iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-        ▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') :=
-    congrArg (fun A => A.car v v') (lrel_rec_unfold (GF := GF) CRec)
-  rw [hunfold_eq]
+  rw [interp_rec_car Δ τ v v']
   isplitr
   · iapply (interp_closed τ v v')
     iexact Hv
@@ -674,14 +619,7 @@ theorem bin_log_related_unfold (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Ex
   iintro %v %v' Hv
   -- Hv : (interp (.rec' τ) Δ).car v v'.
   -- Unfold via lrel_rec_unfold: Hv = ⌜...⌝ ∗ ▷ (interp τ (cons (rec' τ) Δ) Δ).car v v'.
-  let CRec : lrel rT GF -n> lrel rT GF :=
-    { f := fun X => interp τ (TyEnv.cons X Δ)
-      ne := ⟨fun {_ _ _} hXY => (interpNE τ).ne (TyEnv.cons_ne_head hXY)⟩ }
-  have hunfold_eq : (interp (Ty.rec' τ) Δ).car v v' =
-      iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-        ▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') :=
-    congrArg (fun A => A.car v v') (lrel_rec_unfold (GF := GF) CRec)
-  isimp only [hunfold_eq] at Hv
+  isimp only [interp_rec_car Δ τ v v'] at Hv
   ihave HvL : iprop(▷ (interp τ (TyEnv.cons (interp (Ty.rec' τ) Δ) Δ)).car v v') $$ [Hv]
   · icases Hv with ⟨_, HvLater⟩
     iexact HvLater
@@ -740,10 +678,7 @@ theorem bin_log_related_pack (Δ : TyEnv rT GF)
     iexact Hv
   -- Goal: (interp (.exists' τ) Δ).car v v' =
   --       ⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝ ∗ ∃ A, (interp τ (cons A Δ)).car v v'.
-  have hex : (interp (Ty.exists' τ) Δ).car v v' =
-      iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-        (∃ A : lrel rT GF, (interp τ (TyEnv.cons A Δ)).car v v')) := rfl
-  rw [hex]
+  rw [interp_exists_car Δ τ v v']
   isplitr
   · ipureintro; exact Hclosed
   iexists (interp τ' Δ)
@@ -798,25 +733,14 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
   iintro %v %v' #Hv
   -- Hv : (interp (.exists' τ) Δ).car v v' = ⌜closed⌝ ∗ ∃ A, (interp τ (cons A Δ)).car v v'.
   -- Destructure.
-  have hex_unfold : (interp (Ty.exists' τ) Δ).car v v' =
-      iprop((⌜v.1.isClosedEmpty ∧ v'.1.isClosedEmpty⌝) ∗
-        (∃ A : lrel rT GF, (interp τ (TyEnv.cons A Δ)).car v v')) := rfl
-  isimp only [hex_unfold] at Hv
+  isimp only [interp_exists_car Δ τ v v'] at Hv
   icases Hv with ⟨%hvc, %A, #HvA⟩
   -- Now Hv (we destructured): %hvc : closed; %A : witness lrel; HvA : (interp τ (cons A Δ)).car v
   -- v'.
   -- Pick fresh atom x.
-  obtain ⟨x, hxFresh⟩ := HasFresh.fresh_exists
-    (L ∪ e2.fv ∪ e2'.fv ∪ (vs.map (·.1)).toFinset)
-  have hxL : x ∉ L :=
-    fun h => hxFresh (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_left _ h)))
-  have hxFvE2 : x ∉ e2.fv :=
-    fun h => hxFresh (Finset.mem_union_left _ (Finset.mem_union_left _ (Finset.mem_union_right _
-      h)))
-  have hxFvE2' : x ∉ e2'.fv :=
-    fun h => hxFresh (Finset.mem_union_left _ (Finset.mem_union_right _ h))
-  have hxNotDom : x ∉ (vs.map (·.1)).toFinset :=
-    fun h => hxFresh (Finset.mem_union_right _ h)
+  obtain ⟨x, hx⟩ := HasFresh.fresh_exists (L ∪ e2.fv ∪ e2'.fv ∪ (vs.map (·.1)).toFinset)
+  simp only [Finset.mem_union, not_or] at hx
+  obtain ⟨⟨⟨hxL, hxFvE2⟩, hxFvE2'⟩, hxNotDom⟩ := hx
   -- Beta-step the application: (.lam e2).app v reduces to open' e2 v.
   rw [Ectx.fill_appR,
       Ectx.eq_fill_nil (Exp.app (Exp.lam (Exp.substMap vs.fst e2)) v.1),
@@ -834,12 +758,9 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
   -- e2') v'.1)) (interp τ2 Δ).
   -- Use HIH2 at A and x. vs' := (x, (v, v')) :: vs.
   let vs' : ValSubstMap rT := (x, (v, v')) :: vs
-  have hv_c : v.1.isClosed .empty :=
-    ⟨hvc.1.1, by rw [hvc.1.2]; exact Finset.empty_subset _⟩
-  have hv'_c : v'.1.isClosed .empty :=
-    ⟨hvc.2.1, by rw [hvc.2.2]; exact Finset.empty_subset _⟩
   ihave Hvs' : iprop(env_ltyped2 ((x, interp τ (TyEnv.cons A Δ)) :: Γ) vs') $$ [HvA]
-  · iapply (env_ltyped2_insert Γ vs x (interp τ (TyEnv.cons A Δ)) v v' hv_c hv'_c)
+  · iapply (env_ltyped2_insert Γ vs x (interp τ (TyEnv.cons A Δ)) v v'
+      hvc.1.toFvSubsetEmpty hvc.2.toFvSubsetEmpty)
     iframe HvA
     iexact Hvs
   -- Apply HIH2 at A and x.
@@ -852,318 +773,138 @@ theorem bin_log_related_unpack (Δ : TyEnv rT GF)
     (Exp.substMap vs'.fst (Exp.open' e2 (.fvar x)))
     (Exp.substMap vs'.snd (Exp.open' e2' (.fvar x))) hshift $$ HBody_shift
   -- Bridge via substMap_open_fresh.
-  have hxDomFst : SubstMap.lookup vs.fst x = none :=
-    ValSubstMap.fst_lookup_eq_none_of_not_mem hxNotDom
-  have hxDomSnd : SubstMap.lookup vs.snd x = none :=
-    ValSubstMap.snd_lookup_eq_none_of_not_mem hxNotDom
-  have hbridge_fst : Exp.substMap vs'.fst (Exp.open' e2 (.fvar x)) =
-      Exp.open' (Exp.substMap vs.fst e2) v.1 := by
-    show Exp.substMap ((x, v.1) :: vs.fst) (Exp.open' e2 (.fvar x)) = _
-    exact Exp.substMap_open_fresh hvsfst_closed hxFvE2 hxDomFst hvc.1.1
-  have hbridge_snd : Exp.substMap vs'.snd (Exp.open' e2' (.fvar x)) =
-      Exp.open' (Exp.substMap vs.snd e2') v'.1 := by
-    show Exp.substMap ((x, v'.1) :: vs.snd) (Exp.open' e2' (.fvar x)) = _
-    exact Exp.substMap_open_fresh hvssnd_closed hxFvE2' hxDomSnd hvc.2.1
+  obtain ⟨hbridge_fst, hbridge_snd⟩ := substMap_open_fresh_pair (vs' := vs') rfl
+    hvsfst_closed hvssnd_closed hxFvE2 hxFvE2' hxNotDom hvc.1 hvc.2
   isimp only [hbridge_fst, hbridge_snd] at HBody
   -- Bridge ectx fill to bare expr.
   simp only [Ectx.fill_nil]
   iexact HBody
 
-/-! ### Operator / scrut compatibility -/
+/-! ### Operator / scrut compatibility
 
+`lrel_int`, `lrel_bool` and `lrel_real` all relate a value to itself exactly when
+both sides are the *same* literal, so all six operator lemmas share one envelope:
+bind the operands, read off the common literal, then take a pure step. The envelope
+is `refines_{un,bin}op_bind`, parameterised by the literal family `V`; the step is
+`refines_{un,bin}op_val`. -/
+
+/-- One pure step of a `binop` on two values whose result is the literal `l`. -/
+private theorem refines_binop_val (op : BinOp) (w1 w2 : Val rT) {l : BaseLit rT}
+    {A : lrel rT GF} (heval : op.eval w1.1 w2.1 = some (.lit l))
+    (HA : ⊢@{IProp GF} A.car (.ofBaseLit l) (.ofBaseLit l)) :
+    ⊢@{IProp GF} refines ⊤ (.binop op w1.1 w2.1) (.binop op w1.1 w2.1) A :=
+  refines_binop_pure op _ _ _ w1.2 w2.2 IsVal.lit heval HA
+
+/-- One pure step of a `unop` on a value whose result is the literal `l`. -/
+private theorem refines_unop_val (op : UnOp) (w : Val rT) {l : BaseLit rT}
+    {A : lrel rT GF} (heval : op.eval w.1 = some (.lit l))
+    (HA : ⊢@{IProp GF} A.car (.ofBaseLit l) (.ofBaseLit l)) :
+    ⊢@{IProp GF} refines ⊤ (.unop op w.1) (.unop op w.1) A :=
+  refines_unop_pure op _ _ w.2 IsVal.lit heval HA
+
+/-- Bind both operands of a `binop` at a relation `A` that forces the two sides to
+be the *same* value `V i`; the continuation then works on literals only. -/
+private theorem refines_binop_bind (op : BinOp) {ι : Type _} (V : ι → Val rT)
+    {A B : lrel rT GF} {e1 e2 e1' e2' : Exp rT}
+    (hA : ∀ v v' : Val rT, A.car v v' ⊢@{IProp GF} ∃ i : ι, ⌜v = V i ∧ v' = V i⌝) :
+    iprop(refines ⊤ e1 e1' A) ⊢@{IProp GF}
+      refines ⊤ e2 e2' A -∗
+        (∀ (i1 i2 : ι), refines ⊤ (.binop op (V i1).1 (V i2).1)
+          (.binop op (V i1).1 (V i2).1) B) -∗
+          refines ⊤ (.binop op e1 e2) (.binop op e1' e2') B := by
+  iintro IH1 IH2 Hcont
+  -- Bind e2/e2' first, then e1/e1'.
+  rw [show Exp.binop op e1 e2 = Ectx.fill [EctxItem.binopR op e1] e2 from rfl,
+      show Exp.binop op e1' e2' = Ectx.fill [EctxItem.binopR op e1'] e2' from rfl]
+  iapply (refines_bind [EctxItem.binopR op e1] [EctxItem.binopR op e1'] (A := A)) $$ [IH2]
+  · iexact IH2
+  iintro %v2 %v2' Hv2
+  icases hA v2 v2' $$ Hv2 with ⟨%i2, %hv2, %hv2'⟩
+  rw [show Ectx.fill [EctxItem.binopR op e1] v2.1 = Exp.binop op e1 v2.1 from rfl,
+      show Ectx.fill [EctxItem.binopR op e1'] v2'.1 = Exp.binop op e1' v2'.1 from rfl,
+      hv2, hv2',
+      show Exp.binop op e1 (V i2).1 = Ectx.fill [EctxItem.binopL op (V i2)] e1 from rfl,
+      show Exp.binop op e1' (V i2).1 = Ectx.fill [EctxItem.binopL op (V i2)] e1' from rfl]
+  iapply (refines_bind [EctxItem.binopL op (V i2)] [EctxItem.binopL op (V i2)]
+    (A := A)) $$ [IH1]
+  · iexact IH1
+  iintro %v1 %v1' Hv1
+  icases hA v1 v1' $$ Hv1 with ⟨%i1, %hv1, %hv1'⟩
+  rw [show Ectx.fill [EctxItem.binopL op (V i2)] v1.1 = Exp.binop op v1.1 (V i2).1 from rfl,
+      show Ectx.fill [EctxItem.binopL op (V i2)] v1'.1 = Exp.binop op v1'.1 (V i2).1 from rfl,
+      hv1, hv1']
+  ihave Hgoal := Hcont $$ %i1 %i2
+  iexact Hgoal
+
+/-- Unary counterpart of `refines_binop_bind`. -/
+private theorem refines_unop_bind (op : UnOp) {ι : Type _} (V : ι → Val rT)
+    {A B : lrel rT GF} {e e' : Exp rT}
+    (hA : ∀ v v' : Val rT, A.car v v' ⊢@{IProp GF} ∃ i : ι, ⌜v = V i ∧ v' = V i⌝) :
+    iprop(refines ⊤ e e' A) ⊢@{IProp GF}
+      (∀ i : ι, refines ⊤ (.unop op (V i).1) (.unop op (V i).1) B) -∗
+        refines ⊤ (.unop op e) (.unop op e') B := by
+  iintro IH Hcont
+  rw [show Exp.unop op e = Ectx.fill [EctxItem.unop op] e from rfl,
+      show Exp.unop op e' = Ectx.fill [EctxItem.unop op] e' from rfl]
+  iapply (refines_bind [EctxItem.unop op] [EctxItem.unop op] (A := A)) $$ [IH]
+  · iexact IH
+  iintro %v %v' Hv
+  icases hA v v' $$ Hv with ⟨%i, %hv, %hv'⟩
+  rw [show Ectx.fill [EctxItem.unop op] v.1 = Exp.unop op v.1 from rfl,
+      show Ectx.fill [EctxItem.unop op] v'.1 = Exp.unop op v'.1 from rfl,
+      hv, hv']
+  ihave Hgoal := Hcont $$ %i
+  iexact Hgoal
+
+/-- Int-typed binops: `plus`…`mod`, `shl`, `shr` land in `lrel_int`; `eq`, `lt`, `le`
+land in `lrel_bool`; `and`/`or`/`xor` are not int ops, so `Hres` is contradictory. -/
 theorem bin_log_related_int_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (op : BinOp) {e1 e2 e1' e2' : Exp rT} {τ : Ty}
     (Hres : op.intResTy = some τ) :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' .int) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' .int -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.binop op e1 e2) (.binop op e1' e2') τ := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_binop, Exp.substMap_binop]
-  isimp only [interp_int] at IH1'
-  isimp only [interp_int] at IH2'
-  -- Bind e2/e2' first, then e1/e1', getting both int values n1, n2.
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
-        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
-        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') from rfl]
-  iapply (refines_bind [EctxItem.binopR op (Exp.substMap vs.fst e1)]
-    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_int)) $$ [IH2']
-  · iexact IH2'
-  iintro %v2 %v2' Hint2
-  icases lrel_int_unfold v2 v2' $$ Hint2 with ⟨%n2, %hv2, %hv2'⟩
-  rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
-        Exp.binop op (Exp.substMap vs.fst e1) v2.1 from rfl,
-      show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] v2'.1 =
-        Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
-      hv2, hv2']
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.int n2)) =
-        Ectx.fill [EctxItem.binopL op (.int n2)] (Exp.substMap vs.fst e1) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.int n2)) =
-        Ectx.fill [EctxItem.binopL op (.int n2)] (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op (.int n2)] [EctxItem.binopL op (.int n2)]
-    (A := lrel_int)) $$ [IH1']
-  · iexact IH1'
-  iintro %v1 %v1' Hint1
-  icases lrel_int_unfold v1 v1' $$ Hint1 with ⟨%n1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op (.int n2)] v1.1 =
-        Exp.binop op v1.1 pl(#(.int n2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op (.int n2)] v1'.1 =
-        Exp.binop op v1'.1 pl(#(.int n2)) from rfl,
-      hv1, hv1']
-  -- Goal: refines ⊤ (.binop op #n1 #n2) (.binop op #n1 #n2) (interp τ Δ).
-  -- Per-op bridge: int-result ops (plus, minus, mult, div, mod) → lrel_int;
-  -- bool-result ops (eq, lt, le) → lrel_bool. div/mod additionally need
-  -- 0-divisor case-split.
-  cases op
-  case plus =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
-    iapply (refines_binop_pure .plus _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_int))
-    unfold lrel_int
-    iexists (n1 + n2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case minus =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
-    iapply (refines_binop_pure .minus _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_int))
-    unfold lrel_int
-    iexists (n1 - n2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case mult =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
-    iapply (refines_binop_pure .mult _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_int))
-    unfold lrel_int
-    iexists (n1 * n2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case div =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
-    iapply (refines_binop_pure .div _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_int))
-    unfold lrel_int
-    iexists (n1 / n2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case mod =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
-    iapply (refines_binop_pure .mod _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_int))
-    unfold lrel_int
-    iexists (n1 % n2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case and => simp [BinOp.intResTy] at Hres
-  case or  => simp [BinOp.intResTy] at Hres
-  case xor => simp [BinOp.intResTy] at Hres
-  case eq =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .eq _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (decide ((BaseLit.int n1) = .int n2))
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case lt =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .lt _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (decide (n1 < n2))
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case le =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .le _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (decide (n1 ≤ n2))
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case shl =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
-    iapply (refines_binop_pure .shl _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_int))
-    unfold lrel_int
-    iexists (n1 * 2 ^ n2.toNat)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case shr =>
-    simp [BinOp.intResTy] at Hres; subst Hres; rw [interp_int]
-    iapply (refines_binop_pure .shr _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_int))
-    unfold lrel_int
-    iexists (n1 / 2 ^ n2.toNat)
-    ipureintro
-    exact ⟨rfl, rfl⟩
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.binop op e1 e2) (.binop op e1' e2') τ :=
+  bin_log_related_lift2 (fun σ => Exp.substMap_binop σ op) fun _ _ _ _ => by
+    rw [interp_int]
+    iintro IH1 IH2
+    iapply (refines_binop_bind op Val.int lrel_int_unfold) $$ IH1 IH2
+    iintro %n1 %n2
+    cases op <;> simp [BinOp.intResTy] at Hres <;> subst Hres
+    all_goals first
+      | (rw [interp_int]; iapply (refines_binop_val _ _ _ rfl (lrel_int_lit _)))
+      | (rw [interp_bool]; iapply (refines_binop_val _ _ _ rfl (lrel_bool_lit _)))
 
+/-- Bool-typed binops: `and`, `or`, `xor`, `eq` land in `lrel_bool`; the rest are not
+bool ops, so `Hres` is contradictory. -/
 theorem bin_log_related_bool_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (op : BinOp) {e1 e2 e1' e2' : Exp rT} {τ : Ty}
     (Hres : op.boolResTy = some τ) :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' .bool) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' .bool -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.binop op e1 e2) (.binop op e1' e2') τ := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_binop, Exp.substMap_binop]
-  isimp only [interp_bool] at IH1'
-  isimp only [interp_bool] at IH2'
-  -- Bind e2/e2' first, then e1/e1'.
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
-        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
-        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') from rfl]
-  iapply (refines_bind [EctxItem.binopR op (Exp.substMap vs.fst e1)]
-    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_bool)) $$ [IH2']
-  · iexact IH2'
-  iintro %v2 %v2' Hbool2
-  icases lrel_bool_unfold v2 v2' $$ Hbool2 with ⟨%b2, %hv2, %hv2'⟩
-  rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
-        Exp.binop op (Exp.substMap vs.fst e1) v2.1 from rfl,
-      show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] v2'.1 =
-        Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
-      hv2, hv2']
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.bool b2)) =
-        Ectx.fill [EctxItem.binopL op (.bool b2)] (Exp.substMap vs.fst e1) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.bool b2)) =
-        Ectx.fill [EctxItem.binopL op (.bool b2)] (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op (.bool b2)] [EctxItem.binopL op (.bool b2)]
-    (A := lrel_bool)) $$ [IH1']
-  · iexact IH1'
-  iintro %v1 %v1' Hbool1
-  icases lrel_bool_unfold v1 v1' $$ Hbool1 with ⟨%b1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op (.bool b2)] v1.1 =
-        Exp.binop op v1.1 pl(#(.bool b2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op (.bool b2)] v1'.1 =
-        Exp.binop op v1'.1 pl(#(.bool b2)) from rfl,
-      hv1, hv1']
-  -- Bool-binops: and, or, xor, eq → all return bool. plus/minus/etc → none.
-  cases op
-  case plus  => simp [BinOp.boolResTy] at Hres
-  case minus => simp [BinOp.boolResTy] at Hres
-  case mult  => simp [BinOp.boolResTy] at Hres
-  case div   => simp [BinOp.boolResTy] at Hres
-  case mod   => simp [BinOp.boolResTy] at Hres
-  case lt => simp [BinOp.boolResTy] at Hres
-  case le => simp [BinOp.boolResTy] at Hres
-  case shl => simp [BinOp.boolResTy] at Hres
-  case shr => simp [BinOp.boolResTy] at Hres
-  case and =>
-    simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .and _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (b1 && b2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case or =>
-    simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .or _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (b1 || b2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case xor =>
-    simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .xor _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (b1 ^^ b2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case eq =>
-    simp [BinOp.boolResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .eq _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (decide ((BaseLit.bool b1) = .bool b2))
-    ipureintro
-    exact ⟨rfl, rfl⟩
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.binop op e1 e2) (.binop op e1' e2') τ :=
+  bin_log_related_lift2 (fun σ => Exp.substMap_binop σ op) fun _ _ _ _ => by
+    rw [interp_bool]
+    iintro IH1 IH2
+    iapply (refines_binop_bind op Val.bool lrel_bool_unfold) $$ IH1 IH2
+    iintro %b1 %b2
+    cases op <;> simp [BinOp.boolResTy] at Hres <;> subst Hres
+    all_goals (rw [interp_bool]; iapply (refines_binop_val _ _ _ rfl (lrel_bool_lit _)))
 
+/-- Int-typed unops: `minus` lands in `lrel_int`, `toReal` in `lrel_real`. -/
 theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (op : UnOp) {e e' : Exp rT} {τ : Ty}
     (Hres : op.intResTy = some τ) :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' .int) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.unop op e) (.unop op e') τ := by
-  -- Only `op = .minus` is consistent with `op.intResTy = some τ`, with τ = .int.
-  cases op with
-  | neg => simp [UnOp.intResTy] at Hres
-  | frac => simp [UnOp.intResTy] at Hres
-  | toReal =>
-    simp [UnOp.intResTy] at Hres; subst Hres
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.unop op e) (.unop op e') τ :=
+  bin_log_related_lift1 (fun σ => Exp.substMap_unop σ op) fun _ _ => by
+    rw [interp_int]
     iintro IH
-    unfold bin_log_related_ty bin_log_related
-    iintro %vs #Hvs
-    ihave IH' := IH $$ %vs Hvs
-    rw [Exp.substMap_unop, Exp.substMap_unop, interp_real]
-    isimp only [interp_int (GF := GF) Δ] at IH'
-    rw [show Exp.unop UnOp.toReal (Exp.substMap vs.fst e) =
-          Ectx.fill [EctxItem.unop UnOp.toReal] (Exp.substMap vs.fst e) from rfl,
-        show Exp.unop UnOp.toReal (Exp.substMap vs.snd e') =
-          Ectx.fill [EctxItem.unop UnOp.toReal] (Exp.substMap vs.snd e') from rfl]
-    iapply (refines_bind [EctxItem.unop UnOp.toReal] [EctxItem.unop UnOp.toReal]
-      (A := lrel_int)) $$ [IH']
-    · iexact IH'
-    iintro %v %v' Hint
-    icases lrel_int_unfold v v' $$ Hint with ⟨%n, %hv, %hv'⟩
-    rw [show Ectx.fill [EctxItem.unop UnOp.toReal] v.1 = Exp.unop UnOp.toReal v.1 from rfl,
-        show Ectx.fill [EctxItem.unop UnOp.toReal] v'.1 = Exp.unop UnOp.toReal v'.1 from rfl,
-        hv, hv']
-    iapply (refines_unop_pure .toReal _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
-    unfold lrel_real
-    iexists (ProbLangℝ.realOfInt n)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  | minus =>
-    simp [UnOp.intResTy] at Hres; subst Hres
-    iintro IH
-    unfold bin_log_related_ty bin_log_related
-    iintro %vs #Hvs
-    ihave IH' := IH $$ %vs Hvs
-    rw [Exp.substMap_unop, Exp.substMap_unop, interp_int]
-    -- Bind e/e' to extract the int value n.
-    rw [show Exp.unop UnOp.minus (Exp.substMap vs.fst e) =
-          Ectx.fill [EctxItem.unop UnOp.minus] (Exp.substMap vs.fst e) from rfl,
-        show Exp.unop UnOp.minus (Exp.substMap vs.snd e') =
-          Ectx.fill [EctxItem.unop UnOp.minus] (Exp.substMap vs.snd e') from rfl]
-    iapply (refines_bind [EctxItem.unop UnOp.minus] [EctxItem.unop UnOp.minus]
-      (A := lrel_int)) $$ [IH']
-    · iexact IH'
-    iintro %v %v' Hint
-    icases lrel_int_unfold v v' $$ Hint with ⟨%n, %hv, %hv'⟩
-    rw [show Ectx.fill [EctxItem.unop UnOp.minus] v.1 = Exp.unop UnOp.minus v.1 from rfl,
-        show Ectx.fill [EctxItem.unop UnOp.minus] v'.1 = Exp.unop UnOp.minus v'.1 from rfl,
-        hv, hv']
-    -- Goal: refines ⊤ (.unop minus #n) (.unop minus #n) lrel_int.
-    have heval : UnOp.eval .minus (pl(#(.int n)) : Exp rT) = some pl(#(.int n.neg)) := rfl
-    have hφ : (pl(#(.int n)) : Exp rT).isValue ∧ UnOp.eval .minus (pl(#(.int n)) : Exp
-      rT) = some _ :=
-      ⟨IsVal.lit.toIsValue, heval⟩
-    have hf1 : (Exp.unop .minus pl(#(.int n)) : Exp rT) =
-        Ectx.fill [] (Exp.unop .minus pl(#(.int n))) := rfl
-    rw [hf1]
-    iapply (refines_pure_l (K := []) (Hex := pureExec_unop) hφ)
-    inext
-    iapply (refines_pure_r (K := []) (Hex := pureExec_unop) hφ)
-    iapply refines_ret (e1 := Ectx.fill [] pl(#(.int n.neg)))
-      (e2 := Ectx.fill [] pl(#(.int n.neg)))
-      (v1 := .int n.neg) (v2 := .int n.neg)
-      (hv1 := rfl) (hv2 := rfl)
-    imodintro
-    unfold lrel_int
-    iexists n.neg
-    ipureintro
-    exact ⟨rfl, rfl⟩
+    iapply (refines_unop_bind op Val.int lrel_int_unfold) $$ IH
+    iintro %n
+    cases op <;> simp [UnOp.intResTy] at Hres <;> subst Hres
+    all_goals first
+      | (rw [interp_int]; iapply (refines_unop_val _ _ rfl (lrel_int_lit _)))
+      | (rw [interp_real]; iapply (refines_unop_val _ _ rfl (lrel_real_lit _)))
 
 /-! ### The real fragment
 
@@ -1171,130 +912,36 @@ theorem bin_log_related_int_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
 the two sides of a real operation always step to a common result and
 `refines_{unop,binop}_pure` applies directly. -/
 
+/-- Real-typed unops: `minus`, `toReal` and `frac` all land in `lrel_real`. -/
 theorem bin_log_related_real_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (op : UnOp) {e e' : Exp rT} {τ : Ty}
     (Hres : op.realResTy = some τ) :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' .real) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.unop op e) (.unop op e') τ := by
-  iintro IH
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH' := IH $$ %vs Hvs
-  rw [Exp.substMap_unop, Exp.substMap_unop]
-  isimp only [interp_real Δ] at IH'
-  rw [show Exp.unop op (Exp.substMap vs.fst e) =
-        Ectx.fill [EctxItem.unop op] (Exp.substMap vs.fst e) from rfl,
-      show Exp.unop op (Exp.substMap vs.snd e') =
-        Ectx.fill [EctxItem.unop op] (Exp.substMap vs.snd e') from rfl]
-  iapply (refines_bind [EctxItem.unop op] [EctxItem.unop op]) $$ IH'
-  iintro %v %v' Hreal
-  unfold lrel_real
-  icases Hreal with ⟨%r, %hv, %hv'⟩
-  rw [show Ectx.fill [EctxItem.unop op] v.1 = Exp.unop op v.1 from rfl,
-      show Ectx.fill [EctxItem.unop op] v'.1 = Exp.unop op v'.1 from rfl,
-      hv, hv']
-  cases op with
-  | neg => simp [UnOp.realResTy] at Hres
-  | minus =>
-    simp [UnOp.realResTy] at Hres; subst Hres; rw [interp_real]
-    iapply (refines_unop_pure .minus _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
-    unfold lrel_real
-    iexists (ProbLangℝ.realNeg r)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  | toReal =>
-    simp [UnOp.realResTy] at Hres; subst Hres; rw [interp_real]
-    iapply (refines_unop_pure .toReal _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
-    unfold lrel_real
-    iexists r
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  | frac =>
-    simp [UnOp.realResTy] at Hres; subst Hres; rw [interp_real]
-    iapply (refines_unop_pure .frac _ _ IsVal.lit IsVal.lit (heval := rfl) (A := lrel_real))
-    unfold lrel_real
-    iexists (ProbLangℝ.realFrac r)
-    ipureintro
-    exact ⟨rfl, rfl⟩
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.unop op e) (.unop op e') τ :=
+  bin_log_related_lift1 (fun σ => Exp.substMap_unop σ op) fun _ _ => by
+    rw [interp_real]
+    iintro IH
+    iapply (refines_unop_bind op Val.real lrel_real_unfold) $$ IH
+    iintro %r
+    cases op <;> simp [UnOp.realResTy] at Hres <;> subst Hres
+    all_goals (rw [interp_real]; iapply (refines_unop_val _ _ rfl (lrel_real_lit _)))
 
+/-- Real-typed binops: `plus` lands in `lrel_real`, the comparisons in `lrel_bool`. -/
 theorem bin_log_related_real_binop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (op : BinOp) {e1 e2 e1' e2' : Exp rT} {τ : Ty}
     (Hres : op.realResTy = some τ) :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e1 e1' .real) ⊢@{IProp GF}
       bin_log_related_ty (⊤ : CoPset) Δ Γ e2 e2' .real -∗
-        bin_log_related_ty (⊤ : CoPset) Δ Γ (.binop op e1 e2) (.binop op e1' e2') τ := by
-  iintro IH1 IH2
-  unfold bin_log_related_ty bin_log_related
-  iintro %vs #Hvs
-  ihave IH1' := IH1 $$ %vs Hvs
-  ihave IH2' := IH2 $$ %vs Hvs
-  rw [Exp.substMap_binop, Exp.substMap_binop]
-  isimp only [interp_real] at IH1'
-  isimp only [interp_real] at IH2'
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) (Exp.substMap vs.fst e2) =
-        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] (Exp.substMap vs.fst e2) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') (Exp.substMap vs.snd e2') =
-        Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] (Exp.substMap vs.snd e2') from rfl]
-  iapply (refines_bind [EctxItem.binopR op (Exp.substMap vs.fst e1)]
-    [EctxItem.binopR op (Exp.substMap vs.snd e1')] (A := lrel_real)) $$ [IH2']
-  · iexact IH2'
-  iintro %v2 %v2' Hreal2
-  iunfold lrel_real at Hreal2
-  icases Hreal2 with ⟨%r2, %hv2, %hv2'⟩
-  rw [show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.fst e1)] v2.1 =
-        Exp.binop op (Exp.substMap vs.fst e1) v2.1 from rfl,
-      show Ectx.fill [EctxItem.binopR op (Exp.substMap vs.snd e1')] v2'.1 =
-        Exp.binop op (Exp.substMap vs.snd e1') v2'.1 from rfl,
-      hv2, hv2']
-  rw [show Exp.binop op (Exp.substMap vs.fst e1) pl(#(.real r2)) =
-        Ectx.fill [EctxItem.binopL op (.real r2)] (Exp.substMap vs.fst e1) from rfl,
-      show Exp.binop op (Exp.substMap vs.snd e1') pl(#(.real r2)) =
-        Ectx.fill [EctxItem.binopL op (.real r2)] (Exp.substMap vs.snd e1') from rfl]
-  iapply (refines_bind [EctxItem.binopL op (.real r2)] [EctxItem.binopL op (.real r2)]
-    (A := lrel_real)) $$ [IH1']
-  · iexact IH1'
-  iintro %v1 %v1' Hreal1
-  iunfold lrel_real at Hreal1
-  icases Hreal1 with ⟨%r1, %hv1, %hv1'⟩
-  rw [show Ectx.fill [EctxItem.binopL op (.real r2)] v1.1 =
-        Exp.binop op v1.1 pl(#(.real r2)) from rfl,
-      show Ectx.fill [EctxItem.binopL op (.real r2)] v1'.1 =
-        Exp.binop op v1'.1 pl(#(.real r2)) from rfl,
-      hv1, hv1']
-  cases op
-  case plus =>
-    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_real]
-    iapply (refines_binop_pure .plus _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_real))
-    unfold lrel_real
-    iexists (ProbLangℝ.realAdd r1 r2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case eq =>
-    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .eq _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (decide ((BaseLit.real r1 : BaseLit rT) = .real r2))
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case lt =>
-    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .lt _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (ProbLangℝ.realLt r1 r2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  case le =>
-    simp [BinOp.realResTy] at Hres; subst Hres; rw [interp_bool]
-    iapply (refines_binop_pure .le _ _ _ IsVal.lit IsVal.lit IsVal.lit
-      (heval := rfl) (A := lrel_bool))
-    unfold lrel_bool
-    iexists (ProbLangℝ.realLe r1 r2)
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  all_goals simp [BinOp.realResTy] at Hres
+        bin_log_related_ty (⊤ : CoPset) Δ Γ (.binop op e1 e2) (.binop op e1' e2') τ :=
+  bin_log_related_lift2 (fun σ => Exp.substMap_binop σ op) fun _ _ _ _ => by
+    rw [interp_real]
+    iintro IH1 IH2
+    iapply (refines_binop_bind op Val.real lrel_real_unfold) $$ IH1 IH2
+    iintro %r1 %r2
+    cases op <;> simp [BinOp.realResTy] at Hres <;> subst Hres
+    all_goals first
+      | (rw [interp_real]; iapply (refines_binop_val _ _ _ rfl (lrel_real_lit _)))
+      | (rw [interp_bool]; iapply (refines_binop_val _ _ _ rfl (lrel_bool_lit _)))
 
 /-- **The continuous sampler is self-related at `real`.** Couple the two `urand`
 draws along the identity — which is trivially measure-preserving — and return the
@@ -1312,59 +959,23 @@ theorem bin_log_related_urand (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) :
   iapply (refines_ret (e1 := Ectx.fill [] pl(#(.real r))) (e2 := Ectx.fill [] pl(#(.real r)))
     (v1 := Val.real r) (v2 := Val.real r) (hv1 := rfl) (hv2 := rfl))
   imodintro
-  unfold lrel_real
-  iexists r
-  ipureintro
-  exact ⟨rfl, rfl⟩
+  iapply (lrel_real_lit r)
 
+/-- Bool-typed unops: only `neg` is a bool op, and it lands in `lrel_bool`. -/
 theorem bin_log_related_bool_unop (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (op : UnOp) {e e' : Exp rT} {τ : Ty}
     (Hres : op.boolResTy = some τ) :
     iprop(bin_log_related_ty (⊤ : CoPset) Δ Γ e e' .bool) ⊢@{IProp GF}
-      bin_log_related_ty (⊤ : CoPset) Δ Γ (.unop op e) (.unop op e') τ := by
-  -- Only `op = .neg` is consistent with `op.boolResTy = some τ`, with τ = .bool.
-  cases op with
-  | minus => simp [UnOp.boolResTy] at Hres
-  | toReal => simp [UnOp.boolResTy] at Hres
-  | frac => simp [UnOp.boolResTy] at Hres
-  | neg =>
-    simp [UnOp.boolResTy] at Hres; subst Hres
+      bin_log_related_ty (⊤ : CoPset) Δ Γ (.unop op e) (.unop op e') τ :=
+  bin_log_related_lift1 (fun σ => Exp.substMap_unop σ op) fun _ _ => by
+    rw [interp_bool]
     iintro IH
-    unfold bin_log_related_ty bin_log_related
-    iintro %vs #Hvs
-    ihave IH' := IH $$ %vs Hvs
-    rw [Exp.substMap_unop, Exp.substMap_unop, interp_bool]
-    rw [show Exp.unop UnOp.neg (Exp.substMap vs.fst e) =
-          Ectx.fill [EctxItem.unop UnOp.neg] (Exp.substMap vs.fst e) from rfl,
-        show Exp.unop UnOp.neg (Exp.substMap vs.snd e') =
-          Ectx.fill [EctxItem.unop UnOp.neg] (Exp.substMap vs.snd e') from rfl]
-    iapply (refines_bind [EctxItem.unop UnOp.neg] [EctxItem.unop UnOp.neg]
-      (A := lrel_bool)) $$ [IH']
-    · iexact IH'
-    iintro %v %v' Hbool
-    icases lrel_bool_unfold v v' $$ Hbool with ⟨%b, %hv, %hv'⟩
-    rw [show Ectx.fill [EctxItem.unop UnOp.neg] v.1 = Exp.unop UnOp.neg v.1 from rfl,
-        show Ectx.fill [EctxItem.unop UnOp.neg] v'.1 = Exp.unop UnOp.neg v'.1 from rfl,
-        hv, hv']
-    have heval : UnOp.eval .neg (pl(#(.bool b)) : Exp rT) = some (pl(#(.bool (¬b)))) := rfl
-    have hφ : (pl(#(.bool b)) : Exp rT).isValue ∧ UnOp.eval .neg (pl(#(.bool b)) : Exp
-      rT) = some _ :=
-      ⟨IsVal.lit.toIsValue, heval⟩
-    have hf1 : (Exp.unop .neg pl(#(.bool b)) : Exp rT) =
-        Ectx.fill [] (Exp.unop .neg pl(#(.bool b))) := rfl
-    rw [hf1]
-    iapply (refines_pure_l (K := []) (Hex := pureExec_unop) hφ)
-    inext
-    iapply (refines_pure_r (K := []) (Hex := pureExec_unop) hφ)
-    iapply refines_ret (e1 := Ectx.fill [] (pl(#(.bool (¬b)))))
-      (e2 := Ectx.fill [] (pl(#(.bool (¬b)))))
-      (v1 := .bool (¬b)) (v2 := .bool (¬b))
-      (hv1 := rfl) (hv2 := rfl)
-    imodintro
-    unfold lrel_bool
-    iexists (¬b)
-    ipureintro
-    exact ⟨rfl, rfl⟩
+    iapply (refines_unop_bind op Val.bool lrel_bool_unfold) $$ IH
+    iintro %b
+    cases op <;> simp [UnOp.boolResTy] at Hres
+    subst Hres
+    rw [interp_bool]
+    iapply (refines_unop_val _ _ rfl (lrel_bool_lit _))
 
 /-- **Statement:** `eq` of two `UnboxedType`-related arguments is related at `bool`.
 Mirrors Rocq's `bin_log_related_unboxed_eq` (fundamental.v ~167). -/
@@ -1412,34 +1023,23 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
   -- Now extract pure Heq via imod (refines absorbs fupd via ElimModal).
   imod Heq with %heqIff
   -- Compute hdec at Lean level before re-entering iris-heavy section.
+  -- Two values holding literals are equal exactly when the literals are.
+  have hval : ∀ {w w' : Val rT} {m m' : BaseLit rT}, w.1 = .lit m → w'.1 = .lit m' →
+      (w = w' ↔ m = m') := by
+    refine fun hw hw' => ⟨fun h => ?_, fun h => Val.ext (by rw [hw, hw', h])⟩
+    have hp := congrArg Val.fst h
+    rw [hw, hw'] at hp
+    exact Exp.lit.inj hp
   have hdec : decide (l1 = l2) = decide (l1' = l2') :=
-    have h1 : v1 = v2 ↔ (l1 : BaseLit rT) = l2 := by
-      refine ⟨fun h => ?_, fun h => Val.ext (by rw [hv1eq, hv2eq, h])⟩
-      have hp : v1.1 = v2.1 := congrArg Val.fst h
-      rw [hv1eq, hv2eq] at hp
-      exact Exp.lit.inj hp
-    have h2 : v1' = v2' ↔ (l1' : BaseLit rT) = l2' := by
-      refine ⟨fun h => ?_, fun h => Val.ext (by rw [hv1'eq, hv2'eq, h])⟩
-      have hp : v1'.1 = v2'.1 := congrArg Val.fst h
-      rw [hv1'eq, hv2'eq] at hp
-      exact Exp.lit.inj hp
-    have hdecIff : (l1 = l2) ↔ (l1' = l2') := h1.symm.trans (heqIff.trans h2)
-    by
-      by_cases hLR : l1 = l2
-      · rw [decide_eq_true hLR, decide_eq_true (hdecIff.mp hLR)]
-      · rw [decide_eq_false hLR, decide_eq_false (fun h => hLR (hdecIff.mpr h))]
+    decide_eq_decide.mpr ((hval hv1eq hv2eq).symm.trans (heqIff.trans (hval hv1'eq hv2'eq)))
   -- Goal: refines ⊤ (.binop .eq #l1 #l2) (.binop .eq #l1' #l2') lrel_bool.
-  -- β-step both sides via pureExec_binop_discrete with heval = .lit (.bool (decide (l1 = l2))) etc.
-  have heval_l : BinOp.eval .eq (.lit l1) (.lit l2) =
-      some (pl(#(.bool (decide (l1 = l2))))) := rfl
-  have heval_r : BinOp.eval .eq (.lit l1') (.lit l2') =
-      some (pl(#(.bool (decide (l1' = l2'))))) := rfl
+  -- β-step both sides via pureExec_binop_discrete.
   have hφ_l : (Exp.lit l1).isValue ∧ (Exp.lit l2).isValue ∧
-      BinOp.eval .eq (.lit l1) (.lit l2) = some _ :=
-    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, heval_l⟩
+      BinOp.eval .eq (.lit l1) (.lit l2) = some pl(#(.bool (decide (l1 = l2)))) :=
+    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
   have hφ_r : (Exp.lit l1').isValue ∧ (Exp.lit l2').isValue ∧
-      BinOp.eval .eq (.lit l1') (.lit l2') = some _ :=
-    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, heval_r⟩
+      BinOp.eval .eq (.lit l1') (.lit l2') = some pl(#(.bool (decide (l1' = l2')))) :=
+    ⟨IsVal.lit.toIsValue, IsVal.lit.toIsValue, rfl⟩
   rw [Ectx.eq_fill_nil (Exp.binop .eq (.lit l1) (.lit l2)),
       Ectx.eq_fill_nil (Exp.binop .eq (.lit l1') (.lit l2'))]
   iapply (refines_pure_l hφ_l)
@@ -1452,12 +1052,28 @@ theorem bin_log_related_unboxed_eq (Δ : TyEnv rT GF) (Γ : RelCtx rT GF)
     (v2 := .bool (decide (l1' = l2')))
     (hv1 := rfl) (hv2 := rfl)
   imodintro
-  rw [interp_bool]
-  unfold lrel_bool
-  iexists (decide (l1 = l2))
-  rw [hdec]
-  ipureintro
-  exact ⟨rfl, rfl⟩
+  rw [interp_bool, hdec]
+  iapply (lrel_bool_lit _)
+
+/-- The three literal-pattern cases of `pat_match_related`: both sides carry the same
+literal `l'`, so `Pat.lit l` takes the same branch on both, and the bindings are `()`. -/
+private theorem pat_match_lit {Δ : TyEnv rT GF} {l l' : BaseLit rT} {v v' : Val rT}
+    (hv : v = .ofBaseLit l') (hv' : v' = .ofBaseLit l')
+    (hll : l = l' ∨ ¬ (l == l') = true) :
+    ⊢@{IProp GF} (∃ (b b' : Val rT), ⌜Pat.tryMatch (.lit l) v.1 = some b.1 ∧
+        Pat.tryMatch (.lit l) v'.1 = some b'.1⌝ ∗ (interp Ty.unit Δ).car b b') ∨
+      ⌜Pat.tryMatch (.lit l) v.1 = none ∧ Pat.tryMatch (.lit l) v'.1 = none⌝ := by
+  subst hv hv'
+  rcases hll with rfl | hne
+  · ileft
+    iexists (.unit : Val _), (.unit : Val _)
+    isplitr
+    · ipureintro; exact ⟨Pat.tryMatch_lit_eq l, Pat.tryMatch_lit_eq l⟩
+    rw [interp_unit]
+    iapply lrel_unit_lit
+  · iright
+    ipureintro
+    exact ⟨Pat.tryMatch_lit_ne hne, Pat.tryMatch_lit_ne hne⟩
 
 /-- **Pattern-match agreement**: if `v ~ v'` at `interp τs Δ` and `PatTyped τs p τb`,
 then `tryMatch p v.1` and `tryMatch p v'.1` produce related outcomes — either
@@ -1482,82 +1098,30 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       simp [Pat.tryMatch]
     iexact Hvv
   | @lit_int z =>
-    -- v ~ v' at lrel_int means v.1 = v' = .int n for same n.
+    -- v ~ v' at lrel_int means v = v' = .int n for the same n.
     rw [interp_int]
     iintro Hv
     ihave ⟨%n, %h⟩ := lrel_int_unfold v v' $$ Hv
-    by_cases hzn : z = n
-    · -- Match succeeds: tryMatch pl(#(.int z)) pl(#(.int n)) = some pl(#(.unit)) when z = n.
-      ileft
-      iexists (.unit : Val _), (.unit : Val _)
-      isplitr
-      · ipureintro
-        subst hzn
-        refine ⟨?_, ?_⟩
-        · rw [h.1]; exact Pat.tryMatch_lit_eq (.int z)
-        · rw [h.2]; exact Pat.tryMatch_lit_eq (.int z)
-      -- (interp .unit Δ).car ⟨pl(#(.unit)), _⟩ ⟨pl(#(.unit)), _⟩ via lrel_unit.
-      rw [interp_unit]
-      unfold lrel_unit
-      ipureintro
-      exact ⟨rfl, rfl⟩
-    · -- Match fails: z ≠ n so the BaseLit beq is false.
-      iright
-      ipureintro
-      have hbeq : ¬ ((BaseLit.int z : BaseLit rT) == BaseLit.int n) = true := by
-        show ¬ (Int.decEq z n).decide = true
-        intro hd
-        exact hzn (of_decide_eq_true hd)
-      refine ⟨?_, ?_⟩
-      · rw [h.1]; exact Pat.tryMatch_lit_ne hbeq
-      · rw [h.2]; exact Pat.tryMatch_lit_ne hbeq
+    have hll : (BaseLit.int z : BaseLit rT) = .int n ∨
+        ¬ ((BaseLit.int z : BaseLit rT) == .int n) = true :=
+      if hzn : z = n then .inl (by rw [hzn]) else
+        .inr (show ¬ (Int.decEq z n).decide = true from fun hd => hzn (of_decide_eq_true hd))
+    iapply (pat_match_lit h.1 h.2 hll)
   | @lit_bool b =>
     rw [interp_bool]
     iintro Hv
     ihave ⟨%b', %h⟩ := lrel_bool_unfold v v' $$ Hv
-    by_cases hbb : b = b'
-    · ileft
-      iexists (.unit : Val _), (.unit : Val _)
-      isplitr
-      · ipureintro
-        subst hbb
-        refine ⟨?_, ?_⟩
-        · rw [h.1]; exact Pat.tryMatch_lit_eq (.bool b)
-        · rw [h.2]; exact Pat.tryMatch_lit_eq (.bool b)
-      rw [interp_unit]
-      unfold lrel_unit
-      ipureintro
-      exact ⟨rfl, rfl⟩
-    · iright
-      ipureintro
-      have hbeq : ¬ ((BaseLit.bool b : BaseLit rT) == BaseLit.bool b') = true := by
-        show ¬ (Bool.decEq b b').decide = true
-        intro hd; exact hbb (of_decide_eq_true hd)
-      refine ⟨?_, ?_⟩
-      · rw [h.1]; exact Pat.tryMatch_lit_ne hbeq
-      · rw [h.2]; exact Pat.tryMatch_lit_ne hbeq
+    have hll : (BaseLit.bool b : BaseLit rT) = .bool b' ∨
+        ¬ ((BaseLit.bool b : BaseLit rT) == .bool b') = true :=
+      if hbb : b = b' then .inl (by rw [hbb]) else
+        .inr (show ¬ (Bool.decEq b b').decide = true from fun hd => hbb (of_decide_eq_true hd))
+    iapply (pat_match_lit h.1 h.2 hll)
   | lit_unit =>
-    rw [interp_unit]
     show iprop(⌜v = .unit ∧ v' = .unit⌝) ⊢ _
     iintro %h
-    ileft
-    iexists (.unit : Val _), (.unit : Val _)
-    isplitr
-    · ipureintro
-      refine ⟨?_, ?_⟩
-      · rw [h.1]; exact Pat.tryMatch_lit_eq .unit
-      · rw [h.2]; exact Pat.tryMatch_lit_eq .unit
-    -- Goal: `_ ⊢ lrel_unit.car .unit .unit`, def-eq to `iprop(⌜...⌝)`.
-    have hrfl : (lrel_unit (GF := GF)).car .unit .unit
-        = iprop(⌜(.unit : Val rT) = .unit ∧ (.unit : Val rT) = .unit⌝) := rfl
-    rw [hrfl]
-    iintro
-    ipureintro
-    exact ⟨rfl, rfl⟩
+    iapply (pat_match_lit (l := .unit) h.1 h.2 (.inl rfl))
   | @pair τ1 τ2 p1 p2 b1 b2 Hpat1 Hpat2 ih1 ih2 =>
-    have hprod : (interp (Ty.prod τ1 τ2) Δ : lrel rT GF) =
-        lrel_prod (interp τ1 Δ) (interp τ2 Δ) := rfl
-    rw [hprod]
+    rw [interp_prod]
     iintro Hv
     ihave ⟨%a1, %a2, %c1, %c2, %hv1, %hv2, HA, HC⟩ :=
       lrel_prod_unfold (interp τ1 Δ) (interp τ2 Δ) v v' $$ Hv
@@ -1575,9 +1139,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
         · ipureintro
           simp [Pat.tryMatch, hv1, hv2, hra.1, hra.2, hrb.1, hrb.2]
         -- Need (interp (.prod b1 b2) Δ).car ⟨.pair ba bb, _⟩ ⟨.pair ba' bb', _⟩.
-        have hprodb : (interp (Ty.prod b1 b2) Δ : lrel rT GF) =
-            lrel_prod (interp b1 Δ) (interp b2 Δ) := rfl
-        rw [hprodb]
+        rw [interp_prod]
         unfold lrel_prod
         iexists ba, ba', bb, bb'
         isplitr; · ipureintro; rfl
@@ -1593,9 +1155,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       ipureintro
       simp [Pat.tryMatch, hv1, hv2, hna.1, hna.2]
   | @inl τ1 τ2 p b Hpat' ih =>
-    have hsum : (interp (Ty.sum τ1 τ2) Δ : lrel rT GF) =
-        lrel_sum (interp τ1 Δ) (interp τ2 Δ) := rfl
-    rw [hsum]
+    rw [interp_sum]
     iintro Hv
     ihave ⟨%w1, %w2, Hcase⟩ := lrel_sum_unfold (interp τ1 Δ) (interp τ2 Δ) v v' $$ Hv
     icases Hcase with (⟨%hv1, %hv2, HA⟩ | ⟨%hv1, %hv2, HB⟩)
@@ -1615,9 +1175,7 @@ theorem pat_match_related {Δ : TyEnv rT GF} {τs τb : Ty} {p : Pat rT}
       ipureintro
       simp [Pat.tryMatch, hv1, hv2]
   | @inr τ1 τ2 p b Hpat' ih =>
-    have hsum : (interp (Ty.sum τ1 τ2) Δ : lrel rT GF) =
-        lrel_sum (interp τ1 Δ) (interp τ2 Δ) := rfl
-    rw [hsum]
+    rw [interp_sum]
     iintro Hv
     ihave ⟨%w1, %w2, Hcase⟩ := lrel_sum_unfold (interp τ1 Δ) (interp τ2 Δ) v v' $$ Hv
     icases Hcase with (⟨%hv1, %hv2, HA⟩ | ⟨%hv1, %hv2, HB⟩)
@@ -1654,11 +1212,10 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
   -- Goal: refines ⊤ (.scrut v.1 p) (.scrut v'.1 p) (interp (.sum τb .unit) Δ).
   -- Case-split on pat_match_related.
   ihave Hmatch := pat_match_related Hpat v v' $$ Hv
-  rw [show Ectx.fill [EctxItem.scrut p] v.1 = .scrut v.1 p from rfl,
-      show Ectx.fill [EctxItem.scrut p] v'.1 = .scrut v'.1 p from rfl]
+  rw [show Ectx.fill [EctxItem.scrut p] v.1 = Ectx.fill ([] : Ectx rT) (.scrut v.1 p) from rfl,
+      show Ectx.fill [EctxItem.scrut p] v'.1 = Ectx.fill ([] : Ectx rT) (.scrut v'.1 p) from rfl]
   icases Hmatch with (⟨%bb, %bb', %hr, Hbnd⟩ | %hn)
   · -- Both match: step to .inl bb / .inl bb'.
-    rw [Ectx.eq_fill_nil (Exp.scrut v.1 p), Ectx.eq_fill_nil (Exp.scrut v'.1 p)]
     iapply (refines_pure_l (Hex := pureExec_scrut_some) ⟨v.2.toIsValue, hr.1⟩)
     inext
     iapply (refines_pure_r (Hex := pureExec_scrut_some) ⟨v'.2.toIsValue, hr.2⟩)
@@ -1669,9 +1226,7 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
       (v2 := ⟨.inl bb'.1, IsVal.inl bb'.2, (IsVal.inl bb'.2).lc⟩)
       (hv1 := rfl) (hv2 := rfl)
     imodintro
-    have hsum : (interp (Ty.sum τb .unit) Δ : lrel rT GF) =
-        lrel_sum (interp τb Δ) lrel_unit := rfl
-    rw [hsum]
+    rw [interp_sum, interp_unit]
     unfold lrel_sum
     iexists bb, bb'
     ileft
@@ -1679,7 +1234,6 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
     isplitr; · ipureintro; rfl
     iexact Hbnd
   · -- Both fail: step to .inr ()
-    rw [Ectx.eq_fill_nil (Exp.scrut v.1 p), Ectx.eq_fill_nil (Exp.scrut v'.1 p)]
     iapply (refines_pure_l (Hex := pureExec_scrut_none) ⟨v.2.toIsValue, hn.1⟩)
     inext
     iapply (refines_pure_r (Hex := pureExec_scrut_none) ⟨v'.2.toIsValue, hn.2⟩)
@@ -1690,17 +1244,13 @@ theorem bin_log_related_scrut (Δ : TyEnv rT GF) (Γ : RelCtx rT GF) {e e' : Exp
       (v2 := ⟨.inr pl(#(.unit)), IsVal.inr IsVal.lit, (IsVal.inr IsVal.lit).lc⟩)
       (hv1 := rfl) (hv2 := rfl)
     imodintro
-    have hsum : (interp (Ty.sum τb .unit) Δ : lrel rT GF) =
-        lrel_sum (interp τb Δ) lrel_unit := rfl
-    rw [hsum]
+    rw [interp_sum, interp_unit]
     unfold lrel_sum
     iexists (.unit : Val _), (.unit : Val _)
     iright
     isplitr; · ipureintro; rfl
     isplitr; · ipureintro; rfl
-    unfold lrel_unit
-    ipureintro
-    exact ⟨rfl, rfl⟩
+    iapply lrel_unit_lit
 
 /-! ## The fundamental theorem
 
@@ -1802,6 +1352,40 @@ theorem fv_subset_relCtxDom {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT G
   simp only [List.mem_toFinset, List.mem_map]
   exact ⟨p, hpmem, hpeq⟩
 
+omit [ProbLangℝ rT] in
+/-- Helper: an atom outside `Γ`'s domain is not bound by `Γ`. -/
+private theorem RelCtx.lookup_eq_none {Γ : RelCtx rT GF} {x : Var}
+    (h : x ∉ (Γ.map (·.1)).toFinset) : Γ.lookup x = none := by
+  cases hRc : Γ.lookup x with
+  | none => rfl
+  | some _ =>
+    obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome (by rw [hRc]; rfl)
+    exact absurd (List.mem_toFinset.mpr (List.mem_map.mpr ⟨p, hpmem, hpeq⟩)) h
+
+/-- Helper: a cofinite typing derivation for a binder's body pins the body's free
+variables inside `Γrc`. Probe the derivation at one atom fresh for `L`, `Γrc` and the
+variable at hand; that atom is the only one the extended context could have added. -/
+private theorem fv_subset_of_cofinite {Δ : TyEnv rT GF} {Γtc : Tctx} {Γrc : RelCtx rT GF}
+    (HCtx : TctxRelated Δ Γtc Γrc) {L : Finset Var} {e : Exp rT} {τ1 τ2 : Ty}
+    (Hbody : ∀ x ∉ L, Typed (Γtc.insert x τ1) (Exp.open' e (.fvar x)) τ2) :
+    e.fv ⊆ (Γrc.map (·.1)).toFinset := by
+  intro z hz
+  obtain ⟨y, hy⟩ := HasFresh.fresh_exists (L ∪ (Γrc.map (·.1)).toFinset ∪ {z})
+  have hyL : y ∉ L := fun h =>
+    hy (Finset.mem_union_left _ (Finset.mem_union_left _ h))
+  have hyRc : y ∉ (Γrc.map (·.1)).toFinset := fun h =>
+    hy (Finset.mem_union_left _ (Finset.mem_union_right _ h))
+  have hzy : z ≠ y := fun h =>
+    hy (Finset.mem_union_right _ (Finset.mem_singleton.mpr h.symm))
+  have hzdom := fv_subset_relCtxDom (HCtx.insert y τ1 (RelCtx.lookup_eq_none hyRc))
+    (Hbody y hyL) (Exp.fv_subset_open e y hz)
+  simp only [List.mem_toFinset, List.mem_map] at hzdom ⊢
+  obtain ⟨p, hpmem, hpeq⟩ := hzdom
+  rcases List.mem_cons.mp hpmem with rfl | hmem
+  · -- p = (y, _), so hpeq : y = z contradicts hzy.
+    exact (hzy hpeq.symm).elim
+  · exact ⟨p, hmem, hpeq⟩
+
 /-- **Fundamental theorem of the logical relation.** Induction on `Typed`,
 dispatching each case to its `bin_log_related_*` lemma. The binder cases
 (`lam`, `fix`, `tunpack`) recurse on the body's typing under an extended
@@ -1814,313 +1398,83 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
     (HCtx : TctxRelated Δ Γtc Γrc) :
     ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ Γrc e e τ := by
   induction Hty generalizing Δ Γrc with
-  | @fvar _ x τ hx =>
-    exact bin_log_related_var Δ Γrc x τ (HCtx.lookup_some hx)
-  | @lit_int _ n =>
-    unfold bin_log_related_ty bin_log_related
-    iintro %vs _
-    rw [Exp.substMap_lit, Exp.substMap_lit]
-    set v : Val rT := .int n
-    have hv : (pl(#(.int n)) : Exp rT) = v.1 := rfl
-    rw [hv]
-    iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
-    imodintro
-    rw [interp_int]
-    unfold lrel_int
-    iexists n
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  | @lit_real _ r =>
-    unfold bin_log_related_ty bin_log_related
-    iintro %vs _
-    rw [Exp.substMap_lit, Exp.substMap_lit,
-        show (pl(#(.real r)) : Exp rT) = (Val.real r).1 from rfl]
-    iapply (refines_ret (hv1 := rfl) (hv2 := rfl))
-    imodintro
-    rw [interp_real]
-    unfold lrel_real
-    iexists r
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  | «urand» =>
-    exact bin_log_related_urand Δ Γrc
-  | unop_real Hty Hres ih =>
-    rename_i op _ τ
-    have IH := ih Δ Γrc HCtx
+  | @fvar _ x τ hx => exact bin_log_related_var Δ Γrc x τ (HCtx.lookup_some hx)
+  | @lit_int _ n => exact bin_log_related_lit Γrc _ (lrel_int_lit n)
+  | @lit_real _ r => exact bin_log_related_lit Γrc _ (lrel_real_lit r)
+  | @lit_bool _ b => exact bin_log_related_lit Γrc _ (lrel_bool_lit b)
+  | lit_unit => exact bin_log_related_lit Γrc _ lrel_unit_lit
+  | «urand» => exact bin_log_related_urand Δ Γrc
+  | unop_real _ Hres ih =>
+    iintro; iapply (bin_log_related_real_unop Δ Γrc _ Hres) $$ %(ih Δ Γrc HCtx)
+  | unop_int _ Hres ih =>
+    iintro; iapply (bin_log_related_int_unop Δ Γrc _ Hres) $$ %(ih Δ Γrc HCtx)
+  | unop_bool _ Hres ih =>
+    iintro; iapply (bin_log_related_bool_unop Δ Γrc _ Hres) $$ %(ih Δ Γrc HCtx)
+  | binop_real _ _ Hres ih1 ih2 =>
     iintro
-    iapply (bin_log_related_real_unop Δ Γrc op Hres) $$ %IH
-  | binop_real Hty1 Hty2 Hres ih1 ih2 =>
-    rename_i op _ _ τ
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
+    iapply (bin_log_related_real_binop Δ Γrc _ Hres) $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
+  | binop_int _ _ Hres ih1 ih2 =>
     iintro
-    iapply (bin_log_related_real_binop Δ Γrc op Hres) $$ %IH1 %IH2
-  | @lit_bool _ b =>
-    unfold bin_log_related_ty bin_log_related
-    iintro %vs _
-    rw [Exp.substMap_lit, Exp.substMap_lit]
-    set v : Val rT := .bool b
-    have hv : (pl(#(.bool b)) : Exp rT) = v.1 := rfl
-    rw [hv]
-    iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
-    imodintro
-    rw [interp_bool]
-    unfold lrel_bool
-    iexists b
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  | lit_unit =>
-    unfold bin_log_related_ty bin_log_related
-    iintro %vs _
-    rw [Exp.substMap_lit, Exp.substMap_lit]
-    set v : Val rT := .unit
-    have hv : (pl(#(.unit)) : Exp rT) = v.1 := rfl
-    rw [hv]
-    iapply (refines_ret (v1 := v) (v2 := v) (hv1 := rfl) (hv2 := rfl))
-    imodintro
-    rw [interp_unit]
-    unfold lrel_unit
-    ipureintro
-    exact ⟨rfl, rfl⟩
-  | binop_int Hty1 Hty2 Hres ih1 ih2 =>
-    rename_i op _ _ τ
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
+    iapply (bin_log_related_int_binop Δ Γrc _ Hres) $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
+  | binop_bool _ _ Hres ih1 ih2 =>
     iintro
-    iapply (bin_log_related_int_binop Δ Γrc op Hres) $$ %IH1 %IH2
-  | binop_bool Hty1 Hty2 Hres ih1 ih2 =>
-    rename_i op _ _ τ
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_bool_binop Δ Γrc op Hres) $$ %IH1 %IH2
-  | unop_int Hty Hres ih =>
-    rename_i op _ τ
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_int_unop Δ Γrc op Hres) $$ %IH
-  | unop_bool Hty Hres ih =>
-    rename_i op _ τ
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_bool_unop Δ Γrc op Hres) $$ %IH
+    iapply (bin_log_related_bool_binop Δ Γrc _ Hres) $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
   | unboxed_eq HUnboxed _ _ ih1 ih2 =>
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
     iintro
-    iapply (bin_log_related_unboxed_eq Δ Γrc HUnboxed) $$ %IH1 %IH2
+    iapply (bin_log_related_unboxed_eq Δ Γrc HUnboxed) $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
   | pair _ _ ih1 ih2 =>
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
-    iintro
-    iapply bin_log_related_pair $$ %IH1 %IH2
-  | fst _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_fst Δ Γrc) $$ %IH
-  | snd _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_snd Δ Γrc) $$ %IH
-  | inl _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_injl Δ Γrc) $$ %IH
-  | inr _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_injr Δ Γrc) $$ %IH
+    iintro; iapply bin_log_related_pair $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
+  | fst _ ih => iintro; iapply (bin_log_related_fst Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  | snd _ ih => iintro; iapply (bin_log_related_snd Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  | inl _ ih => iintro; iapply (bin_log_related_injl Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  | inr _ ih => iintro; iapply (bin_log_related_injr Δ Γrc) $$ %(ih Δ Γrc HCtx)
   | «case» _ _ _ ih0 ih1 ih2 =>
-    have IH0 := ih0 Δ Γrc HCtx
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
     iintro
-    iapply bin_log_related_case $$ %IH0 %IH1 %IH2
+    iapply bin_log_related_case $$ %(ih0 Δ Γrc HCtx) %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
   | cond _ _ _ ih0 ih1 ih2 =>
-    have IH0 := ih0 Δ Γrc HCtx
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
     iintro
-    iapply bin_log_related_if $$ %IH0 %IH1 %IH2
+    iapply bin_log_related_if $$ %(ih0 Δ Γrc HCtx) %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
   | app _ _ ih1 ih2 =>
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
-    iintro
-    iapply bin_log_related_app $$ %IH1 %IH2
-  | alloc _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_alloc Δ Γrc) $$ %IH
-  | load _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_load Δ Γrc) $$ %IH
+    iintro; iapply bin_log_related_app $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
+  | alloc _ ih => iintro; iapply (bin_log_related_alloc Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  | load _ ih => iintro; iapply (bin_log_related_load Δ Γrc) $$ %(ih Δ Γrc HCtx)
   | store _ _ ih1 ih2 =>
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
-    iintro
-    iapply bin_log_related_store $$ %IH1 %IH2
-  | alloc_tape _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply bin_log_related_alloctape $$ %IH
+    iintro; iapply bin_log_related_store $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
+  | alloc_tape _ ih => iintro; iapply bin_log_related_alloctape $$ %(ih Δ Γrc HCtx)
   | rand _ _ ih1 ih2 =>
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
-    iintro
-    iapply bin_log_related_rand_tape $$ %IH1 %IH2
+    iintro; iapply bin_log_related_rand_tape $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
   | rand_unit _ _ ih1 ih2 =>
-    have IH1 := ih1 Δ Γrc HCtx
-    have IH2 := ih2 Δ Γrc HCtx
-    iintro
-    iapply bin_log_related_rand_unit $$ %IH1 %IH2
+    iintro; iapply bin_log_related_rand_unit $$ %(ih1 Δ Γrc HCtx) %(ih2 Δ Γrc HCtx)
   | «scrut» _ Hpat ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_scrut Δ Γrc Hpat) $$ %IH
-  | tfold _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_fold Δ Γrc) $$ %IH
-  | tunfold _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_unfold Δ Γrc) $$ %IH
-  | tapp _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_tapp Δ Γrc) $$ %IH
-  | tpack _ ih =>
-    have IH := ih Δ Γrc HCtx
-    iintro
-    iapply (bin_log_related_pack Δ Γrc) $$ %IH
-  -- Recursive binder cases (lam, fix).
+    iintro; iapply (bin_log_related_scrut Δ Γrc Hpat) $$ %(ih Δ Γrc HCtx)
+  | tfold _ ih => iintro; iapply (bin_log_related_fold Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  | tunfold _ ih => iintro; iapply (bin_log_related_unfold Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  | tapp _ ih => iintro; iapply (bin_log_related_tapp Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  | tpack _ ih => iintro; iapply (bin_log_related_pack Δ Γrc) $$ %(ih Δ Γrc HCtx)
+  -- Recursive binder cases (lam, fix): instantiate the cofinite quantifier at atoms
+  -- fresh for `L`, `dom Γrc` and `e.fv`, so both freshness side conditions hold at once.
   | @lam L Γtc' e τ1 τ2 Hbody ih =>
-    -- Pick fresh atoms not in L ∪ dom(Γrc) ∪ e.fv to satisfy bin_log_related_lam.
     let L' : Finset Var := L ∪ (Γrc.map (·.1)).toFinset ∪ e.fv
-    have hHbodyTyped : ∀ x ∉ L',
-        Typed (Γtc'.insert x τ1) (Exp.open' e (.fvar x)) τ2 := by
-      intro x hx
-      have hxL : x ∉ L := fun h =>
-        hx (Finset.mem_union_left _ (Finset.mem_union_left _ h))
-      exact Hbody x hxL
-    -- Derive e.fv ⊆ Γrc.dom by picking a fresh atom y.
-    have he_fv : e.fv ⊆ (Γrc.map (·.1)).toFinset := by
-      intro z hz
-      obtain ⟨y, hy⟩ := Cslib.HasFresh.fresh_exists (L ∪ (Γrc.map (·.1)).toFinset ∪ {z})
-      have hyL : y ∉ L := fun h =>
-        hy (Finset.mem_union_left _ (Finset.mem_union_left _ h))
-      have hyRc : y ∉ (Γrc.map (·.1)).toFinset := fun h =>
-        hy (Finset.mem_union_left _ (Finset.mem_union_right _ h))
-      have hzy : z ≠ y := fun h =>
-        hy (Finset.mem_union_right _ (Finset.mem_singleton.mpr h.symm))
-      have hyRcLookup : Γrc.lookup y = none := by
-        cases hRc : Γrc.lookup y with
-        | none => rfl
-        | some A =>
-          exfalso
-          have hsome : (Γrc.lookup y).isSome := by rw [hRc]; rfl
-          obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome hsome
-          apply hyRc
-          simp only [List.mem_toFinset, List.mem_map]
-          exact ⟨p, hpmem, hpeq⟩
-      have HCtxY := HCtx.insert y τ1 hyRcLookup
-      have hzopen : z ∈ (Exp.open' e (.fvar y)).fv := Exp.fv_subset_open e y hz
-      have hzdom := fv_subset_relCtxDom HCtxY (Hbody y hyL) hzopen
-      simp only [List.mem_toFinset, List.mem_map] at hzdom
-      simp only [List.mem_toFinset, List.mem_map]
-      obtain ⟨p, hpmem, hpeq⟩ := hzdom
-      rcases List.mem_cons.mp hpmem with rfl | hmem
-      · -- p = (y, _), so p.1 = y, but hpeq : p.1 = z, so y = z, contradicts hzy
-        exact (hzy hpeq.symm).elim
-      · exact ⟨p, hmem, hpeq⟩
-    -- Each Hbody x is locally closed.
-    have he_lc : ∀ x ∉ L', (Exp.open' e (.fvar x)).IsLocallyClosed := by
-      intro x hx
-      exact (hHbodyTyped x hx).isLocallyClosed
-    apply bin_log_related_lam Δ Γrc L'
-      he_lc he_lc he_fv he_fv
-    intro x hx
-    have hxL : x ∉ L := fun h =>
+    have hxL : ∀ x ∉ L', x ∉ L := fun _ hx h =>
       hx (Finset.mem_union_left _ (Finset.mem_union_left _ h))
-    have hxRc : Γrc.lookup x = none := by
-      -- x ∉ Γrc.map (·.1).toFinset implies x not a key in Γrc.
-      have hxNotDom : x ∉ (Γrc.map (·.1)).toFinset := fun h =>
-        hx (Finset.mem_union_left _ (Finset.mem_union_right _ h))
-      cases hRc : Γrc.lookup x with
-      | none => rfl
-      | some A =>
-        exfalso
-        have hsome : (Γrc.lookup x).isSome := by rw [hRc]; rfl
-        obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome hsome
-        apply hxNotDom
-        simp only [List.mem_toFinset, List.mem_map]
-        exact ⟨p, hpmem, hpeq⟩
-    have HCtx' : TctxRelated Δ (Γtc'.insert x τ1) ((x, interp τ1 Δ) :: Γrc) :=
-      HCtx.insert x τ1 hxRc
-    exact ih x hxL Δ ((x, interp τ1 Δ) :: Γrc) HCtx'
+    have hxRc : ∀ x ∉ L', Γrc.lookup x = none := fun _ hx =>
+      RelCtx.lookup_eq_none fun h => hx (Finset.mem_union_left _ (Finset.mem_union_right _ h))
+    have he_fv := fv_subset_of_cofinite HCtx Hbody
+    have he_lc : ∀ x ∉ L', (Exp.open' e (.fvar x)).IsLocallyClosed := fun x hx =>
+      (Hbody x (hxL x hx)).isLocallyClosed
+    apply bin_log_related_lam Δ Γrc L' he_lc he_lc he_fv he_fv
+    exact fun x hx => ih x (hxL x hx) Δ _ (HCtx.insert x τ1 (hxRc x hx))
   | @«fix» L Γtc' e τ1 τ2 Hbody ih =>
     let L' : Finset Var := L ∪ (Γrc.map (·.1)).toFinset ∪ e.fv
-    have hHbodyTyped : ∀ x ∉ L',
-        Typed (Γtc'.insert x (.arrow τ1 τ2)) (Exp.open' e (.fvar x)) (.arrow τ1 τ2) := by
-      intro x hx
-      have hxL : x ∉ L := fun h =>
-        hx (Finset.mem_union_left _ (Finset.mem_union_left _ h))
-      exact Hbody x hxL
-    -- Derive e.fv ⊆ Γrc.dom by picking a fresh atom y.
-    have he_fv : e.fv ⊆ (Γrc.map (·.1)).toFinset := by
-      intro z hz
-      obtain ⟨y, hy⟩ := Cslib.HasFresh.fresh_exists (L ∪ (Γrc.map (·.1)).toFinset ∪ {z})
-      have hyL : y ∉ L := fun h =>
-        hy (Finset.mem_union_left _ (Finset.mem_union_left _ h))
-      have hyRc : y ∉ (Γrc.map (·.1)).toFinset := fun h =>
-        hy (Finset.mem_union_left _ (Finset.mem_union_right _ h))
-      have hzy : z ≠ y := fun h =>
-        hy (Finset.mem_union_right _ (Finset.mem_singleton.mpr h.symm))
-      have hyRcLookup : Γrc.lookup y = none := by
-        cases hRc : Γrc.lookup y with
-        | none => rfl
-        | some A =>
-          exfalso
-          have hsome : (Γrc.lookup y).isSome := by rw [hRc]; rfl
-          obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome hsome
-          apply hyRc
-          simp only [List.mem_toFinset, List.mem_map]
-          exact ⟨p, hpmem, hpeq⟩
-      have HCtxY := HCtx.insert y (.arrow τ1 τ2) hyRcLookup
-      have hzopen : z ∈ (Exp.open' e (.fvar y)).fv := Exp.fv_subset_open e y hz
-      have hzdom := fv_subset_relCtxDom HCtxY (Hbody y hyL) hzopen
-      simp only [List.mem_toFinset, List.mem_map] at hzdom
-      simp only [List.mem_toFinset, List.mem_map]
-      obtain ⟨p, hpmem, hpeq⟩ := hzdom
-      rcases List.mem_cons.mp hpmem with rfl | hmem
-      · -- p = (y, _), so p.1 = y, but hpeq : p.1 = z, so y = z, contradicts hzy
-        exact (hzy hpeq.symm).elim
-      · exact ⟨p, hmem, hpeq⟩
-    have he_lc : ∀ x ∉ L', (Exp.open' e (.fvar x)).IsLocallyClosed := by
-      intro x hx
-      exact (hHbodyTyped x hx).isLocallyClosed
-    apply bin_log_related_fix Δ Γrc L'
-      he_lc he_lc he_fv he_fv
-    intro x hx
-    have hxL : x ∉ L := fun h =>
+    have hxL : ∀ x ∉ L', x ∉ L := fun _ hx h =>
       hx (Finset.mem_union_left _ (Finset.mem_union_left _ h))
-    have hxRc : Γrc.lookup x = none := by
-      have hxNotDom : x ∉ (Γrc.map (·.1)).toFinset := fun h =>
-        hx (Finset.mem_union_left _ (Finset.mem_union_right _ h))
-      cases hRc : Γrc.lookup x with
-      | none => rfl
-      | some A =>
-        exfalso
-        have hsome : (Γrc.lookup x).isSome := by rw [hRc]; rfl
-        obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome hsome
-        apply hxNotDom
-        simp only [List.mem_toFinset, List.mem_map]
-        exact ⟨p, hpmem, hpeq⟩
-    have HCtx' : TctxRelated Δ (Γtc'.insert x (.arrow τ1 τ2))
-        ((x, interp (.arrow τ1 τ2) Δ) :: Γrc) :=
-      HCtx.insert x (.arrow τ1 τ2) hxRc
-    exact ih x hxL Δ ((x, interp (.arrow τ1 τ2) Δ) :: Γrc) HCtx'
+    have hxRc : ∀ x ∉ L', Γrc.lookup x = none := fun _ hx =>
+      RelCtx.lookup_eq_none fun h => hx (Finset.mem_union_left _ (Finset.mem_union_right _ h))
+    have he_fv := fv_subset_of_cofinite HCtx Hbody
+    have he_lc : ∀ x ∉ L', (Exp.open' e (.fvar x)).IsLocallyClosed := fun x hx =>
+      (Hbody x (hxL x hx)).isLocallyClosed
+    apply bin_log_related_fix Δ Γrc L' he_lc he_lc he_fv he_fv
+    exact fun x hx => ih x (hxL x hx) Δ _ (HCtx.insert x (.arrow τ1 τ2) (hxRc x hx))
   -- Polymorphic binder cases (tlam, tunpack). Closedness is now built into
   -- `lrel`'s structure (option D), so the IH works for any `A`.
   | @tlam Γtc' e τ Hbody ih =>
@@ -2129,44 +1483,24 @@ theorem fundamental {Γtc : Tctx} {e : Exp rT} {τ : Ty} (Hty : Typed Γtc e τ)
       fv_subset_relCtxDom (HCtx.shift default) Hbody
     apply bin_log_related_tlam Δ Γrc hLC hLC he_fv he_fv
     intro A
-    -- Goal: ⊢ □ bin_log_related_ty ⊤ (cons A Δ) Γrc e e τ
-    -- IH at (cons A Δ, Γrc) using TctxRelated.shift.
-    have HCtxShift := HCtx.shift A
     iintro
     imodintro
-    iapply (ih (TyEnv.cons A Δ) Γrc HCtxShift)
+    iapply (ih (TyEnv.cons A Δ) Γrc (HCtx.shift A))
   | @tunpack L Γtc' e1 e2 τ τ2 Hty1 Hbody2 ih1 ih2 =>
-    have HIH1 : ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) Δ Γrc e1 e1 (Ty.exists' τ) :=
-      ih1 Δ Γrc HCtx
     -- Augment L with Γrc.dom for freshness in the inner Γrc.
     let L' : Finset Var := L ∪ (Γrc.map (·.1)).toFinset
+    have hxL : ∀ x ∉ L', x ∉ L := fun _ hx h => hx (Finset.mem_union_left _ h)
+    have hxRc : ∀ x ∉ L', Γrc.lookup x = none := fun _ hx =>
+      RelCtx.lookup_eq_none fun h => hx (Finset.mem_union_right _ h)
     have HIH2 : ∀ A : lrel rT GF, ∀ x ∉ L',
         ⊢@{IProp GF} bin_log_related_ty (⊤ : CoPset) (TyEnv.cons A Δ)
           ((x, interp τ (TyEnv.cons A Δ)) :: Γrc)
-          (Exp.open' e2 (.fvar x)) (Exp.open' e2 (.fvar x)) τ2.shift := by
-      intro A x hxL'
-      have hxL : x ∉ L := fun h => hxL' (Finset.mem_union_left _ h)
-      have hxNotDom : x ∉ (Γrc.map (·.1)).toFinset :=
-        fun h => hxL' (Finset.mem_union_right _ h)
-      have hxRc : Γrc.lookup x = none := by
-        cases hRc : Γrc.lookup x with
-        | none => rfl
-        | some _ =>
-          exfalso
-          have hsome : (Γrc.lookup x).isSome := by rw [hRc]; rfl
-          obtain ⟨p, hpmem, hpeq⟩ := RelCtx.exists_mem_of_lookup_isSome hsome
-          apply hxNotDom
-          simp only [List.mem_toFinset, List.mem_map]
-          exact ⟨p, hpmem, hpeq⟩
-      have HCtxShift := HCtx.shift A
-      have HCtxIns : TctxRelated (TyEnv.cons A Δ) ((Γtc'.shift).insert x τ)
-          ((x, interp τ (TyEnv.cons A Δ)) :: Γrc) :=
-        HCtxShift.insert x τ hxRc
-      exact ih2 x hxL (TyEnv.cons A Δ) ((x, interp τ (TyEnv.cons A Δ)) :: Γrc) HCtxIns
+          (Exp.open' e2 (.fvar x)) (Exp.open' e2 (.fvar x)) τ2.shift := fun A x hx =>
+      ih2 x (hxL x hx) (TyEnv.cons A Δ) _ ((HCtx.shift A).insert x τ (hxRc x hx))
     -- Body closedness from its cofinite typing derivation, as in the `lam` case.
     have he2_lc : ∀ x ∉ L', (Exp.open' e2 (.fvar x)).IsLocallyClosed := fun x hx =>
-      (Hbody2 x (fun h => hx (Finset.mem_union_left _ h))).isLocallyClosed
-    exact bin_log_related_unpack Δ Γrc L' HIH1 he2_lc he2_lc HIH2
+      (Hbody2 x (hxL x hx)).isLocallyClosed
+    exact bin_log_related_unpack Δ Γrc L' (ih1 Δ Γrc HCtx) he2_lc he2_lc HIH2
 
 /-- Closed specialization: `∅ ⊢ₜ e : τ → ⊢ REL e << e : interp τ Δ`. -/
 theorem refines_typed (Δ : TyEnv rT GF) {e : Exp rT} {τ : Ty}
@@ -2175,22 +1509,12 @@ theorem refines_typed (Δ : TyEnv rT GF) {e : Exp rT} {τ : Ty}
   have HRel : TctxRelated Δ Tctx.empty ([] : RelCtx rT GF) := by
     intro x; simp [Tctx.empty, RelCtx.lookup]
   have Hfund := fundamental Hty Δ [] HRel
-  -- Hfund : ⊢ bin_log_related_ty ⊤ Δ [] e e τ
-  --       = ⊢ ∀ vs, env_ltyped2 [] vs -∗ refines ⊤ (substMap vs.fst e) (substMap vs.snd e) ...
-  -- Specialize at vs := [].
   unfold bin_log_related_ty bin_log_related at Hfund
-  -- substMap [] e = e by `Exp.substMap_empty` (applied via ValSubstMap.{fst,snd} of []).
-  have h1 : Exp.substMap (ValSubstMap.fst ([] : ValSubstMap rT)) e = e := rfl
-  have h2 : Exp.substMap (ValSubstMap.snd ([] : ValSubstMap rT)) e = e := rfl
+  -- `substMap [] e = e`, so the goal is def-eq to `Hfund` specialized at `vs := []`.
+  show ⊢@{IProp GF} refines (⊤ : CoPset)
+    (Exp.substMap (ValSubstMap.fst ([] : ValSubstMap rT)) e)
+    (Exp.substMap (ValSubstMap.snd ([] : ValSubstMap rT)) e) (interp τ Δ)
   ihave Hf := Hfund
-  -- Goal `refines ⊤ e e (interp τ Δ)` is def-eq to
-  -- `refines ⊤ (substMap [].fst e) (substMap [].snd e) (interp τ Δ)`.
-  have hgoal_eq : (refines (⊤ : CoPset) e e (interp τ Δ) : IProp GF) =
-      refines (⊤ : CoPset)
-        (Exp.substMap (ValSubstMap.fst ([] : ValSubstMap rT)) e)
-        (Exp.substMap (ValSubstMap.snd ([] : ValSubstMap rT)) e)
-        (interp τ Δ) := rfl
-  rw [hgoal_eq]
   iapply Hf $$ %([] : ValSubstMap rT)
   iapply env_ltyped2_empty
 

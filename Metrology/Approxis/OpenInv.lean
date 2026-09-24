@@ -6,7 +6,6 @@ import Metrology.ProbLang.Syntax.Notation
 
 @[expose] public section
 
-
 /-! # `OpenInv e`: the logical-atomicity predicate enabling mask-shift around evaluating `e`. -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
@@ -14,8 +13,6 @@ open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.Approxi
 namespace ProbLang
 
 -- For the Approxis layer, carry the abstract real type `rT` as a section variable.
-
-
 variable {rT : Type _} [ProbLang.ProbLangℝ rT]
 
 /-- `OpenInv e`: `e` can be evaluated inside a `|={E1, E2}=>` mask-shift, with
@@ -27,26 +24,17 @@ def OpenInv (e : Exp rT) : Prop :=
 
 namespace OpenInv
 
-theorem fupd_open_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF] {E1 E2 E3 : CoPset}
-    {P Q : IProp GF}
-    (h : P ⊢ |={E2, E3}=> Q) : iprop(|={E1, E2}=> P) ⊢ |={E1, E3}=> Q := fupd_elim h
-
-theorem fupd_open_frame_cont {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
-    {E1 E2 E3 : CoPset}
-    {P R Q : IProp GF} (h : P ∗ R ⊢ |={E2, E3}=> Q) : (|={E1, E2}=> P) ∗ R ⊢ |={E1, E3}=> Q :=
-  fupd_frame_right.trans (fupd_elim h)
-
 theorem specCoupl_atomic_bridge_some {hlc : HasLC} {GF : BundledGFunctors}
     [ApproxisWpGS (rT := rT) GF] [InvGS_gen hlc GF]
     {E1 E2 : CoPset}
     {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT} {ε₁ : ENNReal}
     {Φ : Val rT → IProp GF} {v : Val rT} :
     iprop% specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
-        |={∅, E2}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT :=
-          rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ (|={E2, E1}=> Φ v))
+        |={∅, E2}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗
+          errInterp (rT := rT) ε₂ ∗ (|={E2, E1}=> Φ v))
       ⊢ specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ => iprop%
-        |={∅, E1}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT :=
-          rT) ρ' ∗ errInterp (rT := rT) ε₂ ∗ Φ v) := by
+        |={∅, E1}=> stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗
+          errInterp (rT := rT) ε₂ ∗ Φ v) := by
   iintro HSC
   iapply specCoupl_mono_spatial
   iframe
@@ -86,9 +74,7 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
   · iapply (progCoupl_strengthen
       (e₁ := e) (σ₁ := σ₂) (e₁' := ρ'.expr) (σ₁' := ρ'.state) (ε := ε₂)
       (S := {ρ : Cfg rT | ρ.1.isValue}) Cfg.isValue_measurableSet (h σ₂))
-    isplitr
-    swap
-    · iexact HBody
+    iframe HBody
     iintro !> %_ %_ %_ %_ !>
     iapply specCoupl_err_ge_1
     exact _root_.le_refl _
@@ -97,43 +83,29 @@ theorem specCoupl_atomic_bridge_none {GF : BundledGFunctors} [ApproxisWpGS (rT :
   · -- `⟨e₃, σ₃⟩` lies in the value set, which *is* the fact we wanted.
     iintro !>
     iapply (specCoupl_bind (E2 := ∅) Std.LawfulSet.subset_refl)
-    isplitr [HInner]
-    swap
-    · iexact HInner
+    iframe HInner
     iintro %σ₄ %ρ'' %ε₄ HBody4
     iapply fupd_specCoupl
-    have Hbody : iprop(stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗
-      errInterp (rT := rT) ε₄ ∗
-        wp E2 e₃ (fun v => iprop(|={E2, E1}=> Φ v)))
-        ⊢@{IProp GF}
-        iprop(|={E2, ∅}=> specCoupl ∅ σ₄ ρ''.expr ρ''.state ε₄
-          (fun σ₄' ρ''' ε₄' =>
-            iprop(|={∅, E1}=>
-              stateInterp (rT := rT) σ₄' ∗ SpecUpdateGS.specInterp (rT := rT) ρ''' ∗ errInterp (rT
-                := rT) ε₄' ∗
-                wp E1 e₃ Φ))) := by
-      iintro ⟨Hσ4, Hs4, Hε4, HW4⟩
-      ihave HW4' := (BI.equiv_iff.mp ApproxisWpGS.wp_unfold).1 $$ HW4
-      ispecialize HW4' $$ %σ₄ %ρ''.expr %ρ''.state %ε₄ [$]
-      irevert HW4'
-      refine BI.entails_wand ?_
-      refine fupd_open_cont (E1 := E2) (E2 := ∅) (E3 := ∅) ?_
-      iintro HSC
-      iapply fupd_intro
-      iapply specCoupl_mono_spatial
-      iframe
-      iintro %σ₅ %ρ''' %ε₅ HInnerBody
-      cases htv : e₃.toVal? with
-      | none => exact absurd ((Exp.toVal?_eq_none).mp htv) (fun nv => nv he₃val)
-      | some v' =>
-        imod HInnerBody with ⟨Hσ5, Hs5, Hε5, HΦc⟩
-        imod HΦc with HΦv
-        imodintro
-        iframe
-        iapply wp_value_of_toVal htv $$ HΦv
     irevert HBody4
-    refine BI.entails_wand ?_
-    exact fupd_open_cont (E2 := E2) (E3 := ∅) Hbody
+    refine BI.entails_wand (fupd_elim (E2 := E2) (E3 := ∅) ?_)
+    iintro ⟨Hσ4, Hs4, Hε4, HW4⟩
+    ihave HW4' := (BI.equiv_iff.mp ApproxisWpGS.wp_unfold).1 $$ HW4
+    ispecialize HW4' $$ %σ₄ %ρ''.expr %ρ''.state %ε₄ [$]
+    irevert HW4'
+    refine BI.entails_wand (fupd_elim (E1 := E2) (E2 := ∅) (E3 := ∅) ?_)
+    iintro HSC
+    iapply fupd_intro
+    iapply specCoupl_mono_spatial
+    iframe
+    iintro %σ₅ %ρ''' %ε₅ HInnerBody
+    cases htv : e₃.toVal? with
+    | none => exact absurd ((Exp.toVal?_eq_none).mp htv) (fun nv => nv he₃val)
+    | some v' =>
+      imod HInnerBody with ⟨Hσ5, Hs5, Hε5, HΦc⟩
+      imod HΦc with HΦv
+      imodintro
+      iframe
+      iapply wp_value_of_toVal htv $$ HΦv
   · iintro !>
     iapply specCoupl_err_ge_1
     exact Hε1
@@ -145,48 +117,17 @@ theorem of_atomic {e : Exp rT} (h : Atomic' e) : OpenInv e := by
   iapply ApproxisWpGS.wp_unfold
   unfold wpPre
   iintro %σ₁ %e₁' %σ₁' %ε₁ Hres
-  ihave HFR : iprop(
-      (|={E1, E2}=> wp E2 e (fun v => iprop(|={E2, E1}=> Φ v))) ∗
-        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT
-          := rT) ε₁))
-    $$ [HF Hres]
-  · isplitl [HF]
-    · iexact HF
-    iexact Hres
-  have Hbody : iprop(
-      (wp E2 e (fun v => iprop(|={E2, E1}=> Φ v))) ∗
-        (stateInterp (rT := rT) σ₁ ∗ SpecUpdateGS.specInterp (rT := rT) ⟨e₁', σ₁'⟩ ∗ errInterp (rT
-          := rT) ε₁))
-      ⊢@{IProp GF}
-    iprop(|={E2, ∅}=> specCoupl ∅ σ₁ e₁' σ₁' ε₁ (fun σ₂ ρ' ε₂ =>
-        match e.toVal? with
-        | some v => iprop(|={∅, E1}=>
-            stateInterp (rT := rT) σ₂ ∗ SpecUpdateGS.specInterp (rT := rT) ρ' ∗ errInterp (rT :=
-              rT) ε₂ ∗ Φ v)
-        | none => progCoupl e σ₂ ρ'.expr ρ'.state ε₂
-            (fun e₃ σ₃ e₃' σ₃' ε₃ =>
-              iprop(▷ specCoupl ∅ σ₃ e₃' σ₃' ε₃ (fun σ₄ ρ'' ε₄ =>
-                iprop(|={∅, E1}=>
-                  stateInterp (rT := rT) σ₄ ∗ SpecUpdateGS.specInterp (rT := rT) ρ'' ∗ errInterp (rT
-                    := rT) ε₄ ∗
-                    wp E1 e₃ Φ)))))) := by
-    iintro ⟨HW, HresInner⟩
-    ihave HW' := (BI.equiv_iff.mp ApproxisWpGS.wp_unfold).1 $$ HW
-    ispecialize HW' $$ %σ₁ %e₁' %σ₁' %ε₁ HresInner
-    cases htv : e.toVal? with
-    | some v =>
-      irevert HW'
-      refine BI.entails_wand ?_
-      refine fupd_open_cont (E1 := E2) (E2 := ∅) (E3 := ∅) ?_
-      exact (specCoupl_atomic_bridge_some (v := v)).trans Iris.fupd_intro
-    | none =>
-      irevert HW'
-      refine BI.entails_wand ?_
-      refine fupd_open_cont (E1 := E2) (E2 := ∅) (E3 := ∅) ?_
-      exact (specCoupl_atomic_bridge_none h).trans Iris.fupd_intro
+  icombine HF Hres as HFR
   irevert HFR
-  refine BI.entails_wand ?_
-  exact fupd_open_frame_cont (E2 := E2) (E3 := ∅) Hbody
+  refine BI.entails_wand (fupd_frame_right.trans (fupd_elim (E2 := E2) (E3 := ∅) ?_))
+  iintro ⟨HW, HresInner⟩
+  ihave HW' := (BI.equiv_iff.mp ApproxisWpGS.wp_unfold).1 $$ HW
+  ispecialize HW' $$ %σ₁ %e₁' %σ₁' %ε₁ HresInner
+  irevert HW'
+  refine BI.entails_wand (fupd_elim (E1 := E2) (E2 := ∅) (E3 := ∅) ?_)
+  cases htv : e.toVal? with
+  | some v => exact (specCoupl_atomic_bridge_some (v := v)).trans Iris.fupd_intro
+  | none => exact (specCoupl_atomic_bridge_none h).trans Iris.fupd_intro
 
 end OpenInv
 
@@ -194,8 +135,7 @@ end OpenInv
 mask-shift around a single step. -/
 theorem wp_atomic {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
     {e : Exp rT} (h : OpenInv e) {E1 E2 : CoPset} {Φ : Val rT → IProp GF} :
-    iprop((|={E1, E2}=> wp E2 e (fun v => iprop(|={E2, E1}=> Φ v)))) ⊢@{IProp GF}
-      wp E1 e Φ :=
+    iprop(|={E1, E2}=> wp E2 e (fun v => iprop(|={E2, E1}=> Φ v))) ⊢@{IProp GF} wp E1 e Φ :=
   h
 
 /-! ## Proof-mode support
@@ -232,11 +172,28 @@ instance (z : Int) (l : Loc) : IsOpenInv (rT := rT) pl(rand(#(.int z), #(.lbl l)
 
 end Instances
 
+/-- The shared tail of both `ElimAcc` instances below: the `wp` post-condition
+re-closes the invariant and feeds the optional leftover back to `Φ`. -/
+theorem elimAcc_close {X : Type} {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
+    {E₁ E₂ : CoPset} {Φ : Val rT → IProp GF} {β : X → IProp GF} {γ : X → Option (IProp GF)}
+    {x : X} {v : Val rT} :
+    iprop(|={E₂}=> β x ∗ (γ x -∗? Φ v)) ⊢
+      iprop((β x ={E₂, E₁}=∗ (γ x).getD iprop(emp)) ={E₂, E₁}=∗ Φ v) := by
+  iintro Hpost Hcl
+  imod Hpost with ⟨Hβ, HΦ⟩
+  ispecialize Hcl $$ Hβ
+  imod Hcl
+  imodintro
+  cases γ x with
+  | none =>
+    dsimp only [BIBase.wandM]
+    iexact HΦ
+  | some P => iapply HΦ $$ Hcl
+
 /-- `imod`/`iinv` on a mask-shifting update in front of an *atomic* `wp`: the
 mask reopens in the post-condition. Rocq's `elim_modal_fupd_wp_atomic`. -/
-instance (priority := low) elimModal_fupd_wp_atomic {p : Bool} {io : InOut} {E1 E2 : CoPset} {e :
-  Exp rT}
-    [h : IsOpenInv e] {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
+instance (priority := low) elimModal_fupd_wp_atomic {p : Bool} {io : InOut} {E1 E2 : CoPset}
+    {e : Exp rT} [h : IsOpenInv e] {GF : BundledGFunctors} [ApproxisWpGS (rT := rT) GF]
     {P : IProp GF} {Φ : Val rT → IProp GF} :
     ElimModal True p io false iprop(|={E1, E2}=> P) P
       (wp E1 e Φ) (wp E2 e (fun v => iprop(|={E2, E1}=> Φ v))) where
@@ -263,18 +220,7 @@ instance (priority := low) elimAcc_wp_atomic {X : Type} {e : Exp rT} [h : IsOpen
     iapply ApproxisWpGS.wp_frame_wand
     iframe Hclose
     iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E₂}=> β x ∗ (γ x -∗? Φ v))))
-    case HΦ =>
-      intro v
-      iintro Hpost Hcl
-      imod Hpost with ⟨Hβ, HΦ⟩
-      ispecialize Hcl $$ Hβ
-      imod Hcl
-      imodintro
-      cases γ x with
-      | none =>
-        dsimp only [BIBase.wandM]
-        iexact HΦ
-      | some P => iapply HΦ $$ Hcl
+    case HΦ => exact fun _ => elimAcc_close
     iexact Hinner
 
 /-- `iinv` on a non-atomic `wp` at a fixed mask. -/
@@ -294,18 +240,7 @@ instance elimAcc_wp_nonatomic {X : Type} {e : Exp rT}
     iapply ApproxisWpGS.wp_frame_wand
     iframe Hclose
     iapply (ApproxisWpGS.wp_mono (Φ := fun v => iprop(|={E}=> β x ∗ (γ x -∗? Φ v))))
-    case HΦ =>
-      intro v
-      iintro Hpost Hcl
-      imod Hpost with ⟨Hβ, HΦ⟩
-      ispecialize Hcl $$ Hβ
-      imod Hcl
-      imodintro
-      cases γ x with
-      | none =>
-        dsimp only [BIBase.wandM]
-        iexact HΦ
-      | some P => iapply HΦ $$ Hcl
+    case HΦ => exact fun _ => elimAcc_close
     iexact Hinner
 
 end ProbLang

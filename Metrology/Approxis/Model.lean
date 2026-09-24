@@ -191,6 +191,32 @@ noncomputable def lrel_real : lrel rT GF where
     iintro ⟨%r, %h⟩ !%
     exact ⟨h.1 ▸ Exp.lit_isClosedEmpty _, h.2 ▸ Exp.lit_isClosedEmpty _⟩
 
+/-! ### A literal is related to itself -/
+
+omit [ProbLangℝ rT] in
+theorem lrel_unit_lit : ⊢@{IProp GF} lrel_unit.car (.unit : Val rT) .unit := by
+  unfold lrel_unit; ipureintro; exact ⟨rfl, rfl⟩
+
+omit [ProbLangℝ rT] in
+theorem lrel_int_lit (n : Int) : ⊢@{IProp GF} lrel_int.car (.int n : Val rT) (.int n) := by
+  unfold lrel_int; iexists n; ipureintro; exact ⟨rfl, rfl⟩
+
+omit [ProbLangℝ rT] in
+theorem lrel_nat_lit {n : Int} (hn : 0 ≤ n) :
+    ⊢@{IProp GF} lrel_nat.car (.int n : Val rT) (.int n) := by
+  unfold lrel_nat
+  iexists n.toNat
+  ipureintro
+  refine ⟨?_, ?_⟩ <;> rw [Int.toNat_of_nonneg hn]
+
+omit [ProbLangℝ rT] in
+theorem lrel_bool_lit (b : Bool) : ⊢@{IProp GF} lrel_bool.car (.bool b : Val rT) (.bool b) := by
+  unfold lrel_bool; iexists b; ipureintro; exact ⟨rfl, rfl⟩
+
+omit [ProbLangℝ rT] in
+theorem lrel_real_lit (r : rT) : ⊢@{IProp GF} lrel_real.car (.real r : Val rT) (.real r) := by
+  unfold lrel_real; iexists r; ipureintro; exact ⟨rfl, rfl⟩
+
 noncomputable def lrel_arr (A1 A2 : lrel rT GF) : lrel rT GF where
   car v1 v2 := iprop%
     ⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝ ∗
@@ -219,8 +245,8 @@ noncomputable def lrel_prod (A B : lrel rT GF) : lrel rT GF where
 noncomputable def lrel_sum (A B : lrel rT GF) : lrel rT GF where
   car v1 v2 := iprop%
     ∃ (w1 w2 : Val rT),
-      ((⌜ v1.1 = .inl w1.1 ⌝) ∗ (⌜ v2.1 = .inl w2.1 ⌝) ∗ A w1 w2) ∨
-      ((⌜ v1.1 = .inr w1.1 ⌝) ∗ (⌜ v2.1 = .inr w2.1 ⌝) ∗ B w1 w2)
+      (⌜ v1.1 = .inl w1.1 ⌝ ∗ ⌜ v2.1 = .inl w2.1 ⌝ ∗ A w1 w2) ∨
+      (⌜ v1.1 = .inr w1.1 ⌝ ∗ ⌜ v2.1 = .inr w2.1 ⌝ ∗ B w1 w2)
   closed v1 v2 := by
     iintro ⟨%w1, %w2, Hd⟩
     icases Hd with (⟨%h1, %h2, HA⟩ | ⟨%h1, %h2, HB⟩)
