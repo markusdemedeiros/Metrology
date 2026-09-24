@@ -8,12 +8,12 @@ pp.unicode.fun = true
 [[require]]
 name = "mathlib"
 git = "https://github.com/leanprover-community/mathlib4"
-rev = "v4.32.2"
+rev = "v4.34.0"
 
 [[require]]
 name = "cslib"
 git = "https://github.com/leanprover/cslib"
-rev = "v4.32.2"
+rev = "v4.34.0"
 
 [[require]]
 name = "iris"
