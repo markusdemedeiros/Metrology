@@ -6,8 +6,7 @@ public import Metrology.Approxis.AppRelRules
 
 @[expose] public section
 
-
-/-! # Relational tactics: macro wrappers around `refines_*` lemmas, mirroring Rocq's `rel_*`. -/
+/-! # Relational tactics -/
 
 namespace ProbLang
 open Iris Iris.BI Iris.ProofMode

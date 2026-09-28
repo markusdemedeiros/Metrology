@@ -285,6 +285,20 @@ theorem mass_leq {ε : ENNReal} {S : Set (α × β)} {μₗ : Measure α} {μᵣ
       show (∫⁻ _, oneB.1 _ ∂μᵣ) = μᵣ .univ from by
         simp [oneB]] at h
 
+theorem set_leq_zero {S : Set (α × β)} {μₗ : Measure α} {μᵣ : Measure β} {T : Set α}
+    {T' : Set β} (hT : MeasurableSet T) (hT' : MeasurableSet T') (Hcpl : AddCoupl 0 S μₗ μᵣ)
+    (Himp : ∀ a b, S (a, b) → a ∈ T → b ∈ T') : μₗ T ≤ μᵣ T' := by
+  classical
+  let fInd : CouplingFunction α :=
+    .mk (T.indicator 1) ⟨measurable_const.indicator hT, fun x => Set.indicator_le_self _ _ x⟩
+  let gInd : CouplingFunction β :=
+    .mk (T'.indicator 1) ⟨measurable_const.indicator hT', fun x => Set.indicator_le_self _ _ x⟩
+  have hMain := Hcpl fInd gInd fun {a b} hS => by
+    by_cases ha : a ∈ T
+    · simp [fInd, gInd, Set.indicator_of_mem ha, Set.indicator_of_mem (Himp a b hS ha)]
+    · simp [fInd, Set.indicator_of_notMem ha]
+  simpa [fInd, gInd, lintegral_indicator_one hT, lintegral_indicator_one hT'] using hMain
+
 /-- Left transitivity with an equality-coupling: chain an exact-equality coupling into an
 arbitrary coupling, adding the error slacks. -/
 theorem eq_trans_l {ε₁ ε₂ : ENNReal} {R : Set (α × β)} {μ₁ μ₂ : Measure α} {μ₃ : Measure β}

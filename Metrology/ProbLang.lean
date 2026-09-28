@@ -21,6 +21,7 @@ public import Metrology.ProbLang.Interp.BigStepIO
 public import Metrology.ProbLang.Interp.Sample
 public import Metrology.ProbLang.Measure
 public import Metrology.ProbLang.Metatheory
+public import Metrology.ProbLang.ValSubstMap
 public import Metrology.ProbLang.Reals
 public import Metrology.ProbLang.Syntax.Syntax
 public import Metrology.ProbLang.Syntax.Notation

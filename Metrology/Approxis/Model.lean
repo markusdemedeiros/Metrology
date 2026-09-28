@@ -10,7 +10,6 @@ public import Metrology.Iris.Countable
 
 @[expose] public section
 
-
 /-! # Semantic Model -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
@@ -99,7 +98,6 @@ instance {GF : BundledGFunctors} : Inhabited (lrel rT GF) where
 instance lrel.car_ne {GF : BundledGFunctors} (v1 v2 : Val rT) :
     OFE.NonExpansive (fun A : lrel rT GF => A.car v1 v2) where
   ne {_ _ _} hAB := hAB v1 v2
-
 
 /-! ## `na_own` / `na_inv` abbreviations keyed on the pool name -/
 
