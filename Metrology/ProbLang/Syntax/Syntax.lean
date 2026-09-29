@@ -817,6 +817,32 @@ abbrev Val.loc  (l : Loc) : Val rT  := Val.ofBaseLit (.loc l)
 abbrev Val.lbl  (l : Lbl) : Val rT  := Val.ofBaseLit (.lbl l)
 abbrev Val.real (r : rT) : Val rT   := Val.ofBaseLit (.real r)
 
+/-! Compound-value constructors: pairs, injections, and option values. Values are
+closed under these by `IsVal.pair`/`inl`/`inr`. -/
+
+/-- Pair two values. `@[reducible]` for the same reason as `Val.ofBaseLit`: proof-mode
+unification matches at reducible transparency. -/
+@[reducible] def Val.pair (v w : Val rT) : Val rT :=
+  ⟨.pair v.1 w.1, .pair v.2 w.2, .pair v.lc w.lc⟩
+
+/-- Left injection of a value. -/
+@[reducible] def Val.inl (v : Val rT) : Val rT := ⟨.inl v.1, .inl v.2, .inl v.lc⟩
+
+/-- Right injection of a value. -/
+@[reducible] def Val.inr (v : Val rT) : Val rT := ⟨.inr v.1, .inr v.2, .inr v.lc⟩
+
+/-- Option values: `NONE = inl ()`, `SOME v = inr v`. -/
+@[reducible] def Val.option : Option (Val rT) → Val rT
+  | none => .inl .unit
+  | some v => .inr v
+
+omit [ProbLangℝ rT] in
+@[simp] theorem Val.pair_fst (v w : Val rT) : (Val.pair v w).1 = .pair v.1 w.1 := rfl
+omit [ProbLangℝ rT] in
+@[simp] theorem Val.inl_fst (v : Val rT) : (Val.inl v).1 = .inl v.1 := rfl
+omit [ProbLangℝ rT] in
+@[simp] theorem Val.inr_fst (v : Val rT) : (Val.inr v).1 = .inr v.1 := rfl
+
 namespace IsVal
 
 /-- Decidable check. -/
@@ -1025,6 +1051,12 @@ theorem Exp.toVal?_ofVal (v : Val α) : (Exp.ofVal v).toVal? = some v := by
   cases hc : IsVal.check? e with
   | none => exact absurd w.toIsValue (IsVal.not_isValue_of_check?_none hc)
   | some w' => exact congrArg some (Val.ext rfl)
+
+omit [ProbLangℝ rT] in
+/-- The `IsVal` witness of `Exp.ofVal v`, in `ofVal`-typed form (`v.snd` retyped), so
+lemma applications that key on the syntactic `Exp.ofVal` shape can use it directly.
+(`IsVal` is `Type`-valued, hence a `def`.) -/
+def Val.isVal_ofVal (v : Val rT) : IsVal (Exp.ofVal v) := v.2
 
 /-- `v.fst`-shaped form of `toVal?_ofVal` (matches goals after `Exp.ofVal` is unfolded). -/
 @[simp] theorem Val.toVal?_fst (v : Val α) : v.fst.toVal? = some v := Exp.toVal?_ofVal v

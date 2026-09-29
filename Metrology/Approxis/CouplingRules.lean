@@ -140,6 +140,200 @@ theorem Cfg.uniform_addCoupl_bij_fill [MeasurableSingletonClass rT] {z : Int} (H
   rintro _ _ ⟨n, h0, hz, heqL, rfl⟩
   exact ⟨n, h0, hz, heqL, rfl⟩
 
+/-! ## Core probability fact: uniform couplings along an injection (unequal bounds)
+
+Ports `ARcoupl_rand_rand_inj` / `ARcoupl_rand_rand_rev_inj` from
+`clutch/theories/approxis/coupling_rules.v`: coupling `rand zL ~ rand zR` along an
+injection costs the mass of the uncovered fraction of the *larger* support. -/
+
+/-- A sum composed with a map injective on `Ico 0 zL` and landing in `Ico 0 zR` is
+bounded by the full codomain sum. -/
+theorem _root_.Finset.sum_Ico_comp_le_of_injOn {zL zR : Int} {f : Int → Int}
+    (hdom : ∀ n : Int, 0 ≤ n → n < zL → 0 ≤ f n ∧ f n < zR)
+    (hinj : ∀ n₁ n₂ : Int, 0 ≤ n₁ → n₁ < zL → 0 ≤ n₂ → n₂ < zL → f n₁ = f n₂ → n₁ = n₂)
+    (g : Int → ENNReal) :
+    ∑ n ∈ Finset.Ico (0 : Int) zL, g (f n) ≤ ∑ m ∈ Finset.Ico (0 : Int) zR, g m := by
+  have himg : ∑ m ∈ (Finset.Ico (0 : Int) zL).image f, g m =
+      ∑ n ∈ Finset.Ico (0 : Int) zL, g (f n) :=
+    Finset.sum_image fun n hn m hm heq => by
+      simp only [Finset.coe_Ico, Set.mem_Ico] at hn hm
+      exact hinj n m hn.1 hn.2 hm.1 hm.2 heq
+  rw [← himg]
+  refine Finset.sum_le_sum_of_subset fun m hm => ?_
+  obtain ⟨n, hn, rfl⟩ := Finset.mem_image.mp hm
+  simp only [Finset.mem_Ico] at hn ⊢
+  exact hdom n hn.1 hn.2
+
+/-- A sum of `≤ 1` terms over `Ico 0 z` is at most `z.toNat`. -/
+theorem _root_.Finset.sum_Ico_le_toNat {z : Int} {g : Int → ENNReal}
+    (hg : ∀ n, g n ≤ 1) :
+    ∑ n ∈ Finset.Ico (0 : Int) z, g n ≤ (z.toNat : ENNReal) := by
+  calc ∑ n ∈ Finset.Ico (0 : Int) z, g n
+    _ ≤ ∑ _n ∈ Finset.Ico (0 : Int) z, 1 := Finset.sum_le_sum fun n _ => hg n
+    _ = (z.toNat : ENNReal) := by
+        rw [Finset.sum_const, Int.card_Ico, nsmul_eq_mul, mul_one, Int.sub_zero]
+
+/-- Averaging cost of enlarging the denominator: for `S ≤ a`,
+`a⁻¹ * S ≤ (a + d)⁻¹ * S + d / (a + d)` in `ℝ≥0∞`. -/
+theorem _root_.ENNReal.inv_mul_le_inv_mul_add {a d : ℕ} (ha : a ≠ 0) {S : ENNReal}
+    (hS : S ≤ (a : ENNReal)) :
+    (a : ENNReal)⁻¹ * S ≤ ((a : ENNReal) + (d : ENNReal))⁻¹ * S +
+      (d : ENNReal) / ((a : ENNReal) + (d : ENNReal)) := by
+  have ha0 : (a : ENNReal) ≠ 0 := Nat.cast_ne_zero.mpr ha
+  have haT : (a : ENNReal) ≠ (⊤ : ENNReal) := ENNReal.natCast_ne_top a
+  have had0 : (a : ENNReal) + (d : ENNReal) ≠ 0 := by simp [ha0]
+  have hadT : (a : ENNReal) + (d : ENNReal) ≠ (⊤ : ENNReal) :=
+    ENNReal.add_ne_top.mpr ⟨haT, ENNReal.natCast_ne_top d⟩
+  have hinvS : (a : ENNReal)⁻¹ * S ≤ 1 := by
+    calc (a : ENNReal)⁻¹ * S
+      _ ≤ (a : ENNReal)⁻¹ * (a : ENNReal) := by gcongr
+      _ = 1 := ENNReal.inv_mul_cancel ha0 haT
+  calc (a : ENNReal)⁻¹ * S
+    _ = (((a : ENNReal) + d)⁻¹ * ((a : ENNReal) + d)) * ((a : ENNReal)⁻¹ * S) := by
+        rw [ENNReal.inv_mul_cancel had0 hadT, one_mul]
+    _ = ((a : ENNReal) + d)⁻¹ * ((a : ENNReal) * ((a : ENNReal)⁻¹ * S) +
+          (d : ENNReal) * ((a : ENNReal)⁻¹ * S)) := by
+        rw [mul_assoc, add_mul]
+    _ = ((a : ENNReal) + d)⁻¹ * (S + (d : ENNReal) * ((a : ENNReal)⁻¹ * S)) := by
+        rw [← mul_assoc (a : ENNReal), ENNReal.mul_inv_cancel ha0 haT, one_mul]
+    _ ≤ ((a : ENNReal) + d)⁻¹ * (S + (d : ENNReal) * 1) := by gcongr
+    _ = ((a : ENNReal) + d)⁻¹ * S + (d : ENNReal) / ((a : ENNReal) + d) := by
+        rw [mul_one, mul_add, ENNReal.div_eq_inv_mul]
+
+/-- Uniform coupling along an injection, smaller bound on the left:
+`rand zL ~ rand zR` for `zL ≤ zR` along `f`, with error `(zR - zL)/zR`. -/
+theorem Cfg.uniform_addCoupl_inj [MeasurableSingletonClass rT] {zL zR : Int}
+    (HzL : 0 < zL) (Hle : zL ≤ zR) (σ σ' : State rT) (f : Int → Int)
+    (hdom : ∀ n, 0 ≤ n → n < zL → 0 ≤ f n ∧ f n < zR)
+    (hinj : ∀ n₁ n₂, 0 ≤ n₁ → n₁ < zL → 0 ≤ n₂ → n₂ < zL → f n₁ = f n₂ → n₁ = n₂) :
+    AddCoupl (((zR - zL).toNat : ENNReal) / (zR.toNat : ENNReal))
+      {p : Cfg rT × Cfg rT | ∃ n, 0 ≤ n ∧ n < zL ∧
+        p.1 = ⟨pl(#(.int n)), σ⟩ ∧ p.2 = ⟨pl(#(.int (f n))), σ'⟩}
+      (Cfg.uniform zL σ) (Cfg.uniform zR σ') := by
+  classical
+  have HzR : 0 < zR := HzL.trans_le Hle
+  rintro ⟨φ, Hφm, Hφb⟩ ⟨ψ, Hψm, Hψb⟩ Hpt
+  show ∫⁻ c, φ c ∂(Cfg.uniform zL σ) ≤ ∫⁻ c, ψ c ∂(Cfg.uniform zR σ') + _
+  rw [Cfg.lintegral_uniform' HzL σ Hφm, Cfg.lintegral_uniform' HzR σ' Hψm]
+  have hcast : (zR.toNat : ENNReal) = (zL.toNat : ENNReal) + ((zR - zL).toNat : ENNReal) := by
+    rw [← Nat.cast_add]
+    congr 1
+    omega
+  set S : ENNReal := ∑ n ∈ Finset.Ico (0 : Int) zL, ψ ⟨pl(#(.int (f n))), σ'⟩ with hS
+  have h1 : ∑ n ∈ Finset.Ico (0 : Int) zL, φ ⟨pl(#(.int n)), σ⟩ ≤ S := by
+    refine Finset.sum_le_sum fun n hn => ?_
+    simp only [Finset.mem_Ico] at hn
+    exact Hpt ⟨n, hn.1, hn.2, rfl, rfl⟩
+  have h2 : S ≤ ∑ m ∈ Finset.Ico (0 : Int) zR, ψ ⟨pl(#(.int m)), σ'⟩ :=
+    Finset.sum_Ico_comp_le_of_injOn hdom hinj fun m => ψ ⟨pl(#(.int m)), σ'⟩
+  have h3 : S ≤ (zL.toNat : ENNReal) := Finset.sum_Ico_le_toNat fun n => Hψb _
+  calc (zL.toNat : ENNReal)⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) zL, φ ⟨pl(#(.int n)), σ⟩
+    _ ≤ (zL.toNat : ENNReal)⁻¹ * S := by gcongr
+    _ ≤ ((zL.toNat : ENNReal) + ((zR - zL).toNat : ENNReal))⁻¹ * S +
+          ((zR - zL).toNat : ENNReal) / ((zL.toNat : ENNReal) + ((zR - zL).toNat : ENNReal)) :=
+        ENNReal.inv_mul_le_inv_mul_add (by omega) h3
+    _ = (zR.toNat : ENNReal)⁻¹ * S + ((zR - zL).toNat : ENNReal) / (zR.toNat : ENNReal) := by
+        rw [hcast]
+    _ ≤ (zR.toNat : ENNReal)⁻¹ * ∑ m ∈ Finset.Ico (0 : Int) zR, ψ ⟨pl(#(.int m)), σ'⟩ +
+          ((zR - zL).toNat : ENNReal) / (zR.toNat : ENNReal) := by gcongr
+
+/-- Uniform coupling along an injection, smaller bound on the right:
+`rand zL ~ rand zR` for `zR ≤ zL` along `f : [0, zR) ↪ [0, zL)`; the left draw is
+`f m` when the right draw is `m`, with error `(zL - zR)/zL`. -/
+theorem Cfg.uniform_addCoupl_rev_inj [MeasurableSingletonClass rT] {zL zR : Int}
+    (HzR : 0 < zR) (Hle : zR ≤ zL) (σ σ' : State rT) (f : Int → Int)
+    (hdom : ∀ m, 0 ≤ m → m < zR → 0 ≤ f m ∧ f m < zL)
+    (hinj : ∀ m₁ m₂, 0 ≤ m₁ → m₁ < zR → 0 ≤ m₂ → m₂ < zR → f m₁ = f m₂ → m₁ = m₂) :
+    AddCoupl (((zL - zR).toNat : ENNReal) / (zL.toNat : ENNReal))
+      {p : Cfg rT × Cfg rT | ∃ m, 0 ≤ m ∧ m < zR ∧
+        p.1 = ⟨pl(#(.int (f m))), σ⟩ ∧ p.2 = ⟨pl(#(.int m)), σ'⟩}
+      (Cfg.uniform zL σ) (Cfg.uniform zR σ') := by
+  classical
+  have HzL : 0 < zL := HzR.trans_le Hle
+  rintro ⟨φ, Hφm, Hφb⟩ ⟨ψ, Hψm, Hψb⟩ Hpt
+  show ∫⁻ c, φ c ∂(Cfg.uniform zL σ) ≤ ∫⁻ c, ψ c ∂(Cfg.uniform zR σ') + _
+  rw [Cfg.lintegral_uniform' HzL σ Hφm, Cfg.lintegral_uniform' HzR σ' Hψm]
+  have hinjOn : ∀ n ∈ Finset.Ico (0 : Int) zR, ∀ m ∈ Finset.Ico (0 : Int) zR,
+      f n = f m → n = m := fun n hn m hm heq => by
+    simp only [Finset.mem_Ico] at hn hm
+    exact hinj n m hn.1 hn.2 hm.1 hm.2 heq
+  have himg_sub : (Finset.Ico (0 : Int) zR).image f ⊆ Finset.Ico (0 : Int) zL := by
+    intro m hm
+    obtain ⟨n, hn, rfl⟩ := Finset.mem_image.mp hm
+    simp only [Finset.mem_Ico] at hn ⊢
+    exact hdom n hn.1 hn.2
+  have himg_card : ((Finset.Ico (0 : Int) zR).image f).card = zR.toNat := by
+    rw [Finset.card_image_of_injOn hinjOn, Int.card_Ico, Int.sub_zero]
+  -- Split the left sum into the image of `f` and the uncovered remainder.
+  have himg_le : ∑ m ∈ (Finset.Ico (0 : Int) zR).image f, φ ⟨pl(#(.int m)), σ⟩ ≤
+      ∑ m ∈ Finset.Ico (0 : Int) zR, ψ ⟨pl(#(.int m)), σ'⟩ := by
+    rw [Finset.sum_image hinjOn]
+    refine Finset.sum_le_sum fun m hm => ?_
+    simp only [Finset.mem_Ico] at hm
+    exact Hpt ⟨m, hm.1, hm.2, rfl, rfl⟩
+  have hrest_le : ∑ n ∈ Finset.Ico (0 : Int) zL \ (Finset.Ico (0 : Int) zR).image f,
+      φ ⟨pl(#(.int n)), σ⟩ ≤ ((zL - zR).toNat : ENNReal) := by
+    calc ∑ n ∈ Finset.Ico (0 : Int) zL \ (Finset.Ico (0 : Int) zR).image f,
+        φ ⟨pl(#(.int n)), σ⟩
+      _ ≤ ∑ _n ∈ Finset.Ico (0 : Int) zL \ (Finset.Ico (0 : Int) zR).image f, 1 :=
+          Finset.sum_le_sum fun n _ => Hφb _
+      _ = (((Finset.Ico (0 : Int) zL \ (Finset.Ico (0 : Int) zR).image f).card : ℕ) :
+            ENNReal) := by
+          rw [Finset.sum_const, nsmul_eq_mul, mul_one]
+      _ = (((zL - zR).toNat : ℕ) : ENNReal) := by
+          rw [Finset.card_sdiff, Finset.inter_eq_left.mpr himg_sub, himg_card,
+            Int.card_Ico, Int.sub_zero]
+          congr 1
+          omega
+  have hsplit : ∑ n ∈ Finset.Ico (0 : Int) zL, φ ⟨pl(#(.int n)), σ⟩ ≤
+      (∑ m ∈ Finset.Ico (0 : Int) zR, ψ ⟨pl(#(.int m)), σ'⟩) +
+        ((zL - zR).toNat : ENNReal) := by
+    rw [← Finset.sum_sdiff himg_sub, add_comm]
+    exact add_le_add himg_le hrest_le
+  calc (zL.toNat : ENNReal)⁻¹ * ∑ n ∈ Finset.Ico (0 : Int) zL, φ ⟨pl(#(.int n)), σ⟩
+    _ ≤ (zL.toNat : ENNReal)⁻¹ * ((∑ m ∈ Finset.Ico (0 : Int) zR, ψ ⟨pl(#(.int m)), σ'⟩) +
+          ((zL - zR).toNat : ENNReal)) := by gcongr
+    _ = (zL.toNat : ENNReal)⁻¹ * ∑ m ∈ Finset.Ico (0 : Int) zR, ψ ⟨pl(#(.int m)), σ'⟩ +
+          ((zL - zR).toNat : ENNReal) / (zL.toNat : ENNReal) := by
+        rw [mul_add, ENNReal.div_eq_inv_mul]
+    _ ≤ (zR.toNat : ENNReal)⁻¹ * ∑ m ∈ Finset.Ico (0 : Int) zR, ψ ⟨pl(#(.int m)), σ'⟩ +
+          ((zL - zR).toNat : ENNReal) / (zL.toNat : ENNReal) := by
+        gcongr
+        exact_mod_cast Int.toNat_le_toNat Hle
+
+/-- Like `CoupledDraw`, but for the reversed injective coupling: the left draw is
+`f m` for the right draw `m`. -/
+@[reducible] def CoupledDrawRev (z : Int) (f : Int → Int) (σ σ' : State rT) (K : Ectx rT) :
+    Cfg rT → Cfg rT → Prop := fun c₁ c₂ =>
+  ∃ m : Int, 0 ≤ m ∧ m < z ∧
+    c₁ = ⟨pl(#(.int (f m))), σ⟩ ∧ c₂ = ⟨K.fill (pl(#(.int m))), σ'⟩
+
+theorem Cfg.uniform_addCoupl_inj_fill [MeasurableSingletonClass rT] {zL zR : Int}
+    (HzL : 0 < zL) (Hle : zL ≤ zR) (σ σ' : State rT) (f : Int → Int) (K : Ectx rT)
+    (hdom : ∀ n, 0 ≤ n → n < zL → 0 ≤ f n ∧ f n < zR)
+    (hinj : ∀ n₁ n₂, 0 ≤ n₁ → n₁ < zL → 0 ≤ n₂ → n₂ < zL → f n₁ = f n₂ → n₁ = n₂) :
+    AddCoupl (((zR - zL).toNat : ENNReal) / (zR.toNat : ENNReal))
+      {p | CoupledDraw zL f σ σ' K p.1 p.2}
+      (Cfg.uniform zL σ) ((Cfg.uniform zR σ').map K.fillCfg) := by
+  rw [show Cfg.uniform zL σ = (Cfg.uniform zL σ).map id from MeasureTheory.Measure.map_id.symm]
+  refine AddCoupl.map _ _ measurable_id (Ectx.fillCfg.measurable K) ?_
+    (Cfg.uniform_addCoupl_inj HzL Hle σ σ' f hdom hinj)
+  rintro _ _ ⟨n, h0, hz, heqL, rfl⟩
+  exact ⟨n, h0, hz, heqL, rfl⟩
+
+theorem Cfg.uniform_addCoupl_rev_inj_fill [MeasurableSingletonClass rT] {zL zR : Int}
+    (HzR : 0 < zR) (Hle : zR ≤ zL) (σ σ' : State rT) (f : Int → Int) (K : Ectx rT)
+    (hdom : ∀ m, 0 ≤ m → m < zR → 0 ≤ f m ∧ f m < zL)
+    (hinj : ∀ m₁ m₂, 0 ≤ m₁ → m₁ < zR → 0 ≤ m₂ → m₂ < zR → f m₁ = f m₂ → m₁ = m₂) :
+    AddCoupl (((zL - zR).toNat : ENNReal) / (zL.toNat : ENNReal))
+      {p | CoupledDrawRev zR f σ σ' K p.1 p.2}
+      (Cfg.uniform zL σ) ((Cfg.uniform zR σ').map K.fillCfg) := by
+  rw [show Cfg.uniform zL σ = (Cfg.uniform zL σ).map id from MeasureTheory.Measure.map_id.symm]
+  refine AddCoupl.map _ _ measurable_id (Ectx.fillCfg.measurable K) ?_
+    (Cfg.uniform_addCoupl_rev_inj HzR Hle σ σ' f hdom hinj)
+  rintro _ _ ⟨m, h0, hz, heqL, rfl⟩
+  exact ⟨m, h0, hz, heqL, rfl⟩
+
 theorem primStep_rand_unit [MeasurableSingletonClass rT] {z : Int} (Hz : 0 < z) (σ : State rT) :
     primStep ⟨pl(rand(#(.int z), #(.unit))), σ⟩ = Cfg.uniform z σ := by
   have Hwitness : HeadStepSupport ⟨pl(rand(#(.int z), #(.unit))), σ⟩ ⟨pl(#(.int 0)), σ⟩ :=
@@ -399,6 +593,99 @@ theorem wp_couple_rand_rand_avoid (z bad : Int) (Hz : 0 < z) (K : Ectx rT) (E : 
     iapply ErrorCredit.contradict (_root_.le_refl 1) $$ Hec
   · simp only [id_eq]
     iapply Hcnt $$ %n %⟨hn, hb⟩ Hj'
+
+/-- Coupling `rand zL ~ rand zR` (`zL ≤ zR`) along an injection `f : [0,zL) ↪ [0,zR)`,
+spending `(zR - zL)/zR` error credits: the left draw is `n`, the right draw is `f n`.
+Ports `wp_couple_rand_rand_inj` from `clutch/theories/approxis/coupling_rules.v`. -/
+theorem wp_couple_rand_rand_inj (zL zR : Int) (f : Int → Int) (ε : ENNReal)
+    (hdom : ∀ n, 0 ≤ n → n < zL → 0 ≤ f n ∧ f n < zR)
+    (hinj : ∀ n₁ n₂, 0 ≤ n₁ → n₁ < zL → 0 ≤ n₂ → n₂ < zL → f n₁ = f n₂ → n₁ = n₂)
+    (HzL : 0 < zL) (Hle : zL ≤ zR)
+    (hε : ((zR - zL).toNat : ENNReal) / (zR.toNat : ENNReal) ≤ ε)
+    (K : Ectx rT) (E : CoPset) (Φ : Val rT → IProp GF) : iprop%
+    ⤇ K.fill pl(rand(#(.int zR), #(.unit))) ∗ ↯ ε ∗
+    (∀ n, ⌜0 ≤ n ∧ n < zL⌝ -∗ ⤇ K.fill pl(#(.int (f n))) -∗ Φ (.int n)) ⊢
+    wp E pl(rand(#(.int zL), #(.unit))) Φ := by
+  iintro ⟨Hj, Herr, Hcnt⟩
+  ihave Herr' := ErrorCredit.weaken hε $$ Herr
+  iapply wp_lift_prim_steps_coupl Exp.rand_toVal?_eq_none
+  iintro %σ₁ %e₁' %σ₁' %εnow ⟨Hσ, Hs, Hε⟩
+  ihave %Heq := specAuth_specFrag_agree $$ Hs Hj
+  subst Heq
+  ihave %Hεle := ErrorCredit.supply_bound $$ Hε Herr'
+  imod ErrorCredit.supply_decrease $$ Hε Herr' with Hdec
+  imod BIFUpdate.subset (E1 := E) Std.LawfulSet.empty_subset with Hclose
+  imodintro
+  iexists CoupledDraw zL f σ₁ σ₁' K,
+    ((zR - zL).toNat : ENNReal) / (zR.toNat : ENNReal),
+    εnow - ((zR - zL).toNat : ENNReal) / (zR.toNat : ENNReal)
+  isplitr; · ipureintro; exact _root_.le_of_eq (add_tsub_cancel_of_le Hεle)
+  isplitr; · ipureintro; exact (randUnit_uniform_step HzL σ₁).1.toReducible
+  isplitr
+  · ipureintro
+    exact ((randUnit_uniform_step (HzL.trans_le Hle) σ₁').1.toReducible).fill K
+  isplitr
+  · ipureintro
+    rw [primStep_rand_unit HzL, primStep_fill Exp.rand_not_isValue,
+      primStep_rand_unit (HzL.trans_le Hle)]
+    exact Cfg.uniform_addCoupl_inj_fill HzL Hle σ₁ σ₁' f K hdom hinj
+  iintro %e₂ %σ₂ %e₂' %σ₂' %⟨n, hn0, hnz, heq1, heq2⟩
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
+  iintro !> !>
+  imod specProg_update (e3 := K.fill pl(#(.int (f n)))) $$ Hs Hj with ⟨Hs', Hj'⟩
+  imod Hclose
+  imodintro
+  iframe Hσ Hs' Hdec
+  iapply wp_value_of_toVal (v := .int n) rfl
+  iapply Hcnt $$ %n %⟨hn0, hnz⟩ Hj'
+
+/-- Coupling `rand zL ~ rand zR` (`zR ≤ zL`) along an injection `f : [0,zR) ↪ [0,zL)`,
+spending `(zL - zR)/zL` error credits: the left draw is `f m`, the right draw is `m`.
+Ports `wp_couple_rand_rand_rev_inj` from `clutch/theories/approxis/coupling_rules.v`. -/
+theorem wp_couple_rand_rand_rev_inj (zL zR : Int) (f : Int → Int) (ε : ENNReal)
+    (hdom : ∀ m, 0 ≤ m → m < zR → 0 ≤ f m ∧ f m < zL)
+    (hinj : ∀ m₁ m₂, 0 ≤ m₁ → m₁ < zR → 0 ≤ m₂ → m₂ < zR → f m₁ = f m₂ → m₁ = m₂)
+    (HzR : 0 < zR) (Hle : zR ≤ zL)
+    (hε : ((zL - zR).toNat : ENNReal) / (zL.toNat : ENNReal) ≤ ε)
+    (K : Ectx rT) (E : CoPset) (Φ : Val rT → IProp GF) : iprop%
+    ⤇ K.fill pl(rand(#(.int zR), #(.unit))) ∗ ↯ ε ∗
+    (∀ m, ⌜0 ≤ m ∧ m < zR⌝ -∗ ⤇ K.fill pl(#(.int m)) -∗ Φ (.int (f m))) ⊢
+    wp E pl(rand(#(.int zL), #(.unit))) Φ := by
+  iintro ⟨Hj, Herr, Hcnt⟩
+  ihave Herr' := ErrorCredit.weaken hε $$ Herr
+  iapply wp_lift_prim_steps_coupl Exp.rand_toVal?_eq_none
+  iintro %σ₁ %e₁' %σ₁' %εnow ⟨Hσ, Hs, Hε⟩
+  ihave %Heq := specAuth_specFrag_agree $$ Hs Hj
+  subst Heq
+  ihave %Hεle := ErrorCredit.supply_bound $$ Hε Herr'
+  imod ErrorCredit.supply_decrease $$ Hε Herr' with Hdec
+  imod BIFUpdate.subset (E1 := E) Std.LawfulSet.empty_subset with Hclose
+  imodintro
+  iexists CoupledDrawRev zR f σ₁ σ₁' K,
+    ((zL - zR).toNat : ENNReal) / (zL.toNat : ENNReal),
+    εnow - ((zL - zR).toNat : ENNReal) / (zL.toNat : ENNReal)
+  isplitr; · ipureintro; exact _root_.le_of_eq (add_tsub_cancel_of_le Hεle)
+  isplitr
+  · ipureintro; exact (randUnit_uniform_step (HzR.trans_le Hle) σ₁).1.toReducible
+  isplitr
+  · ipureintro
+    exact ((randUnit_uniform_step HzR σ₁').1.toReducible).fill K
+  isplitr
+  · ipureintro
+    rw [primStep_rand_unit (HzR.trans_le Hle), primStep_fill Exp.rand_not_isValue,
+      primStep_rand_unit HzR]
+    exact Cfg.uniform_addCoupl_rev_inj_fill HzR Hle σ₁ σ₁' f K hdom hinj
+  iintro %e₂ %σ₂ %e₂' %σ₂' %⟨m, hm0, hmz, heq1, heq2⟩
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq1
+  obtain ⟨rfl, rfl⟩ := (Cfg.mk.injEq ..).mp heq2
+  iintro !> !>
+  imod specProg_update (e3 := K.fill pl(#(.int m))) $$ Hs Hj with ⟨Hs', Hj'⟩
+  imod Hclose
+  imodintro
+  iframe Hσ Hs' Hdec
+  iapply wp_value_of_toVal (v := .int (f m)) rfl
+  iapply Hcnt $$ %m %⟨hm0, hmz⟩ Hj'
 
 theorem wp_couple_tapes_bij {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
     {z : Int} {α αₛ : Loc} {ns nsₛ : List Int} (f : Int → Int)

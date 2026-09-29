@@ -400,6 +400,18 @@ theorem fv_open_subset (e : Exp rT) (y : Var) :
 
 end Exp
 
+/-! ## The `pl_step_simp` cleanup set
+
+β/fix steps substitute through binders with `openRec`, and `pl%`-elaborated binders
+carry `closeRec` wrappers; on an *opaque* leaf (an abstract `Val` projection or a
+closed library constant) the recursion is stuck, so wrappers pile up in stepped
+expressions and every later `whnf`-based defeq re-evaluates them over the whole leaf.
+`@[pl_step_simp]` collects the propositional erasure lemmas — `openRec_val_fst` for
+values, plus a per-library-constant `openRec`/`closeRec` identity pair (closed terms
+are invariant) — and the step tactics run `simp only [pl_step_simp]` after each step. -/
+
+register_simp_attr pl_step_simp
+
 /-- `is_lc` discharges `Exp.IsLocallyClosed e` goals. Runtime values and program
 fragments are locally closed; the proof is either a kernel computation of the decidable
 checker (`Exp.lcb_imp_lc (by rfl)`, for fully concrete closed subterms such as source

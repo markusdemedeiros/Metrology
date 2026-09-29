@@ -128,6 +128,12 @@ syntax:100 "inl(" pl_exp ")"                                    : pl_exp
 syntax:100 "inr(" pl_exp ")"                                    : pl_exp
 syntax:10 "case " pl_exp " | " pl_pat " => " pl_exp:10
           (" | " pl_pat " => " pl_exp:10)*                      : pl_exp
+-- Raw binary sum eliminator (`Exp.case` directly, no `scrut`): unlike the
+-- pattern-matching `case` above, this steps whenever the scrutinee's head is
+-- `inl`/`inr`, even when the payload is an *abstract* value (`Pat.tryMatch`
+-- would be stuck on it). Use it for library code verified against symbolic data.
+syntax:10 "case! " pl_exp " | " pl_pat " => " pl_exp:10
+          " | " pl_pat " => " pl_exp:10                         : pl_exp
 syntax:100 "alloc(" pl_exp ")"                                  : pl_exp
 syntax:80 "!" pl_exp:80                                         : pl_exp
 syntax:80 pl_exp:80 " ← " pl_exp:80                            : pl_exp
@@ -338,6 +344,21 @@ meta partial def elabPL (env : NameEnv) (st : IO.Ref AtomState) :
       let v1 ← elabPL env st e1
       let lam ← mkAnonLam (← elabPL env st e2)
       `(Exp.app $lam $v1)
+  | `(pl_exp|case! $e | $p1 => $bl | $p2 => $br) => do
+      let patToArg (p : TSyntax `pl_pat) : TermElabM (TSyntax `pl_arg) := do
+        match p with
+        | `(pl_pat|$i:ident) => `(pl_arg|$i:ident)
+        | `(pl_pat|_) => `(pl_arg|_)
+        | _ => throwErrorAt p "case!: branch binder must be a variable or `_`"
+      let xl ← match p1 with
+        | `(pl_pat|inl($q)) => patToArg q
+        | _ => throwErrorAt p1 "case!: first branch must be `inl(x)`"
+      let xr ← match p2 with
+        | `(pl_pat|inr($q)) => patToArg q
+        | _ => throwErrorAt p2 "case!: second branch must be `inr(x)`"
+      let brL ← elabBindArg env st xl bl mkNamedLam
+      let brR ← elabBindArg env st xr br mkNamedLam
+      `(Exp.case $(← elabPL env st e) $brL $brR)
   | `(pl_exp|scrut $e with $p)   => do `(Exp.scrut $(← elabPL env st e) pl_pat($p))
   | `(pl_exp|let! $p:pl_pat := $e; $body) => do
       -- Desugar to a single-branch `case`; the `case` arm handles everything.

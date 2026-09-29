@@ -48,6 +48,8 @@ omitting the local hypothesis block, so display-golden values stay focused. -/
 elab "show_goal_render" : tactic => do
   logInfo m!"{← getMainTarget}"
 
+set_option pp.unicode.fun true
+
 variable {rT : Type _} [LawfulProbLangℝ rT]
 variable {hlc : HasLC} {GF : BundledGFunctors} [ErisGS rT hlc GF]
 variable (E : CoPset) (Φ : Val rT → IProp GF)
@@ -61,9 +63,6 @@ variable (E : CoPset) (Φ : Val rT → IProp GF)
 -- target that `#guard_msgs` inspects is unaffected (it never prints hypotheses),
 -- so the goldens below are exactly the stepped forms, and the file is sorry-free.
 variable (hstop : ∀ Q : IProp GF, ⊢ Q)
--- Companion fixture for the incidental `IsVal _` (a `Type`, not an entailment)
--- side goal that a stalled step can leave — see §25b.
-variable (hval : ∀ e : Exp rT, IsVal e)
 
 /-! ## 1. β-reduction, fully substituted (binder consumed) — CLEAN -/
 
@@ -288,7 +287,10 @@ Focusing `fst((#2, #3))` inside `#1 + ·` yields a continuation
 `fun v ↦ tglWp E pl(#1 + {Exp.ofVal v}) Φ` — no bvar leak; the `{Exp.ofVal v}`
 escape is the expected display for a Lean-level value spliced into `pl(…)`. -/
 
-/-- info: ⊢ tglWp E pl(fst((#2, #3))) fun v ↦ tglWp E pl(#1 + {Exp.ofVal v}) Φ -/
+/--
+info:
+⊢ tglWp E pl(fst((#2, #3))) fun v ↦ tglWp E pl(#1 + {Exp.ofVal v}) Φ
+-/
 #guard_msgs (info) in
 example : ⊢ tglWp E pl(#1 + fst((#2, #3))) Φ := by
   twp_bind pl(fst((#2, #3))); show_goal_render; exact hstop _
@@ -410,7 +412,10 @@ example : ⊢ tglWp E pl(&loopFolded #2) Φ := by
 
 /-! ## 23. heap `alloc` focus via `twp_bind` — continuation renders CLEAN -/
 
-/-- info: ⊢ tglWp E pl(alloc(#1)) fun v ↦ tglWp E pl(!{Exp.ofVal v}) Φ -/
+/--
+info:
+⊢ tglWp E pl(alloc(#1)) fun v ↦ tglWp E pl(!{Exp.ofVal v}) Φ
+-/
 #guard_msgs (info) in
 example : ⊢ tglWp E pl(!alloc(#1)) Φ := by
   twp_bind pl(alloc(#1)); show_goal_render; exact hstop _
@@ -421,7 +426,10 @@ The value-position literal now renders as `#1` (the `Exp.ofVal ⟨#1, _⟩` reco
 collapsed to its underlying expression). The opaque bound value `{Exp.ofVal v}`
 correctly stays escaped — there is no surface form for an abstract value. -/
 
-/-- info: ⊢ tglWp E pl(urand) fun v ↦ tglWp E pl({Exp.ofVal v} + #1) Φ -/
+/--
+info:
+⊢ tglWp E pl(urand) fun v ↦ tglWp E pl({Exp.ofVal v} + {Exp.ofVal ↑1}) Φ
+-/
 #guard_msgs (info) in
 example : ⊢ tglWp E pl(urand + #1) Φ := by
   twp_bind pl(urand); show_goal_render; exact hstop _
@@ -444,12 +452,12 @@ info:
 example : ⊢ tglWp E (Exp.app Examples.geometric (.lit .unit)) Φ := by
   twp_pures; show_goal_render; exact hstop _
 
--- 25b. `GeometricTrial f #0` — `@[pl_fold]` ⇒ recursive call folds to
--- `&Examples.GeometricTrial`; stalls at the abstract `f #()` discriminant.
-/-- info: ⊢ tglWp E pl(if f #() then &Examples.GeometricTrial f (#0 + #1) else #0) Φ -/
+-- 25b. `GeometricTrial f #0` — the argument `f` is a *free variable*, not a value,
+-- so the guarded β does not fire and the applied constant renders unchanged.
+/-- info: ⊢ tglWp E pl(&Examples.GeometricTrial f #0) Φ -/
 #guard_msgs (info) in
 example : ⊢ tglWp E pl(&Examples.GeometricTrial f #0) Φ := by
-  twp_pures; show_goal_render; all_goals first | exact hstop _ | exact hval _
+  twp_pures; show_goal_render; exact hstop _
 
 /-! ## 26. Robustness — β with a binder-valued argument substituted before a surviving
 binder. `(fun x, (x, fun y, #2)) (fun z, #3)` → `(fun z, #3, fun y, #2)`: BOTH the

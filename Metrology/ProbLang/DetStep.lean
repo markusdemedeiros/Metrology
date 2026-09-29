@@ -351,5 +351,47 @@ theorem DetExec.cons {cfg1 cfg2 cfg3 : Cfg rT} {n : ℕ}
     DetExec (n + 1) cfg1 cfg3 where
   det_exec := ⟨cfg2, hstep, hrest.det_exec⟩
 
+
+/-! ## `PureSteps`: the reflexive-transitive closure of `PureStep`
+
+Deterministic pure computations (the list/map recursions of
+`Metrology/Code/Switching.lean` and the like) are proved once as `PureSteps` facts by
+plain Lean induction, then consumed uniformly on the program side (`wp_pure_steps`) and
+the spec side (`step_pure_steps`). -/
+
+def PureSteps (e1 e2 : Exp rT) : Prop := ∃ n, nsteps PureStep n e1 e2
+
+namespace PureSteps
+
+theorem refl (e : Exp rT) : PureSteps e e := ⟨0, rfl⟩
+
+theorem single {e1 e2 : Exp rT} (h : PureStep e1 e2) : PureSteps e1 e2 := ⟨1, e2, h, rfl⟩
+
+theorem trans {e1 e2 e3 : Exp rT} (h1 : PureSteps e1 e2) (h2 : PureSteps e2 e3) :
+    PureSteps e1 e3 := by
+  obtain ⟨n, h1⟩ := h1
+  obtain ⟨m, h2⟩ := h2
+  induction n generalizing e1 with
+  | zero => exact ⟨m, (show e1 = e2 from h1) ▸ h2⟩
+  | succ n ih =>
+    obtain ⟨c, hc, hrest⟩ := h1
+    obtain ⟨k, hk⟩ := ih hrest
+    exact ⟨k + 1, c, hc, hk⟩
+
+theorem fill (K : Ectx rT) {e1 e2 : Exp rT} :
+    PureSteps e1 e2 → PureSteps (K.fill e1) (K.fill e2)
+  | ⟨n, h⟩ => ⟨n, PureStep.fill_nsteps K h⟩
+
+theorem of_pureExec {φ : Prop} {n : ℕ} {e1 e2 : Exp rT} [h : PureExec φ n e1 e2]
+    (hφ : φ) : PureSteps e1 e2 := ⟨n, h.pure_exec hφ⟩
+
+/-- Recover a (trivially-conditioned) `PureExec` from `PureSteps`, to reuse the
+`PureExec`-shaped consumers (`wp_pure_step_later'`, `step_pure`, …). -/
+theorem pureExec {e1 e2 : Exp rT} (h : PureSteps e1 e2) :
+    PureExec True h.choose e1 e2 := ⟨fun _ => h.choose_spec⟩
+
+end PureSteps
+
 end ProbLang
 end
+
