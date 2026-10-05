@@ -119,6 +119,15 @@ theorem twp_err_pos {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} (Hnv : 
   iapply twp_err_incr Hnv
   iframe
 
+theorem twp_err_pos_add {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} {a : ℝ≥0∞}
+    (Hnv : e.toVal? = none) :
+    ⊢ ↯ a -∗ (∀ ε, ⌜0 < ε⌝ -∗ ↯ (a + ε) -∗ tglWp E e Φ) -∗ tglWp E e Φ := by
+  iintro Ha Hwp
+  iapply twp_err_pos Hnv
+  iintro %ε %Hε Hε
+  icombine Ha Hε as H
+  iapply Hwp $$ %ε %Hε H
+
 /-- Generic error-spending presample rule, factoring out the `glm'` plumbing shared by
 `twp_rand_exp` and `twp_urand_exp`.
 

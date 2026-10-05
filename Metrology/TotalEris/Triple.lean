@@ -50,7 +50,7 @@ attempted and only one elaborates, so the two coexist.
 
 /-- The precondition of a total triple. -/
 declare_syntax_cat twpPre
-syntax " [" noWs "{ " term:min " }" noWs "] " : twpPre
+syntax " [" noWs "{ " (term:min)? " }" noWs "] " : twpPre
 
 /-- The program of a total triple, with an optional mask. -/
 declare_syntax_cat twpProg
@@ -62,9 +62,10 @@ syntax " [" noWs "{ " ((ppSpace (binderIdent <|> bracketedBinder))+ ", ")?
   "RET " term:min "; " term:min " }" noWs "] " : twpPost
 
 syntax (name := twpTriple) twpPre twpProg twpPost : term
+syntax (name := twpTriplePinned) "⊢@{" term "} " twpPre twpProg twpPost : term
 
 meta def parseTwpPre : TSyntax `twpPre → MacroM Term
-  | `(twpPre| [{ $P }]) => return P
+  | `(twpPre| [{ $[$P]? }]) => P.getDM `(iprop(emp))
   | _ => Macro.throwUnsupported
 
 meta def parseTwpProg : TSyntax `twpProg → MacroM (Term × Term)
@@ -91,6 +92,14 @@ meta def parseTwpPost : TSyntax `twpPost → MacroM Term
     let k ← parseTwpPost post
     `(⊢ ∀ Φ, $P -∗ $k -∗ tglWp $E $e Φ)
   | _ => Macro.throwUnsupported
+
+@[macro twpTriplePinned] meta def expandTwpTriplePinned : Macro
+  | stx => do
+    let #[_, PROP, _, pre, prog, post] := stx.getArgs | Macro.throwUnsupported
+    let P ← parseTwpPre ⟨pre⟩
+    let (e, E) ← parseTwpProg ⟨prog⟩
+    let k ← parseTwpPost ⟨post⟩
+    `(⊢@{$(⟨PROP⟩)} ∀ Φ, $P -∗ $k -∗ tglWp $E $e Φ)
 
 end TotalEris
 end ProbLang
