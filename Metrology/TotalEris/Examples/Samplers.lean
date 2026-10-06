@@ -9,6 +9,7 @@ public import Metrology.TotalEris.Examples.Samplers.Selector
 public import Metrology.TotalEris.Examples.Samplers.Gauss
 public import Metrology.TotalEris.Examples.Samplers.GaussianAdequacy
 public import Metrology.TotalEris.Examples.Samplers.GaussianConcentration
+public import Metrology.TotalEris.Examples.Samplers.GaussianSum
 public import Metrology.TotalEris.Examples.Samplers.Gaussian
 
 @[expose] public section

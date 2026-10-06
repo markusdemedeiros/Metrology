@@ -86,6 +86,60 @@ theorem geo_nonneg (E : CoPset) :
   iintro %ε %Hε Herr
   iapply (geo_nonneg_pos_err E ε Hε) $$ Herr
 
+theorem geo_nonneg_depth (E : CoPset) (k : ℕ) :
+    iprop(↯((2⁻¹ : ENNReal) ^ k)) ⊢@{IProp GF}
+      tglWp E (Exp.app (geometric (rT := rT)) pl(#(.unit)))
+        (geoPost (rT := rT) (GF := GF)) := by
+  induction k with
+  | zero =>
+    iintro Herr
+    iexfalso
+    iapply ErrorCredit.contradict (by simp) $$ Herr
+  | succ k IH =>
+    iintro Herr
+    twp_pures
+    twp_bind (pl(rand(#(.int 2), #(.unit))))
+    let F : ℕ → ENNReal := fun n => if n = 0 then 0 else (2⁻¹ : ENNReal) ^ k
+    have HSum : (∑ n ∈ Finset.range (2 : Int).toNat, F n) / ((2 : Int).toNat : ENNReal) ≤
+        (2⁻¹ : ENNReal) ^ (k + 1) := by
+      simp [F, Finset.sum_range_succ, pow_succ, div_eq_mul_inv]
+    iapply (twp_rand_exp' (z := 2) (ε₂ := F) (Hz := by decide) (HSum := HSum)) $$ Herr
+    iintro %n ⟨%⟨Hn₁, Hn₂⟩, Hcr⟩
+    simp only [Exp.ofVal]
+    interval_cases n
+    · twp_pures
+      twp_value
+      iexists 0
+      itrivial
+    · twp_pure
+      twp_pure
+      twp_bind (Exp.app geometric pl(#(.unit)))
+      iapply (ErisWpGS.tglWp_wand (Φ := geoPost))
+      isplitl [Hcr]
+      · iapply IH
+        iapply (ErrorCredit.ext (show F (Int.toNat 1) = (2⁻¹ : ENNReal) ^ k from rfl))
+        iexact Hcr
+      iintro %w ⟨%m, %⟨rfl, Hmnn⟩⟩
+      twp_pures
+      twp_value
+      iexists (m + 1)
+      ipureintro
+      exact ⟨rfl, by omega⟩
+
+theorem geo_nonneg_of_depth (E : CoPset) :
+    ⊢@{IProp GF} tglWp E (Exp.app (geometric (rT := rT)) pl(#(.unit)))
+      (geoPost (rT := rT) (GF := GF)) := by
+  have hlim : Filter.liminf (fun k : ℕ => (2⁻¹ : ENNReal) ^ k) Filter.atTop = 0 :=
+    (ENNReal.tendsto_pow_atTop_nhds_zero_of_lt_one (by norm_num)).liminf_eq
+  iapply fupd_tglWp
+  imod ErrorCredit.zero with Herr
+  imodintro
+  iapply twp_err_liminf Filter.univ_mem solve_not_value
+  isplitl [Herr]
+  · iapply ErrorCredit.ext hlim.symm $$ Herr
+  · iintro %k - Hk
+    iapply geo_nonneg_depth E k $$ Hk
+
 /-! ## Probabilistic statement via `twp_tgl`
 
   Pure-Prop version of `geoPost`, suitable for feeding into `twp_tgl`. -/
