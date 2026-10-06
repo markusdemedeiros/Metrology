@@ -128,6 +128,31 @@ theorem twp_err_pos_add {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} {a 
   icombine Ha Hε as H
   iapply Hwp $$ %ε %Hε H
 
+/-- If a program's spec holds at every credit cost in a set, you only have to pay the infimum of
+those costs. -/
+theorem twp_err_biInf {ι : Type _} {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF} {S : Set ι}
+    {ε : ι → ℝ≥0∞} (Hnv : e.toVal? = none) :
+    iprop(↯(⨅ i ∈ S, ε i) ∗ ∀ i, ⌜i ∈ S⌝ -∗ ↯(ε i) -∗ tglWp E e Φ) ⊢ tglWp E e Φ := by
+  iintro ⟨Herr, Hwp⟩
+  iapply twp_err_incr Hnv
+  iframe Herr
+  iintro %ε' %Hlt Hε'
+  obtain ⟨i, hi⟩ := iInf_lt_iff.mp Hlt
+  obtain ⟨hiS, hlt⟩ := iInf_lt_iff.mp hi
+  iapply Hwp $$ %i %hiS
+  iapply ErrorCredit.weaken hlt.le $$ Hε'
+
+/-- If the spec holds at cost `ε i` for every `i` in some set in the filter `l`, you only have to
+pay `liminf ε` along `l`. -/
+theorem twp_err_liminf {ι : Type _} {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
+    {l : Filter ι} {S : Set ι} {ε : ι → ℝ≥0∞} (hS : S ∈ l) (Hnv : e.toVal? = none) :
+    iprop(↯(Filter.liminf ε l) ∗ ∀ i, ⌜i ∈ S⌝ -∗ ↯(ε i) -∗ tglWp E e Φ) ⊢ tglWp E e Φ := by
+  iintro ⟨Herr, Hwp⟩
+  iapply twp_err_biInf (S := S) Hnv
+  iframe Hwp
+  iapply ErrorCredit.weaken (Filter.le_liminf_of_le (h := Filter.mem_of_superset hS
+    fun i hi => biInf_le ε hi)) $$ Herr
+
 /-- Generic error-spending presample rule, factoring out the `glm'` plumbing shared by
 `twp_rand_exp` and `twp_urand_exp`.
 
