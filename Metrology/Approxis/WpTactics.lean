@@ -258,12 +258,16 @@ elab "wp_value" : tactic =>
       | ~q(Exp.ofVal $v) => return (v, q(Exp.toVal?_ofVal $v))
       | ~q(Val.fst $v) => return (v, q(Exp.toVal?_ofVal $v))
       | _ => do
-        let tv : Q(Option (Val $α)) ← whnf q(Exp.toVal? $e)
+        -- A closure's value check goes through the kernel (`Exp.closedFunVal?`).
+        let tv : Q(Option (Val $α)) ← match ← Exp.closedFunVal? α e with
+          | some (some v) => have v : Q(Val $α) := v; pure q(some $v)
+          | some none => pure q(none)
+          | none => whnf q(Exp.toVal? $e)
         let ~q(some $v) := tv
           | throwTacticEx `wp_value mvar m!"{← ppExpr e} is not a value"
         let hproof : Q(Exp.toVal? $e = some $v) ← mkFreshExprSyntheticOpaqueMVar
           q(Exp.toVal? $e = some $v)
-        (← Tactic.evalTacticAt (← `(tactic| rfl)) hproof.mvarId!).forM addMVarGoal
+        (← Tactic.evalTacticAt (← `(tactic| kernel_rfl)) hproof.mvarId!).forM addMVarGoal
         return (v, hproof)
     have goal : Q(IProp $GF) := LeanExpr.headBeta (mkApp g.Φ v)
     -- If the postcondition can absorb a `|={E}=>`, leave the clean goal `Φ v`;
@@ -309,7 +313,7 @@ elab "wp_show" colGt ppSpace e':term : tactic => do
   let tac ← runTacticWp fun mvar g => do
     addMVarGoal mvar
     let eS ← Term.exprToSyntax (g.e : LeanExpr)
-    `(tactic| iapply (wp_expr_eq (e := $eS) (e' := $e') rfl))
+    `(tactic| iapply (wp_expr_eq (e := $eS) (e' := $e') (by kernel_rfl)))
   Tactic.evalTactic tac
 
 /-- `wp_value_at v` closes a value goal `wp E e Φ` with `e` a β-residual only
@@ -318,7 +322,7 @@ elab "wp_value_at" colGt ppSpace v:term : tactic => do
   let tac ← runTacticWp fun mvar g => do
     addMVarGoal mvar
     let eS ← Term.exprToSyntax (g.e : LeanExpr)
-    `(tactic| iapply (wp_value_eq (e := $eS) $v rfl))
+    `(tactic| iapply (wp_value_eq (e := $eS) $v (by kernel_rfl)))
   Tactic.evalTactic tac
 
 /-- `wp_alloc` with the expression anchored by a (definitional) equality. -/
@@ -334,7 +338,7 @@ elab "wp_alloc_at" colGt ppSpace v:term : tactic => do
   let tac ← runTacticWp fun mvar g => do
     addMVarGoal mvar
     let eS ← Term.exprToSyntax (g.e : LeanExpr)
-    `(tactic| iapply (wp_alloc_eq (ea := $eS) $v rfl))
+    `(tactic| iapply (wp_alloc_eq (ea := $eS) $v (by kernel_rfl)))
   Tactic.evalTactic tac
 
 /-- `wp_steps h` consumes a `PureSteps` fact `h` against the goal `wp E e Φ`, anchoring
@@ -344,7 +348,7 @@ elab "wp_steps" colGt ppSpace h:term : tactic => do
   let tac ← runTacticWp fun mvar g => do
     addMVarGoal mvar
     let eS ← Term.exprToSyntax (g.e : LeanExpr)
-    `(tactic| iapply (wp_pure_steps_at (e₁ := $eS) rfl $h))
+    `(tactic| iapply (wp_pure_steps_at (e₁ := $eS) (by kernel_rfl) $h))
   Tactic.evalTactic tac
 
 /-! ## Spec-side stepping: `tp_bind` / `tp_pure` / `tp_pures`
@@ -418,7 +422,7 @@ elab "tp_pure_core" : tactic => do
     let e₂fullS ← Term.exprToSyntax e₂full
     let hypIdent := mkIdent hypName
     `(tactic| imod (step_pure_at (K := $Ks) (e := $e₁s) (e' := $e₂s)
-        (e₁full := $especS) (e₂full := $e₂fullS) rfl rfl (by is_value))
+        (e₁full := $especS) (e₂full := $e₂fullS) (by kernel_rfl) (by kernel_rfl) (by is_value))
         $$ $hypIdent:ident with $hypIdent:ident)
   Tactic.evalTactic tacSeq
 
@@ -461,7 +465,7 @@ elab "tp_bind" colGt ppSpace focus:term:max : tactic => do
     let hypIdent := mkIdent hypName
     `(tacticSeq|
       ihave $hypIdent:ident := specProgFrag_reshape
-        (e₁ := $especS) (e₂ := Ectx.fill $Ks $es) rfl $$ $hypIdent:ident)
+        (e₁ := $especS) (e₂ := Ectx.fill $Ks $es) (by kernel_rfl) $$ $hypIdent:ident)
   Tactic.evalTactic tacSeq
 
 end ProbLang.ApproxisWpGS

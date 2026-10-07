@@ -28,8 +28,6 @@ indistinguishable up to the birthday bound `Q (Q - 1) / (2 N)`.
 open Iris Iris.BI Iris.ProofMode ProbLang ProbLang.ApproxisWpGS
 open scoped AppGS
 
-set_option maxHeartbeats 3200000
-
 namespace ProbLang
 namespace Switching
 

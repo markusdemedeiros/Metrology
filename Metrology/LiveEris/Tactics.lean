@@ -67,13 +67,15 @@ public meta partial def exprAsVal? {α : Q(Type)} (e : Q(Exp $α)) :
   | ~q(Exp.inr $a) => do
     let some va ← exprAsVal? a | return none
     return some q(Val.inr $va)
-  | _ =>
-    -- Reflective fallback, time-boxed: `toVal?` on a *concrete* `lam`/`fix` library
-    -- closure forces a full local-closedness evaluation of its body under `whnf`,
-    -- which grows superlinearly with binder nesting (`listRemoveNth`-sized programs
-    -- blow past 3M heartbeats). A timeout is reported as "not a value": decomposition
-    -- then descends past the closure, and a supplied focus term still matches the
-    -- rebuilt candidate by lazy δ in `isDefEq`, with clean emitted frames.
+  | _ => do
+    -- Fast path: a concrete `lam`/`fix` (possibly behind a library constant) is a value
+    -- iff it is locally closed, decided by kernel reduction (`Exp.closedFunVal?`) —
+    -- `whnf` of `toVal?` re-evaluates `lcb` through every inlined library body.
+    if let some r ← Exp.closedFunVal? α e then return r
+    -- Reflective fallback, time-boxed: other heads (where `toVal?` is cheap) and
+    -- closures the kernel cannot decide (metavariables). A timeout is reported as
+    -- "not a value": decomposition then descends past the closure, and a supplied focus
+    -- term still matches the rebuilt candidate by lazy δ in `isDefEq`.
     let tv? : Option Q(Option (Val $α)) ← controlAt CoreM fun runInBase =>
       Core.tryCatchRuntimeEx
         (runInBase do
@@ -543,12 +545,16 @@ elab "live_pure_excused_core" focus:(ppSpace colGt term:max)? : tactic =>
 `|={E}=> Φ v` when the postcondition cannot absorb an update). -/
 elab "live_value" : tactic =>
   runTacticLiveWp fun mvar { α, GF, instPL, instWp, hyps, Q, E, e, Φ, .. } => do
-    let tv : Q(Option (Val $α)) ← whnf q(Exp.toVal? $e)
+    -- A closure's value check goes through the kernel (`Exp.closedFunVal?`).
+    let tv : Q(Option (Val $α)) ← match ← Exp.closedFunVal? α e with
+      | some (some v) => have v : Q(Val $α) := v; pure q(some $v)
+      | some none => pure q(none)
+      | none => whnf q(Exp.toVal? $e)
     let ~q(some $v) := tv
       | throwTacticEx `live_value mvar m!"{← ppExpr e} is not a value"
     let hproof : Q(Exp.toVal? $e = some $v) ← mkFreshExprSyntheticOpaqueMVar
       q(Exp.toVal? $e = some $v)
-    (← Tactic.evalTacticAt (← `(tactic| rfl)) hproof.mvarId!).forM addMVarGoal
+    (← Tactic.evalTacticAt (← `(tactic| kernel_rfl)) hproof.mvarId!).forM addMVarGoal
     have goal : Q(IProp $GF) := Expr.headBeta q($Φ $v)
     let c : Q(Prop) ← mkFreshExprMVarQ q(Prop)
     let p' : Q(Bool) ← mkFreshExprMVarQ q(Bool)
@@ -585,7 +591,7 @@ macro "pl_closed " c:ident : command => do
   let fv := mkIdent (n.appendAfter "_fv")
   let oR := mkIdent (n.appendAfter "_openRec")
   let cR := mkIdent (n.appendAfter "_closeRec")
-  let c₁ ← `(theorem $lc {rT : Type _} : ($c : Exp rT).IsLocallyClosed := Exp.lcb_imp_lc (by rfl))
+  let c₁ ← `(theorem $lc {rT : Type _} : ($c : Exp rT).IsLocallyClosed := Exp.lcb_imp_lc (by lcb_kernel))
   let c₂ ← `(theorem $fv {rT : Type _} : ($c : Exp rT).fv = ∅ := by simp [$c:ident, Exp.fv])
   let c₃ ← `(@[simp] theorem $oR {rT : Type _} (k : ℕ) (t : Exp rT) :
       Exp.openRec k t ($c : Exp rT) = $c := (Exp.open_lc k t $c $lc).symm)

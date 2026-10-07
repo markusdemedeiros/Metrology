@@ -1751,7 +1751,7 @@ theorem cell_ternary_param
       ext ⟨b, p1, p2, p3⟩; simp only [hJoint, Set.mem_iUnion, Set.mem_ofPred_eq]; tauto
     rw [this]; exact MeasurableSet.iUnion IH
 
-set_option maxHeartbeats 1000000 in
+set_option maxHeartbeats 300000 in
 /-- **Quaternary joint-recursive cell (param)** (arity-extension appendix, §21): copied
 from `cell_ternary_param` with one extra child `s4`/`ih4`. Codomain `α × α × α × α`
 treated as `α × (α × α × α)`. Needs `[Inhabited β]`.

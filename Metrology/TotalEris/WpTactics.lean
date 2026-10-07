@@ -75,13 +75,15 @@ public meta partial def exprAsVal? {α : Q(Type)} (e : Q(Exp $α)) :
   | ~q(Exp.inr $a) => do
     let some va ← exprAsVal? a | return none
     return some q(Val.inr $va)
-  | _ =>
-    -- Reflective fallback, time-boxed: `toVal?` on a *concrete* `lam`/`fix` library
-    -- closure forces a full local-closedness evaluation of its body under `whnf`,
-    -- which grows superlinearly with binder nesting (`listRemoveNth`-sized programs
-    -- blow past 3M heartbeats). A timeout is reported as "not a value": decomposition
-    -- then descends past the closure, and a supplied focus term still matches the
-    -- rebuilt candidate by lazy δ in `isDefEq`, with clean emitted frames.
+  | _ => do
+    -- Fast path: a concrete `lam`/`fix` (possibly behind a library constant) is a value
+    -- iff it is locally closed, decided by kernel reduction (`Exp.closedFunVal?`) —
+    -- `whnf` of `toVal?` re-evaluates `lcb` through every inlined library body.
+    if let some r ← Exp.closedFunVal? α e then return r
+    -- Reflective fallback, time-boxed: other heads (where `toVal?` is cheap) and
+    -- closures the kernel cannot decide (metavariables). A timeout is reported as
+    -- "not a value": decomposition then descends past the closure, and a supplied focus
+    -- term still matches the rebuilt candidate by lazy δ in `isDefEq`.
     let tv? : Option Q(Option (Val $α)) ← controlAt CoreM fun runInBase =>
       Core.tryCatchRuntimeEx
         (runInBase do
@@ -551,14 +553,18 @@ elab "twp_pure_core" focus:(ppSpace colGt term:max)? : tactic =>
 reducing it to the postcondition `Φ v`. -/
 elab "twp_value" : tactic =>
   runTacticTglWp fun mvar { α, GF, instPL, instWp, hyps, E, e, Φ, .. } => do
-    let tv : Q(Option (Val $α)) ← whnf q(Exp.toVal? $e)
+    -- A closure's value check goes through the kernel (`Exp.closedFunVal?`).
+    let tv : Q(Option (Val $α)) ← match ← Exp.closedFunVal? α e with
+      | some (some v) => have v : Q(Val $α) := v; pure q(some $v)
+      | some none => pure q(none)
+      | none => whnf q(Exp.toVal? $e)
     let ~q(some $v) := tv
       | throwTacticEx `twp_value mvar m!"{← ppExpr e} is not a value"
     -- `e.toVal? = some v` holds definitionally (`v` came from whnf of `e.toVal?`);
     -- discharge it with `rfl`.
     let hproof : Q(Exp.toVal? $e = some $v) ← mkFreshExprSyntheticOpaqueMVar
       q(Exp.toVal? $e = some $v)
-    (← Tactic.evalTacticAt (← `(tactic| rfl)) hproof.mvarId!).forM addMVarGoal
+    (← Tactic.evalTacticAt (← `(tactic| kernel_rfl)) hproof.mvarId!).forM addMVarGoal
     have goal : Q(IProp $GF) := Expr.headBeta q($Φ $v)
     -- iWpValueHead: if the postcondition can absorb a `|={E}=>` (an `ElimModal` exists
     -- whose side condition is dischargeable), leave the clean goal `Φ v`; otherwise hand

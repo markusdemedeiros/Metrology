@@ -1,6 +1,7 @@
 module
 
 public import Metrology.ProbLang.Syntax.Syntax
+public meta import Lean.Elab.Tactic.Basic
 
 @[expose] public section
 
@@ -412,9 +413,62 @@ are invariant) — and the step tactics run `simp only [pl_step_simp]` after eac
 
 register_simp_attr pl_step_simp
 
+/-- Decide `Exp.lcb k e = true` (or any closed-form `a = b`) by *kernel* reduction and
+close it with `Eq.refl`. On an inlined library closure the elaborator's `rfl`/`whnf`
+re-evaluates `lcb` through every unfolded constant body (seconds per call, and it
+recurs on every pure step); the kernel's cached reduction does the same check in
+milliseconds. -/
+public meta def Exp.kernelDecideEq (g : Lean.MVarId) : Lean.MetaM Unit := g.withContext do
+  let ty ← Lean.instantiateMVars (← g.getType)
+  let some (_, lhs, rhs) := ty.eq? | throwError "lcb_kernel: goal is not an equation"
+  if ty.hasMVar then throwError "lcb_kernel: goal contains metavariables"
+  unless ← Lean.ofExceptKernelException
+      (Lean.Kernel.isDefEq (← Lean.getEnv) (← Lean.getLCtx) lhs rhs) do
+    throwError "lcb_kernel: sides are not definitionally equal"
+  g.assign (← Lean.Meta.mkExpectedTypeHint (← Lean.Meta.mkEqRefl lhs) ty)
+
+open Lean in
+/-- Value check for a concrete `lam`/`fix` closure `e : Exp α` (possibly behind a library
+constant), deciding its local closedness by kernel reduction instead of `whnf` of
+`Exp.toVal?`. Returns `some (some v)` with `v.fst = e` for a closed closure,
+`some none` for an open one, and `none` when `e` is not a `lam`/`fix` or the kernel
+cannot decide (e.g. metavariables), so the caller falls back to `toVal?`. -/
+public meta def Exp.closedFunVal? (α e : Expr) : MetaM (Option (Option Expr)) := do
+  let eW ← Meta.whnf e
+  let ctor ← if eW.isAppOfArity ``Exp.lam 2 then pure ``IsVal.lam
+    else if eW.isAppOfArity ``Exp.fix 2 then pure ``IsVal.fix else return none
+  let lcbTrue (x : Expr) : Expr :=
+    mkApp3 (mkConst ``Eq [1]) (mkConst ``Bool)
+      (mkApp3 (mkConst ``Exp.lcb [0]) α (mkNatLit 0) x) (mkConst ``Bool.true)
+  let some (_, lhs, rhs) := (lcbTrue e).eq? | return none
+  let ok ← try ofExceptKernelException (Kernel.isDefEq (← getEnv) (← getLCtx) lhs rhs)
+    catch _ => return none
+  unless ok do return some none
+  let rflTrue := mkApp2 (mkConst ``Eq.refl [1]) (mkConst ``Bool) (mkConst ``Bool.true)
+  let lcOf (x : Expr) : MetaM Expr := do
+    return mkApp3 (mkConst ``Exp.lcb_imp_lc [0]) α x
+      (← Meta.mkExpectedTypeHint rflTrue (lcbTrue x))
+  let snd := mkApp3 (mkConst ctor) α eW.appArg! (← lcOf eW)
+  return some (some (mkApp4 (mkConst ``Val.mk) α e snd (← lcOf e)))
+
+/-- `lcb_kernel` closes `Exp.lcb k e = true` by kernel reduction (see
+`Exp.kernelDecideEq`). -/
+syntax "lcb_kernel" : tactic
+elab_rules : tactic
+  | `(tactic| lcb_kernel) => Lean.Elab.Tactic.liftMetaFinishingTactic Exp.kernelDecideEq
+
+/-- `kernel_rfl` closes a definitional equation `a = b` by kernel reduction when it is
+metavariable-free (the step tactics' anchors `e_full = K.fill e`, `e.toVal? = some v`),
+and falls back to the elaborator's `rfl` (which can unify metavariables) otherwise. -/
+syntax "kernel_rfl" : tactic
+elab_rules : tactic
+  | `(tactic| kernel_rfl) => Lean.Elab.Tactic.liftMetaFinishingTactic fun g => do
+    if (← Lean.instantiateMVars (← g.getType)).hasMVar then g.refl
+    else Exp.kernelDecideEq g
+
 /-- `is_lc` discharges `Exp.IsLocallyClosed e` goals. Runtime values and program
 fragments are locally closed; the proof is either a kernel computation of the decidable
-checker (`Exp.lcb_imp_lc (by rfl)`, for fully concrete closed subterms such as source
+checker (`Exp.lcb_imp_lc (by lcb_kernel)`, for fully concrete closed subterms such as source
 `lam`/`fix` bodies), or a structural decomposition bottoming out at an abstract value's
 `Val.lc` field (`exact Val.lc _`) or a closedness hypothesis already in context. -/
 syntax "is_lc" : tactic
@@ -422,10 +476,10 @@ macro_rules
   | `(tactic| is_lc) =>
     `(tactic| first
         | assumption
-        | exact Exp.lcb_imp_lc (by rfl)
+        | exact Exp.lcb_imp_lc (by lcb_kernel)
         | repeat' (first
             | assumption
-            | exact Exp.lcb_imp_lc (by rfl)
+            | exact Exp.lcb_imp_lc (by lcb_kernel)
             | exact Val.lc _
             | exact Exp.IsLocallyClosed.fvar _
             | exact Exp.IsLocallyClosed.lit _
@@ -443,7 +497,7 @@ macro_rules
                  simp only [Exp.open', Exp.openRec])
             -- Clear an `openRec k t e₀` stuck on a closed leaf `e₀`: rewrite it back to
             -- `e₀` (the side goal `e₀.IsLocallyClosed` is then closed by the recursion —
-            -- `Val.lc` for a value, `lcb_imp_lc (by rfl)` for a closed constant).
+            -- `Val.lc` for a value, `lcb_imp_lc (by lcb_kernel)` for a closed constant).
             | rw [← Exp.open_lc]
             | apply Exp.IsLocallyClosed.app | apply Exp.IsLocallyClosed.unop
             | apply Exp.IsLocallyClosed.binop | apply Exp.IsLocallyClosed.cond
@@ -465,7 +519,7 @@ macro_rules
                                -- `Val`'s `v.isValue`), matched up to defeq
             | exact Val.snd _                -- `IsVal v.fst` for an abstract `Val v`
             | exact Val.isValue _            -- `v.fst.isValue` (`Nonempty (IsVal v.fst)`)
-            | exact Exp.lcb_imp_lc (by rfl)  -- a closed `(lam/fix …).IsLocallyClosed` subterm
+            | exact Exp.lcb_imp_lc (by lcb_kernel)  -- a closed `(lam/fix …).IsLocallyClosed` subterm
             | exact Val.lc _                 -- a value's closedness, from its `Val.lc` field
             | exact ProbLang.IsVal.lit
             | refine ProbLang.IsVal.lam ?_ | refine ProbLang.IsVal.fix ?_

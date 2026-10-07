@@ -128,7 +128,6 @@ theorem bin_log_related_fix_step {Δ : TyEnv rT GF} {Γrc' : RelCtx rT GF} {f : 
   · exact fun _ => close_fv_in_outer_dom hKe'_fv
   exact bin_log_related_close_cofinite hfRc hKe_lc hKe'_lc Hbody
 
-set_option maxHeartbeats 400000 in
 theorem bin_log_related_under_typed_ctx {Γtc : Tctx} {e e' : Exp rT} {τ : Ty} {Γtc' : Tctx}
     {τ' : Ty} {K : Ctx rT} (HK : TypedCtx K Γtc τ Γtc' τ') (Hty_e : Typed Γtc e τ)
     (Hty_e' : Typed Γtc e' τ)

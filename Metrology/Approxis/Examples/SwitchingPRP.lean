@@ -17,8 +17,6 @@ Representation predicates and query rules for `randomFunction`/`randomPermutatio
 open Iris Iris.BI Iris.ProofMode ProbLang ProbLang.ApproxisWpGS
 open scoped AppGS
 
-set_option maxHeartbeats 3200000
-
 namespace ProbLang
 namespace Switching
 

@@ -1670,7 +1670,6 @@ theorem Exp.toVal?_isValue {e : Exp α} : e.toVal? = some v → e.isValue := by
 theorem Exp.toVal?_isValueR {e : Exp α} (h : e.toVal? = some v) : e.isValueR :=
   (Exp.isValue_iff_isValueR.mp (Exp.toVal?_isValue h)).1
 
-set_option maxHeartbeats 4000000 in
 theorem head_ctx_step_val {e : Exp rT} {σ : State rT} {Ki : EctxItem rT} :
     headStep ⟨Ki.fillItem e, σ⟩ ≠ 0 → e.isValueR := by
   head_case
@@ -2274,7 +2273,6 @@ theorem isAtomicSupport_uniform (z : Int) (σ : State rT) :
       unfold Cfg.uniform; simp only [Int.isPos, dite_eq_right hz]
     rw [hrw]; exact isAtomicSupport_dirac _
 
-set_option maxHeartbeats 1000000 in
 /-- **`headStep` is purely atomic** away from `urand`. Atomicity is a discrete
 notion — it is FALSE for the continuous sampler `urand` (`Cfg.uniformReal` is
 diffuse when `unifUnit` is), hence the `e ≠ .urand` hypothesis. The continuous
@@ -2410,7 +2408,6 @@ theorem headStep_univ_le_one (ρ : Cfg rT) : (headStep ρ) Set.univ ≤ 1 := by
     have := @Cfg.uniform_isProbabilityMeasure rT _ z σ
     exact this.measure_univ.le
   obtain ⟨e, σ⟩ := ρ
-  set_option maxHeartbeats 1000000 in
   show (headStep ⟨e, σ⟩) Set.univ ≤ 1
   unfold headStep
   split
