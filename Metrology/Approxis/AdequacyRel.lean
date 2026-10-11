@@ -11,6 +11,8 @@ public import Iris.Instances.Lib.FUpd
 
 @[expose] public section
 
+local stepindex Nat
+
 /-! # Relational adequacy: bridging parametric `refines` to an `AddCoupl` on `limExec`. -/
 
 namespace ProbLang
@@ -79,16 +81,16 @@ section ApproxisFunctor
 variable (rT : Type) [LawfulProbLangℝ rT] [MeasurableSingletonClass rT]
 
 noncomputable def ApproxisFunctor : BundledGFunctors := fun
-  | 0 => ⟨InvMapF, by infer_instance⟩
-  | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
-  | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
-  | 3 => ⟨AuthURF (constOF Credit), by infer_instance⟩
-  | 4 => ⟨constOF (SpecHeap rT), by infer_instance⟩
-  | 5 => ⟨constOF SpecTapes, by infer_instance⟩
-  | 6 => ⟨constOF (SpecProg rT), by infer_instance⟩
-  | 7 => ⟨constOF (Auth ErrorCredit), by infer_instance⟩
-  | 8 => ⟨NaInvF, by infer_instance⟩
-  | _ => ⟨constOF Unit, by infer_instance⟩
+  | 0 => ⟨InvMapF⟩
+  | 1 => ⟨constOF (DisjointLeibnizSet CoPset)⟩
+  | 2 => ⟨constOF (DisjointLeibnizSet PosSet)⟩
+  | 3 => ⟨AuthURF (constOF Credit)⟩
+  | 4 => ⟨constOF (SpecHeap rT)⟩
+  | 5 => ⟨constOF SpecTapes⟩
+  | 6 => ⟨constOF (SpecProg rT)⟩
+  | 7 => ⟨constOF (Auth ErrorCredit)⟩
+  | 8 => ⟨NaInvF⟩
+  | _ => ⟨constOF Unit⟩
 
 /-! ### `RefinesPreGS` instances for `ApproxisFunctor` -/
 

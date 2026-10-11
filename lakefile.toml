@@ -17,8 +17,7 @@ rev = "v4.34.0"
 
 [[require]]
 name = "iris"
-git = "https://github.com/leanprover-community/iris-lean.git"
-subDir = "Iris"
+path = "../iris-lean/Iris"
 
 # SampCert dropped in the iris-lean-bump branch: it has no v4.30.0 release.
 # The two dependent files Metrology/SampCert/{SLang,Samplers}.lean are excluded

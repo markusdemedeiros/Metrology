@@ -10,6 +10,8 @@ public import Metrology.Iris.Algebra
 
 @[expose] public section
 
+local stepindex Nat
+
 noncomputable section
 
 open Std Iris COFE
@@ -21,51 +23,57 @@ instance : COFE ErrorCredit := COFE.ofDiscrete _
 instance : OFE.Discrete ErrorCredit := ⟨id⟩
 instance (x : ErrorCredit) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-instance : CMRA ErrorCredit where
+instance : RA ErrorCredit where
   pcore _ := some 0
   op := (· + ·)
+  assoc {_ _ _} := (add_assoc ..).symm
+  comm {_ _} := (add_comm ..).symm
+  pcore_op_left {_ _} := by rintro ⟨rfl⟩; simp
+  pcore_idem := by simp
+
+instance : CMRA ErrorCredit := ORA.ofCMRAData {
   ValidN _ ε := ε < 1
   Valid ε := ε < 1
   op_ne.ne _ _ _ h := by rw [h]
   pcore_ne _ := by rintro ⟨rfl⟩; exists 0
   validN_ne {_ _ _} := by rintro ⟨rfl⟩; exact id
   valid_iff_validN := .symm <| forall_const Nat
-  validN_succ := (·)
+  validN_le H _ := H
   validN_op_left {n x y} H := lt_of_add_lt_of_nonneg_left H (zero_le)
-  assoc {_ _ _} := (add_assoc ..).symm
-  comm {_ _} := (add_comm ..).symm
-  pcore_op_left {_ _} := by rintro ⟨rfl⟩; simp
-  pcore_idem := by simp
-  pcore_op_mono {_ _} := by rintro ⟨rfl⟩ _; exists 0; simp
-  extend _ h := ⟨_, _, OFE.discrete h, .rfl, .rfl⟩
+  pcore_op_mono {_ _} := by rintro ⟨rfl⟩ _; exact ⟨0, congrArg some (zero_add 0).symm⟩
+  extend _ h := ⟨_, _, OFE.discrete h, .rfl, .rfl⟩ }
 
-instance : CMRA.Discrete ErrorCredit where
+instance : ORA.Discrete ErrorCredit where
   discrete_valid := id
+  discrete_ord := CMRA.ord_of_ord0
 
-instance : UCMRA ErrorCredit where
+instance : URA ErrorCredit where
   unit := 0
-  unit_valid := by simp [CMRA.Valid]
-  unit_left_id := by simp [CMRA.op]
-  pcore_unit := by simp [CMRA.pcore]
+  unit_left_id := zero_add _
+  pcore_unit := rfl
+  total _ := ⟨0, rfl⟩
+
+instance : UCMRA ErrorCredit := UORA.ofUCMRAData {
+  unit_valid := show (0 : ErrorCredit) < 1 from zero_lt_one }
 
 theorem ErrorCredit.included_iff {ε₁ ε₂ : ErrorCredit} : ε₁ ≼ ε₂ ↔ ε₁ ≤ ε₂ := by
   refine ⟨?_, (⟨ε₂ - ε₁, add_tsub_cancel_of_le · |>.symm⟩)⟩
   rintro ⟨ε₃, rfl⟩
   exact le_self_add
 
-theorem ErrorCredit.includedN_iff {ε₁ ε₂ : ErrorCredit} : ε₁ ≼{n} ε₂ ↔ ε₁ ≤ ε₂ :=
+theorem ErrorCredit.includedN_iff {n : Nat} {ε₁ ε₂ : ErrorCredit} : ε₁ ≼{n} ε₂ ↔ ε₁ ≤ ε₂ :=
   ErrorCredit.included_iff
 
-instance {ε : ErrorCredit} : CMRA.Cancelable ε where
+instance {ε : ErrorCredit} : ORA.Cancelable ε where
   cancelableN {n ε₁ ε₂} := by
-    simp [CMRA.ValidN, CMRA.op, OFE.Dist]
+    simp [Valid.ValidN, Op.op, OFE.Dist, HasDist.dist]
     intro H1 H2
     refine (ENNReal.add_right_inj ?_).mp H2
     rintro rfl; simp at H1
 
 theorem ErrorCredit.localUpdate {ε₁ ε₂ ε₁' ε₂' : ErrorCredit} (h1 : ε₂' <= ε₂)
     (h2 : ε₁ + ε₂' = ε₁' + ε₂) : (ε₁, ε₂) ~l~> (ε₁', ε₂') := by
-  rintro n (_|ε) <;> simp only [OFE.Dist, CMRA.op?, CMRA.ValidN, CMRA.op]
+  rintro n (_|ε) <;> simp only [OFE.Dist, HasDist.dist, Op.op?, Valid.ValidN, Op.op]
   · rintro H rfl
     symm at h2
     obtain rfl : ε₁' = ε₂' := ENNReal.add_left_inj H.ne_top |>.mp (by grind)
@@ -79,10 +87,12 @@ theorem ErrorCredit.localUpdate {ε₁ ε₂ ε₁' ε₂' : ErrorCredit} (h1 : 
     rw [add_comm]
     exact (add_le_add_left h1 ε)
 
+instance : Iris.IsRAUnit (◯ 0 : Auth ErrorCredit) where
+  unit_left_id := by simp [Op.op]
+  pcore_unit := by simp [PCore.pcore, PCore.core]
+
 instance : Iris.IsUnit (◯ 0 : Auth ErrorCredit) where
-  unit_valid := Auth.frag_valid.mpr (by simp [CMRA.Valid])
-  unit_left_id := by simp [CMRA.op]
-  pcore_unit := by simp [CMRA.pcore, CMRA.core]
+  unit_valid := Auth.frag_valid.mpr (by simp [Valid.Valid])
 
 class ECPreGS (GF : BundledGFunctors) where
   ec : ElemG GF (constOF (Auth ErrorCredit))
@@ -101,7 +111,7 @@ def ec (ε : ℝ≥0∞) : IProp GF := iOwn (E := IEC.ec) IEC.γec (◯ ε)
 notation "↯ " r:50 => ec r
 notation "●↯ " r:50 => ecAuth r
 
-instance : CMRA.Discrete (Auth ErrorCredit) := by infer_instance
+instance : ORA.Discrete (Auth ErrorCredit) := by infer_instance
 instance : OFE.DiscreteE (◯ r : Auth ErrorCredit) := Auth.frag_discrete
 
 end Resources
@@ -118,7 +128,7 @@ theorem split {ε₁ ε₂} : ↯(ε₁ + ε₂) ⊢@{IProp GF} ↯ε₁ ∗ ↯
   unfold ec
   iintro Hε
   iapply iOwn_op
-  simp [CMRA.op]
+  simp [Op.op]
   iexact Hε
 
 theorem difference {ε₁ ε₂} (Hwf : ε₁ ≤ ε₂) : ↯ε₂ ⊢@{IProp GF} ↯ε₁ ∗ ↯(ε₂ - ε₁) := by
@@ -155,7 +165,7 @@ theorem supply_decrease {εₛ ε} : ⊢@{IProp GF} ●↯ εₛ -∗ ↯ε -∗
   unfold ec ecAuth
   ihave Hc := iOwn_op |>.mpr $$ [$Hs $Hε]
   refine iOwn_update <| Auth.auth_update_dealloc ?_
-  simp only [UCMRA.unit]
+  simp only [UnitOp.unit]
   refine localUpdate (zero_le) ?_
   simpa [add_zero] using (tsub_add_cancel_of_le Hle).symm
 
@@ -164,7 +174,7 @@ theorem supply_increase {ε₁ ε₂ : ℝ≥0∞} (h : ε₁ + ε₂ < 1) :
   unfold ec ecAuth
   have Hupd : (● ε₁) ~~> (● ε₁ + ε₂) • (◯ ε₂ : Auth ℝ≥0∞) := by
     refine Auth.auth_update_alloc <| (local_update_unital_discrete ..).mpr ?_
-    simp only [CMRA.Valid, CMRA.op, UCMRA.unit, zero_add, forall_apply_eq_imp_iff]
+    simp only [Valid.Valid, Op.op, UnitOp.unit, zero_add, forall_apply_eq_imp_iff]
     exact fun _ => ⟨h, add_comm _ _⟩
   iintro Hε
   ihave H := iOwn_update Hupd $$ Hε

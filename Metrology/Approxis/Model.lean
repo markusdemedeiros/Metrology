@@ -10,6 +10,8 @@ public import Metrology.Iris.Countable
 
 @[expose] public section
 
+local stepindex Nat
+
 /-! # Semantic Model -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS
@@ -54,7 +56,7 @@ theorem lrel.ext {GF : BundledGFunctors} {A B : lrel rT GF}
   subst hcar; rfl
 
 instance {GF : BundledGFunctors} : OFE (lrel rT GF) where
-  Dist n A B := ∀ v1 v2, A.car v1 v2 ≡{n}≡ B.car v1 v2
+  dist n A B := ∀ v1 v2, A.car v1 v2 ≡{n}≡ B.car v1 v2
   dist_eqv := {
     refl _ _ _ := dist_eqv.refl _
     symm h v1 v2 := dist_eqv.symm (h v1 v2)
@@ -89,6 +91,9 @@ noncomputable instance {GF : BundledGFunctors} : IsCOFE (lrel rT GF) where
             (Function.const _ iprop(⌜v1.1.isClosedEmpty ∧ v2.1.isClosedEmpty⌝))).compl
           (lrel.toFunChain c) fun k => (c.chain k).closed v1 v2 }
   conv_compl {_ c} v1 v2 := IsCOFE.conv_compl (c := lrel.toFunChain c) v1 v2
+  lbcompl := (·.elim)
+  conv_lbcompl := (·.elim)
+  lbcompl_ne := (·.elim)
 
 instance {GF : BundledGFunctors} : Inhabited (lrel rT GF) where
   default :=

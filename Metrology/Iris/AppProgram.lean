@@ -12,6 +12,8 @@ public import Metrology.ProbLang.Syntax.Notation
 
 @[expose] public section
 
+local stepindex Nat
+
 /-!
 # Program-side ghost state
 

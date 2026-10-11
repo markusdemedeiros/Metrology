@@ -14,6 +14,8 @@ public import Mathlib.Analysis.Calculus.ContDiff.Polynomial
 
 @[expose] public section
 
+local stepindex Nat
+
 /-! # Reduced Correctness Specifications
 
 This file contains several reductions of the correctness specification for CTE samplers, based

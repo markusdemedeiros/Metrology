@@ -7,6 +7,8 @@ public import Metrology.Iris.StepFupd
 
 @[expose] public section
 
+local stepindex Nat
+
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS ProbLang.Cfg
 open scoped AppGS
 
@@ -181,7 +183,7 @@ theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp rT) (σ σ' : State rT
     iintro -
     imod BIFUpdate.subset (E2 := ∅) Std.LawfulSet.empty_subset with -
     imodintro
-    simp only [Nat.repeat]
+    simp only [step_fupdN]
     ipureintro
     simp only [execCoupl, asExpr, execN_zero, MeasureTheory.Measure.map_zero]
     exact AddCoupl.zero_left _ _
@@ -201,7 +203,7 @@ theorem wp_adequacy_step_fupdN (ε : ENNReal) (e e' : Exp rT) (σ σ' : State rT
       iintro %σ₂ %e₂' %σ₂' %ε' Hprog
       iapply wp_adequacy_prog_coupl (Hnone := Hnone) $$ Hprog
       iintro %e₃ %σ₃ %e₃' %σ₃' %ε₃ Hspec
-      simp only [Nat.repeat]
+      simp only [step_fupdN]
       iintro !> !> !>
       iapply wp_adequacy_spec_coupl $$ Hspec
       iintro %σ₄ %e₄' %σ₄' %ε₄ HZ

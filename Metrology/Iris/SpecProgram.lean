@@ -12,6 +12,8 @@ public import Metrology.ProbLang.Discrete
 
 @[expose] public section
 
+local stepindex Nat
+
 section SpecRA
 open Std Iris Iris.Std COFE ProbLang
 

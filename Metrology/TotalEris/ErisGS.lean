@@ -8,6 +8,8 @@ public import Iris.Algebra.Auth
 
 @[expose] public section
 
+local stepindex Nat
+
 /-! # Eris Ghost State Definitions -/
 
 open Iris Auth
@@ -48,14 +50,14 @@ noncomputable instance erisWpGS_of_components : ErisWpGS (rT := rT) GF where
 end ErisInstance
 
 noncomputable def erisGF : BundledGFunctors.{0,0,0} := fun
-  | 0 => ⟨InvMapF, by infer_instance⟩
-  | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
-  | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
-  | 3 => ⟨AuthURF (constOF Credit), by infer_instance⟩
-  | 4 => ⟨constOF (Auth ErrorCredit), by infer_instance⟩
-  | 5 => ⟨constOF (SpecHeap ℝ), by infer_instance⟩
-  | 6 => ⟨constOF SpecTapes, by infer_instance⟩
-  | _ => ⟨constOF Unit, by infer_instance⟩
+  | 0 => ⟨InvMapF⟩
+  | 1 => ⟨constOF (DisjointLeibnizSet CoPset)⟩
+  | 2 => ⟨constOF (DisjointLeibnizSet PosSet)⟩
+  | 3 => ⟨AuthURF (constOF Credit)⟩
+  | 4 => ⟨constOF (Auth ErrorCredit)⟩
+  | 5 => ⟨constOF (SpecHeap ℝ)⟩
+  | 6 => ⟨constOF SpecTapes⟩
+  | _ => ⟨constOF Unit⟩
 
 instance : WsatGpreS erisGF where
   inv := { τ := 0, transp := by unfold erisGF; rfl }

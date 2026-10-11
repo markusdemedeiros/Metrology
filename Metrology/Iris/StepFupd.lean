@@ -53,14 +53,14 @@ end StepFUpd
 
 section StepFUpdPlain
 
-variable {PROP : Type _} [Sbi PROP] [BIFUpdate PROP] [BIFUpdateSbi PROP] [BIAffine PROP]
+variable {PROP : Type _} [BI PROP] [BIPlainly PROP] [BIFUpdate PROP] [BIFUpdatePlainly PROP] [BIAffine PROP]
 
 open Iris.BI.BIBase
 
 theorem fupd_step_fupdN_plain_forall_1 (Φ : A → PROP) [∀ x, Plain (Φ x)] (n : Nat) : iprop%
     (∀ x, |={∅}=> |={∅}[∅]▷=>^[n] Φ x) ⊢ |={∅}=> |={∅}[∅]▷=>^[n] ∀ x, Φ x := by
   cases n with
-  | zero => simp only [Nat.repeat]; exact (fupd_plain_forall Std.LawfulSet.subset_refl).mpr
+  | zero => simp only [step_fupdN]; exact (fupd_plain_forall Std.LawfulSet.subset_refl).mpr
   | succ n =>
     calc _ ⊢ ∀ x, |={∅}=> ▷^[n+1] ◇ Φ x :=
         forall_mono fun _ => (BIFUpdate.mono step_fupdN_plain).trans BIFUpdate.trans

@@ -15,6 +15,8 @@ public import Iris.ProofMode.InstancesUpdates
 
 @[expose] public section
 
+local stepindex Nat
+
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 
 namespace ProbLang
@@ -82,7 +84,7 @@ abbrev specCoupl (E : CoPset) (σ : State rT) (e' : Exp rT) (σ' : State rT) (ε
 
 omit [ApproxisWpGS (rT := rT) GF] in
 theorem specCouplState_ne {Φ : SpecCouplState rT → IProp GF} : NonExpansive Φ where
-  ne _ _ _ hd := .of_eq (congrArg Φ (OFE.Discrete.discrete_0 hd))
+  ne _ _ _ hd := .of_eq (congrArg Φ (OFE.Discrete.discrete hd))
 
 macro "spec_trivial_left" : tactic => `(tactic| (isplitr; · ipureintro; trivial))
 macro "spec_trivial_cases" : tactic => `(tactic| repeat spec_trivial_left)
@@ -229,7 +231,7 @@ theorem progCoupl_ne {n : Nat} {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp r
   refine sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <|
     sep_ne.ne (.of_eq rfl) ?_
   exact forall_ne fun _ => forall_ne fun _ => forall_ne fun _ => forall_ne fun _ =>
-    BIFUpdate.ne.ne (HZ _ _ _ _ _)
+    FUpdNE.fupd_ne.ne (HZ _ _ _ _ _)
 
 theorem progCoupl_mono {e₁ : Exp rT} {σ₁ : State rT} {e₁' : Exp rT} {σ₁' : State rT}
     {ε : ENNReal} {Z₁ Z₂ : Exp rT → State rT → Exp rT → State rT → ENNReal → IProp GF} : iprop%
@@ -271,19 +273,19 @@ theorem wpPre_ne_aux {n : Nat} {wp wp' : WpType (rT := rT) (GF := GF)} {E : CoPs
     (Hwp : ∀ m, m < n → ∀ e₃, wp E e₃ Φ ≡{m}≡ wp' E e₃ Ψ) :
     wpPre wp E e Φ ≡{n}≡ wpPre wp' E e Ψ := by
   refine forall_ne fun _ => forall_ne fun _ => forall_ne fun _ => forall_ne fun _ => ?_
-  refine wand_ne.ne (.of_eq rfl) (BIFUpdate.ne.ne ?_)
+  refine wand_ne.ne (.of_eq rfl) (FUpdNE.fupd_ne.ne ?_)
   refine least_fixpoint_ne_outer (fun _ _ => ?_) (.of_eq rfl)
   refine or_ne.ne (.of_eq rfl) (or_ne.ne ?_ (.of_eq rfl))
   cases htv : e.toVal? with
   | some v =>
-    exact BIFUpdate.ne.ne <| sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <|
+    exact FUpdNE.fupd_ne.ne <| sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <|
       sep_ne.ne (.of_eq rfl) (HΦ v)
   | none =>
     refine progCoupl_ne fun e₃ _ _ _ _ => ?_
     apply Contractive.distLater_dist
     intro m Hm
     refine specCoupl_ne fun _ _ _ => ?_
-    exact BIFUpdate.ne.ne <| sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <|
+    exact FUpdNE.fupd_ne.ne <| sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <|
       sep_ne.ne (.of_eq rfl) (Hwp m Hm e₃)
 
 instance wpPre_contractive : Contractive (wpPre (rT := rT) (GF := GF)) where
@@ -1727,11 +1729,11 @@ theorem wp_pure_step_fupd' {E E' : CoPset} {e₁ e₂ : Exp rT} {φ : Prop} {n :
   | zero =>
     simp only [nsteps] at Hsteps
     subst Hsteps
-    simp only [Nat.repeat]
+    simp only [step_fupdN]
     iintro H; iexact H
   | succ n IH =>
     obtain ⟨c, Hstep, Hrest⟩ := Hsteps
-    simp only [Nat.repeat]
+    simp only [step_fupdN]
     iintro H
     iapply wp_lift_pure_det_step_concentrated Hstep
     imod H; imodintro; iintro !>; imod H; imodintro
@@ -1746,7 +1748,7 @@ theorem wp_pure_step_later' {E : CoPset} {e₁ e₂ : Exp rT} {φ : Prop} {n : N
     exact .rfl
   | succ n ih =>
     refine (BI.later_mono ih).trans ?_
-    simp only [Nat.repeat]
+    simp only [step_fupdN]
     iintro H
     imodintro; iintro !>; imodintro; iexact H
 

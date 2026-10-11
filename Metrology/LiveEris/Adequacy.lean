@@ -5,6 +5,8 @@ public import Metrology.Iris.StepFupd
 
 @[expose] public section
 
+local stepindex Nat
+
 /-!
 # LiveEris adequacy
 
@@ -338,14 +340,14 @@ theorem lwp_adequacy_body (hD : MeasurableSet {σ : State rT | D σ})
       · cases k with
         | zero =>
           imodintro
-          simp only [Nat.repeat]
+          simp only [step_fupdN]
           ipureintro
           intro m hm
           omega
         | succ k' =>
           rcases hck _ _ _ Hck with hDρ | h1
           · imodintro
-            simp only [Nat.repeat]
+            simp only [step_fupdN]
             iintro !> !>
             imod HL with ⟨Hσ'', Hc'', HW'⟩
             iapply BIFUpdate.mono (step_fupdN_mono (pure_mono ?_))

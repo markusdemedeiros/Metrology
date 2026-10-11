@@ -8,6 +8,8 @@ public import Iris.Algebra.Auth
 
 @[expose] public section
 
+local stepindex Nat
+
 /-! # LiveEris ghost state -/
 
 open Iris Auth
@@ -58,14 +60,14 @@ noncomputable instance liveWpGS_of_components : LiveWpGS rT Coord GF where
 end LiveInstance
 
 noncomputable def liveGF : BundledGFunctors.{0,0,0} := fun
-  | 0 => ⟨InvMapF, by infer_instance⟩
-  | 1 => ⟨constOF (DisjointLeibnizSet CoPset), by infer_instance⟩
-  | 2 => ⟨constOF (DisjointLeibnizSet PosSet), by infer_instance⟩
-  | 3 => ⟨AuthURF (constOF Credit), by infer_instance⟩
-  | 4 => ⟨constOF (Auth LiveCredit), by infer_instance⟩
-  | 5 => ⟨constOF (SpecHeap ℝ), by infer_instance⟩
-  | 6 => ⟨constOF SpecTapes, by infer_instance⟩
-  | _ => ⟨constOF Unit, by infer_instance⟩
+  | 0 => ⟨InvMapF⟩
+  | 1 => ⟨constOF (DisjointLeibnizSet CoPset)⟩
+  | 2 => ⟨constOF (DisjointLeibnizSet PosSet)⟩
+  | 3 => ⟨AuthURF (constOF Credit)⟩
+  | 4 => ⟨constOF (Auth LiveCredit)⟩
+  | 5 => ⟨constOF (SpecHeap ℝ)⟩
+  | 6 => ⟨constOF SpecTapes⟩
+  | _ => ⟨constOF Unit⟩
 
 instance : WsatGpreS liveGF where
   inv := { τ := 0, transp := by unfold liveGF; rfl }

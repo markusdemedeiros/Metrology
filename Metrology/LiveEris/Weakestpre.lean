@@ -4,6 +4,8 @@ public import Metrology.LiveEris.GS
 
 @[expose] public section
 
+local stepindex Nat
+
 noncomputable section
 
 /-!
@@ -116,11 +118,11 @@ instance wpInner_contractive {Q : State rT → State rT → Prop} :
     cases e'.toVal? with
     | some v => exact .of_eq rfl
     | none =>
-      refine BIFUpdate.ne.ne <| glm_ne fun ρ _ => or_ne.ne (.of_eq rfl) <|
+      refine FUpdNE.fupd_ne.ne <| glm_ne fun ρ _ => or_ne.ne (.of_eq rfl) <|
         sep_ne.ne (.of_eq rfl) ?_
       apply Contractive.distLater_dist
       intro m Hm
-      exact BIFUpdate.ne.ne <| sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <|
+      exact FUpdNE.fupd_ne.ne <| sep_ne.ne (.of_eq rfl) <| sep_ne.ne (.of_eq rfl) <|
         HW m Hm E' ρ.expr Φ
 
 /-- The LiveEris weakest precondition with progress predicate `Q`. -/
@@ -169,7 +171,7 @@ theorem lwp_ind {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
   let Ψ' : WpState rT → IProp GF := fun s => iprop(⌜s.1 = E⌝ -∗ Ψ s.2)
   let : NonExpansive Ψ' := nonExpansive_of_discrete_leibniz Ψ'
   ihave HΨ' : iprop(Ψ' ⟨E, e⟩) $$ [HW]
-  · iapply (least_fixpoint_iter (F := wpPre Q (lwp Q) Φ) (Φ := Ψ'))
+  · iapply (least_fixpoint_iter (SI := Nat) (F := wpPre Q (lwp Q) Φ) (Φ := Ψ'))
     · iintro !> %s HF
       obtain ⟨E', e'⟩ := s
       iintro %rfl

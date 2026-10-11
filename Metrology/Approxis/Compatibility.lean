@@ -9,6 +9,8 @@ public import Metrology.ProbLang.Syntax.LocallyClosed
 
 @[expose] public section
 
+local stepindex Nat
+
 set_option linter.discrete false
 
 /-! # Compatibility Lemmas -/

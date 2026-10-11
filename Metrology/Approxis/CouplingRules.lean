@@ -7,6 +7,8 @@ public import Metrology.ProbLang.Metatheory
 
 @[expose] public section
 
+local stepindex Nat
+
 set_option linter.discrete false
 
 /-! # Coupling Rules -/

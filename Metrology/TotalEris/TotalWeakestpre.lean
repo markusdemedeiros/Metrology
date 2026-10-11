@@ -7,6 +7,8 @@ public import Iris.ProofMode.InstancesUpdates
 
 @[expose] public section
 
+local stepindex Nat
+
 open Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 open scoped ENNReal
 
@@ -179,7 +181,7 @@ theorem tglWp_ind {E : CoPset} {e : Exp rT} {Φ : Val rT → IProp GF}
   let Q' : TglWpState rT → IProp GF := fun s => iprop(⌜s.1 = E⌝ -∗ Q s.2)
   let : NonExpansive Q' := nonExpansive_of_discrete_leibniz Q'
   ihave HQ' : iprop(Q' ⟨E, e⟩) $$ [HW]
-  · iapply (least_fixpoint_iter (F := tglWpPreFixed Φ) (Φ := Q'))
+  · iapply (least_fixpoint_iter (SI := Nat) (F := tglWpPreFixed Φ) (Φ := Q'))
     · iintro !> %s HF
       obtain ⟨E', e'⟩ := s
       iintro %rfl

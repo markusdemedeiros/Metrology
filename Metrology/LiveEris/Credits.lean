@@ -9,6 +9,8 @@ public import Metrology.Iris.Algebra
 
 @[expose] public section
 
+local stepindex Nat
+
 /-!
 # Error and divergence credits
 
@@ -38,52 +40,58 @@ instance : COFE (CreditBelow b) := COFE.ofDiscrete _
 instance : OFE.Discrete (CreditBelow b) := ⟨id⟩
 instance (x : CreditBelow b) : OFE.DiscreteE x := ⟨OFE.Discrete.discrete_0⟩
 
-instance : CMRA (CreditBelow b) where
+instance : RA (CreditBelow b) where
   pcore _ := some ⟨0⟩
   op x y := ⟨x.val + y.val⟩
+  assoc {_ _ _} := by ext; exact (add_assoc ..).symm
+  comm {_ _} := by ext; exact add_comm ..
+  pcore_op_left {_ _} := by rintro ⟨rfl⟩; ext; exact zero_add _
+  pcore_idem := by simp
+
+instance : CMRA (CreditBelow b) := ORA.ofCMRAData {
   ValidN _ x := x.val < b
   Valid x := x.val < b
   op_ne.ne _ _ _ h := by rw [h]
   pcore_ne _ := by rintro ⟨rfl⟩; exists ⟨0⟩
   validN_ne {_ _ _} := by rintro ⟨rfl⟩; exact id
   valid_iff_validN := .symm <| forall_const Nat
-  validN_succ := (·)
+  validN_le H _ := H
   validN_op_left {_ _ _} H := lt_of_le_of_lt le_self_add H
-  assoc {_ _ _} := by ext; exact (add_assoc ..).symm
-  comm {_ _} := by ext; exact add_comm ..
-  pcore_op_left {_ _} := by rintro ⟨rfl⟩; ext; exact zero_add _
-  pcore_idem := by simp
-  pcore_op_mono {_ _} := by rintro ⟨rfl⟩ _; exists ⟨0⟩; simp
-  extend _ h := ⟨_, _, OFE.discrete h, .rfl, .rfl⟩
+  pcore_op_mono {_ _} := by rintro ⟨rfl⟩ _; exact ⟨⟨0⟩, congrArg some (CreditBelow.ext (zero_add 0).symm)⟩
+  extend _ h := ⟨_, _, OFE.discrete h, .rfl, .rfl⟩ }
 
-instance : CMRA.Discrete (CreditBelow b) where
+instance : ORA.Discrete (CreditBelow b) where
   discrete_valid := id
+  discrete_ord := CMRA.ord_of_ord0
 
-instance [NeZero b] : UCMRA (CreditBelow b) where
+instance : URA (CreditBelow b) where
   unit := ⟨0⟩
-  unit_valid := pos_iff_ne_zero.mpr (NeZero.ne b)
   unit_left_id := by intro _; ext; exact zero_add _
   pcore_unit := rfl
+  total _ := ⟨⟨0⟩, rfl⟩
+
+instance [NeZero b] : UCMRA (CreditBelow b) := UORA.ofUCMRAData {
+  unit_valid := pos_iff_ne_zero.mpr (NeZero.ne b) }
 
 @[simp] theorem op_val (x y : CreditBelow b) : (x • y).val = x.val + y.val := rfl
 
-@[simp] theorem unit_val [NeZero b] : (UCMRA.unit : CreditBelow b).val = 0 := rfl
+@[simp] theorem unit_val [NeZero b] : (UnitOp.unit : CreditBelow b).val = 0 := rfl
 
 @[simp] theorem valid_iff (x : CreditBelow b) : ✓ x ↔ x.val < b := .rfl
 
-@[simp] theorem validN_iff {n} (x : CreditBelow b) : ✓{n} x ↔ x.val < b := .rfl
+@[simp] theorem validN_iff {n : Nat} (x : CreditBelow b) : ✓{n} x ↔ x.val < b := .rfl
 
 theorem included_iff {x y : CreditBelow b} : x ≼ y ↔ x.val ≤ y.val := by
   refine ⟨?_, fun h => ⟨⟨y.val - x.val⟩, CreditBelow.ext (add_tsub_cancel_of_le h).symm⟩⟩
   rintro ⟨z, rfl⟩
   exact le_self_add
 
-theorem includedN_iff {n} {x y : CreditBelow b} : x ≼{n} y ↔ x.val ≤ y.val :=
+theorem includedN_iff {n : Nat} {x y : CreditBelow b} : x ≼{n} y ↔ x.val ≤ y.val :=
   included_iff
 
 theorem localUpdate {x₁ x₂ x₁' x₂' : CreditBelow b} (h1 : x₂'.val ≤ x₂.val)
     (h2 : x₁.val + x₂'.val = x₁'.val + x₂.val) : (x₁, x₂) ~l~> (x₁', x₂') := by
-  rintro n (_ | z) <;> simp only [OFE.Dist, CMRA.op?, validN_iff]
+  rintro n (_ | z) <;> simp only [OFE.Dist, HasDist.dist, Op.op?, validN_iff]
   · rintro H rfl
     have hx : x₂'.val = x₁'.val := (ENNReal.add_right_inj H.ne_top).mp (h2.trans (add_comm _ _))
     exact ⟨hx ▸ lt_of_le_of_lt h1 H, CreditBelow.ext hx.symm⟩
@@ -116,14 +124,17 @@ theorem credits_included {ε₁ δ₁ ε₂ δ₂ : ℝ≥0∞} :
     credits ε₁ δ₁ ≼ credits ε₂ δ₂ ↔ ε₁ ≤ ε₂ ∧ δ₁ ≤ δ₂ :=
   Prod.inc_def.trans (and_congr CreditBelow.included_iff CreditBelow.included_iff)
 
-theorem credits_includedN {n} {ε₁ δ₁ ε₂ δ₂ : ℝ≥0∞} :
+theorem credits_includedN {n : Nat} {ε₁ δ₁ ε₂ δ₂ : ℝ≥0∞} :
     credits ε₁ δ₁ ≼{n} credits ε₂ δ₂ ↔ ε₁ ≤ ε₂ ∧ δ₁ ≤ δ₂ :=
   Prod.incN_def.trans (and_congr CreditBelow.includedN_iff CreditBelow.includedN_iff)
 
-theorem credits_unit : (UCMRA.unit : LiveCredit) = credits 0 0 := rfl
+theorem credits_unit : (UnitOp.unit : LiveCredit) = credits 0 0 := rfl
+
+instance : Iris.IsRAUnit (◯ credits 0 0 : Auth LiveCredit) :=
+  inferInstanceAs (Iris.IsRAUnit (UnitOp.unit : Auth LiveCredit))
 
 instance : Iris.IsUnit (◯ credits 0 0 : Auth LiveCredit) :=
-  inferInstanceAs (Iris.IsUnit (UCMRA.unit : Auth LiveCredit))
+  inferInstanceAs (Iris.IsUnit (UnitOp.unit : Auth LiveCredit))
 
 class LCPreGS (GF : BundledGFunctors) where
   lc : ElemG GF (constOF (Auth LiveCredit))
@@ -146,7 +157,7 @@ def creditFrag (ε δ : ℝ≥0∞) : IProp GF := iOwn (E := ILC.lc) ILC.γlc (�
 scoped notation "↯ " r:50 => creditFrag r 0
 scoped notation "↻ " r:50 => creditFrag 0 r
 
-instance : CMRA.Discrete (Auth LiveCredit) := by infer_instance
+instance : ORA.Discrete (Auth LiveCredit) := by infer_instance
 instance : OFE.DiscreteE (◯ r : Auth LiveCredit) := Auth.frag_discrete
 
 instance creditFrag_timeless (ε δ : ℝ≥0∞) : BI.Timeless (creditFrag ε δ : IProp GF) :=

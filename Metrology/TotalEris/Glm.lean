@@ -15,6 +15,8 @@ public import Iris.ProofMode.InstancesUpdates
 
 @[expose] public section
 
+local stepindex Nat
+
 open Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang
 open scoped ENNReal
 
@@ -242,7 +244,7 @@ theorem glm'_strong_mono
     (∀ ρ ε', Z₁ ρ ε' -∗ Z₂ ρ ε') -∗ bi_least_fixpoint (glmPre' Z₂) s)
   let : NonExpansive Ψ := nonExpansive_of_discrete_leibniz Ψ
   ihave HΨ : iprop(Ψ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
-  · iapply (least_fixpoint_iter (F := glmPre' Z₁))
+  · iapply (least_fixpoint_iter (SI := Nat) (F := glmPre' Z₁))
     · iintro !> %s HF Hwand
       iapply least_fixpoint_unfold_mpr (glmPre' Z₂)
       obtain ⟨ρ, ε⟩ := s
@@ -336,7 +338,7 @@ theorem glm'_bind
     fun s => bi_least_fixpoint (glmPre' Z) ((⟨K.fill s.1.expr, s.1.state⟩, s.2) : GlmState rT)
   let : NonExpansive Φ := nonExpansive_of_discrete_leibniz Φ
   ihave HΦ : iprop(Φ ((⟨e, σ⟩, ε) : GlmState rT)) $$ [HG]
-  · iapply (least_fixpoint_iter (F := glmPre' Z'))
+  · iapply (least_fixpoint_iter (SI := Nat) (F := glmPre' Z'))
     · iintro !> %s HF
       obtain ⟨ρ, ε'⟩ := s
       iapply least_fixpoint_unfold_mpr (glmPre' Z)

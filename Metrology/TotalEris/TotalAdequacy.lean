@@ -6,6 +6,8 @@ public import Metrology.ProbLang.Erasure
 
 @[expose] public section
 
+local stepindex Nat
+
 /-!
 # Total adequacy
 
@@ -485,7 +487,7 @@ theorem twp_tgl_value [AppPreGS rT GF] [ECPreGS GF] [InvGpreS GF]
   ihave Hwp' := Hwp $$ HecFrag
   imod ErisWpGS.tglWp_value_inv_with_state (E := ⊤) (v := v) (σ := σ) (ε := ε)
     (Φ := fun v => iprop(⌜φ v⌝)) $$ [$Hwp' $HappAuth $HecAuth] with ⟨_, _, %hφ⟩
-  simp only [Nat.repeat]
+  simp only [step_fupdN]
   imod (BIFUpdate.subset (E1 := ⊤) (E2 := ∅) Std.LawfulSet.empty_subset) with _
   imodintro; ipureintro
   exact hφ

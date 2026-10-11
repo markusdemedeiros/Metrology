@@ -8,6 +8,8 @@ public import Metrology.ProbLang.Syntax.Types
 
 @[expose] public section
 
+local stepindex Nat
+
 /-! # Type Interpretation -/
 
 open Std Iris Iris.Std Iris.BI Iris.ProofMode OFE COFE ProbLang ProbLang.ApproxisWpGS

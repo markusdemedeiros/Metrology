@@ -4,6 +4,8 @@ public import Iris.BI.Lib.Fixpoint
 
 @[expose] public section
 
+local stepindex Nat
+
 /-!
 # Shared `bi_least_fixpoint` utilities
 
@@ -18,7 +20,7 @@ open Iris Iris.BI OFE
 Used in both `Metrology/Approxis/AppWeakestpre.lean` and
 `Metrology/TotalEris/Weakestpre.lean` to discharge the contractivity
 side-condition when fixing the post-functor `Φ` as an outer parameter. -/
-theorem least_fixpoint_ne_outer {PROP : Type _} [BI PROP] {A : Type _} [OFE A]
+theorem least_fixpoint_ne_outer {PROP : Type _} [BI PROP] [BIStepIndexed PROP] {A : Type _} [OFE A]
     {F1 F2 : (A → PROP) → (A → PROP)} {n : Nat} (HF : ∀ Φ x, F1 Φ x ≡{n}≡ F2 Φ x)
     {x1 x2 : A} (Hx : x1 ≡{n}≡ x2) : bi_least_fixpoint F1 x1 ≡{n}≡ bi_least_fixpoint F2 x2 := by
   refine forall_ne fun Φ => ?_
